@@ -86,28 +86,29 @@ struct MaterialColorAnchors {
     QColor border;
 };
 
+// Xenon's neutrals lean slightly warm, toward its rose accent, where Ladybird's lean cool.
 static MaterialColorAnchors material_color_anchors(bool dark)
 {
     if (dark) {
         return {
-            .tab_strip = QColor(33, 36, 42),
-            .background = QColor(13, 15, 18),
-            .surface = QColor(34, 36, 40),
-            .recessed = QColor(55, 58, 63),
-            .hover = QColor(57, 61, 66),
-            .pressed = QColor(70, 74, 80),
-            .border = QColor(150, 155, 162),
+            .tab_strip = QColor(38, 34, 37),
+            .background = QColor(16, 14, 16),
+            .surface = QColor(38, 35, 37),
+            .recessed = QColor(60, 56, 59),
+            .hover = QColor(63, 58, 61),
+            .pressed = QColor(77, 71, 75),
+            .border = QColor(160, 152, 156),
         };
     }
 
     return {
-        .tab_strip = QColor(195, 197, 204),
-        .background = QColor(242, 243, 246),
+        .tab_strip = QColor(204, 199, 202),
+        .background = QColor(246, 244, 245),
         .surface = QColor(255, 255, 255),
-        .recessed = QColor(150, 150, 152),
-        .hover = QColor(229, 229, 230),
-        .pressed = QColor(219, 220, 221),
-        .border = QColor(95, 96, 98),
+        .recessed = QColor(152, 148, 150),
+        .hover = QColor(231, 228, 229),
+        .pressed = QColor(221, 217, 219),
+        .border = QColor(98, 94, 96),
     };
 }
 
@@ -140,9 +141,10 @@ QColor chrome_tab_strip_background(QPalette const& palette, WindowActivity activ
     return color;
 }
 
-// In dark mode, the chrome is lifted from near black toward a cool slate rather than a plain gray.
-static constexpr QColor dark_chrome_base { 17, 20, 25 };
-static constexpr QColor dark_chrome_tint { 150, 165, 180 };
+// In dark mode, the chrome is lifted from near black toward a warm gray, which sits better beside Xenon's rose accent
+// than a cool slate would.
+static constexpr QColor dark_chrome_base { 20, 18, 20 };
+static constexpr QColor dark_chrome_tint { 172, 162, 166 };
 
 QColor chrome_background(QPalette const& palette)
 {
@@ -236,12 +238,12 @@ QColor chrome_window_outline(QPalette const& palette)
 
 QColor chrome_accent()
 {
-    return BrandColors::Violet100;
+    return BrandColors::Rose100;
 }
 
 static QColor chrome_text_highlight()
 {
-    return BrandColors::SlateBlue900;
+    return BrandColors::Rose500;
 }
 
 QColor chrome_text(QPalette const& palette)
@@ -391,8 +393,8 @@ QString toolbar_container_style_sheet(QPalette const& palette)
     auto disabled_text = style_sheet_color(chrome_muted_text(palette));
     auto close_hover = style_sheet_color(chrome_destructive_hover());
     auto close_text = style_sheet_color(chrome_destructive_text());
-    auto badge_surface_color = QColor(dark ? BrandColors::Indigo900 : BrandColors::Violet10);
-    auto badge_border_color = QColor(dark ? BrandColors::Violet50 : BrandColors::Indigo60);
+    auto badge_surface_color = QColor(dark ? BrandColors::Rose950 : BrandColors::Rose10);
+    auto badge_border_color = QColor(dark ? BrandColors::Rose40 : BrandColors::Rose500);
     auto badge_surface = style_sheet_color(badge_surface_color);
     auto badge_border = style_sheet_color(badge_border_color);
     auto badge_surface_hover = style_sheet_color(mix(badge_surface_color, badge_border_color, dark ? 0.28 : 0.22));
@@ -1516,8 +1518,8 @@ QString message_popover_style_sheet(QPalette const& palette)
 
     auto accent = ChromeStyle::chrome_accent();
     auto accent_color = ChromeStyle::style_sheet_color(accent);
-    auto accent_hover = style_sheet_color(BrandColors::Violet500);
-    auto accent_pressed = style_sheet_color(BrandColors::Violet900);
+    auto accent_hover = style_sheet_color(BrandColors::Rose300);
+    auto accent_pressed = style_sheet_color(BrandColors::Rose500);
 
     return qformatted(R"(
 QFrame#LadybirdMessagePopover {{

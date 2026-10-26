@@ -166,6 +166,22 @@ add_dependencies(xenon ${ladybird_helper_processes})
 # NB: Ladybird's resource lists are variables of its UI directory, which don't reach this one.
 include("${LADYBIRD_SOURCE_DIR}/UI/cmake/ResourceFiles.cmake")
 
+# Xenon ships its own versions of some of Ladybird's internal pages, which take the place of upstream's in the bundle.
+set(XENON_ABOUT_PAGE_OVERRIDES
+    webui.css
+    welcome.css
+    welcome.html
+    welcome.js
+)
+foreach (page IN LISTS XENON_ABOUT_PAGE_OVERRIDES)
+    list(FIND ABOUT_PAGES "${LADYBIRD_SOURCE_DIR}/Base/res/ladybird/about-pages/${page}" index)
+    if (index EQUAL -1)
+        message(FATAL_ERROR "Xenon overrides about-pages/${page}, which Ladybird no longer ships. Check upstream's changes.")
+    endif()
+    list(REMOVE_AT ABOUT_PAGES ${index})
+    list(INSERT ABOUT_PAGES ${index} "${XENON_UI_DIR}/Resources/about-pages/${page}")
+endforeach()
+
 if (APPLE)
     # NB: Ladybird sets this in its UI/CMakeLists.txt, whose variables don't reach this directory either.
     if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")

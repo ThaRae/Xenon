@@ -10,6 +10,7 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 | --- | --- |
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good commit. It isn't modified. |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
+| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (the welcome page and the shared web UI stylesheet). The build bundles these in place of upstream's copies, which stay untouched. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 
@@ -72,6 +73,10 @@ What exists now and what's planned, measured against Helium:
 - [x] **!bangs**: `!w ladybird` or `ladybird !w` goes straight to Wikipedia's results, and `!gh` alone opens GitHub.
   They resolve locally, with no request to a search engine. There's a built-in list of common bangs in
   `UI/Bangs.cpp`.
+- [x] **Welcome/setup flow**: on first run (or any time at `about:welcome`), either take Xenon's picks (DuckDuckGo, with
+  blocking on) or answer two questions: which search engine, from a private/mainstream list with a live preview of
+  where a search goes, and whether to block ads and trackers (on by default, with all three filter lists). Nothing is
+  saved until you finish.
 - [x] **Quick link copy**: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> copies the current page's URL.
   (DevTools stays on <kbd>⌘</kbd><kbd>⇧</kbd><kbd>I</kbd> and <kbd>F12</kbd>.)
 - [x] **Content blocking** (from Ladybird, though it's off until you turn it on in settings).
@@ -84,7 +89,10 @@ What exists now and what's planned, measured against Helium:
 - [ ] Tab groups
 - [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed
 - [ ] A separate profile directory (LibWebView currently hardcodes `Ladybird` in profile paths)
-- [ ] Xenon's own palette and app icon (the app still uses Ladybird's icon)
+- [x] Xenon's own palette, built around **#ff0050** (`UI/BrandColors.h` for the chrome, `UI/Resources/about-pages/webui.css`
+  for the internal pages)
+- [ ] Xenon's own app icon (the app still uses Ladybird's)
+- [ ] uBlock Origin's filter set for Ladybird's content blocker (being built in a separate repo, `xenon-ublock`)
 
 Helium features that depend on Chromium, like Chrome Web Store extensions and web app installs, are out of scope
 until Ladybird supports them.

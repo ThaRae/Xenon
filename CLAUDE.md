@@ -7,8 +7,11 @@ and the feature checklist.
 
 - Don't edit `ladybird/`. It's a pinned, unmodified submodule. Engine-side changes need a different approach, like a
   patch series applied at build time, so raise that before doing it.
-- Port Helium's features, not its look. Xenon has its own palette, so don't retheme `UI/ChromeStyle.cpp` to match
-  Helium.
+- Port Helium's features, not its look. Xenon has its own palette with a **#ff0050** accent: a rose scale in
+  `UI/BrandColors.h` for the Qt chrome, and `--xenon-rose*` variables in `UI/Resources/about-pages/webui.css` for the
+  internal pages. Use those rather than Ladybird's violet/indigo, and don't retheme anything to match Helium.
+- To change one of Ladybird's internal pages, put Xenon's version in `UI/Resources/about-pages/` and add it to
+  `XENON_ABOUT_PAGE_OVERRIDES` in `UI/Xenon.cmake`. Never edit the copy in `ladybird/Base/res`.
 - `UI/` started as a copy of `ladybird/UI/Qt`. Keep upstream's structure, naming, comment style, and the `Ladybird`
   namespace, so upstream changes still merge cleanly. Put Xenon-only features in their own files (`Bangs.cpp`,
   `XenonSettings.cpp`) where possible, and keep edits to copied files small.
