@@ -39,6 +39,7 @@ set(XENON_SOURCES
     CrashReportNotifier.cpp
     CrashReportReviewWidget.cpp
     DevToolsBanner.cpp
+    ElementPicker.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
     Extensions/Alarms.cpp
@@ -268,6 +269,11 @@ copy_resources_to_build("${xenon_resource_dir}" xenon)
 # UI/FilterLists.cpp hands the lists to the browser at startup; the notice and license travel with them.
 file(GLOB XENON_FILTER_LISTS CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/lists/*.txt")
 copy_resource_set(xenon/filter-lists/lists RESOURCES ${XENON_FILTER_LISTS} DESTINATION "${xenon_resource_dir}" TARGET xenon)
+# uBlock Origin's own lists, which Xenon passes as trusted, and uBlock Origin's scriptlets and redirect surrogates.
+file(GLOB XENON_TRUSTED_FILTER_LISTS CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/trusted-lists/*.txt")
+copy_resource_set(xenon/filter-lists/trusted-lists RESOURCES ${XENON_TRUSTED_FILTER_LISTS} DESTINATION "${xenon_resource_dir}" TARGET xenon)
+file(GLOB XENON_FILTER_LIST_RESOURCES CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/resources/*")
+copy_resource_set(xenon/filter-lists/resources RESOURCES ${XENON_FILTER_LIST_RESOURCES} DESTINATION "${xenon_resource_dir}" TARGET xenon)
 copy_resource_set(xenon/filter-lists
     RESOURCES
         "${XENON_UI_DIR}/Resources/filter-lists/LICENSE-GPL-3.0.txt"

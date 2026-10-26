@@ -192,7 +192,11 @@ def check_filter_lists(checks: Checks):
 
     manifest = json.loads(manifest_path.read_text())
     listed = {entry["file"] for entry in manifest["lists"]}
-    present = {f"lists/{path.name}" for path in (directory / "lists").glob("*.txt")}
+    present = {
+        f"{subdirectory}/{path.name}"
+        for subdirectory in ("lists", "trusted-lists")
+        for path in (directory / subdirectory).glob("*.txt")
+    }
     for file in sorted(listed - present):
         checks.fail("filter lists", f"the manifest names {file}, which is missing")
     for file in sorted(present - listed):
@@ -205,6 +209,8 @@ def check_filter_lists(checks: Checks):
             checks.fail(
                 "filter lists", f"{entry['id']} ships although it's excluded: {manifest['excluded'][entry['id']]}"
             )
+    if "resources" in manifest and not (directory / manifest["resources"]["file"]).exists():
+        checks.fail("filter lists", f"{manifest['resources']['file']} is missing; run Meta/update-filter-lists.py")
     for name in ("NOTICE.txt", "LICENSE-GPL-3.0.txt"):
         if not (directory / name).exists():
             checks.fail("filter lists", f"UI/Resources/filter-lists/{name} is missing; the lists' licenses require it")

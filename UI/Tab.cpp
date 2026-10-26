@@ -23,6 +23,7 @@
 #include <UI/ChromeStyle.h>
 #include <UI/ContentBlockingButton.h>
 #include <UI/ContentBlockingPopover.h>
+#include <UI/ElementPicker.h>
 #include <UI/Extensions/Toolbar.h>
 #include <UI/Icon.h>
 #include <UI/JavaScriptDialog.h>
@@ -854,6 +855,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     m_content_blocking_button->setToolTip("Ad Block");
     QObject::connect(m_content_blocking_button, &QToolButton::clicked, this, [this] { show_content_blocking_popover(); });
     view().on_content_blocking_change = [this](auto const& snapshot) { update_content_blocking_controls(snapshot); };
+    view().on_element_picker_filter = [this](auto const& filter) { ElementPicker::confirm_filter(*this, filter); };
     update_content_blocking_controls(view().content_blocking_snapshot());
     content_blocker_count_visibility_changed();
 
