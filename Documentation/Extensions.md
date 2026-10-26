@@ -399,6 +399,10 @@ for Bitwarden in Chrome.
   - `webNavigation.getFrame` and `getAllFrames` for a tab's top frame. Stubs, so Bitwarden's background gets the
     objects it uses without checking: `webNavigation` events, `scripting`, `webRequest` events, and `notifications`.
   - Fetching from the hosts in `host_permissions` without CORS (patch 3).
+  - Optional permissions: `permissions.request()` asks with Chrome's warnings, over the popup when it asks from there,
+    and needs a user gesture; granted ones last across sessions and reach open contexts at once, with `onAdded`;
+    `permissions.remove()` takes them back. `chrome.privacy.services` password and autofill settings, which only
+    record which extension controls them, since Xenon has neither of its own.
   - The Extensions dialog: load unpacked (remembered in the profile), reload, and remove (which deletes the
     extension's storage). Toolbars and shortcuts follow it.
   - `Meta/xenon.py test` runs the test page twice in one profile. It checks that the background answers messages and
@@ -413,7 +417,8 @@ for Bitwarden in Chrome.
     So do `scripting.executeScript`, `insertCSS`, and `removeCSS`; registered content scripts never run;
     `webNavigation` events never fire.
   - `webRequest` events never fire, and notifications are never shown (milestone 4).
-  - `permissions.request` answers `false`: optional permissions need a prompt. `idle` always reports `active`.
+  - Optional host permissions (`origins` in `permissions.request`). `idle` always reports `active`.
+  - The permission prompt has only been built, not clicked: headless tests have no user gestures.
   - `tabs.captureVisibleTab` and `action.setIcon` with `imageData` fail. `tabs.onDetached`, `onMoved`, `onReplaced`,
     and `onHighlighted`, and `permissions.onAdded` and `onRemoved`, exist but never fire.
   - A background page whose process crashes isn't restarted until the extension is reloaded.
@@ -424,7 +429,8 @@ for Bitwarden in Chrome.
     page at its preferred size instead.
   - Nothing has clicked through the popup, the Extensions dialog, or a command shortcut yet: no test drives the Qt
     side, and they've only been built and seen in the toolbar.
-  - Logging in to Bitwarden hasn't been tried, nor has its popup been opened from the toolbar.
+  - Bitwarden logs in and works from its popup (tried by hand). Making it the default password manager needed the
+    optional `privacy` permission, which the prompt now grants; that path hasn't been tried by hand yet.
 - [ ] Milestone 3: content scripts
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] Milestone 5: installing from the store
