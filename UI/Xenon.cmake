@@ -41,6 +41,8 @@ set(XENON_SOURCES
     DevToolsBanner.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
+    Extensions/Alarms.cpp
+    Extensions/Browser.cpp
     Extensions/Extension.cpp
     Extensions/Locales.cpp
     Extensions/Manifest.cpp
@@ -151,10 +153,13 @@ endif()
 list(TRANSFORM XENON_SOURCES PREPEND "${XENON_UI_DIR}/")
 list(TRANSFORM XENON_ARC_SOURCES PREPEND "${XENON_UI_DIR}/")
 
-# The chrome.* API that extension pages get (see UI/Extensions/Router.cpp), built into the browser.
+# The chrome.* API that extension contexts get, and the scripts that run the background worker (see
+# UI/Extensions/Router.cpp), built into the browser.
 set(XENON_GENERATED_DIR "${CMAKE_BINARY_DIR}/Xenon")
 embed_as_string(xenon_chrome_api "${XENON_UI_DIR}/Resources/extensions/chrome-api.js" "${XENON_GENERATED_DIR}/ChromeAPI.cpp" chrome_api_source NAMESPACE "Ladybird::Extensions")
-list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp")
+embed_as_string(xenon_background_page "${XENON_UI_DIR}/Resources/extensions/background-page.js" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" background_page_source NAMESPACE "Ladybird::Extensions")
+embed_as_string(xenon_worker_bridge "${XENON_UI_DIR}/Resources/extensions/worker-bridge.js" "${XENON_GENERATED_DIR}/WorkerBridge.cpp" worker_bridge_source NAMESPACE "Ladybird::Extensions")
+list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" "${XENON_GENERATED_DIR}/WorkerBridge.cpp")
 
 # NB: Qt finalizes executables in a deferred call by default, and we are already running deferred, so finalize by hand.
 qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})

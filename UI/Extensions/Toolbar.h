@@ -14,39 +14,59 @@
 #include <QToolButton>
 #include <QWidget>
 
+class QHBoxLayout;
+
+namespace Ladybird {
+
+class Tab;
+
+}
+
 namespace Ladybird::Extensions {
 
 class ActionPopup;
 
-// An extension's toolbar button: its action's icon and title, opening its popup.
+// An extension's toolbar button: its action's icon, title, and badge in this tab, opening its popup.
 class ActionButton final : public QToolButton {
 public:
     AK_ALLOC_WITH_KMALLOC;
 
-    ActionButton(QWidget* parent, QWidget& popup_parent, NonnullRefPtr<Extension>);
+    ActionButton(QWidget* parent, Tab&, NonnullRefPtr<Extension>);
 
     Extension const& extension() const { return *m_extension; }
 
+    void update_appearance();
+    void open_popup();
+
 private:
     virtual QSize sizeHint() const override { return { 34, 34 }; }
+    virtual void paintEvent(QPaintEvent*) override;
 
-    void toggle_popup();
+    void clicked();
 
-    QWidget& m_popup_parent;
+    Tab& m_tab;
     NonnullRefPtr<Extension> m_extension;
     QPointer<ActionPopup> m_popup;
+    QString m_badge_text;
+    QColor m_badge_background_color;
+    Optional<QColor> m_badge_text_color;
 };
 
-// The buttons of every loaded extension that has an action, for a tab's toolbar.
+// The buttons of every loaded extension that has an action, in a tab's toolbar.
 class ActionToolbar final : public QWidget {
 public:
     AK_ALLOC_WITH_KMALLOC;
 
-    // Popups open as children of popup_parent (the tab), as the toolbar's other popovers do.
-    ActionToolbar(QWidget* parent, QWidget& popup_parent);
+    ActionToolbar(QWidget* parent, Tab&);
+
+    Tab& tab() const { return m_tab; }
+    ActionButton* button_for(Extension const&) const;
 
 private:
-    QWidget& m_popup_parent;
+    void rebuild();
+
+    Tab& m_tab;
+    QHBoxLayout* m_layout { nullptr };
 };
 
 }

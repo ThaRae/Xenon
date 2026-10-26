@@ -1,9 +1,9 @@
-// The chrome.* API of Xenon's extension pages.
+// The chrome.* API of Xenon's extension pages and background workers.
 //
-// This runs before an extension page's own scripts, as the body of a function given `bridge`, the page's channel to
-// Xenon's UI process (bridge.postMessage(string) and bridge.onmessage), and `config`, what the page needs to answer
-// synchronously: the extension's ID, manifest, and messages. Everything else is a call to the UI process, which knows
-// which extension and page sent it and checks what that extension may do.
+// This runs before an extension's own scripts, given `bridge`, the context's channel to Xenon's UI process
+// (bridge.postMessage(string) and bridge.onmessage), and `config`, what it needs to answer synchronously: the
+// extension's ID, manifest, and messages, and what kind of context this is. Everything else is a call to the UI
+// process, which knows which extension and context sent it and checks what that extension may do.
 //
 // https://developer.chrome.com/docs/extensions/reference/api
 
@@ -11,6 +11,9 @@
 
 const pendingCalls = new Map();
 let nextCallId = 1;
+
+// Events the UI process sends, by name ("alarms.onAlarm").
+const events = new Map();
 
 function post(message) {
     bridge.postMessage(JSON.stringify(message));
@@ -72,6 +75,17 @@ function api(operation) {
     return (...args) => promiseOrCallback(args, operation);
 }
 
+// Extension messages and API arguments travel as JSON, as Chrome sends messages.
+function toJSON(value) {
+    const json = JSON.stringify(value);
+    return json === undefined ? null : JSON.parse(json);
+}
+
+// A method the UI process answers, with the arguments it was given.
+function method(name, transform = result => result) {
+    return api((...args) => call(name, args.map(toJSON)).then(transform));
+}
+
 class ExtensionEvent {
     #listeners = [];
 
@@ -105,15 +119,56 @@ class ExtensionEvent {
     }
 }
 
-// Extension messages travel as JSON, as Chrome sends them.
-function toJSON(value) {
-    const json = JSON.stringify(value);
-    return json === undefined ? null : JSON.parse(json);
+function event(name) {
+    const extensionEvent = new ExtensionEvent();
+    events.set(name, extensionEvent);
+    return extensionEvent;
 }
+
+const hasPermission = permission => config.permissions.includes(permission);
 
 // --- chrome.runtime ----------------------------------------------------------------------------------------------------
 
-const runtimeOnMessage = new ExtensionEvent();
+// A long-lived connection between two contexts of the extension (runtime.connect and runtime.onConnect).
+const ports = new Map();
+
+class Port {
+    #id;
+    #disconnected = false;
+
+    constructor(id, name, sender) {
+        this.#id = id;
+        this.name = name;
+        if (sender) this.sender = sender;
+        this.onMessage = new ExtensionEvent();
+        this.onDisconnect = new ExtensionEvent();
+        ports.set(id, this);
+    }
+
+    postMessage(message) {
+        if (this.#disconnected) throw new ExtensionError("Attempting to use a disconnected port object");
+        post({ type: "port-message", port: this.#id, message: toJSON(message) });
+    }
+
+    disconnect() {
+        if (this.#disconnected) return;
+        this.#disconnected = true;
+        ports.delete(this.#id);
+        post({ type: "port-disconnect", port: this.#id });
+    }
+
+    // The other end went away, or never came.
+    closeFromUIProcess(error) {
+        if (this.#disconnected) return;
+        this.#disconnected = true;
+        ports.delete(this.#id);
+        if (error) withLastError(new ExtensionError(error), () => this.onDisconnect.dispatch(this));
+        else this.onDisconnect.dispatch(this);
+    }
+}
+
+const runtimeOnMessage = event("runtime.onMessage");
+const runtimeOnConnect = event("runtime.onConnect");
 
 const runtime = {
     id: config.id,
@@ -168,26 +223,55 @@ const runtime = {
         return undefined;
     },
 
+    connect(...args) {
+        // connect(extensionId?, connectInfo?)
+        const extensionId = typeof args[0] === "string" ? args.shift() : undefined;
+        const name = args[0]?.name ?? "";
+        const id = crypto.randomUUID();
+        const port = new Port(id, String(name));
+        if (extensionId !== undefined && extensionId !== config.id)
+            queueMicrotask(() => port.closeFromUIProcess("Messaging other extensions isn't supported yet."));
+        else post({ type: "connect", port: id, name: String(name) });
+        return port;
+    },
+
     onMessage: runtimeOnMessage,
-    onMessageExternal: new ExtensionEvent(),
-    onConnect: new ExtensionEvent(),
-    onConnectExternal: new ExtensionEvent(),
-    onInstalled: new ExtensionEvent(),
-    onStartup: new ExtensionEvent(),
-    onSuspend: new ExtensionEvent(),
-    onUpdateAvailable: new ExtensionEvent(),
+    onConnect: runtimeOnConnect,
+    onMessageExternal: event("runtime.onMessageExternal"),
+    onConnectExternal: event("runtime.onConnectExternal"),
+    onInstalled: event("runtime.onInstalled"),
+    onStartup: event("runtime.onStartup"),
+    onSuspend: event("runtime.onSuspend"),
+    onUpdateAvailable: event("runtime.onUpdateAvailable"),
+
+    getContexts: method("runtime.getContexts"),
+    openOptionsPage: method("runtime.openOptionsPage"),
+    setUninstallURL: method("runtime.setUninstallURL"),
+    requestUpdateCheck: api(() => ({ status: "no_update" })),
 
     reload() {
         post({ type: "call", id: nextCallId++, name: "runtime.reload", args: [] });
     },
 
-    openOptionsPage: api(() => call("runtime.openOptionsPage")),
-    setUninstallURL: api(() => undefined),
+    ContextType: {
+        TAB: "TAB",
+        POPUP: "POPUP",
+        BACKGROUND: "BACKGROUND",
+        OFFSCREEN_DOCUMENT: "OFFSCREEN_DOCUMENT",
+        SIDE_PANEL: "SIDE_PANEL",
+        DEVELOPER_TOOLS: "DEVELOPER_TOOLS",
+    },
+    OnInstalledReason: {
+        INSTALL: "install",
+        UPDATE: "update",
+        CHROME_UPDATE: "chrome_update",
+        SHARED_MODULE_UPDATE: "shared_module_update",
+    },
 };
 
 // --- chrome.storage ----------------------------------------------------------------------------------------------------
 
-const storageOnChanged = new ExtensionEvent();
+const storageOnChanged = event("storage.onChanged");
 const storageAreas = {};
 
 class StorageArea {
@@ -276,6 +360,157 @@ const i18n = {
     detectLanguage: api(() => ({ isReliable: false, languages: [] })),
 };
 
+// --- chrome.alarms -----------------------------------------------------------------------------------------------------
+
+const alarms = {
+    create: api((...args) => {
+        // create(name?, alarmInfo)
+        const name = typeof args[0] === "string" ? args.shift() : "";
+        return call("alarms.create", [name, toJSON(args[0] ?? {})]).then(() => undefined);
+    }),
+    get: api(name => call("alarms.get", [name ?? ""])),
+    getAll: method("alarms.getAll"),
+    clear: api(name => call("alarms.clear", [name ?? ""])),
+    clearAll: method("alarms.clearAll"),
+    onAlarm: event("alarms.onAlarm"),
+};
+
+// --- chrome.action -----------------------------------------------------------------------------------------------------
+
+const action = {
+    setBadgeText: method("action.setBadgeText"),
+    getBadgeText: method("action.getBadgeText"),
+    setBadgeBackgroundColor: method("action.setBadgeBackgroundColor"),
+    getBadgeBackgroundColor: method("action.getBadgeBackgroundColor"),
+    setBadgeTextColor: method("action.setBadgeTextColor"),
+    getBadgeTextColor: method("action.getBadgeTextColor"),
+    setTitle: method("action.setTitle"),
+    getTitle: method("action.getTitle"),
+    setIcon: api(details => {
+        // FIXME: Icons drawn as ImageData, which can't travel as JSON.
+        if (details?.imageData && !details.path)
+            throw new ExtensionError("action.setIcon() takes only a path for now.");
+        return call("action.setIcon", [toJSON({ ...details, imageData: undefined })]);
+    }),
+    setPopup: method("action.setPopup"),
+    getPopup: method("action.getPopup"),
+    enable: method("action.enable"),
+    disable: method("action.disable"),
+    isEnabled: method("action.isEnabled"),
+    openPopup: method("action.openPopup"),
+    getUserSettings: api(() => ({ isOnToolbar: true })),
+    onClicked: event("action.onClicked"),
+};
+
+// --- chrome.tabs and chrome.windows ------------------------------------------------------------------------------------
+
+const tabs = {
+    query: method("tabs.query"),
+    get: method("tabs.get"),
+    getCurrent: method("tabs.getCurrent", tab => tab ?? undefined),
+    create: method("tabs.create"),
+    update: api((...args) => {
+        // update(tabId?, updateProperties)
+        const tabId = typeof args[0] === "number" ? args.shift() : null;
+        return call("tabs.update", [tabId, toJSON(args[0] ?? {})]);
+    }),
+    remove: api(tabIds => call("tabs.remove", [Array.isArray(tabIds) ? tabIds : [tabIds]]).then(() => undefined)),
+    reload: api((...args) => {
+        const tabId = typeof args[0] === "number" ? args.shift() : null;
+        return call("tabs.reload", [tabId]).then(() => undefined);
+    }),
+    duplicate: method("tabs.duplicate"),
+    // FIXME: Messages to tabs need content scripts, which come with milestone 3.
+    sendMessage: api(() => {
+        throw new ExtensionError("Could not establish connection. Receiving end does not exist.");
+    }),
+    captureVisibleTab: method("tabs.captureVisibleTab"),
+    onActivated: event("tabs.onActivated"),
+    onAttached: event("tabs.onAttached"),
+    onCreated: event("tabs.onCreated"),
+    onDetached: event("tabs.onDetached"),
+    onHighlighted: event("tabs.onHighlighted"),
+    onMoved: event("tabs.onMoved"),
+    onRemoved: event("tabs.onRemoved"),
+    onReplaced: event("tabs.onReplaced"),
+    onUpdated: event("tabs.onUpdated"),
+    TAB_ID_NONE: -1,
+};
+
+const windows = {
+    get: method("windows.get"),
+    getAll: method("windows.getAll"),
+    getCurrent: method("windows.getCurrent"),
+    getLastFocused: method("windows.getLastFocused"),
+    create: method("windows.create"),
+    update: method("windows.update"),
+    remove: api(windowId => call("windows.remove", [windowId]).then(() => undefined)),
+    onCreated: event("windows.onCreated"),
+    onRemoved: event("windows.onRemoved"),
+    onFocusChanged: event("windows.onFocusChanged"),
+    onBoundsChanged: event("windows.onBoundsChanged"),
+    WINDOW_ID_NONE: -1,
+    WINDOW_ID_CURRENT: -2,
+};
+
+// --- The rest ----------------------------------------------------------------------------------------------------------
+
+const permissions = {
+    contains: method("permissions.contains"),
+    getAll: method("permissions.getAll"),
+    request: method("permissions.request"),
+    remove: method("permissions.remove"),
+    onAdded: event("permissions.onAdded"),
+    onRemoved: event("permissions.onRemoved"),
+};
+
+const management = {
+    getSelf: method("management.getSelf"),
+};
+
+const idle = {
+    queryState: method("idle.queryState"),
+    setDetectionInterval: method("idle.setDetectionInterval"),
+    getAutoLockDelay: method("idle.getAutoLockDelay"),
+    onStateChanged: event("idle.onStateChanged"),
+};
+
+const offscreen = {
+    createDocument: method("offscreen.createDocument"),
+    closeDocument: method("offscreen.closeDocument"),
+    hasDocument: method("offscreen.hasDocument"),
+    Reason: Object.fromEntries(
+        [
+            "TESTING",
+            "AUDIO_PLAYBACK",
+            "IFRAME_SCRIPTING",
+            "DOM_SCRAPING",
+            "BLOBS",
+            "DOM_PARSER",
+            "USER_MEDIA",
+            "DISPLAY_MEDIA",
+            "WEB_RTC",
+            "CLIPBOARD",
+            "LOCAL_STORAGE",
+            "WORKERS",
+            "BATTERY_STATUS",
+            "MATCH_MEDIA",
+            "GEOLOCATION",
+        ].map(reason => [reason, reason])
+    ),
+};
+
+const commands = {
+    getAll: method("commands.getAll"),
+    onCommand: event("commands.onCommand"),
+};
+
+const extension = {
+    inIncognitoContext: false,
+    isAllowedIncognitoAccess: api(() => false),
+    isAllowedFileSchemeAccess: api(() => false),
+};
+
 // --- Messages from the UI process --------------------------------------------------------------------------------------
 
 function deliverMessage({ id, message, sender }) {
@@ -299,6 +534,16 @@ function deliverMessage({ id, message, sender }) {
     if (!responded && !keepsChannelOpen) post({ type: "response", id, handled: false });
 }
 
+function acceptConnection({ port: id, name, sender }) {
+    if (!runtimeOnConnect.hasListeners()) {
+        post({ type: "connected", port: id, accepted: false });
+        return;
+    }
+    const port = new Port(id, name, sender);
+    post({ type: "connected", port: id, accepted: true });
+    runtimeOnConnect.dispatch(port);
+}
+
 bridge.onmessage = text => {
     const message = JSON.parse(text);
     switch (message.type) {
@@ -313,12 +558,21 @@ bridge.onmessage = text => {
         case "message":
             deliverMessage(message);
             break;
+        case "connect":
+            acceptConnection(message);
+            break;
+        case "port-message":
+            ports.get(message.port)?.onMessage.dispatch(message.message, ports.get(message.port));
+            break;
+        case "port-disconnect":
+            ports.get(message.port)?.closeFromUIProcess(message.error);
+            break;
         case "event":
             if (message.name === "storage.onChanged") {
                 const [changes, areaName] = message.args;
                 storageAreas[areaName]?.onChanged.dispatch(changes);
-                storageOnChanged.dispatch(changes, areaName);
             }
+            events.get(message.name)?.dispatch(...message.args);
             break;
     }
 };
@@ -344,9 +598,29 @@ if (config.isPopup) {
     });
 }
 
+// A page that goes away says so, so that its ports close and messages stop waiting for it.
+if (typeof document !== "undefined") addEventListener("pagehide", () => post({ type: "closing" }));
+
+// The background worker's script runs right after this, and once it has, the UI process sends runtime.onInstalled or
+// runtime.onStartup (see /_generated_background_worker.js).
+if (config.isBackground) {
+    const ready = Symbol.for("xenon.background.ready");
+    Object.defineProperty(self, ready, {
+        configurable: true,
+        value() {
+            delete self[ready];
+            post({ type: "call", id: nextCallId++, name: "runtime.backgroundReady", args: [] });
+        },
+    });
+}
+
 // --- chrome ------------------------------------------------------------------------------------------------------------
 
-const chrome = { runtime, i18n };
-if (config.permissions.includes("storage")) chrome.storage = storage;
+const chrome = { runtime, i18n, tabs, windows, permissions, management, commands, extension };
+if (hasPermission("storage")) chrome.storage = storage;
+if (hasPermission("alarms")) chrome.alarms = alarms;
+if (hasPermission("idle")) chrome.idle = idle;
+if (hasPermission("offscreen")) chrome.offscreen = offscreen;
+if (config.manifest.action) chrome.action = action;
 
 Object.defineProperty(globalThis, "chrome", { value: chrome, writable: true, configurable: true, enumerable: false });

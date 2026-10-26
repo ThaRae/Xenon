@@ -28,7 +28,6 @@ async function run() {
     check("runtime.getURL", chrome.runtime.getURL("/a/b.html") === `chrome-extension://${id}/a/b.html`);
     check("runtime.getManifest", chrome.runtime.getManifest().name === "Xenon test extension");
     check("runtime.getPlatformInfo", ["mac", "linux", "win"].includes((await chrome.runtime.getPlatformInfo()).os));
-    check("no chrome.tabs yet", chrome.tabs === undefined);
 
     check("i18n.getMessage", chrome.i18n.getMessage("greeting", "Xenon") === "Hello, Xenon!");
     check("i18n.getMessage missing", chrome.i18n.getMessage("missing") === "");
@@ -94,6 +93,46 @@ async function run() {
             resolve();
         })
     );
+
+    // The background service worker starts with the browser, so it may still be starting.
+    let pong;
+    for (let attempt = 0; attempt < 50 && !pong; ++attempt) {
+        pong = await chrome.runtime.sendMessage({ toBackground: "ping" }).catch(() => undefined);
+        if (!pong) await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    check("background worker answers", pong?.pong === true && pong.senderUrl === location.href.split("#")[0]);
+    check("background is a worker", pong?.isWorker === true);
+    check("background events: onInstalled", (await chrome.runtime.sendMessage({ toBackground: "events" }))?.includes("installed:install"));
+
+    const port = chrome.runtime.connect({ name: "test-port" });
+    const echo = await new Promise(resolve => {
+        port.onMessage.addListener(resolve);
+        port.postMessage({ hello: "background" });
+        setTimeout(() => resolve(undefined), 2000);
+    });
+    check("runtime.connect ports", echo?.echo?.hello === "background" && echo.name === "test-port");
+    port.disconnect();
+
+    await chrome.runtime.sendMessage({ toBackground: "set-alarm" });
+    await new Promise(resolve => setTimeout(resolve, 400));
+    check("alarms fire in the background", (await chrome.runtime.sendMessage({ toBackground: "events" }))?.includes("alarm:test"));
+    check("alarms.getAll after firing", (await chrome.alarms.getAll()).length === 0);
+
+    const contexts = await chrome.runtime.getContexts({});
+    check(
+        "runtime.getContexts",
+        contexts.some(context => context.contextType === "BACKGROUND") &&
+            contexts.some(context => context.contextType === "TAB" && context.documentUrl === location.href)
+    );
+    const self = await chrome.management.getSelf();
+    check("management.getSelf", self.id === id && self.installType === "development" && self.version === "1.0");
+    check(
+        "permissions.contains",
+        (await chrome.permissions.contains({ permissions: ["storage", "alarms"] })) &&
+            !(await chrome.permissions.contains({ permissions: ["cookies"] }))
+    );
+    check("tabs.query", Array.isArray(await chrome.tabs.query({})));
+    check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
 
     console.log(`XENON-EXTENSION-TEST ${JSON.stringify(results)}`);
     window.close();

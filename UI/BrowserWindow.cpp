@@ -21,6 +21,7 @@
 #include <UI/ChromeLayout.h>
 #include <UI/ChromeStyle.h>
 #include <UI/DevToolsBanner.h>
+#include <UI/Extensions/Browser.h>
 #include <UI/Icon.h>
 #include <UI/Menu.h>
 #include <UI/StringUtils.h>
@@ -744,6 +745,8 @@ void BrowserWindow::initialize_tab(Tab* tab)
         QObject::connect(tab, &Tab::loaded, this, [this, tab] { initialize_tab_view(tab); }, Qt::SingleShotConnection);
 
     initialize_tab_buttons(tab);
+
+    Extensions::Browser::did_create_tab(*this, *tab);
 }
 
 void BrowserWindow::initialize_tab_view(Tab* tab)
@@ -904,6 +907,8 @@ void BrowserWindow::set_current_tab(Tab* tab)
 
         if (auto session_tab_id = m_current_tab->session_tab_id(); session_tab_id.has_value())
             m_session->session_store->active_tab_changed(*session_tab_id);
+
+        Extensions::Browser::did_activate_tab(*this, *m_current_tab);
     }
 
     WebView::Application::the().update_actions_for_active_web_view();

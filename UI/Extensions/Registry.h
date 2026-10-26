@@ -14,13 +14,26 @@
 #include <AK/NonnullRefPtr.h>
 #include <AK/RefPtr.h>
 #include <AK/Vector.h>
+#include <LibCore/AnonymousBuffer.h>
+#include <LibWebView/HeadlessWebView.h>
 #include <LibWebView/URLSchemeHandler.h>
 #include <UI/Extensions/Extension.h>
 #include <UI/Extensions/Storage.h>
 
 namespace Ladybird::Extensions {
 
-// The extensions this browser has loaded, and what serves them: chrome-extension:// URLs, and their storage.
+// The page that hosts an extension's background service worker (see UI/Resources/extensions/background-page.js). Chrome
+// reserves paths starting with an underscore, and named its MV2 background pages the same way.
+constexpr auto BACKGROUND_PAGE_PATH = "/_generated_background_page.html"sv;
+
+// Why runtime.onInstalled fires for an extension this session, if it does.
+struct InstallReason {
+    StringView reason;
+    Optional<String> previous_version;
+};
+
+// The extensions this browser has loaded, and what serves them: chrome-extension:// URLs, their storage, and their
+// background pages.
 class Registry {
     AK_MAKE_NONCOPYABLE(Registry);
 
@@ -31,32 +44,78 @@ public:
     // be extension pages, and so before the first renderer starts.
     void register_url_scheme();
 
-    // Loads the unpacked extensions named on the command line, once the profile is known. Extensions keep their storage in
-    // the profile's data directory.
-    void initialize(ByteString profile_data_directory, Vector<ByteString> const& unpacked_extensions, String ui_language);
+    // Loads the extensions loaded in earlier sessions, and the unpacked extensions named on the command line, once the
+    // profile is known. Extensions keep their state in the profile's data directory.
+    void initialize(ByteString profile_data_directory, Vector<ByteString> const& command_line_extensions, String ui_language);
 
-    ErrorOr<NonnullRefPtr<Extension>, String> load_unpacked(StringView directory);
+    // Starts every extension's background, once the browser can create views.
+    void start_background_pages();
+
+    enum class Persist : u8 {
+        No,
+        Yes,
+    };
+    // Loads an unpacked extension, or reloads it if it's loaded already. One that persists loads again next session,
+    // as one loaded from the Extensions dialog does; one from the command line is for this session only.
+    ErrorOr<NonnullRefPtr<Extension>, String> load_unpacked(StringView directory, Persist);
+    ErrorOr<NonnullRefPtr<Extension>, String> reload(StringView id);
+    // Unloads an extension, and deletes its storage.
+    void remove(StringView id);
 
     RefPtr<Extension> extension(StringView id) const;
     Vector<NonnullRefPtr<Extension>> const& extensions() const { return m_extensions; }
-
-    StorageArea& storage(Extension const&, StorageArea::Kind);
+    bool is_persisted(Extension const&) const;
 
     // The extension a chrome-extension:// URL belongs to.
     RefPtr<Extension> extension_for_url(URL::URL const&) const;
 
-    Function<void()> on_extensions_changed;
+    StorageArea& storage(Extension const&, StorageArea::Kind);
+
+    // Taken by the background's first start, which reports it as runtime.onInstalled; none means runtime.onStartup.
+    Optional<InstallReason> take_install_reason(StringView id);
+
+    // chrome.offscreen: an extension page in a hidden view, at most one per extension.
+    bool has_offscreen_document(Extension const&) const;
+    void create_offscreen_document(Extension const&, URL::URL const&);
+    void close_offscreen_document(Extension const&);
+    bool is_offscreen_view(Extension const&, u64 view_id) const;
+
+    // Called whenever the set of extensions changes, until the listener returns false.
+    void on_extensions_change(Function<bool()>);
 
 private:
     friend class AK::NeverDestroyed<Registry>;
     Registry() = default;
 
     ErrorOr<WebView::URLSchemeResponse> respond(WebView::URLSchemeRequest const&) const;
+    Optional<String> generated_resource(Extension const&, StringView path) const;
 
-    ByteString m_storage_directory;
+    void add(NonnullRefPtr<Extension>);
+    void start_background_page(Extension const&);
+    void stop_background_page(StringView id);
+    OwnPtr<WebView::HeadlessWebView> create_hidden_view(URL::URL const&);
+    static void close_hidden_view(NonnullOwnPtr<WebView::HeadlessWebView>);
+
+    void load_state();
+    void save_state() const;
+    void notify_extensions_changed();
+
+    ByteString m_extensions_directory;
     String m_ui_language;
     Vector<NonnullRefPtr<Extension>> m_extensions;
     HashMap<ByteString, NonnullOwnPtr<StorageArea>> m_storage;
+
+    // The directories of the extensions to load every session, and each extension's version when last loaded.
+    Vector<ByteString> m_persisted_directories;
+    HashMap<String, String> m_known_versions;
+    HashMap<String, InstallReason> m_install_reasons;
+
+    bool m_can_start_background_pages { false };
+    Optional<Core::AnonymousBuffer> m_theme;
+    HashMap<String, NonnullOwnPtr<WebView::HeadlessWebView>> m_background_pages;
+    HashMap<String, NonnullOwnPtr<WebView::HeadlessWebView>> m_offscreen_documents;
+
+    Vector<Function<bool()>> m_change_listeners;
 };
 
 }

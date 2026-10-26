@@ -4,13 +4,27 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <AK/JsonArray.h>
+#include <AK/JsonObject.h>
+#include <AK/JsonValue.h>
 #include <AK/LexicalPath.h>
 #include <AK/NeverDestroyed.h>
+#include <LibCore/Directory.h>
+#include <LibCore/File.h>
+#include <LibCore/StandardPaths.h>
+#include <LibCore/System.h>
+#include <LibFileSystem/FileSystem.h>
+#include <LibGfx/SystemTheme.h>
+#include <LibWebCommon/WebView/Utilities.h>
+#include <LibWebView/HeadlessWebView.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
 
 namespace Ladybird::Extensions {
+
+// The background page's view lays nothing out that anyone sees.
+static constexpr Web::DevicePixelSize BACKGROUND_PAGE_SIZE { 800, 600 };
 
 Registry& Registry::the()
 {
@@ -29,31 +43,94 @@ void Registry::register_url_scheme()
     WebView::register_url_scheme(MUST(String::from_utf8(EXTENSION_SCHEME)), move(handler), move(bridge));
 }
 
-void Registry::initialize(ByteString profile_data_directory, Vector<ByteString> const& unpacked_extensions, String ui_language)
+void Registry::initialize(ByteString profile_data_directory, Vector<ByteString> const& command_line_extensions, String ui_language)
 {
-    m_storage_directory = LexicalPath::join(profile_data_directory, "Extensions"sv, "Storage"sv).string();
+    m_extensions_directory = LexicalPath::join(profile_data_directory, "Extensions"sv).string();
     m_ui_language = move(ui_language);
+    load_state();
 
-    for (auto const& directory : unpacked_extensions) {
-        if (auto extension = load_unpacked(directory); extension.is_error())
+    for (auto const& directory : m_persisted_directories.span()) {
+        if (auto extension = load_unpacked(directory, Persist::No); extension.is_error())
+            warnln("Could not load the extension in {}: {}", directory, extension.error());
+    }
+    for (auto const& directory : command_line_extensions) {
+        if (auto extension = load_unpacked(directory, Persist::No); extension.is_error())
             warnln("Could not load the extension in {}: {}", directory, extension.error());
     }
 }
 
-ErrorOr<NonnullRefPtr<Extension>, String> Registry::load_unpacked(StringView directory)
+void Registry::start_background_pages()
+{
+    m_can_start_background_pages = true;
+    for (auto const& extension : m_extensions)
+        start_background_page(extension);
+}
+
+ErrorOr<NonnullRefPtr<Extension>, String> Registry::load_unpacked(StringView directory, Persist persist)
 {
     auto extension = TRY(Extension::load_unpacked(directory, m_ui_language));
     for (auto const& warning : extension->manifest().warnings)
         warnln("Extension {} ({}): {}", extension->manifest().name, extension->id(), warning);
 
-    // Loading an unpacked extension again reloads it, as Chrome's "Load unpacked" does.
+    if (persist == Persist::Yes && !m_persisted_directories.contains_slow(extension->root())) {
+        m_persisted_directories.append(extension->root());
+        save_state();
+    }
+
+    add(extension);
+    return extension;
+}
+
+ErrorOr<NonnullRefPtr<Extension>, String> Registry::reload(StringView id)
+{
+    auto existing = extension(id);
+    if (!existing)
+        return "No such extension."_string;
+    return load_unpacked(existing->root(), Persist::No);
+}
+
+void Registry::add(NonnullRefPtr<Extension> extension)
+{
+    // Loading an extension that's loaded already reloads it, as Chrome's "Load unpacked" does: its pages and background
+    // start over, and it keeps its storage.
+    stop_background_page(extension->id());
     m_extensions.remove_all_matching([&](auto const& loaded) { return loaded->id() == extension->id(); });
     m_extensions.append(extension);
-    dbgln("Loaded extension {} {} as {}", extension->manifest().name, extension->manifest().version, extension->id());
 
-    if (on_extensions_changed)
-        on_extensions_changed();
-    return extension;
+    auto const& version = extension->manifest().version;
+    auto known_version = m_known_versions.get(extension->id());
+    if (!known_version.has_value())
+        m_install_reasons.set(extension->id(), { .reason = "install"sv, .previous_version = {} });
+    else if (*known_version != version)
+        m_install_reasons.set(extension->id(), { .reason = "update"sv, .previous_version = *known_version });
+    m_known_versions.set(extension->id(), version);
+    save_state();
+
+    dbgln("Loaded extension {} {} as {}", extension->manifest().name, version, extension->id());
+    start_background_page(extension);
+    notify_extensions_changed();
+}
+
+void Registry::remove(StringView id)
+{
+    auto removed = extension(id);
+    if (!removed)
+        return;
+
+    stop_background_page(id);
+    Router::the().forget_extension(*removed);
+    m_extensions.remove_all_matching([&](auto const& loaded) { return loaded->id() == id; });
+    m_persisted_directories.remove_all_matching([&](auto const& directory) { return directory == removed->root(); });
+    m_known_versions.remove(removed->id());
+    m_install_reasons.remove(removed->id());
+    m_storage.remove_all_matching([&](auto const& key, auto const&) { return key.starts_with(ByteString::formatted("{}/", id)); });
+    save_state();
+
+    auto storage = LexicalPath::join(m_extensions_directory, "Storage"sv, id).string();
+    if (FileSystem::exists(storage))
+        (void)FileSystem::remove(storage, FileSystem::RecursionMode::Allowed);
+
+    notify_extensions_changed();
 }
 
 RefPtr<Extension> Registry::extension(StringView id) const
@@ -63,6 +140,11 @@ RefPtr<Extension> Registry::extension(StringView id) const
             return extension;
     }
     return nullptr;
+}
+
+bool Registry::is_persisted(Extension const& extension) const
+{
+    return m_persisted_directories.contains_slow(extension.root());
 }
 
 RefPtr<Extension> Registry::extension_for_url(URL::URL const& url) const
@@ -78,11 +160,138 @@ StorageArea& Registry::storage(Extension const& extension, StorageArea::Kind kin
     return *m_storage.ensure(key, [&] {
         Optional<ByteString> file;
         if (kind == StorageArea::Kind::Local || kind == StorageArea::Kind::Sync)
-            file = LexicalPath::join(m_storage_directory, extension.id(), ByteString::formatted("{}.json", storage_area_name(kind))).string();
+            file = LexicalPath::join(m_extensions_directory, "Storage"sv, extension.id(), ByteString::formatted("{}.json", storage_area_name(kind))).string();
 
         auto quota = StorageArea::quota_for(kind, extension.manifest().has_permission("unlimitedStorage"sv));
         return MUST(StorageArea::create(kind, quota, move(file)));
     });
+}
+
+Optional<InstallReason> Registry::take_install_reason(StringView id)
+{
+    return m_install_reasons.take(MUST(String::from_utf8(id)));
+}
+
+void Registry::on_extensions_change(Function<bool()> listener)
+{
+    m_change_listeners.append(move(listener));
+}
+
+void Registry::notify_extensions_changed()
+{
+    m_change_listeners.remove_all_matching([](auto& listener) { return !listener(); });
+}
+
+// --- Background pages --------------------------------------------------------------------------------------------------
+
+// A view no one sees, for background pages and offscreen documents. A headless view reports itself visible, so its
+// page's timers, and its workers, run at full speed.
+OwnPtr<WebView::HeadlessWebView> Registry::create_hidden_view(URL::URL const& url)
+{
+    if (!m_theme.has_value()) {
+        auto theme_path = LexicalPath::join(WebView::s_ladybird_resource_root, "themes"sv, "Default.ini"sv);
+        auto theme = Gfx::load_system_theme(theme_path.string());
+        if (theme.is_error()) {
+            warnln("Extensions: can't create hidden views without a theme: {}", theme.error());
+            return nullptr;
+        }
+        m_theme = theme.release_value();
+    }
+
+    auto view = WebView::HeadlessWebView::create(*m_theme, BACKGROUND_PAGE_SIZE);
+    view->load(url);
+    return view;
+}
+
+void Registry::close_hidden_view(NonnullOwnPtr<WebView::HeadlessWebView> view)
+{
+    auto request_close = view->prepare_for_immediate_close();
+    request_close();
+    // NB: The view goes once its page has had the chance to close.
+    Core::deferred_invoke([view = move(view)] { });
+}
+
+void Registry::start_background_page(Extension const& extension)
+{
+    if (!m_can_start_background_pages || !extension.manifest().background_service_worker.has_value())
+        return;
+    if (auto view = create_hidden_view(extension.url_for(BACKGROUND_PAGE_PATH)))
+        m_background_pages.set(extension.id(), view.release_nonnull());
+}
+
+void Registry::stop_background_page(StringView id)
+{
+    auto key = MUST(String::from_utf8(id));
+    if (auto view = m_background_pages.take(key); view.has_value())
+        close_hidden_view(view.release_value());
+    if (auto view = m_offscreen_documents.take(key); view.has_value())
+        close_hidden_view(view.release_value());
+}
+
+bool Registry::has_offscreen_document(Extension const& extension) const
+{
+    return m_offscreen_documents.contains(extension.id());
+}
+
+void Registry::create_offscreen_document(Extension const& extension, URL::URL const& url)
+{
+    if (auto view = create_hidden_view(url))
+        m_offscreen_documents.set(extension.id(), view.release_nonnull());
+}
+
+void Registry::close_offscreen_document(Extension const& extension)
+{
+    if (auto view = m_offscreen_documents.take(extension.id()); view.has_value())
+        close_hidden_view(view.release_value());
+}
+
+bool Registry::is_offscreen_view(Extension const& extension, u64 view_id) const
+{
+    auto view = m_offscreen_documents.get(extension.id());
+    return view.has_value() && (*view)->view_id() == view_id;
+}
+
+// --- chrome-extension:// -----------------------------------------------------------------------------------------------
+
+// The response body of a generated resource, in an unlinked temporary file, since the renderer reads responses from a
+// file descriptor.
+static ErrorOr<IPC::File> file_with_contents(StringView contents)
+{
+    auto pattern = ByteString::formatted("{}/xenon-extension-XXXXXX", Core::StandardPaths::tempfile_directory());
+    Vector<char> path;
+    path.append(pattern.characters(), pattern.length());
+    path.append('\0');
+    auto fd = TRY(Core::System::mkstemp(path.span()));
+    auto file = IPC::File::adopt_fd(fd);
+    TRY(Core::System::unlink(StringView { path.data(), path.size() - 1 }));
+
+    auto stream = TRY(Core::File::adopt_fd(TRY(Core::System::dup(fd)), Core::File::OpenMode::Write));
+    TRY(stream->write_until_depleted(contents.bytes()));
+    if (::lseek(fd, 0, SEEK_SET) < 0)
+        return Error::from_syscall("lseek"sv, errno);
+    return file;
+}
+
+Optional<String> Registry::generated_resource(Extension const& extension, StringView path) const
+{
+    auto const& worker = extension.manifest().background_service_worker;
+    if (!worker.has_value())
+        return {};
+
+    if (path == BACKGROUND_PAGE_PATH)
+        return MUST(String::formatted("<!doctype html>\n<meta charset=\"utf-8\">\n<title>{} background</title>\n", extension.manifest().name));
+
+    // The worker loads the chrome.* API, then the extension's script, then tells the UI process it's running.
+    if (path == "/_generated_background_worker.js"sv) {
+        if (extension.manifest().background_is_module)
+            return MUST(String::formatted("import \"/_generated_chrome_api.js\";\nimport \"/{}\";\nself[Symbol.for(\"xenon.background.ready\")]?.();\n", *worker));
+        return MUST(String::formatted("importScripts(\"/_generated_chrome_api.js\", \"/{}\");\nself[Symbol.for(\"xenon.background.ready\")]?.();\n", *worker));
+    }
+
+    if (path == "/_generated_chrome_api.js"sv)
+        return Router::the().background_worker_script(extension);
+
+    return {};
 }
 
 ErrorOr<WebView::URLSchemeResponse> Registry::respond(WebView::URLSchemeRequest const& request) const
@@ -107,22 +316,100 @@ ErrorOr<WebView::URLSchemeResponse> Registry::respond(WebView::URLSchemeRequest 
     if (!allowed)
         return Error::from_errno(EACCES);
 
-    auto file_path = TRY(extension->resolve(request.url));
-    auto file = TRY(WebView::open_local_file_for_renderer(file_path));
-
     Vector<HTTP::Header> headers;
-    auto mime_type = mime_type_for_path(file_path);
-    headers.append(HTTP::Header::isomorphic_encode("Content-Type"sv, mime_type));
-    headers.append(HTTP::Header::isomorphic_encode("Cache-Control"sv, "no-cache"sv));
-    headers.append(HTTP::Header::isomorphic_encode("X-Content-Type-Options"sv, "nosniff"sv));
+    auto add_headers = [&](StringView mime_type, bool is_sandboxed) {
+        headers.append(HTTP::Header::isomorphic_encode("Content-Type"sv, mime_type));
+        headers.append(HTTP::Header::isomorphic_encode("Cache-Control"sv, "no-cache"sv));
+        headers.append(HTTP::Header::isomorphic_encode("X-Content-Type-Options"sv, "nosniff"sv));
 
-    // Extension pages run under MV3's policy, and sandboxed pages under theirs, which also makes their origin opaque.
-    if (mime_type.starts_with("text/html"sv)) {
-        auto const& policy = extension->is_sandboxed_page(path) ? extension->manifest().sandbox_csp : extension->manifest().extension_pages_csp;
-        headers.append(HTTP::Header::isomorphic_encode("Content-Security-Policy"sv, policy));
+        // Extension pages run under MV3's policy, and sandboxed pages under theirs, which also makes their origin opaque.
+        if (mime_type.starts_with("text/html"sv)) {
+            auto const& policy = is_sandboxed ? extension->manifest().sandbox_csp : extension->manifest().extension_pages_csp;
+            headers.append(HTTP::Header::isomorphic_encode("Content-Security-Policy"sv, policy));
+        }
+    };
+
+    // Xenon's own resources, which only the extension and the browser may reach.
+    if (path.starts_with("/_generated_"sv)) {
+        bool from_extension_or_browser = request.is_navigation ? !request.navigation_initiator.has_value() : request.from_same_origin_process;
+        auto contents = from_extension_or_browser ? generated_resource(*extension, path) : Optional<String> {};
+        if (!contents.has_value())
+            return Error::from_errno(ENOENT);
+
+        add_headers(mime_type_for_path(path), false);
+        return WebView::URLSchemeResponse { .file = TRY(file_with_contents(*contents)), .headers = move(headers) };
     }
 
-    return WebView::URLSchemeResponse { .file = move(file), .headers = move(headers) };
+    auto file_path = TRY(extension->resolve(request.url));
+    add_headers(mime_type_for_path(file_path), extension->is_sandboxed_page(path));
+    return WebView::URLSchemeResponse { .file = TRY(WebView::open_local_file_for_renderer(file_path)), .headers = move(headers) };
+}
+
+// --- State -------------------------------------------------------------------------------------------------------------
+
+static ErrorOr<JsonObject> read_state_file(ByteString const& path)
+{
+    if (!FileSystem::exists(path))
+        return JsonObject {};
+    auto contents = TRY(TRY(Core::File::open(path, Core::File::OpenMode::Read))->read_until_eof());
+    auto json = TRY(JsonValue::from_string(contents));
+    if (!json.is_object())
+        return Error::from_string_literal("not a JSON object");
+    return json.as_object();
+}
+
+void Registry::load_state()
+{
+    auto path = LexicalPath::join(m_extensions_directory, "extensions.json"sv).string();
+    auto json = read_state_file(path);
+    if (json.is_error()) {
+        warnln("Extensions: unable to read {}: {}", path, json.error());
+        return;
+    }
+
+    if (auto directories = json.value().get_array("unpacked"sv); directories.has_value()) {
+        for (auto const& directory : directories->values()) {
+            if (directory.is_string())
+                m_persisted_directories.append(directory.as_string().to_byte_string());
+        }
+    }
+    if (auto versions = json.value().get_object("versions"sv); versions.has_value()) {
+        versions->for_each_member([&](String const& id, JsonValue const& version) {
+            if (version.is_string())
+                m_known_versions.set(id, version.as_string());
+        });
+    }
+}
+
+void Registry::save_state() const
+{
+    if (m_extensions_directory.is_empty())
+        return;
+
+    JsonArray directories;
+    for (auto const& directory : m_persisted_directories)
+        directories.must_append(MUST(String::from_byte_string(directory)));
+    JsonObject versions;
+    for (auto const& [id, version] : m_known_versions)
+        versions.set(id, version);
+
+    JsonObject state;
+    state.set("unpacked"sv, move(directories));
+    state.set("versions"sv, move(versions));
+
+    auto write = [&]() -> ErrorOr<void> {
+        TRY(Core::Directory::create(m_extensions_directory, Core::Directory::CreateDirectories::Yes));
+        auto path = LexicalPath::join(m_extensions_directory, "extensions.json"sv).string();
+        auto temporary = ByteString::formatted("{}.tmp", path);
+        auto file = TRY(Core::File::open(temporary, Core::File::OpenMode::Write | Core::File::OpenMode::Truncate, 0600));
+        auto serialized = state.serialized();
+        TRY(file->write_until_depleted(serialized.bytes()));
+        file->close();
+        TRY(Core::System::rename(temporary, path));
+        return {};
+    };
+    if (auto result = write(); result.is_error())
+        warnln("Extensions: unable to save the list of extensions: {}", result.error());
 }
 
 }

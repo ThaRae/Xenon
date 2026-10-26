@@ -150,5 +150,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
         app->offer_newest_pending_crash_report();
     }
 
+    Ladybird::Extensions::Registry::the().start_background_pages();
+
     return app->execute();
 }

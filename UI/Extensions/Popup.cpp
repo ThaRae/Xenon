@@ -6,9 +6,11 @@
 
 #include <LibCore/EventLoop.h>
 #include <UI/ChromeStyle.h>
+#include <UI/Extensions/Browser.h>
 #include <UI/Extensions/Popup.h>
 #include <UI/Extensions/Router.h>
 #include <UI/StringUtils.h>
+#include <UI/Tab.h>
 #include <UI/WebContentView.h>
 
 #include <QFrame>
@@ -28,15 +30,16 @@ static constexpr int MAXIMUM_HEIGHT = 600;
 static constexpr int INITIAL_WIDTH = 360;
 static constexpr int INITIAL_HEIGHT = 480;
 
-ActionPopup::ActionPopup(QWidget* parent, QWidget& anchor, NonnullRefPtr<Extension> extension)
-    : Popover(parent)
+ActionPopup::ActionPopup(Tab& tab, QWidget& anchor, NonnullRefPtr<Extension> extension, String popup_path)
+    : Popover(&tab)
     , m_anchor(anchor)
     , m_extension(AK::move(extension))
+    , m_popup_path(AK::move(popup_path))
 {
     setAccessibleName(qstring_from_ak_string(m_extension->manifest().name));
     card().setObjectName("XenonExtensionPopup");
 
-    auto palette = parent->palette();
+    auto palette = tab.palette();
     card().setStyleSheet(qformatted(R"(
 QFrame#XenonExtensionPopup {{
     background: {0};
@@ -54,6 +57,8 @@ QFrame#XenonExtensionPopup {{
 
     m_view = new WebContentView(&card());
     layout->addWidget(m_view);
+    // NB: Before the page loads, so that its chrome.* knows it's a popup.
+    Browser::did_open_popup(m_view->view_id(), tab);
 
     m_view->on_close = [this] {
         close();
@@ -74,9 +79,7 @@ ActionPopup::~ActionPopup()
 
 void ActionPopup::show_popup()
 {
-    auto const& popup_path = m_extension->manifest().action->default_popup;
-    VERIFY(popup_path.has_value());
-    m_view->load(m_extension->url_for(*popup_path));
+    m_view->load(m_extension->url_for(m_popup_path));
 
     move_popover_below(*this, m_anchor);
     show();
@@ -108,10 +111,15 @@ void ActionPopup::hideEvent(QHideEvent* event)
 {
     Popover::hideEvent(event);
 
-    // A closed popup's page goes away, as in Chrome; the next click opens it afresh.
+    // A closed popup's page goes away, as in Chrome; the next click opens it afresh. Its ports close then too, which is
+    // how an extension's background learns its popup closed.
+    Browser::did_close_popup(m_view->view_id());
     auto request_close = m_view->prepare_for_immediate_close();
     deleteLater();
-    Core::deferred_invoke(AK::move(request_close));
+    Core::deferred_invoke([request_close = AK::move(request_close)] {
+        request_close();
+        Core::deferred_invoke([] { Router::the().prune_closed_contexts(); });
+    });
 }
 
 }

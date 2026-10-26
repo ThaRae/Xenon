@@ -15,6 +15,7 @@
 #include <UI/ChromeLayout.h>
 #include <UI/ChromeStyle.h>
 #include <UI/EventLoopImplementationQt.h>
+#include <UI/Extensions/Browser.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/ExternalURLHandler.h>
 #include <UI/Menu.h>
@@ -735,6 +736,8 @@ void Application::present_window(BrowserWindow& window, WindowConfiguration cons
         window.activateWindow();
         window.raise();
     }
+
+    Extensions::Browser::did_create_window(window);
 }
 
 WebView::SessionLaunchPolicy Application::launch_restore_policy() const

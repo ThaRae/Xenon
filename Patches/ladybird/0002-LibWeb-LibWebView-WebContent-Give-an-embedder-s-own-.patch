@@ -25,8 +25,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibWeb/DOM/Document.cpp            |  4 +
  Libraries/LibWeb/Page/Page.h                 |  3 +
- Libraries/LibWebView/URLSchemeHandler.cpp    | 40 +++++++-
- Libraries/LibWebView/URLSchemeHandler.h      | 37 +++++++-
+ Libraries/LibWebView/URLSchemeHandler.cpp    | 48 +++++++++-
+ Libraries/LibWebView/URLSchemeHandler.h      | 39 +++++++-
  Libraries/LibWebView/WebContentClient.cpp    |  8 ++
  Libraries/LibWebView/WebContentClient.h      |  1 +
  Libraries/LibWebView/WebContentPage.cpp      | 34 +++++++
@@ -40,7 +40,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Services/WebContent/PageClient.h             |  5 +
  Services/WebContent/WebContentClient.ipc     |  2 +
  Services/WebContent/WebContentServer.ipc     |  1 +
- 17 files changed, 288 insertions(+), 3 deletions(-)
+ 17 files changed, 298 insertions(+), 3 deletions(-)
  create mode 100644 Services/WebContent/EmbedderBridge.cpp
  create mode 100644 Services/WebContent/EmbedderBridge.h
 
@@ -74,13 +74,14 @@ index f695ce40fe1aed4afea908d19d8f18da66d95e68..401a793cc92b527166906802f4ef57f3
      virtual void request_embedder_resource(EmbedderResourceRequest request) { request.on_complete(Error::from_errno(ENOTSUP)); }
  
 diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
-index fd107545c9fefd072f77296494bcc78c77a4bebe..f1a744eb066ab9e5a7ab8d1190cee31936126e54 100644
+index fd107545c9fefd072f77296494bcc78c77a4bebe..37ba20576e4f12a1b1c1eeaf80a4d930b9bb265f 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.cpp
 +++ b/Libraries/LibWebView/URLSchemeHandler.cpp
-@@ -7,12 +7,14 @@
+@@ -7,12 +7,15 @@
  #include <AK/NeverDestroyed.h>
  #include <LibURL/EmbedderSchemes.h>
  #include <LibWebView/URLSchemeHandler.h>
++#include <LibWebView/ViewImplementation.h>
 +#include <LibWebView/WebContentPage.h>
  
  namespace WebView {
@@ -92,7 +93,7 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..f1a744eb066ab9e5a7ab8d1190cee319
  };
  
  static Vector<RegisteredScheme>& registered_schemes()
-@@ -21,11 +23,11 @@ static Vector<RegisteredScheme>& registered_schemes()
+@@ -21,11 +24,11 @@ static Vector<RegisteredScheme>& registered_schemes()
      return *schemes;
  }
  
@@ -106,7 +107,7 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..f1a744eb066ab9e5a7ab8d1190cee319
  }
  
  URLSchemeHandler* url_scheme_handler(StringView scheme)
-@@ -37,4 +39,38 @@ URLSchemeHandler* url_scheme_handler(StringView scheme)
+@@ -37,4 +40,45 @@ URLSchemeHandler* url_scheme_handler(StringView scheme)
      return nullptr;
  }
  
@@ -133,6 +134,13 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..f1a744eb066ab9e5a7ab8d1190cee319
 +    return page && page->embedder_bridge_endpoint(m_document_id).has_value();
 +}
 +
++Optional<u64> URLSchemeBridgeEndpoint::view_id() const
++{
++    if (auto page = m_page.strong_ref())
++        return page->view().view_id();
++    return {};
++}
++
 +void URLSchemeBridgeEndpoint::post_message(String message) const
 +{
 +    if (auto page = m_page.strong_ref())
@@ -146,7 +154,7 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..f1a744eb066ab9e5a7ab8d1190cee319
 +
  }
 diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
-index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..9d71c98307b4a8ee26e6a8623a09b9c69313b6f5 100644
+index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..b64c44a2dcce7786642a3a3bf795dbb2d0db70f0 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.h
 +++ b/Libraries/LibWebView/URLSchemeHandler.h
 @@ -11,11 +11,14 @@
@@ -164,7 +172,7 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..9d71c98307b4a8ee26e6a8623a09b9c6
  
  namespace WebView {
  
-@@ -41,10 +44,42 @@ struct URLSchemeResponse {
+@@ -41,10 +44,44 @@ struct URLSchemeResponse {
  
  using URLSchemeHandler = Function<ErrorOr<URLSchemeResponse>(URLSchemeRequest const&)>;
  
@@ -180,6 +188,8 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..9d71c98307b4a8ee26e6a8623a09b9c6
 +
 +    // Whether the document is still around. Messages to a document that's gone are dropped.
 +    bool is_open() const;
++    // The view showing the document, which is the top-level traversable's.
++    Optional<u64> view_id() const;
 +    void post_message(String) const;
 +
 +    bool operator==(URLSchemeBridgeEndpoint const&) const;

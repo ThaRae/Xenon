@@ -12,6 +12,7 @@
 
 namespace Ladybird {
 
+class Tab;
 class WebContentView;
 
 }
@@ -25,7 +26,7 @@ class ActionPopup final : public Popover {
 public:
     AK_ALLOC_WITH_KMALLOC;
 
-    ActionPopup(QWidget* parent, QWidget& anchor, NonnullRefPtr<Extension>);
+    ActionPopup(Tab&, QWidget& anchor, NonnullRefPtr<Extension>, String popup_path);
     virtual ~ActionPopup() override;
 
     Extension const& extension() const { return *m_extension; }
@@ -40,6 +41,7 @@ private:
 
     QWidget& m_anchor;
     NonnullRefPtr<Extension> m_extension;
+    String m_popup_path;
     WebContentView* m_view { nullptr };
 };
 
