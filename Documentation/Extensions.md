@@ -167,7 +167,10 @@ The scheme is `chrome-extension`, Chrome's own, since extensions compare URLs ag
 
 ### Background context
 
-Bitwarden's MV3 manifest declares `background.service_worker`. Ladybird registers service workers but can't run
+Bitwarden's MV3 manifest declares `background.service_worker`: a classic (not module) script, built for webpack's
+`webworker` target. Its Firefox build runs the same code as a background page, so it needs a worker-like global rather
+than anything particular to service workers. The one exception is Web Push through `self.registration`, which it
+skips when `registration` is missing, falling back to a WebSocket. Ladybird registers service workers but can't run
 one. Rather than wait for a full Service Worker implementation, Xenon starts the background script as an
 embedder-owned worker (patch 3) at the extension's origin:
 
@@ -180,8 +183,14 @@ embedder-owned worker (patch 3) at the extension's origin:
   stopped. Stopping idle workers is a memory optimization for later.
 - Once Ladybird runs real service workers, the background script moves to one, and the bootstrap script stays as is.
 
-**Offscreen documents** (`chrome.offscreen`, which Bitwarden uses for the clipboard) are extension pages loaded in a
-hidden view with no tab. They need hidden views (a later patch) and arrive with the clipboard APIs.
+The background has to come early. Bitwarden's popup won't show its unlock screen until the background has run its
+state migrations: it polls `storage.local` for the state version the worker writes, for up to about 16 seconds. It
+also opens ports to the worker as it starts.
+
+**Offscreen documents** (`chrome.offscreen`) are extension pages loaded in a hidden view with no tab. Bitwarden uses
+one for the clipboard and for a `localStorage` backup of device-trust keys. It picks those code paths by
+`manifest_version`, not by checking that `chrome.offscreen` exists, so the API has to be there with the background.
+Offscreen documents need hidden views (a later patch).
 
 ### Content scripts and isolation
 
@@ -201,9 +210,11 @@ the requested `run_at`: `document_start`, `document_end`, or `document_idle` (th
   autofill and inline menu use. A content script's `fetch()` goes out with the page's origin, as in Chrome MV3.
 - **`chrome.scripting.executeScript` / `insertCSS`** (and `registerContentScripts`) use the same path, into the
   extension's isolated world by default, or the main world when an extension asks for `world: "MAIN"`.
-- **Extension iframes in pages:** Bitwarden's inline autofill menu is an `<iframe>` of a `web_accessible_resources`
-  page inside the site. It is an extension page with its own origin, process, and full `chrome.*`; the site only sees a
-  cross-origin frame.
+- **Extension iframes in pages:** Bitwarden's inline autofill menu is an `<iframe credentialless>` of a
+  `web_accessible_resources` page (`overlay/menu.html`), in a closed shadow root inside the site. It is an extension
+  page with its own origin, process, and full `chrome.*`; the site only sees a cross-origin frame. That page nests a
+  sandboxed extension page (`sandbox="allow-scripts"`) and relays `postMessage` between them. Its notification bar
+  (`notification/bar.html`) works the same way.
 
 ### Messaging
 
@@ -228,15 +239,18 @@ renderer to another directly.
 
 ### The `chrome.*` API, in milestone order
 
-Ordered by what Bitwarden needs, then by what Proton Pass and 1Password add. "Stub" means the API exists and
-behaves plausibly without doing anything real yet, so that an extension's startup doesn't throw.
+Ordered by what Bitwarden needs, then by what Proton Pass and 1Password add. Bitwarden's needs come from reading its
+source (`bitwarden/clients`, `apps/browser`, version 2026.10.1); most of its calls go through `BrowserApi`
+(`platform/browser/browser-api.ts`). "Stub" means the API exists and behaves plausibly without doing anything real
+yet, so that an extension's startup doesn't throw. Bitwarden feature-detects `sidePanel`, `management`,
+`extension.getViews`, `dom.openOrClosedShadowRoot`, and Web Push, so those can come late.
 
 | Milestone | APIs | For |
 | --- | --- | --- |
-| **1. Extension pages** | Loading unpacked, `chrome-extension://`, the toolbar button and popup. `runtime`: `id`, `getURL`, `getManifest`, `getPlatformInfo`, `lastError`, `sendMessage`/`onMessage` between pages of one extension. `storage`: `local`, `session`, `sync` (stored locally), `onChanged`, `getBytesInUse`, `setAccessLevel`. `i18n`: `getMessage`, `getUILanguage`, `getAcceptLanguages`, `__MSG_` in the manifest. | Bitwarden's popup renders and keeps its state |
-| **2. Background** | The background service worker. `runtime`: `connect`/`onConnect`, `onInstalled`, `onStartup`, `reload`, `openOptionsPage`, `setUninstallURL`. `alarms`. `tabs`: `query`, `get`, `getCurrent`, `create`, `update`, `remove`, `sendMessage`, `connect`, `onActivated`, `onUpdated`, `onRemoved`, `onReplaced`. `windows`: `getCurrent`, `getLastFocused`, `create`, `update`, `onFocusChanged`. `action`: `setIcon`, `setBadgeText`, `setBadgeBackgroundColor`, `setTitle`, `setPopup`, `openPopup`. `commands`. `idle`. `permissions`: `contains`, `getAll`, `request`. | Bitwarden unlocks, syncs, and keeps its vault in the background; the badge shows matching logins |
-| **3. Content scripts** | Isolated worlds, `content_scripts`, `web_accessible_resources` (with `use_dynamic_url`). `scripting`: `executeScript`, `insertCSS`, `removeCSS`, `registerContentScripts`. `webNavigation`: `getFrame`, `getAllFrames`, `onCommitted`, `onCompleted`, `onBeforeNavigate`. `tabs.sendMessage` with `frameId`. `activeTab`. | Autofill, the inline menu, and saving new logins |
-| **4. The rest of Bitwarden** | `contextMenus`. `notifications`. `offscreen` and clipboard read/write. `webRequest` with `onAuthRequired` (`webRequestAuthProvider`), for HTTP auth dialogs. `sidePanel`. `privacy.services.passwordSavingEnabled` (a stub: Ladybird has no password manager of its own to turn off). `nativeMessaging`, for unlocking through the desktop app. | Feature parity with Bitwarden in Chrome |
+| **1. Extension pages** | Loading unpacked, `chrome-extension://`, the toolbar button and popup. `runtime`: `id`, `getURL`, `getManifest`, `getPlatformInfo`, `lastError`, `sendMessage`/`onMessage` between pages of one extension. `storage`: `local`, `session`, `sync` (stored locally), `managed` (empty), `get`/`set`/`remove`/`clear`/`getKeys`/`getBytesInUse`, `onChanged` on `chrome.storage` and on each area, `setAccessLevel`. `i18n`: `getMessage`, `getUILanguage`, `getAcceptLanguages`, `__MSG_` in the manifest. | A test extension's popup runs and keeps its state. Bitwarden's popup loads, but waits for the background. |
+| **2. Background** | The background service worker. `runtime`: `connect`/`onConnect` and ports (`sender` with `tab`, `frameId`, `url`, `origin`, `documentId`), `onInstalled`, `onStartup`, `getContexts`, `reload`, `openOptionsPage`, `setUninstallURL`. `alarms`. `tabs`: `query` (with URL patterns), `get`, `getCurrent`, `create`, `update`, `remove`, `sendMessage`, `connect`, `captureVisibleTab`, `onActivated`, `onAttached`, `onCreated`, `onDetached`, `onRemoved`, `onReplaced`, `onUpdated`. `windows`: `getAll`, `get`, `getCurrent`, `getLastFocused`, `create` (including `type: "popup"`, for Bitwarden's popout), `update`, `remove`, `onCreated`, `onFocusChanged`, `onRemoved`. `action`: `setIcon`, `setBadgeText`, `setBadgeBackgroundColor`, `setTitle`, `setPopup`, `openPopup`. `commands`. `idle` (with the `locked` state). `permissions`: `contains`, `getAll`, `request`, `onAdded`. `offscreen` and the clipboard. `management.getSelf`. | Bitwarden's popup reaches its unlock screen; Bitwarden unlocks, syncs, and keeps its vault in the background; the badge shows matching logins |
+| **3. Content scripts** | Isolated worlds, `content_scripts` (Bitwarden's two, at `document_start`, one in all frames), `web_accessible_resources` (with `use_dynamic_url`), sandboxed pages. `scripting`: `executeScript` (`files`, `func` with results, `allFrames`/`frameIds`, `injectImmediately`, `world: "MAIN"`), `insertCSS`, `removeCSS`, `registerContentScripts`/`unregisterContentScripts` (Bitwarden's passkey support registers a `world: "MAIN"` script). `webNavigation`: `getFrame`, `getAllFrames`, `onCommitted`, `onCompleted`, `onErrorOccurred`, `onBeforeNavigate`. `tabs.sendMessage` with `frameId`. `activeTab`. | Autofill, the inline menu, saving new logins, and passkeys |
+| **4. The rest of Bitwarden** | `contextMenus`. `notifications` (with buttons). `webRequest`: `onAuthRequired` with `asyncBlocking` (`webRequestAuthProvider`, for HTTP auth dialogs), and the non-blocking `onBeforeRequest`, `onBeforeRedirect`, `onHeadersReceived` (with `responseHeaders`), `onCompleted`, `onErrorOccurred`. `sidePanel`. `privacy.services` `passwordSavingEnabled`, `autofillAddressEnabled`, `autofillCreditCardEnabled` (stubs: Ladybird has no password manager or autofill of its own to turn off). `nativeMessaging` (`connectNative("com.8bit.bitwarden")`), for unlocking through the desktop app. Web Push for the background. | Feature parity with Bitwarden in Chrome |
 | **5. Installing from the store** | CRX3 install and updates, the Chrome Web Store, offering password managers in the welcome flow as Helium does. Then whatever Proton Pass and 1Password use beyond the above, found the same way Bitwarden's needs were. | The setup flow Helium has |
 
 ### Where each piece lives
