@@ -85,6 +85,15 @@ jobs:
             fi
           } >> "$summary"
 
+      - name: Upload the dependency build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-build-logs
+          path: Build/vcpkg-release/buildtrees/*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload the welcome page render
         if: always()
         uses: actions/upload-artifact@v4

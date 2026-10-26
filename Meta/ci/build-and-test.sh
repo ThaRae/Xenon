@@ -16,6 +16,23 @@ git config --global --add safe.directory '*'
 cache_url=${CACHE_URL:-http://10.255.42.1:8642/xenon}
 read_only=${CACHE_READ_ONLY:-false}
 
+mkdir -p Build
+touch Build/.ci-started
+
+# A token pasted with a trailing newline, or the wrong one, otherwise only shows up as a 401 on every cache request.
+# Ask slab-ccache first: a missing object (404) means the token is good.
+if [[ -n ${CCACHE_TOKEN:-} ]]; then
+  CCACHE_TOKEN=$(printf '%s' "$CCACHE_TOKEN" | tr -d '[:space:]')
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H "Authorization: Bearer $CCACHE_TOKEN" "$cache_url/.token-check" || true)
+  if [[ $code == 401 ]]; then
+    echo "warning: slab-ccache refused CCACHE_TOKEN (${#CCACHE_TOKEN} characters); building without the caches"
+    unset CCACHE_TOKEN
+  elif [[ $code != 404 && $code != 200 ]]; then
+    echo "warning: slab-ccache didn't answer (HTTP ${code:-none}); building without the caches"
+    unset CCACHE_TOKEN
+  fi
+fi
+
 if [[ -n ${CCACHE_TOKEN:-} ]]; then
   # Ladybird's build already compiles through ccache when it finds it; point that at slab-ccache only. The checkout is
   # always /xenon in the container, so the cache's keys stay put from run to run.
@@ -46,4 +63,13 @@ status=0
 ./Meta/xenon.py --jobs "$JOBS" test || status=$?
 
 ccache --show-stats > Build/release/ccache-stats.txt 2>&1 || true
+
+# vcpkg keeps a failed dependency's build output in its buildtrees, which the CI log otherwise never shows.
+if ((status != 0)) && [[ -d Build/vcpkg-release/buildtrees ]]; then
+  while IFS= read -r log; do
+    echo "::group::$log"
+    tail -n 80 "$log"
+    echo "::endgroup::"
+  done < <(find Build/vcpkg-release/buildtrees -maxdepth 2 -name '*.log' -newer Build/.ci-started -exec grep -l -i -E 'error|failed' {} +)
+fi
 exit $status
