@@ -115,11 +115,13 @@ def check_build_lists_every_source(checks: Checks):
 def check_about_page_overrides(checks: Checks):
     build_file = (UI_DIR / "Xenon.cmake").read_text()
     match = re.search(r"set\(XENON_ABOUT_PAGE_OVERRIDES\s+([^)]*)\)", build_file)
-    if not match:
-        checks.fail("overrides", "UI/Xenon.cmake has no XENON_ABOUT_PAGE_OVERRIDES list")
+    additions_match = re.search(r"set\(XENON_ABOUT_PAGE_ADDITIONS\s+([^)]*)\)", build_file)
+    if not match or not additions_match:
+        checks.fail("overrides", "UI/Xenon.cmake needs XENON_ABOUT_PAGE_OVERRIDES and XENON_ABOUT_PAGE_ADDITIONS lists")
         return
 
     overrides = match.group(1).split()
+    additions = additions_match.group(1).split()
     shipped = {path.name for path in (UI_DIR / "Resources" / "about-pages").iterdir()}
     upstream = LADYBIRD_SOURCE_DIR / "Base" / "res" / "ladybird" / "about-pages"
 
@@ -128,10 +130,13 @@ def check_about_page_overrides(checks: Checks):
             checks.fail("overrides", f"{name} is listed as an override but UI/Resources/about-pages/{name} is missing")
         if not (upstream / name).exists():
             checks.fail("overrides", f"{name} overrides a page Ladybird no longer ships; check upstream's changes")
-    for name in sorted(shipped - set(overrides)):
-        checks.fail(
-            "overrides", f"UI/Resources/about-pages/{name} isn't in XENON_ABOUT_PAGE_OVERRIDES, so it never ships"
-        )
+    for name in additions:
+        if name not in shipped:
+            checks.fail("overrides", f"{name} is listed as an addition but UI/Resources/about-pages/{name} is missing")
+        if (upstream / name).exists():
+            checks.fail("overrides", f"Ladybird now ships its own {name}; move it to XENON_ABOUT_PAGE_OVERRIDES")
+    for name in sorted(shipped - set(overrides) - set(additions)):
+        checks.fail("overrides", f"UI/Resources/about-pages/{name} isn't listed in UI/Xenon.cmake, so it never ships")
 
 
 def check_bangs(checks: Checks):

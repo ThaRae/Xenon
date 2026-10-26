@@ -51,6 +51,7 @@ set(XENON_SOURCES
     Menu.cpp
     NativeWindowContainer.cpp
     NativeTextEditingLineEdit.cpp
+    NewTabPage.cpp
     ProcessManagerWindow.cpp
     PerformanceMonitorWidget.cpp
     PictureInPictureWindow.cpp
@@ -202,12 +203,19 @@ add_dependencies(xenon ${ladybird_helper_processes})
 # NB: Ladybird's resource lists are variables of its UI directory, which don't reach this one.
 include("${LADYBIRD_SOURCE_DIR}/UI/cmake/ResourceFiles.cmake")
 
-# Xenon ships its own versions of some of Ladybird's internal pages, which take the place of upstream's in the bundle.
+# Xenon ships its own versions of some of Ladybird's internal pages, which take the place of upstream's in the bundle,
+# and adds a few files of its own beside them.
 set(XENON_ABOUT_PAGE_OVERRIDES
+    newtab.html
     webui.css
     welcome.css
     welcome.html
     welcome.js
+)
+set(XENON_ABOUT_PAGE_ADDITIONS
+    newtab.css
+    newtab.js
+    xenon.css
 )
 foreach (page IN LISTS XENON_ABOUT_PAGE_OVERRIDES)
     list(FIND ABOUT_PAGES "${LADYBIRD_SOURCE_DIR}/Base/res/ladybird/about-pages/${page}" index)
@@ -216,6 +224,9 @@ foreach (page IN LISTS XENON_ABOUT_PAGE_OVERRIDES)
     endif()
     list(REMOVE_AT ABOUT_PAGES ${index})
     list(INSERT ABOUT_PAGES ${index} "${XENON_UI_DIR}/Resources/about-pages/${page}")
+endforeach()
+foreach (page IN LISTS XENON_ABOUT_PAGE_ADDITIONS)
+    list(APPEND ABOUT_PAGES "${XENON_UI_DIR}/Resources/about-pages/${page}")
 endforeach()
 
 if (APPLE)

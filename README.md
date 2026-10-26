@@ -10,7 +10,7 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 | --- | --- |
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good commit. It isn't modified. |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
-| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (the welcome page and the shared web UI stylesheet). The build bundles these in place of upstream's copies, which stay untouched. |
+| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, and the shared web UI stylesheet), with `xenon.css` for what its own pages share, and the bundled filter lists. The build ships these in place of upstream's copies, which stay untouched. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 
@@ -122,6 +122,9 @@ What exists now and what's planned, measured against Helium:
   blocking on) or answer two questions: which search engine, from a private/mainstream list with a live preview of
   where a search goes, and whether to block ads and trackers (on by default, with all three filter lists). Nothing is
   saved until you finish.
+- [x] **New tab page**: your eight most visited sites, one per site with its favicon, ranked by Ladybird's
+  decaying visit score, plus a reminder of the !bangs. Private windows say so instead and show no history. The page is
+  static, so Xenon's UI hands it the sites once it has loaded (`UI/NewTabPage.cpp`).
 - [x] **Quick link copy**: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> copies the current page's URL.
   (DevTools stays on <kbd>⌘</kbd><kbd>⇧</kbd><kbd>I</kbd> and <kbd>F12</kbd>.)
 - [x] **uBlock Origin's filter lists, built in**: the lists Helium's uBlock Origin fork turns on (uBlock filters,

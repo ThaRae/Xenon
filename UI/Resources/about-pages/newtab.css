@@ -1,0 +1,137 @@
+/*
+ * Copyright (c) 2026, the Xenon developers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Fainter than the welcome flow's, since this page is seen all day. */
+.glow {
+    opacity: 0.6;
+}
+
+.corner-mark {
+    position: fixed;
+    top: 22px;
+    left: 32px;
+}
+
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 96px 32px 120px;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.top-sites {
+    display: grid;
+    grid-template-columns: repeat(4, 112px);
+    gap: 12px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.top-sites:empty {
+    display: none;
+}
+
+.site a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 6px 12px;
+    color: var(--xenon-ink);
+    text-decoration: none;
+    border-radius: 14px;
+}
+
+.site a:hover {
+    background-color: var(--xenon-row-hover);
+}
+
+.site a:focus-visible {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: 0;
+}
+
+.site-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    font-family: var(--xenon-mono);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--xenon-muted);
+    text-transform: uppercase;
+    background-color: var(--xenon-row-hover);
+    border: 1px solid var(--xenon-hairline);
+    border-radius: 14px;
+}
+
+.site-icon img {
+    width: 26px;
+    height: 26px;
+}
+
+.site-name {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.note {
+    max-width: 30em;
+    margin: 0;
+    font-size: 15px;
+    text-align: center;
+    color: var(--xenon-muted);
+}
+
+.note strong {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+    color: var(--xenon-ink);
+}
+
+.hint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 14px;
+    padding: 0 24px 28px;
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
+.bang {
+    white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+    .top-sites {
+        grid-template-columns: repeat(2, 112px);
+    }
+}
