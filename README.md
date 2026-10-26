@@ -172,6 +172,8 @@ What exists now and what's planned, measured against Helium:
   for the internal pages)
 - [ ] Xenon's own app icon (the app still uses Ladybird's)
 - [ ] uBlock Origin's filter set for Ladybird's content blocker (being built in a separate repo, `xenon-ublock`)
+- [ ] WebAuthn: security keys first, then passkeys on them, which Ladybird doesn't implement yet. The design is in
+  `Documentation/WebAuthn.md`.
 
 Web app installs, which depend on Chromium in Helium, are out of scope until Ladybird supports them.
 
