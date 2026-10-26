@@ -155,7 +155,8 @@ What exists now and what's planned, measured against Helium:
   1Password. In progress; see [Documentation/Extensions.md](Documentation/Extensions.md). So far, unpacked extensions
   load from the Extensions dialog or with `--load-extension=<dir>`, get a toolbar button and popup, and run their
   background service worker. They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`,
-  `action`, `commands`, and `offscreen`. Content scripts come next.
+  `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for. Bitwarden's background and
+  popup start. Content scripts come next.
 - [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
   surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
   picker. See xenon-ublock's `docs/gap-analysis.md`.

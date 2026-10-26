@@ -90,7 +90,12 @@ outright once upstream has the equivalent. A fork does make engine work a little
    body of a function given a bridge object, whose `postMessage(string)` reaches the UI process and whose `onmessage`
    receives its replies. The UI process takes each message's sender from its own records of the documents a page hosts,
    including which view the page is in, which is how Xenon tells a popup from a tab or a hidden page.
-3. **User scripts in isolated worlds** (next, milestone 3). The same bootstrap-and-bridge, for any document and into a
+3. **An origin access allowlist** (`0003`, done). The UI process may let an origin fetch from some others as if they
+   were the same origin: with no CORS, and with a same-origin request's credentials. Blink and WebKit keep the same
+   kind of list for browser extensions. An entry is a source origin, a destination scheme and host (or any host), and
+   whether the host's subdomains count; ports aren't compared. Main fetch treats a matching request as same-origin, and
+   `Application::set_origin_access_allow_list()` gives the list to every WebContent and WebWorker process.
+4. **User scripts in isolated worlds** (next, milestone 3). The same bootstrap-and-bridge, for any document and into a
    world of the embedder's choosing: the main world, or a named isolated world built on
    `WrapperWorldType::Extension`, a realm per document and world whose global wraps the same `Window`, with its own
    `WindowProxy` from `window_proxy_for()`. `Tests/LibWeb/TestWindowProxyWorld.cpp` builds exactly such a realm over a
@@ -192,6 +197,9 @@ The scheme is `chrome-extension`, Chrome's own, since extensions compare URLs ag
   `'unsafe-eval'` there, so a manifest that asks for them is refused at load. `sandbox.pages` are served with
   `content_security_policy.sandbox` and a `sandbox` CSP directive, which gives them an opaque origin and no `chrome.*`.
 - **Process:** site isolation gives each extension's origin processes of its own, as a site of its own.
+- **Fetching from other sites:** an extension's pages and workers fetch from the hosts in its `host_permissions`
+  without CORS, as in Chrome (patch 3). Bitwarden needs this: its server answers CORS requests from its web vault's
+  origin only. Content scripts won't get it: their requests are the page's.
 
 ### Background context
 
@@ -237,7 +245,7 @@ the API has to be there with the background.
 For each navigation, `ExtensionRegistry` matches every enabled extension's `content_scripts` against the frame's URL:
 `matches` and `exclude_matches` (match patterns), `include_globs` and `exclude_globs`, `all_frames`, and
 `match_about_blank` / `match_origin_as_fallback` for `about:blank` and `blob:` frames. It also checks the extension
-has host permission for the URL. Matching scripts go to the frame's WebContent process as user scripts (patch 3) at
+has host permission for the URL. Matching scripts go to the frame's WebContent process as user scripts (patch 4) at
 the requested `run_at`: `document_start`, `document_end`, or `document_idle` (the default).
 
 - **Isolation:** each extension gets its own isolated world per frame. The world shares the DOM with the page but
@@ -304,11 +312,12 @@ for Bitwarden in Chrome.
 | Piece | Engine patch | Xenon |
 | --- | --- | --- |
 | `chrome-extension://` origin, secure context, loading | 0001 | `UI/Extensions/Registry`: maps URLs to files, adds CSP, decides who may load what |
+| Fetching from permitted hosts without CORS | 0003 | `UI/Extensions/Registry`: an allowlist entry per extension and `host_permissions` pattern |
 | Manifest, ID, locales, `__MSG_`, match patterns | | `UI/Extensions/Manifest`, `Extension`, `Locales`, `MatchPattern` |
 | `chrome.*` in extension pages | 0002 | `UI/Resources/extensions/chrome-api.js` (the API surface, built into the browser), `UI/Extensions/Router` (answers calls, routes messages, sends events) |
 | `chrome.storage` | | `UI/Extensions/Storage`: a JSON file per extension and area under `<profile data>/Extensions/Storage/<id>/`; `session` and `managed` are in memory |
 | Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
-| Content scripts in isolated worlds | 3 | Content-script matching, with `MatchPattern` |
+| Content scripts in isolated worlds | 4 | Content-script matching, with `MatchPattern` |
 | Background worker, offscreen documents | 0001 (workers' loads) | `UI/Extensions/Registry` (their hidden views and generated files), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
@@ -337,7 +346,10 @@ for Bitwarden in Chrome.
   extension can do in plain words. `optional_permissions` need `permissions.request()` and a user gesture, and ask.
   Every API handler checks the calling extension's permissions in the UI process; a missing `chrome.foo` in the
   bootstrap is a convenience, not the check.
-- **Host access** is checked at injection time and per call (`scripting`, `tabs` URL fields, `webRequest`).
+- **Host access** is checked at injection time and per call (`scripting`, `tabs` URL fields, `webRequest`), and
+  decides which hosts an extension fetches from without CORS. Every process gets the whole allowlist, so a compromised
+  renderer could learn which extensions are loaded; it can't use the list to reach more than it already could, since
+  Ladybird enforces CORS in the renderer.
   `activeTab` grants the current tab's origin until it navigates.
 - **Isolation:** content scripts in isolated worlds, extension pages in their own process with their own origin, and
   sender identity from the UI process. A compromised site's renderer can't reach extension pages, which live in
@@ -384,14 +396,23 @@ for Bitwarden in Chrome.
     only with the `tabs` permission or host permission for it.
   - `action`, per tab: badges, titles, icons from paths, popups, `enable`/`disable`, `openPopup`, and `onClicked`.
   - `commands` as shortcuts; `offscreen` documents; `management.getSelf`; `permissions.contains` and `getAll`.
+  - `webNavigation.getFrame` and `getAllFrames` for a tab's top frame. Stubs, so Bitwarden's background gets the
+    objects it uses without checking: `webNavigation` events, `scripting`, `webRequest` events, and `notifications`.
+  - Fetching from the hosts in `host_permissions` without CORS (patch 3).
   - The Extensions dialog: load unpacked (remembered in the profile), reload, and remove (which deletes the
     extension's storage). Toolbars and shortcuts follow it.
   - `Meta/xenon.py test` runs the test page twice in one profile. It checks that the background answers messages and
     ports from a worker global, gets `onInstalled` and then `onStartup`, and that alarms, tabs, windows, and an
-    offscreen document work.
+    offscreen document work, and that the page and the background fetch from a permitted host without CORS while a web
+    page can't.
+  - Bitwarden 2026.10.0's Chrome build loads. Its background runs its state migrations and fetches its server's
+    config, and its popup page shows the welcome screen (seen in a headless render at popup size).
 
   Left from milestones 1 and 2:
   - `tabs.sendMessage` and `tabs.connect` fail as if the tab had no listener, until content scripts (milestone 3).
+    So do `scripting.executeScript`, `insertCSS`, and `removeCSS`; registered content scripts never run;
+    `webNavigation` events never fire.
+  - `webRequest` events never fire, and notifications are never shown (milestone 4).
   - `permissions.request` answers `false`: optional permissions need a prompt. `idle` always reports `active`.
   - `tabs.captureVisibleTab` and `action.setIcon` with `imageData` fail. `tabs.onDetached`, `onMoved`, `onReplaced`,
     and `onHighlighted`, and `permissions.onAdded` and `onRemoved`, exist but never fire.
@@ -403,7 +424,7 @@ for Bitwarden in Chrome.
     page at its preferred size instead.
   - Nothing has clicked through the popup, the Extensions dialog, or a command shortcut yet: no test drives the Qt
     side, and they've only been built and seen in the toolbar.
-  - Bitwarden itself hasn't been loaded yet.
+  - Logging in to Bitwarden hasn't been tried, nor has its popup been opened from the toolbar.
 - [ ] Milestone 3: content scripts
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] Milestone 5: installing from the store
