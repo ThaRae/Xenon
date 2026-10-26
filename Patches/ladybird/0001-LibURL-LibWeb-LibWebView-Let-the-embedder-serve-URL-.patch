@@ -41,8 +41,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Libraries/LibWebView/CMakeLists.txt           |  1 +
  Libraries/LibWebView/HelperProcess.cpp        |  5 ++
  Libraries/LibWebView/URLSchemeHandler.cpp     | 40 +++++++++++++
- Libraries/LibWebView/URLSchemeHandler.h       | 43 ++++++++++++++
- Libraries/LibWebView/WebContentPage.cpp       | 17 ++++++
+ Libraries/LibWebView/URLSchemeHandler.h       | 50 ++++++++++++++++
+ Libraries/LibWebView/WebContentPage.cpp       | 29 ++++++++++
  Libraries/LibWebView/WebContentPage.h         |  1 +
  Services/WebContent/ConnectionFromClient.cpp  | 22 +++++++
  Services/WebContent/ConnectionFromClient.h    |  4 ++
@@ -52,7 +52,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Services/WebContent/WebContentServer.ipc      |  2 +
  Services/WebContent/main.cpp                  |  5 ++
  Services/WebWorker/main.cpp                   |  5 ++
- 25 files changed, 334 insertions(+), 2 deletions(-)
+ 25 files changed, 353 insertions(+), 2 deletions(-)
  create mode 100644 Libraries/LibURL/EmbedderSchemes.cpp
  create mode 100644 Libraries/LibURL/EmbedderSchemes.h
  create mode 100644 Libraries/LibWeb/Loader/EmbedderResourceRequest.h
@@ -494,10 +494,10 @@ index 0000000000000000000000000000000000000000..fd107545c9fefd072f77296494bcc78c
 +}
 diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..ab5cfcd721bcc851b2d70ff186f59871bc92ae45
+index 0000000000000000000000000000000000000000..6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa
 --- /dev/null
 +++ b/Libraries/LibWebView/URLSchemeHandler.h
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 2026, the Xenon developers.
 + *
@@ -513,6 +513,7 @@ index 0000000000000000000000000000000000000000..ab5cfcd721bcc851b2d70ff186f59871
 +#include <AK/Vector.h>
 +#include <LibHTTP/Header.h>
 +#include <LibIPC/File.h>
++#include <LibURL/Origin.h>
 +#include <LibURL/URL.h>
 +#include <LibWebView/Export.h>
 +
@@ -524,6 +525,12 @@ index 0000000000000000000000000000000000000000..ab5cfcd721bcc851b2d70ff186f59871
 +    // Whether the process asking hosts a document of the URL's own origin. Site isolation gives every origin of an
 +    // embedder scheme processes of its own, so this tells a page's own requests from those of pages that embed it.
 +    bool from_same_origin_process { false };
++
++    // Whether this fetches the document of a navigation. Navigations are fetched in the process of the document they
++    // start from, so the asking process says nothing about who wants the URL; the navigation's initiator does.
++    bool is_navigation { false };
++    // The origin of the document that started the navigation, or none if the user started it from the browser's UI.
++    Optional<URL::Origin> navigation_initiator;
 +};
 +
 +struct URLSchemeResponse {
@@ -542,7 +549,7 @@ index 0000000000000000000000000000000000000000..ab5cfcd721bcc851b2d70ff186f59871
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 884a2fc4fd4d27f748b41cb270a57fb2bfa3338f..ca73daff145b6afe782b8a8645110f8de0abdf48 100644
+index 884a2fc4fd4d27f748b41cb270a57fb2bfa3338f..4a0a67384565fa986f3951279df2ca0400d128d5 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -33,6 +33,7 @@
@@ -553,7 +560,7 @@ index 884a2fc4fd4d27f748b41cb270a57fb2bfa3338f..ca73daff145b6afe782b8a8645110f8d
  #include <LibWebView/Utilities.h>
  #include <LibWebView/ViewImplementation.h>
  #include <LibWebView/WebContentClient.h>
-@@ -1520,6 +1521,22 @@ void WebContentPage::did_request_file(ByteString path, i32 request_id)
+@@ -1520,6 +1521,34 @@ void WebContentPage::did_request_file(ByteString path, i32 request_id)
          async_handle_file_return(0, file.release_value(), request_id);
  }
  
@@ -565,7 +572,19 @@ index 884a2fc4fd4d27f748b41cb270a57fb2bfa3338f..ca73daff145b6afe782b8a8645110f8d
 +        return;
 +    }
 +
-+    auto response = (*handler)({ .url = url, .from_same_origin_process = client().hosts_a_document_of_origin(url.origin()) });
++    URLSchemeRequest request { .url = url, .from_same_origin_process = client().hosts_a_document_of_origin(url.origin()), .is_navigation = false, .navigation_initiator = {} };
++    traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
++        auto navigation = navigable.uncommitted_navigation();
++        if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
++            return IterationDecision::Continue;
++
++        request.is_navigation = true;
++        if (navigation->retry.has_value() && navigation->retry->user_involvement != Web::HTML::UserNavigationInvolvement::BrowserUI)
++            request.navigation_initiator = navigation->retry->initiator_origin_snapshot;
++        return IterationDecision::Break;
++    });
++
++    auto response = (*handler)(request);
 +    if (response.is_error()) {
 +        async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
 +        return;

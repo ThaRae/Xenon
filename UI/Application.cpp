@@ -15,6 +15,7 @@
 #include <UI/ChromeLayout.h>
 #include <UI/ChromeStyle.h>
 #include <UI/EventLoopImplementationQt.h>
+#include <UI/Extensions/Registry.h>
 #include <UI/ExternalURLHandler.h>
 #include <UI/Menu.h>
 #include <UI/PictureInPictureWindow.h>
@@ -549,6 +550,31 @@ void Application::show_process_manager()
     m_process_manager_window->show();
     m_process_manager_window->raise();
     m_process_manager_window->activateWindow();
+}
+
+void Application::create_platform_arguments(Core::ArgsParser& args_parser)
+{
+    args_parser.add_option(Core::ArgsParser::Option {
+        .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
+        .help_string = "Load the unpacked extensions in these directories, separated by commas",
+        .long_name = "load-extension",
+        .short_name = 0,
+        .value_name = "paths",
+        .accept_value = [this](StringView paths) -> ErrorOr<bool> {
+            for (auto path : paths.split_view(','))
+                m_extensions_to_load.append(path);
+            return true;
+        },
+        .hide_mode = Core::ArgsParser::OptionHideMode::None,
+    });
+}
+
+void Application::create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&)
+{
+    // NB: Extensions are served from the UI process, which renderers have to know before the first of them starts.
+    auto languages = platform_preferred_languages();
+    auto ui_language = languages.is_empty() ? "en-US"_string : languages.first();
+    Extensions::Registry::the().initialize(profile().paths().data, m_extensions_to_load, move(ui_language));
 }
 
 void Application::create_platform_actions()
