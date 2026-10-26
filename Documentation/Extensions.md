@@ -36,7 +36,7 @@ plan keeps the engine changes few, small, and generic, so that they could go ups
 API much like WebKit's `WKUserScript`, `WKContentWorld`, `WKScriptMessageHandler` and `WKURLSchemeHandler`.
 Everything specific to Chrome extensions (manifests, `chrome.*`, permissions, the popup) stays in Xenon's `UI/`.
 
-There are two ways to carry the engine changes. **This needs a decision before anything under `ladybird/` changes.**
+There were two ways to carry the engine changes. Xenon uses the second, a patch series.
 
 ### Option A: a Ladybird fork on Gitea
 
@@ -51,7 +51,7 @@ submodule URL points at the fork, pinned to a commit on `xenon`.
   history for rebases to work, so the shallow submodule clone goes. Force-pushed rebases make old submodule pins
   unreachable unless every rebase is tagged.
 
-### Option B: a patch series in this repo (recommended)
+### Option B: a patch series in this repo (chosen)
 
 `Patches/ladybird/0001-*.patch`, ..., in `git format-patch` form, applied to the pinned upstream commit at build
 time. This is how Helium and ungoogled-chromium carry their Chromium changes.
@@ -300,7 +300,7 @@ behaves plausibly without doing anything real yet, so that an extension's startu
 
 ## Status
 
-- [ ] Engine strategy: patch series (recommended) or fork. Waiting on a decision.
+- [x] Engine strategy: a patch series in `Patches/ladybird`, applied by `Meta/patches.py`.
 - [ ] Milestone 1: extension pages
 - [ ] Milestone 2: background
 - [ ] Milestone 3: content scripts

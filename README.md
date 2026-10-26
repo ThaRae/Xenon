@@ -8,13 +8,17 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 
 | Path | What it is |
 | --- | --- |
-| `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good commit. It isn't modified. |
+| `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good upstream commit. |
+| `Patches/ladybird/` | Xenon's changes to the engine, as a patch series applied to the pinned commit at build time (`Meta/patches.py`). |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
 | `UI/Resources/` | Xenon's versions of Ladybird's internal pages (the welcome page and the shared web UI stylesheet). The build bundles these in place of upstream's copies, which stay untouched. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 
-Ladybird stays an unmodified checkout. Its build is configured with
+The submodule always points at an upstream commit. Xenon's engine changes live in `Patches/ladybird`, as
+`git format-patch` files that `Meta/xenon.py` applies with `git am` on a local `xenon-patches` branch before it
+configures the build, the way Helium patches Chromium. Each patch is a self-contained change that could go upstream.
+Ladybird's build is configured with
 `-DCMAKE_PROJECT_ladybird_INCLUDE=Meta/CMake/XenonHook.cmake`, which defers an `include(UI/Xenon.cmake)` until the
 end of Ladybird's top-level `CMakeLists.txt`. The `xenon` target links against LibWebView, and the engine's helper processes
 (WebContent, RequestServer, ImageDecoder, ...) are built into `Xenon.app`.
@@ -69,7 +73,8 @@ needs `npx`. It also checks the things that break Xenon quietly:
 - a page override for a page upstream no longer ships
 - a malformed or duplicate !bang
 - Ladybird's violet coming back into the chrome
-- local edits in `ladybird/`, or a pinned commit that doesn't exist upstream
+- engine changes in `ladybird/` that aren't exported to `Patches/ladybird`, or a pinned commit that doesn't exist
+  upstream
 
 CI runs on Gitea Actions at git.avx512.dev, on slab's ephemeral runners:
 
@@ -96,16 +101,32 @@ source and license. The GPL-3.0 text ships beside them. `Meta/check.py` fails if
 license. `./Meta/xenon.py test` checks that Xenon blocks with them, given no list arguments, by loading a local page
 with blocking on and off.
 
+## Changing the engine
+
+```bash
+./Meta/patches.py apply     # ladybird/ at the pinned commit plus the series, one commit per patch
+# edit in ladybird/ and commit there (or amend, or git rebase -i), then:
+./Meta/patches.py export    # writes the commits back to Patches/ladybird
+```
+
+`Meta/xenon.py build` applies the series by itself when `ladybird/` is at the pinned commit, and builds whatever is
+checked out otherwise, so a rebuild in the middle of an edit builds the edit. `Meta/check.py` fails while `ladybird/`
+holds changes that aren't exported. `.gitmodules` sets the submodule to `ignore = all`, so the patched checkout never
+shows up as a change in Xenon.
+
 ## Updating Ladybird
 
 ```bash
 git -C ladybird fetch --depth 1 origin master
-git -C ladybird checkout FETCH_HEAD
+./Meta/patches.py apply --base FETCH_HEAD    # fix any patch that stops applying, then:
+./Meta/patches.py export
+./Meta/patches.py pin                        # stages the new commit as the pin
 ./Meta/xenon.py build
 ```
 
 If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon last synced with, and port the relevant
-changes into `UI/`. The weekly Upstream workflow lists those changes and shows whether `master` still builds.
+changes into `UI/`. The weekly Upstream workflow applies the series to `master`, names any patch that no longer
+applies, builds, and lists those UI changes, so a bump holds no surprises.
 
 ## Features
 

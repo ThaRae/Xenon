@@ -3,7 +3,8 @@
 # Builds and runs Xenon: Ladybird's engine (the `ladybird` submodule) with Xenon's own frontend in `UI/`.
 #
 # Ladybird is configured from its own source tree, and Meta/CMake/XenonHook.cmake is injected after its
-# project() call so the Xenon frontend is added once every engine library and helper process exists.
+# project() call so the Xenon frontend is added once every engine library and helper process exists. Xenon's patches
+# to the engine (Patches/ladybird) are applied first, if ladybird/ doesn't have them yet; see Meta/patches.py.
 
 import argparse
 import http.server
@@ -26,6 +27,8 @@ if not (LADYBIRD_SOURCE_DIR / "Meta" / "ladybird.py").exists():
     sys.exit(1)
 
 sys.path.insert(0, str(LADYBIRD_SOURCE_DIR / "Meta"))
+
+import patches  # noqa: E402
 
 from Utils.build_vcpkg import build_vcpkg  # noqa: E402
 from Utils.find_compiler import pick_host_compiler  # noqa: E402
@@ -76,6 +79,7 @@ def main():
         shutil.rmtree(build_dir, ignore_errors=True)
         return
 
+    patches.ensure_applied()
     build_dir = configure_main(platform, args.preset, args.cc, args.cxx, args.jobs)
 
     if args.command == "build":

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-# Xenon's fast checks: formatting, and the invariants that keep Xenon building on an unmodified Ladybird checkout.
+# Xenon's fast checks: formatting, and the invariants that keep Xenon building on upstream Ladybird plus Xenon's patch
+# series (Patches/ladybird, see Meta/patches.py).
 # The same script runs locally (by hand or from the pre-push hook in .githooks/) and as CI's first job.
 #
 #   Meta/check.py            check everything
@@ -21,6 +22,8 @@ import sys
 import venv
 
 from pathlib import Path
+
+import patches
 
 XENON_SOURCE_DIR = Path(__file__).resolve().parent.parent
 LADYBIRD_SOURCE_DIR = XENON_SOURCE_DIR / "ladybird"
@@ -215,16 +218,24 @@ def check_submodule(checks: Checks, online: bool, unpinned: bool):
         checks.fail("submodule", "ladybird/ isn't checked out; run git submodule update --init --depth 1")
         return
 
-    # Xenon builds on an unmodified Ladybird, so local edits there would build here and nowhere else.
+    # Xenon builds on upstream Ladybird plus the patch series, so an engine change that isn't in the series would build
+    # here and nowhere else.
     status = git("-C", str(LADYBIRD_SOURCE_DIR), "status", "--porcelain", "--untracked-files=no")
     if status:
-        checks.fail("submodule", "ladybird/ has local modifications; Xenon must build on an unmodified Ladybird")
+        checks.fail("submodule", "ladybird/ has uncommitted changes; commit them there and run Meta/patches.py export")
+
+    if not unpinned and patches.state() == patches.State.OTHER:
+        checks.fail(
+            "submodule",
+            f"ladybird/ is {patches.State.OTHER.value}; Meta/patches.py export saves engine changes to the series, "
+            "and Meta/patches.py apply restores it",
+        )
+
+    for path in patches.patch_files():
+        if not path.read_text().startswith(f"From {'0' * 40} "):
+            checks.fail("patches", f"{relative(path)} wasn't written by Meta/patches.py export")
 
     pinned = git("ls-tree", "HEAD", "ladybird").split()
-    checked_out = git("-C", str(LADYBIRD_SOURCE_DIR), "rev-parse", "HEAD")
-    if pinned and pinned[2] != checked_out and not unpinned:
-        checks.fail("submodule", f"ladybird/ is at {checked_out[:10]} but the commit pins {pinned[2][:10]}")
-
     if online and pinned:
         result = subprocess.run(
             ["git", "-C", str(LADYBIRD_SOURCE_DIR), "fetch", "--quiet", "--depth=1", LADYBIRD_UPSTREAM, pinned[2]],
