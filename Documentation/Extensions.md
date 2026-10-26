@@ -27,7 +27,8 @@ And it lacks these, each of which needs an engine change:
   can't target a frame. Content scripts in the page's world are out: the page could read everything a password
   manager hands its content script.
 - **A native channel to the UI process from an extension context**, available synchronously when the context starts.
-- **A background context the browser owns**, with no tab and no document.
+- **A background context the browser owns**, with no tab. This one turned out not to need a change of its own: a
+  hidden page in a `HeadlessWebView` runs the background script as a dedicated worker.
 
 ## The engine question
 
@@ -80,14 +81,15 @@ outright once upstream has the equivalent. A fork does make engine work a little
    Its URLs get tuple origins (`scheme://host`), are potentially trustworthy (secure contexts), and are fetch schemes,
    with CORS requests allowed. LibURL's origin computation, SecureContexts, and Fetch consult a registry
    (`LibURL/EmbedderSchemes.h`), which renderers learn from `--embedder-scheme` arguments. A request for such a URL
-   goes from WebContent to the UI process, as a `file://` load does, and the embedder's handler answers it with a file
-   and headers, or refuses it. The handler learns whether the asking process hosts a document of the URL's origin, and,
-   for a navigation, who started it.
+   or WebWorker goes to the UI process, as a `file://` load does, and the embedder's handler answers it with a file and
+   headers, or refuses it. The handler learns whether the asking process hosts a document (or runs a worker) of the
+   URL's origin, and, for a navigation, who started it.
 2. **A script bridge for the embedder's pages** (`0002`, done). `register_url_scheme()` takes an optional
    `URLSchemeBridge`. Before a document of the scheme may run scripts (at the start of
    `Document::set_ready_to_run_scripts()`), WebContent asks the UI process for a bootstrap script and runs it as the
    body of a function given a bridge object, whose `postMessage(string)` reaches the UI process and whose `onmessage`
-   receives its replies. The UI process takes each message's sender from its own records of the documents a page hosts.
+   receives its replies. The UI process takes each message's sender from its own records of the documents a page hosts,
+   including which view the page is in, which is how Xenon tells a popup from a tab or a hidden page.
 3. **User scripts in isolated worlds** (next, milestone 3). The same bootstrap-and-bridge, for any document and into a
    world of the embedder's choosing: the main world, or a named isolated world built on
    `WrapperWorldType::Extension`, a realm per document and world whose global wraps the same `Window`, with its own
@@ -100,37 +102,47 @@ outright once upstream has the equivalent. A fork does make engine work a little
    The patch also needs a way to run a script in a frame's world and return its result (for
    `scripting.executeScript` with `func`), and per-extension stylesheets (for `insertCSS`; `Page::set_user_style()` is
    one per page and has no IPC). The xenon-ublock session's patches run uBlock Origin's scriptlets at document start in
-   every frame, at `Document::update_for_history_step_application`, `LocalNavigable::initialize_navigable`, and
-   `LocalTraversableNavigable`; this patch should share those injection points rather than add a second set.
-4. **Embedder-owned workers** (milestone 2). The UI process starts a worker with a script URL of a registered scheme and
-   no owning document, in the WebWorker process, with the same bridge. It lives until the UI process closes it. The
-   WebWorker process also needs patch 1's resource requests, which only WebContent has so far.
+   every frame, at the three places WebDriver BiDi's `document_is_ready_for_scripts` fires:
+   `Document::update_for_history_step_application` (navigated documents), `LocalNavigable::initialize_navigable` (a
+   child navigable's first `about:blank`), and `LocalTraversableNavigable::create_for_new_web_view` (popups). This patch
+   should add one `PageClient::page_document_is_ready_for_scripts(Document&)` hook called at those three, which
+   uBlock's scriptlets then move onto, rather than a second set of injection points. Patch 2's hook, at the start of
+   `Document::set_ready_to_run_scripts()`, won't do for content scripts: `create_a_new_browsing_context_and_document()`
+   calls it for an initial `about:blank` before that document has its creator's base URL or a navigable, so it can't
+   tell which site's scripts apply (`match_about_blank`). Extension pages are never `about:blank`, so patch 2 is fine
+   where it is.
+
+The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
+no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
+with what the engine already has (see [Background context](#background-context)). The one engine change it needed was
+letting the WebWorker process load `chrome-extension://` URLs, which went into patch 1.
 
 Site isolation already gives every `chrome-extension://<id>` origin processes of its own, as a site of its own, so
 the "embedder-chosen processes" patch planned at first isn't needed.
 
 Later patches, as the milestones need them: request interception for `webRequest` (in WebContent's
 `ResourceLoader::load()`, next to the content blocker's `should_block_request()`, asking the UI process; RequestServer
-has no interception IPC), HTTP auth challenges for `webRequestAuthProvider`, and hidden pages with no tab, for
-offscreen documents.
+has no interception IPC), and HTTP auth challenges for `webRequestAuthProvider`. Offscreen documents need no patch:
+LibWebView's `HeadlessWebView` already hosts a page with no window.
 
 ## Architecture
 
 ```
- UI process (Xenon)                                     WebContent process, one per extension
- ┌──────────────────────────────────────────┐          ┌──────────────────────────────────────┐
- │ Extensions::Registry                      │          │ chrome-extension://<id>/popup.html   │
- │  ├ Extension (manifest, id, locales)      │  scheme  │  main world: chrome.* (full)         │
- │  ├ Storage (per id, on disk)              │◄────────►│                                      │
- │  ├ Router (calls, messages, ports,        │  JSON    └──────────────────────────────────────┘
- │  │   events, sender info)                 │  over    ┌──────────────────────────────────────┐
- │  ├ Permissions                            │  IPC     │ WebWorker: background service worker │
- │  └ API handlers: runtime, storage, i18n,  │◄────────►│  chrome.* (full)                     │
- │      tabs, scripting, alarms, ...         │          └──────────────────────────────────────┘
- │ Toolbar: action buttons, popup Popover    │          ┌──────────────────────────────────────┐
- │ Extensions dialog (load, enable, remove)  │◄────────►│ WebContent for https://example.com    │
- └──────────────────────────────────────────┘          │  main world: the page                │
-                                                        │  isolated world per extension:       │
+ UI process (Xenon)                                     Processes for chrome-extension://<id>
+ ┌───────────────────────────────────────────┐          ┌──────────────────────────────────────┐
+ │ Extensions::Registry (extensions, files,  │          │ popup.html, options, tabs            │
+ │   storage, hidden views)                  │  scheme  │  main world: chrome.* (full)         │
+ │ Extensions::Router (calls, messages,      │◄────────►├──────────────────────────────────────┤
+ │   ports, events, sender info)             │  JSON    │ hidden: _generated_background_page   │
+ │  ├ Storage, Alarms                        │  over    │  └ dedicated Worker: the background  │
+ │  └ Browser: tabs, windows, action,        │  IPC     │     script, chrome.* (full)          │
+ │      commands                             │          │ hidden: offscreen document           │
+ │ Toolbar: action buttons, popups           │          │  chrome.runtime                      │
+ │ Extensions dialog (load, reload, remove)  │          └──────────────────────────────────────┘
+ └───────────────────────────────────────────┘          ┌──────────────────────────────────────┐
+                                                 ◄─────►│ WebContent for https://example.com   │
+                                              milestone │  main world: the page                │
+                                                      3 │  isolated world per extension:       │
                                                         │   content scripts, chrome.* (subset) │
                                                         └──────────────────────────────────────┘
 ```
@@ -140,8 +152,8 @@ Renderers only carry messages.
 
 ### Loading extensions
 
-**Unpacked first.** The Extensions dialog has **Load unpacked…**, and `--load-extension=<dir>` (Chrome's flag) loads
-one for a session. Loading:
+**Unpacked first.** The Extensions dialog (**Extensions** in the main menu) has **Load Unpacked…**, **Reload**, and
+**Remove**, and `--load-extension=<dir>[,<dir>...]` (Chrome's flag) loads extensions for a session. Loading:
 
 1. Reads `manifest.json`. `manifest_version` has to be 3 (2 is refused, with a message saying so). Unknown keys are
    kept and ignored, as Chrome does, with a warning per key in the dialog.
@@ -151,10 +163,10 @@ one for a session. Loading:
 3. Loads `_locales/<default_locale>/messages.json` and the UI language's, and resolves `__MSG_name__` in `name`,
    `description`, `action.default_title`, and the other strings Chrome localizes.
 4. Validates paths: every file the manifest names has to exist inside the directory.
-5. Records it in the registry: ID, path, enabled, granted permissions, and whether it is unpacked. Unpacked extensions
-   load from their directory; nothing is copied. For now the registry lasts for the session, as with Chrome's
-   `--load-extension`; keeping it in the profile (`<profile>/Extensions/registry.json`) comes with the Extensions
-   dialog.
+5. Records it in the registry. Unpacked extensions load from their directory; nothing is copied. Those loaded from the
+   Extensions dialog are remembered in the profile (`<profile data>/Extensions/extensions.json`, with each one's last
+   version, which decides `onInstalled`'s `reason` and `onStartup`); those from `--load-extension` last for the
+   session, as in Chrome.
 
 **CRX later.** A CRX3 file is a signed header (a protobuf with the public key and signatures) in front of a zip.
 Installing one verifies the signature, derives the ID from the key, unpacks to `<profile>/Extensions/<id>/<version>/`,
@@ -179,46 +191,53 @@ The scheme is `chrome-extension`, Chrome's own, since extensions compare URLs ag
   default, `script-src 'self' 'wasm-unsafe-eval'; object-src 'self';`. MV3 forbids remote script sources and
   `'unsafe-eval'` there, so a manifest that asks for them is refused at load. `sandbox.pages` are served with
   `content_security_policy.sandbox` and a `sandbox` CSP directive, which gives them an opaque origin and no `chrome.*`.
-- **Process:** each extension's pages share one WebContent process, which hosts nothing else (patch 4).
+- **Process:** site isolation gives each extension's origin processes of its own, as a site of its own.
 
 ### Background context
 
 Bitwarden's MV3 manifest declares `background.service_worker`: a classic (not module) script, built for webpack's
-`webworker` target. Its Firefox build runs the same code as a background page, so it needs a worker-like global rather
-than anything particular to service workers. The one exception is Web Push through `self.registration`, which it
-skips when `registration` is missing, falling back to a WebSocket. Ladybird registers service workers but can't run
-one. Rather than wait for a full Service Worker implementation, Xenon starts the background script as an
-embedder-owned worker (patch 3) at the extension's origin:
+`webworker` target, which loads its chunks with `importScripts()`. Its Firefox build runs the same code as a background
+page, so it needs a worker-like global rather than anything particular to service workers: it only uses
+`ServiceWorkerGlobalScope` as a type. The one exception is Web Push through `self.registration`, which it skips when
+`registration` is missing, falling back to a WebSocket. Ladybird registers service workers but can't run one yet, so
+Xenon runs the background script the way Chrome ran MV2 background pages, with a worker inside:
 
-- It has a worker global: `self`, `importScripts()`, `fetch()`, IndexedDB, `crypto`, timers, and no DOM, which is what
-  MV3 extension code expects. `chrome.*` is installed before the script runs.
-- `ServiceWorkerGlobalScope` members extensions touch (`self.registration`, `clients`, `skipWaiting()`, the `install`
-  and `activate` events) are filled in by the bootstrap script as far as extensions need them.
-- It starts when the extension is enabled and stays running. Chrome stops idle service workers after 30 seconds and
-  restarts them on an event. Xenon doesn't at first: an extension that survives being stopped also survives not being
-  stopped. Stopping idle workers is a memory optimization for later.
-- Once Ladybird runs real service workers, the background script moves to one, and the bootstrap script stays as is.
-- If embedder-owned workers prove hard, the fallback is a background page: the script in a hidden extension page with
-  no tab, as Bitwarden's Firefox build runs it. A `HeadlessWebView` or an unparented `WebContentView` can host it, kept
-  `Visible` with `ViewImplementation::set_system_visibility_state()`, since hidden documents get their timers
-  throttled. Bitwarden's Chrome build expects a worker global, though: it's built for webpack's `webworker` target,
-  which loads code with `importScripts()`.
+- At startup, and whenever an extension loads, the registry opens `chrome-extension://<id>/_generated_background_page.html`
+  in a `HeadlessWebView`: a page with no window, which reports itself visible, so its timers and its workers aren't
+  throttled. It is an extension page, in the extension's process, with the extension's origin and storage.
+- That page's bootstrap (`background-page.js`) starts `/_generated_background_worker.js` as a dedicated `Worker`, which
+  loads `/_generated_chrome_api.js` and then the manifest's script, with `importScripts()`, or with static `import`s for
+  `"type": "module"`. The worker gets a worker global (`self`, `importScripts()`, `fetch()`, IndexedDB, `crypto`,
+  timers, no DOM) and has `chrome.*` before its first line runs.
+- Workers have no script bridge of their own, so the page relays: the worker's `chrome.*` (`worker-bridge.js`) talks to
+  its page over a `MessagePort`, and the page passes messages to and from the UI process unchanged. The router knows
+  the background's messages from the page they come through, so `getContexts()` reports one `BACKGROUND` context.
+- The `_generated_` files are only for the extension's own processes and the browser; a web page can't load them, even
+  when an extension makes everything web accessible. They are served from unlinked temporary files, since the renderer
+  reads responses from a file descriptor.
+- `runtime.onInstalled` (`install`, or `update` with `previousVersion`) or `runtime.onStartup` fires once the worker's
+  script has run, so its top-level listeners are in place, as in Chrome.
+- It stays running, as an MV2 background page did. Chrome stops idle service workers after 30 seconds and restarts them
+  on an event; an extension that survives being stopped also survives not being stopped. Stopping idle workers is a
+  memory optimization for later.
+- `chrome.extension.getBackgroundPage()` is left out, which is how Bitwarden tells MV3 from MV2.
+- Once Ladybird runs real service workers, the background script can move to one; `chrome-api.js` stays as it is.
 
 The background has to come early. Bitwarden's popup won't show its unlock screen until the background has run its
 state migrations: it polls `storage.local` for the state version the worker writes, for up to about 16 seconds. It
 also opens ports to the worker as it starts.
 
-**Offscreen documents** (`chrome.offscreen`) are extension pages loaded in a hidden view with no tab. Bitwarden uses
-one for the clipboard and for a `localStorage` backup of device-trust keys. It picks those code paths by
-`manifest_version`, not by checking that `chrome.offscreen` exists, so the API has to be there with the background.
-Offscreen documents need hidden views (a later patch).
+**Offscreen documents** (`chrome.offscreen`) are extension pages in another `HeadlessWebView`, one per extension, with
+`chrome.runtime` alone, as in Chrome. Bitwarden uses one for the clipboard and for a `localStorage` backup of
+device-trust keys. It picks those code paths by `manifest_version`, not by checking that `chrome.offscreen` exists, so
+the API has to be there with the background.
 
 ### Content scripts and isolation
 
 For each navigation, `ExtensionRegistry` matches every enabled extension's `content_scripts` against the frame's URL:
 `matches` and `exclude_matches` (match patterns), `include_globs` and `exclude_globs`, `all_frames`, and
 `match_about_blank` / `match_origin_as_fallback` for `about:blank` and `blob:` frames. It also checks the extension
-has host permission for the URL. Matching scripts go to the frame's WebContent process as user scripts (patch 2) at
+has host permission for the URL. Matching scripts go to the frame's WebContent process as user scripts (patch 3) at
 the requested `run_at`: `document_start`, `document_end`, or `document_idle` (the default).
 
 - **Isolation:** each extension gets its own isolated world per frame. The world shares the DOM with the page but
@@ -290,21 +309,25 @@ for Bitwarden in Chrome.
 | `chrome.storage` | | `UI/Extensions/Storage`: a JSON file per extension and area under `<profile data>/Extensions/Storage/<id>/`; `session` and `managed` are in memory |
 | Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
 | Content scripts in isolated worlds | 3 | Content-script matching, with `MatchPattern` |
-| Background worker | 4 | Starts and stops it with the extension |
-| Managing extensions | | `--load-extension` for now; an Extensions dialog (Qt) next. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
+| Background worker, offscreen documents | 0001 (workers' loads) | `UI/Extensions/Registry` (their hidden views and generated files), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
+| `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
+| `alarms` | | `UI/Extensions/Alarms` |
+| Managing extensions | | `UI/Extensions/Dialog` (Qt), and `--load-extension`. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
 
 ### The toolbar and the popup
 
 - Each enabled extension with an `action` gets a toolbar button after the address bar, with `action.default_icon`
   (the size closest to the toolbar's, for the screen's scale) and `default_title` as the tooltip. The badge
-  (`setBadgeText`, `setBadgeBackgroundColor`) is drawn on the icon, in the extension's color if it set one and
-  Xenon's rose otherwise.
+  (`setBadgeText`, `setBadgeBackgroundColor`, `setBadgeTextColor`) is drawn on the icon, in the extension's color if
+  it set one and Xenon's rose otherwise. Every `action.set*` given a `tabId` applies to that tab alone.
 - Clicking it opens `action.default_popup` in a `Popover` anchored to the button, as the content blocking popover is,
   hosting a `WebContentView` of the popup page. The popover sizes itself to the page's content, between 25×25 and
   800×600 as in Chrome. It closes when it loses focus, on Escape, or when the page calls `window.close()`.
 - With no popup, a click fires `action.onClicked` in the background worker and grants `activeTab`.
-- `commands` become shortcuts, with `_execute_action` opening the popup. Chrome's defaults apply unless they clash
-  with Xenon's own (⌘⇧C copies the URL).
+- `commands` with a `suggested_key` become shortcuts in every window, with `_execute_action` opening the popup (or
+  firing `action.onClicked`). As in Chrome, `Ctrl` means ⌘ on macOS and `MacCtrl` means Control. A shortcut that clashes
+  with one of Xenon's (⌘⇧C copies the URL) or another extension's does nothing for now; Chrome drops the extension's
+  instead, and lets the user pick another.
 - The chrome uses Xenon's palette from `UI/BrandColors.h`; the popup page draws itself.
 
 ### Security
@@ -343,7 +366,7 @@ for Bitwarden in Chrome.
 ## Status
 
 - [x] Engine strategy: a patch series in `Patches/ladybird`, applied by `Meta/patches.py`.
-- [ ] **Milestone 1: extension pages.** Done:
+- [x] **Milestone 1: extension pages.**
   - Loading unpacked extensions with `--load-extension=<dir>[,<dir>...]`, with Chrome's validation, IDs, and locales.
   - `chrome-extension://` pages: their own origin, secure contexts, MV3's CSP, and storage of their own.
   - `chrome.runtime` (`id`, `getURL`, `getManifest`, `getPlatformInfo`, `sendMessage`, `onMessage`, `lastError`),
@@ -351,16 +374,36 @@ for Bitwarden in Chrome.
   - A toolbar button per extension, and its popup, sized to its page.
   - `Meta/xenon.py test` checks the APIs from an extension page, and that a web page reaches neither `chrome.*` nor
     the extension's files.
+- [x] **Milestone 2: background.**
+  - The background script in a dedicated worker of a hidden background page, with `onInstalled` and `onStartup`.
+  - `runtime` ports (`connect`, `onConnect`, `Port`), `getContexts`, `reload`, `openOptionsPage`, and `sender.tab` for
+    pages in tabs.
+  - `alarms`; `tabs` (`query`, `get`, `getCurrent`, `create`, `update`, `remove`, `reload`, `duplicate`, and
+    `onCreated`, `onUpdated`, `onActivated`, `onRemoved`, `onAttached`); `windows` (`get`, `getAll`, `getCurrent`,
+    `getLastFocused`, `create` with `type: "popup"`, `update`, `remove`, and their events). A tab's URL and title show
+    only with the `tabs` permission or host permission for it.
+  - `action`, per tab: badges, titles, icons from paths, popups, `enable`/`disable`, `openPopup`, and `onClicked`.
+  - `commands` as shortcuts; `offscreen` documents; `management.getSelf`; `permissions.contains` and `getAll`.
+  - The Extensions dialog: load unpacked (remembered in the profile), reload, and remove (which deletes the
+    extension's storage). Toolbars and shortcuts follow it.
+  - `Meta/xenon.py test` runs the test page twice in one profile. It checks that the background answers messages and
+    ports from a worker global, gets `onInstalled` and then `onStartup`, and that alarms, tabs, windows, and an
+    offscreen document work.
 
-  Left:
-  - An Extensions dialog to load, reload, and remove extensions, and toolbar buttons that follow those changes.
+  Left from milestones 1 and 2:
+  - `tabs.sendMessage` and `tabs.connect` fail as if the tab had no listener, until content scripts (milestone 3).
+  - `permissions.request` answers `false`: optional permissions need a prompt. `idle` always reports `active`.
+  - `tabs.captureVisibleTab` and `action.setIcon` with `imageData` fail. `tabs.onDetached`, `onMoved`, `onReplaced`,
+    and `onHighlighted`, and `permissions.onAdded` and `onRemoved`, exist but never fire.
+  - A background page whose process crashes isn't restarted until the extension is reloaded.
   - Web pages loading `web_accessible_resources` as subresources: the scheme handler needs the request's initiator.
   - `__MSG_` in extension CSS files, which Chrome localizes as it serves them.
   - History navigation (back and forward) to extension pages.
   - The popup's size is measured from its page's body, which suits pages that set their width; Chrome lays out the
     page at its preferred size instead.
-  - The popup has only been checked by hand so far, by its button showing up; nothing clicks it in a test.
-- [ ] Milestone 2: background
+  - Nothing has clicked through the popup, the Extensions dialog, or a command shortcut yet: no test drives the Qt
+    side, and they've only been built and seen in the toolbar.
+  - Bitwarden itself hasn't been loaded yet.
 - [ ] Milestone 3: content scripts
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] Milestone 5: installing from the store
