@@ -25,7 +25,7 @@ if [[ -n ${CCACHE_TOKEN:-} ]]; then
 
   # Ladybird's build appends these to its own local vcpkg cache.
   mode=$([[ $read_only == true ]] && echo read || echo readwrite)
-  export VCPKG_BINARY_SOURCES="x-http,$cache_url/vcpkg/{name}/{version}/{sha}.zip,$mode,Authorization: Bearer $CCACHE_TOKEN"
+  export VCPKG_BINARY_SOURCES="http,$cache_url/vcpkg/{name}/{version}/{sha}.zip,$mode,Authorization: Bearer $CCACHE_TOKEN"
   echo "caches: slab-ccache at $cache_url, read-only=$read_only"
 else
   echo "no CCACHE_TOKEN: building without slab-ccache"

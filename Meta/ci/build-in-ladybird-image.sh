@@ -25,8 +25,12 @@ for attempt in 1 2 3; do
   sleep $((attempt * 10))
 done
 
-# Host networking, so the build reaches slab-ccache (10.255.42.1:8642) from inside the container.
+# Host networking, so the build reaches slab-ccache (10.255.42.1:8642) from inside the container. The image's tools
+# (rustup, cargo) want root, so the command runs as root and then hands everything it wrote in the checkout back to the
+# runner's user, who has to be able to clean it up after the job.
+# shellcheck disable=SC2016 # The command line is expanded by the container's shell, not this one.
 exec "${docker[@]}" run --rm --network host \
   --volume "$root:/xenon" --workdir /xenon \
-  --env CCACHE_TOKEN --env CACHE_READ_ONLY --env JOBS --env CI=true \
-  "$image" "$@"
+  --env CCACHE_TOKEN --env CACHE_READ_ONLY --env JOBS --env CI=true --env PYTHONDONTWRITEBYTECODE=1 \
+  --env HOST_OWNER="$(id -u):$(id -g)" \
+  "$image" bash -c '"$@"; status=$?; chown -R "$HOST_OWNER" /xenon; exit $status' bash "$@"
