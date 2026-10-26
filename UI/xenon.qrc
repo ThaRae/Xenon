@@ -1,0 +1,9 @@
+<!DOCTYPE RCC><RCC version="1.0">
+    <qresource>
+        <file alias="Icons/ladybird.png">Icons/ladybird.png</file>
+        <file>OrcaScripts/Ladybird/__init__.py</file>
+        <file>OrcaScripts/Ladybird/script.py</file>
+        <file>OrcaScripts/Ladybird/script_utilities.py</file>
+        <file>OrcaScripts/orca_customizations_bootstrap.py</file>
+    </qresource>
+</RCC>

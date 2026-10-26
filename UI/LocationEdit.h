@@ -1,0 +1,119 @@
+/*
+ * Copyright (c) 2023, Cameron Youell <cameronyouell@gmail.com>
+ * Copyright (c) 2026-present, the Ladybird developers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#pragma once
+
+#include <AK/Function.h>
+#include <AK/kmalloc.h>
+#include <LibWebView/BrowsingSession.h>
+#include <LibWebView/Omnibox.h>
+#include <LibWebView/Settings.h>
+
+#include <QString>
+#include <UI/NativeTextEditingLineEdit.h>
+
+class QAction;
+class QEvent;
+class QGraphicsDropShadowEffect;
+class QMouseEvent;
+class QResizeEvent;
+class QToolButton;
+class QVariantAnimation;
+
+namespace Ladybird {
+
+class Autocomplete;
+
+class LocationEdit final
+    : public NativeTextEditingLineEdit
+    , public WebView::SettingsObserver {
+    Q_OBJECT
+
+public:
+    AK_ALLOC_WITH_KMALLOC;
+
+    LocationEdit(QWidget*, WebView::IsPrivate);
+
+    void set_trailing_action(QAction*);
+    QAction* trailing_action() const;
+    void set_zoom_action(QAction*);
+
+    Optional<URL::URL const&> url() const { return m_url; }
+    void set_url(Optional<URL::URL>);
+    bool url_is_hidden() const { return m_url_is_hidden; }
+    void set_url_is_hidden(bool);
+    void show_autocomplete();
+    void park_editing_session();
+    bool has_parked_editing_session() const { return m_parked_editing_session.has_value(); }
+
+    Function<void(String, Optional<URL::URL>, WebView::OmniboxDestinationKind)> on_navigation;
+
+signals:
+    void focus_return_requested();
+
+private:
+    virtual void changeEvent(QEvent* event) override;
+    virtual bool event(QEvent* event) override;
+    virtual bool eventFilter(QObject* watched, QEvent* event) override;
+    virtual void contextMenuEvent(QContextMenuEvent* event) override;
+    virtual void focusInEvent(QFocusEvent* event) override;
+    virtual void focusOutEvent(QFocusEvent* event) override;
+    virtual void keyPressEvent(QKeyEvent* event) override;
+    virtual void native_text_editing_command_will_execute(Web::TextEditingCommand const&) override;
+    virtual void mouseReleaseEvent(QMouseEvent* event) override;
+    virtual void resizeEvent(QResizeEvent* event) override;
+
+    virtual void search_engine_settings_changed() override;
+
+    void show_full_url_preserving_display_selection();
+    int serialized_url_position_for_display_position(int) const;
+    void update_text_margins();
+    int trailing_text_margin() const;
+    void update_trailing_item_positions();
+    void update_placeholder();
+    void update_chrome_style();
+    void update_location_icon();
+    void update_zoom_indicator();
+    void update_focus_glow(int alpha);
+    void set_field_hovered(bool);
+    void schedule_chrome_style_update();
+    void animate_focus_glow(int target_alpha);
+    void highlight_location();
+    bool text_matches_current_url() const;
+    QString serialized_url() const;
+    QString display_url() const;
+    QString current_query() const;
+    void set_text_and_restart_editing(QString const& text);
+
+    WebView::Omnibox m_omnibox;
+    Autocomplete* m_autocomplete { nullptr };
+    QToolButton* m_leading_icon_button { nullptr };
+    QToolButton* m_trailing_action_button { nullptr };
+    QToolButton* m_zoom_indicator_button { nullptr };
+    QVariantAnimation* m_focus_glow_animation { nullptr };
+    QGraphicsDropShadowEffect* m_focus_glow_effect { nullptr };
+    QAction* m_zoom_action { nullptr };
+
+    Optional<URL::URL> m_url;
+    bool m_url_is_hidden { false };
+
+    struct ParkedEditingSession {
+        int cursor_position { 0 };
+        int selection_start { -1 };
+        int selection_length { 0 };
+    };
+    Optional<ParkedEditingSession> m_parked_editing_session;
+    bool m_has_user_edited_hidden_url { false };
+    bool m_is_updating_chrome_style { false };
+    bool m_is_updating_field_hover { false };
+    bool m_has_pending_chrome_style_update { false };
+    bool m_should_show_full_url_on_mouse_release { false };
+    int m_text_leading_margin { 0 };
+    int m_focus_glow_alpha { 0 };
+};
+
+}
