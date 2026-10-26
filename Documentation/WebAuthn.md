@@ -376,6 +376,8 @@ Keychain on the Mac itself.
 - [ ] Milestone 2: passkeys on security keys, and Linux.
 - [ ] Milestone 3: platform passkeys (undecided).
 
-This branch starts from `main`, which doesn't have `Patches/` and `Meta/patches.py` yet: they're on
-`claude/webextensions-42c7aa` (commit `8d4bd1f`). Milestone 1 starts by bringing that commit over, or by rebasing
-once that branch merges.
+This branch starts from `main`, which doesn't have `Patches/` and `Meta/patches.py` yet. The series so far is on
+other branches: `claude/webextensions-42c7aa` has `0001`–`0003`, and the `xenon-ublock` branch adds xenon-ublock's
+engine patches on top as `0004`–`0009`. Milestone 1 starts by basing this work on those patches, so WebAuthn's six
+come after `0009`, or by bringing over the tooling alone (`8d4bd1f`) and renumbering after `0009` when the branches
+merge. On a base older than `c517088`, `Meta/patches.py` isn't executable; run it as `python3 Meta/patches.py`.
