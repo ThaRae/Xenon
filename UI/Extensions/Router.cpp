@@ -315,7 +315,7 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
         result = handle_permissions_call(context, name, args);
     else if (name.starts_with_bytes("runtime."sv) || name.starts_with_bytes("management."sv) || name.starts_with_bytes("idle."sv) || name.starts_with_bytes("offscreen."sv) || name.starts_with_bytes("commands."sv))
         result = handle_runtime_call(context, name, args);
-    else if (name.starts_with_bytes("tabs."sv) || name.starts_with_bytes("windows."sv) || name.starts_with_bytes("action."sv))
+    else if (name.starts_with_bytes("tabs."sv) || name.starts_with_bytes("windows."sv) || name.starts_with_bytes("action."sv) || name.starts_with_bytes("webNavigation."sv))
         result = Browser::handle_call(*context.extension, context.endpoint.view_id(), name, args);
 
     if (result.is_error())

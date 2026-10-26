@@ -458,6 +458,76 @@ const windows = {
     WINDOW_ID_CURRENT: -2,
 };
 
+// --- chrome.webNavigation and chrome.scripting -------------------------------------------------------------------------
+
+// FIXME: Frames inside pages, and the navigation events, come with content scripts (milestone 3). For now the events
+//        never fire, and a tab has its top-level frame alone.
+const webNavigation = {
+    getFrame: method("webNavigation.getFrame"),
+    getAllFrames: method("webNavigation.getAllFrames"),
+    onBeforeNavigate: event("webNavigation.onBeforeNavigate"),
+    onCommitted: event("webNavigation.onCommitted"),
+    onDOMContentLoaded: event("webNavigation.onDOMContentLoaded"),
+    onCompleted: event("webNavigation.onCompleted"),
+    onErrorOccurred: event("webNavigation.onErrorOccurred"),
+    onCreatedNavigationTarget: event("webNavigation.onCreatedNavigationTarget"),
+    onReferenceFragmentUpdated: event("webNavigation.onReferenceFragmentUpdated"),
+    onTabReplaced: event("webNavigation.onTabReplaced"),
+    onHistoryStateUpdated: event("webNavigation.onHistoryStateUpdated"),
+};
+
+// FIXME: Injecting into pages comes with content scripts (milestone 3). Until then, injecting fails, and registered
+//        content scripts are accepted but never run.
+const notSupportedYet = name =>
+    api(() => {
+        throw new ExtensionError(`${name}() isn't supported yet.`);
+    });
+const scripting = {
+    executeScript: notSupportedYet("scripting.executeScript"),
+    insertCSS: notSupportedYet("scripting.insertCSS"),
+    removeCSS: notSupportedYet("scripting.removeCSS"),
+    registerContentScripts: api(() => undefined),
+    unregisterContentScripts: api(() => undefined),
+    updateContentScripts: api(() => undefined),
+    getRegisteredContentScripts: api(() => []),
+    ExecutionWorld: { ISOLATED: "ISOLATED", MAIN: "MAIN" },
+};
+
+// --- chrome.webRequest and chrome.notifications ------------------------------------------------------------------------
+
+// FIXME: Seeing requests needs the engine to ask the UI process about them (milestone 4). Until then, the events never
+//        fire, and requests go ahead as if no extension were listening.
+const webRequest = {
+    onBeforeRequest: event("webRequest.onBeforeRequest"),
+    onBeforeSendHeaders: event("webRequest.onBeforeSendHeaders"),
+    onSendHeaders: event("webRequest.onSendHeaders"),
+    onHeadersReceived: event("webRequest.onHeadersReceived"),
+    onAuthRequired: event("webRequest.onAuthRequired"),
+    onResponseStarted: event("webRequest.onResponseStarted"),
+    onBeforeRedirect: event("webRequest.onBeforeRedirect"),
+    onCompleted: event("webRequest.onCompleted"),
+    onErrorOccurred: event("webRequest.onErrorOccurred"),
+    handlerBehaviorChanged: api(() => undefined),
+    MAX_HANDLER_BEHAVIOR_CHANGED_CALLS_PER_10_MINUTES: 20,
+};
+
+// FIXME: Xenon doesn't show extensions' notifications yet (milestone 4). They're accepted, and reported as not
+//        permitted, as in Chrome when the user turns an extension's notifications off.
+const notifications = {
+    create: api((...args) => (typeof args[0] === "string" && args[0] ? args[0] : crypto.randomUUID())),
+    update: api(() => false),
+    clear: api(() => false),
+    getAll: api(() => ({})),
+    getPermissionLevel: api(() => "denied"),
+    onClicked: event("notifications.onClicked"),
+    onButtonClicked: event("notifications.onButtonClicked"),
+    onClosed: event("notifications.onClosed"),
+    onPermissionLevelChanged: event("notifications.onPermissionLevelChanged"),
+    onShowSettings: event("notifications.onShowSettings"),
+    TemplateType: { BASIC: "basic", IMAGE: "image", LIST: "list", PROGRESS: "progress" },
+    PermissionLevel: { GRANTED: "granted", DENIED: "denied" },
+};
+
 // --- The rest ----------------------------------------------------------------------------------------------------------
 
 const permissions = {
@@ -629,6 +699,10 @@ if (config.contextType !== "OFFSCREEN_DOCUMENT") {
     if (hasPermission("alarms")) chrome.alarms = alarms;
     if (hasPermission("idle")) chrome.idle = idle;
     if (hasPermission("offscreen")) chrome.offscreen = offscreen;
+    if (hasPermission("webNavigation")) chrome.webNavigation = webNavigation;
+    if (hasPermission("scripting")) chrome.scripting = scripting;
+    if (hasPermission("webRequest")) chrome.webRequest = webRequest;
+    if (hasPermission("notifications")) chrome.notifications = notifications;
     if (config.manifest.action) chrome.action = action;
 }
 

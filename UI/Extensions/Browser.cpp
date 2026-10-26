@@ -1063,6 +1063,49 @@ static ErrorOr<JsonValue, String> handle_action_call(Extension const& extension,
     return MUST(String::formatted("{} isn't supported yet.", name));
 }
 
+// --- chrome.webNavigation ---------------------------------------------------------------------------------------------
+
+// FIXME: Only a tab's top-level frame, for now. Its frames, and the navigation events, come with content scripts.
+static JsonObject top_frame_to_json(Tab& tab)
+{
+    JsonObject json;
+    json.set("frameId"sv, 0);
+    json.set("parentFrameId"sv, -1);
+    json.set("url"sv, tab.url().serialize());
+    json.set("errorOccurred"sv, false);
+    json.set("frameType"sv, "outermost_frame"sv);
+    json.set("documentLifecycle"sv, "active"sv);
+    return json;
+}
+
+static ErrorOr<JsonValue, String> handle_web_navigation_call(Extension const& extension, StringView name, JsonArray const& args)
+{
+    if (!extension.manifest().has_permission("webNavigation"sv))
+        return "The webNavigation permission is required."_string;
+
+    auto details = !args.is_empty() && args.at(0).is_object() ? args.at(0).as_object() : JsonObject {};
+    auto tab_id_value = details.get_i64("tabId"sv);
+    if (!tab_id_value.has_value())
+        return "tabId is required."_string;
+
+    // As in Chrome, a tab or frame that doesn't exist gives null.
+    auto tab = find_tab(*tab_id_value);
+
+    if (name == "webNavigation.getFrame"sv) {
+        if (!tab.has_value() || details.get_i64("frameId"sv).value_or(0) != 0)
+            return JsonValue {};
+        return top_frame_to_json(*tab->tab);
+    }
+    if (name == "webNavigation.getAllFrames"sv) {
+        if (!tab.has_value())
+            return JsonValue {};
+        JsonArray frames;
+        frames.must_append(top_frame_to_json(*tab->tab));
+        return frames;
+    }
+    return MUST(String::formatted("{} isn't supported yet.", name));
+}
+
 ErrorOr<JsonValue, String> handle_call(Extension const& extension, Optional<u64> caller_view_id, StringView name, JsonArray const& args)
 {
     if (name.starts_with("tabs."sv)) {
@@ -1074,6 +1117,8 @@ ErrorOr<JsonValue, String> handle_call(Extension const& extension, Optional<u64>
         return handle_windows_call(extension, caller_view_id, name, args);
     if (name.starts_with("action."sv))
         return handle_action_call(extension, name, args);
+    if (name.starts_with("webNavigation."sv))
+        return handle_web_navigation_call(extension, name, args);
     return MUST(String::formatted("{} isn't supported yet.", name));
 }
 

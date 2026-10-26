@@ -142,6 +142,14 @@ async function run() {
     check("tabs.connect disconnects without content scripts", tabPortError?.includes("Receiving end does not exist"));
     check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
 
+    // Headless runs have no windows, and so no tabs. A tab that doesn't exist has no frames.
+    check("webNavigation.getFrame of no tab", (await chrome.webNavigation.getFrame({ tabId: 987654, frameId: 0 })) === null);
+    check("webNavigation.getAllFrames of no tab", (await chrome.webNavigation.getAllFrames({ tabId: 987654 })) === null);
+    check("webNavigation events", typeof chrome.webNavigation.onCommitted.addListener === "function");
+    check("webRequest events", typeof chrome.webRequest?.onAuthRequired?.addListener === "function");
+    check("notifications.create", typeof (await chrome.notifications.create("test", { type: "basic" })) === "string");
+    check("scripting.executeScript fails", await chrome.scripting.executeScript({ target: { tabId: 987654 }, func: () => 1 }).then(() => false, () => true));
+
     check("offscreen.hasDocument before", (await chrome.offscreen.hasDocument()) === false);
     await chrome.offscreen.createDocument({ url: "offscreen.html", reasons: ["CLIPBOARD"], justification: "test" });
     let offscreen;

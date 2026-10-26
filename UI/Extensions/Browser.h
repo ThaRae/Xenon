@@ -25,8 +25,8 @@ class Tab;
 
 }
 
-// chrome.tabs, chrome.windows, and chrome.action: what extensions see of the browser's windows and tabs, by Chrome's
-// numeric IDs, and the state of their toolbar buttons.
+// chrome.tabs, chrome.windows, chrome.action, and chrome.webNavigation: what extensions see of the browser's windows and
+// tabs, by Chrome's numeric IDs, and the state of their toolbar buttons.
 namespace Ladybird::Extensions::Browser {
 
 ErrorOr<JsonValue, String> handle_call(Extension const&, Optional<u64> caller_view_id, StringView name, JsonArray const& args);

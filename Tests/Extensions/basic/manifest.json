@@ -16,7 +16,11 @@
         "storage",
         "alarms",
         "tabs",
-        "offscreen"
+        "offscreen",
+        "webNavigation",
+        "scripting",
+        "webRequest",
+        "notifications"
     ],
     "icons": {
         "16": "icon16.png",
