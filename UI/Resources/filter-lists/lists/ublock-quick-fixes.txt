@@ -1,0 +1,255 @@
+! Title: uBlock filters – Quick fixes (for Ladybird)
+! Source: https://ublockorigin.github.io/uAssets/filters/quick-fixes.txt
+! Homepage: https://github.com/uBlockOrigin/uAssets
+! License: GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+! Converted by xenon-ublock on 2026-10-26 17:30 UTC for adblock 0.13.3, as built into Ladybird's LibWeb/ContentBlocker.
+! Kept 244 of 461 upstream filters, as 247 filters; the rest cannot take
+! effect in Ladybird. See report.md and dropped/ next to this file for what was dropped and why.
+!
+@@||hb.vntsm.com/v4/live/vms/sites/aternos.org/index.js$script,domain=aternos.org
+@@||cdn.snigelweb.com/adengine/aternos.org/loader.js$script,domain=aternos.org
+aternos.org##.header-center:style(margin-top:-5000px !important;)
+aternos.org##.sidebar:style(width: 1.745px !important; padding: 1px !important)
+aternos.org##.ad-dfp:style(min-height: 0.1485mm !important; height: 0.1485mm !important;)
+aternos.org###placement-takeover
+youtube.com#@##player-ads
+www.youtube.com###toast:has(> #text-container > yt-formatted-string#text.yt-notification-action-renderer)
+www.youtube.com##.ytSnackbarContainerOpened:has(> .snackbarViewModelSwipeable > .snackbarViewModelEngagementBarWrapper .ytAttributedStringWhiteSpacePreWrap[style])
+web.facebook.com,www.facebook.com##div[role="complementary"] a[rel="nofollow noreferrer external"][attributionsrc^="/privacy_sandbox/comet/register/"][attributionsrc*="?eid="]
+web.facebook.com,www.facebook.com##div[role="complementary"] div[data-visualcompletion="ignore-dynamic"] a[href*="fbclid"][href*="utm_medium"][href*="utm_source"][href*="utm_id"][href*="utm_content"][href*="utm_term"][href*="utm_campaign"]
+web.facebook.com,www.facebook.com##div[role="complementary"] div[data-visualcompletion="ignore-dynamic"] a[rel="nofollow noreferrer noopener"][target="rhcad2"]
+web.facebook.com,www.facebook.com##div[role="complementary"] div[data-visualcompletion="ignore-dynamic"] a[rel="nofollow noreferrer tag"][aria-labelledby^="_R_"]
+web.facebook.com,www.facebook.com##div[role="complementary"] a[attributionsrc][href^="http"][target="_blank"][role="link"][rel*="noreferrer"]:has(img[src])
+||imasdk.googleapis.com/js/sdkloader/ima3.js$script,3p,redirect=google-ima.js,domain=ashleyhardat.com,important
+||ashleyhardat.com^$badfilter
+@@||pagead2.googlesyndication.com^$script,domain=next-episode.net
+@@*$image,xhr,script,domain=japscan.app|japscan.biz|japscan.br|japscan.cc|japscan.club|japscan.co|japscan.co.uk|japscan.com|japscan.com.br|japscan.com.tr|japscan.de|japscan.es|japscan.fr|japscan.in|japscan.info|japscan.io|japscan.it|japscan.live|japscan.lol|japscan.me|japscan.net|japscan.nl|japscan.online|japscan.org|japscan.pl|japscan.pro|japscan.ru|japscan.site|japscan.to|japscan.top|japscan.tv|japscan.uk|japscan.us|japscan.ws|japscan.xyz
+/^https:\/\/acscdn\.com\/script\/(?:aclib|atg|compatibility|ippg|suv4|ut)\.js(\?cb=\d{13})?$/$script,3p,match-case,important,domain=japscan.app|japscan.biz|japscan.br|japscan.cc|japscan.club|japscan.co|japscan.co.uk|japscan.com|japscan.com.br|japscan.com.tr|japscan.de|japscan.es|japscan.fr|japscan.in|japscan.info|japscan.io|japscan.it|japscan.live|japscan.lol|japscan.me|japscan.net|japscan.nl|japscan.online|japscan.org|japscan.pl|japscan.pro|japscan.ru|japscan.site|japscan.to|japscan.top|japscan.tv|japscan.uk|japscan.us|japscan.ws|japscan.xyz
+||platform.pubadx.one/pubadx-ad.js$script,domain=japscan.app|japscan.biz|japscan.br|japscan.cc|japscan.club|japscan.co|japscan.co.uk|japscan.com|japscan.com.br|japscan.com.tr|japscan.de|japscan.es|japscan.fr|japscan.in|japscan.info|japscan.io|japscan.it|japscan.live|japscan.lol|japscan.me|japscan.net|japscan.nl|japscan.online|japscan.org|japscan.pl|japscan.pro|japscan.ru|japscan.site|japscan.to|japscan.top|japscan.tv|japscan.uk|japscan.us|japscan.ws|japscan.xyz,important
+||static.cloudflareinsights.com/beacon.min.js/$script,domain=japscan.app|japscan.biz|japscan.br|japscan.cc|japscan.club|japscan.co|japscan.co.uk|japscan.com|japscan.com.br|japscan.com.tr|japscan.de|japscan.es|japscan.fr|japscan.in|japscan.info|japscan.io|japscan.it|japscan.live|japscan.lol|japscan.me|japscan.net|japscan.nl|japscan.online|japscan.org|japscan.pl|japscan.pro|japscan.ru|japscan.site|japscan.to|japscan.top|japscan.tv|japscan.uk|japscan.us|japscan.ws|japscan.xyz,important
+||network-loop.com/campaigns/banners/$domain=japscan.app|japscan.biz|japscan.br|japscan.cc|japscan.club|japscan.co|japscan.co.uk|japscan.com|japscan.com.br|japscan.com.tr|japscan.de|japscan.es|japscan.fr|japscan.in|japscan.info|japscan.io|japscan.it|japscan.live|japscan.lol|japscan.me|japscan.net|japscan.nl|japscan.online|japscan.org|japscan.pl|japscan.pro|japscan.ru|japscan.site|japscan.to|japscan.top|japscan.tv|japscan.uk|japscan.us|japscan.ws|japscan.xyz,important
+japscan.*#@#.navbar-nav > li.nav-item > a.text-truncate.nav-link.font-weight-bold[href*="?"]
+japscan.*#@#body > div.full-container > div.full-container.text-center > div.mt-2[style="margin: 0px auto; display: block;"] > a.Aikoi.donate[target="_blank"][rel][href^="https://www.longosto.shop/?utm_source="] > img.img-fluid
+japscan.*##html > div[style="position: fixed; inset: 0px; z-index: 2147483647; pointer-events: auto;"]
+/dl?op=player_api&cmd=*adb=$xhr,1p,important,domain=poophq.com|veev.to|doods.to
+||adsco.re^$script,redirect=none:5,domain=poophq.com|veev.to|doods.to
+*$other,3p,domain=poophq.com|veev.to|doods.to
+@@||veevcdn.co^$other,3p,domain=poophq.com|veev.to|doods.to
+@@*$ghide,xhr,domain=poophq.com|veev.to|doods.to
+veev.to#@#.avb-active
+dogdrip.net##html[lang="ko"] [id^="img_"][style]:has(iframe[frameborder="0"][style]):style(clip-path: circle(0) !important;)
+smsonline.cloud##html[data-theme][lang] [id^="img_"][style]:has(iframe[frameborder="0"][style]):style(clip-path: circle(0) !important;)
+~bing.com,~dogdrip.net,~smsonline.cloud##div[style^="height:    250px; width:    300px;"]
+~bing.com,~dogdrip.net,~smsonline.cloud##div[style^="width:    160px; height:    600px; margin: 0px auto; min-width: 160px; min-height: 600px;"]
+~bing.com,~dogdrip.net,~smsonline.cloud##div[style^="width:    300px; height:    250px;"]
+~bing.com,~dogdrip.net,~smsonline.cloud##img[height="   250"][width="   300"]
+~bing.com,~dogdrip.net,~smsonline.cloud##img[height="   90"][width="   728"]
+~bing.com,~dogdrip.net,~smsonline.cloud##ins[style$="height:    90px; width:    728px;"]
+~bing.com,~dogdrip.net,~smsonline.cloud##amp-img[height="   120"]
+~bing.com,~dogdrip.net,~smsonline.cloud##amp-img[width="   300"]
+~bing.com,~dogdrip.net,~smsonline.cloud##amp-img[width="   336"]
+~bing.com,~dogdrip.net,~smsonline.cloud##div[id][class][style^="display"][style*="hidden"][style*="width:   "]
+~bing.com,~dogdrip.net,~smsonline.cloud##ins[id][style*="--gn-ov-ad-height"]
+~bing.com,~dogdrip.net,~smsonline.cloud,*##iframe[id][height^="  "]:style(visibility: hidden !important;)
+||html-load.com^$image,1p
+||html-load.com/l/$xhr
+-load.com/script/$xhr,domain=smsonline.cloud
+||loader.nyitvatartas24.hu^
+bing.com##ol#b_results > li.b_algo:has(> .b_title > h2 > a[id][ads])
+bing.com##ol#b_results > li:has(> :is(.b_tpcn, .b_title, h2) a[href^="https://www.bing.com/aclk?"])
+@@*$image,xhr,domain=bg-gledai.app|bg-gledai.biz|bg-gledai.br|bg-gledai.cc|bg-gledai.club|bg-gledai.co|bg-gledai.co.uk|bg-gledai.com|bg-gledai.com.br|bg-gledai.com.tr|bg-gledai.de|bg-gledai.es|bg-gledai.fr|bg-gledai.in|bg-gledai.info|bg-gledai.io|bg-gledai.it|bg-gledai.live|bg-gledai.me|bg-gledai.net|bg-gledai.nl|bg-gledai.online|bg-gledai.org|bg-gledai.pl|bg-gledai.pro|bg-gledai.ru|bg-gledai.site|bg-gledai.to|bg-gledai.top|bg-gledai.tv|bg-gledai.uk|bg-gledai.us|bg-gledai.video|bg-gledai.ws|bg-gledai.xyz|gledaitv.app|gledaitv.biz|gledaitv.br|gledaitv.cc|gledaitv.club|gledaitv.co|gledaitv.co.uk|gledaitv.com|gledaitv.com.br|gledaitv.com.tr|gledaitv.de|gledaitv.es|gledaitv.fan|gledaitv.fr|gledaitv.in|gledaitv.info|gledaitv.io|gledaitv.it|gledaitv.live|gledaitv.me|gledaitv.net|gledaitv.nl|gledaitv.online|gledaitv.org|gledaitv.pl|gledaitv.pro|gledaitv.ru|gledaitv.site|gledaitv.to|gledaitv.top|gledaitv.tv|gledaitv.uk|gledaitv.us|gledaitv.ws|gledaitv.xyz
+@@*$ghide,domain=bg-gledai.app|bg-gledai.biz|bg-gledai.br|bg-gledai.cc|bg-gledai.club|bg-gledai.co|bg-gledai.co.uk|bg-gledai.com|bg-gledai.com.br|bg-gledai.com.tr|bg-gledai.de|bg-gledai.es|bg-gledai.fr|bg-gledai.in|bg-gledai.info|bg-gledai.io|bg-gledai.it|bg-gledai.live|bg-gledai.me|bg-gledai.net|bg-gledai.nl|bg-gledai.online|bg-gledai.org|bg-gledai.pl|bg-gledai.pro|bg-gledai.ru|bg-gledai.site|bg-gledai.to|bg-gledai.top|bg-gledai.tv|bg-gledai.uk|bg-gledai.us|bg-gledai.video|bg-gledai.ws|bg-gledai.xyz|gledaitv.app|gledaitv.biz|gledaitv.br|gledaitv.cc|gledaitv.club|gledaitv.co|gledaitv.co.uk|gledaitv.com|gledaitv.com.br|gledaitv.com.tr|gledaitv.de|gledaitv.es|gledaitv.fan|gledaitv.fr|gledaitv.in|gledaitv.info|gledaitv.io|gledaitv.it|gledaitv.live|gledaitv.me|gledaitv.net|gledaitv.nl|gledaitv.online|gledaitv.org|gledaitv.pl|gledaitv.pro|gledaitv.ru|gledaitv.site|gledaitv.to|gledaitv.top|gledaitv.tv|gledaitv.uk|gledaitv.us|gledaitv.ws|gledaitv.xyz
+@@||pagead2.googlesyndication.com^$script,domain=bg-gledai.app|bg-gledai.biz|bg-gledai.br|bg-gledai.cc|bg-gledai.club|bg-gledai.co|bg-gledai.co.uk|bg-gledai.com|bg-gledai.com.br|bg-gledai.com.tr|bg-gledai.de|bg-gledai.es|bg-gledai.fr|bg-gledai.in|bg-gledai.info|bg-gledai.io|bg-gledai.it|bg-gledai.live|bg-gledai.me|bg-gledai.net|bg-gledai.nl|bg-gledai.online|bg-gledai.org|bg-gledai.pl|bg-gledai.pro|bg-gledai.ru|bg-gledai.site|bg-gledai.to|bg-gledai.top|bg-gledai.tv|bg-gledai.uk|bg-gledai.us|bg-gledai.video|bg-gledai.ws|bg-gledai.xyz|gledaitv.app|gledaitv.biz|gledaitv.br|gledaitv.cc|gledaitv.club|gledaitv.co|gledaitv.co.uk|gledaitv.com|gledaitv.com.br|gledaitv.com.tr|gledaitv.de|gledaitv.es|gledaitv.fan|gledaitv.fr|gledaitv.in|gledaitv.info|gledaitv.io|gledaitv.it|gledaitv.live|gledaitv.me|gledaitv.net|gledaitv.nl|gledaitv.online|gledaitv.org|gledaitv.pl|gledaitv.pro|gledaitv.ru|gledaitv.site|gledaitv.to|gledaitv.top|gledaitv.tv|gledaitv.uk|gledaitv.us|gledaitv.ws|gledaitv.xyz
+gledaitv.*###ad-overlay
+bg-gledai.video,gledaitv.*###gledai-access-notice
+||imasdk.googleapis.com/js/sdkloader/ima3.js$script,domain=bg-gledai.video,redirect=google-ima.js
+||viads.com^$script,domain=bg-gledai.video,redirect=noopjs
+@@||ads.*.js|$script,3p,domain=seirsanduk.app|seirsanduk.biz|seirsanduk.br|seirsanduk.cc|seirsanduk.club|seirsanduk.co|seirsanduk.co.uk|seirsanduk.com|seirsanduk.com.br|seirsanduk.com.tr|seirsanduk.de|seirsanduk.es|seirsanduk.fr|seirsanduk.in|seirsanduk.info|seirsanduk.io|seirsanduk.it|seirsanduk.live|seirsanduk.me|seirsanduk.net|seirsanduk.nl|seirsanduk.online|seirsanduk.org|seirsanduk.pl|seirsanduk.pro|seirsanduk.ru|seirsanduk.site|seirsanduk.to|seirsanduk.top|seirsanduk.tv|seirsanduk.uk|seirsanduk.us|seirsanduk.ws|seirsanduk.xyz|seir-sanduk.com
+@@||ads.*.js?$script,3p,domain=seirsanduk.app|seirsanduk.biz|seirsanduk.br|seirsanduk.cc|seirsanduk.club|seirsanduk.co|seirsanduk.co.uk|seirsanduk.com|seirsanduk.com.br|seirsanduk.com.tr|seirsanduk.de|seirsanduk.es|seirsanduk.fr|seirsanduk.in|seirsanduk.info|seirsanduk.io|seirsanduk.it|seirsanduk.live|seirsanduk.me|seirsanduk.net|seirsanduk.nl|seirsanduk.online|seirsanduk.org|seirsanduk.pl|seirsanduk.pro|seirsanduk.ru|seirsanduk.site|seirsanduk.to|seirsanduk.top|seirsanduk.tv|seirsanduk.uk|seirsanduk.us|seirsanduk.ws|seirsanduk.xyz|seir-sanduk.com
+@@||kupuvamsamo.online/adserver.js$domain=seirsanduk.app|seirsanduk.biz|seirsanduk.br|seirsanduk.cc|seirsanduk.club|seirsanduk.co|seirsanduk.co.uk|seirsanduk.com|seirsanduk.com.br|seirsanduk.com.tr|seirsanduk.de|seirsanduk.es|seirsanduk.fr|seirsanduk.in|seirsanduk.info|seirsanduk.io|seirsanduk.it|seirsanduk.live|seirsanduk.me|seirsanduk.net|seirsanduk.nl|seirsanduk.online|seirsanduk.org|seirsanduk.pl|seirsanduk.pro|seirsanduk.ru|seirsanduk.site|seirsanduk.to|seirsanduk.top|seirsanduk.tv|seirsanduk.uk|seirsanduk.us|seirsanduk.ws|seirsanduk.xyz|seir-sanduk.com
+@@||seir-sanduk.com^$script,1p
+@@||pvpoke-re.com^$ghide
+||g.doubleclick.net/pagead/ads?client=ca-pub-3497863494706299$frame,redirect=noop.html,domain=pvpoke-re.com
+royalroad.com##.dKKumhSnWiFq75vPUVtmTanQ:has(a[href^="https://www.royalroad.com/a/r?campaign="]:not([href*="&url=https%3A%2F%2Fwww.royalroad.com"]))
+gecmisi.com.tr##.ad-container
+vook.vc#@#[class*="-spnsr"]
+vook.vc##.note-main-spnsr a:not([href*="vook.vc"])
+vook.vc##.note-right-spnsr
+||sbisec.co.jp/etgate/^$all,badfilter
+||banei-keiba.or.jp^$badfilter
+||preview.studio.site^$badfilter
+nontonx.com###rules-nontonx
+||raw.githubusercontent.com^$domain=nontonx.com
+@@||embed.wcostream.com^$script,1p
+@@||global.novelpia.com^$ghide
+global.novelpia.com##div[id^="novelpia_"]
+th.gl##body:style(overflow:auto !important; pointer-events:auto !important)
+@@||historicaerials.com^$ghide
+myanimelist.net###contentWrapper ~ div[class]:not([id]):has(a.ga-click img.ga-impression)
+myanimelist.net###headerSmall + div[class]:not([id]):has(a.ga-click img.ga-impression)
+myanimelist.net##div[style="overflow: hidden; padding: 10px 0; border-bottom: solid #cdcdcd 1px"]:has([data-ad-target])
+myanimelist.net##div[style="padding:16px 0px 0px 0px;"]
+bus-location.1507t.xyz#@#.ad-area:not(.text-ad)
+bus-location.1507t.xyz##div[id]:empty:style(height: 1px !important; width 1px !important; position: fixed !important; z-index: 2147483647 !important;)
+bus-location.1507t.xyz##div[id]:has(> script[src^="https://adm.shinobi.jp"]):style(height: 1px !important; width 1px !important; position: fixed !important; z-index: 2147483647 !important;)
+||adm.shinobi.jp^$script,redirect=noop.js,domain=bus-location.1507t.xyz
+||cloudfront.net/?$script,redirect=noopjs,domain=meuplayeronlinehd.com|multicanaistt.space
+meuplayeronlinehd.com###player:style(display: block !important;)
+streamcash.to##div.video-js:style(z-index:2147483647 !important)
+||mjzeexubcswjka.com^
+||uijarxbm.com^
+twitch.tv##.stream-display-ad__wrapper + div > div[style^="position:"] > div[class^="Layout-sc-"]:has(video[src^="https://m.media-amazon.com"])
+twitch.tv##.chat-shell > div[class^="Layout-sc-"]  > div[style^="transition:"]:has(video[src^="https://m.media-amazon.com"])
+igorslab.de##a[aria-label*="Banner"]
+igorslab.de##.herald-sticky
+igorslab.de##img[src^="blob:http"]
+/^https:\/\/www\.igorslab\.de\/(?:[0-9a-z-]{7,}\/)+A[\/0-9A-Z_a-z-]{100,}(?:[0-9a-z-]{7,}\/)*$/$image,1p,match-case
+*$script,xhr,3p,domain=igorslab.de
+@@||google.com^$script,xhr,3p,domain=igorslab.de
+@@||jsdelivr.net^$script,xhr,3p,domain=igorslab.de
+||igorslab.de^$script,xhr,1p
+||igorslab.de/?$image
+||igorslab.de/wp-content/*/ajax-handler.php$image
+||igorslab.de/wp-content/uploads/2020/03/980x120px_pure.jpg
+||igorslab.de/wp-content/uploads/2020/03/igor_pulse_9070GRE_
+||igorslab.de/wp-content/uploads/2020/06/nv-rtx-pro-blackwell-980x125-1.jpg
+||igorslab.de/wp-content/uploads/2020/06/nv-rtx-pro-blackwell-display-300x300-1.jpg
+||igorslab.de/wp-content/uploads/2021/04/Optris_Final-2.jpg
+||igorslab.de/wp-content/uploads/2021/07/SHARKOON_Igors_Lab_SKILLER_SGK50_S2_301x251px.jpg
+||igorslab.de/wp-content/uploads/2021/07/SHARKOON_Igors_Lab_SKILLER_SGK50_S2_301x501px.jpg
+||igorslab.de/wp-content/uploads/2021/07/SHARKOON_Igors_Lab_SKILLER_SGM50W_301x501px.jpg
+||igorslab.de/wp-content/uploads/2021/07/SHARKOON_Igors_Lab_SKILLER_SGM50W_1024x120px.jpg
+||igorslab.de/wp-content/uploads/2021/07/SHARKOON_Igors_Lab_SKILLER_SGP30_D1-D6_301x251px.jpg
+||igorslab.de/wp-content/uploads/2021/07/SHARKOON_Igors_Lab_SKILLER_SGP30_D1-D6_301x501px.jpg
+||igorslab.de/wp-content/uploads/2021/11/Fractal-Sep-launch.jpg
+||igorslab.de/wp-content/uploads/2022/12/View-600-Teal-300x400-1.jpg
+||igorslab.de/wp-content/uploads/2023/04/980x100_DAMN_Fruehlingsdeals_ARCTIC_MINDFACTORY.jpg
+||igorslab.de/wp-content/uploads/2023/04/Igors_Lab_ARCTIC_MX-7_980x100_
+||igorslab.de/wp-content/uploads/2023/11/980x125-2.png
+||igorslab.de/wp-content/uploads/2024/01/Palit_RTX50_300_250_en.jpg
+||igorslab.de/wp-content/uploads/2024/09/0926_VGA_Autumn-Pack_900x125.jpg
+||igorslab.de/wp-content/uploads/2024/09/Igors_Lab_980x125.jpg
+||igorslab.de/wp-content/uploads/2025/03/DP_H_DE.png
+||igorslab.de/wp-content/uploads/2024/07/SHARKOON_Igors_Lab_SKILLER_SGM50W_301x251px.jpg
+||igorslab.de/wp-content/uploads/2025/08/HATOR-Skyfall_80_MAG_ULTIMA_8K_Wireless.jpg
+||igorslab.de/wp-content/uploads/2025/10/Terminator-Air_300-x-400-1.jpg
+||igorslab.de/wp-content/uploads/2025/11/V2-Banner_V4_1-2.jpg
+||igorslab.de/wp-content/uploads/2025/12/Halnziye.jpg
+||igorslab.de/wp-content/uploads/2026/01/Cooler-Master.png
+||igorslab.de/wp-content/uploads/2026/03/AT-120-K-300%C3%97250.jpg
+||igorslab.de/wp-content/uploads/2026/04/300-%D1%85-350-HATOR-Quasar-3-Ultima-3.jpg
+||igorslab.de/wp-content/uploads/2026/07/Terminator-Air_980-x-125-1.jpg
+||igorslab.de/wp-content/uploads/2026/08/DP_V_DE.png
+||igorslab.de/wp-content/uploads/2026/08/HK5-2026.jpg
+||igorslab.de/wp-content/uploads/2026/08/Horizontal.jpg
+||igorslab.de/wp-content/uploads/2026/08/Vertical.jpg
+||igorslab.de/wp-content/uploads/2026/10/Solstice-H.png
+||igorslab.de/wp-content/uploads/2026/10/Solstice-V.png
+@@/^https:\/\/www\.igorslab\.de\/wp-content\/themes\/igor\/js\/jquery-\d\.\d{1,2}\.\d{1,2}\.min\.js\?ver=/$script,1p,match-case
+@@||www.igorslab.de/wp-content/uploads/20*.pdf^$xhr,1p
+@@||www.igorslab.de/community/$script,xhr
+@@||www.igorslab.de/cdn-cgi/challenge-platform/$script,xhr
+@@||www.igorslab.de/cdn-cgi/scripts/*/cloudflare-static/rocket-loader.min.js
+@@||www.igorslab.de/wp-content/plugins/XFWP/assets/js/xfwp-admin.js
+@@||www.igorslab.de/wp-content/plugins/ba-plus-before-after-image-slider/assets/s201-bai.js
+@@||www.igorslab.de/wp-content/plugins/igorslab-advanced-pdf-viewer/assets/viewer.js
+@@||www.igorslab.de/wp-content/plugins/igorslab-ai-seo-performance-suite/assets/js/consent.js
+@@||www.igorslab.de/wp-content/plugins/igorslab-geizhals-auto/assets/ilgha-frontend.js
+@@||www.igorslab.de/wp-content/plugins/igorslab-youtube-latest-shortcode/assets/frontend.js
+@@||www.igorslab.de/wp-content/plugins/meks-flexible-shortcodes/js/main.js
+@@||www.igorslab.de/wp-content/plugins/wonderplugin-gridgallery/engine/wonderplugingridgallery.js
+@@||www.igorslab.de/wp-content/plugins/wonderplugin-gridgallery/engine/wonderplugingridlightbox.js
+@@||www.igorslab.de/wp-content/plugins/wonderplugin-gallery/engine/wonderplugingallery.js
+@@||www.igorslab.de/wp-content/plugins/wonderplugin-slider/engine/wonderpluginslider.js
+@@||www.igorslab.de/wp-content/plugins/wonderplugin-slider/engine/wonderpluginsliderskins.js
+@@||www.igorslab.de/wp-content/plugins/wp-google-search/assets/js/google_cse_v2.js
+@@||www.igorslab.de/wp-content/themes/herald/assets/js/min.js
+@@||www.igorslab.de/wp-includes/js/utils.min.js
+@@||www.igorslab.de/wp-includes/js/imagesloaded.min.js
+@@||www.igorslab.de/wp-admin/admin-ajax.php
+igorslab.de##a[rel][target]:not([target="blank"],[target="_blank"])
+||igorslab.de/wp-content/plugins/igorslab-ads-suite/
+igorslab.de##div[style="height: 90 px; text-align: left;"]
+igorslab.de##div[style^="display:block;position:relative;max-width:"]
+igorslab.de##[style*="!important"]
+igorslab.de##[style*="aspect-ratio"]
+igorslab.de##[style*="background-image:url"]
+igorslab.de##div[style*="blob:http"]:style(background: none !important;)
+sulpanaro.net#@#div[class^="sulpa-"]
+||static.elektroda.pl/html5/mouser/$frame,1p
+elektroda.pl,elektroda.com,elektroda.de##.f-box:has(> div > iframe[src^="https://static.elektroda.pl/html5/mouser/"])
+elektroda.pl,elektroda.com,elektroda.de##[class*="col-sm-"] > div:has(> a[onclick*="sendGAEvent"][href^="/rtvforum/"])
+elektroda.pl,elektroda.com,elektroda.de##a[href*="/rtvforum/n/red/"]:has(img + [class])
+||static2.elektroda.pl/img/botland_
+elektroda.pl##a[href^="https://www.elektroda.pl/rtvforum/n/red/"]:has(img[src^="https://obrazki.elektroda.pl/"])
+elektroda.pl##.the-discussion div:has(> a[href^="https://www.elektroda.pl/rtvforum/"] > picture > source)
+elektroda.pl##.topic-lists-wrap > ul > li:not(.post) a:has(source)
+elektroda.pl##.the-content > section:has(> div[id] > div > div > a[rel*="nofollow"])
+elektroda.pl##div[class*="no-padd"] > div[class*="col-"]:has(> [id] > [style] > form)
+elektroda.pl##div:has(> form[action][onsubmit*="("] table[style*="background"])
+elektroda.pl##.row > .col-md-12 > div:has(.adsbygoogle)
+elektroda.pl##.ad-resize.container:style(padding:0 !important)
+genshin-soku.com,monhan-soku.com,xn--gckdevd5myivf.site,xn--o9j0bk1l6d1bnv1as45bb2j.com,yamiisoku.com###yaab-overlay
+genshin-soku.com,monhan-soku.com,xn--gckdevd5myivf.site,xn--o9j0bk1l6d1bnv1as45bb2j.com,yamiisoku.com##a[rel*="sponsored"]:not(.aedr-form__purchase[href="https://amzn.to/4g4yOhg"])
+genshin-soku.com,monhan-soku.com,xn--gckdevd5myivf.site,xn--o9j0bk1l6d1bnv1as45bb2j.com,yamiisoku.com##a:has(img[src^="https://m.media-amazon.com" i])
+genshin-soku.com,monhan-soku.com,xn--gckdevd5myivf.site,xn--o9j0bk1l6d1bnv1as45bb2j.com,yamiisoku.com##[href*="aHR0"]
+genshin-soku.com,monhan-soku.com,xn--gckdevd5myivf.site,xn--o9j0bk1l6d1bnv1as45bb2j.com,yamiisoku.com##[class*="pdx-"]
+genshin-soku.com,monhan-soku.com,xn--gckdevd5myivf.site,xn--o9j0bk1l6d1bnv1as45bb2j.com,yamiisoku.com##[id*="-sale"]
+genshin-soku.com,monhan-soku.com,xn--gckdevd5myivf.site,xn--o9j0bk1l6d1bnv1as45bb2j.com,yamiisoku.com##.catalog-content
+@@||genshin-soku.com/wp-content/plugins/amazon-egift-donation/assets/front.js
+@@||genshin-soku.com/wp-content/plugins/yamiisoku-bbs-comments/assets/comments.js
+@@||genshin-soku.com/wp-content/plugins/yamiisoku-popular-posts/assets/script.js
+@@||genshin-soku.com/wp-content/themes/monhan-soku-theme/assets/js/comment-more.js
+@@||genshin-soku.com/wp-includes/js/wp-emoji-release.min.js
+@@||monhan-soku.com/wp-content/plugins/yamiisoku-bbs-comments/assets/comments.js
+@@||monhan-soku.com/wp-content/plugins/yamiisoku-popular-posts/assets/script.js
+@@||monhan-soku.com/wp-content/themes/monhan-soku-theme/assets/js/comment-more.js
+@@||monhan-soku.com/wp-includes/js/jquery/jquery-migrate.min.js
+@@||monhan-soku.com/wp-includes/js/jquery/jquery.min.js
+@@||monhan-soku.com/wp-includes/js/mediaelement/mediaelement-and-player.min.js
+@@||monhan-soku.com/wp-includes/js/mediaelement/mediaelement-migrate.min.js
+@@||monhan-soku.com/wp-includes/js/mediaelement/renderers/vimeo.min.js
+@@||monhan-soku.com/wp-includes/js/mediaelement/wp-mediaelement.min.js
+@@||monhan-soku.com/wp-includes/js/wp-emoji-release.min.js
+@@||xn--gckdevd5myivf.site/wp-content/plugins/yamiisoku-popular-posts/assets/script.js
+@@||xn--gckdevd5myivf.site/wp-content/plugins/yamiisoku-bbs-comments/assets/comments.js
+@@||xn--gckdevd5myivf.site/wp-includes/js/comment-reply.min.js
+@@||xn--gckdevd5myivf.site/wp-includes/js/jquery/jquery-migrate.min.js
+@@||xn--gckdevd5myivf.site/wp-includes/js/jquery/jquery.min.js
+@@||xn--gckdevd5myivf.site/wp-content/themes/cocoon-child-master/javascript.js
+@@||xn--gckdevd5myivf.site/wp-content/themes/cocoon-master/javascript.js
+@@||xn--gckdevd5myivf.site/wp-content/themes/cocoon-master/js/group-link.js
+@@||xn--gckdevd5myivf.site/wp-content/themes/cocoon-master/plugins/baguettebox/dist/baguetteBox.min.js
+@@||xn--gckdevd5myivf.site/wp-content/themes/cocoon-master/plugins/lozad.js-master/dist/lozad.min.js
+@@||xn--gckdevd5myivf.site/wp-content/themes/cocoon-master/skins/skin-colors-blue/javascript.js
+@@||xn--o9j0bk1l6d1bnv1as45bb2j.com/wp-content/plugins/yamiisoku-bbs-comments/assets/comments.js
+@@||xn--o9j0bk1l6d1bnv1as45bb2j.com/wp-content/plugins/yamiisoku-popular-posts/assets/script.js
+@@||xn--o9j0bk1l6d1bnv1as45bb2j.com/wp-content/themes/yamiisoku-matome-theme/assets/js/comment-more.js
+@@||xn--o9j0bk1l6d1bnv1as45bb2j.com/wp-includes/js/wp-emoji-release.min.js
+@@||yamiisoku.com/wp-content/plugins/yamiisoku-popular-posts/assets/script.js
+@@||yamiisoku.com/wp-content/themes/yamiisoku-matome-theme/assets/js/comment-more.js
+@@||yamiisoku.com/wp-content/plugins/yamiisoku-bbs-comments/assets/comments.js
+@@||yamiisoku.com/wp-includes/js/jquery/jquery-migrate.min.js
+@@||yamiisoku.com/wp-includes/js/jquery/jquery.min.js
+@@||yamiisoku.com/wp-includes/js/mediaelement/mediaelement-and-player.min.js
+@@||yamiisoku.com/wp-includes/js/mediaelement/mediaelement-migrate.min.js
+@@||yamiisoku.com/wp-includes/js/mediaelement/renderers/vimeo.min.js
+@@||yamiisoku.com/wp-includes/js/mediaelement/wp-mediaelement.min.js
+@@||yamiisoku.com/wp-includes/js/wp-emoji-release.min.js
+@@||ajax.googleapis.com/ajax/libs/jquery/*/jquery.min.js$domain=yamiisoku.com
+@@||cdnjs.cloudflare.com/ajax/libs/jquery-migrate/*/jquery-migrate.min.js$domain=yamiisoku.com
+@@||platform.twitter.com/widgets.js$domain=genshin-soku.com|monhan-soku.com|xn--gckdevd5myivf.site|xn--o9j0bk1l6d1bnv1as45bb2j.com|yamiisoku.com
+@@||platform.x.com/widgets.js$domain=genshin-soku.com|monhan-soku.com|xn--gckdevd5myivf.site|xn--o9j0bk1l6d1bnv1as45bb2j.com|yamiisoku.com
+@@||platform.twitter.com/js/tweet.$script,domain=genshin-soku.com|monhan-soku.com|xn--gckdevd5myivf.site|xn--o9j0bk1l6d1bnv1as45bb2j.com|yamiisoku.com
+@@||yamiisoku.com/wp-content/plugins/antenna-portal/assets/portal.js
+@@||yamiisoku.com/wp-content/plugins/antenna-timeline/assets/timeline.js
+@@||yamiisoku.com/wp-content/themes/cocoon-child-master/javascript.js
+@@||yamiisoku.com/wp-content/themes/cocoon-master/javascript.js
+@@||yamiisoku.com/wp-content/themes/cocoon-master/js/group-link.js
+@@||yamiisoku.com/wp-content/themes/cocoon-master/plugins/baguettebox/dist/baguetteBox.min.js
+@@||yamiisoku.com/wp-content/themes/cocoon-master/plugins/lozad.js-master/dist/lozad.min.js
+@@||yamiisoku.com/wp-content/themes/cocoon-master/plugins/stickyfill/dist/stickyfill.min.js
+@@||yamiisoku.com/wp-includes/js/comment-reply.min.js
+*$script,xhr,domain=genshin-soku.com|monhan-soku.com|xn--gckdevd5myivf.site|xn--o9j0bk1l6d1bnv1as45bb2j.com|yamiisoku.com
+iplookup.flagfox.net##.adsbygoogle
+||error-report.com^$badfilter

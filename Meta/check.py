@@ -12,6 +12,7 @@
 # clang-format and ruff are installed into Build/tools on first use; prettier runs through npx.
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -171,6 +172,37 @@ def check_palette(checks: Checks):
                 checks.fail("palette", f"{relative(path)}:{number} uses Ladybird's brand colors; use --xenon-rose")
 
 
+def check_filter_lists(checks: Checks):
+    # The lists Xenon ships (Meta/update-filter-lists.py writes them): every one the manifest names is there, none is
+    # there that it doesn't name, and none ships without a license that allows it.
+    directory = UI_DIR / "Resources" / "filter-lists"
+    manifest_path = directory / "manifest.json"
+    if not manifest_path.exists():
+        checks.fail(
+            "filter lists", "UI/Resources/filter-lists/manifest.json is missing; run Meta/update-filter-lists.py"
+        )
+        return
+
+    manifest = json.loads(manifest_path.read_text())
+    listed = {entry["file"] for entry in manifest["lists"]}
+    present = {f"lists/{path.name}" for path in (directory / "lists").glob("*.txt")}
+    for file in sorted(listed - present):
+        checks.fail("filter lists", f"the manifest names {file}, which is missing")
+    for file in sorted(present - listed):
+        checks.fail("filter lists", f"{file} isn't in the manifest")
+
+    for entry in manifest["lists"]:
+        if entry["license_needs_review"]:
+            checks.fail("filter lists", f"{entry['id']} ships without a license that allows it")
+        if entry["id"] in manifest.get("excluded", {}):
+            checks.fail(
+                "filter lists", f"{entry['id']} ships although it's excluded: {manifest['excluded'][entry['id']]}"
+            )
+    for name in ("NOTICE.txt", "LICENSE-GPL-3.0.txt"):
+        if not (directory / name).exists():
+            checks.fail("filter lists", f"UI/Resources/filter-lists/{name} is missing; the lists' licenses require it")
+
+
 def check_symlinks(checks: Checks):
     for name, target in REQUIRED_SYMLINKS.items():
         path = XENON_SOURCE_DIR / name
@@ -307,6 +339,7 @@ def main():
     check_about_page_overrides(checks)
     check_bangs(checks)
     check_palette(checks)
+    check_filter_lists(checks)
     check_symlinks(checks)
     check_submodule(checks, online=args.online, unpinned=args.unpinned)
     if not args.skip_formatting:

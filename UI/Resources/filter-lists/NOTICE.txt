@@ -1,0 +1,83 @@
+Xenon's content blocking filter lists
+
+These are third-party filter lists, converted by xenon-ublock for Ladybird's content blocker on 2026-10-26 17:30 UTC (xenon-ublock 419c2a3). Converting dropped or rewrote the filters Ladybird can't apply; each list's header says how many it kept. Each list remains under its own license, as below. The GPL-3.0 text is in LICENSE-GPL-3.0.txt; the lists offered under the GPL or CC BY-SA are distributed here under the GPL.
+
+uBlock filters – Ads
+  Source:   https://ublockorigin.github.io/uAssets/filters/filters.txt
+  Homepage: https://github.com/uBlockOrigin/uAssets
+  License:  GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+
+uBlock filters – Badware risks
+  Source:   https://ublockorigin.github.io/uAssets/filters/badware.txt
+  Homepage: https://github.com/uBlockOrigin/uAssets
+  License:  GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+
+uBlock filters – Privacy
+  Source:   https://ublockorigin.github.io/uAssets/filters/privacy.txt
+  Homepage: https://github.com/uBlockOrigin/uAssets
+  License:  GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+
+uBlock filters – Unbreak
+  Source:   https://ublockorigin.github.io/uAssets/filters/unbreak.txt
+  Homepage: https://github.com/uBlockOrigin/uAssets
+  License:  GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+
+uBlock filters – Quick fixes
+  Source:   https://ublockorigin.github.io/uAssets/filters/quick-fixes.txt
+  Homepage: https://github.com/uBlockOrigin/uAssets
+  License:  GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+
+AdGuard – Ads
+  Source:   https://filters.adtidy.org/extension/ublock/filters/2_without_easylist.txt
+  Homepage: https://github.com/AdguardTeam/AdguardFilters#adguard-filters
+  License:  GPL-3.0 (https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE)
+
+EasyList
+  Source:   https://ublockorigin.github.io/uAssets/thirdparties/easylist.txt
+  Homepage: https://easylist.to/
+  License:  GPL-3.0-or-later OR CC-BY-SA-3.0-or-later (https://easylist.to/pages/licence.html)
+
+AdGuard/uBO – URL Tracking Protection
+  Source:   https://ublockorigin.github.io/uAssets/filters/privacy-removeparam.txt
+  Homepage: https://github.com/uBlockOrigin/uAssets
+  License:  GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+
+EasyPrivacy
+  Source:   https://ublockorigin.github.io/uAssets/thirdparties/easyprivacy.txt
+  Homepage: https://easylist.to/
+  License:  GPL-3.0-or-later OR CC-BY-SA-3.0-or-later (https://easylist.to/pages/licence.html)
+
+Online Malicious URL Blocklist
+  Source:   https://malware-filter.gitlab.io/urlhaus-filter/urlhaus-filter-vivaldi-online.txt
+  Homepage: https://gitlab.com/malware-filter/urlhaus-filter#malicious-url-blocklist
+  License:  CC0-1.0 (https://gitlab.com/malware-filter/urlhaus-filter#license)
+
+AdGuard – Cookie Notices
+  Source:   https://filters.adtidy.org/extension/ublock/filters/18.txt
+  Homepage: https://github.com/AdguardTeam/AdguardFilters#adguard-filters
+  License:  GPL-3.0 (https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE)
+
+EasyList – Cookie Notices
+  Source:   https://ublockorigin.github.io/uAssets/thirdparties/easylist-cookies.txt
+  Homepage: https://github.com/easylist/easylist#fanboy-lists
+  License:  GPL-3.0-or-later OR CC-BY-SA-3.0-or-later (https://easylist.to/pages/licence.html)
+
+uBlock filters – Cookie Notices
+  Source:   https://ublockorigin.github.io/uAssets/filters/annoyances-cookies.txt
+  Homepage: https://github.com/uBlockOrigin/uAssets
+  License:  GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+
+EasyList – Newsletter Notices
+  Source:   https://ublockorigin.github.io/uAssets/thirdparties/easylist-newsletters.txt
+  Homepage: https://easylist.to/
+  License:  GPL-3.0-or-later OR CC-BY-SA-3.0-or-later (https://easylist.to/pages/licence.html)
+
+EasyList – Notifications
+  Source:   https://ublockorigin.github.io/uAssets/thirdparties/easylist-notifications.txt
+  Homepage: https://easylist.to/
+  License:  GPL-3.0-or-later OR CC-BY-SA-3.0-or-later (https://easylist.to/pages/licence.html)
+
+uBlock filters – Annoyances
+  Source:   https://ublockorigin.github.io/uAssets/filters/annoyances.txt
+  Homepage: https://github.com/uBlockOrigin/uAssets
+  License:  GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)

@@ -41,6 +41,7 @@ set(XENON_SOURCES
     DevToolsBanner.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
+    FilterLists.cpp
     FindInPageWidget.cpp
     Icon.cpp
     HiddenPageSizing.cpp
@@ -146,7 +147,7 @@ qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
-target_link_libraries(xenon PRIVATE AK LibCore LibGfx LibIPC LibMain LibWebView LibURL LibWakeLock)
+target_link_libraries(xenon PRIVATE AK LibCore LibFileSystem LibGfx LibIPC LibMain LibWebView LibURL LibWakeLock)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL)
 # NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
 #     tree, so Xenon's root comes first.
@@ -226,7 +227,7 @@ if (APPLE)
     endif()
 
     set(xenon_bundle_dir "$<TARGET_BUNDLE_DIR:xenon>")
-    copy_resources_to_build("${xenon_bundle_dir}/Contents/Resources" xenon)
+    set(xenon_resource_dir "${xenon_bundle_dir}/Contents/Resources")
 
     add_custom_command(TARGET xenon POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${xenon_bundle_dir}/Contents/Resources"
@@ -238,8 +239,23 @@ if (APPLE)
         VERBATIM
     )
 else()
-    copy_resources_to_build("${CMAKE_BINARY_DIR}/${IN_BUILD_PREFIX}${CMAKE_INSTALL_DATADIR}/Lagom" xenon)
+    set(xenon_resource_dir "${CMAKE_BINARY_DIR}/${IN_BUILD_PREFIX}${CMAKE_INSTALL_DATADIR}/Lagom")
 endif()
+
+copy_resources_to_build("${xenon_resource_dir}" xenon)
+
+# uBlock Origin's filter lists, converted for Ladybird by xenon-ublock (Meta/update-filter-lists.py refreshes them).
+# UI/FilterLists.cpp hands the lists to the browser at startup; the notice and license travel with them.
+file(GLOB XENON_FILTER_LISTS CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/lists/*.txt")
+copy_resource_set(xenon/filter-lists/lists RESOURCES ${XENON_FILTER_LISTS} DESTINATION "${xenon_resource_dir}" TARGET xenon)
+copy_resource_set(xenon/filter-lists
+    RESOURCES
+        "${XENON_UI_DIR}/Resources/filter-lists/LICENSE-GPL-3.0.txt"
+        "${XENON_UI_DIR}/Resources/filter-lists/NOTICE.txt"
+        "${XENON_UI_DIR}/Resources/filter-lists/manifest.json"
+    DESTINATION "${xenon_resource_dir}"
+    TARGET xenon
+)
 
 qt_finalize_target(xenon)
 

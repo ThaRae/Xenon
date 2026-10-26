@@ -13,6 +13,7 @@
 #include <LibWebView/Utilities.h>
 #include <UI/Application.h>
 #include <UI/BrowserWindow.h>
+#include <UI/FilterLists.h>
 #if defined(LADYBIRD_QT_HAVE_POSITIONING)
 #    include <UI/GeolocationProviderQt.h>
 #endif
@@ -74,7 +75,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
         Ladybird::install_qt_geolocation_provider();
 #endif
 
-    auto app = TRY(Ladybird::Application::create(arguments));
+    auto app = TRY(Ladybird::Application::create(Ladybird::FilterLists::with_bundled_filter_lists(arguments)));
 #if defined(AK_OS_MACOS)
     app->set_spell_checker(Ladybird::create_platform_spell_checker());
 #endif

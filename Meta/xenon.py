@@ -6,10 +6,14 @@
 # project() call so the Xenon frontend is added once every engine library and helper process exists.
 
 import argparse
+import http.server
+import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
+import threading
 
 from pathlib import Path
 
@@ -39,6 +43,11 @@ TESTS_TARGET = "xenon-tests"
 
 # A page rendered with nothing on it compresses to a few kilobytes; the welcome page is well over this.
 SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
+
+# Requests the bundled filter lists block (EasyList: /jquery.popunder.js; EasyPrivacy: -tracking-pixel.), and ordinary
+# ones nothing should block.
+BLOCKED_REQUESTS = {"/jquery.popunder.js": "script", "/site-tracking-pixel.gif": "img"}
+ALLOWED_REQUESTS = {"/app.js": "script", "/logo.gif": "img"}
 
 
 def main():
@@ -194,10 +203,69 @@ def test_main(platform: Platform, build_dir: Path):
         print(output[-4000:], file=sys.stderr)
         failures.append("headless render of about:welcome")
 
+    print("==> content blocking with the bundled filter lists", flush=True)
+    if not check_content_blocking(app_executable(platform, build_dir), env):
+        failures.append("content blocking")
+
     if failures:
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
         sys.exit(1)
     print("All tests passed.")
+
+
+# Loads a local page with blocking on and off, in a throwaway profile, and checks which of its requests reach the server.
+# Xenon is given no lists here, so this also proves it loads its bundled ones by itself.
+def check_content_blocking(executable: Path, env: dict) -> bool:
+    requested: set[str] = set()
+    tags = "".join(f'<{tag} src="{path}"></{tag}>' for path, tag in {**BLOCKED_REQUESTS, **ALLOWED_REQUESTS}.items())
+    page = f"<!doctype html><title>Xenon content blocking</title><p>loaded</p>{tags}".encode()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            requested.add(self.path)
+            body = page if self.path == "/" else b""
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html" if self.path == "/" else "application/octet-stream")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+
+    passed = True
+    try:
+        for blocking in (False, True):
+            requested.clear()
+            with tempfile.TemporaryDirectory() as profile:
+                (Path(profile) / "config").mkdir()
+                (Path(profile) / "config" / "Settings.json").write_text(
+                    json.dumps({"contentBlockers": {"enabled": blocking}})
+                )
+                command = [str(executable), "--headless=text", "--profile-path", profile, url]
+                try:
+                    subprocess.run(command, env=env, capture_output=True, timeout=120)
+                except subprocess.TimeoutExpired:
+                    print("    timed out loading the test page", file=sys.stderr)
+                    return False
+
+            expected_blocked = set(BLOCKED_REQUESTS) if blocking else set()
+            reached = {path for path in (*BLOCKED_REQUESTS, *ALLOWED_REQUESTS) if path in requested}
+            wrongly_blocked = set(ALLOWED_REQUESTS) - reached
+            wrongly_allowed = (set(BLOCKED_REQUESTS) - reached) ^ expected_blocked
+            label = "blocking on " if blocking else "blocking off"
+            if "/" not in requested or wrongly_blocked or wrongly_allowed:
+                print(f"    {label}: page loaded={'/' in requested}, reached={sorted(reached)}", file=sys.stderr)
+                passed = False
+            else:
+                print(f"    {label}: reached {sorted(reached)}")
+    finally:
+        server.shutdown()
+    return passed
 
 
 def run_command(command: list):

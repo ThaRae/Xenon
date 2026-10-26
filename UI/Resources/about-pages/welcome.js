@@ -15,7 +15,7 @@ const searchPreview = document.querySelector("#search-preview");
 const searchSuggestions = document.querySelector("#search-suggestions-enabled");
 const searchSuggestionsLabel = document.querySelector("#search-suggestions-label");
 const filterLists = document.querySelector("#filter-lists");
-const contentBlockerLists = document.querySelector("#content-blocker-lists");
+const filterListsNote = document.querySelector("#filter-lists-note");
 const startBrowsing = document.querySelector("#start-browsing");
 const saveStatus = document.querySelector("#save-status");
 
@@ -34,12 +34,6 @@ const engineInfo = {
     Bing: { group: "mainstream", note: "", host: "bing.com/search?q=" },
     Yahoo: { group: "mainstream", note: "Bing results", host: "search.yahoo.com/search?p=" },
     Yandex: { group: "mainstream", note: "", host: "yandex.com/search/?text=" },
-};
-
-const filterListNotes = {
-    easyList: "Ads",
-    easyPrivacy: "Trackers",
-    fanboyAnnoyances: "Cookie banners and pop-ups",
 };
 
 let settings;
@@ -147,38 +141,13 @@ function populateEngines() {
     addEngine(mainstreamEngines, "", "Addresses only", false, false);
 }
 
-function populateFilterLists() {
-    for (const list of settings.contentBlockerLists) {
-        if (!Object.hasOwn(filterListNotes, list.identifier)) continue;
-
-        const row = document.createElement("label");
-        row.className = "check-option filter-list";
-        row.title = list.url;
-
-        // Xenon blocks by default, so every built-in list starts out on.
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.dataset.identifier = list.identifier;
-        checkbox.checked = true;
-
-        const name = document.createElement("span");
-        name.textContent = list.name;
-
-        const note = document.createElement("span");
-        note.className = "filter-list-note";
-        note.textContent = filterListNotes[list.identifier];
-
-        row.append(checkbox, name, note);
-        contentBlockerLists.append(row);
-    }
-}
-
 function blockingEnabled() {
     return document.querySelector('input[name="ad-blocking"]:checked').value === "on";
 }
 
 function updateBlockingDetails() {
     filterLists.classList.toggle("hidden", !blockingEnabled());
+    filterListsNote.classList.toggle("hidden", !blockingEnabled());
 }
 
 function initialize() {
@@ -189,7 +158,6 @@ function initialize() {
     searchSuggestions.checked = settings.searchEngine.suggestions;
     updateSearchDetails();
 
-    populateFilterLists();
     updateBlockingDetails();
 
     for (const button of document.querySelectorAll("button")) button.disabled = false;
@@ -205,15 +173,15 @@ function finish() {
         suggestions: searchSuggestions.checked && !searchSuggestions.disabled,
     });
 
-    const blocking = blockingEnabled();
-    for (const checkbox of contentBlockerLists.querySelectorAll("input")) {
-        ladybird.sendMessage("setContentBlockerListEnabled", {
-            identifier: checkbox.dataset.identifier,
-            enabled: blocking && checkbox.checked,
-        });
+    // Xenon's own lists (UI/FilterLists.cpp) apply whenever blocking is on. Ladybird's catalog holds the raw upstream
+    // versions of some of them, which would only add duplicates without the fixes for Ladybird, so it stays off, and so
+    // do its daily downloads.
+    for (const list of settings.contentBlockerLists) {
+        if (list.enabled)
+            ladybird.sendMessage("setContentBlockerListEnabled", { identifier: list.identifier, enabled: false });
     }
-    ladybird.sendMessage("setContentBlockerEnabled", blocking);
-    ladybird.sendMessage("setFilterListUpdatesEnabled", blocking);
+    ladybird.sendMessage("setFilterListUpdatesEnabled", false);
+    ladybird.sendMessage("setContentBlockerEnabled", blockingEnabled());
 
     ladybird.sendMessage("completeFirstRun");
 }
@@ -233,7 +201,6 @@ useDefaults.addEventListener("click", () => {
     if (defaultEngine) defaultEngine.checked = true;
     updateSearchDetails();
     document.querySelector('input[name="ad-blocking"][value="on"]').checked = true;
-    for (const checkbox of contentBlockerLists.querySelectorAll("input")) checkbox.checked = true;
     finish();
 });
 

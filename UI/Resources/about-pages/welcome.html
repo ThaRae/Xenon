@@ -81,8 +81,8 @@ SPDX-License-Identifier: BSD-2-Clause
             <section class="step" data-step="blocking" aria-labelledby="blocking-title" hidden>
                 <h1 id="blocking-title" tabindex="-1">Block ads and trackers?</h1>
                 <p class="lede">
-                    Xenon can strip ads, trackers, and cookie banners from every site. Pages get lighter and fewer
-                    companies follow you around.
+                    Xenon has uBlock Origin's filter lists built in. They strip ads, trackers, and cookie banners from
+                    every site, and nothing is sent anywhere to do it.
                 </p>
 
                 <div class="choice-list" role="radiogroup" aria-labelledby="blocking-title">
@@ -100,10 +100,25 @@ SPDX-License-Identifier: BSD-2-Clause
                     </label>
                 </div>
 
-                <div id="filter-lists" class="filter-lists">
-                    <div id="content-blocker-lists"></div>
-                    <p class="aside">These lists download from their maintainers and update on their own.</p>
-                </div>
+                <dl id="filter-lists" class="filter-lists">
+                    <div class="filter-list">
+                        <dt>Ads</dt>
+                        <dd>uBlock filters, EasyList, AdGuard</dd>
+                    </div>
+                    <div class="filter-list">
+                        <dt>Trackers</dt>
+                        <dd>EasyPrivacy, uBlock Privacy</dd>
+                    </div>
+                    <div class="filter-list">
+                        <dt>Malware and scam sites</dt>
+                        <dd>URLhaus, uBlock Badware risks</dd>
+                    </div>
+                    <div class="filter-list">
+                        <dt>Cookie banners and pop-ups</dt>
+                        <dd>AdGuard, Fanboy, uBlock</dd>
+                    </div>
+                </dl>
+                <p id="filter-lists-note" class="aside">The lists come with Xenon and update when Xenon does.</p>
 
                 <p id="save-status" class="save-status" role="status"></p>
                 <div class="actions">

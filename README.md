@@ -83,6 +83,19 @@ The builds run in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`
 The `CCACHE_TOKEN` repository secret points ccache and vcpkg's package cache at slab-ccache. Without it, every build
 starts cold and takes a couple of hours.
 
+## Updating the filter lists
+
+```bash
+./Meta/update-filter-lists.py              # rebuilds them in ../xenon-ublock, then copies them in
+./Meta/update-filter-lists.py --no-build   # copies what ../xenon-ublock last built
+```
+
+It ships xenon-ublock's `helium` preset, except for Peter Lowe's list, which states no license, and Helium's own two
+lists (AGPL-3.0, and almost nothing survives conversion). `UI/Resources/filter-lists/NOTICE.txt` credits every list's
+source and license. The GPL-3.0 text ships beside them. `Meta/check.py` fails if a list ships without a cleared
+license. `./Meta/xenon.py test` checks that Xenon blocks with them, given no list arguments, by loading a local page
+with blocking on and off.
+
 ## Updating Ladybird
 
 ```bash
@@ -111,9 +124,16 @@ What exists now and what's planned, measured against Helium:
   saved until you finish.
 - [x] **Quick link copy**: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> copies the current page's URL.
   (DevTools stays on <kbd>⌘</kbd><kbd>⇧</kbd><kbd>I</kbd> and <kbd>F12</kbd>.)
-- [x] **Content blocking** (from Ladybird, though it's off until you turn it on in settings).
-- [ ] Helium's privacy defaults: content blocking on from first launch, and no background requests without consent.
-  Ladybird currently defaults to the content blocker off and background networking on.
+- [x] **uBlock Origin's filter lists, built in**: the lists Helium's uBlock Origin fork turns on (uBlock filters,
+  EasyList, EasyPrivacy, AdGuard, URLhaus, and the cookie banner and annoyance lists), converted for Ladybird's content
+  blocker by [xenon-ublock](../xenon-ublock). They block ads, trackers, malware sites, and cookie banners whenever
+  content blocking is on, which the welcome flow turns on by default. They ship with Xenon in
+  `UI/Resources/filter-lists`, so nothing is downloaded. Ladybird's own downloadable catalog stays off, since it holds
+  raw copies of the same lists.
+- [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
+  surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
+  picker. See xenon-ublock's `docs/gap-analysis.md`.
+- [ ] Daily filter list updates, which need a host for xenon-ublock's converted lists.
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [ ] Split view
 - [ ] MRU tab switching (<kbd>Ctrl</kbd><kbd>Tab</kbd> in most-recently-used order)
@@ -132,4 +152,5 @@ until Ladybird supports them.
 ## License
 
 Code in `UI/` that came from Ladybird keeps its original BSD-2-Clause license and copyright headers. New Xenon files
-use BSD-2-Clause too.
+use BSD-2-Clause too. The filter lists in `UI/Resources/filter-lists` are third-party data under their own licenses
+(GPL-3.0, GPL-3.0 or CC BY-SA, and CC0), listed in its `NOTICE.txt`.

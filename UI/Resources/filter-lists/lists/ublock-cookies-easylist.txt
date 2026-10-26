@@ -1,0 +1,222 @@
+! Title: uBlock filters – Cookie Notices (for Ladybird)
+! Source: https://ublockorigin.github.io/uAssets/filters/annoyances-cookies.txt
+! Homepage: https://github.com/uBlockOrigin/uAssets
+! License: GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+! Converted by xenon-ublock on 2026-10-26 17:30 UTC for adblock 0.13.3, as built into Ladybird's LibWeb/ContentBlocker.
+! Kept 214 of 2376 upstream filters, as 214 filters; the rest cannot take
+! effect in Ladybird. See report.md and dropped/ next to this file for what was dropped and why.
+!
+blaklader.*##div#onetrust-consent-sdk
+decider.com,nypost.com,pagesix.com##.zephr-component
+cellcom.co.il##.cookies_popup_container
+partner.co.il##.cookie-message
+||globetel.fi/wp-content/plugins/gdpr-cookie-compliance/
+||iubenda.com^$domain=my-personaltrainer.it
+musee-moyenage.fr##body.tac-modal-open:style(overflow: auto !important;)
+groupeapocom.com###website_cookies_bar
+||la7.it/la7_iabtcf2/cmp.js
+||privacymanager.io^$domain=la7.it
+@@||cdn.privacy-mgmt.com/unified/wrappermessagingwithoutdetection.js$domain=businessinsider.com,badfilter
+businessinsider.com##.related-posts
+/wrapperMessagingWithoutDetection.js$domain=autosport.com
+||sindicateuropol.ro/wp-content/plugins/elementor/assets/lib/dialog/dialog.min.js
+/wp-content/plugins/privacy-policy-popup/*
+yeshinvoice.co.il##.cookie
+kamaze.co.il##.privacy-consent
+4chef.co.il,kitchenware.co.il##.custom-cookie-outer
+alislamy.co.il,amrusi.co.il,am-oved.co.il,anglo-saxon.co.il,keter-books.co.il,kibutz-poalim.co.il,modan.co.il,nuni.co.il,ogenceramica.co.il,recycles.co.il###cookie-consent-banner
+ameat.co.il,focus.co.il,harishon-labinyan.co.il,house-design.shop,kerenby.co.il,korenelectric.co.il,locks.co.il,mosheparts.co.il,mozartbakery.co.il,peerlocks.com,soragit.co.il,spy.org.il,tudo.co.il###cookie-consent-popup
+18comp.co.il,an-cooling.com,autotire.co.il,dpirzul.com,dsfiga.co.il,gantim.com,gilcopharm.com,gordonsystem.co.il,matov.co.il,matrefa.com,mishely-art.com,peimot.com,sound-world.co.il,tiptop-tire.co.il,tireplus.co.il###sb_privacy_policy_notice
+cameracity.co.il,carmelpc.co.il,depot365.co.il,drummer.co.il,electro-buy.co.il,eline.co.il,freedio.co.il,haboosh.com,hotbuy.co.il,kafu.co.il,j-sale.co.il,lcdeal.co.il,mivnit.co.il,mugrabi.co.il,musicol-shop.co.il,musicworld.co.il,orpc.co.il,out-of-the-box.co.il,studioland.co.il,technoshlomo.co.il,video.org.il,voltstreet.co.il##[class^="cookiesPopup"]
+kitchensdesign.co.il,kiwi-kids.co.il,knesset.tv,lehamim.co.il,masgernet.co.il,milstone.co.il,vs-key.co.il##.cookie-consent
+hayeruka-ks.co.il,mashkar.co.il,millenniumac.co.il,simply-smart.com,yamitspark.co.il##.cookies13wrap
+flying.co.il##.cookie-consent-banner
+easygo.co.il##.cookieMessage
+123fresh.co.il###cookie-consent-wrapper
+maxstock.co.il###wpconsent-root
+kamada.com###cookieAlert
+albombom.co.il###bottomCookiesContentWrapper
+shop.hazi-hinam.co.il##app-cookie-consent
+delitlv.co.il###gdprCookieBar
+jfc.org.il###footer_cookies_message_wrap
+clalitsmile.co.il##.ccm-root
+l-s.co.il##.sogo-pc-banner
+/wp-content/plugins/saglix-cookie-consent-manager/*
+willi-food.co.il##.scm-banner
+91fm.co.il##.dkd-banner
+checkid.co.il###approval-popup
+beitberl.ac.il,shimur.org###MavilixCookiesBox
+||rcommoncf.entrata.com/privacy_controller/
+||cdn.shopify.com/extensions/*/gdpr-cookie-consent-
+||cdn.privacy-mgmt.com/consent/$domain=support.theguardian.com,important
+metro-cc.hr##.consent-disclaimer
+metro-cc.hr##body:style(overflow: auto !important;)
+||trk.cultura.com/privacy/
+||ccm.merudata.app^
+||cdn.ing.com/ing-feat-cookie-preference/
+/wrapperMessagingWithoutDetection.js$important,domain=tomsguide.com
+consent.google.*##[data-p*="/consent.google."]:has(button[jsname="tWT92d"])
+consent.youtube.com##body.bodyUIModernization:has([action="https://consent.youtube.com/save"] .saveButtonUIModernization[value][aria-label])
+standard.co.uk##html.sp-message-open:style(width: initial !important)
+standard.co.uk##html.sp-message-open > body:style(position: unset !important; overflow: unset !important)
+standard.co.uk##[id^="sp_message_container"]
+windhager.eu###viucom-cookie-badge
+archive.nytimes.com##body > div[style*="z-index: 2147483647"]:has(a[href="https://nytimes.com/cookie-policy/"])
+tumblr.com##.components-modal__screen-overlay
+tumblr.com##.tmblr-iframe--gdpr-banner
+my.tonies.com,cambio-carsharing.de,festool.*,festoolcanada.com,fuso-trucks.*,tracker.fressnapf.de,myfabrics.co.uk##body.overflowHidden:style(overflow: auto !important)
+cambio-carsharing.de,festool.*,festoolcanada.com,fuso-trucks.*,tracker.fressnapf.de###focus-lock-id
+gamingbible.com,ladbible.com,ladbiblegroup.com,sportbible.com,tyla.com,unilad.com,uniladtech.com##html.sp-message-open:style(width: initial !important)
+gamingbible.com,ladbible.com,ladbiblegroup.com,sportbible.com,tyla.com,unilad.com,uniladtech.com##html.sp-message-open > body:style(position: unset !important; overflow: unset !important)
+gamingbible.com,ladbible.com,ladbiblegroup.com,sportbible.com,tyla.com,unilad.com,uniladtech.com##[title="SP Consent Message"]
+m2o.it,deejay.it,capital.it,ilmattino.it,leggo.it,libero.it,tiscali.it##html[style="overflow: hidden;"]:not(:has(#cmp_consent_wall)):style(overflow: auto !important)
+m2o.it,deejay.it,capital.it,ilmattino.it,leggo.it,libero.it,tiscali.it##[id^="iubenda"]
+ilmattino.it,leggo.it##.banner:has([href="javascript:acceptAllCookies();void(0);"])
+ilmattino.it,leggo.it###cmp_consent_wall:style(visibility: hidden !important;)
+ilmattino.it,leggo.it##body:has(#cmp_consent_wall):style(overflow: auto !important;)
+ft.com##html.sp-message-open:style(width: initial !important)
+ft.com##html.sp-message-open > body:style(position: unset !important; overflow: unset !important; margin-top: 0 !important)
+ft.com##[id^="sp_message_container"]
+ft.com##[title="SP Consent Message"]
+open.online#@#.qc-cmp2-container
+@@||cdn-cookieyes.com/client_data/$script,xhr,domain=ilovefreegle.org
+mediaworld.it,mediamarkt.*###mms-consent-portal-container:style(visibility: hidden !important;)
+mediaworld.it,mediamarkt.*##body:has(#mms-consent-portal-container):style(overflow: auto !important;)
+uber.com,ubereats.com##div[role="dialog"]:has(button[data-tracking-name="cookie-preferences-mloi-initial-opt-out"]):style(visibility: hidden !important;)
+ai.meta.com##[data-testid="cookie-policy-manage-dialog"]:style(visibility: hidden !important;)
+@@/otBannerSdk.js$domain=saal-digital.de
+@@||cmp.inmobi.com/geoip$xhr,domain=ilgiornale.it
+@@||cmp.inmobi.com/GVL-v3/$domain=ilgiornale.it
+@@||cmp.inmobi.com/tcfv2/$domain=ilgiornale.it
+@@||cmp.inmobi.com^*/choice.js$domain=ilgiornale.it
+@@||consent.cookiebot.com^$script,domain=dimensione.com
+@@||cmp.pubtech.ai/*/pubtech-cmp-v2*.js$script,domain=everyeye.it
+@@||cmp-assets.pubtech.ai/vendorList/*.json$xhr,domain=everyeye.it
+everyeye.it###tksfmcont
+everyeye.it###pubtech-cmp
+||cdn-cookieyes.com^$important,domain=planhub.ca
+united-domains.de##div[consent-skip-blocker]
+erneuerbare-energien-aktuell.de,gearnews.com,glow25.de,h-f.at,hornetsecurity.com,iphone-ticker.de,kampfkunst-herz.de,kayzen.io,oloid.de,tcm-whieda.de,wasserkunst-hamburg.de,zahnspange-oelde.de###BorlabsCookieBox
+gameinformer.com#@##onetrust-consent-sdk
+gameinformer.com###onetrust-consent-sdk:style(visibility: collapse !important;)
+gameinformer.com###onetrust-banner-sdk
+jekabpils.lv###cookieConsent
+||privacy-mgmt.com^$domain=news.sky.com,important
+||privacy-mgmt.com^$domain=radiox.co.uk
+dlalakierni.pl##.header-cookie-message
+mundodeportivo.com##.ev-modals div[class*="ev-open-modal-notifier"], .ev-modals-notifier div[class*="ev-open-modal-notifier"]:style(visibility: hidden !important;)
+consent.youtube.com##[data-p*="/consent.youtube.com"]:has(button[jsname="b3VHJd"])
+||cdn.tinypass.com/api/piano.js$script,domain=corriere.it
+everyeye.it##html > body:style(margin-top: 45px !important;)
+@@||cdn.cookielaw.org/scripttemplates/otSDKStub.js$script,domain=breitbart.com
+music.amazon.*###overlay > div > #banner:has([href*="privacyprefs/"])
+chrono24.*##dialog.gdpr-layer
+@@||cmp.pubtech.ai/*/pubtech-cmp-v2.js$script,from=ilrestodelcarlino.it|quotidiano.net|lanazione.it|ilgiorno.it|iltelegrafolivorno.it
+euronews.com,raymond-weil.com,auto.it,beauxarts.com,beinsports.com,bfmtv.com,boursobank.com,boursorama.com,boursier.com,brut.media,canalplus.com,decathlon.fr,diverto.tv,eden-park.com,foodvisor.io,franceinfo.fr,frandroid.com,jobijoba.*,hotelsbarriere.com,intersport.*,idealista.it,o2.fr,lejdd.fr,lechorepublicain.fr,la-croix.com,linfo.re,lamontagne.fr,laredoute.fr,largus.fr,leprogres.fr,lesnumeriques.com,libramemoria.com,lopinion.fr,marieclaire.fr,maville.com,michelin.*,midilibre.fr,meteofrance.com,mondialtissus.fr,orange.fr,orpi.com,oscaro.com,ouest-france.fr,parismatch.com,pagesjaunes.fr,programme-television.org,publicsenat.fr,rmcbfmplay.com,science-et-vie.com,seloger.com,societe.com,suzuki.fr,sudouest.fr,web-agri.fr###didomi-host
+euronews.com,raymond-weil.com,auto.it,beauxarts.com,beinsports.com,bfmtv.com,boursobank.com,boursorama.com,boursier.com,brut.media,canalplus.com,decathlon.fr,diverto.tv,eden-park.com,foodvisor.io,frandroid.com,jobijoba.*,hotelsbarriere.com,intersport.*,idealista.it,o2.fr,lejdd.fr,lechorepublicain.fr,la-croix.com,linfo.re,lamontagne.fr,laredoute.fr,largus.fr,leprogres.fr,lesnumeriques.com,libramemoria.com,lopinion.fr,marieclaire.fr,maville.com,michelin.*,midilibre.fr,meteofrance.com,mondialtissus.fr,orange.fr,orpi.com,oscaro.com,ouest-france.fr,parismatch.com,pagesjaunes.fr,programme-television.org,publicsenat.fr,rmcbfmplay.com,science-et-vie.com,seloger.com,societe.com,suzuki.fr,sudouest.fr,web-agri.fr##body.didomi-popup-open:style(overflow: auto !important;)
+nutri-plus.de##.acris-cookie-consent
+nutri-plus.de##.modal-backdrop
+americanairlines.*##.aa_optoutmulti-cookie-policy:style(visibility: hidden !important;)
+24ur.com##.cookies
+e24.no,minmote.no,tek.no,vg.no##div[id^="sp_message_container_"]:style(z-index: -1 !important;)
+cmp.e24.no,cmp.minmote.no,cmp.tek.no,cmp.vg.no##.tcfv2-stack .pur-buttons-container > button:style(display: inline-block !important;)
+@@||cmp.*.no^$domain=e24.no|minmote.no|vg.no|tek.no
+@@||privacy-mgmt.com/mms^$domain=e24.no|minmote.no|vg.no|tek.no
+/wrappermessagingwithoutdetection.js$script,domain=finn.no
+proffsmagasinet.se,staypro.*#@#.consent-content
+||privacy-mgmt.com/mms^$badfilter
+||assets.poool.fr^$domain=larousse.fr
+||assets.poool-subscribe.fr^$domain=larousse.fr
+money.it#@#.cky-consent-container
+||sdk.privacy-center.org/*/loader.js$script,important,domain=huffingtonpost.es
+alternate.de###usercentrics-cmp-ui
+@@||cookiebot.com^$~image,3p,domain=fastnedcharging.com
+emailnator.com###cookie-notice
+anghami.com##.cookie-container
+automoto.it,ansa.it,cdt.ch,delladio.it,huffingtonpost.it,internazionale.it,lastampa.it,macitynet.it,moto.it,movieplayer.it,multiplayer.it,repubblica.it,tomshw.it,skuola.net,spaziogames.it,today.it,tuttoandroid.net,tuttotech.net###iubenda-cs-banner:style(visibility: hidden !important; opacity: 0 !important;)
+automoto.it,ansa.it,cdt.ch,delladio.it,huffingtonpost.it,internazionale.it,lastampa.it,macitynet.it,moto.it,movieplayer.it,multiplayer.it,repubblica.it,tomshw.it,skuola.net,spaziogames.it,today.it,tuttoandroid.net,tuttotech.net##html:style(overflow: auto !important;)
+ilgazzettino.it,ilmessaggero.it,ilsecoloxix.it###iubenda-cs-banner:style(visibility: hidden !important;)
+ilgazzettino.it,ilmessaggero.it,ilsecoloxix.it##html:style(overflow: auto !important;)
+||utils.cedsdigital.it/src/js/cmpConsentWall.js^$domain=ilgazzettino.it|ilmessaggero.it
+||iubenda.com^$domain=3bmeteo.com,important
+dailystar.co.uk,mirror.co.uk##.qc-cmp2-container:style(visibility: hidden !important;)
+dailystar.co.uk,mirror.co.uk###CIPAConsentNotice:style(visibility: hidden !important;)
+@@||cmp.inmobi.com/GVL-$xhr,domain=dailystar.co.uk
+ibellud.com,barometern.se,st.nu,20minutes.fr,20minutos.es,24sata.hr,abc.es,actu.fr,androidplanet.nl,antena3.com,antena3internacional.com,atresmedia.com,atresmediapublicidad.com,atresmediastudios.com,atresplayer.com,autopista.es,beleggersbelangen.nl,belfasttelegraph.co.uk,bemad.es,bonduelle.it,bonniernews.se,bt.se,cadenadial.com,caracol.com.co,cas.sk,charentelibre.fr,ciclismoafondo.es,cnews.fr,cope.es,correryfitness.com,courrier-picard.fr,cuatro.com,decathlon.nl,decathlon.pl,diariocordoba.com,diariodenavarra.es,diariovasco.com,diepresse.com,distrifood.nl,divinity.es,dnevnik.hr,dumpert.nl,dvhn.nl,ebuyclub.com,edreams.de,edreams.net,elcomercio.es,elconfidencial.com,elcorreo.com,eldesmarque.com,eldiario.es,eldiariomontanes.es,elespanol.com,elle.fr,elpais.com,elperiodico.com,elperiodicodearagon.com,elplural.com,energytv.es,engadget.com,es.ara.cat,euronews.com,europafm.com,expressen.se,factoriadeficcion.com,filmstarts.de,flooxernow.com,folkbladet.nu,footmercato.net,france24.com,francetvinfo.fr,ghacks.net,gooieneemlander.nl,gva.be,haarlemsdagblad.nl,hbvl.be,heraldo.es,hoy.es,ideal.es,idealista.pt,krone.at,kurier.at,lacoste.com,ladepeche.fr,lalibre.be,lanouvellerepublique.fr,larazon.es,lasexta.com,lasprovincias.es,latribune.fr,lavanguardia.com,laverdad.es,lavoixdunord.fr,lavozdegalicia.es,lc.nl,leboncoin.fr,lecturas.com,ledauphine.com,leidschdagblad.nl,lejdd.fr,lejsl.com,leparisien.fr,lesoir.be,letelegramme.fr,lexpress.fr,libremercado.com,limburger.nl,localeyes.dk,los40.com,lotoquebec.com,lunion.fr,marianne.cz,marmiton.org,mediaset.es,melodia-fm.com,metronieuws.nl,moviepilot.de,mtmad.es,multilife.com.pl,mundodeportivo.com,nationalgeographic.com.es,nicematin.com,nieuwsblad.be,noordhollandsdagblad.nl,notretemps.com,numerama.com,ondacero.es,podiumpodcast.com,portail.lotoquebec.com,profil.at,public.fr,publico.es,radiofrance.fr,rankia.com,rfi.fr,rossmann.pl,rtbf.be,rtl.lu,science-et-vie.com,sensacine.com,sfgame.net,shure.com,silicon.es,sncf-connect.com,sport.es,standaard.be,techcrunch.com,telegraaf.nl,telequebec.tv,tijd.be,tradingsat.com,trailrun.es,video-streaming.orange.fr###didomi-host:style(visibility: hidden !important;)
+ibellud.com,barometern.se,st.nu,20minutes.fr,20minutos.es,24sata.hr,abc.es,actu.fr,androidplanet.nl,antena3.com,antena3internacional.com,atresmedia.com,atresmediapublicidad.com,atresmediastudios.com,atresplayer.com,autopista.es,beleggersbelangen.nl,belfasttelegraph.co.uk,bemad.es,bonduelle.it,bonniernews.se,bt.se,cadenadial.com,caracol.com.co,cas.sk,charentelibre.fr,ciclismoafondo.es,cnews.fr,cope.es,correryfitness.com,courrier-picard.fr,cuatro.com,decathlon.nl,decathlon.pl,diariocordoba.com,diariodenavarra.es,diariosur.es,diariovasco.com,diepresse.com,distrifood.nl,divinity.es,dnevnik.hr,dumpert.nl,dvhn.nl,ebuyclub.com,edreams.de,edreams.net,elcomercio.es,elconfidencial.com,elcorreo.com,eldesmarque.com,eldiario.es,eldiariomontanes.es,elespanol.com,elle.fr,elpais.com,elperiodico.com,elperiodicodearagon.com,elplural.com,energytv.es,engadget.com,es.ara.cat,euronews.com,europafm.com,expressen.se,factoriadeficcion.com,filmstarts.de,flooxernow.com,folkbladet.nu,footmercato.net,france24.com,francetvinfo.fr,ghacks.net,gooieneemlander.nl,gva.be,haarlemsdagblad.nl,hbvl.be,heraldo.es,hoy.es,ideal.es,idealista.pt,krone.at,kurier.at,lacoste.com,ladepeche.fr,lalibre.be,lanouvellerepublique.fr,larazon.es,lasexta.com,lasprovincias.es,latribune.fr,lavanguardia.com,laverdad.es,lavoixdunord.fr,lavozdegalicia.es,lc.nl,leboncoin.fr,lecturas.com,ledauphine.com,leidschdagblad.nl,lejdd.fr,lejsl.com,leparisien.fr,lesoir.be,letelegramme.fr,lexpress.fr,libremercado.com,limburger.nl,localeyes.dk,los40.com,lotoquebec.com,lunion.fr,marianne.cz,marmiton.org,mediaset.es,melodia-fm.com,metronieuws.nl,moviepilot.de,mtmad.es,multilife.com.pl,mundodeportivo.com,nationalgeographic.com.es,nicematin.com,nieuwsblad.be,noordhollandsdagblad.nl,notretemps.com,numerama.com,ondacero.es,podiumpodcast.com,portail.lotoquebec.com,profil.at,public.fr,publico.es,radiofrance.fr,rankia.com,rfi.fr,rossmann.pl,rtbf.be,rtl.lu,science-et-vie.com,sensacine.com,sfgame.net,shure.com,silicon.es,sncf-connect.com,sport.es,standaard.be,techcrunch.com,telegraaf.nl,telequebec.tv,tijd.be,tradingsat.com,trailrun.es,video-streaming.orange.fr##body.didomi-popup-open:style(overflow: auto !important;)
+@@||sdk.privacy-center.org^$script,domain=actu.fr|elpais.com|franceinfo.fr|informacion.es|laprovincia.es|ledauphine.com|diariosur.es
+euronews.com###poool-fullscreen-widget
+ryobitools.eu###onetrust-consent-sdk
+tvn24.pl###onetrust-consent-sdk
+tfl.gov.uk###cb-cookieoverlay
+mineralstech.com##.consent-dialog-overlay
+1und1.de###__tealiumGDPRcpPrefs:style(visibility: hidden !important;)
+bunte.de,chip.de,focus.de,tvspielfilm.de,tvtoday.de##[id^="sp_message_container"]
+bunte.de,chip.de,focus.de,tvspielfilm.de,tvtoday.de##html.sp-message-open > body:style(position: unset !important; overflow: unset !important)
+estadiodeportivo.com,tameteo.*,tempo.pt,meteored.*,pogoda.com,yourweather.co.uk,tempo.com,theweather.net,tiempo.com,ilmeteo.net,daswetter.com##.cmp_gdpr:style(visibility: hidden !important;)
+estadiodeportivo.com,tameteo.*,tempo.pt,meteored.*,pogoda.com,yourweather.co.uk,tempo.com,theweather.net,tiempo.com,ilmeteo.net,daswetter.com##.body_fixed:style(overflow: auto !important;)
+kicker.de###kick__pur__layer:has(a[href][onclick="ov.cmp.acceptAllConsents()"]):style(visibility: hidden !important;)
+formulatv.com##.fc-consent-root:style(opacity: 0 !important;)
+formulatv.com##body[style="overflow: hidden;"]:style(overflow: auto !important;)
+lefigaro.fr,linternaute.com##body.appconsent_noscroll:style(overflow: auto !important;)
+lefigaro.fr,linternaute.com###appconsent:style(visibility: hidden !important;)
+linternaute.com##.ccminsert > .jEmbedTagPlaceholder.pending > .jEmbedTagPlaceholder__content
+winfuture.de##.videop em:not([data-video-src])
+winfuture.de##.videop em[data-video-src]:style(display: block !important;)
+caminteresse.fr##[id^="sp_message_container"]:style(visibility: hidden !important;)
+caminteresse.fr##.sp-message-open body:style(overflow: auto !important;)
+@@||cmp.inmobi.com^$script,domain=dailypost.co.uk|dailyrecord.co.uk|the-express.com
+@@||cmp.inmobi.com/*.json^$xhr,domain=dailypost.co.uk|dailyrecord.co.uk|the-express.com
+@@||cmp.inmobi.com/geoip$xhr,domain=dailypost.co.uk|dailyrecord.co.uk|the-express.com
+@@||cdn-images.the-express.com/*/dist/gdpr-$script,1p
+vol.at,aedt.de,berlin-live.de,bike-magazin.de,connect.de,gutefrage.net,insideparadeplatz.ch,morgenpost.de,thueringen24.de##body:has(.cmpboxinner):style(overflow: auto !important;)
+vol.at,aedt.de,berlin-live.de,bike-magazin.de,connect.de,gutefrage.net,insideparadeplatz.ch,morgenpost.de,thueringen24.de##[id^="cmpbox"]:style(visibility: hidden !important;)
+adnkronos.com,cornwalllive.com,cyprus-mail.com,einthusan.tv,informazione.it,mymovies.it,tuttoeuropei.com,video.lacnews24.it,protothema.gr,flash.gr##.qc-cmp2-container
+@@||cdn.jsdelivr.net/gh/*/cookieconsent@v*/dist/cookieconsent.js$from=webtic.it
+easyjet.com,experian.co.uk,postoffice.co.uk,tescobank.com##.ensNotifyBanner
+easyjet.com,experian.co.uk,postoffice.co.uk###ensBannerBG
+tescobank.com###ensPrivacyBlock
+icvs2023.conf.tuwien.ac.at##.cookiemodal
+multioferta.es###interOpacidadCookie
+multioferta.es##.dm_cookies_cont2
+@@||clickskeks.at^$domain=wittmann-group.com
+guildford.gov.uk##.cookie-consents-updated-confirmation
+auto-doc.*,auto-doc.fr##.popup-traffic-mobile
+auto-doc.*,auto-doc.fr##body:style(overflow: auto !important;)
+hummel.dk##.veil
+elavon.*##.cookiePolicyAccepted
+thewutangclan.com##[class^="cookies__cookiesContainer_"]
+welcometothejungle.com###axeptio_overlay
+betaseries.com###popup-bg
+technomarket.bg#@#.cdk-overlay-container
+technomarket.bg#@#html:style(position: static !important; overflow: auto !important; width: auto !important;)
+@@||consent.cookiebot.com^$domain=tme.com
+@@||consent.cookiebot.com/uc.js^$domain=altibox.dk|altibox.no
+altibox.dk,altibox.no##.CybotCookiebotDialogContentWrapper
+account.scaleway.com###backdrop-modal
+bistro.sk##pie-cookie-banner
+@@||cookie-cdn.cookiepro.com/scripttemplates/*/otBannerSdk.js$script,domain=observatornews.ro
+@@||bundles.efilli.com/migros.com.tr.prod.js$domain=migros.com.tr
+migros.com.tr##sm-mobile-app-popup
+@@||ketchcdn.com^$script,xhr,domain=southpark.app|southpark.biz|southpark.br|southpark.cc|southpark.club|southpark.co|southpark.co.uk|southpark.com|southpark.com.br|southpark.com.tr|southpark.de|southpark.es|southpark.fr|southpark.in|southpark.info|southpark.io|southpark.it|southpark.lat|southpark.live|southpark.me|southpark.net|southpark.nl|southpark.online|southpark.org|southpark.pl|southpark.pro|southpark.ru|southpark.site|southpark.su|southpark.to|southpark.top|southpark.tv|southpark.uk|southpark.us|southpark.ws|southpark.xyz|southparkstudios.app|southparkstudios.biz|southparkstudios.br|southparkstudios.cc|southparkstudios.club|southparkstudios.co|southparkstudios.co.uk|southparkstudios.com|southparkstudios.com.br|southparkstudios.com.tr|southparkstudios.de|southparkstudios.es|southparkstudios.fr|southparkstudios.in|southparkstudios.info|southparkstudios.io|southparkstudios.it|southparkstudios.live|southparkstudios.me|southparkstudios.net|southparkstudios.nl|southparkstudios.nu|southparkstudios.online|southparkstudios.org|southparkstudios.pl|southparkstudios.pro|southparkstudios.ru|southparkstudios.site|southparkstudios.to|southparkstudios.top|southparkstudios.tv|southparkstudios.uk|southparkstudios.us|southparkstudios.ws|southparkstudios.xyz|southpark.cc.com
+@@||cdn.ketchjs.com/lanyard/v*/lanyard.js$domain=southpark.app|southpark.biz|southpark.br|southpark.cc|southpark.club|southpark.co|southpark.co.uk|southpark.com|southpark.com.br|southpark.com.tr|southpark.de|southpark.es|southpark.fr|southpark.in|southpark.info|southpark.io|southpark.it|southpark.lat|southpark.live|southpark.me|southpark.net|southpark.nl|southpark.online|southpark.org|southpark.pl|southpark.pro|southpark.ru|southpark.site|southpark.su|southpark.to|southpark.top|southpark.tv|southpark.uk|southpark.us|southpark.ws|southpark.xyz|southparkstudios.app|southparkstudios.biz|southparkstudios.br|southparkstudios.cc|southparkstudios.club|southparkstudios.co|southparkstudios.co.uk|southparkstudios.com|southparkstudios.com.br|southparkstudios.com.tr|southparkstudios.de|southparkstudios.es|southparkstudios.fr|southparkstudios.in|southparkstudios.info|southparkstudios.io|southparkstudios.it|southparkstudios.live|southparkstudios.me|southparkstudios.net|southparkstudios.nl|southparkstudios.nu|southparkstudios.online|southparkstudios.org|southparkstudios.pl|southparkstudios.pro|southparkstudios.ru|southparkstudios.site|southparkstudios.to|southparkstudios.top|southparkstudios.tv|southparkstudios.uk|southparkstudios.us|southparkstudios.ws|southparkstudios.xyz|southpark.cc.com
+southpark.*,southparkstudios.*#@##onetrust-consent-sdk
+infshop.fi##.basicLightbox:has(.gdpr-consent-preliminary)
+@@||cdn.cookie-script.com^$script,xmlhttprequest,domain=hellozdrowie.pl
+hellozdrowie.pl#@##cookiescript_injected_wrapper
+@@||consent.cookiebot.com/uc.js$script,domain=vcg.de
+@@||consent.cookiebot.com/*/cc.js
+itavisen.no##.qc-cmp2-container
+@@||onetrust.com^$script,xhr,domain=nectar.com
+@@||cdn.cookielaw.org/scripttemplates/*/otBannerSdk.js$script,domain=nowtv.com.tr
+nowtv.com.tr#@##onetrust-consent-sdk
+nowtv.com.tr#@##onetrust-banner-sdk
+donaukurier.de#@#body:style(overflow: auto !important;)
+donaukurier.de#@##cmpwrapper
+@@||consentmanager.net^$script,domain=hrt.hr
+vpg.no##.modal-backdrop.fade
+vpg.no##.offcanvas-backdrop.fade
+vpg.no###cookieConsentModal
+vpg.no##.js-offcanvas-singleton.offcanvas-start
+notthebee.com##section[aria-label="Opt-Out Request Honored"]
+shop-sks.com##.cookie-permission-container

@@ -329,22 +329,28 @@ kbd {
 
 .filter-lists {
     max-width: 420px;
-    margin-top: 22px;
+    margin: 22px 0 0;
 }
 
 .filter-list {
     display: grid;
-    grid-template-columns: 14px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px;
-    padding: 6px 10px;
+    padding: 7px 10px;
 }
 
-.filter-list-note {
+.filter-list dt {
+    font-size: 14px;
+}
+
+.filter-list dd {
+    margin: 0;
     font-size: 13px;
     color: var(--muted);
+    text-align: right;
 }
 
-.filter-lists .aside {
+#filter-lists-note {
     margin: 10px 10px 0;
     font-size: 13px;
 }
