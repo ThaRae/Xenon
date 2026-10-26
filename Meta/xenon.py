@@ -7,6 +7,7 @@
 # to the engine (Patches/ladybird) are applied first, if ladybird/ doesn't have them yet; see Meta/patches.py.
 
 import argparse
+import hashlib
 import http.server
 import json
 import os
@@ -28,12 +29,12 @@ if not (LADYBIRD_SOURCE_DIR / "Meta" / "ladybird.py").exists():
 
 sys.path.insert(0, str(LADYBIRD_SOURCE_DIR / "Meta"))
 
-import patches  # noqa: E402
-
 from Utils.build_vcpkg import build_vcpkg  # noqa: E402
 from Utils.find_compiler import pick_host_compiler  # noqa: E402
 from Utils.host_platform import HostSystem  # noqa: E402
 from Utils.host_platform import Platform  # noqa: E402
+
+import patches  # noqa: E402
 
 PRESETS = {
     "Release": ("release", "vcpkg-release"),
@@ -51,6 +52,10 @@ SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
 # ones nothing should block.
 BLOCKED_REQUESTS = {"/jquery.popunder.js": "script", "/site-tracking-pixel.gif": "img"}
 ALLOWED_REQUESTS = {"/app.js": "script", "/logo.gif": "img"}
+
+# A test extension whose pages check the chrome.* APIs and print what they found on a line starting with this.
+TEST_EXTENSION_DIR = XENON_SOURCE_DIR / "Tests" / "Extensions" / "basic"
+EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
 
 
 def main():
@@ -211,6 +216,10 @@ def test_main(platform: Platform, build_dir: Path):
     if not check_content_blocking(app_executable(platform, build_dir), env):
         failures.append("content blocking")
 
+    print("==> extension pages and their chrome.* APIs", flush=True)
+    if not check_extensions(app_executable(platform, build_dir), env):
+        failures.append("extensions")
+
     if failures:
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
         sys.exit(1)
@@ -269,6 +278,103 @@ def check_content_blocking(executable: Path, env: dict) -> bool:
                 print(f"    {label}: reached {sorted(reached)}")
     finally:
         server.shutdown()
+    return passed
+
+
+# Chrome's ID for an unpacked extension without a key: its directory's path, hashed (see UI/Extensions/Extension.cpp).
+def unpacked_extension_id(directory: Path) -> str:
+    digest = hashlib.sha256(str(directory.resolve()).encode()).hexdigest()[:32]
+    return "".join(chr(ord("a") + int(digit, 16)) for digit in digest)
+
+
+# Runs a page in a headless browser, in a throwaway profile, until the page closes itself, and returns the results it
+# printed after EXTENSION_TEST_MARKER.
+def run_extension_test_page(executable: Path, env: dict, url: str) -> dict | None:
+    with tempfile.TemporaryDirectory() as profile:
+        command = [
+            str(executable),
+            "--headless=manual",
+            "--profile-path",
+            profile,
+            f"--load-extension={TEST_EXTENSION_DIR}",
+            url,
+        ]
+        try:
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired:
+            print(f"    timed out on {url}", file=sys.stderr)
+            return None
+
+    output = result.stdout + result.stderr
+    for line in output.splitlines():
+        if EXTENSION_TEST_MARKER in line:
+            # The console prints the logged string in quotes.
+            return json.loads(line.split(EXTENSION_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
+    print(output[-4000:], file=sys.stderr)
+    return None
+
+
+def check_extensions(executable: Path, env: dict) -> bool:
+    extension_id = unpacked_extension_id(TEST_EXTENSION_DIR)
+    passed = True
+
+    # An extension page gets chrome.* and its extension's origin.
+    results = run_extension_test_page(executable, env, f"chrome-extension://{extension_id}/tests.html")
+    if results is None:
+        return False
+    failed = sorted(name for name, ok in results.items() if ok is not True)
+    if failed:
+        print(f"    extension page: failed {failed}", file=sys.stderr)
+        passed = False
+    else:
+        print(f"    extension page: {len(results)} checks passed")
+
+    # A web page gets neither chrome.* nor the extension's files, which aren't web accessible.
+    page = f"""<!doctype html><script>
+        const results = {{ "no chrome.runtime": typeof chrome === "undefined" || !chrome.runtime }};
+        const base = "chrome-extension://{extension_id}/";
+        const image = new Promise(resolve => {{
+            const img = new Image();
+            img.onload = () => resolve(false);
+            img.onerror = () => resolve(true);
+            img.src = base + "popup.css";
+        }});
+        Promise.all([
+            fetch(base + "manifest.json").then(() => false, () => true),
+            image,
+        ]).then(([fetch_failed, image_failed]) => {{
+            results["fetch blocked"] = fetch_failed;
+            results["subresource blocked"] = image_failed;
+            console.log("{EXTENSION_TEST_MARKER}" + JSON.stringify(results));
+            window.close();
+        }});
+    </script>""".encode()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(page)))
+            self.end_headers()
+            self.wfile.write(page)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        results = run_extension_test_page(executable, env, f"http://127.0.0.1:{server.server_address[1]}/")
+    finally:
+        server.shutdown()
+    if results is None:
+        return False
+    failed = sorted(name for name, ok in results.items() if ok is not True)
+    if failed:
+        print(f"    web page: failed {failed}", file=sys.stderr)
+        passed = False
+    else:
+        print(f"    web page: {len(results)} checks passed")
     return passed
 
 

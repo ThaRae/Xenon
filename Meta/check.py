@@ -103,7 +103,9 @@ def check_includes(checks: Checks):
 def check_build_lists_every_source(checks: Checks):
     build_file = (UI_DIR / "Xenon.cmake").read_text()
     # Sources are listed relative to UI/ (Bangs.cpp, Extensions/Manifest.cpp), or by a path ending in Tests/ or UI/.
-    listed = {name.removeprefix("/") for name in re.findall(r"([A-Za-z0-9_/]+\.(?:cpp|mm))\b", build_file)}
+    # Generated sources live in the build directory.
+    source_pattern = r"(?<!GENERATED_DIR\})(?<![A-Za-z0-9_/])([A-Za-z0-9_/]+\.(?:cpp|mm))\b"
+    listed = {name.removeprefix("/") for name in re.findall(source_pattern, build_file)}
     listed = {name.split("/UI/")[-1].removeprefix("UI/") for name in listed}
 
     for path in ui_sources(".cpp", ".mm"):

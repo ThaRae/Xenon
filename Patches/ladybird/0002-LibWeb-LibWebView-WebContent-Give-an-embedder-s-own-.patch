@@ -1,0 +1,599 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 14:40:46 -0400
+Subject: [PATCH] LibWeb+LibWebView+WebContent: Give an embedder's own pages a
+ script bridge
+
+A browser that serves pages of its own scheme, like extension pages, has
+to give them an API that talks to the UI process, available from their
+first line of script on. WebView::register_url_scheme() now takes an
+optional URLSchemeBridge for that.
+
+Before a document of such a scheme may run scripts, WebContent asks the
+UI process for a bootstrap script and runs it as the body of a function
+given the bridge: an object whose postMessage(string) reaches the UI
+process, and whose onmessage receives what the UI process posts back.
+The bridge is a parameter, so nothing new appears on the global object
+unless the bootstrap puts it there.
+
+The UI process answers only for documents it knows the asking page hosts
+or is creating, and only if their origin is of a bridged scheme. It takes
+a message's sender from its own records of the document, never from the
+renderer, so a renderer can't speak for a document it doesn't host.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWeb/DOM/Document.cpp            |  4 +
+ Libraries/LibWeb/Page/Page.h                 |  3 +
+ Libraries/LibWebView/URLSchemeHandler.cpp    | 40 +++++++-
+ Libraries/LibWebView/URLSchemeHandler.h      | 37 +++++++-
+ Libraries/LibWebView/WebContentClient.cpp    |  8 ++
+ Libraries/LibWebView/WebContentClient.h      |  1 +
+ Libraries/LibWebView/WebContentPage.cpp      | 34 +++++++
+ Libraries/LibWebView/WebContentPage.h        |  7 ++
+ Services/WebContent/CMakeLists.txt           |  1 +
+ Services/WebContent/ConnectionFromClient.cpp |  6 ++
+ Services/WebContent/ConnectionFromClient.h   |  1 +
+ Services/WebContent/EmbedderBridge.cpp       | 99 ++++++++++++++++++++
+ Services/WebContent/EmbedderBridge.h         | 37 ++++++++
+ Services/WebContent/PageClient.cpp           |  5 +
+ Services/WebContent/PageClient.h             |  5 +
+ Services/WebContent/WebContentClient.ipc     |  2 +
+ Services/WebContent/WebContentServer.ipc     |  1 +
+ 17 files changed, 288 insertions(+), 3 deletions(-)
+ create mode 100644 Services/WebContent/EmbedderBridge.cpp
+ create mode 100644 Services/WebContent/EmbedderBridge.h
+
+diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
+index d4d7cd02ad50b225c209732ec7b042b79678bd31..dba2d9e44efdfcf6307e55356f1e7f64333835fe 100644
+--- a/Libraries/LibWeb/DOM/Document.cpp
++++ b/Libraries/LibWeb/DOM/Document.cpp
+@@ -7997,6 +7997,10 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+ 
+ void Document::set_ready_to_run_scripts()
+ {
++    // AD-HOC: The embedder may prepare the document's realm before its scripts run, as for the pages of a scheme it
++    //         serves itself.
++    page().client().page_document_is_ready_to_run_scripts(*this);
++
+     m_ready_to_run_scripts = true;
+     if (auto callback = m_deferred_parser_start) {
+         m_deferred_parser_start = nullptr;
+diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
+index f695ce40fe1aed4afea908d19d8f18da66d95e68..401a793cc92b527166906802f4ef57f3de181c53 100644
+--- a/Libraries/LibWeb/Page/Page.h
++++ b/Libraries/LibWeb/Page/Page.h
+@@ -866,6 +866,9 @@ public:
+     virtual void page_did_consume_user_activation([[maybe_unused]] HTML::UserActivationConsumption consumption) { }
+ 
+     virtual void request_file(FileRequest) = 0;
++    // Called before any script of the document's own may run, for the embedder to prepare the document's realm.
++    virtual void page_document_is_ready_to_run_scripts(DOM::Document&) { }
++
+     // A URL of a scheme the embedder serves itself, which only the UI process can answer.
+     virtual void request_embedder_resource(EmbedderResourceRequest request) { request.on_complete(Error::from_errno(ENOTSUP)); }
+ 
+diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
+index fd107545c9fefd072f77296494bcc78c77a4bebe..f1a744eb066ab9e5a7ab8d1190cee31936126e54 100644
+--- a/Libraries/LibWebView/URLSchemeHandler.cpp
++++ b/Libraries/LibWebView/URLSchemeHandler.cpp
+@@ -7,12 +7,14 @@
+ #include <AK/NeverDestroyed.h>
+ #include <LibURL/EmbedderSchemes.h>
+ #include <LibWebView/URLSchemeHandler.h>
++#include <LibWebView/WebContentPage.h>
+ 
+ namespace WebView {
+ 
+ struct RegisteredScheme {
+     String scheme;
+     URLSchemeHandler handler;
++    Optional<URLSchemeBridge> bridge;
+ };
+ 
+ static Vector<RegisteredScheme>& registered_schemes()
+@@ -21,11 +23,11 @@ static Vector<RegisteredScheme>& registered_schemes()
+     return *schemes;
+ }
+ 
+-void register_url_scheme(String scheme, URLSchemeHandler handler)
++void register_url_scheme(String scheme, URLSchemeHandler handler, Optional<URLSchemeBridge> bridge)
+ {
+     VERIFY(!url_scheme_handler(scheme));
+     URL::register_embedder_scheme(scheme);
+-    registered_schemes().append({ move(scheme), move(handler) });
++    registered_schemes().append({ move(scheme), move(handler), move(bridge) });
+ }
+ 
+ URLSchemeHandler* url_scheme_handler(StringView scheme)
+@@ -37,4 +39,38 @@ URLSchemeHandler* url_scheme_handler(StringView scheme)
+     return nullptr;
+ }
+ 
++URLSchemeBridge* url_scheme_bridge(StringView scheme)
++{
++    for (auto& registered : registered_schemes()) {
++        if (registered.scheme == scheme)
++            return registered.bridge.has_value() ? &registered.bridge.value() : nullptr;
++    }
++    return nullptr;
++}
++
++URLSchemeBridgeEndpoint::URLSchemeBridgeEndpoint(WebContentPage& page, Web::HTML::CrossProcessId document_id, URL::URL url, URL::Origin origin)
++    : m_page(page)
++    , m_document_id(document_id)
++    , m_url(move(url))
++    , m_origin(move(origin))
++{
++}
++
++bool URLSchemeBridgeEndpoint::is_open() const
++{
++    auto page = m_page.strong_ref();
++    return page && page->embedder_bridge_endpoint(m_document_id).has_value();
++}
++
++void URLSchemeBridgeEndpoint::post_message(String message) const
++{
++    if (auto page = m_page.strong_ref())
++        page->async_post_embedder_message(m_document_id, move(message));
++}
++
++bool URLSchemeBridgeEndpoint::operator==(URLSchemeBridgeEndpoint const& other) const
++{
++    return m_page.ptr() == other.m_page.ptr() && m_document_id == other.m_document_id;
++}
++
+ }
+diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
+index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..9d71c98307b4a8ee26e6a8623a09b9c69313b6f5 100644
+--- a/Libraries/LibWebView/URLSchemeHandler.h
++++ b/Libraries/LibWebView/URLSchemeHandler.h
+@@ -11,11 +11,14 @@
+ #include <AK/String.h>
+ #include <AK/StringView.h>
+ #include <AK/Vector.h>
++#include <AK/WeakPtr.h>
+ #include <LibHTTP/Header.h>
+ #include <LibIPC/File.h>
+ #include <LibURL/Origin.h>
+ #include <LibURL/URL.h>
++#include <LibWebCommon/HTML/CrossProcessId.h>
+ #include <LibWebView/Export.h>
++#include <LibWebView/Forward.h>
+ 
+ namespace WebView {
+ 
+@@ -41,10 +44,42 @@ struct URLSchemeResponse {
+ 
+ using URLSchemeHandler = Function<ErrorOr<URLSchemeResponse>(URLSchemeRequest const&)>;
+ 
++// A document of a scheme with a script bridge, as the UI process knows it: its URL and origin come from the UI process's
++// own records, never from the renderer.
++class WEBVIEW_API URLSchemeBridgeEndpoint {
++public:
++    URLSchemeBridgeEndpoint(WebContentPage&, Web::HTML::CrossProcessId document_id, URL::URL, URL::Origin);
++
++    Web::HTML::CrossProcessId document_id() const { return m_document_id; }
++    URL::URL const& url() const { return m_url; }
++    URL::Origin const& origin() const { return m_origin; }
++
++    // Whether the document is still around. Messages to a document that's gone are dropped.
++    bool is_open() const;
++    void post_message(String) const;
++
++    bool operator==(URLSchemeBridgeEndpoint const&) const;
++
++private:
++    WeakPtr<WebContentPage> m_page;
++    Web::HTML::CrossProcessId m_document_id;
++    URL::URL m_url;
++    URL::Origin m_origin;
++};
++
++// A script bridge between the UI process and the scheme's documents. Before a document's own scripts run, its bootstrap
++// script runs as the body of a function given the bridge: an object whose postMessage(string) calls on_message, and
++// whose onmessage, if the script sets it, receives what URLSchemeBridgeEndpoint::post_message() sends.
++struct URLSchemeBridge {
++    Function<Optional<String>(URLSchemeBridgeEndpoint const&)> bootstrap_script;
++    Function<void(URLSchemeBridgeEndpoint const&, String message)> on_message;
++};
++
+ // Serves a URL scheme from the UI process, as a browser serves its extension pages. The scheme's URLs get tuple origins
+ // and are potentially trustworthy (see URL::register_embedder_scheme()). Register every scheme before the first
+ // renderer starts, since renderers learn the schemes when they launch. A handler that fails makes a network error.
+-WEBVIEW_API void register_url_scheme(String scheme, URLSchemeHandler);
++WEBVIEW_API void register_url_scheme(String scheme, URLSchemeHandler, Optional<URLSchemeBridge> = {});
+ URLSchemeHandler* url_scheme_handler(StringView scheme);
++URLSchemeBridge* url_scheme_bridge(StringView scheme);
+ 
+ }
+diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
+index 2894a7bac8490e8cd3c023319ec0fc7106649c36..7e77afc33cf07791abfa1cf57994aeddc7eca931 100644
+--- a/Libraries/LibWebView/WebContentClient.cpp
++++ b/Libraries/LibWebView/WebContentClient.cpp
+@@ -55,6 +55,14 @@ Messages::WebContentClient::DidAddBlobUrlEntryResponse WebContentClient::did_add
+     return URL::BlobURLEntry::Token { 0 };
+ }
+ 
++Messages::WebContentClient::DidRequestEmbedderBootstrapResponse WebContentClient::did_request_embedder_bootstrap(Web::PageId page_id, Web::HTML::CrossProcessId document_id)
++{
++    if (auto* page = this->page(page_id))
++        return page->did_request_embedder_bootstrap(document_id);
++
++    return Optional<String> {};
++}
++
+ bool WebContentClient::hosts_an_environment_with_storage_key(Web::StorageAPI::StorageKey const& storage_key)
+ {
+     bool hosts_one = false;
+diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
+index 181fe16e93f1aa50bb179874d43bb50a1f4cbd16..e72d5f151cbf9045ed90efffa4b69976954320c8 100644
+--- a/Libraries/LibWebView/WebContentClient.h
++++ b/Libraries/LibWebView/WebContentClient.h
+@@ -84,6 +84,7 @@ public:
+     static Optional<WebContentClient&> client_for_compositor_context_id(Web::CompositorContextId);
+ 
+     virtual Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::PageId page_id, Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry entry) override;
++    virtual Messages::WebContentClient::DidRequestEmbedderBootstrapResponse did_request_embedder_bootstrap(Web::PageId page_id, Web::HTML::CrossProcessId document_id) override;
+     virtual void did_retain_blob_url_token(Web::HTML::CrossProcessId navigable_id, URL::BlobURLEntry::Token token) override;
+     virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
+ 
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 4a0a67384565fa986f3951279df2ca0400d128d5..9a4ae167651877a56e145b5aa044f21929a0fcf1 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -1549,6 +1549,40 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+     async_handle_embedder_resource_return(0, move(response.value().file), move(response.value().headers), request_id);
+ }
+ 
++// A document of this page whose scheme has a script bridge, which the page hosts or is creating.
++Optional<URLSchemeBridgeEndpoint> WebContentPage::embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id)
++{
++    Optional<URLSchemeBridgeEndpoint> endpoint;
++    for_each_hosted_document([&](CanonicalDocument& document) {
++        if (document.id() != document_id)
++            return IterationDecision::Continue;
++
++        auto const& origin = document.origin();
++        if (!origin.is_opaque() && origin.scheme().has_value() && url_scheme_bridge(*origin.scheme()))
++            endpoint = URLSchemeBridgeEndpoint { *this, document_id, document.creation_url(), origin };
++        return IterationDecision::Break;
++    });
++    return endpoint;
++}
++
++Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::CrossProcessId document_id)
++{
++    auto endpoint = embedder_bridge_endpoint(document_id);
++    if (!endpoint.has_value())
++        return Optional<String> {};
++    return url_scheme_bridge(*endpoint->origin().scheme())->bootstrap_script(*endpoint);
++}
++
++void WebContentPage::did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message)
++{
++    // NB: A document may post a message as it goes away, so one this page no longer hosts is dropped rather than taken
++    //     for misbehavior. Who sent the message comes from the UI process's records, never from the message.
++    auto endpoint = embedder_bridge_endpoint(document_id);
++    if (!endpoint.has_value())
++        return;
++    url_scheme_bridge(*endpoint->origin().scheme())->on_message(*endpoint, move(message));
++}
++
+ void WebContentPage::did_request_color_picker(Color current_color)
+ {
+     view().did_request_color_picker({}, *this, current_color);
+diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
+index 6945989cd227dff33e4ee90d20feddd398da9935..f2222d065db9f778c989c94a90241a97534a2443 100644
+--- a/Libraries/LibWebView/WebContentPage.h
++++ b/Libraries/LibWebView/WebContentPage.h
+@@ -25,6 +25,7 @@
+ #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
+ #include <LibWebView/Export.h>
+ #include <LibWebView/Forward.h>
++#include <LibWebView/URLSchemeHandler.h>
+ #include <WebContent/WebContentClientEndpoint.h>
+ #include <WebContent/WebContentServerEndpoint.h>
+ #include <WebContent/WebContentTestClientEndpoint.h>
+@@ -62,6 +63,7 @@ namespace WebView {
+ 
+ class WEBVIEW_API WebContentPage final
+     : public RefCounted<WebContentPage>
++    , public Weakable<WebContentPage>
+     , public WebContentClientPageStub
+     , public WebContentTestClientPageStub
+     , public WebContentServerPageProxy {
+@@ -155,6 +157,9 @@ public:
+     void fail_renderer_owned_downloads();
+     void reset_session_history_for_testing();
+ 
++    // A document of this page whose scheme has a script bridge, which the page hosts or is creating.
++    Optional<URLSchemeBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
++
+ private:
+     void relay_finished_input_event(WebContentPage const& reporting_page, u64 event_id, Web::EventResult);
+     Optional<CanonicalNavigable&> population_worker_navigable(Web::HTML::CrossProcessId navigable_id) const;
+@@ -254,6 +259,7 @@ private:
+     virtual void did_change_picture_in_picture_player_controls_visibility(bool shown) override;
+     virtual void did_request_file(ByteString path, i32 request_id) override;
+     virtual void did_request_embedder_resource(URL::URL url, i32 request_id) override;
++    virtual void did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message) override;
+     virtual void did_request_color_picker(Color current_color) override;
+     virtual void did_request_geolocation_position(u64 request_id) override;
+     virtual void did_cancel_geolocation_position_request(u64 request_id) override;
+@@ -354,6 +360,7 @@ private:
+     Messages::WebContentClient::DidRequestCookieResponse did_request_cookie(Optional<Web::HTML::EnvironmentId> const&, URL::URL, HTTP::Cookie::Source);
+     Messages::WebContentClient::DidRequestAllCookiesCookiestoreResponse did_request_all_cookies_cookiestore(Web::HTML::EnvironmentId const&, URL::URL);
+     Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry);
++    Optional<String> did_request_embedder_bootstrap(Web::HTML::CrossProcessId document_id);
+ 
+     // Test-only handlers, reached over the separate test transport (see WebContentTestClient).
+     virtual void did_finish_test(String text) override;
+diff --git a/Services/WebContent/CMakeLists.txt b/Services/WebContent/CMakeLists.txt
+index f3b98190f612a0f813de644bccd8e7c8343266ab..4458f1ff70ea56e2fa4ca1a587c729fe28d94149 100644
+--- a/Services/WebContent/CMakeLists.txt
++++ b/Services/WebContent/CMakeLists.txt
+@@ -4,6 +4,7 @@ set(SOURCES
+     DevToolsConsoleClient.cpp
+     DevToolsDebugger.cpp
+     DevToolsIndexedDB.cpp
++    EmbedderBridge.cpp
+     PageClient.cpp
+     PageHost.cpp
+     TestConnection.cpp
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 0cf88592750d7ebbe150b74c861985eafd3acac1..7049a3ca628b73d78082dec00d24c8d10c47e471 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3317,6 +3317,12 @@ void ConnectionFromClient::handle_embedder_resource_return(Web::PageId, i32 erro
+     request->on_complete(Web::EmbedderResource { .fd = file->take_fd(), .headers = move(headers) });
+ }
+ 
++void ConnectionFromClient::post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message)
++{
++    if (auto page = this->page(page_id); page.has_value())
++        page->deliver_embedder_message(document_id, move(message));
++}
++
+ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+ {
+     if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 4e8668edc84f5fde87bc48c7d17f9b69a1b52f10..022bbed019c8805664daed827253223b05292d6c 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -269,6 +269,7 @@ private:
+     virtual void did_complete_window_rect_request(Web::PageId page_id, u64 completion_id) override;
+     virtual void handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) override;
+     virtual void handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) override;
++    virtual void post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) override;
+     virtual void blob_url_entry_removed(Utf16String url) override;
+     virtual void did_delete_all_cookies(Web::PageId page_id, u64 request_id) override;
+     virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
+diff --git a/Services/WebContent/EmbedderBridge.cpp b/Services/WebContent/EmbedderBridge.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..04a5e694251252b985ead1e3b65d5e301a63371d
+--- /dev/null
++++ b/Services/WebContent/EmbedderBridge.cpp
+@@ -0,0 +1,99 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibGC/Function.h>
++#include <LibJS/Runtime/AbstractOperations.h>
++#include <LibJS/Runtime/NativeFunction.h>
++#include <LibJS/Runtime/Object.h>
++#include <LibJS/Runtime/PrimitiveString.h>
++#include <LibJS/Runtime/Realm.h>
++#include <LibURL/EmbedderSchemes.h>
++#include <LibWeb/DOM/Document.h>
++#include <LibWeb/HTML/EventLoop/EventLoop.h>
++#include <LibWeb/HTML/Scripting/ClassicScript.h>
++#include <LibWeb/HTML/Scripting/Environments.h>
++#include <LibWeb/HTML/Scripting/ExceptionReporter.h>
++#include <LibWeb/HTML/Scripting/TemporaryExecutionContext.h>
++#include <WebContent/ConnectionFromClient.h>
++#include <WebContent/EmbedderBridge.h>
++
++namespace WebContent {
++
++static void call_with_bridge(Web::HTML::EnvironmentSettingsObject& settings, JS::Value function, JS::Value this_value, ReadonlySpan<JS::Value> arguments)
++{
++    if (!function.is_function())
++        return;
++
++    Web::HTML::prepare_to_run_callback(settings);
++    auto result = JS::call(settings.global_object().vm(), function, this_value, arguments);
++    if (result.is_error())
++        Web::HTML::report_exception(JS::throw_completion(result.error_value()), settings.realm());
++    Web::HTML::clean_up_after_running_callback(settings);
++}
++
++void EmbedderBridges::install(ConnectionFromClient& client, Web::PageId page_id, Web::DOM::Document& document)
++{
++    auto origin = document.origin();
++    if (origin.is_opaque() || !origin.scheme().has_value() || !URL::is_embedder_scheme(*origin.scheme()))
++        return;
++
++    auto document_id = document.id();
++    auto response = client.send_sync_but_allow_failure<Messages::WebContentClient::DidRequestEmbedderBootstrap>(page_id, document_id);
++    if (!response)
++        return;
++    auto bootstrap = response->take_script();
++    if (!bootstrap.has_value())
++        return;
++
++    auto& settings = document.relevant_settings_object();
++    auto& realm = settings.realm();
++    Web::HTML::TemporaryExecutionContext execution_context { realm };
++
++    auto bridge = JS::Object::create(realm, realm.intrinsics().object_prototype());
++    bridge->define_native_function(realm, "postMessage"_utf16_fly_string, [&client, page_id, document_id](JS::VM& vm) -> JS::ThrowCompletionOr<JS::Value> {
++        auto message = TRY(vm.argument(0).to_utf16_string(vm)).to_utf8();
++        client.async_did_post_embedder_message(page_id, document_id, move(message));
++        return JS::js_undefined(); }, 1, JS::default_attributes);
++
++    // NB: The bootstrap is a function body, so that the bridge is a parameter rather than something on the global object.
++    auto source = Utf16String::formatted("(function (bridge) {{\n{}\n}})", *bootstrap);
++    auto script = Web::HTML::ClassicScript::create("embedder bootstrap", source.utf16_view(), settings, settings.api_base_url());
++    auto function = script->run(Web::HTML::ClassicScript::RethrowErrors::Yes);
++    if (function.is_abrupt()) {
++        Web::HTML::report_exception(function, realm);
++        return;
++    }
++
++    m_bridges.set(document_id, { .document = document, .object = *bridge });
++    call_with_bridge(settings, function.value(), JS::js_undefined(), { { JS::Value { bridge } } });
++}
++
++void EmbedderBridges::deliver_message(Web::HTML::CrossProcessId document_id, String message)
++{
++    auto bridge = m_bridges.get(document_id);
++    if (!bridge.has_value())
++        return;
++
++    auto document = bridge->document.ptr();
++    auto object = bridge->object.ptr();
++    if (!document || !object) {
++        m_bridges.remove(document_id);
++        return;
++    }
++
++    Web::HTML::queue_a_task(Web::HTML::Task::Source::PostedMessage, nullptr, document, GC::create_function(document->heap(), [document = GC::Ref { *document }, object = GC::Ref { *object }, message = move(message)] {
++        auto& settings = document->relevant_settings_object();
++        auto& vm = settings.global_object().vm();
++
++        Web::HTML::TemporaryExecutionContext execution_context { settings.realm() };
++        auto handler = object->get("onmessage"_utf16_fly_string);
++        if (handler.is_error())
++            return;
++        call_with_bridge(settings, handler.value(), object, { { JS::PrimitiveString::create(vm, Utf16String::from_utf8(message)) } });
++    }));
++}
++
++}
+diff --git a/Services/WebContent/EmbedderBridge.h b/Services/WebContent/EmbedderBridge.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..821ebf0605e312a654000324200d7cbf2a94dc21
+--- /dev/null
++++ b/Services/WebContent/EmbedderBridge.h
+@@ -0,0 +1,37 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/HashMap.h>
++#include <AK/String.h>
++#include <LibGC/Weak.h>
++#include <LibJS/Forward.h>
++#include <LibWeb/Forward.h>
++#include <LibWebCommon/HTML/CrossProcessId.h>
++#include <LibWebCommon/Page/PageId.h>
++#include <WebContent/Forward.h>
++
++namespace WebContent {
++
++// The script bridge between the UI process and the documents of the schemes it serves itself (see
++// WebView::register_url_scheme()). Before a document's own scripts run, the UI process may give it a bootstrap script,
++// which runs as the body of a function given the bridge: an object whose postMessage(string) sends a message to the UI
++// process, and whose onmessage, if the script sets it, receives the UI process's messages.
++class EmbedderBridges {
++public:
++    void install(ConnectionFromClient&, Web::PageId, Web::DOM::Document&);
++    void deliver_message(Web::HTML::CrossProcessId document_id, String message);
++
++private:
++    struct Bridge {
++        GC::Weak<Web::DOM::Document> document;
++        GC::Weak<JS::Object> object;
++    };
++    HashMap<Web::HTML::CrossProcessId, Bridge> m_bridges;
++};
++
++}
+diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
+index aa8889bccda229dc4a911d2564d592e1ecf4a868..32479bd241b3cd549c5f788d4980a45d5a482771 100644
+--- a/Services/WebContent/PageClient.cpp
++++ b/Services/WebContent/PageClient.cpp
+@@ -1877,6 +1877,11 @@ void PageClient::request_embedder_resource(Web::EmbedderResourceRequest request)
+     client().request_embedder_resource(m_id, move(request));
+ }
+ 
++void PageClient::page_document_is_ready_to_run_scripts(Web::DOM::Document& document)
++{
++    m_embedder_bridges.install(client(), m_id, document);
++}
++
+ URL::BlobURLEntry::Token PageClient::page_did_add_blob_url_entry(Web::HTML::EnvironmentSettingsObject const& environment, Utf16String const& url, Web::FileAPI::SerializedBlobURLEntry const& entry)
+ {
+     auto response = client().send_sync_but_allow_failure<Messages::WebContentClient::DidAddBlobUrlEntry>(m_id, environment.id, url, entry);
+diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
+index f4c58794fe8478047a550d77b0fa7f9504f4e9b2..fb651743b76d52b8d2681e7b959e21752be009da 100644
+--- a/Services/WebContent/PageClient.h
++++ b/Services/WebContent/PageClient.h
+@@ -36,6 +36,7 @@
+ #include <LibWebCommon/WebView/Geolocation.h>
+ #include <LibWebCommon/WebView/Mutation.h>
+ #include <LibWebCommon/WebView/StorageSetResult.h>
++#include <WebContent/EmbedderBridge.h>
+ #include <WebContent/Forward.h>
+ 
+ namespace WebContent {
+@@ -60,6 +61,8 @@ public:
+ 
+     WebDriverConnection& ensure_webdriver_session();
+     void run_webdriver_command(u64 command_id, Optional<Web::HTML::CrossProcessId> navigable_id, String const& name, JsonValue payload, Vector<String> arguments);
++
++    void deliver_embedder_message(Web::HTML::CrossProcessId document_id, String message) { m_embedder_bridges.deliver_message(document_id, move(message)); }
+     void webdriver_did_set_current_browsing_context(u64 command_id, Web::HTML::CrossProcessId navigable_id);
+     void did_handle_webdriver_mouse_event(u64 request_id);
+     bool prepare_webdriver_input_command(u64, Optional<Web::HTML::CrossProcessId>, JsonValue&);
+@@ -381,6 +384,7 @@ private:
+     virtual void page_did_change_accessibility_tree() override;
+     virtual void page_did_take_screenshot(Gfx::ShareableBitmap const& screenshot) override;
+     virtual void received_message_from_web_ui(Utf16String const& name, JS::Value data) override;
++    virtual void page_document_is_ready_to_run_scripts(Web::DOM::Document&) override;
+     virtual void page_did_block_resource() override;
+     virtual void page_did_start_network_request(u64 request_id, URL::URL const&, ByteString const&, Vector<HTTP::Header> const&, ReadonlyBytes, Optional<String>, String const& referrer_policy, bool is_navigation_request, Web::Fetch::Infrastructure::Request::Priority) override;
+     virtual void page_did_receive_network_response_headers(u64 request_id, u32 status_code, Optional<String>, Vector<HTTP::Header> const&, Requests::CacheState) override;
+@@ -430,6 +434,7 @@ private:
+     HashMap<u64, GC::Ref<GC::Function<void()>>> m_pending_webdriver_mouse_events;
+     u64 m_next_webdriver_mouse_event_request_id { 0 };
+     RefPtr<WebUIConnection> m_web_ui;
++    EmbedderBridges m_embedder_bridges;
+ 
+     GC::Ptr<WebContentConsoleClient> m_top_level_document_console_client;
+ 
+diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
+index 4349f5d54116ad68fbf2e58d967ebfd030d5df5e..1a94dd33311e1d17f23f19da5ca8852acb111627 100644
+--- a/Services/WebContent/WebContentClient.ipc
++++ b/Services/WebContent/WebContentClient.ipc
+@@ -230,6 +230,8 @@ endpoint WebContentClient routed by Web::PageId page_id
+     did_change_picture_in_picture_player_controls_visibility(Web::PageId page_id, bool shown) =|
+     did_request_file(Web::PageId page_id, ByteString path, i32 request_id) =|
+     did_request_embedder_resource(Web::PageId page_id, URL::URL url, i32 request_id) =|
++    [NotRouted] did_request_embedder_bootstrap(Web::PageId page_id, Web::HTML::CrossProcessId document_id) => (Optional<String> script)
++    did_post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) =|
+     did_request_color_picker(Web::PageId page_id, Color current_color) =|
+     did_request_geolocation_position(Web::PageId page_id, u64 request_id) =|
+     did_cancel_geolocation_position_request(Web::PageId page_id, u64 request_id) =|
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index cabeb63a74c3621054bdc14be432a2aa767b321e..4afae00ee9d06a8be4aebc3dd26e63324c1bd710 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -277,6 +277,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+ 
+     handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) =|
+     handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) =|
++    post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) =|
+     blob_url_entry_removed(Utf16String url) =|
+     did_delete_all_cookies(Web::PageId page_id, u64 request_id) =|
+ 

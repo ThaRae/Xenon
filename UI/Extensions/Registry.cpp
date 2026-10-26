@@ -8,6 +8,7 @@
 #include <AK/NeverDestroyed.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Extensions/Registry.h>
+#include <UI/Extensions/Router.h>
 
 namespace Ladybird::Extensions {
 
@@ -19,9 +20,13 @@ Registry& Registry::the()
 
 void Registry::register_url_scheme()
 {
-    WebView::register_url_scheme(MUST(String::from_utf8(EXTENSION_SCHEME)), [this](WebView::URLSchemeRequest const& request) {
-        return respond(request);
-    });
+    WebView::URLSchemeBridge bridge {
+        .bootstrap_script = [](WebView::URLSchemeBridgeEndpoint const& endpoint) { return Router::the().bootstrap_script(endpoint); },
+        .on_message = [](WebView::URLSchemeBridgeEndpoint const& endpoint, String message) { Router::the().on_message(endpoint, message); },
+    };
+
+    auto handler = [this](WebView::URLSchemeRequest const& request) { return respond(request); };
+    WebView::register_url_scheme(MUST(String::from_utf8(EXTENSION_SCHEME)), move(handler), move(bridge));
 }
 
 void Registry::initialize(ByteString profile_data_directory, Vector<ByteString> const& unpacked_extensions, String ui_language)

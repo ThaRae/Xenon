@@ -46,6 +46,7 @@ set(XENON_SOURCES
     Extensions/Manifest.cpp
     Extensions/MatchPattern.cpp
     Extensions/Registry.cpp
+    Extensions/Router.cpp
     Extensions/Storage.cpp
     FilterLists.cpp
     FindInPageWidget.cpp
@@ -147,6 +148,11 @@ endif()
 
 list(TRANSFORM XENON_SOURCES PREPEND "${XENON_UI_DIR}/")
 list(TRANSFORM XENON_ARC_SOURCES PREPEND "${XENON_UI_DIR}/")
+
+# The chrome.* API that extension pages get (see UI/Extensions/Router.cpp), built into the browser.
+set(XENON_GENERATED_DIR "${CMAKE_BINARY_DIR}/Xenon")
+embed_as_string(xenon_chrome_api "${XENON_UI_DIR}/Resources/extensions/chrome-api.js" "${XENON_GENERATED_DIR}/ChromeAPI.cpp" chrome_api_source NAMESPACE "Ladybird::Extensions")
+list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp")
 
 # NB: Qt finalizes executables in a deferred call by default, and we are already running deferred, so finalize by hand.
 qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
