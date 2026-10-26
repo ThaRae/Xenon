@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs Xenon's fast checks (Meta/check.py) before every push, the same ones CI's first job runs.
+# Enable once per clone with: git config core.hooksPath .githooks
+# Skip for one push with: git push --no-verify
+exec "$(git rev-parse --show-toplevel)/Meta/check.py"

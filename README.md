@@ -51,6 +51,38 @@ Other commands:
 ./Meta/xenon.py clean
 ```
 
+## Tests and CI
+
+```bash
+./Meta/check.py            # formatting and Xenon's invariants, in seconds
+./Meta/check.py --fix      # apply the formatters first
+./Meta/xenon.py test       # unit tests (Tests/), plus a headless render of about:welcome
+git config core.hooksPath .githooks   # run Meta/check.py before every push
+```
+
+`Meta/check.py` formats C++ with clang-format, web pages with prettier, and Python with ruff, at the versions
+Ladybird's CI uses, read from the submodule. It installs clang-format and ruff into `Build/tools` itself; prettier
+needs `npx`. It also checks the things that break Xenon quietly:
+
+- an include that resolves to Ladybird's header instead of ours
+- a source file left out of the build
+- a page override for a page upstream no longer ships
+- a malformed or duplicate !bang
+- Ladybird's violet coming back into the chrome
+- local edits in `ladybird/`, or a pinned commit that doesn't exist upstream
+
+CI runs on Gitea Actions at git.avx512.dev, on slab's ephemeral runners:
+
+| Workflow | Runs | Does |
+| --- | --- | --- |
+| `.gitea/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online` on `slab`, then on `slab-large`, a Linux build, `Meta/xenon.py test`, and the welcome page render as an artifact |
+| `.gitea/workflows/upstream.yml` | weekly, by hand | the same build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
+
+The builds run in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
+`ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
+The `CCACHE_TOKEN` repository secret points ccache and vcpkg's package cache at slab-ccache. Without it, every build
+starts cold and takes a couple of hours.
+
 ## Updating Ladybird
 
 ```bash
@@ -60,7 +92,7 @@ git -C ladybird checkout FETCH_HEAD
 ```
 
 If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon last synced with, and port the relevant
-changes into `UI/`.
+changes into `UI/`. The weekly Upstream workflow lists those changes and shows whether `master` still builds.
 
 ## Features
 

@@ -108,7 +108,35 @@ if (HAS_DIRECTX)
     list(APPEND XENON_SOURCES WebContentViewWindows.cpp)
 endif()
 
-# FIXME: Port the Vulkan/DMA-BUF presentation path (WebContentViewLinux.cpp + Shaders/) once Xenon targets Linux.
+# Linux presents the page through Vulkan with DMA-BUF images when glslang is around to compile its shaders (see
+# Ladybird's check_for_dependencies.cmake), as upstream's UI/Qt does. The generated headers get their own directory and
+# target name, as upstream's ladybird target generates the same ones.
+if (NOT APPLE AND USE_VULKAN_DMABUF_IMAGES)
+    set(XENON_SHADER_DIR "${CMAKE_BINARY_DIR}/Xenon/Shaders")
+    set(xenon_vert_shader_header "${XENON_SHADER_DIR}/WebContentViewLinuxVertShader.h")
+    set(xenon_frag_shader_header "${XENON_SHADER_DIR}/WebContentViewLinuxFragShader.h")
+    set(xenon_generated_shader_headers "${xenon_vert_shader_header}" "${xenon_frag_shader_header}")
+    foreach (stage IN ITEMS vert frag)
+        set(shader "${XENON_UI_DIR}/Shaders/WebContentViewLinux.${stage}")
+        set(header "${xenon_${stage}_shader_header}")
+        add_custom_command(
+            OUTPUT "${header}"
+            COMMAND ${CMAKE_COMMAND}
+                -DLOG=${XENON_SHADER_DIR}/glslang-webcontent-${stage}.log
+                -P "${LADYBIRD_SOURCE_DIR}/Meta/CMake/run_quiet.cmake"
+                --
+                "${GLSLANG_VALIDATOR}"
+                -V
+                --vn webcontent_${stage}_shader_spv
+                -o "${header}"
+                "${shader}"
+            DEPENDS "${shader}"
+            VERBATIM
+        )
+    endforeach()
+    add_custom_target(xenon_generate_web_content_view_linux_shaders DEPENDS ${xenon_generated_shader_headers})
+    list(APPEND XENON_SOURCES WebContentViewLinux.cpp)
+endif()
 
 list(TRANSFORM XENON_SOURCES PREPEND "${XENON_UI_DIR}/")
 list(TRANSFORM XENON_ARC_SOURCES PREPEND "${XENON_UI_DIR}/")
@@ -132,6 +160,13 @@ endif()
 
 if (LINUX AND NOT ANDROID)
     target_link_libraries(xenon PRIVATE LibThreading PkgConfig::GIO PkgConfig::XCB_ICCCM Qt::GuiPrivate)
+endif()
+
+if (TARGET xenon_generate_web_content_view_linux_shaders)
+    target_sources(xenon PRIVATE ${xenon_generated_shader_headers})
+    target_include_directories(xenon PRIVATE "${XENON_SHADER_DIR}")
+    target_link_libraries(xenon PRIVATE Vulkan::Vulkan)
+    add_dependencies(xenon xenon_generate_web_content_view_linux_shaders)
 endif()
 
 if (APPLE)
@@ -207,3 +242,10 @@ else()
 endif()
 
 qt_finalize_target(xenon)
+
+# Xenon's unit tests, which Meta/xenon.py test builds and runs. Each is named TestXenon* to stay clear of Ladybird's.
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBangs.cpp" Xenon NAME TestXenonBangs LIBS LibURL)
+target_sources(TestXenonBangs PRIVATE "${XENON_UI_DIR}/Bangs.cpp")
+target_include_directories(TestXenonBangs BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
+add_custom_target(xenon-tests DEPENDS TestXenonBangs)

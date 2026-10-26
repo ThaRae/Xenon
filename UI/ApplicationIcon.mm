@@ -34,13 +34,12 @@ void set_profile_application_icon(WebView::Profile const& profile)
                                     blue:qBlue(color) / 255.0
                                    alpha:1];
     };
+    // Shades of Xenon's rose far enough apart to tell profiles' badges apart.
     NSArray<NSColor*>* badge_colors = @[
-        ns_color(BrandColors::SlateBlue500),
-        ns_color(BrandColors::Indigo30),
-        ns_color(BrandColors::Violet100),
-        ns_color(BrandColors::Violet900),
-        ns_color(BrandColors::SlateBlue900),
-        ns_color(BrandColors::Indigo60),
+        ns_color(BrandColors::Rose100),
+        ns_color(BrandColors::Rose900),
+        ns_color(BrandColors::Rose60),
+        ns_color(BrandColors::Rose500),
     ];
     auto* badge_color = badge_colors[profile.paths().identity.hash() % [badge_colors count]];
 

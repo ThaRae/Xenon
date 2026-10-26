@@ -35,6 +35,10 @@ PRESETS = {
 }
 
 APP_TARGET = "xenon"
+TESTS_TARGET = "xenon-tests"
+
+# A page rendered with nothing on it compresses to a few kilobytes; the welcome page is well over this.
+SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
 
 
 def main():
@@ -51,6 +55,8 @@ def main():
     run_parser = subparsers.add_parser("run", help="Build and launch Xenon")
     run_parser.add_argument("--no-build", action="store_true")
     run_parser.add_argument("args", nargs=argparse.REMAINDER)
+    test_parser = subparsers.add_parser("test", help="Build and run the unit tests and the headless smoke test")
+    test_parser.add_argument("--no-build", action="store_true")
     subparsers.add_parser("clean", help="Delete the build directory for the preset")
 
     args = parser.parse_args()
@@ -69,6 +75,10 @@ def main():
         if not args.no_build:
             build_main(build_dir, args.jobs, APP_TARGET)
         run_main(platform, build_dir, args.args)
+    elif args.command == "test":
+        if not args.no_build:
+            build_main(build_dir, args.jobs, APP_TARGET, TESTS_TARGET)
+        test_main(platform, build_dir)
 
 
 def configure_build_env(preset: str, jobs: str | None) -> tuple[Path, Path]:
@@ -115,15 +125,15 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
     return build_dir
 
 
-def build_main(build_dir: Path, jobs: str | None, target: str):
+def build_main(build_dir: Path, jobs: str | None, *targets: str):
     build_args = ["ninja", "-C", build_dir]
     if jobs:
         build_args.extend(["-j", jobs])
-    build_args.append(target)
+    build_args.extend(targets)
     run_command(build_args)
 
 
-def run_main(platform: Platform, build_dir: Path, args: list[str]):
+def app_executable(platform: Platform, build_dir: Path) -> Path:
     if platform.host_system == HostSystem.macOS:
         executable = build_dir / "bin" / "Xenon.app" / "Contents" / "MacOS" / "Xenon"
     else:
@@ -132,8 +142,62 @@ def run_main(platform: Platform, build_dir: Path, args: list[str]):
     if not executable.exists():
         print(f"Executable not found: {executable}. Build Xenon before running it.", file=sys.stderr)
         sys.exit(1)
+    return executable
 
-    run_command([executable, *args])
+
+def run_main(platform: Platform, build_dir: Path, args: list[str]):
+    run_command([app_executable(platform, build_dir), *args])
+
+
+def test_main(platform: Platform, build_dir: Path):
+    failures = []
+
+    for test in sorted((build_dir / "bin").glob("TestXenon*")):
+        if test.is_dir() or not os.access(test, os.X_OK):
+            continue
+        print(f"==> {test.name}", flush=True)
+        if subprocess.run([test]).returncode != 0:
+            failures.append(test.name)
+
+    # Rendering the welcome page without a window runs Xenon's bundled resources, the WebUI bridge, and the engine's
+    # helper processes together, which unit tests can't.
+    smoke_dir = build_dir / "smoke"
+    smoke_dir.mkdir(exist_ok=True)
+    screenshot = smoke_dir / "welcome.png"
+    screenshot.unlink(missing_ok=True)
+
+    env = dict(os.environ)
+    if platform.host_system != HostSystem.macOS and not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
+        env["QT_QPA_PLATFORM"] = "offscreen"
+
+    print("==> headless render of about:welcome", flush=True)
+    command = [
+        app_executable(platform, build_dir),
+        "--headless=screenshot",
+        "--screenshot-delay=2",
+        f"--screenshot-path={screenshot}",
+        "--window-width=1100",
+        "--window-height=900",
+        "about:welcome",
+    ]
+    try:
+        result = subprocess.run([str(part) for part in command], env=env, capture_output=True, text=True, timeout=120)
+        output = result.stdout + result.stderr
+        rendered = result.returncode == 0 and screenshot.exists()
+    except subprocess.TimeoutExpired as error:
+        output = f"timed out after {error.timeout} s"
+        rendered = False
+
+    if rendered and screenshot.stat().st_size >= SMOKE_TEST_MIN_SCREENSHOT_BYTES:
+        print(f"    rendered {screenshot} ({screenshot.stat().st_size} bytes)")
+    else:
+        print(output[-4000:], file=sys.stderr)
+        failures.append("headless render of about:welcome")
+
+    if failures:
+        print(f"Failed: {', '.join(failures)}", file=sys.stderr)
+        sys.exit(1)
+    print("All tests passed.")
 
 
 def run_command(command: list):

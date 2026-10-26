@@ -26,3 +26,6 @@ and the feature checklist.
   the `xenon` target.
 - `./Meta/xenon.py run`: build and launch `Build/release/bin/Xenon.app`.
 - `ninja -C Build/release xenon`: incremental rebuild once configured.
+- `./Meta/check.py` (`--fix` to format): run before committing. CI runs it too, along with `./Meta/xenon.py test`
+  (unit tests in `Tests/`, plus a headless render of about:welcome).
+- New unit tests are `Tests/Test*.cpp`, registered in `UI/Xenon.cmake` as `TestXenon*` targets under `xenon-tests`.

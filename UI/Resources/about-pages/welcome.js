@@ -60,7 +60,8 @@ function showStep(name, { focus = true } = {}) {
     // The greeting stands on its own; the questions are counted.
     stepCounter.textContent = index === 0 ? "" : `${index} of ${steps.length - 1}`;
 
-    if (location.hash.slice(1) !== steps[index].dataset.step) history.replaceState(null, "", `#${steps[index].dataset.step}`);
+    if (location.hash.slice(1) !== steps[index].dataset.step)
+        history.replaceState(null, "", `#${steps[index].dataset.step}`);
     if (focus) steps[index].querySelector("h1").focus({ preventScroll: true });
     window.scrollTo(0, 0);
 }
