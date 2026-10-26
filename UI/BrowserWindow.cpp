@@ -22,6 +22,7 @@
 #include <UI/ChromeStyle.h>
 #include <UI/DevToolsBanner.h>
 #include <UI/Extensions/Browser.h>
+#include <UI/Extensions/Dialog.h>
 #include <UI/Icon.h>
 #include <UI/Menu.h>
 #include <UI/StringUtils.h>
@@ -417,6 +418,7 @@ void BrowserWindow::initialize_hamburger_menu()
     m_hamburger_menu->addSeparator();
 
     m_hamburger_menu->addAction(application.open_settings_action());
+    m_hamburger_menu->addAction(Extensions::create_extensions_action(this));
     m_hamburger_menu->addMenu(application.inspect_menu());
     m_hamburger_menu->addMenu(application.debug_menu());
     m_hamburger_menu->addSeparator();

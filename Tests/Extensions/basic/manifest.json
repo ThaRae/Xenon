@@ -15,7 +15,8 @@
     "permissions": [
         "storage",
         "alarms",
-        "tabs"
+        "tabs",
+        "offscreen"
     ],
     "icons": {
         "16": "icon16.png",

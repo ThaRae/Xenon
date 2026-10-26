@@ -616,11 +616,15 @@ if (config.isBackground) {
 
 // --- chrome ------------------------------------------------------------------------------------------------------------
 
-const chrome = { runtime, i18n, tabs, windows, permissions, management, commands, extension };
-if (hasPermission("storage")) chrome.storage = storage;
-if (hasPermission("alarms")) chrome.alarms = alarms;
-if (hasPermission("idle")) chrome.idle = idle;
-if (hasPermission("offscreen")) chrome.offscreen = offscreen;
-if (config.manifest.action) chrome.action = action;
+// Offscreen documents get chrome.runtime alone, as in Chrome.
+const chrome = { runtime };
+if (config.contextType !== "OFFSCREEN_DOCUMENT") {
+    Object.assign(chrome, { i18n, tabs, windows, permissions, management, commands, extension });
+    if (hasPermission("storage")) chrome.storage = storage;
+    if (hasPermission("alarms")) chrome.alarms = alarms;
+    if (hasPermission("idle")) chrome.idle = idle;
+    if (hasPermission("offscreen")) chrome.offscreen = offscreen;
+    if (config.manifest.action) chrome.action = action;
+}
 
 Object.defineProperty(globalThis, "chrome", { value: chrome, writable: true, configurable: true, enumerable: false });

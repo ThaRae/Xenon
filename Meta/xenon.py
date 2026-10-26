@@ -287,15 +287,15 @@ def unpacked_extension_id(directory: Path) -> str:
     return "".join(chr(ord("a") + int(digit, 16)) for digit in digest)
 
 
-# Runs a page in a headless browser, in a throwaway profile, until the page closes itself, and returns the results it
-# printed after EXTENSION_TEST_MARKER.
-def run_extension_test_page(executable: Path, env: dict, url: str) -> dict | None:
-    with tempfile.TemporaryDirectory() as profile:
+# Runs a page in a headless browser until the page closes itself, and returns the results it printed after
+# EXTENSION_TEST_MARKER. The profile is a throwaway one, unless one is given.
+def run_extension_test_page(executable: Path, env: dict, url: str, profile: str | None = None) -> dict | None:
+    with tempfile.TemporaryDirectory() as temporary_profile:
         command = [
             str(executable),
             "--headless=manual",
             "--profile-path",
-            profile,
+            profile or temporary_profile,
             f"--load-extension={TEST_EXTENSION_DIR}",
             url,
         ]
@@ -318,16 +318,22 @@ def check_extensions(executable: Path, env: dict) -> bool:
     extension_id = unpacked_extension_id(TEST_EXTENSION_DIR)
     passed = True
 
-    # An extension page gets chrome.* and its extension's origin.
-    results = run_extension_test_page(executable, env, f"chrome-extension://{extension_id}/tests.html")
-    if results is None:
-        return False
-    failed = sorted(name for name, ok in results.items() if ok is not True)
-    if failed:
-        print(f"    extension page: failed {failed}", file=sys.stderr)
-        passed = False
-    else:
-        print(f"    extension page: {len(results)} checks passed")
+    # An extension page gets chrome.* and its extension's origin, and its background worker runs. The page runs twice in
+    # one profile: the first time, the extension is installed; the second, the browser starts up with it.
+    with tempfile.TemporaryDirectory() as profile:
+        for run, expected_event in enumerate(("installed:install", "startup"), 1):
+            results = run_extension_test_page(executable, env, f"chrome-extension://{extension_id}/tests.html", profile)
+            if results is None:
+                return False
+            failed = sorted(name for name, ok in results.items() if ok is not True and not name.startswith("info: "))
+            if expected_event not in (results.get("info: background events") or []):
+                failed.append(f"background got {expected_event}")
+            checks = sum(1 for name in results if not name.startswith("info: "))
+            if failed:
+                print(f"    extension page, run {run}: failed {failed}", file=sys.stderr)
+                passed = False
+            else:
+                print(f"    extension page, run {run}: {checks} checks passed, and the background got {expected_event}")
 
     # A web page gets neither chrome.* nor the extension's files, which aren't web accessible.
     page = f"""<!doctype html><script>

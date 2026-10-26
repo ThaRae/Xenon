@@ -22,7 +22,9 @@
 
 #include <QApplication>
 #include <QGuiApplication>
+#include <QKeySequence>
 #include <QPointer>
+#include <QShortcut>
 #include <QWindow>
 
 namespace Ladybird::Extensions::Browser {
@@ -378,8 +380,84 @@ static void dispatch_tab_updated(Tab& tab, JsonObject const& change)
     }
 }
 
+// --- chrome.commands ---------------------------------------------------------------------------------------------------
+
+// Chrome's shortcut names ("Ctrl+Shift+Y", "MacCtrl+Comma") in Qt's terms. As in Chrome, Ctrl means Command on macOS,
+// which is what Qt means by it there too.
+static QKeySequence key_sequence_for_shortcut(StringView shortcut)
+{
+    QStringList keys;
+    for (auto part : shortcut.split_view('+')) {
+        part = part.trim_whitespace();
+        if (part.is_one_of("Ctrl"sv, "Command"sv))
+            keys.append("Ctrl");
+        else if (part == "MacCtrl"sv)
+            keys.append("Meta");
+        else if (part == "Comma"sv)
+            keys.append(",");
+        else if (part == "Period"sv)
+            keys.append(".");
+        else
+            keys.append(qstring_from_ak_string(part));
+    }
+    return QKeySequence(keys.join('+'));
+}
+
+static void run_command(Extension const& extension, String const& command, BrowserWindow& window)
+{
+    auto* tab = window.current_tab();
+    if (command == "_execute_action"sv) {
+        if (action_appearance(extension, tab).popup.has_value()) {
+            if (state().open_popup)
+                state().open_popup(extension);
+        } else {
+            action_clicked(extension, tab);
+        }
+        return;
+    }
+
+    JsonArray args;
+    args.must_append(command);
+    if (tab)
+        args.must_append(tab_to_json(*tab, window, extension));
+    Router::the().dispatch_event(extension, "commands.onCommand"sv, move(args));
+}
+
+static void install_command_shortcuts(BrowserWindow& window)
+{
+    for (auto* shortcut : window.findChildren<QShortcut*>("XenonExtensionCommand"))
+        delete shortcut;
+
+    for (auto const& extension : Registry::the().extensions()) {
+        for (auto const& command : extension->manifest().commands) {
+            if (!command.suggested_key.has_value())
+                continue;
+            auto sequence = key_sequence_for_shortcut(*command.suggested_key);
+            if (sequence.isEmpty())
+                continue;
+
+            auto* shortcut = new QShortcut(sequence, &window);
+            shortcut->setObjectName("XenonExtensionCommand");
+            QObject::connect(shortcut, &QShortcut::activated, &window, [&window, extension = NonnullRefPtr { *extension }, name = command.name] {
+                run_command(*extension, name, window);
+            });
+        }
+    }
+}
+
 void did_create_window(BrowserWindow& window)
 {
+    install_command_shortcuts(window);
+
+    static bool follows_extensions = false;
+    if (!exchange(follows_extensions, true)) {
+        Registry::the().on_extensions_change([] {
+            for (auto* window : all_windows())
+                install_command_shortcuts(*window);
+            return true;
+        });
+    }
+
     for (auto const& extension : Registry::the().extensions()) {
         JsonArray args;
         args.must_append(window_to_json(window, extension, false));

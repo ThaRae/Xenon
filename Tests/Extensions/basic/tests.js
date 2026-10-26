@@ -102,7 +102,10 @@ async function run() {
     }
     check("background worker answers", pong?.pong === true && pong.senderUrl === location.href.split("#")[0]);
     check("background is a worker", pong?.isWorker === true);
-    check("background events: onInstalled", (await chrome.runtime.sendMessage({ toBackground: "events" }))?.includes("installed:install"));
+    // Meta/xenon.py runs this page twice in one profile, and checks the first run installs and the second starts up.
+    const backgroundEvents = await chrome.runtime.sendMessage({ toBackground: "events" });
+    results["info: background events"] = backgroundEvents;
+    check("background gets onInstalled or onStartup", backgroundEvents?.includes("installed:install") || backgroundEvents?.includes("startup"));
 
     const port = chrome.runtime.connect({ name: "test-port" });
     const echo = await new Promise(resolve => {
@@ -133,6 +136,24 @@ async function run() {
     );
     check("tabs.query", Array.isArray(await chrome.tabs.query({})));
     check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
+
+    check("offscreen.hasDocument before", (await chrome.offscreen.hasDocument()) === false);
+    await chrome.offscreen.createDocument({ url: "offscreen.html", reasons: ["CLIPBOARD"], justification: "test" });
+    let offscreen;
+    for (let attempt = 0; attempt < 50 && !offscreen; ++attempt) {
+        offscreen = await chrome.runtime.sendMessage({ toOffscreen: "ping" }).catch(() => undefined);
+        if (!offscreen) await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    check(
+        "offscreen document",
+        offscreen?.offscreen && offscreen.hasDOM && offscreen.localStorage && offscreen.onlyRuntime
+    );
+    check(
+        "offscreen in getContexts",
+        (await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] })).length === 1
+    );
+    await chrome.offscreen.closeDocument();
+    check("offscreen.hasDocument after", (await chrome.offscreen.hasDocument()) === false);
 
     console.log(`XENON-EXTENSION-TEST ${JSON.stringify(results)}`);
     window.close();
