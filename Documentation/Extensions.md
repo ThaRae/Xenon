@@ -91,10 +91,17 @@ outright once upstream has the equivalent. A fork does make engine work a little
 3. **User scripts in isolated worlds** (next, milestone 3). The same bootstrap-and-bridge, for any document and into a
    world of the embedder's choosing: the main world, or a named isolated world built on
    `WrapperWorldType::Extension`, a realm per document and world whose global wraps the same `Window`, with its own
-   `WindowProxy` from `window_proxy_for()`. Injection at document start, document end, and document idle, in all frames
-   or only the top one. The UI process decides which scripts go into which frames, since it knows every navigable's URL.
-   The xenon-ublock session is writing a main-world document-start hook for uBlock Origin's scriptlets; this patch
-   should share its injection points rather than add a second set.
+   `WindowProxy` from `window_proxy_for()`. `Tests/LibWeb/TestWindowProxyWorld.cpp` builds exactly such a realm over a
+   live document, and shows DOM events crossing into it: `create_a_new_javascript_realm()` with
+   `create_global_object_wrapper(realm, window)` and `window_proxy_for(world, realm)`, a `HostDefined` with the
+   window's principal realm, then `cache_global_object_wrapper()` and `initialize_window_web_interfaces()`. Nothing
+   outside the tests creates one yet. Injection at document start, document end, and document idle, in all frames or
+   only the top one. The UI process decides which scripts go into which frames, since it knows every navigable's URL.
+   The patch also needs a way to run a script in a frame's world and return its result (for
+   `scripting.executeScript` with `func`), and per-extension stylesheets (for `insertCSS`; `Page::set_user_style()` is
+   one per page and has no IPC). The xenon-ublock session's patches run uBlock Origin's scriptlets at document start in
+   every frame, at `Document::update_for_history_step_application`, `LocalNavigable::initialize_navigable`, and
+   `LocalTraversableNavigable`; this patch should share those injection points rather than add a second set.
 4. **Embedder-owned workers** (milestone 2). The UI process starts a worker with a script URL of a registered scheme and
    no owning document, in the WebWorker process, with the same bridge. It lives until the UI process closes it. The
    WebWorker process also needs patch 1's resource requests, which only WebContent has so far.
@@ -102,9 +109,10 @@ outright once upstream has the equivalent. A fork does make engine work a little
 Site isolation already gives every `chrome-extension://<id>` origin processes of its own, as a site of its own, so
 the "embedder-chosen processes" patch planned at first isn't needed.
 
-Later patches, as the milestones need them: request interception for `webRequest` (in RequestServer, next to the
-content blocker), HTTP auth challenges for `webRequestAuthProvider`, and hidden pages with no tab, for offscreen
-documents.
+Later patches, as the milestones need them: request interception for `webRequest` (in WebContent's
+`ResourceLoader::load()`, next to the content blocker's `should_block_request()`, asking the UI process; RequestServer
+has no interception IPC), HTTP auth challenges for `webRequestAuthProvider`, and hidden pages with no tab, for
+offscreen documents.
 
 ## Architecture
 
@@ -190,6 +198,11 @@ embedder-owned worker (patch 3) at the extension's origin:
   restarts them on an event. Xenon doesn't at first: an extension that survives being stopped also survives not being
   stopped. Stopping idle workers is a memory optimization for later.
 - Once Ladybird runs real service workers, the background script moves to one, and the bootstrap script stays as is.
+- If embedder-owned workers prove hard, the fallback is a background page: the script in a hidden extension page with
+  no tab, as Bitwarden's Firefox build runs it. A `HeadlessWebView` or an unparented `WebContentView` can host it, kept
+  `Visible` with `ViewImplementation::set_system_visibility_state()`, since hidden documents get their timers
+  throttled. Bitwarden's Chrome build expects a worker global, though: it's built for webpack's `webworker` target,
+  which loads code with `importScripts()`.
 
 The background has to come early. Bitwarden's popup won't show its unlock screen until the background has run its
 state migrations: it polls `storage.local` for the state version the worker writes, for up to about 16 seconds. It
@@ -261,6 +274,12 @@ yet, so that an extension's startup doesn't throw. Bitwarden feature-detects `si
 | **4. The rest of Bitwarden** | `contextMenus`. `notifications` (with buttons). `webRequest`: `onAuthRequired` with `asyncBlocking` (`webRequestAuthProvider`, for HTTP auth dialogs), and the non-blocking `onBeforeRequest`, `onBeforeRedirect`, `onHeadersReceived` (with `responseHeaders`), `onCompleted`, `onErrorOccurred`. `sidePanel`. `privacy.services` `passwordSavingEnabled`, `autofillAddressEnabled`, `autofillCreditCardEnabled` (stubs: Ladybird has no password manager or autofill of its own to turn off). `nativeMessaging` (`connectNative("com.8bit.bitwarden")`), for unlocking through the desktop app. Web Push for the background. | Feature parity with Bitwarden in Chrome |
 | **5. Installing from the store** | CRX3 install and updates, the Chrome Web Store, offering password managers in the welcome flow as Helium does. Then whatever Proton Pass and 1Password use beyond the above, found the same way Bitwarden's needs were. | The setup flow Helium has |
 
+Passkeys need more than Bitwarden's scripts: Ladybird's `navigator.credentials` rejects `get()`, `store()`, and
+`create()` as not implemented, and there is no `PublicKeyCredential`. Bitwarden's passkey support replaces
+`navigator.credentials` from a main-world script, and may require those to exist first. Nothing in Ladybird detects
+login forms or autofills either (`:autofill` never matches), so autofill comes entirely from the extension, as it does
+for Bitwarden in Chrome.
+
 ### Where each piece lives
 
 | Piece | Engine patch | Xenon |
@@ -305,7 +324,10 @@ yet, so that an extension's startup doesn't throw. Bitwarden feature-detects `si
   an `<img>`) is still subject to it, as in Chrome.
 - **Storage** is per extension ID, in the profile, and deleted with the extension.
 - **Native messaging** (milestone 4) runs only hosts registered in Chrome's manifest locations whose
-  `allowed_origins` list the extension, over stdin/stdout with Chrome's length-prefixed framing.
+  `allowed_origins` list the extension, over stdin/stdout with Chrome's length-prefixed framing. It needs no engine
+  change: the UI process spawns the host with `Core::Process` and pipes, as LibWebView spawns its helpers. Not with
+  `QProcess`, whose exit status LibWebView's `ProcessMonitor` would reap first: it calls `waitpid(-1)` on every
+  `SIGCHLD`.
 - **No `file://` access** for content scripts unless the user turns it on per extension, as in Chrome.
 
 ## Testing
