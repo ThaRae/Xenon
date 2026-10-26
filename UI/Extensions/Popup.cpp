@@ -113,13 +113,12 @@ void ActionPopup::hideEvent(QHideEvent* event)
 
     // A closed popup's page goes away, as in Chrome; the next click opens it afresh. Its ports close then too, which is
     // how an extension's background learns its popup closed.
+    // NB: The page is asked to close before its view goes. Once the view is gone, the page is closed on this side, and
+    //     the request would have no connection to go out on, leaving WebContent to time out instead.
     Browser::did_close_popup(m_view->view_id());
-    auto request_close = m_view->prepare_for_immediate_close();
+    m_view->prepare_for_immediate_close()();
     deleteLater();
-    Core::deferred_invoke([request_close = AK::move(request_close)] {
-        request_close();
-        Core::deferred_invoke([] { Router::the().prune_closed_contexts(); });
-    });
+    Core::deferred_invoke([] { Router::the().prune_closed_contexts(); });
 }
 
 }

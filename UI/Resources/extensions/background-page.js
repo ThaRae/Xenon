@@ -19,5 +19,9 @@ channel.port1.onmessage = event => bridge.postMessage(event.data);
 bridge.onmessage = text => channel.port1.postMessage(text);
 
 worker.addEventListener("error", event => {
-    console.error(`Background script error: ${event.message} (${event.filename}:${event.lineno}:${event.colno})`);
+    // An exception in the script comes as an ErrorEvent. A plain error event means the script couldn't load, or the
+    // worker's process went away, as it does when the browser quits.
+    if (event instanceof ErrorEvent)
+        console.error(`Background script error: ${event.message} (${event.filename}:${event.lineno}:${event.colno})`);
+    else console.error("The background script couldn't load, or its worker stopped.");
 });
