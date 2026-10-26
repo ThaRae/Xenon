@@ -1,6 +1,10 @@
 Xenon's content blocking filter lists
 
-These are third-party filter lists, converted by xenon-ublock for Ladybird's content blocker on 2026-10-26 17:30 UTC (xenon-ublock 419c2a3). Converting dropped or rewrote the filters Ladybird can't apply; each list's header says how many it kept. Each list remains under its own license, as below. The GPL-3.0 text is in LICENSE-GPL-3.0.txt; the lists offered under the GPL or CC BY-SA are distributed here under the GPL.
+These are third-party filter lists, converted by xenon-ublock for Ladybird's content blocker on 2026-10-26 18:47 UTC (xenon-ublock 6d929ad). Converting dropped or rewrote the filters Ladybird can't apply; each list's header says how many it kept. Each list remains under its own license, as below. The GPL-3.0 text is in LICENSE-GPL-3.0.txt; the lists offered under the GPL or CC BY-SA are distributed here under the GPL.
+
+uBlock Origin 1.75.0: scriptlets and redirect resources
+  Source:   https://github.com/gorhill/uBlock/archive/refs/tags/1.75.0.tar.gz
+  License:  GPL-3.0 (LICENSE-GPL-3.0.txt)
 
 uBlock filters – Ads
   Source:   https://ublockorigin.github.io/uAssets/filters/filters.txt

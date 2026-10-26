@@ -2,7 +2,7 @@
 ! Source: https://malware-filter.gitlab.io/urlhaus-filter/urlhaus-filter-vivaldi-online.txt
 ! Homepage: https://gitlab.com/malware-filter/urlhaus-filter#malicious-url-blocklist
 ! License: CC0-1.0 (https://gitlab.com/malware-filter/urlhaus-filter#license)
-! Converted by xenon-ublock on 2026-10-26 17:30 UTC for adblock 0.13.3, as built into Ladybird's LibWeb/ContentBlocker.
+! Converted by xenon-ublock on 2026-10-26 18:47 UTC for Ladybird's content blocker with xenon-ublock's engine/patches (adblock 0.13.3 with css-validation, uBlock Origin's resources).
 ! Kept 98191 of 98191 upstream filters, as 98191 filters; the rest cannot take
 ! effect in Ladybird. See report.md and dropped/ next to this file for what was dropped and why.
 !
