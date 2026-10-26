@@ -197,6 +197,18 @@ set_target_properties(xenon PROPERTIES
 # The engine's helper processes (WebContent, RequestServer, ...) live next to the browser executable.
 if (APPLE OR WIN32)
     set_target_properties(${ladybird_helper_processes} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:xenon>")
+else()
+    # Elsewhere, Ladybird's own ladybird target puts its resources and helpers in the build directory's share/Lagom and
+    # libexec, and Xenon's would be the same files, which ninja refuses. So Xenon gets an install prefix of its own,
+    # which is where the engine looks for them, relative to the executable (see WebView::platform_init()). Its lib links
+    # back to the build's libraries, as the binaries' rpath is $ORIGIN/../lib.
+    set(XENON_PREFIX_DIR "${CMAKE_BINARY_DIR}/xenon")
+    set_target_properties(xenon PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_BINDIR}")
+    set_target_properties(${ladybird_helper_processes} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_LIBEXECDIR}")
+    add_custom_command(TARGET xenon POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E create_symlink "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}" "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_LIBDIR}"
+        VERBATIM
+    )
 endif()
 add_dependencies(xenon ${ladybird_helper_processes})
 
@@ -250,7 +262,7 @@ if (APPLE)
         VERBATIM
     )
 else()
-    set(xenon_resource_dir "${CMAKE_BINARY_DIR}/${IN_BUILD_PREFIX}${CMAKE_INSTALL_DATADIR}/Lagom")
+    set(xenon_resource_dir "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_DATADIR}/Lagom")
 endif()
 
 copy_resources_to_build("${xenon_resource_dir}" xenon)

@@ -143,10 +143,11 @@ def build_main(build_dir: Path, jobs: str | None, *targets: str):
 
 
 def app_executable(platform: Platform, build_dir: Path) -> Path:
+    # On Linux, Xenon has an install prefix of its own in the build directory (see UI/Xenon.cmake).
     if platform.host_system == HostSystem.macOS:
         executable = build_dir / "bin" / "Xenon.app" / "Contents" / "MacOS" / "Xenon"
     else:
-        executable = build_dir / "bin" / "Xenon"
+        executable = build_dir / "xenon" / "bin" / "Xenon"
 
     if not executable.exists():
         print(f"Executable not found: {executable}. Build Xenon before running it.", file=sys.stderr)

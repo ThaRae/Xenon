@@ -23,6 +23,15 @@ touch Build/.ci-started
 # Ask slab-ccache first: a missing object (404) means the token is good.
 if [[ -n ${CCACHE_TOKEN:-} ]]; then
   CCACHE_TOKEN=$(printf '%s' "$CCACHE_TOKEN" | tr -d '[:space:]')
+  # slab-ccache's token is 64 hex digits (slab-infra host/phase7-ccache.sh). A secret saved with something around it,
+  # such as quotes or terminal escapes from a copy, still holds the token, so use that.
+  if [[ ! $CCACHE_TOKEN =~ ^[0-9a-f]{64}$ ]]; then
+    candidates=$(printf '%s' "$CCACHE_TOKEN" | grep -oE '[0-9a-f]{64}' || true)
+    if [[ -n $candidates && $(printf '%s\n' "$candidates" | wc -l) -eq 1 ]]; then
+      echo "warning: CCACHE_TOKEN has ${#CCACHE_TOKEN} characters around a 64-digit token; using the token (fix the secret)"
+      CCACHE_TOKEN=$candidates
+    fi
+  fi
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H "Authorization: Bearer $CCACHE_TOKEN" "$cache_url/.token-check" || true)
   if [[ $code == 401 ]]; then
     echo "warning: slab-ccache refused CCACHE_TOKEN (${#CCACHE_TOKEN} characters); building without the caches"
@@ -64,12 +73,17 @@ status=0
 
 ccache --show-stats > Build/release/ccache-stats.txt 2>&1 || true
 
-# vcpkg keeps a failed dependency's build output in its buildtrees, which the CI log otherwise never shows.
-if ((status != 0)) && [[ -d Build/vcpkg-release/buildtrees ]]; then
-  while IFS= read -r log; do
-    echo "::group::$log"
-    tail -n 80 "$log"
-    echo "::endgroup::"
-  done < <(find Build/vcpkg-release/buildtrees -maxdepth 2 -name '*.log' -newer Build/.ci-started -exec grep -l -i -E 'error|failed' {} +)
+# vcpkg keeps a failed dependency's build output in its buildtrees, which the CI log otherwise never shows. Print the
+# logs of the ports it says failed, and only those.
+install_log=Build/release/vcpkg-manifest-install.log
+if ((status != 0)) && [[ -f $install_log ]]; then
+  while IFS= read -r port; do
+    for log in Build/vcpkg-release/buildtrees/"$port"/*-out.log Build/vcpkg-release/buildtrees/"$port"/*-err.log; do
+      [[ -f $log ]] || continue
+      echo "::group::$log"
+      tail -n 80 "$log"
+      echo "::endgroup::"
+    done
+  done < <(sed -n 's/^error: building \([^:]*\):.*/\1/p' "$install_log" | sort -u)
 fi
 exit $status
