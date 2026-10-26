@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.parse
 
 from pathlib import Path
 
@@ -323,24 +324,7 @@ def check_extensions(executable: Path, env: dict) -> bool:
     extension_id = unpacked_extension_id(TEST_EXTENSION_DIR)
     passed = True
 
-    # An extension page gets chrome.* and its extension's origin, and its background worker runs. The page runs twice in
-    # one profile: the first time, the extension is installed; the second, the browser starts up with it.
-    with tempfile.TemporaryDirectory() as profile:
-        for run, expected_event in enumerate(("installed:install", "startup"), 1):
-            results = run_extension_test_page(executable, env, f"chrome-extension://{extension_id}/tests.html", profile)
-            if results is None:
-                return False
-            failed = sorted(name for name, ok in results.items() if ok is not True and not name.startswith("info: "))
-            if expected_event not in (results.get("info: background events") or []):
-                failed.append(f"background got {expected_event}")
-            checks = sum(1 for name in results if not name.startswith("info: "))
-            if failed:
-                print(f"    extension page, run {run}: failed {failed}", file=sys.stderr)
-                passed = False
-            else:
-                print(f"    extension page, run {run}: {checks} checks passed, and the background got {expected_event}")
-
-    # A web page gets neither chrome.* nor the extension's files, which aren't web accessible.
+    # A web page, and JSON with no CORS headers, from two local servers: two origins.
     page = f"""<!doctype html><script>
         const results = {{ "no chrome.runtime": typeof chrome === "undefined" || !chrome.runtime }};
         const base = "chrome-extension://{extension_id}/";
@@ -353,31 +337,65 @@ def check_extensions(executable: Path, env: dict) -> bool:
         Promise.all([
             fetch(base + "manifest.json").then(() => false, () => true),
             image,
-        ]).then(([fetch_failed, image_failed]) => {{
+            fetch(new URLSearchParams(location.search).get("data")).then(() => false, () => true),
+        ]).then(([fetch_failed, image_failed, data_fetch_failed]) => {{
             results["fetch blocked"] = fetch_failed;
             results["subresource blocked"] = image_failed;
+            results["CORS still applies to web pages"] = data_fetch_failed;
             console.log("{EXTENSION_TEST_MARKER}" + JSON.stringify(results));
             window.close();
         }});
     </script>""".encode()
+    data = b'{"ok": true}'
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
+            body, content_type = (data, "application/json") if self.path == "/data.json" else (page, "text/html")
             self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.send_header("Content-Length", str(len(page)))
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(page)
+            self.wfile.write(body)
 
         def log_message(self, *args):
             pass
 
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    page_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    data_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    for server in (page_server, data_server):
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    data_url = f"http://127.0.0.1:{data_server.server_address[1]}/data.json"
+
     try:
-        results = run_extension_test_page(executable, env, f"http://127.0.0.1:{server.server_address[1]}/")
+        # An extension page gets chrome.* and its extension's origin, and its background worker runs. The page runs
+        # twice in one profile: the first time, the extension is installed; the second, the browser starts up with it.
+        with tempfile.TemporaryDirectory() as profile:
+            for run, expected_event in enumerate(("installed:install", "startup"), 1):
+                url = f"chrome-extension://{extension_id}/tests.html?data={urllib.parse.quote(data_url, safe='')}"
+                results = run_extension_test_page(executable, env, url, profile)
+                if results is None:
+                    return False
+                failed = sorted(
+                    name for name, ok in results.items() if ok is not True and not name.startswith("info: ")
+                )
+                if expected_event not in (results.get("info: background events") or []):
+                    failed.append(f"background got {expected_event}")
+                checks = sum(1 for name in results if not name.startswith("info: "))
+                if failed:
+                    print(f"    extension page, run {run}: failed {failed}", file=sys.stderr)
+                    passed = False
+                else:
+                    print(
+                        f"    extension page, run {run}: {checks} checks passed, and the background got {expected_event}"
+                    )
+
+        # A web page gets neither chrome.* nor the extension's files, which aren't web accessible, nor the extension's
+        # exemption from CORS.
+        page_url = f"http://127.0.0.1:{page_server.server_address[1]}/?data={urllib.parse.quote(data_url, safe='')}"
+        results = run_extension_test_page(executable, env, page_url)
     finally:
-        server.shutdown()
+        for server in (page_server, data_server):
+            server.shutdown()
     if results is None:
         return False
     failed = sorted(name for name, ok in results.items() if ok is not True)

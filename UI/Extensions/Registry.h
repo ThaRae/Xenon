@@ -99,6 +99,7 @@ private:
     void load_state();
     void save_state() const;
     void notify_extensions_changed();
+    void update_origin_access_allow_list();
 
     ByteString m_extensions_directory;
     String m_ui_language;

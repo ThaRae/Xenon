@@ -142,6 +142,18 @@ async function run() {
     check("tabs.connect disconnects without content scripts", tabPortError?.includes("Receiving end does not exist"));
     check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
 
+    // Meta/xenon.py serves JSON with no CORS headers from a host the extension has permission for, which its pages and
+    // its background reach as Chrome lets them: without CORS. The header would otherwise need a preflight.
+    const dataURL = new URLSearchParams(location.search).get("data");
+    if (dataURL) {
+        const fetched = await fetch(dataURL, { headers: { "X-Xenon-Test": "1" } })
+            .then(response => response.json())
+            .catch(error => ({ error: String(error) }));
+        check("fetch from a permitted host, without CORS", fetched?.ok === true);
+        const fetchedInBackground = await chrome.runtime.sendMessage({ toBackground: "fetch", url: dataURL });
+        check("the background fetches from a permitted host", fetchedInBackground?.ok === true);
+    }
+
     // Headless runs have no windows, and so no tabs. A tab that doesn't exist has no frames.
     check("webNavigation.getFrame of no tab", (await chrome.webNavigation.getFrame({ tabId: 987654, frameId: 0 })) === null);
     check("webNavigation.getAllFrames of no tab", (await chrome.webNavigation.getAllFrames({ tabId: 987654 })) === null);

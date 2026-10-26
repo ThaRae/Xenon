@@ -26,11 +26,14 @@ public:
     bool matches_origin(URL::Origin const&) const;
 
     bool matches_all_urls() const { return m_all_urls; }
+    bool matches_scheme(StringView) const;
+    // The host without "*.", or empty for any host.
+    String const& host() const { return m_host; }
+    bool matches_subdomains() const { return m_match_subdomains; }
 
 private:
     MatchPattern() = default;
 
-    bool matches_scheme(StringView) const;
     bool matches_host(StringView) const;
 
     bool m_all_urls { false };

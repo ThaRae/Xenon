@@ -16,8 +16,10 @@
 #include <LibFileSystem/FileSystem.h>
 #include <LibGfx/SystemTheme.h>
 #include <LibWebCommon/WebView/Utilities.h>
+#include <LibWebView/Application.h>
 #include <LibWebView/HeadlessWebView.h>
 #include <LibWebView/Utilities.h>
+#include <UI/Extensions/MatchPattern.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
 
@@ -177,8 +179,35 @@ void Registry::on_extensions_change(Function<bool()> listener)
     m_change_listeners.append(move(listener));
 }
 
+// An extension's pages and workers fetch from the hosts it has permission for without CORS, as in Chrome. Ports in
+// its patterns aren't kept: a pattern reaches its hosts on any port.
+void Registry::update_origin_access_allow_list()
+{
+    Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list;
+    for (auto const& extension : m_extensions) {
+        auto origin = extension->base_url().origin();
+        for (auto const& permission : extension->manifest().host_permissions) {
+            auto pattern = MatchPattern::parse(permission);
+            if (pattern.is_error())
+                continue;
+            for (auto scheme : { "http"_string, "https"_string }) {
+                if (!pattern.value().matches_scheme(scheme))
+                    continue;
+                allow_list.append({
+                    .source_origin = origin,
+                    .destination_scheme = scheme,
+                    .destination_host = pattern.value().host(),
+                    .allow_destination_subdomains = pattern.value().matches_subdomains(),
+                });
+            }
+        }
+    }
+    WebView::Application::the().set_origin_access_allow_list(move(allow_list));
+}
+
 void Registry::notify_extensions_changed()
 {
+    update_origin_access_allow_list();
     m_change_listeners.remove_all_matching([](auto& listener) { return !listener(); });
 }
 

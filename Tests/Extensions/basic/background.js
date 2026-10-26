@@ -21,6 +21,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case "set-alarm":
             chrome.alarms.create("test", { when: Date.now() + 100 }).then(() => sendResponse(true));
             return true;
+        case "fetch":
+            fetch(message.url, { headers: { "X-Xenon-Test": "1" } })
+                .then(response => response.json())
+                .then(sendResponse, error => sendResponse({ error: String(error) }));
+            return true;
         default:
             return undefined;
     }
