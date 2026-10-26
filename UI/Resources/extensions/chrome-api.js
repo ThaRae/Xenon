@@ -420,10 +420,15 @@ const tabs = {
         return call("tabs.reload", [tabId]).then(() => undefined);
     }),
     duplicate: method("tabs.duplicate"),
-    // FIXME: Messages to tabs need content scripts, which come with milestone 3.
+    // FIXME: Messages and ports to tabs need content scripts, which come with milestone 3.
     sendMessage: api(() => {
         throw new ExtensionError("Could not establish connection. Receiving end does not exist.");
     }),
+    connect(tabId, connectInfo) {
+        const port = new Port(crypto.randomUUID(), String(connectInfo?.name ?? ""));
+        queueMicrotask(() => port.closeFromUIProcess("Could not establish connection. Receiving end does not exist."));
+        return port;
+    },
     captureVisibleTab: method("tabs.captureVisibleTab"),
     onActivated: event("tabs.onActivated"),
     onAttached: event("tabs.onAttached"),

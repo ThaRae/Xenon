@@ -135,6 +135,11 @@ async function run() {
             !(await chrome.permissions.contains({ permissions: ["cookies"] }))
     );
     check("tabs.query", Array.isArray(await chrome.tabs.query({})));
+    const tabPortError = await new Promise(resolve => {
+        const tabPort = chrome.tabs.connect(0);
+        tabPort.onDisconnect.addListener(() => resolve(chrome.runtime.lastError?.message));
+    });
+    check("tabs.connect disconnects without content scripts", tabPortError?.includes("Receiving end does not exist"));
     check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
 
     check("offscreen.hasDocument before", (await chrome.offscreen.hasDocument()) === false);
