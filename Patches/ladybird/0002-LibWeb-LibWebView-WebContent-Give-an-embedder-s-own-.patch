@@ -25,11 +25,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibWeb/DOM/Document.cpp            |  4 +
  Libraries/LibWeb/Page/Page.h                 |  3 +
- Libraries/LibWebView/URLSchemeHandler.cpp    | 48 +++++++++-
+ Libraries/LibWebView/URLSchemeHandler.cpp    | 50 +++++++++-
  Libraries/LibWebView/URLSchemeHandler.h      | 39 +++++++-
  Libraries/LibWebView/WebContentClient.cpp    |  8 ++
  Libraries/LibWebView/WebContentClient.h      |  1 +
- Libraries/LibWebView/WebContentPage.cpp      | 34 +++++++
+ Libraries/LibWebView/WebContentPage.cpp      | 38 ++++++++
  Libraries/LibWebView/WebContentPage.h        |  7 ++
  Services/WebContent/CMakeLists.txt           |  1 +
  Services/WebContent/ConnectionFromClient.cpp |  6 ++
@@ -40,7 +40,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Services/WebContent/PageClient.h             |  5 +
  Services/WebContent/WebContentClient.ipc     |  2 +
  Services/WebContent/WebContentServer.ipc     |  1 +
- 17 files changed, 298 insertions(+), 3 deletions(-)
+ 17 files changed, 304 insertions(+), 3 deletions(-)
  create mode 100644 Services/WebContent/EmbedderBridge.cpp
  create mode 100644 Services/WebContent/EmbedderBridge.h
 
@@ -74,7 +74,7 @@ index f695ce40fe1aed4afea908d19d8f18da66d95e68..401a793cc92b527166906802f4ef57f3
      virtual void request_embedder_resource(EmbedderResourceRequest request) { request.on_complete(Error::from_errno(ENOTSUP)); }
  
 diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
-index fd107545c9fefd072f77296494bcc78c77a4bebe..37ba20576e4f12a1b1c1eeaf80a4d930b9bb265f 100644
+index fd107545c9fefd072f77296494bcc78c77a4bebe..1af8cfee26db69525ce16fc05448ccfb8581b651 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.cpp
 +++ b/Libraries/LibWebView/URLSchemeHandler.cpp
 @@ -7,12 +7,15 @@
@@ -107,7 +107,7 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..37ba20576e4f12a1b1c1eeaf80a4d930
  }
  
  URLSchemeHandler* url_scheme_handler(StringView scheme)
-@@ -37,4 +40,45 @@ URLSchemeHandler* url_scheme_handler(StringView scheme)
+@@ -37,4 +40,47 @@ URLSchemeHandler* url_scheme_handler(StringView scheme)
      return nullptr;
  }
  
@@ -136,8 +136,10 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..37ba20576e4f12a1b1c1eeaf80a4d930
 +
 +Optional<u64> URLSchemeBridgeEndpoint::view_id() const
 +{
-+    if (auto page = m_page.strong_ref())
-+        return page->view().view_id();
++    if (!is_open())
++        return {};
++    if (auto view = m_page->traversable().view(); view.has_value())
++        return view->view_id();
 +    return {};
 +}
 +
@@ -250,16 +252,20 @@ index 181fe16e93f1aa50bb179874d43bb50a1f4cbd16..e72d5f151cbf9045ed90efffa4b69976
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 4a0a67384565fa986f3951279df2ca0400d128d5..9a4ae167651877a56e145b5aa044f21929a0fcf1 100644
+index 4a0a67384565fa986f3951279df2ca0400d128d5..b31e4658f4a96568a65f465515e1ac2fa7ad7a38 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1549,6 +1549,40 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1549,6 +1549,44 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
      async_handle_embedder_resource_return(0, move(response.value().file), move(response.value().headers), request_id);
  }
  
 +// A document of this page whose scheme has a script bridge, which the page hosts or is creating.
 +Optional<URLSchemeBridgeEndpoint> WebContentPage::embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id)
 +{
++    // NB: A page that has closed, or whose traversable has gone, hosts nothing, though it may live on a little longer.
++    if (!m_is_open || !m_traversable)
++        return {};
++
 +    Optional<URLSchemeBridgeEndpoint> endpoint;
 +    for_each_hosted_document([&](CanonicalDocument& document) {
 +        if (document.id() != document_id)

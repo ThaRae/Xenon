@@ -306,6 +306,11 @@ def run_extension_test_page(executable: Path, env: dict, url: str, profile: str 
             return None
 
     output = result.stdout + result.stderr
+    # The browser has to exit cleanly too: a crash as it closes is still a crash.
+    if result.returncode != 0:
+        print(output[-4000:], file=sys.stderr)
+        print(f"    the browser exited with {result.returncode} on {url}", file=sys.stderr)
+        return None
     for line in output.splitlines():
         if EXTENSION_TEST_MARKER in line:
             # The console prints the logged string in quotes.
