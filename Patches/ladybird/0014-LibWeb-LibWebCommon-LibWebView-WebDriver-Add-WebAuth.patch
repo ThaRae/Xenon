@@ -1,0 +1,3405 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 19:58:04 -0400
+Subject: [PATCH] LibWeb+LibWebCommon+LibWebView+WebDriver: Add WebAuthn
+ virtual authenticators
+
+This adds the virtual authenticators of WebAuthn's WebDriver extension:
+software CTAP1/U2F and CTAP2 authenticators with P-256 credentials,
+discoverable credentials and user verification on demand, which the UI
+process's ceremonies find as they would security keys. WebDriver gets
+the extension's commands to add and remove them, add, list and remove
+their credentials, and set whether the user is verified. With a virtual
+authenticator present, a tab's ceremonies run without asking anyone, as
+under automation nobody is there to answer.
+
+Tests reach the same commands through Internals, and testdriver-vendor.js
+uses them for WPT's add_virtual_authenticator() and its relatives. A
+test's virtual authenticators belong to its own tab, since test-web runs
+tests side by side in one browser process.
+
+The new tests register a credential and sign in with it, checking the
+assertion's signature with WebCrypto, run a ceremony in a cross-origin
+iframe with and without allow="publickey-credentials-get", check the
+argument errors, and drive the WebDriver extension end to end. Eight of
+WPT's webauthn tests are imported, and all of their subtests pass.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWeb/Internals/Internals.cpp      |  18 +
+ Libraries/LibWeb/Internals/Internals.h        |   2 +
+ Libraries/LibWeb/Internals/Internals.idl      |   4 +
+ Libraries/LibWeb/Page/Page.h                  |   3 +
+ Libraries/LibWebCommon/WebDriver/Client.cpp   |   8 +
+ Libraries/LibWebCommon/WebDriver/Client.h     |  10 +
+ Libraries/LibWebView/Application.cpp          |   3 +
+ Libraries/LibWebView/CMakeLists.txt           |   1 +
+ Libraries/LibWebView/WebAuthn/Coordinator.cpp |  62 +-
+ .../WebAuthn/VirtualAuthenticator.cpp         | 603 ++++++++++++++++
+ .../WebAuthn/VirtualAuthenticator.h           | 120 ++++
+ Libraries/LibWebView/WebContentTestClient.cpp |  11 +
+ Libraries/LibWebView/WebContentTestClient.h   |   1 +
+ .../LibWebView/WebDriverBrowserConnection.cpp |   6 +
+ .../LibWebView/WebDriverBrowserConnection.h   |   1 +
+ Services/WebContent/PageClient.cpp            |  12 +
+ Services/WebContent/PageClient.h              |   1 +
+ Services/WebContent/WebContentTestClient.ipc  |   4 +
+ Services/WebDriver/Client.cpp                 |  76 ++
+ Services/WebDriver/Client.h                   |   8 +
+ Services/WebDriver/Session.cpp                |   7 +
+ Services/WebDriver/Session.h                  |   1 +
+ Services/WebDriver/WebDriverBrowserClient.ipc |   3 +
+ Tests/LibWeb/TestConfig.ini                   |  11 +
+ .../Text/data/webauthn-get-in-frame.html      |  14 +
+ .../expected/WebAuthn/argument-checks.txt     |  14 +
+ .../Text/expected/WebAuthn/create-and-get.txt |  17 +
+ .../expected/WebAuthn/cross-origin-iframe.txt |   3 +
+ ...eatecredential-badargs-challenge.https.txt |  11 +
+ .../createcredential-badargs-rp.https.txt     |  17 +
+ .../createcredential-badargs-user.https.txt   |  22 +
+ ...atecredential-excludecredentials.https.txt |  12 +
+ .../createcredential-passing.https.txt        |  55 ++
+ ...reatecredential-pubkeycredparams.https.txt |  15 +
+ .../getcredential-badargs-rpid.https.txt      |  12 +
+ .../webauthn/getcredential-passing.https.txt  |  20 +
+ .../Text/input/WebAuthn/argument-checks.html  |  40 ++
+ .../Text/input/WebAuthn/create-and-get.html   | 116 +++
+ .../input/WebAuthn/cross-origin-iframe.html   |  56 ++
+ .../wpt-import/resources/testdriver-vendor.js |  33 +
+ ...atecredential-badargs-challenge.https.html |  27 +
+ .../createcredential-badargs-rp.https.html    |  42 ++
+ .../createcredential-badargs-user.https.html  |  45 ++
+ ...tecredential-excludecredentials.https.html |  82 +++
+ .../createcredential-passing.https.html       | 149 ++++
+ ...eatecredential-pubkeycredparams.https.html |  73 ++
+ .../getcredential-badargs-rpid.https.html     |  46 ++
+ .../webauthn/getcredential-passing.https.html |  74 ++
+ .../Text/input/wpt-import/webauthn/helpers.js | 679 ++++++++++++++++++
+ Tests/LibWebView/CMakeLists.txt               |   6 +
+ Tests/LibWebView/test-webdriver-webauthn.py   | 140 ++++
+ 51 files changed, 2788 insertions(+), 8 deletions(-)
+ create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
+ create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
+ create mode 100644 Tests/LibWeb/Text/data/webauthn-get-in-frame.html
+ create mode 100644 Tests/LibWeb/Text/expected/WebAuthn/argument-checks.txt
+ create mode 100644 Tests/LibWeb/Text/expected/WebAuthn/create-and-get.txt
+ create mode 100644 Tests/LibWeb/Text/expected/WebAuthn/cross-origin-iframe.txt
+ create mode 100644 Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-challenge.https.txt
+ create mode 100644 Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-rp.https.txt
+ create mode 100644 Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-user.https.txt
+ create mode 100644 Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-excludecredentials.https.txt
+ create mode 100644 Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-passing.https.txt
+ create mode 100644 Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-pubkeycredparams.https.txt
+ create mode 100644 Tests/LibWeb/Text/expected/wpt-import/webauthn/getcredential-badargs-rpid.https.txt
+ create mode 100644 Tests/LibWeb/Text/expected/wpt-import/webauthn/getcredential-passing.https.txt
+ create mode 100644 Tests/LibWeb/Text/input/WebAuthn/argument-checks.html
+ create mode 100644 Tests/LibWeb/Text/input/WebAuthn/create-and-get.html
+ create mode 100644 Tests/LibWeb/Text/input/WebAuthn/cross-origin-iframe.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-challenge.https.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-rp.https.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-user.https.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-excludecredentials.https.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-passing.https.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-pubkeycredparams.https.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/getcredential-badargs-rpid.https.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/getcredential-passing.https.html
+ create mode 100644 Tests/LibWeb/Text/input/wpt-import/webauthn/helpers.js
+ create mode 100644 Tests/LibWebView/test-webdriver-webauthn.py
+
+diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
+index ae0b1e9a5ef450c6a317d5e411ff8d3141c33252..fc8219dbed56735f074213b90c9b042595f7da59 100644
+--- a/Libraries/LibWeb/Internals/Internals.cpp
++++ b/Libraries/LibWeb/Internals/Internals.cpp
+@@ -1939,6 +1939,24 @@ void Internals::pump_gamepad_events()
+     page().client().pump_gamepad_events();
+ }
+ 
++WebIDL::ExceptionOr<Utf16String> Internals::run_web_authn_command(Utf16String const& name, Utf16String const& payload, Vector<Utf16String> const& arguments)
++{
++    auto json = JsonValue::from_string(payload.to_utf8());
++    if (json.is_error())
++        return WebIDL::SyntaxError::create("The payload is not JSON"_utf16);
++
++    Vector<String> argument_strings;
++    for (auto const& argument : arguments)
++        argument_strings.append(argument.to_utf8());
++
++    auto response = page().client().run_web_authn_command(name.to_utf8(), json.release_value(), argument_strings);
++    if (!response.has_value())
++        return WebIDL::NotSupportedError::create("WebAuthn commands need the UI process's test connection"_utf16);
++    if (response->is_error())
++        return WebIDL::OperationError::create(Utf16String::formatted("{}: {}", response->error().error, response->error().message));
++    return Utf16String::from_utf8(response->value().serialized());
++}
++
+ GC::Ref<InternalGamepad> Internals::connect_virtual_gamepad()
+ {
+     auto virtual_gamepad = page().client().create_virtual_gamepad();
+diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
+index 8448534c886d9fc56ad818ca8952a4bb2fcc8e3b..043b2a12610475a892e8d4608c6d376d50ec2dfe 100644
+--- a/Libraries/LibWeb/Internals/Internals.h
++++ b/Libraries/LibWeb/Internals/Internals.h
+@@ -242,6 +242,8 @@ public:
+     void pump_gamepad_events();
+ 
+     GC::Ref<InternalGamepad> connect_virtual_gamepad();
++
++    WebIDL::ExceptionOr<Utf16String> run_web_authn_command(Utf16String const& name, Utf16String const& payload, Vector<Utf16String> const& arguments);
+     void disconnect_virtual_gamepad(GC::Ref<InternalGamepad>);
+ 
+     void perform_per_test_cleanup();
+diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
+index 66279cf9bc970656ca60323581f8926f0b261f3f..ddc7cb14a27c5b49ee9e3197df8721796230f5eb 100644
+--- a/Libraries/LibWeb/Internals/Internals.idl
++++ b/Libraries/LibWeb/Internals/Internals.idl
+@@ -254,6 +254,10 @@ interface Internals {
+ 
+     InternalGamepad connectVirtualGamepad();
+ 
++    // Runs one of WebAuthn's WebDriver extension commands, such as "add-virtual-authenticator", with a JSON payload,
++    // and returns the result as JSON. https://w3c.github.io/webauthn/#sctn-automation
++    DOMString runWebAuthnCommand(DOMString name, optional DOMString payload = "null", optional sequence<DOMString> arguments = []);
++
+     undefined setHighlightedNode(Node? node);
+ 
+     undefined clearElement(HTMLElement element);
+diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
+index 0dbeea79f595429da9197c9643fd8a7e868cc396..da49a708b3021971dd1cdc617d456dae204241c6 100644
+--- a/Libraries/LibWeb/Page/Page.h
++++ b/Libraries/LibWeb/Page/Page.h
+@@ -99,6 +99,7 @@
+ #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
+ #include <LibWebCommon/UIEvents/KeyCode.h>
+ #include <LibWebCommon/WebAuthn/WebAuthn.h>
++#include <LibWebCommon/WebDriver/Response.h>
+ #include <LibWebCommon/WebView/StorageSetResult.h>
+ 
+ namespace Web {
+@@ -925,6 +926,8 @@ public:
+     virtual void page_did_request_stop_gamepad_effects([[maybe_unused]] Gamepad::GamepadHandle handle) { }
+ 
+     virtual Optional<Gamepad::VirtualGamepad> create_virtual_gamepad() { return {}; }
++    // https://w3c.github.io/webauthn/#sctn-automation
++    virtual Optional<WebDriver::Response> run_web_authn_command([[maybe_unused]] String const& name, [[maybe_unused]] JsonValue const& payload, [[maybe_unused]] Vector<String> const& arguments) { return {}; }
+     virtual void set_virtual_gamepad_button([[maybe_unused]] Gamepad::GamepadHandle handle, [[maybe_unused]] i32 button, [[maybe_unused]] bool down) { }
+     virtual void set_virtual_gamepad_axis([[maybe_unused]] Gamepad::GamepadHandle handle, [[maybe_unused]] i32 axis, [[maybe_unused]] i16 value) { }
+     virtual void disconnect_virtual_gamepad([[maybe_unused]] Gamepad::GamepadHandle handle) { }
+diff --git a/Libraries/LibWebCommon/WebDriver/Client.cpp b/Libraries/LibWebCommon/WebDriver/Client.cpp
+index 9bb4d31ebd7b353a9361e0daf39366d6a79fc57d..ff77de64f2432d98e35a5699549dd2a2debfb061 100644
+--- a/Libraries/LibWebCommon/WebDriver/Client.cpp
++++ b/Libraries/LibWebCommon/WebDriver/Client.cpp
+@@ -115,6 +115,14 @@ static constexpr auto s_webdriver_endpoints = Array {
+     ROUTE(GET, "/session/:session_id/screenshot"sv, take_screenshot),
+     ROUTE(GET, "/session/:session_id/element/:element_id/screenshot"sv, take_element_screenshot),
+     ROUTE(POST, "/session/:session_id/print"sv, print_page),
++    ROUTE(POST, "/session/:session_id/webauthn/authenticator"sv, add_virtual_authenticator),
++    ROUTE(DELETE, "/session/:session_id/webauthn/authenticator/:authenticator_id"sv, remove_virtual_authenticator),
++    ROUTE(POST, "/session/:session_id/webauthn/authenticator/:authenticator_id/credential"sv, add_credential),
++    ROUTE(GET, "/session/:session_id/webauthn/authenticator/:authenticator_id/credentials"sv, get_credentials),
++    ROUTE(DELETE, "/session/:session_id/webauthn/authenticator/:authenticator_id/credentials/:credential_id"sv, remove_credential),
++    ROUTE(DELETE, "/session/:session_id/webauthn/authenticator/:authenticator_id/credentials"sv, remove_all_credentials),
++    ROUTE(POST, "/session/:session_id/webauthn/authenticator/:authenticator_id/uv"sv, set_user_verified),
++    ROUTE(POST, "/session/:session_id/webauthn/authenticator/:authenticator_id/credentials/:credential_id/props"sv, set_credential_properties),
+ };
+ 
+ // https://w3c.github.io/webdriver/#dfn-match-a-request
+diff --git a/Libraries/LibWebCommon/WebDriver/Client.h b/Libraries/LibWebCommon/WebDriver/Client.h
+index 6dab74e76e969c7e0f789f1897d12a63b85f8d1d..388ee119916dead4409d840c86f52a5f98c5db6e 100644
+--- a/Libraries/LibWebCommon/WebDriver/Client.h
++++ b/Libraries/LibWebCommon/WebDriver/Client.h
+@@ -130,6 +130,16 @@ public:
+     // 18. Print, https://w3c.github.io/webdriver/#print
+     virtual ResponsePromise print_page(Parameters parameters, JsonValue payload) = 0;
+ 
++    // https://w3c.github.io/webauthn/#sctn-automation
++    virtual ResponsePromise add_virtual_authenticator(Parameters parameters, JsonValue payload) = 0;
++    virtual ResponsePromise remove_virtual_authenticator(Parameters parameters, JsonValue payload) = 0;
++    virtual ResponsePromise add_credential(Parameters parameters, JsonValue payload) = 0;
++    virtual ResponsePromise get_credentials(Parameters parameters, JsonValue payload) = 0;
++    virtual ResponsePromise remove_credential(Parameters parameters, JsonValue payload) = 0;
++    virtual ResponsePromise remove_all_credentials(Parameters parameters, JsonValue payload) = 0;
++    virtual ResponsePromise set_user_verified(Parameters parameters, JsonValue payload) = 0;
++    virtual ResponsePromise set_credential_properties(Parameters parameters, JsonValue payload) = 0;
++
+     Function<void()> on_death;
+ 
+ protected:
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index aaa6c412d8b312e41b31c7214da8493f79e3a1c9..7998fb70219984f5ad5d0e1a383b5b9f8822fe13 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -72,6 +72,8 @@
+ #include <LibWebView/URL.h>
+ #include <LibWebView/UserAgent.h>
+ #include <LibWebView/Utilities.h>
++#include <LibWebView/WebAuthn/Coordinator.h>
++#include <LibWebView/WebAuthn/VirtualAuthenticator.h>
+ #include <LibWebView/WebContentClient.h>
+ #include <LibWebView/WebDriverBiDi.h>
+ #include <LibWebView/WebDriverBrowserConnection.h>
+@@ -1759,6 +1761,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
+ ErrorOr<void> Application::launch_services()
+ {
+     m_default_session = BrowsingSession::create(IsPrivate::No);
++    WebAuthnCoordinator::the().add_authenticator_source(VirtualAuthenticators::the());
+     StorageAreaRegistry::the().on_change_for_devtools = [this](StorageJar& jar, WebView::StorageChange const& change) {
+         // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
+         if (m_devtools)
+diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
+index 8b84a1a14cf5da6bd5f5e2b3e81f385f943fc7b3..bf1f33edfc44e375966d35c02cadc519c63f9403 100644
+--- a/Libraries/LibWebView/CMakeLists.txt
++++ b/Libraries/LibWebView/CMakeLists.txt
+@@ -77,6 +77,7 @@ set(SOURCES
+     WebAuthn/CBOR.cpp
+     WebAuthn/ClientData.cpp
+     WebAuthn/Coordinator.cpp
++    WebAuthn/VirtualAuthenticator.cpp
+     WebCompatReport.cpp
+     WebContentClient.cpp
+     WebContentPage.cpp
+diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.cpp b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
+index 14a098cc789c647c3ea75fec25219563d9b2d320..737212b1d0745299a487fde4c5699c74930f0827 100644
+--- a/Libraries/LibWebView/WebAuthn/Coordinator.cpp
++++ b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
+@@ -15,6 +15,7 @@
+ #include <LibWebView/WebAuthn/ClientData.h>
+ #include <LibWebView/WebAuthn/Coordinator.h>
+ #include <LibWebView/WebAuthn/Prompt.h>
++#include <LibWebView/WebAuthn/VirtualAuthenticator.h>
+ #include <LibWebView/WebContentPage.h>
+ 
+ namespace WebView {
+@@ -120,6 +121,7 @@ private:
+     void finish_registration(bool share_attestation);
+     void finish_assertion(Authenticator::Assertion const&);
+     void show_prompt(WebAuthnPrompt::State);
++    void answer_prompt_without_a_user();
+     void close_prompt();
+     void check_liveness();
+ 
+@@ -221,7 +223,7 @@ void WebAuthnCoordinator::Ceremony::check_liveness()
+         return;
+     }
+ 
+-    if (m_phase == Phase::Answered)
++    if (m_phase == Phase::Answered || VirtualAuthenticators::the().is_enabled_for(m_page->traversable()))
+         return;
+ 
+     // A ceremony continues only while the user can see the view that started it. It may lose focus to its prompt.
+@@ -779,6 +781,10 @@ void WebAuthnCoordinator::Ceremony::show_prompt(WebAuthnPrompt::State state)
+ {
+     m_prompt.state = state;
+ 
++    if (m_page && VirtualAuthenticators::the().is_enabled_for(m_page->traversable())) {
++        answer_prompt_without_a_user();
++        return;
++    }
+     auto* view = this->view();
+     if (!view || !view->on_web_authn_prompt)
+         return;
+@@ -786,6 +792,43 @@ void WebAuthnCoordinator::Ceremony::show_prompt(WebAuthnPrompt::State state)
+     view->on_web_authn_prompt(m_prompt);
+ }
+ 
++// NB: With virtual authenticators, as under automation, nobody is there to answer a prompt. The ceremony goes on as if
++//     the user took the default, or gave up when there is nothing left to wait for.
++void WebAuthnCoordinator::Ceremony::answer_prompt_without_a_user()
++{
++    Core::deferred_invoke([weak_self = make_weak_ptr()] {
++        auto self = weak_self.strong_ref();
++        if (!self || self->m_phase == Phase::Ended)
++            return;
++
++        switch (self->m_prompt.state) {
++        case WebAuthnPrompt::State::InsertKey:
++        case WebAuthnPrompt::State::TouchKey:
++            return;
++        case WebAuthnPrompt::State::ChooseAccount:
++            self->user_chose_account(0);
++            return;
++        case WebAuthnPrompt::State::AttestationConsent:
++            self->user_answered_attestation_consent(true);
++            return;
++        case WebAuthnPrompt::State::KeyAlreadyRegistered:
++            self->end({});
++            return;
++        case WebAuthnPrompt::State::EnterPin:
++        case WebAuthnPrompt::State::KeyNotRegistered:
++        case WebAuthnPrompt::State::PinBlocked:
++        case WebAuthnPrompt::State::PinNotSet:
++        case WebAuthnPrompt::State::KeyNotSupported:
++        case WebAuthnPrompt::State::NoPlatformAuthenticator:
++            break;
++        }
++
++        if (any_of(self->m_candidates, [](auto const& candidate) { return candidate.is_busy; }))
++            return;
++        self->end(not_allowed("No authenticator could complete the request"sv));
++    });
++}
++
+ void WebAuthnCoordinator::Ceremony::close_prompt()
+ {
+     if (!m_prompt_is_shown)
+@@ -821,15 +864,18 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
+ {
+     // A ceremony may only start in a view that can ask the user, and that the user is looking at: as in other browsers,
+     // a page in the background can't ask for a credential.
++    // NB: With virtual authenticators, as under automation and in tests, nobody is there to look at a prompt.
+     auto& traversable = page.traversable();
+     auto view = traversable.view();
+-    if (!view.has_value() || !view->on_web_authn_prompt) {
+-        page.async_web_authn_request_completed(request_id, not_allowed("No authenticators are available"sv));
+-        return;
+-    }
+-    if (traversable.system_visibility_state() != Web::HTML::VisibilityState::Visible || !traversable.has_system_focus()) {
+-        page.async_web_authn_request_completed(request_id, not_allowed("The page does not have focus"sv));
+-        return;
++    if (!VirtualAuthenticators::the().is_enabled_for(traversable)) {
++        if (!view.has_value() || !view->on_web_authn_prompt) {
++            page.async_web_authn_request_completed(request_id, not_allowed("No authenticators are available"sv));
++            return;
++        }
++        if (traversable.system_visibility_state() != Web::HTML::VisibilityState::Visible || !traversable.has_system_focus()) {
++            page.async_web_authn_request_completed(request_id, not_allowed("The page does not have focus"sv));
++            return;
++        }
+     }
+ 
+     if (any_of(m_ceremonies, [&](auto const& ceremony) { return ceremony->page() && &ceremony->page()->traversable() == &traversable; })) {
+diff --git a/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd283f54b1
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
+@@ -0,0 +1,603 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/Base64.h>
++#include <AK/JsonArray.h>
++#include <AK/JsonObject.h>
++#include <AK/Random.h>
++#include <LibCore/EventLoop.h>
++#include <LibCrypto/ASN1/Constants.h>
++#include <LibCrypto/ASN1/DER.h>
++#include <LibCrypto/Certificate/Certificate.h>
++#include <LibCrypto/Curves/SECPxxxr1.h>
++#include <LibCrypto/Hash/SHA2.h>
++#include <LibCrypto/PK/EC.h>
++#include <LibCrypto/PK/PK.h>
++#include <LibWebView/CanonicalTraversable.h>
++#include <LibWebView/WebAuthn/AttestationObject.h>
++#include <LibWebView/WebAuthn/VirtualAuthenticator.h>
++
++namespace WebView {
++
++using Web::WebDriver::Error;
++using Web::WebDriver::ErrorCode;
++
++static constexpr size_t P256_SCALAR_SIZE = 32;
++static constexpr size_t CREDENTIAL_ID_LENGTH = 32;
++
++NonnullRefPtr<VirtualAuthenticator> VirtualAuthenticator::create(String id, Configuration configuration, Optional<Web::HTML::CrossProcessId> traversable_id)
++{
++    return adopt_ref(*new VirtualAuthenticator(move(id), configuration, traversable_id));
++}
++
++VirtualAuthenticator::VirtualAuthenticator(String id, Configuration configuration, Optional<Web::HTML::CrossProcessId> traversable_id)
++    : m_id(move(id))
++    , m_name(MUST(String::formatted("Virtual authenticator {}", m_id)))
++    , m_configuration(configuration)
++    , m_traversable_id(traversable_id)
++{
++    m_info.algorithms = { COSE_ALGORITHM_ES256 };
++    m_info.supports_resident_keys = configuration.has_resident_key;
++    m_info.has_built_in_user_verification = configuration.has_user_verification;
++    m_info.make_credential_without_user_verification = true;
++    m_info.is_u2f_only = configuration.protocol == Protocol::CTAP1U2F;
++    m_info.transports = { configuration.transport };
++    m_info.attachment = configuration.transport == Web::WebAuthn::AuthenticatorTransport::Internal
++        ? Web::WebAuthn::AuthenticatorAttachment::Platform
++        : Web::WebAuthn::AuthenticatorAttachment::CrossPlatform;
++}
++
++bool VirtualAuthenticator::is_available_to(Web::HTML::CrossProcessId traversable_id) const
++{
++    return !m_traversable_id.has_value() || *m_traversable_id == traversable_id;
++}
++
++static ByteBuffer sha256(ReadonlyBytes bytes)
++{
++    return MUST(ByteBuffer::copy(Crypto::Hash::SHA256::hash(bytes).bytes()));
++}
++
++Optional<Authenticator::Failure> VirtualAuthenticator::check_user(bool user_verification) const
++{
++    // https://w3c.github.io/webauthn/#dom-virtualauthenticatorconfiguration-isuserconsenting
++    // Determines the result of all user consent authorization gestures, and by extension, any test of user presence.
++    if (!m_configuration.is_user_consenting)
++        return Failure { Error::OperationDenied, {} };
++
++    // https://w3c.github.io/webauthn/#dom-virtualauthenticatorconfiguration-isuserverified
++    // Determines the result of user verification performed on the virtual authenticator.
++    if (user_verification) {
++        if (!m_configuration.has_user_verification)
++            return Failure { Error::NotSupported, {} };
++        if (!m_configuration.is_user_verified)
++            return Failure { Error::OperationDenied, {} };
++    }
++    return {};
++}
++
++static u8 flags_for(bool user_verified, bool backup_eligibility, bool backup_state)
++{
++    u8 flags = AuthenticatorData::UserPresent;
++    if (user_verified)
++        flags |= AuthenticatorData::UserVerified;
++    if (backup_eligibility)
++        flags |= AuthenticatorData::BackupEligible;
++    if (backup_state)
++        flags |= AuthenticatorData::BackupState;
++    return flags;
++}
++
++// https://w3c.github.io/webauthn/#sctn-op-make-cred
++ErrorOr<Authenticator::MakeCredentialResult> VirtualAuthenticator::make_credential_impl(MakeCredentialRequest const& request)
++{
++    // If the excludeCredentialDescriptorList names a credential on this authenticator for the RP, and the user
++    // consents, return an error code equivalent to "InvalidStateError".
++    for (auto const& excluded : request.exclude_list) {
++        auto is_excluded = any_of(m_credentials, [&](auto const& credential) { return credential.rp_id == request.rp_id && credential.id == excluded.id; });
++        if (!is_excluded)
++            continue;
++        if (auto failure = check_user(false); failure.has_value())
++            return *failure;
++        return Failure { Error::CredentialExcluded, {} };
++    }
++
++    if (request.algorithm != COSE_ALGORITHM_ES256)
++        return Failure { Error::NotSupported, {} };
++    if (request.resident_key && !m_configuration.has_resident_key)
++        return Failure { Error::NotSupported, {} };
++
++    if (auto failure = check_user(request.user_verification); failure.has_value())
++        return *failure;
++
++    Crypto::Curves::SECP256r1 curve;
++    auto private_key = TRY(curve.generate_private_key());
++    auto public_key = TRY(curve.generate_public_key(private_key));
++
++    Credential credential;
++    credential.id = TRY(ByteBuffer::create_uninitialized(CREDENTIAL_ID_LENGTH));
++    fill_with_random(credential.id.bytes());
++    credential.is_resident_credential = request.resident_key;
++    credential.rp_id = request.rp_id;
++    credential.private_key = private_key;
++    credential.user_handle = request.user_id;
++    credential.user_name = request.user_name;
++    credential.user_display_name = request.user_display_name;
++    credential.backup_eligibility = m_configuration.default_backup_eligibility;
++    credential.backup_state = m_configuration.default_backup_state;
++
++    // A new discoverable credential replaces one the authenticator holds for the same RP and user.
++    if (credential.is_resident_credential) {
++        m_credentials.remove_all_matching([&](auto const& existing) {
++            return existing.is_resident_credential && existing.rp_id == credential.rp_id && existing.user_handle == credential.user_handle;
++        });
++    }
++
++    auto x = TRY(public_key.x_bytes());
++    auto y = TRY(public_key.y_bytes());
++
++    AuthenticatorData authenticator_data;
++    authenticator_data.rp_id_hash = sha256(request.rp_id.bytes());
++    authenticator_data.flags = flags_for(request.user_verification, credential.backup_eligibility, credential.backup_state);
++    authenticator_data.sign_count = 0;
++    authenticator_data.attested_credential_data = AuthenticatorData::AttestedCredentialData {
++        .aaguid = TRY(ByteBuffer::create_zeroed(16)),
++        .credential_id = credential.id,
++        .credential_public_key = cose_key_for_es256(x, y),
++    };
++
++    Registration registration;
++    registration.credential_id = credential.id;
++    registration.authenticator_data = authenticator_data.serialize();
++    registration.attestation_format = "none"_string;
++    registration.attestation_statement = none_attestation_statement();
++    registration.resident_key = credential.is_resident_credential;
++
++    m_credentials.append(move(credential));
++    return registration;
++}
++
++// https://w3c.github.io/webauthn/#sctn-op-get-assertion
++ErrorOr<Authenticator::GetAssertionResult> VirtualAuthenticator::get_assertion_impl(GetAssertionRequest const& request)
++{
++    // Let credentialOptions be the public key credential sources for the RP: those in the allow list if there is one,
++    // and the discoverable ones otherwise. If credentialOptions is empty, return an error code equivalent to
++    // "NotAllowedError".
++    Vector<Credential&> credential_options;
++    for (auto& credential : m_credentials) {
++        if (credential.rp_id != request.rp_id)
++            continue;
++        if (request.allow_list.is_empty() ? !credential.is_resident_credential : !any_of(request.allow_list, [&](auto const& allowed) { return allowed.id == credential.id; }))
++            continue;
++        credential_options.append(credential);
++    }
++    if (credential_options.is_empty())
++        return Failure { Error::NoCredentials, {} };
++
++    if (auto failure = check_user(request.user_verification); failure.has_value())
++        return *failure;
++
++    Vector<Assertion> assertions;
++    for (auto& credential : credential_options) {
++        // Increment the credential's signature counter.
++        ++credential.sign_count;
++
++        AuthenticatorData authenticator_data;
++        authenticator_data.rp_id_hash = sha256(request.rp_id.bytes());
++        authenticator_data.flags = flags_for(request.user_verification, credential.backup_eligibility, credential.backup_state);
++        authenticator_data.sign_count = credential.sign_count;
++        auto serialized_authenticator_data = authenticator_data.serialize();
++
++        // Let signature be the assertion signature of the concatenation authenticatorData || hash.
++        ByteBuffer signed_data;
++        signed_data.append(serialized_authenticator_data);
++        signed_data.append(request.client_data_hash);
++        Crypto::Curves::SECP256r1 curve;
++        auto hash = sha256(signed_data);
++        auto signature = TRY(curve.sign(hash, credential.private_key));
++
++        Assertion assertion;
++        assertion.credential_id = credential.id;
++        assertion.authenticator_data = move(serialized_authenticator_data);
++        assertion.signature = TRY(signature.to_asn());
++
++        // The user handle is returned for discoverable credentials.
++        if (credential.is_resident_credential && credential.user_handle.has_value())
++            assertion.user = UserEntity { *credential.user_handle, credential.user_name, credential.user_display_name };
++
++        assertions.append(move(assertion));
++    }
++    return assertions;
++}
++
++void VirtualAuthenticator::make_credential(MakeCredentialRequest request, Function<void(MakeCredentialResult)> on_complete)
++{
++    auto result = make_credential_impl(request);
++    Core::deferred_invoke([on_complete = move(on_complete), result = move(result)]() mutable {
++        if (result.is_error())
++            on_complete(Failure { Error::Other, {} });
++        else
++            on_complete(result.release_value());
++    });
++}
++
++void VirtualAuthenticator::get_assertion(GetAssertionRequest request, Function<void(GetAssertionResult)> on_complete)
++{
++    auto result = get_assertion_impl(request);
++    Core::deferred_invoke([on_complete = move(on_complete), result = move(result)]() mutable {
++        if (result.is_error())
++            on_complete(Failure { Error::Other, {} });
++        else
++            on_complete(result.release_value());
++    });
++}
++
++void VirtualAuthenticator::wait_for_touch(Function<void(Optional<Failure>)> on_complete)
++{
++    auto failure = check_user(false);
++    Core::deferred_invoke([on_complete = move(on_complete), failure] {
++        on_complete(failure);
++    });
++}
++
++void VirtualAuthenticator::get_pin_retries(Function<void(Optional<u32>)> on_complete)
++{
++    Core::deferred_invoke([on_complete = move(on_complete)] {
++        on_complete({});
++    });
++}
++
++VirtualAuthenticators& VirtualAuthenticators::the()
++{
++    static auto& authenticators = *new VirtualAuthenticators;
++    return authenticators;
++}
++
++class VirtualAuthenticators::VirtualDiscovery final : public AuthenticatorSource::Discovery {
++public:
++    VirtualDiscovery(CanonicalTraversable const& traversable, Function<void(NonnullRefPtr<Authenticator>)> on_authenticator)
++        : m_traversable_id(traversable.id())
++        , on_authenticator(move(on_authenticator))
++    {
++        VirtualAuthenticators::the().m_discoveries.append(this);
++    }
++
++    virtual ~VirtualDiscovery() override
++    {
++        VirtualAuthenticators::the().m_discoveries.remove_first_matching([this](auto* discovery) { return discovery == this; });
++    }
++
++    void report(VirtualAuthenticator& authenticator)
++    {
++        if (authenticator.is_available_to(m_traversable_id))
++            on_authenticator(authenticator);
++    }
++
++private:
++    Web::HTML::CrossProcessId m_traversable_id;
++    Function<void(NonnullRefPtr<Authenticator>)> on_authenticator;
++};
++
++bool VirtualAuthenticators::is_enabled_for(CanonicalTraversable const& traversable) const
++{
++    return any_of(m_authenticators, [&](auto const& authenticator) { return authenticator->is_available_to(traversable.id()); });
++}
++
++NonnullOwnPtr<AuthenticatorSource::Discovery> VirtualAuthenticators::discover(CanonicalTraversable const& traversable, Function<void(NonnullRefPtr<Authenticator>)> on_authenticator)
++{
++    auto discovery = make<VirtualDiscovery>(traversable, move(on_authenticator));
++    for (auto& authenticator : Vector { m_authenticators })
++        discovery->report(authenticator);
++    return discovery;
++}
++
++static Error invalid_argument(StringView message)
++{
++    return Error::from_code(ErrorCode::InvalidArgument, message);
++}
++
++Web::WebDriver::Response VirtualAuthenticators::run_command(StringView name, JsonValue const& payload, Vector<String> const& arguments, Optional<Web::HTML::CrossProcessId> traversable_id)
++{
++    if (name == "add-virtual-authenticator"sv)
++        return add_virtual_authenticator(payload, traversable_id);
++
++    if (arguments.is_empty())
++        return invalid_argument("Missing authenticator ID"sv);
++
++    if (name == "remove-virtual-authenticator"sv)
++        return remove_virtual_authenticator(arguments[0]);
++
++    // If authenticatorId does not match any Virtual Authenticator in the Virtual Authenticator Database, return a
++    // WebDriver error with WebDriver error code invalid argument.
++    auto authenticator = m_authenticators.first_matching([&](auto const& authenticator) { return authenticator->id() == arguments[0]; });
++    if (!authenticator.has_value())
++        return invalid_argument("No such virtual authenticator"sv);
++
++    if (name == "add-credential"sv)
++        return add_credential(**authenticator, payload);
++    if (name == "get-credentials"sv)
++        return get_credentials(**authenticator);
++    if (name == "remove-all-credentials"sv)
++        return remove_all_credentials(**authenticator);
++    if (name == "set-user-verified"sv)
++        return set_user_verified(**authenticator, payload);
++
++    if (arguments.size() < 2)
++        return invalid_argument("Missing credential ID"sv);
++    if (name == "remove-credential"sv)
++        return remove_credential(**authenticator, arguments[1]);
++    if (name == "set-credential-properties"sv)
++        return set_credential_properties(**authenticator, arguments[1], payload);
++
++    return Error::from_code(ErrorCode::UnknownCommand, "Unknown WebAuthn command"sv);
++}
++
++// https://w3c.github.io/webauthn/#sctn-automation-add-virtual-authenticator
++Web::WebDriver::Response VirtualAuthenticators::add_virtual_authenticator(JsonValue const& parameters, Optional<Web::HTML::CrossProcessId> traversable_id)
++{
++    // 1. Let configuration be the request's parameters.
++    // 2. If configuration is not a JSON Object, return a WebDriver error with WebDriver error code invalid argument.
++    if (!parameters.is_object())
++        return invalid_argument("The parameters must be an object"sv);
++    auto const& object = parameters.as_object();
++
++    VirtualAuthenticator::Configuration configuration;
++
++    // 3-4. For each property in the Virtual Authenticator Configuration: if it is required and missing, or of the wrong
++    //      type or value, return a WebDriver error with WebDriver error code invalid argument.
++    auto protocol = object.get_string("protocol"sv);
++    if (!protocol.has_value())
++        return invalid_argument("protocol is required"sv);
++    if (*protocol == "ctap1/u2f"sv)
++        configuration.protocol = VirtualAuthenticator::Protocol::CTAP1U2F;
++    else if (*protocol == "ctap2"sv)
++        configuration.protocol = VirtualAuthenticator::Protocol::CTAP2;
++    else if (*protocol == "ctap2_1"sv)
++        configuration.protocol = VirtualAuthenticator::Protocol::CTAP2_1;
++    else
++        return invalid_argument("Unknown protocol"sv);
++
++    auto transport = object.get_string("transport"sv);
++    if (!transport.has_value())
++        return invalid_argument("transport is required"sv);
++    auto transport_value = Web::WebAuthn::authenticator_transport_from_string(*transport);
++    if (!transport_value.has_value())
++        return invalid_argument("Unknown transport"sv);
++    configuration.transport = *transport_value;
++
++    auto get_bool = [&](StringView key, bool& value) -> Optional<Error> {
++        if (!object.has(key))
++            return {};
++        auto boolean = object.get_bool(key);
++        if (!boolean.has_value())
++            return invalid_argument(MUST(String::formatted("{} must be a boolean", key)));
++        value = *boolean;
++        return {};
++    };
++    if (auto error = get_bool("hasResidentKey"sv, configuration.has_resident_key); error.has_value())
++        return error.release_value();
++    if (auto error = get_bool("hasUserVerification"sv, configuration.has_user_verification); error.has_value())
++        return error.release_value();
++    if (auto error = get_bool("isUserConsenting"sv, configuration.is_user_consenting); error.has_value())
++        return error.release_value();
++    if (auto error = get_bool("isUserVerified"sv, configuration.is_user_verified); error.has_value())
++        return error.release_value();
++    if (auto error = get_bool("defaultBackupEligibility"sv, configuration.default_backup_eligibility); error.has_value())
++        return error.release_value();
++    if (auto error = get_bool("defaultBackupState"sv, configuration.default_backup_state); error.has_value())
++        return error.release_value();
++
++    // 5. For each extension in configuration's extensions, if the endpoint node does not support the extension,
++    //    return a WebDriver error with WebDriver error code unsupported operation.
++    // NB: The extensions Ladybird supports so far are client extensions, which need nothing of authenticators.
++    if (auto extensions = object.get_array("extensions"sv); extensions.has_value() && !extensions->is_empty())
++        return Error::from_code(ErrorCode::UnsupportedOperation, "Virtual authenticators support no extensions"sv);
++
++    // NB: A CTAP1/U2F authenticator has neither discoverable credentials nor user verification.
++    if (configuration.protocol == VirtualAuthenticator::Protocol::CTAP1U2F && (configuration.has_resident_key || configuration.has_user_verification))
++        return invalid_argument("A ctap1/u2f authenticator can't have resident keys or user verification"sv);
++
++    // 6. Generate a valid authenticatorId.
++    // 7-8. Let authenticator be a new Virtual Authenticator with authenticatorId and configuration, and store it in the
++    //      Virtual Authenticator Database.
++    auto id = MUST(String::formatted("{}", m_next_authenticator_id++));
++    auto authenticator = VirtualAuthenticator::create(id, configuration, traversable_id);
++    m_authenticators.append(authenticator);
++    for (auto* discovery : Vector { m_discoveries })
++        discovery->report(authenticator);
++
++    // 9. Return success with data authenticatorId.
++    return JsonValue { id };
++}
++
++// https://w3c.github.io/webauthn/#sctn-automation-remove-virtual-authenticator
++Web::WebDriver::Response VirtualAuthenticators::remove_virtual_authenticator(String const& authenticator_id)
++{
++    // 1. If authenticatorId does not match any Virtual Authenticator in the Virtual Authenticator Database, return a
++    //    WebDriver error with WebDriver error code invalid argument.
++    // 2. Remove the Virtual Authenticator identified by authenticatorId from the Virtual Authenticator Database.
++    auto removed = m_authenticators.remove_first_matching([&](auto const& authenticator) { return authenticator->id() == authenticator_id; });
++    if (!removed)
++        return invalid_argument("No such virtual authenticator"sv);
++
++    // 3. Return success.
++    return JsonValue {};
++}
++
++static ErrorOr<ByteBuffer, Error> decode_base64url_parameter(JsonObject const& object, StringView key)
++{
++    auto value = object.get_string(key);
++    if (!value.has_value())
++        return invalid_argument(MUST(String::formatted("{} must be a string", key)));
++    auto bytes = decode_base64url(*value);
++    if (bytes.is_error())
++        return invalid_argument(MUST(String::formatted("{} must be base64url encoded", key)));
++    return bytes.release_value();
++}
++
++// https://w3c.github.io/webauthn/#sctn-automation-add-credential
++Web::WebDriver::Response VirtualAuthenticators::add_credential(VirtualAuthenticator& authenticator, JsonValue const& parameters)
++{
++    // 1. Let parameters be the parameters argument. 2. If it is not a JSON Object, return invalid argument.
++    if (!parameters.is_object())
++        return invalid_argument("The parameters must be an object"sv);
++    auto const& object = parameters.as_object();
++
++    VirtualAuthenticator::Credential credential;
++
++    // 3. Let credentialId be the result of decoding Base64url Encoding on the parameters' credentialId property.
++    auto credential_id = decode_base64url_parameter(object, "credentialId"sv);
++    if (credential_id.is_error())
++        return credential_id.release_error();
++    credential.id = credential_id.release_value();
++
++    // 4. Let isResidentCredential be the parameters' isResidentCredential property. If it is not defined, return
++    //    invalid argument.
++    auto is_resident_credential = object.get_bool("isResidentCredential"sv);
++    if (!is_resident_credential.has_value())
++        return invalid_argument("isResidentCredential must be a boolean"sv);
++    credential.is_resident_credential = *is_resident_credential;
++
++    // 5. Let rpId be the parameters' rpId property. If it is not a valid RP ID, return invalid argument.
++    auto rp_id = object.get_string("rpId"sv);
++    if (!rp_id.has_value() || rp_id->is_empty())
++        return invalid_argument("rpId must be a string"sv);
++    credential.rp_id = *rp_id;
++
++    // 6. Let privateKey be the result of decoding Base64url Encoding on the parameters' privateKey property. It must
++    //    be an asymmetric key package containing a single private key per [RFC5958].
++    auto private_key_bytes = decode_base64url_parameter(object, "privateKey"sv);
++    if (private_key_bytes.is_error())
++        return private_key_bytes.release_error();
++    Crypto::ASN1::Decoder decoder { private_key_bytes.value() };
++    auto private_key = Crypto::Certificate::parse_private_key_info(decoder);
++    if (private_key.is_error() || private_key.value().ec.d().is_zero())
++        return invalid_argument("privateKey must be a PKCS #8 P-256 private key"sv);
++    credential.private_key = private_key.value().ec.d();
++
++    // 7. Let userHandle be the result of decoding Base64url Encoding on the parameters' userHandle property, or null.
++    if (object.has("userHandle"sv) && !object.get("userHandle"sv)->is_null()) {
++        auto user_handle = decode_base64url_parameter(object, "userHandle"sv);
++        if (user_handle.is_error())
++            return user_handle.release_error();
++        credential.user_handle = user_handle.release_value();
++    }
++
++    // 8. Let signCount be the parameters' signCount property.
++    if (auto sign_count = object.get_u32("signCount"sv); sign_count.has_value())
++        credential.sign_count = *sign_count;
++
++    credential.user_name = object.get_string("userName"sv).value_or({});
++    credential.user_display_name = object.get_string("userDisplayName"sv).value_or({});
++    credential.backup_eligibility = object.get_bool("backupEligibility"sv).value_or(authenticator.configuration().default_backup_eligibility);
++    credential.backup_state = object.get_bool("backupState"sv).value_or(authenticator.configuration().default_backup_state);
++
++    // 11. If isResidentCredential is true and the authenticator's hasResidentKey is false, return invalid argument.
++    if (credential.is_resident_credential && !authenticator.configuration().has_resident_key)
++        return invalid_argument("The authenticator has no resident keys"sv);
++
++    // 13. Store the credential in the authenticator.
++    authenticator.credentials().remove_all_matching([&](auto const& existing) { return existing.id == credential.id; });
++    authenticator.credentials().append(move(credential));
++
++    // 14. Return success.
++    return JsonValue {};
++}
++
++// https://w3c.github.io/webauthn/#sctn-automation-get-credentials
++Web::WebDriver::Response VirtualAuthenticators::get_credentials(VirtualAuthenticator& authenticator)
++{
++    // 1. Let credentialsArray be an empty array.
++    JsonArray credentials;
++
++    // 2. For each Public Key Credential Source credential, managed by authenticator, construct a corresponding
++    //    Credential Parameters JSON object and add it to credentialsArray.
++    for (auto const& credential : authenticator.credentials()) {
++        Crypto::Curves::SECP256r1 curve;
++        auto public_key = curve.generate_public_key(credential.private_key);
++        if (public_key.is_error())
++            continue;
++        Crypto::PK::ECPrivateKey private_key { credential.private_key, P256_SCALAR_SIZE, {}, Crypto::PK::ECPublicKey { public_key.release_value() } };
++        Span<u32 const> parameters = Crypto::ASN1::secp256r1_oid;
++        auto pkcs8 = Crypto::PK::wrap_in_private_key_info(private_key, Crypto::ASN1::ec_public_key_encryption_oid, parameters);
++        if (pkcs8.is_error())
++            continue;
++
++        JsonObject object;
++        object.set("credentialId"sv, MUST(encode_base64url(credential.id, AK::OmitPadding::Yes)));
++        object.set("isResidentCredential"sv, credential.is_resident_credential);
++        object.set("rpId"sv, credential.rp_id);
++        object.set("privateKey"sv, MUST(encode_base64url(pkcs8.value(), AK::OmitPadding::Yes)));
++        if (credential.user_handle.has_value())
++            object.set("userHandle"sv, MUST(encode_base64url(*credential.user_handle, AK::OmitPadding::Yes)));
++        object.set("signCount"sv, credential.sign_count);
++        object.set("backupEligibility"sv, credential.backup_eligibility);
++        object.set("backupState"sv, credential.backup_state);
++        object.set("userName"sv, credential.user_name);
++        object.set("userDisplayName"sv, credential.user_display_name);
++        credentials.must_append(move(object));
++    }
++
++    // 3. Return success with data containing credentialsArray.
++    return JsonValue { move(credentials) };
++}
++
++// https://w3c.github.io/webauthn/#sctn-automation-remove-credential
++Web::WebDriver::Response VirtualAuthenticators::remove_credential(VirtualAuthenticator& authenticator, String const& credential_id)
++{
++    auto id = decode_base64url(credential_id);
++    if (id.is_error())
++        return invalid_argument("The credential ID must be base64url encoded"sv);
++
++    // If credentialId does not match any Public Key Credential Source managed by authenticator, return invalid
++    // argument. Otherwise, remove it.
++    if (!authenticator.credentials().remove_first_matching([&](auto const& credential) { return credential.id == id.value(); }))
++        return invalid_argument("No such credential"sv);
++    return JsonValue {};
++}
++
++// https://w3c.github.io/webauthn/#sctn-automation-remove-all-credentials
++Web::WebDriver::Response VirtualAuthenticators::remove_all_credentials(VirtualAuthenticator& authenticator)
++{
++    authenticator.credentials().clear();
++    return JsonValue {};
++}
++
++// https://w3c.github.io/webauthn/#sctn-automation-set-user-verified
++Web::WebDriver::Response VirtualAuthenticators::set_user_verified(VirtualAuthenticator& authenticator, JsonValue const& parameters)
++{
++    // If parameters is not a JSON Object, or its isUserVerified property is not a boolean, return invalid argument.
++    if (!parameters.is_object())
++        return invalid_argument("The parameters must be an object"sv);
++    auto is_user_verified = parameters.as_object().get_bool("isUserVerified"sv);
++    if (!is_user_verified.has_value())
++        return invalid_argument("isUserVerified must be a boolean"sv);
++
++    authenticator.configuration().is_user_verified = *is_user_verified;
++    return JsonValue {};
++}
++
++// https://w3c.github.io/webauthn/#sctn-automation-set-credential-properties
++Web::WebDriver::Response VirtualAuthenticators::set_credential_properties(VirtualAuthenticator& authenticator, String const& credential_id, JsonValue const& parameters)
++{
++    if (!parameters.is_object())
++        return invalid_argument("The parameters must be an object"sv);
++    auto id = decode_base64url(credential_id);
++    if (id.is_error())
++        return invalid_argument("The credential ID must be base64url encoded"sv);
++
++    auto credential = authenticator.credentials().find_if([&](auto const& credential) { return credential.id == id.value(); });
++    if (credential.is_end())
++        return invalid_argument("No such credential"sv);
++
++    auto const& object = parameters.as_object();
++    if (auto backup_eligibility = object.get_bool("backupEligibility"sv); backup_eligibility.has_value())
++        credential->backup_eligibility = *backup_eligibility;
++    if (auto backup_state = object.get_bool("backupState"sv); backup_state.has_value())
++        credential->backup_state = *backup_state;
++    return JsonValue {};
++}
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6729cfb3c9b09a30c0e6e4861e8d0a9148e45d6
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
+@@ -0,0 +1,120 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/HashMap.h>
++#include <AK/JsonValue.h>
++#include <LibCrypto/BigInt/UnsignedBigInteger.h>
++#include <LibWebCommon/HTML/CrossProcessId.h>
++#include <LibWebCommon/WebDriver/Response.h>
++#include <LibWebView/Export.h>
++#include <LibWebView/WebAuthn/Authenticator.h>
++
++namespace WebView {
++
++// https://w3c.github.io/webauthn/#sctn-automation-virtual-authenticators
++// A software authenticator for automation and tests, which behaves as WebDriver's virtual authenticators do.
++class WEBVIEW_API VirtualAuthenticator final : public Authenticator {
++public:
++    // https://w3c.github.io/webauthn/#virtual-authenticators-properties
++    enum class Protocol : u8 {
++        CTAP1U2F,
++        CTAP2,
++        CTAP2_1,
++    };
++
++    struct Configuration {
++        Protocol protocol { Protocol::CTAP2 };
++        Web::WebAuthn::AuthenticatorTransport transport { Web::WebAuthn::AuthenticatorTransport::Usb };
++        bool has_resident_key { false };
++        bool has_user_verification { false };
++        bool is_user_consenting { true };
++        bool is_user_verified { false };
++        bool default_backup_eligibility { false };
++        bool default_backup_state { false };
++    };
++
++    // https://w3c.github.io/webauthn/#credential-parameters
++    struct Credential {
++        ByteBuffer id;
++        bool is_resident_credential { false };
++        String rp_id;
++        Crypto::UnsignedBigInteger private_key;
++        Optional<ByteBuffer> user_handle;
++        String user_name;
++        String user_display_name;
++        u32 sign_count { 0 };
++        bool backup_eligibility { false };
++        bool backup_state { false };
++    };
++
++    // An authenticator a test adds for itself is only for its own tab. One that WebDriver adds is for every tab.
++    static NonnullRefPtr<VirtualAuthenticator> create(String id, Configuration, Optional<Web::HTML::CrossProcessId> traversable_id);
++
++    String const& id() const { return m_id; }
++    bool is_available_to(Web::HTML::CrossProcessId traversable_id) const;
++    Configuration& configuration() { return m_configuration; }
++    Vector<Credential>& credentials() { return m_credentials; }
++
++    virtual Info const& info() const override { return m_info; }
++    virtual String const& name() const override { return m_name; }
++    virtual void make_credential(MakeCredentialRequest, Function<void(MakeCredentialResult)>) override;
++    virtual void get_assertion(GetAssertionRequest, Function<void(GetAssertionResult)>) override;
++    virtual void wait_for_touch(Function<void(Optional<Failure>)>) override;
++    virtual void get_pin_retries(Function<void(Optional<u32>)>) override;
++    virtual void cancel() override { }
++
++private:
++    VirtualAuthenticator(String id, Configuration, Optional<Web::HTML::CrossProcessId> traversable_id);
++
++    ErrorOr<MakeCredentialResult> make_credential_impl(MakeCredentialRequest const&);
++    ErrorOr<GetAssertionResult> get_assertion_impl(GetAssertionRequest const&);
++    Optional<Failure> check_user(bool user_verification) const;
++
++    String m_id;
++    String m_name;
++    Configuration m_configuration;
++    Optional<Web::HTML::CrossProcessId> m_traversable_id;
++    Info m_info;
++    Vector<Credential> m_credentials;
++};
++
++// The virtual authenticators WebDriver and tests have added, which ceremonies find as they would security keys.
++class WEBVIEW_API VirtualAuthenticators final : public AuthenticatorSource {
++public:
++    static VirtualAuthenticators& the();
++
++    // Whether a tab has virtual authenticators, which make its ceremonies run without asking the user anything.
++    bool is_enabled_for(CanonicalTraversable const&) const;
++
++    virtual NonnullOwnPtr<Discovery> discover(CanonicalTraversable const&, Function<void(NonnullRefPtr<Authenticator>)> on_authenticator) override;
++
++    // https://w3c.github.io/webauthn/#sctn-automation
++    // Runs one of WebAuthn's WebDriver extension commands. The arguments are the URL's variables after the session
++    // ID, and the payload is the request's body. A test runs them for its own tab only.
++    Web::WebDriver::Response run_command(StringView name, JsonValue const& payload, Vector<String> const& arguments, Optional<Web::HTML::CrossProcessId> traversable_id = {});
++
++private:
++    VirtualAuthenticators() = default;
++
++    class VirtualDiscovery;
++
++    Web::WebDriver::Response add_virtual_authenticator(JsonValue const& parameters, Optional<Web::HTML::CrossProcessId> traversable_id);
++    Web::WebDriver::Response remove_virtual_authenticator(String const& authenticator_id);
++    Web::WebDriver::Response add_credential(VirtualAuthenticator&, JsonValue const& parameters);
++    Web::WebDriver::Response get_credentials(VirtualAuthenticator&);
++    Web::WebDriver::Response remove_credential(VirtualAuthenticator&, String const& credential_id);
++    Web::WebDriver::Response remove_all_credentials(VirtualAuthenticator&);
++    Web::WebDriver::Response set_user_verified(VirtualAuthenticator&, JsonValue const& parameters);
++    Web::WebDriver::Response set_credential_properties(VirtualAuthenticator&, String const& credential_id, JsonValue const& parameters);
++
++    Vector<NonnullRefPtr<VirtualAuthenticator>> m_authenticators;
++    Vector<VirtualDiscovery*> m_discoveries;
++    u64 m_next_authenticator_id { 1 };
++};
++
++}
+diff --git a/Libraries/LibWebView/WebContentTestClient.cpp b/Libraries/LibWebView/WebContentTestClient.cpp
+index 5f9034e9d3ed6df4294ade5c179a9ab1d9064026..908be237dcd746716e4a8914c8f73623f44721f5 100644
+--- a/Libraries/LibWebView/WebContentTestClient.cpp
++++ b/Libraries/LibWebView/WebContentTestClient.cpp
+@@ -4,9 +4,11 @@
+  * SPDX-License-Identifier: BSD-2-Clause
+  */
+ 
++#include <LibWebView/CanonicalTraversable.h>
+ #include <LibWebView/CookieJar.h>
+ #include <LibWebView/GamepadManager.h>
+ #include <LibWebView/HSTSStore.h>
++#include <LibWebView/WebAuthn/VirtualAuthenticator.h>
+ #include <LibWebView/WebContentClient.h>
+ #include <LibWebView/WebContentPage.h>
+ #include <LibWebView/WebContentTestClient.h>
+@@ -121,6 +123,15 @@ Messages::WebContentTestClient::CreateVirtualGamepadResponse WebContentTestClien
+     return GamepadManager::the().create_virtual_gamepad(m_client);
+ }
+ 
++Messages::WebContentTestClient::RunWebAuthnCommandResponse WebContentTestClient::run_web_authn_command(Web::PageId page_id, String name, JsonValue payload, Vector<String> arguments)
++{
++    // NB: Tests run side by side, so a test's virtual authenticators are only for its own tab.
++    auto* page = m_client.page(page_id);
++    if (!page)
++        return Web::WebDriver::Error::from_code(Web::WebDriver::ErrorCode::NoSuchWindow, "The page is gone"sv);
++    return VirtualAuthenticators::the().run_command(name, payload, arguments, page->traversable().id());
++}
++
+ void WebContentTestClient::set_virtual_gamepad_button(Web::Gamepad::GamepadHandle handle, i32 button, bool down)
+ {
+     GamepadManager::the().set_virtual_gamepad_button(m_client, handle, button, down);
+diff --git a/Libraries/LibWebView/WebContentTestClient.h b/Libraries/LibWebView/WebContentTestClient.h
+index 7026f180b93138df31b821a398c61adaf45ffb09..ed505aa7336a4efb41bdb6ce645ac6569d061545 100644
+--- a/Libraries/LibWebView/WebContentTestClient.h
++++ b/Libraries/LibWebView/WebContentTestClient.h
+@@ -43,6 +43,7 @@ private:
+     virtual Messages::WebContentTestClient::DidRequestRegisterSessionStoreTabForTestingResponse did_request_register_session_store_tab_for_testing(Web::PageId page_id) override;
+     virtual Messages::WebContentTestClient::DidRequestSessionStoreTabStateForTestingResponse did_request_session_store_tab_state_for_testing(Web::PageId page_id) override;
+     virtual Messages::WebContentTestClient::CreateVirtualGamepadResponse create_virtual_gamepad() override;
++    virtual Messages::WebContentTestClient::RunWebAuthnCommandResponse run_web_authn_command(Web::PageId page_id, String name, JsonValue payload, Vector<String> arguments) override;
+     virtual void set_virtual_gamepad_button(Web::Gamepad::GamepadHandle handle, i32 button, bool down) override;
+     virtual void set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle handle, i32 axis, i16 value) override;
+     virtual void disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle handle) override;
+diff --git a/Libraries/LibWebView/WebDriverBrowserConnection.cpp b/Libraries/LibWebView/WebDriverBrowserConnection.cpp
+index 0de514cd661d9229d913d2bb46bbff41aa113d1c..f3df74e27a8b1e3aba627f261d86d0bb99433dbd 100644
+--- a/Libraries/LibWebView/WebDriverBrowserConnection.cpp
++++ b/Libraries/LibWebView/WebDriverBrowserConnection.cpp
+@@ -8,6 +8,7 @@
+ #include <LibCore/EventLoop.h>
+ #include <LibWebView/Application.h>
+ #include <LibWebView/ViewImplementation.h>
++#include <LibWebView/WebAuthn/VirtualAuthenticator.h>
+ #include <LibWebView/WebDriverBrowserConnection.h>
+ #if defined(AK_OS_MACOS)
+ #    include <LibIPC/TransportBootstrapMach.h>
+@@ -297,6 +298,11 @@ void WebDriverBrowserConnection::traverse_history(u64 command_id, String window_
+     });
+ }
+ 
++void WebDriverBrowserConnection::web_authn_command(u64 command_id, String name, JsonValue payload, Vector<String> arguments)
++{
++    async_command_complete(command_id, VirtualAuthenticators::the().run_command(name, payload, arguments));
++}
++
+ void WebDriverBrowserConnection::get_session_history(u64 command_id, String window_handle)
+ {
+     auto view = ViewImplementation::find_view_by_handle(window_handle);
+diff --git a/Libraries/LibWebView/WebDriverBrowserConnection.h b/Libraries/LibWebView/WebDriverBrowserConnection.h
+index 65ebbee45e5be9015c0bdf9abe4f482e2fb855ef..dd5b1871005b7ecf1e3db38faaf27cadb19f5627 100644
+--- a/Libraries/LibWebView/WebDriverBrowserConnection.h
++++ b/Libraries/LibWebView/WebDriverBrowserConnection.h
+@@ -33,6 +33,7 @@ private:
+     virtual void traverse_history(u64 command_id, String window_handle, i32 delta, bool handle_user_prompts) override;
+     virtual void get_session_history(u64 command_id, String window_handle) override;
+     virtual void load_url(u64 command_id, String window_handle, URL::URL url) override;
++    virtual void web_authn_command(u64 command_id, String name, JsonValue payload, Vector<String> arguments) override;
+     virtual void run_content_command(u64 command_id, String window_handle, Web::WebDriver::SessionBrowsingContext browsing_context, String name, JsonValue payload, Vector<String> arguments) override;
+     virtual void switch_to_window(u64 command_id, String window_handle) override;
+     virtual void switch_to_parent_frame(u64 command_id, String window_handle) override;
+diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
+index 55c7c0f1fde041c75ceb22d3c924339e923f25e9..03136feef04c960a47eb3ecab8e5cebed39c8bb1 100644
+--- a/Services/WebContent/PageClient.cpp
++++ b/Services/WebContent/PageClient.cpp
+@@ -2020,6 +2020,18 @@ void PageClient::page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHand
+     client().async_gamepad_stop_effects(handle);
+ }
+ 
++Optional<Web::WebDriver::Response> PageClient::run_web_authn_command(String const& name, JsonValue const& payload, Vector<String> const& arguments)
++{
++    auto* test_connection = client().test_connection();
++    if (!test_connection)
++        return {};
++
++    auto response = test_connection->send_sync_but_allow_failure<Messages::WebContentTestClient::RunWebAuthnCommand>(m_id, name, payload, arguments);
++    if (!response)
++        return {};
++    return response->take_response();
++}
++
+ Optional<Web::Gamepad::VirtualGamepad> PageClient::create_virtual_gamepad()
+ {
+     auto* test_connection = client().test_connection();
+diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
+index ffda6406aa35cd5960eacb9412b8dbef24969744..2956d9527a025e7b4a557f01bd617e41f615d40b 100644
+--- a/Services/WebContent/PageClient.h
++++ b/Services/WebContent/PageClient.h
+@@ -376,6 +376,7 @@ private:
+     virtual void page_did_play_gamepad_effect(Web::Gamepad::GamepadHandle, Web::Gamepad::GamepadEffect const&) override;
+     virtual void page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHandle) override;
+     virtual Optional<Web::Gamepad::VirtualGamepad> create_virtual_gamepad() override;
++    virtual Optional<Web::WebDriver::Response> run_web_authn_command(String const& name, JsonValue const& payload, Vector<String> const& arguments) override;
+     virtual void set_virtual_gamepad_button(Web::Gamepad::GamepadHandle, i32 button, bool down) override;
+     virtual void set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle, i32 axis, i16 value) override;
+     virtual void disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle) override;
+diff --git a/Services/WebContent/WebContentTestClient.ipc b/Services/WebContent/WebContentTestClient.ipc
+index db3e671e23ca93f457383366da113677104fbeb7..ca4ca4ffcf391119e9314a7c877933bedc3c63d9 100644
+--- a/Services/WebContent/WebContentTestClient.ipc
++++ b/Services/WebContent/WebContentTestClient.ipc
+@@ -6,6 +6,7 @@
+ #include <LibWebCommon/HTML/SessionHistoryEntryDescriptor.h>
+ #include <LibWebCommon/Page/PageId.h>
+ #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
++#include <LibWebCommon/WebDriver/Response.h>
+ 
+ endpoint WebContentTestClient routed by Web::PageId page_id
+ {
+@@ -38,5 +39,8 @@ endpoint WebContentTestClient routed by Web::PageId page_id
+     set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle handle, i32 axis, i16 value) =|
+     disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle handle) =|
+     pump_gamepad_events() => (Vector<Web::Gamepad::GamepadChangeEvent> events)
++    // https://w3c.github.io/webauthn/#sctn-automation
++    [NotRouted] run_web_authn_command(Web::PageId page_id, String name, JsonValue payload, Vector<String> arguments) => (Web::WebDriver::Response response)
++
+     get_virtual_gamepad_received_rumble_effects(Web::Gamepad::GamepadHandle handle) => (Vector<Web::Gamepad::ReceivedDualRumbleEffect> dual_rumble_effects, Vector<Web::Gamepad::ReceivedTriggerRumbleEffect> trigger_rumble_effects)
+ }
+diff --git a/Services/WebDriver/Client.cpp b/Services/WebDriver/Client.cpp
+index 00bffcadbce1f71ea40288bec3a2f5ef7af54e91..91b2a3ca64451b5ed0c6baffc4f610cb0e5b8eaf 100644
+--- a/Services/WebDriver/Client.cpp
++++ b/Services/WebDriver/Client.cpp
+@@ -962,4 +962,80 @@ ResponsePromise Client::print_page(Web::WebDriver::Parameters parameters, JsonVa
+     return session->run_top_level_content_command("print_page"sv, move(payload));
+ }
+ 
++// https://w3c.github.io/webauthn/#sctn-automation
++// The virtual authenticators belong to the browser, which runs every WebAuthn command. Its arguments are the URL's
++// variables after the session ID.
++static ResponsePromise run_web_authn_command(Web::WebDriver::Parameters const& parameters, JsonValue payload, StringView name)
++{
++    auto session = WEBDRIVER_TRY(Session::find_session(parameters[0]));
++    Vector<String> arguments;
++    for (size_t i = 1; i < parameters.size(); ++i)
++        arguments.append(parameters[i]);
++    return session->run_web_authn_command(name, move(payload), move(arguments));
++}
++
++// 11.3 Add Virtual Authenticator, https://w3c.github.io/webauthn/#sctn-automation-add-virtual-authenticator
++// POST /session/{session id}/webauthn/authenticator
++ResponsePromise Client::add_virtual_authenticator(Web::WebDriver::Parameters parameters, JsonValue payload)
++{
++    dbgln_if(WEBDRIVER_DEBUG, "Handling POST /session/<session_id>/webauthn/authenticator");
++    return run_web_authn_command(parameters, move(payload), "add-virtual-authenticator"sv);
++}
++
++// 11.4 Remove Virtual Authenticator, https://w3c.github.io/webauthn/#sctn-automation-remove-virtual-authenticator
++// DELETE /session/{session id}/webauthn/authenticator/{authenticatorId}
++ResponsePromise Client::remove_virtual_authenticator(Web::WebDriver::Parameters parameters, JsonValue payload)
++{
++    dbgln_if(WEBDRIVER_DEBUG, "Handling DELETE /session/<session_id>/webauthn/authenticator/<authenticator_id>");
++    return run_web_authn_command(parameters, move(payload), "remove-virtual-authenticator"sv);
++}
++
++// 11.5 Add Credential, https://w3c.github.io/webauthn/#sctn-automation-add-credential
++// POST /session/{session id}/webauthn/authenticator/{authenticatorId}/credential
++ResponsePromise Client::add_credential(Web::WebDriver::Parameters parameters, JsonValue payload)
++{
++    dbgln_if(WEBDRIVER_DEBUG, "Handling POST /session/<session_id>/webauthn/authenticator/<authenticator_id>/credential");
++    return run_web_authn_command(parameters, move(payload), "add-credential"sv);
++}
++
++// 11.6 Get Credentials, https://w3c.github.io/webauthn/#sctn-automation-get-credentials
++// GET /session/{session id}/webauthn/authenticator/{authenticatorId}/credentials
++ResponsePromise Client::get_credentials(Web::WebDriver::Parameters parameters, JsonValue payload)
++{
++    dbgln_if(WEBDRIVER_DEBUG, "Handling GET /session/<session_id>/webauthn/authenticator/<authenticator_id>/credentials");
++    return run_web_authn_command(parameters, move(payload), "get-credentials"sv);
++}
++
++// 11.7 Remove Credential, https://w3c.github.io/webauthn/#sctn-automation-remove-credential
++// DELETE /session/{session id}/webauthn/authenticator/{authenticatorId}/credentials/{credentialId}
++ResponsePromise Client::remove_credential(Web::WebDriver::Parameters parameters, JsonValue payload)
++{
++    dbgln_if(WEBDRIVER_DEBUG, "Handling DELETE /session/<session_id>/webauthn/authenticator/<authenticator_id>/credentials/<credential_id>");
++    return run_web_authn_command(parameters, move(payload), "remove-credential"sv);
++}
++
++// 11.8 Remove All Credentials, https://w3c.github.io/webauthn/#sctn-automation-remove-all-credentials
++// DELETE /session/{session id}/webauthn/authenticator/{authenticatorId}/credentials
++ResponsePromise Client::remove_all_credentials(Web::WebDriver::Parameters parameters, JsonValue payload)
++{
++    dbgln_if(WEBDRIVER_DEBUG, "Handling DELETE /session/<session_id>/webauthn/authenticator/<authenticator_id>/credentials");
++    return run_web_authn_command(parameters, move(payload), "remove-all-credentials"sv);
++}
++
++// 11.9 Set User Verified, https://w3c.github.io/webauthn/#sctn-automation-set-user-verified
++// POST /session/{session id}/webauthn/authenticator/{authenticatorId}/uv
++ResponsePromise Client::set_user_verified(Web::WebDriver::Parameters parameters, JsonValue payload)
++{
++    dbgln_if(WEBDRIVER_DEBUG, "Handling POST /session/<session_id>/webauthn/authenticator/<authenticator_id>/uv");
++    return run_web_authn_command(parameters, move(payload), "set-user-verified"sv);
++}
++
++// 11.10 Set Credential Properties, https://w3c.github.io/webauthn/#sctn-automation-set-credential-properties
++// POST /session/{session id}/webauthn/authenticator/{authenticatorId}/credentials/{credentialId}/props
++ResponsePromise Client::set_credential_properties(Web::WebDriver::Parameters parameters, JsonValue payload)
++{
++    dbgln_if(WEBDRIVER_DEBUG, "Handling POST /session/<session_id>/webauthn/authenticator/<authenticator_id>/credentials/<credential_id>/props");
++    return run_web_authn_command(parameters, move(payload), "set-credential-properties"sv);
++}
++
+ }
+diff --git a/Services/WebDriver/Client.h b/Services/WebDriver/Client.h
+index aab0773b5089552d4e432a84decc0b2aa41249d9..a770c371e435d8ccd343a6920427b902d07de5d6 100644
+--- a/Services/WebDriver/Client.h
++++ b/Services/WebDriver/Client.h
+@@ -98,6 +98,14 @@ private:
+     virtual ResponsePromise take_screenshot(Web::WebDriver::Parameters parameters, JsonValue payload) override;
+     virtual ResponsePromise take_element_screenshot(Web::WebDriver::Parameters parameters, JsonValue payload) override;
+     virtual ResponsePromise print_page(Web::WebDriver::Parameters parameters, JsonValue payload) override;
++    virtual ResponsePromise add_virtual_authenticator(Web::WebDriver::Parameters parameters, JsonValue payload) override;
++    virtual ResponsePromise remove_virtual_authenticator(Web::WebDriver::Parameters parameters, JsonValue payload) override;
++    virtual ResponsePromise add_credential(Web::WebDriver::Parameters parameters, JsonValue payload) override;
++    virtual ResponsePromise get_credentials(Web::WebDriver::Parameters parameters, JsonValue payload) override;
++    virtual ResponsePromise remove_credential(Web::WebDriver::Parameters parameters, JsonValue payload) override;
++    virtual ResponsePromise remove_all_credentials(Web::WebDriver::Parameters parameters, JsonValue payload) override;
++    virtual ResponsePromise set_user_verified(Web::WebDriver::Parameters parameters, JsonValue payload) override;
++    virtual ResponsePromise set_credential_properties(Web::WebDriver::Parameters parameters, JsonValue payload) override;
+ 
+     LaunchBrowserCallback m_launch_browser_callback;
+ };
+diff --git a/Services/WebDriver/Session.cpp b/Services/WebDriver/Session.cpp
+index bd7a3c3458c6883476e11a8a5159d62dd7f15ebd..42747580b119dd0e5407efed9f7269953b1f9f4f 100644
+--- a/Services/WebDriver/Session.cpp
++++ b/Services/WebDriver/Session.cpp
+@@ -614,6 +614,13 @@ NonnullRefPtr<Session::WebDriverPromise> Session::load_url(URL::URL url)
+     });
+ }
+ 
++NonnullRefPtr<Session::WebDriverPromise> Session::run_web_authn_command(StringView name, JsonValue payload, Vector<String> arguments)
++{
++    return perform_browser_command([this, name = MUST(String::from_utf8(name)), payload = move(payload), arguments = move(arguments)](u64 command_id) mutable {
++        m_browser_connection->async_web_authn_command(command_id, move(name), move(payload), move(arguments));
++    });
++}
++
+ NonnullRefPtr<Session::WebDriverPromise> Session::run_content_command(StringView name, JsonValue payload, Vector<String> arguments)
+ {
+     return run_content_command(Web::WebDriver::SessionBrowsingContext::Current, name, move(payload), move(arguments));
+diff --git a/Services/WebDriver/Session.h b/Services/WebDriver/Session.h
+index f0c36371b28f12a919f826a8ae584cd7fb561cc0..53f31210cb72c12233f66f353de0bfe26c7b00d6 100644
+--- a/Services/WebDriver/Session.h
++++ b/Services/WebDriver/Session.h
+@@ -97,6 +97,7 @@ public:
+     NonnullRefPtr<WebDriverPromise> traverse_history(i32 delta, HandleUserPrompts);
+     NonnullRefPtr<WebDriverPromise> session_history();
+     NonnullRefPtr<WebDriverPromise> load_url(URL::URL);
++    NonnullRefPtr<WebDriverPromise> run_web_authn_command(StringView name, JsonValue payload, Vector<String> arguments);
+     NonnullRefPtr<WebDriverPromise> switch_to_parent_frame();
+     NonnullRefPtr<WebDriverPromise> run_content_command(StringView name, JsonValue payload = {}, Vector<String> arguments = {});
+     NonnullRefPtr<WebDriverPromise> run_top_level_content_command(StringView name, JsonValue payload = {}, Vector<String> arguments = {});
+diff --git a/Services/WebDriver/WebDriverBrowserClient.ipc b/Services/WebDriver/WebDriverBrowserClient.ipc
+index d606b906d6ec4ffe13cbd4007dc5642deb095fcb..97ce16ca32027d4e227f7a4d5cd7ab5a7b328152 100644
+--- a/Services/WebDriver/WebDriverBrowserClient.ipc
++++ b/Services/WebDriver/WebDriverBrowserClient.ipc
+@@ -21,6 +21,9 @@ endpoint WebDriverBrowserClient {
+     set_strict_file_interactability(bool strict_file_interactability) =|
+     set_timeouts_configuration(JsonValue timeouts) =|
+ 
++    // https://w3c.github.io/webauthn/#sctn-automation
++    web_authn_command(u64 command_id, String name, JsonValue payload, Vector<String> arguments) =|
++
+     // https://w3c.github.io/webdriver-bidi/
+     bidi_command(u64 command_id, String method, JsonValue params) =|
+     bidi_get_top_level_traversables(u64 command_id, Vector<String> navigable_ids) =|
+diff --git a/Tests/LibWeb/TestConfig.ini b/Tests/LibWeb/TestConfig.ini
+index f020eed588bebec620225cb31eedaddd4a0d2b7f..766103b7e7677b542aaad558ef445ec794aa255b 100644
+--- a/Tests/LibWeb/TestConfig.ini
++++ b/Tests/LibWeb/TestConfig.ini
+@@ -1,4 +1,15 @@
+ [LoadFromHttpServer]
++Text/input/wpt-import/webauthn/getcredential-passing.https.html
++Text/input/wpt-import/webauthn/getcredential-badargs-rpid.https.html
++Text/input/wpt-import/webauthn/createcredential-pubkeycredparams.https.html
++Text/input/wpt-import/webauthn/createcredential-passing.https.html
++Text/input/wpt-import/webauthn/createcredential-excludecredentials.https.html
++Text/input/wpt-import/webauthn/createcredential-badargs-user.https.html
++Text/input/wpt-import/webauthn/createcredential-badargs-rp.https.html
++Text/input/wpt-import/webauthn/createcredential-badargs-challenge.https.html
++Text/input/WebAuthn/argument-checks.html
++Text/input/WebAuthn/cross-origin-iframe.html
++Text/input/WebAuthn/create-and-get.html
+ Text/input/HTML/xml-document-encoding.html
+ Text/input/HTML/createImageBitmap-video.html
+ Text/input/HTML/HTMLVideoElement-capture-before-seek-keeps-frame.html
+diff --git a/Tests/LibWeb/Text/data/webauthn-get-in-frame.html b/Tests/LibWeb/Text/data/webauthn-get-in-frame.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad039f46403501469397718d741f40e91e5e4069
+--- /dev/null
++++ b/Tests/LibWeb/Text/data/webauthn-get-in-frame.html
+@@ -0,0 +1,14 @@
++<!DOCTYPE html>
++<script>
++window.addEventListener("message", async event => {
++    try {
++        const assertion = await navigator.credentials.get({
++            publicKey: { challenge: new Uint8Array(16), allowCredentials: [{ type: "public-key", id: new Uint8Array(event.data) }] },
++        });
++        parent.postMessage({ result: "resolved", clientData: new TextDecoder().decode(assertion.response.clientDataJSON) }, "*");
++    } catch (e) {
++        parent.postMessage({ result: e.name }, "*");
++    }
++});
++parent.postMessage({ result: "ready", origin: location.origin }, "*");
++</script>
+diff --git a/Tests/LibWeb/Text/expected/WebAuthn/argument-checks.txt b/Tests/LibWeb/Text/expected/WebAuthn/argument-checks.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..c080968b2580350764edca484b682ee8d62c09e4
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/WebAuthn/argument-checks.txt
+@@ -0,0 +1,14 @@
++empty user ID: TypeError
++65-byte user ID: TypeError
++another site's RP ID: SecurityError
++a public suffix as RP ID: SecurityError
++only unknown credential types: NotSupportedError
++missing challenge: TypeError
++publicKey with password: NotSupportedError
++aborted already: rejected with reason
++conditional mediation: TypeError
++appid on another site: SecurityError
++isUserVerifyingPlatformAuthenticatorAvailable: false
++isConditionalMediationAvailable: false
++bad base64url in JSON: EncodingError
++no authenticators: NotAllowedError
+diff --git a/Tests/LibWeb/Text/expected/WebAuthn/create-and-get.txt b/Tests/LibWeb/Text/expected/WebAuthn/create-and-get.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..6204de30300d6129386539acf36a223aa53298f5
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/WebAuthn/create-and-get.txt
+@@ -0,0 +1,17 @@
++credential: true, type public-key, id matches rawId: true
++rawId is the same object: true
++response: true
++authenticatorAttachment: cross-platform
++transports: ["usb"]
++publicKeyAlgorithm: -7
++publicKey bytes: 91
++clientExtensionResults: {"credProps":{"rk":false}}
++clientData type: webauthn.create, challenge matches: true, origin matches: true, crossOrigin: false
++registration flags: user present true, user verified true, attested credential data true
++toJSON: id true, rawId true, type public-key, response keys attestationObject,authenticatorData,clientDataJSON,publicKey,publicKeyAlgorithm,transports
++excluded credential: InvalidStateError
++assertion: true, same id: true, response: true
++userHandle: null
++assertion flags: user present true, user verified true, sign count 1
++signature verifies: true
++unknown credential: NotAllowedError
+diff --git a/Tests/LibWeb/Text/expected/WebAuthn/cross-origin-iframe.txt b/Tests/LibWeb/Text/expected/WebAuthn/cross-origin-iframe.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..1e0acfd9cda8f4a3dc64275f8f8a313e4ca9b813
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/WebAuthn/cross-origin-iframe.txt
+@@ -0,0 +1,3 @@
++cross-origin frame without allow: NotAllowedError
++cross-origin frame with allow: resolved
++origin is the frame's: true, crossOrigin: true, topOrigin is the page's: true
+diff --git a/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-challenge.https.txt b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-challenge.https.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..167d8c728ca9d86408a47c6ecc19634ea3a222a5
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-challenge.https.txt
+@@ -0,0 +1,11 @@
++Harness status: OK
++
++Found 6 tests
++
++6 Pass
++Pass	Bad challenge: challenge missing
++Pass	Bad challenge: challenge is string
++Pass	Bad challenge: challenge is null
++Pass	Bad challenge: challenge is empty object
++Pass	Bad challenge: challenge is empty Array
++Pass	Clean up the test environment
+\ No newline at end of file
+diff --git a/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-rp.https.txt b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-rp.https.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..1cc09b7d8c2c1adae452704a53cedc63bc2c193b
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-rp.https.txt
+@@ -0,0 +1,17 @@
++Harness status: OK
++
++Found 12 tests
++
++12 Pass
++Pass	Bad rp: rp missing
++Pass	Bad rp: rp null
++Pass	Bad rp: rp is string
++Pass	Bad rp: rp is empty object
++Pass	Bad rp: id is null
++Pass	Bad rp: id is empty String
++Pass	Bad rp: id is invalid domain (has space)
++Pass	Bad rp: id is invalid domain (starts with dash)
++Pass	Bad rp: id is invalid domain (starts with number)
++Pass	Bad rp id: id is host + port
++Pass	rp missing name
++Pass	Clean up the test environment
+\ No newline at end of file
+diff --git a/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-user.https.txt b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-user.https.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..e95ed0f10406336e13ede423f71f79008ba75856
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-badargs-user.https.txt
+@@ -0,0 +1,22 @@
++Harness status: OK
++
++Found 17 tests
++
++17 Pass
++Pass	Bad user: user missing
++Pass	Bad user: user is string
++Pass	Bad user: user is empty object
++Pass	Bad user: id is undefined
++Pass	Bad user: id is object
++Pass	Bad user: id is null
++Pass	Bad user: id is empty String
++Pass	Bad user: id is empty Array
++Pass	Bad user: ArrayBuffer id is too long (65 bytes)
++Pass	Bad user: Int16Array id is too long (66 bytes)
++Pass	Bad user: Int32Array id is too long (68 bytes)
++Pass	Bad user: Float32Array id is too long (68 bytes)
++Pass	Bad user: Float64Array id is too long (72 bytes)
++Pass	Bad user: id is too long (65 bytes)
++Pass	user missing name
++Pass	Bad user: displayName is undefined
++Pass	Clean up the test environment
+\ No newline at end of file
+diff --git a/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-excludecredentials.https.txt b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-excludecredentials.https.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..702cf9c95efaafdd4ca65bd0c72e93aa8ae44c40
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-excludecredentials.https.txt
+@@ -0,0 +1,12 @@
++Harness status: OK
++
++Found 7 tests
++
++7 Pass
++Pass	Bad excludeCredentials: string
++Pass	Bad excludeCredentials: empty object
++Pass	excludeCredentials missing
++Pass	excludeCredentials empty array
++Pass	exclude existing credential
++Pass	exclude random (non-existing) credential
++Pass	Clean up the test environment
+\ No newline at end of file
+diff --git a/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-passing.https.txt b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-passing.https.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..4543d3eaa89afbad04fadef9b5991c8e8abb31cc
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-passing.https.txt
+@@ -0,0 +1,55 @@
++Harness status: OK
++
++Found 50 tests
++
++50 Pass
++Pass	passing credentials.create() with default arguments
++Pass	passing credentials.create() with rpId (hostname)
++Pass	very short user id
++Pass	max length user id
++Pass	Uint8Array user id
++Pass	Int8Array user id
++Pass	Int16Array user id
++Pass	Int32Array user id
++Pass	Float32Array user id
++Pass	DataView user id
++Pass	Int16Array challenge
++Pass	Int32Array challenge
++Pass	Float32Array challenge
++Pass	Float64Array challenge
++Pass	DataView challenge
++Pass	Absurdly large challenge
++Pass	pubKeyCredParams is empty Array
++Pass	EC256 pubKeyCredParams
++Pass	SelectEC256 pubKeyCredParams from a list
++Pass	pubKeyCredParams with unknown value
++Pass	passing credentials.create() with no timeout
++Pass	authenticatorSelection is undefined
++Pass	authenticatorSelection is empty object
++Pass	authenticatorSelection default values
++Pass	authenticatorSelection attachment undefined
++Pass	authenticatorSelection attachment empty string
++Pass	authenticatorSelection attachment empty object
++Pass	authenticatorSelection attachment null
++Pass	authenticatorSelection attachment unknown value
++Pass	authenticatorSelection residentKey undefined
++Pass	authenticatorSelection residentKey false
++Pass	authenticatorSelection userVerification undefined
++Pass	authenticatorSelection userVerification discouraged
++Pass	authenticatorSelection userVerification empty string
++Pass	authenticatorSelection userVerification empty object
++Pass	authenticatorSelection userVerification unknown value
++Pass	authenticatorSelection userVerification null
++Pass	attestation parameter: attestation is "none"
++Pass	attestation parameter: attestation is "indirect"
++Pass	attestation parameter: attestation is "direct"
++Pass	attestation parameter: attestation is undefined
++Pass	attestation parameter: attestation is empty object
++Pass	attestation parameter: attestation is empty array
++Pass	attestation parameter: attestation is null
++Pass	attestation parameter: attestation is "noneofyourbusiness"
++Pass	attestation parameter: attestation is empty string
++Pass	extensions undefined
++Pass	extensions are empty object
++Pass	extensions are dict of empty strings
++Pass	Clean up the test environment
+\ No newline at end of file
+diff --git a/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-pubkeycredparams.https.txt b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-pubkeycredparams.https.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..1fad3c5867958974d0f7323fd120e047947cb99b
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/wpt-import/webauthn/createcredential-pubkeycredparams.https.txt
+@@ -0,0 +1,15 @@
++Harness status: OK
++
++Found 10 tests
++
++10 Pass
++Pass	Bad pubKeyCredParams: pubKeyCredParams is undefined
++Pass	Bad pubKeyCredParams: pubKeyCredParams is string
++Pass	Bad pubKeyCredParams: pubKeyCredParams is null
++Pass	Bad pubKeyCredParams: first param has bad type ("something-else")
++Pass	Bad pubKeyCredParams: first param has bad type ("")
++Pass	Bad pubKeyCredParams: first param has bad type (null)
++Pass	Bad pubKeyCredParams: first param has bad type (empty object)
++Pass	Bad pubKeyCredParams: first param has bad alg (42)
++Pass	Bad pubKeyCredParams: first param has bad alg (0)
++Pass	Clean up the test environment
+\ No newline at end of file
+diff --git a/Tests/LibWeb/Text/expected/wpt-import/webauthn/getcredential-badargs-rpid.https.txt b/Tests/LibWeb/Text/expected/wpt-import/webauthn/getcredential-badargs-rpid.https.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8d94e9249d204c58ff5a2aa191eaf6b17b7b03c
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/wpt-import/webauthn/getcredential-badargs-rpid.https.txt
+@@ -0,0 +1,12 @@
++Harness status: OK
++
++Found 7 tests
++
++7 Pass
++Pass	Bad rpId: empty string
++Pass	Bad rpId: null
++Pass	Bad rpId: invalid domain (has space)
++Pass	Bad rpId: invalid domain (starts with dash)
++Pass	Bad rpId: invalid domain (starts with number)
++Pass	Bad rpId: host + port
++Pass	Clean up the test environment
+\ No newline at end of file
+diff --git a/Tests/LibWeb/Text/expected/wpt-import/webauthn/getcredential-passing.https.txt b/Tests/LibWeb/Text/expected/wpt-import/webauthn/getcredential-passing.https.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..f5339bd9528d602b6a9a692861b9e8f24964803b
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/wpt-import/webauthn/getcredential-passing.https.txt
+@@ -0,0 +1,20 @@
++Harness status: OK
++
++Found 15 tests
++
++15 Pass
++Pass	passing credentials.get() with default args
++Pass	passing credentials.create() with no timeout
++Pass	rpId undefined
++Pass	passing credentials.get() with rpId (hostname)
++Pass	authenticatorSelection userVerification undefined
++Pass	authenticatorSelection userVerification preferred
++Pass	authenticatorSelection userVerification discouraged
++Pass	authenticatorSelection userVerification empty string
++Pass	authenticatorSelection userVerification empty object
++Pass	authenticatorSelection userVerification unknown value
++Pass	authenticatorSelection userVerification null
++Pass	extensions undefined
++Pass	extensions are empty object
++Pass	extensions are dict of empty strings
++Pass	Clean up the test environment
+\ No newline at end of file
+diff --git a/Tests/LibWeb/Text/input/WebAuthn/argument-checks.html b/Tests/LibWeb/Text/input/WebAuthn/argument-checks.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..678feab887175166cc6ecad0a96b916eb844b928
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/WebAuthn/argument-checks.html
+@@ -0,0 +1,40 @@
++<!DOCTYPE html>
++<script src="../include.js"></script>
++<script>
++function creationOptions(overrides = {}) {
++    return {
++        rp: { name: "Test" },
++        user: { id: new Uint8Array([1]), name: "user", displayName: "User" },
++        challenge: new Uint8Array(16),
++        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
++        ...overrides,
++    };
++}
++
++async function outcome(promise) {
++    try {
++        const result = await promise;
++        return `resolved with ${result}`;
++    } catch (e) {
++        return typeof e === "string" ? `rejected with ${e}` : e.name;
++    }
++}
++
++asyncTest(async done => {
++    println(`empty user ID: ${await outcome(navigator.credentials.create({ publicKey: creationOptions({ user: { id: new Uint8Array(0), name: "user", displayName: "User" } }) }))}`);
++    println(`65-byte user ID: ${await outcome(navigator.credentials.create({ publicKey: creationOptions({ user: { id: new Uint8Array(65), name: "user", displayName: "User" } }) }))}`);
++    println(`another site's RP ID: ${await outcome(navigator.credentials.create({ publicKey: creationOptions({ rp: { name: "Test", id: "example.com" } }) }))}`);
++    println(`a public suffix as RP ID: ${await outcome(navigator.credentials.get({ publicKey: { challenge: new Uint8Array(16), rpId: "localhost" } }))}`);
++    println(`only unknown credential types: ${await outcome(navigator.credentials.create({ publicKey: creationOptions({ pubKeyCredParams: [{ type: "bogus", alg: -7 }] }) }))}`);
++    println(`missing challenge: ${await outcome(navigator.credentials.get({ publicKey: {} }))}`);
++    println(`publicKey with password: ${await outcome(navigator.credentials.get({ publicKey: { challenge: new Uint8Array(16) }, password: true }))}`);
++    println(`aborted already: ${await outcome(navigator.credentials.get({ publicKey: { challenge: new Uint8Array(16) }, signal: AbortSignal.abort("reason") }))}`);
++    println(`conditional mediation: ${await outcome(navigator.credentials.get({ publicKey: { challenge: new Uint8Array(16) }, mediation: "conditional" }))}`);
++    println(`appid on another site: ${await outcome(navigator.credentials.get({ publicKey: { challenge: new Uint8Array(16), extensions: { appid: "https://example.com/app-id.json" } } }))}`);
++    println(`isUserVerifyingPlatformAuthenticatorAvailable: ${await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}`);
++    println(`isConditionalMediationAvailable: ${await PublicKeyCredential.isConditionalMediationAvailable()}`);
++    println(`bad base64url in JSON: ${await outcome((async () => PublicKeyCredential.parseRequestOptionsFromJSON({ challenge: "*" }))())}`);
++    println(`no authenticators: ${await outcome(navigator.credentials.get({ publicKey: { challenge: new Uint8Array(16) } }))}`);
++    done();
++});
++</script>
+diff --git a/Tests/LibWeb/Text/input/WebAuthn/create-and-get.html b/Tests/LibWeb/Text/input/WebAuthn/create-and-get.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..ea85668930df5b64225f8b5b8865ed258e665889
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/WebAuthn/create-and-get.html
+@@ -0,0 +1,116 @@
++<!DOCTYPE html>
++<script src="../include.js"></script>
++<script>
++function addVirtualAuthenticator(configuration) {
++    return JSON.parse(internals.runWebAuthnCommand("add-virtual-authenticator", JSON.stringify(configuration)));
++}
++
++function removeVirtualAuthenticator(id) {
++    internals.runWebAuthnCommand("remove-virtual-authenticator", "null", [id]);
++}
++
++function base64url(buffer) {
++    return btoa(String.fromCharCode(...new Uint8Array(buffer))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
++}
++
++// WebAuthn signatures are DER, and WebCrypto's ECDSA wants r and s side by side.
++function rawSignatureFromDer(der) {
++    const bytes = new Uint8Array(der);
++    let offset = 2;
++    const integers = [];
++    for (let i = 0; i < 2; ++i) {
++        const length = bytes[offset + 1];
++        let integer = bytes.slice(offset + 2, offset + 2 + length);
++        offset += 2 + length;
++        while (integer.length > 32 && integer[0] === 0)
++            integer = integer.slice(1);
++        const padded = new Uint8Array(32);
++        padded.set(integer, 32 - integer.length);
++        integers.push(padded);
++    }
++    const raw = new Uint8Array(64);
++    raw.set(integers[0], 0);
++    raw.set(integers[1], 32);
++    return raw;
++}
++
++asyncTest(async done => {
++    const authenticator = addVirtualAuthenticator({ protocol: "ctap2", transport: "usb", hasResidentKey: true, hasUserVerification: true, isUserVerified: true });
++
++    const challenge = crypto.getRandomValues(new Uint8Array(32));
++    const credential = await navigator.credentials.create({
++        publicKey: {
++            rp: { name: "Test" },
++            user: { id: new Uint8Array([1, 2, 3, 4]), name: "user@example.com", displayName: "User" },
++            challenge,
++            pubKeyCredParams: [{ type: "public-key", alg: -7 }],
++            extensions: { credProps: true },
++        },
++    });
++
++    println(`credential: ${credential instanceof PublicKeyCredential}, type ${credential.type}, id matches rawId: ${credential.id === base64url(credential.rawId)}`);
++    println(`rawId is the same object: ${credential.rawId === credential.rawId}`);
++    println(`response: ${credential.response instanceof AuthenticatorAttestationResponse}`);
++    println(`authenticatorAttachment: ${credential.authenticatorAttachment}`);
++    println(`transports: ${JSON.stringify(credential.response.getTransports())}`);
++    println(`publicKeyAlgorithm: ${credential.response.getPublicKeyAlgorithm()}`);
++    println(`publicKey bytes: ${credential.response.getPublicKey().byteLength}`);
++    println(`clientExtensionResults: ${JSON.stringify(credential.getClientExtensionResults())}`);
++
++    const clientData = JSON.parse(new TextDecoder().decode(credential.response.clientDataJSON));
++    println(`clientData type: ${clientData.type}, challenge matches: ${clientData.challenge === base64url(challenge)}, origin matches: ${clientData.origin === location.origin}, crossOrigin: ${clientData.crossOrigin}`);
++
++    const flags = new Uint8Array(credential.response.getAuthenticatorData())[32];
++    println(`registration flags: user present ${!!(flags & 0x01)}, user verified ${!!(flags & 0x04)}, attested credential data ${!!(flags & 0x40)}`);
++
++    const json = credential.toJSON();
++    println(`toJSON: id ${json.id === credential.id}, rawId ${json.rawId === credential.id}, type ${json.type}, response keys ${Object.keys(json.response).sort().join(",")}`);
++
++    try {
++        await navigator.credentials.create({
++            publicKey: {
++                rp: { name: "Test" },
++                user: { id: new Uint8Array([1, 2, 3, 4]), name: "user@example.com", displayName: "User" },
++                challenge,
++                pubKeyCredParams: [{ type: "public-key", alg: -7 }],
++                excludeCredentials: [{ type: "public-key", id: credential.rawId }],
++            },
++        });
++        println("excluded credential: created");
++    } catch (e) {
++        println(`excluded credential: ${e.name}`);
++    }
++
++    const assertionChallenge = crypto.getRandomValues(new Uint8Array(32));
++    const assertion = await navigator.credentials.get({
++        publicKey: {
++            challenge: assertionChallenge,
++            allowCredentials: [{ type: "public-key", id: credential.rawId }],
++            userVerification: "required",
++        },
++    });
++    println(`assertion: ${assertion instanceof PublicKeyCredential}, same id: ${assertion.id === credential.id}, response: ${assertion.response instanceof AuthenticatorAssertionResponse}`);
++    println(`userHandle: ${assertion.response.userHandle}`);
++
++    const assertionFlags = new Uint8Array(assertion.response.authenticatorData)[32];
++    const signCount = new DataView(assertion.response.authenticatorData).getUint32(33);
++    println(`assertion flags: user present ${!!(assertionFlags & 0x01)}, user verified ${!!(assertionFlags & 0x04)}, sign count ${signCount}`);
++
++    // The signature is over the authenticator data and the hash of the client data.
++    const publicKey = await crypto.subtle.importKey("spki", credential.response.getPublicKey(), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
++    const clientDataHash = await crypto.subtle.digest("SHA-256", assertion.response.clientDataJSON);
++    const signedData = new Uint8Array([...new Uint8Array(assertion.response.authenticatorData), ...new Uint8Array(clientDataHash)]);
++    const verified = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, publicKey, rawSignatureFromDer(assertion.response.signature), signedData);
++    println(`signature verifies: ${verified}`);
++
++    try {
++        await navigator.credentials.get({ publicKey: { challenge: assertionChallenge, allowCredentials: [{ type: "public-key", id: new Uint8Array(32) }] } });
++        println("unknown credential: resolved");
++    } catch (e) {
++        println(`unknown credential: ${e.name}`);
++    }
++
++    removeVirtualAuthenticator(authenticator);
++    done();
++});
++</script>
+diff --git a/Tests/LibWeb/Text/input/WebAuthn/cross-origin-iframe.html b/Tests/LibWeb/Text/input/WebAuthn/cross-origin-iframe.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..a95963ff324c1ef3682406d4efe2452f2e538782
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/WebAuthn/cross-origin-iframe.html
+@@ -0,0 +1,56 @@
++<!DOCTYPE html>
++<script src="../include.js"></script>
++<script>
++function nextMessage() {
++    return new Promise(resolve => window.addEventListener("message", event => resolve(event.data), { once: true }));
++}
++
++async function loadFrame(allow) {
++    const frame = document.createElement("iframe");
++    if (allow)
++        frame.allow = allow;
++    const frameHost = `frame-${location.hostname}`;
++    frame.src = `${location.protocol}//${frameHost}:${location.port}/static/Text/data/webauthn-get-in-frame.html`;
++    const ready = nextMessage();
++    document.body.appendChild(frame);
++    const { origin } = await ready;
++    return { frame, origin, host: frameHost };
++}
++
++async function getInFrame(frame, credentialId) {
++    const result = nextMessage();
++    frame.contentWindow.postMessage(credentialId, "*");
++    return await result;
++}
++
++asyncTest(async done => {
++    const authenticator = JSON.parse(internals.runWebAuthnCommand("add-virtual-authenticator", JSON.stringify({ protocol: "ctap2", transport: "usb" })));
++
++    // A credential for the frame's site, as if it had registered earlier.
++    const keyPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
++    const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey));
++    const base64url = bytes => btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
++    const credentialId = crypto.getRandomValues(new Uint8Array(16));
++
++    const withoutAllow = await loadFrame(null);
++    internals.runWebAuthnCommand("add-credential", JSON.stringify({
++        credentialId: base64url(credentialId),
++        isResidentCredential: false,
++        rpId: withoutAllow.host,
++        privateKey: base64url(pkcs8),
++        signCount: 0,
++    }), [authenticator]);
++
++    const denied = await getInFrame(withoutAllow.frame, credentialId);
++    println(`cross-origin frame without allow: ${denied.result}`);
++
++    const withAllow = await loadFrame("publickey-credentials-get");
++    const allowed = await getInFrame(withAllow.frame, credentialId);
++    println(`cross-origin frame with allow: ${allowed.result}`);
++    const clientData = JSON.parse(allowed.clientData);
++    println(`origin is the frame's: ${clientData.origin === withAllow.origin}, crossOrigin: ${clientData.crossOrigin}, topOrigin is the page's: ${clientData.topOrigin === location.origin}`);
++
++    internals.runWebAuthnCommand("remove-virtual-authenticator", "null", [authenticator]);
++    done();
++});
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/resources/testdriver-vendor.js b/Tests/LibWeb/Text/input/wpt-import/resources/testdriver-vendor.js
+index 9ef5966b21e700ad149dd85b167a7712c44ae572..8e8c80be849df92f22cfbaf2c5ce947270403acc 100644
+--- a/Tests/LibWeb/Text/input/wpt-import/resources/testdriver-vendor.js
++++ b/Tests/LibWeb/Text/input/wpt-import/resources/testdriver-vendor.js
+@@ -141,3 +141,36 @@ window.test_driver_internal.action_sequence = async function(actions, context) {
+         }
+     }
+ };
++
++// https://w3c.github.io/webauthn/#sctn-automation
++function runWebAuthnCommand(name, payload, args = []) {
++    return JSON.parse(window.internals.runWebAuthnCommand(name, JSON.stringify(payload ?? null), args));
++}
++
++window.test_driver_internal.add_virtual_authenticator = async function(config, context) {
++    return runWebAuthnCommand("add-virtual-authenticator", config);
++};
++
++window.test_driver_internal.remove_virtual_authenticator = async function(authenticator_id, context) {
++    runWebAuthnCommand("remove-virtual-authenticator", null, [authenticator_id]);
++};
++
++window.test_driver_internal.add_credential = async function(authenticator_id, credential, context) {
++    runWebAuthnCommand("add-credential", credential, [authenticator_id]);
++};
++
++window.test_driver_internal.get_credentials = async function(authenticator_id, context) {
++    return runWebAuthnCommand("get-credentials", null, [authenticator_id]);
++};
++
++window.test_driver_internal.remove_credential = async function(authenticator_id, credential_id, context) {
++    runWebAuthnCommand("remove-credential", null, [authenticator_id, credential_id]);
++};
++
++window.test_driver_internal.remove_all_credentials = async function(authenticator_id, context) {
++    runWebAuthnCommand("remove-all-credentials", null, [authenticator_id]);
++};
++
++window.test_driver_internal.set_user_verified = async function(authenticator_id, uv, context) {
++    runWebAuthnCommand("set-user-verified", uv, [authenticator_id]);
++};
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-challenge.https.html b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-challenge.https.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7bb34e1a72226d1e10134c3d3d8a540c3203eac
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-challenge.https.html
+@@ -0,0 +1,27 @@
++<!DOCTYPE html>
++<meta charset="utf-8">
++<title>WebAuthn navigator.credentials.create() challenge Tests</title>
++<meta name="timeout" content="long">
++<link rel="author" title="Adam Powers" href="mailto:adam@fidoalliance.org">
++<link rel="help" href="https://w3c.github.io/webauthn/#iface-credential">
++<script src="../resources/testharness.js"></script>
++<script src="../resources/testharnessreport.js"></script>
++<script src="../resources/testdriver.js"></script>
++<script src="../resources/testdriver-vendor.js"></script>
++<script src=helpers.js></script>
++<body></body>
++<script>
++standardSetup(function() {
++    "use strict";
++
++    // bad challenge values
++    new CreateCredentialsTest({path: "options.publicKey.challenge", value: undefined}).runTest("Bad challenge: challenge missing", TypeError);
++    new CreateCredentialsTest("options.publicKey.challenge", "hi mom").runTest("Bad challenge: challenge is string", TypeError);
++    new CreateCredentialsTest("options.publicKey.challenge", null).runTest("Bad challenge: challenge is null", TypeError);
++    new CreateCredentialsTest("options.publicKey.challenge", {}).runTest("Bad challenge: challenge is empty object", TypeError);
++    new CreateCredentialsTest("options.publicKey.challenge", new Array()).runTest("Bad challenge: challenge is empty Array", TypeError);
++});
++
++/* JSHINT */
++/* globals standardSetup, CreateCredentialsTest */
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-rp.https.html b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-rp.https.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..f65711fce366ce6468806e252977306a5cbf710d
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-rp.https.html
+@@ -0,0 +1,42 @@
++<!DOCTYPE html>
++<meta charset="utf-8">
++<title>WebAuthn navigator.credentials.create() rp Tests</title>
++<meta name="timeout" content="long">
++<link rel="author" title="Adam Powers" href="mailto:adam@fidoalliance.org">
++<link rel="help" href="https://w3c.github.io/webauthn/#iface-credential">
++<script src="../resources/testharness.js"></script>
++<script src="../resources/testharnessreport.js"></script>
++<script src="../resources/testdriver.js"></script>
++<script src="../resources/testdriver-vendor.js"></script>
++<script src=helpers.js></script>
++<body></body>
++<script>
++standardSetup(function() {
++    "use strict";
++
++    // rp bad values
++    new CreateCredentialsTest({path: "options.publicKey.rp", value: undefined}).runTest("Bad rp: rp missing", TypeError);
++    new CreateCredentialsTest({ path: "options.publicKey.rp", value: null }).runTest("Bad rp: rp null", TypeError);
++    new CreateCredentialsTest("options.publicKey.rp", "hi mom").runTest("Bad rp: rp is string", TypeError);
++    new CreateCredentialsTest("options.publicKey.rp", {}).runTest("Bad rp: rp is empty object", TypeError);
++
++    // // rp.id
++    new CreateCredentialsTest("options.publicKey.rp.id", null).runTest("Bad rp: id is null", "SecurityError");
++    new CreateCredentialsTest("options.publicKey.rp.id", "").runTest("Bad rp: id is empty String", "SecurityError");
++    new CreateCredentialsTest("options.publicKey.rp.id", "invalid domain.com").runTest("Bad rp: id is invalid domain (has space)", "SecurityError");
++    new CreateCredentialsTest("options.publicKey.rp.id", "-invaliddomain.com").runTest("Bad rp: id is invalid domain (starts with dash)", "SecurityError");
++    new CreateCredentialsTest("options.publicKey.rp.id", "0invaliddomain.com").runTest("Bad rp: id is invalid domain (starts with number)", "SecurityError");
++
++    let hostAndPort = window.location.host;
++    if (!hostAndPort.match(/:\d+$/)) {
++        hostAndPort += ":443";
++    }
++    new CreateCredentialsTest("options.publicKey.rp.id", hostAndPort).runTest("Bad rp id: id is host + port", "SecurityError");
++
++    // // rp.name
++    new CreateCredentialsTest({path: "options.publicKey.rp.name", value: undefined}).runTest("rp missing name", TypeError);
++});
++
++/* JSHINT */
++/* globals standardSetup, CreateCredentialsTest */
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-user.https.html b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-user.https.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c5ac66c452b98aa6ecaf7af73387e30b0f5e6c0
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-badargs-user.https.html
+@@ -0,0 +1,45 @@
++<!DOCTYPE html>
++<meta charset="utf-8">
++<title>WebAuthn navigator.credentials.create() user Tests</title>
++<meta name="timeout" content="long">
++<link rel="author" title="Adam Powers" href="mailto:adam@fidoalliance.org">
++<link rel="help" href="https://w3c.github.io/webauthn/#iface-credential">
++<script src="../resources/testharness.js"></script>
++<script src="../resources/testharnessreport.js"></script>
++<script src="../resources/testdriver.js"></script>
++<script src="../resources/testdriver-vendor.js"></script>
++<script src=helpers.js></script>
++<body></body>
++<script>
++standardSetup(function() {
++    "use strict";
++
++    // user bad values
++    new CreateCredentialsTest({path: "options.publicKey.user", value: undefined}).runTest("Bad user: user missing", TypeError);
++    new CreateCredentialsTest("options.publicKey.user", "hi mom").runTest("Bad user: user is string", TypeError);
++    new CreateCredentialsTest("options.publicKey.user", {}).runTest("Bad user: user is empty object", TypeError);
++
++    // // user.id
++    new CreateCredentialsTest({path: "options.publicKey.user.id", value: undefined}).runTest("Bad user: id is undefined", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", {}).runTest("Bad user: id is object", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", null).runTest("Bad user: id is null", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", "").runTest("Bad user: id is empty String", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", new Array()).runTest("Bad user: id is empty Array", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", new ArrayBuffer(65)).runTest("Bad user: ArrayBuffer id is too long (65 bytes)", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", new Int16Array(33)).runTest("Bad user: Int16Array id is too long (66 bytes)", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", new Int32Array(17)).runTest("Bad user: Int32Array id is too long (68 bytes)", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", new Float32Array(17)).runTest("Bad user: Float32Array id is too long (68 bytes)", TypeError);
++    new CreateCredentialsTest("options.publicKey.user.id", new Float64Array(9)).runTest("Bad user: Float64Array id is too long (72 bytes)", TypeError);
++    var buf = new ArrayBuffer(65);
++    new CreateCredentialsTest("options.publicKey.user.id", new DataView(buf)).runTest("Bad user: id is too long (65 bytes)", TypeError);
++
++    // // user.name
++    new CreateCredentialsTest({path: "options.publicKey.user.name", value: undefined}).runTest("user missing name", TypeError);
++
++    // // user.displayName
++    new CreateCredentialsTest({path: "options.publicKey.user.displayName", value: undefined}).runTest("Bad user: displayName is undefined", TypeError);
++});
++
++/* JSHINT */
++/* globals standardSetup, CreateCredentialsTest */
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-excludecredentials.https.html b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-excludecredentials.https.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..9fe0cc831b8bbd4aa49212dd5bfefb920c0d0e9b
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-excludecredentials.https.html
+@@ -0,0 +1,82 @@
++<!DOCTYPE html>
++<meta charset="utf-8">
++<title>WebAuthn navigator.credentials.create() excludeCredentials Tests</title>
++<meta name="timeout" content="long">
++<link rel="author" title="Adam Powers" href="mailto:adam@fidoalliance.org">
++<link rel="help" href="https://w3c.github.io/webauthn/#iface-credential">
++<script src="../resources/testharness.js"></script>
++<script src="../resources/testharnessreport.js"></script>
++<script src="../resources/testdriver.js"></script>
++<script src="../resources/testdriver-vendor.js"></script>
++<script src=helpers.js></script>
++<body></body>
++<script>
++standardSetup(function() {
++    "use strict";
++
++    // bad excludeCredentials values
++    new CreateCredentialsTest("options.publicKey.excludeCredentials", "hi mom").runTest("Bad excludeCredentials: string", TypeError);
++    new CreateCredentialsTest("options.publicKey.excludeCredentials", {}).runTest("Bad excludeCredentials: empty object", TypeError);
++    // TODO: bad excludeCredentials with [{.type}] or [{.id}] or [{.transports}] wrong
++
++    // good excludeCredentials values
++    new CreateCredentialsTest({path: "options.publicKey.excludeCredentials", value: undefined}).runTest("excludeCredentials missing");
++    new CreateCredentialsTest("options.publicKey.excludeCredentials", []).runTest("excludeCredentials empty array");
++
++    // proper excludeCredentials behavior
++    // should error on excluding existing credential
++    promise_test((t) => {
++        var cred1;
++        return Promise.resolve()
++            .then(() => {
++                return createCredential();
++            })
++            .then((cred) => {
++                cred1 = cred;
++                var excludeCred = {
++                    id: cred.rawId,
++                    type: "public-key"
++                };
++                var args = {
++                    options: {
++                        publicKey: {
++                            excludeCredentials: [excludeCred]
++                        }
++                    }
++                };
++                var p = createCredential(args);
++                return promise_rejects_dom(t, "InvalidStateError", p, "expected to fail on excluded credential");
++            });
++    }, "exclude existing credential");
++
++    // should not error on excluding random credential
++    promise_test(() => {
++        return Promise.resolve()
++            .then(() => {
++                return createCredential();
++            })
++            .then(() => {
++                var randomCredId = new Uint8Array(162);
++                window.crypto.getRandomValues(randomCredId);
++
++                var excludeCred = {
++                    id: randomCredId,
++                    type: "public-key"
++                };
++                var args = {
++                    options: {
++                        publicKey: {
++                            excludeCredentials: [excludeCred]
++                        }
++                    }
++                };
++                return createCredential(args);
++            });
++    }, "exclude random (non-existing) credential");
++
++    // TODO: exclude including transport type (USB, BLE, NFC)
++});
++
++/* JSHINT */
++/* globals standardSetup, CreateCredentialsTest, createCredential, promise_test, promise_rejects_dom */
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-passing.https.html b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-passing.https.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..1ab14f0eeb2bad7d7caca87c140923fa2b7bf843
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-passing.https.html
+@@ -0,0 +1,149 @@
++<!DOCTYPE html>
++<meta charset="utf-8">
++<title>WebAuthn credential.create() Passing Tests</title>
++<meta name="timeout" content="long">
++<link rel="author" title="Adam Powers" href="mailto:adam@fidoalliance.org">
++<link rel="help" href="https://w3c.github.io/webauthn/#iface-credential">
++<script src="../resources/testharness.js"></script>
++<script src="../resources/testharnessreport.js"></script>
++<script src="../resources/testdriver.js"></script>
++<script src="../resources/testdriver-vendor.js"></script>
++<script src=helpers.js></script>
++<body></body>
++<script>
++standardSetup(function() {
++    "use strict";
++
++    // CreateCredentialTest passing tests
++
++    // default arguments
++    new CreateCredentialsTest().runTest("passing credentials.create() with default arguments");
++
++    // rp
++    new CreateCredentialsTest({path: "options.publicKey.rp.id", value: window.location.hostname}).runTest("passing credentials.create() with rpId (hostname)");
++
++    // user
++    new CreateCredentialsTest("options.publicKey.user.id", new ArrayBuffer(1)).runTest("very short user id");
++    new CreateCredentialsTest("options.publicKey.user.id", new ArrayBuffer(64)).runTest("max length user id");
++    new CreateCredentialsTest("options.publicKey.user.id", new Uint8Array(64)).runTest("Uint8Array user id");
++    new CreateCredentialsTest("options.publicKey.user.id", new Int8Array(64)).runTest("Int8Array user id");
++    new CreateCredentialsTest("options.publicKey.user.id", new Int16Array(32)).runTest("Int16Array user id");
++    new CreateCredentialsTest("options.publicKey.user.id", new Int32Array(16)).runTest("Int32Array user id");
++    new CreateCredentialsTest("options.publicKey.user.id", new Float32Array(16)).runTest("Float32Array user id");
++    var dvBuf1 = new ArrayBuffer(16);
++    new CreateCredentialsTest("options.publicKey.user.id", new DataView(dvBuf1)).runTest("DataView user id");
++
++    // good challenge values
++    // all these challenges are zero-filled buffers... think anyone will complain?
++    new CreateCredentialsTest("options.publicKey.challenge", new Int16Array(33)).runTest("Int16Array challenge");
++    new CreateCredentialsTest("options.publicKey.challenge", new Int32Array(17)).runTest("Int32Array challenge");
++    new CreateCredentialsTest("options.publicKey.challenge", new Float32Array(17)).runTest("Float32Array challenge");
++    new CreateCredentialsTest("options.publicKey.challenge", new Float64Array(9)).runTest("Float64Array challenge");
++    var dvBuf2 = new ArrayBuffer(65);
++    new CreateCredentialsTest("options.publicKey.challenge", new DataView(dvBuf2)).runTest("DataView challenge");
++    new CreateCredentialsTest("options.publicKey.challenge", new ArrayBuffer(8192)).runTest("Absurdly large challenge");
++
++    // good pubKeyCredParams values
++    // empty pubKeyCredParams should default to EC256 and RS256
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", []).runTest("pubKeyCredParams is empty Array");
++    const pkParamEC256 = {
++        type: "public-key",
++        alg: cose_alg_ECDSA_w_SHA256
++    };
++    const pkParamEC512 = {
++        type: "public-key",
++        alg: cose_alg_ECDSA_w_SHA512
++    };
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [pkParamEC256]).runTest("EC256 pubKeyCredParams");
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [pkParamEC512, pkParamEC256])
++        .runTest("SelectEC256 pubKeyCredParams from a list");
++
++    // pubKeyCredParams with unknown value
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [{ "type": "unknown", alg: -7, }, { "type": "public-key", alg: -7, }])
++        .runTest("pubKeyCredParams with unknown value");
++
++    // timeout
++    new CreateCredentialsTest({path: "options.publicKey.timeout", value: undefined}).runTest("passing credentials.create() with no timeout");
++
++    // valid authenticatorSelection values
++    var defaultAuthnrSel = {
++        authenticatorAttachment: "cross-platform",
++        requireResidentKey: false,
++        userVerification: "preferred"
++    };
++    // attachment
++    var authnrSelAttachUndef = cloneObject(defaultAuthnrSel);
++    authnrSelAttachUndef.authenticatorAttachment = undefined;
++    var authnrSelAttachEmptyStr = cloneObject(defaultAuthnrSel);
++    authnrSelAttachEmptyStr.authenticatorAttachment = "";
++    var authnrSelAttachEmptyObj = cloneObject(defaultAuthnrSel);
++    authnrSelAttachEmptyObj.authenticatorAttachment = {};
++    var authnrSelAttachNull = cloneObject(defaultAuthnrSel);
++    authnrSelAttachNull.authenticatorAttachment = null;
++    var authnrSelAttachUnknownValue = cloneObject(defaultAuthnrSel);
++    authnrSelAttachUnknownValue.authenticatorAttachment = "unknown-value";
++    // resident key
++    var authnrSelRkUndef = cloneObject(defaultAuthnrSel);
++    authnrSelRkUndef.requireResidentKey = undefined;
++    var authnrSelRkFalse = cloneObject(defaultAuthnrSel);
++    authnrSelRkFalse.requireResidentKey = false;
++    // user verification
++    var authnrSelUvUndef = cloneObject(defaultAuthnrSel);
++    authnrSelUvUndef.userVerification = undefined;
++    var authnrSelUvDiscouraged = cloneObject(defaultAuthnrSel);
++    authnrSelUvDiscouraged.userVerification = "discouraged";
++    var authnrSelUvEmptyStr = cloneObject(defaultAuthnrSel);
++    authnrSelUvEmptyStr.userVerification = "";
++    var authnrSelUvEmptyObj = cloneObject(defaultAuthnrSel);
++    authnrSelUvEmptyObj.userVerification = {};
++    var authnrSelUvStr = cloneObject(defaultAuthnrSel);
++    authnrSelUvStr.userVerification = "requiredshirtshoestshirt";
++    var authnrSelUvNull = cloneObject(defaultAuthnrSel);
++    authnrSelUvNull.userVerification = null;
++
++    new CreateCredentialsTest({path: "options.publicKey.authenticatorSelection", value: undefined}).runTest("authenticatorSelection is undefined");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", {}).runTest("authenticatorSelection is empty object");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", cloneObject(defaultAuthnrSel)).runTest("authenticatorSelection default values");
++
++    // authnr selection attachment
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelAttachUndef).runTest("authenticatorSelection attachment undefined");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelAttachEmptyStr).runTest("authenticatorSelection attachment empty string");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelAttachEmptyObj).runTest("authenticatorSelection attachment empty object");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelAttachNull).runTest("authenticatorSelection attachment null");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelAttachUnknownValue).runTest("authenticatorSelection attachment unknown value");
++
++    // authnr selection resident key
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelRkUndef).runTest("authenticatorSelection residentKey undefined");
++    // XXX: assumes authnr is behaving like most U2F authnrs; really depends on the authnr or mock configuration
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelRkFalse).runTest("authenticatorSelection residentKey false");
++
++    // authnr selection user verification
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelUvUndef).runTest("authenticatorSelection userVerification undefined");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelUvDiscouraged).runTest("authenticatorSelection userVerification discouraged");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelUvEmptyStr).runTest("authenticatorSelection userVerification empty string");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelUvEmptyObj).runTest("authenticatorSelection userVerification empty object");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelUvStr).runTest("authenticatorSelection userVerification unknown value");
++    new CreateCredentialsTest("options.publicKey.authenticatorSelection", authnrSelUvNull).runTest("authenticatorSelection userVerification null");
++
++    // good attestation values
++    new CreateCredentialsTest("options.publicKey.attestation", "none").runTest("attestation parameter: attestation is \"none\"");
++    new CreateCredentialsTest("options.publicKey.attestation", "indirect").runTest("attestation parameter: attestation is \"indirect\"");
++    new CreateCredentialsTest("options.publicKey.attestation", "direct").runTest("attestation parameter: attestation is \"direct\"");
++    new CreateCredentialsTest({path: "options.publicKey.attestation", value: undefined}).runTest("attestation parameter: attestation is undefined");
++    // attestation unknown values
++    new CreateCredentialsTest("options.publicKey.attestation", {}).runTest("attestation parameter: attestation is empty object");
++    new CreateCredentialsTest("options.publicKey.attestation", []).runTest("attestation parameter: attestation is empty array");
++    new CreateCredentialsTest("options.publicKey.attestation", null).runTest("attestation parameter: attestation is null");
++    new CreateCredentialsTest("options.publicKey.attestation", "noneofyourbusiness").runTest("attestation parameter: attestation is \"noneofyourbusiness\"");
++    new CreateCredentialsTest("options.publicKey.attestation", "").runTest("attestation parameter: attestation is empty string");
++    // TODO: test this with multiple mock authenticators to make sure that the right options are chosen when available?
++
++    // good extension values
++    new CreateCredentialsTest({path: "options.publicKey.extensions", value: undefined}).runTest("extensions undefined");
++    new CreateCredentialsTest("options.publicKey.extensions", {}).runTest("extensions are empty object");
++    new CreateCredentialsTest("options.publicKey.extensions", {foo: "", bar: "", bat: ""}).runTest("extensions are dict of empty strings");
++});
++
++/* JSHINT */
++/* globals standardSetup, CreateCredentialsTest, cose_alg_ECDSA_w_SHA256, cose_alg_ECDSA_w_SHA512, cloneObject */
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-pubkeycredparams.https.html b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-pubkeycredparams.https.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..62bab802135d018cae36ec95e3ecfca223911bb1
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/createcredential-pubkeycredparams.https.html
+@@ -0,0 +1,73 @@
++<!DOCTYPE html>
++<meta charset="utf-8">
++<title>WebAuthn navigator.credentials.create() pubKeyCredParams Tests</title>
++<meta name="timeout" content="long">
++<link rel="author" title="Adam Powers" href="mailto:adam@fidoalliance.org">
++<link rel="help" href="https://w3c.github.io/webauthn/#iface-credential">
++<script src="../resources/testharness.js"></script>
++<script src="../resources/testharnessreport.js"></script>
++<script src="../resources/testdriver.js"></script>
++<script src="../resources/testdriver-vendor.js"></script>
++<script src=helpers.js></script>
++<body></body>
++<script>
++standardSetup(function() {
++    "use strict";
++
++    var badType = {
++        type: "something-else",
++        alg: cose_alg_ECDSA_w_SHA512
++    };
++    var badTypeEmptyString = cloneObject(badType);
++    badTypeEmptyString.type = "";
++    var badTypeNull = cloneObject(badType);
++    badTypeNull.type = null;
++    var badTypeEmptyObj = cloneObject(badType);
++    badTypeEmptyObj.type = {};
++
++    var badAlg = {
++        type: "public-key",
++        alg: 42
++    };
++    var badAlgZero = cloneObject(badAlg);
++    badAlgZero.alg = 0;
++
++    // bad pubKeyCredParams values
++    new CreateCredentialsTest({path: "options.publicKey.pubKeyCredParams", value: undefined}).runTest("Bad pubKeyCredParams: pubKeyCredParams is undefined", TypeError);
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", "hi mom").runTest("Bad pubKeyCredParams: pubKeyCredParams is string", TypeError);
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", null).runTest("Bad pubKeyCredParams: pubKeyCredParams is null", TypeError);
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [badType]).runTest("Bad pubKeyCredParams: first param has bad type (\"something-else\")", "NotSupportedError");
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [badTypeEmptyString]).runTest("Bad pubKeyCredParams: first param has bad type (\"\")", "NotSupportedError");
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [badTypeNull]).runTest("Bad pubKeyCredParams: first param has bad type (null)", "NotSupportedError");
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [badTypeEmptyObj]).runTest("Bad pubKeyCredParams: first param has bad type (empty object)", "NotSupportedError");
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [badAlg])
++      .modify("options.publicKey.timeout", 300)
++      .runTest("Bad pubKeyCredParams: first param has bad alg (42)", "NotAllowedError");
++    new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [badAlgZero])
++      .modify("options.publicKey.timeout", 300)
++      .runTest("Bad pubKeyCredParams: first param has bad alg (0)", "NotAllowedError");
++
++    // TODO: come back to this when mock authenticators support multiple cryptos so that we can test the preference ranking
++    // function verifyEC256(res) {
++    //     debug ("verifyEC256 got", res);
++    //     debug ("client data JSON", ab2str(res.response.clientDataJSON));
++    //     parseAuthenticatorData(res.response.attestationObject);
++    // }
++    // new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [pkParamEC256, pkParamEC512])
++    //     .afterTest(verifyEC256)
++    //     .runTest("EC256, EC512 pubKeyCredParams");
++    // function verifyEC512(res) {
++    //     debug ("verifyEC512 got", res);
++    //     debug ("client data JSON", ab2str(res.response.clientDataJSON));
++    //     // parseAuthenticatorData(res.response.attestationObject);
++    //     printHex ("clientDataJSON", res.response.clientDataJSON);
++    //     printHex ("attestationObject", res.response.attestationObject);
++    // }
++    // new CreateCredentialsTest("options.publicKey.pubKeyCredParams", [pkParamEC512, pkParamEC256])
++    //     .afterTest(verifyEC512)
++    //     .runTest("EC512, EC256 pubKeyCredParams");
++});
++
++/* JSHINT */
++/* globals standardSetup, CreateCredentialsTest, cose_alg_ECDSA_w_SHA512, cloneObject */
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/getcredential-badargs-rpid.https.html b/Tests/LibWeb/Text/input/wpt-import/webauthn/getcredential-badargs-rpid.https.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..1b452985e839c21b35136675cce8e706f1c38395
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/getcredential-badargs-rpid.https.html
+@@ -0,0 +1,46 @@
++<!DOCTYPE html>
++<meta charset="utf-8">
++<title>WebAuthn credential.get() rpId Tests</title>
++<meta name="timeout" content="long">
++<link rel="author" title="Adam Powers" href="mailto:adam@fidoalliance.org">
++<link rel="help" href="https://w3c.github.io/webauthn/#iface-credential">
++<script src="../resources/testharness.js"></script>
++<script src="../resources/testharnessreport.js"></script>
++<script src="../resources/testdriver.js"></script>
++<script src="../resources/testdriver-vendor.js"></script>
++<script src=helpers.js></script>
++<body></body>
++<script>
++standardSetup(function() {
++    "use strict";
++
++    var credPromise = createCredential();
++
++    new GetCredentialsTest("options.publicKey.rpId", "")
++        .addCredential(credPromise)
++        .runTest("Bad rpId: empty string", "SecurityError");
++    new GetCredentialsTest("options.publicKey.rpId", null)
++        .addCredential(credPromise)
++        .runTest("Bad rpId: null", "SecurityError");
++    new GetCredentialsTest("options.publicKey.rpId", "invalid domain.com")
++        .addCredential(credPromise)
++        .runTest("Bad rpId: invalid domain (has space)", "SecurityError");
++    new GetCredentialsTest("options.publicKey.rpId", "-invaliddomain.com")
++        .addCredential(credPromise)
++        .runTest("Bad rpId: invalid domain (starts with dash)", "SecurityError");
++    new GetCredentialsTest("options.publicKey.rpId", "0invaliddomain.com")
++        .addCredential(credPromise)
++        .runTest("Bad rpId: invalid domain (starts with number)", "SecurityError");
++
++    let hostAndPort = window.location.host;
++    if (!hostAndPort.match(/:\d+$/)) {
++        hostAndPort += ":443";
++    }
++    new GetCredentialsTest({path: "options.publicKey.rpId", value: hostAndPort})
++        .addCredential(credPromise)
++        .runTest("Bad rpId: host + port", "SecurityError");
++});
++
++/* JSHINT */
++/* globals standardSetup, GetCredentialsTest, createCredential */
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/getcredential-passing.https.html b/Tests/LibWeb/Text/input/wpt-import/webauthn/getcredential-passing.https.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..e1db03f0428eb7f6dd186d5bc51dfd1fbd4cf4b8
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/getcredential-passing.https.html
+@@ -0,0 +1,74 @@
++<!DOCTYPE html>
++<meta charset="utf-8">
++<title>WebAuthn credential.get() Passing Tests</title>
++<meta name="timeout" content="long">
++<link rel="author" title="Adam Powers" href="mailto:adam@fidoalliance.org">
++<link rel="help" href="https://w3c.github.io/webauthn/#iface-credential">
++<script src="../resources/testharness.js"></script>
++<script src="../resources/testharnessreport.js"></script>
++<script src="../resources/testdriver.js"></script>
++<script src="../resources/testdriver-vendor.js"></script>
++<script src=helpers.js></script>
++<body></body>
++<script>
++standardSetup(function() {
++    "use strict";
++
++    var credPromise = createCredential();
++
++    // GetCredentialsTest with default args
++    new GetCredentialsTest()
++        .addCredential(credPromise)
++        .runTest("passing credentials.get() with default args");
++
++    // timeout
++    new GetCredentialsTest({path: "options.publicKey.timeout", value: undefined})
++        .addCredential(credPromise)
++        .runTest("passing credentials.create() with no timeout");
++
++    // rpId
++    new GetCredentialsTest({path: "options.publicKey.rpId", value: undefined})
++        .addCredential(credPromise)
++        .runTest("rpId undefined");
++    new GetCredentialsTest({path: "options.publicKey.rpId", value: window.location.hostname})
++        .addCredential(credPromise)
++        .runTest("passing credentials.get() with rpId (hostname)");
++
++    // authnr selection user verification
++    new GetCredentialsTest({path: "options.publicKey.userVerification", value: undefined})
++        .addCredential(credPromise)
++        .runTest("authenticatorSelection userVerification undefined");
++    new GetCredentialsTest("options.publicKey.userVerification", "preferred")
++        .addCredential(credPromise)
++        .runTest("authenticatorSelection userVerification preferred");
++    new GetCredentialsTest("options.publicKey.userVerification", "discouraged")
++        .addCredential(credPromise)
++        .runTest("authenticatorSelection userVerification discouraged");
++    new GetCredentialsTest("options.publicKey.userVerification", "")
++        .addCredential(credPromise)
++        .runTest("authenticatorSelection userVerification empty string");
++    new GetCredentialsTest("options.publicKey.userVerification", {})
++        .addCredential(credPromise)
++        .runTest("authenticatorSelection userVerification empty object");
++    new GetCredentialsTest("options.publicKey.userVerification", "requiredshirtshoestshirt")
++        .addCredential(credPromise)
++        .runTest("authenticatorSelection userVerification unknown value");
++    new GetCredentialsTest("options.publicKey.userVerification", null)
++        .addCredential(credPromise)
++        .runTest("authenticatorSelection userVerification null");
++
++    // good extension values
++    new GetCredentialsTest({path: "options.publicKey.extensions", value: undefined})
++        .addCredential(credPromise)
++        .runTest("extensions undefined");
++    new GetCredentialsTest("options.publicKey.extensions", {})
++        .addCredential(credPromise)
++        .runTest("extensions are empty object");
++    new GetCredentialsTest("options.publicKey.extensions", {foo: "", bar: "", bat: ""})
++        .addCredential(credPromise)
++        .runTest("extensions are dict of empty strings");
++});
++
++/* JSHINT */
++/* globals standardSetup, GetCredentialsTest, createCredential */
++</script>
+diff --git a/Tests/LibWeb/Text/input/wpt-import/webauthn/helpers.js b/Tests/LibWeb/Text/input/wpt-import/webauthn/helpers.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..a45b686ca775c94dc015d6d59a4a6d0bd598ce73
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/wpt-import/webauthn/helpers.js
+@@ -0,0 +1,679 @@
++// Useful constants for working with COSE key objects
++const cose_kty = 1;
++const cose_kty_ec2 = 2;
++const cose_alg = 3;
++const cose_alg_ECDSA_w_SHA256 = -7;
++const cose_alg_ECDSA_w_SHA512 = -36;
++const cose_crv = -1;
++const cose_crv_P256 = 1;
++const cose_crv_x = -2;
++const cose_crv_y = -3;
++
++/**
++ * These are the default arguments that will be passed to navigator.credentials.create()
++ * unless modified by a specific test case
++ */
++var createCredentialDefaultArgs = {
++    options: {
++        publicKey: {
++            // Relying Party:
++            rp: {
++                name: "Acme",
++            },
++
++            // User:
++            user: {
++                id: new Uint8Array(16), // Won't survive the copy, must be rebuilt
++                name: "john.p.smith@example.com",
++                displayName: "John P. Smith",
++            },
++
++            pubKeyCredParams: [{
++                type: "public-key",
++                alg: cose_alg_ECDSA_w_SHA256,
++            }],
++
++            authenticatorSelection: {
++                requireResidentKey: false,
++            },
++
++            timeout: 60000, // 1 minute
++            excludeCredentials: [] // No excludeList
++        }
++    }
++};
++
++/**
++ * These are the default arguments that will be passed to navigator.credentials.get()
++ * unless modified by a specific test case
++ */
++var getCredentialDefaultArgs = {
++    options: {
++        publicKey: {
++            timeout: 60000
++            // allowCredentials: [newCredential]
++        }
++    }
++};
++
++function createCredential(opts) {
++    opts = opts || {};
++
++    // set the default options
++    var createArgs = cloneObject(createCredentialDefaultArgs);
++    let challengeBytes = new Uint8Array(16);
++    window.crypto.getRandomValues(challengeBytes);
++    createArgs.options.publicKey.challenge = challengeBytes;
++    createArgs.options.publicKey.user.id = new Uint8Array(16);
++
++    // change the defaults with any options that were passed in
++    extendObject(createArgs, opts);
++
++    // create the credential, return the Promise
++    return navigator.credentials.create(createArgs.options);
++}
++
++function assertCredential(credential) {
++    var options = cloneObject(getCredentialDefaultArgs);
++    let challengeBytes = new Uint8Array(16);
++    window.crypto.getRandomValues(challengeBytes);
++    options.challenge = challengeBytes;
++    options.allowCredentials = [{type: 'public-key', id: credential.rawId}];
++    return navigator.credentials.get({publicKey: options});
++}
++
++function createRandomString(len) {
++    var text = "";
++    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
++    for(var i = 0; i < len; i++) {
++        text += possible.charAt(Math.floor(Math.random() * possible.length));
++    }
++    return text;
++}
++
++
++function ab2str(buf) {
++    return String.fromCharCode.apply(null, new Uint8Array(buf));
++}
++
++// Useful constants for working with attestation data
++const authenticator_data_user_present = 0x01;
++const authenticator_data_user_verified = 0x04;
++const authenticator_data_attested_cred_data = 0x40;
++const authenticator_data_extension_data = 0x80;
++
++function parseAuthenticatorData(buf) {
++    if (buf.byteLength < 37) {
++        throw new TypeError ("parseAuthenticatorData: buffer must be at least 37 bytes");
++    }
++
++    printHex ("authnrData", buf);
++
++    var authnrData = new DataView(buf);
++    var authnrDataObj = {};
++    authnrDataObj.length = buf.byteLength;
++
++    authnrDataObj.rpIdHash = new Uint8Array (buf.slice (0,32));
++    authnrDataObj.rawFlags = authnrData.getUint8(32);
++    authnrDataObj.counter = authnrData.getUint32(33, false);
++    authnrDataObj.rawCounter = [];
++    authnrDataObj.rawCounter[0] = authnrData.getUint8(33);
++    authnrDataObj.rawCounter[1] = authnrData.getUint8(34);
++    authnrDataObj.rawCounter[2] = authnrData.getUint8(35);
++    authnrDataObj.rawCounter[3] = authnrData.getUint8(36);
++    authnrDataObj.flags = {};
++
++    authnrDataObj.flags.userPresent = (authnrDataObj.rawFlags&authenticator_data_user_present)?true:false;
++    authnrDataObj.flags.userVerified = (authnrDataObj.rawFlags&authenticator_data_user_verified)?true:false;
++    authnrDataObj.flags.attestedCredentialData = (authnrDataObj.rawFlags&authenticator_data_attested_cred_data)?true:false;
++    authnrDataObj.flags.extensionData = (authnrDataObj.rawFlags&authenticator_data_extension_data)?true:false;
++
++    return authnrDataObj;
++}
++
++/**
++ * TestCase
++ *
++ * A generic template for test cases
++ * Is intended to be overloaded with subclasses that override testObject, testFunction and argOrder
++ * The testObject is the default arguments for the testFunction
++ * The default testObject can be modified with the modify() method, making it easy to create new tests based on the default
++ * The testFunction is the target of the test and is called by the doIt() method. doIt() applies the testObject as arguments via toArgs()
++ * toArgs() uses argOrder to make sure the resulting array is in the right order of the arguments for the testFunction
++ */
++class TestCase {
++    constructor() {
++        this.testFunction = function() {
++            throw new Error("Test Function not implemented");
++        };
++        this.testObject = {};
++        this.argOrder = [];
++        this.ctx = null;
++    }
++
++    /**
++     * toObject
++     *
++     * return a copy of the testObject
++     */
++    toObject() {
++        return JSON.parse(JSON.stringify(this.testObject)); // cheap clone
++    }
++
++    /**
++     * toArgs
++     *
++     * converts test object to an array that is ordered in the same way as the arguments to the test function
++     */
++    toArgs() {
++        var ret = [];
++        // XXX, TODO: this won't necessarily produce the args in the right order
++        for (let idx of this.argOrder) {
++            ret.push(this.testObject[idx]);
++        }
++        return ret;
++    }
++
++    /**
++     * modify
++     *
++     * update the internal object by a path / value combination
++     * e.g. :
++     * modify ("foo.bar", 3)
++     * accepts three types of args:
++     *    "foo.bar", 3
++     *    {path: "foo.bar", value: 3}
++     *    [{path: "foo.bar", value: 3}, ...]
++     */
++    modify(arg1, arg2) {
++        var mods;
++
++        // check for the two argument scenario
++        if (typeof arg1 === "string" && arg2 !== undefined) {
++            mods = {
++                path: arg1,
++                value: arg2
++            };
++        } else {
++            mods = arg1;
++        }
++
++        // accept a single modification object instead of an array
++        if (!Array.isArray(mods) && typeof mods === "object") {
++            mods = [mods];
++        }
++
++        // iterate through each of the desired modifications, and call recursiveSetObject on them
++        for (let idx in mods) {
++            var mod = mods[idx];
++            let paths = mod.path.split(".");
++            recursiveSetObject(this.testObject, paths, mod.value);
++        }
++
++        // iterates through nested `obj` using the `pathArray`, creating the path if it doesn't exist
++        // when the final leaf of the path is found, it is assigned the specified value
++        function recursiveSetObject(obj, pathArray, value) {
++            var currPath = pathArray.shift();
++            if (typeof obj[currPath] !== "object") {
++                obj[currPath] = {};
++            }
++            if (pathArray.length > 0) {
++                return recursiveSetObject(obj[currPath], pathArray, value);
++            }
++            obj[currPath] = value;
++        }
++
++        return this;
++    }
++
++    /**
++     * actually runs the test function with the supplied arguments
++     */
++    doIt() {
++        if (typeof this.testFunction !== "function") {
++            throw new Error("Test function not found");
++        }
++
++        return this.testFunction.call(this.ctx, ...this.toArgs());
++    }
++
++    /**
++     * run the test function with the top-level properties of the test object applied as arguments
++     * expects the test to pass, and then validates the results
++     */
++    testPasses(desc) {
++        return this.doIt()
++            .then((ret) => {
++                // check the result
++                this.validateRet(ret);
++                return ret;
++            });
++    }
++
++    /**
++     * run the test function with the top-level properties of the test object applied as arguments
++     * expects the test to fail
++     */
++    testFails(t, testDesc, expectedErr) {
++        if (typeof expectedErr == "string") {
++            return promise_rejects_dom(t, expectedErr, this.doIt(), "Expected  bad parameters to fail");
++        }
++
++        return promise_rejects_js(t, expectedErr, this.doIt(), "Expected bad parameters to fail");
++    }
++
++    /**
++     * Runs the test that's implemented by the class by calling the doIt() function
++     * @param  {String} desc                A description of the test being run
++     * @param  [Error|String] expectedErr   A string matching an error type, such as "SecurityError" or an object with a .name value that is an error type string
++     */
++    runTest(desc, expectedErr) {
++        promise_test((t) => {
++            return Promise.resolve().then(() => {
++                return this.testSetup();
++            }).then(() => {
++                if (expectedErr === undefined) {
++                    return this.testPasses(desc);
++                } else {
++                    return this.testFails(t, desc, expectedErr);
++                }
++            }).then((res) => {
++                return this.testTeardown(res);
++            })
++        }, desc)
++    }
++
++    /**
++     * called before runTest
++     * virtual method expected to be overridden by child class if needed
++     */
++    testSetup() {
++        if (this.beforeTestFn) {
++            this.beforeTestFn.call(this);
++        }
++
++        return Promise.resolve();
++    }
++
++    /**
++     * Adds a callback function that gets called in the TestCase context
++     * and within the testing process.
++     */
++    beforeTest(fn) {
++        if (typeof fn !== "function") {
++            throw new Error ("Tried to call non-function before test");
++        }
++
++        this.beforeTestFn = fn;
++
++        return this;
++    }
++
++    /**
++     * called after runTest
++     * virtual method expected to be overridden by child class if needed
++     */
++    testTeardown(res) {
++        if (this.afterTestFn) {
++            this.afterTestFn.call(this, res);
++        }
++
++        return Promise.resolve();
++    }
++
++    /**
++     * Adds a callback function that gets called in the TestCase context
++     * and within the testing process. Good for validating results.
++     */
++    afterTest(fn) {
++        if (typeof fn !== "function") {
++            throw new Error ("Tried to call non-function after test");
++        }
++
++        this.afterTestFn = fn;
++
++        return this;
++    }
++
++    /**
++     * validates the value returned from the test function
++     * virtual method expected to be overridden by child class
++     */
++    validateRet() {
++        throw new Error("Not implemented");
++    }
++}
++
++function cloneObject(o) {
++    return JSON.parse(JSON.stringify(o));
++}
++
++function extendObject(dst, src) {
++    Object.keys(src).forEach(function(key) {
++        if (isSimpleObject(src[key]) && !isAbortSignal(src[key])) {
++            dst[key] ||= {};
++            extendObject(dst[key], src[key]);
++        } else {
++            dst[key] = src[key];
++        }
++    });
++}
++
++function isSimpleObject(o) {
++    return (typeof o === "object" &&
++        !Array.isArray(o) &&
++        !(o instanceof ArrayBuffer) &&
++        !(o instanceof Uint8Array));
++}
++
++function isAbortSignal(o) {
++    return (o instanceof AbortSignal);
++}
++
++/**
++ * CreateCredentialTest
++ *
++ * tests the WebAuthn navigator.credentials.create() interface
++ */
++class CreateCredentialsTest extends TestCase {
++    constructor() {
++        // initialize the parent class
++        super();
++
++        // the function to be tested
++        this.testFunction = navigator.credentials.create;
++        // the context to call the test function with (i.e. - the 'this' object for the function)
++        this.ctx = navigator.credentials;
++
++        // the default object to pass to makeCredential, to be modified with modify() for various tests
++        let challengeBytes = new Uint8Array(16);
++        window.crypto.getRandomValues(challengeBytes);
++        this.testObject = cloneObject(createCredentialDefaultArgs);
++        // cloneObject can't clone the BufferSource in user.id, so let's recreate it.
++        this.testObject.options.publicKey.user.id = new Uint8Array(16);
++        this.testObject.options.publicKey.challenge = challengeBytes;
++
++        // how to order the properties of testObject when passing them to makeCredential
++        this.argOrder = [
++            "options"
++        ];
++
++        // enable the constructor to modify the default testObject
++        // would prefer to do this in the super class, but have to call super() before using `this.*`
++        if (arguments.length) this.modify(...arguments);
++    }
++
++    validateRet(ret) {
++        validatePublicKeyCredential(ret);
++        validateAuthenticatorAttestationResponse(ret.response);
++    }
++}
++
++/**
++ * GetCredentialsTest
++ *
++ * tests the WebAuthn navigator.credentials.get() interface
++ */
++class GetCredentialsTest extends TestCase {
++    constructor(...args) {
++        // initialize the parent class
++        super();
++
++        // the function to be tested
++        this.testFunction = navigator.credentials.get;
++        // the context to call the test function with (i.e. - the 'this' object for the function)
++        this.ctx = navigator.credentials;
++
++        // default arguments
++        let challengeBytes = new Uint8Array(16);
++        window.crypto.getRandomValues(challengeBytes);
++        this.testObject = cloneObject(getCredentialDefaultArgs);
++        this.testObject.options.publicKey.challenge = challengeBytes;
++
++        // how to order the properties of testObject when passing them to makeCredential
++        this.argOrder = [
++            "options"
++        ];
++
++        this.credentialPromiseList = [];
++
++        // set to true to pass an empty allowCredentials list to credentials.get
++        this.isResidentKeyTest = false;
++
++        // enable the constructor to modify the default testObject
++        // would prefer to do this in the super class, but have to call super() before using `this.*`
++        if (arguments.length) {
++            if (args.cred instanceof Promise) this.credPromise = args.cred;
++            else if (typeof args.cred === "object") this.credPromise = Promise.resolve(args.cred);
++            delete args.cred;
++            this.modify(...arguments);
++        }
++    }
++
++    addCredential(arg) {
++        // if a Promise was passed in, add it to the list
++        if (arg instanceof Promise) {
++            this.credentialPromiseList.push(arg);
++            return this;
++        }
++
++        // if a credential object was passed in, convert it to a Promise for consistency
++        if (typeof arg === "object") {
++            this.credentialPromiseList.push(Promise.resolve(arg));
++            return this;
++        }
++
++        // if no credential specified then create one
++        var p = createCredential();
++        this.credentialPromiseList.push(p);
++
++        return this;
++    }
++
++    testSetup(desc) {
++        if (!this.credentialPromiseList.length) {
++            throw new Error("Attempting list without defining credential to test");
++        }
++
++        return Promise.all(this.credentialPromiseList)
++            .then((credList) => {
++                var idList = credList.map((cred) => {
++                    return {
++                        id: cred.rawId,
++                        transports: ["usb", "nfc", "ble"],
++                        type: "public-key"
++                    };
++                });
++                if (!this.isResidentKeyTest) {
++                    this.testObject.options.publicKey.allowCredentials = idList;
++                }
++                // return super.test(desc);
++            })
++            .catch((err) => {
++                throw Error(err);
++            });
++    }
++
++    validateRet(ret) {
++        validatePublicKeyCredential(ret);
++        validateAuthenticatorAssertionResponse(ret.response);
++    }
++
++    setIsResidentKeyTest(isResidentKeyTest) {
++        this.isResidentKeyTest = isResidentKeyTest;
++        return this;
++    }
++}
++
++/**
++ * converts a uint8array to base64 url-safe encoding
++ * based on similar function in resources/utils.js
++ */
++function base64urlEncode(array) {
++  let string = String.fromCharCode.apply(null, array);
++  let result = btoa(string);
++  return result.replace(/=+$/g, '').replace(/\+/g, "-").replace(/\//g, "_");
++}
++/**
++ * runs assertions against a PublicKeyCredential object to ensure it is properly formatted
++ */
++function validatePublicKeyCredential(cred) {
++    // class
++    assert_class_string(cred, "PublicKeyCredential", "Expected return to be instance of 'PublicKeyCredential' class");
++    // id
++    assert_idl_attribute(cred, "id", "should return PublicKeyCredential with id attribute");
++    assert_readonly(cred, "id", "should return PublicKeyCredential with readonly id attribute");
++    // rawId
++    assert_idl_attribute(cred, "rawId", "should return PublicKeyCredential with rawId attribute");
++    assert_readonly(cred, "rawId", "should return PublicKeyCredential with readonly rawId attribute");
++    assert_equals(cred.id, base64urlEncode(new Uint8Array(cred.rawId)), "should return PublicKeyCredential with id attribute set to base64 encoding of rawId attribute");
++
++    // type
++    assert_idl_attribute(cred, "type", "should return PublicKeyCredential with type attribute");
++    assert_equals(cred.type, "public-key", "should return PublicKeyCredential with type 'public-key'");
++}
++
++/**
++ * runs assertions against a AuthenticatorAttestationResponse object to ensure it is properly formatted
++ */
++function validateAuthenticatorAttestationResponse(attr) {
++    // class
++    assert_class_string(attr, "AuthenticatorAttestationResponse", "Expected credentials.create() to return instance of 'AuthenticatorAttestationResponse' class");
++
++    // clientDataJSON
++    assert_idl_attribute(attr, "clientDataJSON", "credentials.create() should return AuthenticatorAttestationResponse with clientDataJSON attribute");
++    assert_readonly(attr, "clientDataJSON", "credentials.create() should return AuthenticatorAttestationResponse with readonly clientDataJSON attribute");
++    // TODO: clientDataJSON() and make sure fields are correct
++
++    // attestationObject
++    assert_idl_attribute(attr, "attestationObject", "credentials.create() should return AuthenticatorAttestationResponse with attestationObject attribute");
++    assert_readonly(attr, "attestationObject", "credentials.create() should return AuthenticatorAttestationResponse with readonly attestationObject attribute");
++    // TODO: parseAuthenticatorData() and make sure flags are correct
++}
++
++/**
++ * runs assertions against a AuthenticatorAssertionResponse object to ensure it is properly formatted
++ */
++function validateAuthenticatorAssertionResponse(assert) {
++    // class
++    assert_class_string(assert, "AuthenticatorAssertionResponse", "Expected credentials.create() to return instance of 'AuthenticatorAssertionResponse' class");
++
++    // clientDataJSON
++    assert_idl_attribute(assert, "clientDataJSON", "credentials.get() should return AuthenticatorAssertionResponse with clientDataJSON attribute");
++    assert_readonly(assert, "clientDataJSON", "credentials.get() should return AuthenticatorAssertionResponse with readonly clientDataJSON attribute");
++    // TODO: clientDataJSON() and make sure fields are correct
++
++    // signature
++    assert_idl_attribute(assert, "signature", "credentials.get() should return AuthenticatorAssertionResponse with signature attribute");
++    assert_readonly(assert, "signature", "credentials.get() should return AuthenticatorAssertionResponse with readonly signature attribute");
++
++    // authenticatorData
++    assert_idl_attribute(assert, "authenticatorData", "credentials.get() should return AuthenticatorAssertionResponse with authenticatorData attribute");
++    assert_readonly(assert, "authenticatorData", "credentials.get() should return AuthenticatorAssertionResponse with readonly authenticatorData attribute");
++    // TODO: parseAuthenticatorData() and make sure flags are correct
++}
++
++function defaultAuthenticatorArgs() {
++  return {
++    protocol: 'ctap1/u2f',
++    transport: 'usb',
++    hasResidentKey: false,
++    hasUserVerification: false,
++    isUserVerified: false,
++  };
++}
++
++function standardSetup(cb, options = {}) {
++  // Setup an automated testing environment if available.
++  let authenticatorArgs = Object.assign(defaultAuthenticatorArgs(), options);
++  window.test_driver.add_virtual_authenticator(authenticatorArgs)
++      .then(authenticator => {
++        cb();
++        // XXX add a subtest to clean up the virtual authenticator since
++        // testharness does not support waiting for promises on cleanup.
++        promise_test(
++            () =>
++                window.test_driver.remove_virtual_authenticator(authenticator),
++            'Clean up the test environment');
++      })
++      .catch(error => {
++        if (error !==
++            'error: Action add_virtual_authenticator not implemented') {
++          throw error;
++        }
++        // The protocol is not available. Continue manually.
++        cb();
++      });
++}
++
++// virtualAuthenticatorPromiseTest runs |testCb| in a promise_test with a
++// virtual authenticator set up before and destroyed after the test, if the
++// virtual testing API is available. In manual tests, setup and teardown is
++// skipped.
++function virtualAuthenticatorPromiseTest(
++    testCb, options = {}, name = 'Virtual Authenticator Test') {
++  let authenticatorArgs = Object.assign(defaultAuthenticatorArgs(), options);
++  promise_test(async t => {
++    let authenticator;
++    try {
++      authenticator =
++          await window.test_driver.add_virtual_authenticator(authenticatorArgs);
++      t.add_cleanup(
++          () => window.test_driver.remove_virtual_authenticator(authenticator));
++    } catch (error) {
++      if (error !== 'error: Action add_virtual_authenticator not implemented') {
++        throw error;
++      }
++    }
++    return testCb(t, authenticator);
++  }, name);
++}
++
++function bytesEqual(a, b) {
++  if (a instanceof ArrayBuffer) {
++    a = new Uint8Array(a);
++  }
++  if (b instanceof ArrayBuffer) {
++    b = new Uint8Array(b);
++  }
++  if (a.byteLength != b.byteLength) {
++    return false;
++  }
++  for (let i = 0; i < a.byteLength; i++) {
++    if (a[i] != b[i]) {
++      return false;
++    }
++  }
++  return true;
++}
++
++// Compares two PublicKeyCredentialUserEntity objects.
++function userEntityEquals(a, b) {
++  return bytesEqual(a.id, b.id) && a.name == b.name && a.displayName == b.displayName;
++}
++
++// Asserts that `actual` and `expected`, which are both JSON types, are equal.
++// The object key order is ignored for comparison.
++function assertJsonEquals(actual, expected, optMsg) {
++  // Returns a copy of `jsonObj`, which must be a JSON type, with object keys
++  // recursively sorted in lexicographic order; or simply `jsonObj` if it is not
++  // an instance of Object.
++  function deepSortKeys(jsonObj) {
++    if (jsonObj instanceof Array) {
++      return Array.from(jsonObj, (x) => { return deepSortKeys(x); })
++    }
++    if (typeof jsonObj !== 'object' || jsonObj === null ||
++      jsonObj.__proto__.constructor !== Object ||
++      Object.keys(jsonObj).length === 0) {
++      return jsonObj;
++    }
++    return Object.keys(jsonObj).sort().reduce((acc, key) => {
++      acc[key] = deepSortKeys(jsonObj[key]);
++      return acc;
++    }, {});
++  }
++
++  assert_equals(
++    JSON.stringify(deepSortKeys(actual)),
++    JSON.stringify(deepSortKeys(expected)), optMsg);
++}
+diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
+index 60ebbacec459fd8581f692a3da5969220920f837..df309ae637e0051d980b41694658d97d63ce560b 100644
+--- a/Tests/LibWebView/CMakeLists.txt
++++ b/Tests/LibWebView/CMakeLists.txt
+@@ -404,6 +404,12 @@ if (BUILD_TESTING AND NOT WIN32)
+     )
+     set_tests_properties(TestWebDriverForceDark PROPERTIES TIMEOUT 120)
+ 
++    add_test(
++        NAME TestWebDriverWebAuthn
++        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test-webdriver-webauthn.py $<TARGET_FILE:WebDriver>
++    )
++    set_tests_properties(TestWebDriverWebAuthn PROPERTIES TIMEOUT 120)
++
+     add_test(
+         NAME TestWebDriverBiDi
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test-webdriver-bidi.py $<TARGET_FILE:WebDriver>
+diff --git a/Tests/LibWebView/test-webdriver-webauthn.py b/Tests/LibWebView/test-webdriver-webauthn.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..2d1008ad015e12f26bf2aa4d5f4d858afd77d839
+--- /dev/null
++++ b/Tests/LibWebView/test-webdriver-webauthn.py
+@@ -0,0 +1,140 @@
++#!/usr/bin/env python3
++#
++# Copyright (c) 2026-present, the Ladybird developers.
++#
++# SPDX-License-Identifier: BSD-2-Clause
++
++# WebAuthn's WebDriver extension: a virtual authenticator that WebDriver adds registers a credential and signs in with
++# it, as a security key would, and WebDriver can then list, add and remove its credentials.
++# https://w3c.github.io/webauthn/#sctn-automation
++
++import http.server
++import runpy
++import subprocess
++import sys
++import threading
++
++from pathlib import Path
++
++helpers = runpy.run_path(str(Path(__file__).with_name("test-webdriver-delete-session.py")))
++
++PAGE = b"""<!doctype html>
++<title>WebAuthn</title>
++<script>
++function base64url(buffer) {
++    return btoa(String.fromCharCode(...new Uint8Array(buffer))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
++}
++
++async function register() {
++    const credential = await navigator.credentials.create({
++        publicKey: {
++            rp: { name: "WebDriver test" },
++            user: { id: new Uint8Array([7, 7, 7]), name: "user", displayName: "User" },
++            challenge: new Uint8Array(32),
++            pubKeyCredParams: [{ type: "public-key", alg: -7 }],
++            authenticatorSelection: { residentKey: "required" },
++        },
++    });
++    return credential.id;
++}
++
++async function signIn() {
++    const assertion = await navigator.credentials.get({ publicKey: { challenge: new Uint8Array(32) } });
++    return { id: assertion.id, userHandle: base64url(assertion.response.userHandle) };
++}
++</script>
++"""
++
++
++class Handler(http.server.BaseHTTPRequestHandler):
++    def do_GET(self):
++        self.send_response(200)
++        self.send_header("Content-Type", "text/html")
++        self.send_header("Cache-Control", "no-store")
++        self.end_headers()
++        self.wfile.write(PAGE)
++
++    def log_message(self, format, *args):
++        pass
++
++
++server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
++threading.Thread(target=server.serve_forever, daemon=True).start()
++port = helpers["unused_port"]()
++process = subprocess.Popen([sys.argv[1], "--headless", "-l", "127.0.0.1", "-p", str(port)])
++session = None
++try:
++    helpers["wait_for_port"](port)
++    session = helpers["create_session"](port)
++
++    def command(method, path, body=None):
++        status, payload, raw = helpers["request"](port, method, f"/session/{session}/{path}", body)
++        assert status == 200, f"{method} {path}: {raw}"
++        return payload["value"]
++
++    def run(script):
++        return command("POST", "execute/async", {"script": f"{script}.then(arguments[0], e => arguments[0](e.name))", "args": []})
++
++    # localhost is a secure context with a domain, so it may use WebAuthn.
++    command("POST", "url", {"url": f"http://localhost:{server.server_port}/"})
++
++    authenticator = command(
++        "POST",
++        "webauthn/authenticator",
++        {"protocol": "ctap2", "transport": "usb", "hasResidentKey": True, "hasUserVerification": True, "isUserVerified": True},
++    )
++
++    credential_id = run("register()")
++    credentials = command("GET", f"webauthn/authenticator/{authenticator}/credentials")
++    assert len(credentials) == 1, f"Expected one credential, got {credentials}"
++    assert credentials[0]["credentialId"] == credential_id, f"{credentials[0]['credentialId']} != {credential_id}"
++    assert credentials[0]["rpId"] == "localhost", credentials[0]
++    assert credentials[0]["isResidentCredential"] is True, credentials[0]
++
++    # A discoverable credential signs in without an allow list, and says whose it is.
++    signed_in = run("signIn()")
++    assert signed_in["id"] == credential_id, signed_in
++    assert signed_in["userHandle"] == "BwcH", signed_in
++    credentials = command("GET", f"webauthn/authenticator/{authenticator}/credentials")
++    assert credentials[0]["signCount"] == 1, credentials[0]
++
++    # A credential added through WebDriver, with its private key, signs in as well.
++    command("DELETE", f"webauthn/authenticator/{authenticator}/credentials")
++    command(
++        "POST",
++        f"webauthn/authenticator/{authenticator}/credential",
++        {
++            "credentialId": "AQID",
++            "isResidentCredential": True,
++            "rpId": "localhost",
++            "privateKey": credentials[0]["privateKey"],
++            "userHandle": "CAgI",
++            "signCount": 41,
++        },
++    )
++    signed_in = run("signIn()")
++    assert signed_in == {"id": "AQID", "userHandle": "CAgI"}, signed_in
++
++    # Without user verification, a ceremony that requires it fails.
++    command("POST", f"webauthn/authenticator/{authenticator}/uv", {"isUserVerified": False})
++    result = run("navigator.credentials.get({ publicKey: { challenge: new Uint8Array(32), userVerification: 'required' } })")
++    assert result == "NotAllowedError", result
++
++    command("DELETE", f"webauthn/authenticator/{authenticator}")
++    status, payload, raw = helpers["request"](port, "GET", f"/session/{session}/webauthn/authenticator/{authenticator}/credentials")
++    assert status == 400 and payload["value"]["error"] == "invalid argument", raw
++
++    print("PASS: WebAuthn's WebDriver extension drives a virtual authenticator")
++finally:
++    try:
++        if session is not None:
++            helpers["request"](port, "DELETE", f"/session/{session}")
++    finally:
++        process.terminate()
++        try:
++            process.wait(timeout=5)
++        except subprocess.TimeoutExpired:
++            process.kill()
++            process.wait()
++        server.shutdown()
++        server.server_close()
