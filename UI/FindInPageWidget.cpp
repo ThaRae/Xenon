@@ -1,0 +1,232 @@
+/*
+ * Copyright (c) 2024, Tim Ledbetter <timledbetter@gmail.com>
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#include <UI/ChromeStyle.h>
+#include <UI/FindInPageWidget.h>
+#include <UI/Icon.h>
+#include <UI/NativeTextEditingLineEdit.h>
+#include <UI/StringUtils.h>
+#include <UI/Tab.h>
+
+#include <QEvent>
+#include <QKeyEvent>
+#include <QPointer>
+#include <QStyle>
+
+namespace Ladybird {
+
+static constexpr auto FIND_TEXT_NO_RESULTS_PROPERTY = "noResults";
+
+static void set_dynamic_property_if_needed(QWidget& widget, char const* property, bool value)
+{
+    if (widget.property(property).toBool() == value)
+        return;
+
+    widget.setProperty(property, value);
+    widget.style()->unpolish(&widget);
+    widget.style()->polish(&widget);
+    widget.update();
+}
+
+FindInPageWidget::FindInPageWidget(Tab* tab, WebContentView* content_view)
+    : QWidget(static_cast<QWidget*>(tab), Qt::Widget)
+    , m_tab(tab)
+    , m_content_view(content_view)
+{
+    setObjectName("LadybirdFindInPageBar");
+    setAttribute(Qt::WA_StyledBackground);
+    setFocusPolicy(Qt::FocusPolicy::StrongFocus);
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    update_chrome_style();
+
+    auto* layout = new QHBoxLayout(this);
+    setLayout(layout);
+
+    layout->setContentsMargins(5, 5, 5, 5);
+    layout->setAlignment(Qt::AlignmentFlag::AlignLeft);
+
+    m_find_text = new NativeTextEditingLineEdit(this);
+    m_find_text->setFocusPolicy(Qt::FocusPolicy::StrongFocus);
+    m_find_text->setSizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Fixed);
+    m_find_text->setPlaceholderText("Search");
+    m_find_text->setMinimumWidth(50);
+    m_find_text->setMaximumWidth(250);
+    connect(m_find_text, &QLineEdit::textChanged, this, &FindInPageWidget::find_text_changed);
+
+    m_previous_button = new QPushButton(this);
+    m_previous_button->setFixedWidth(30);
+    m_previous_button->setIcon(create_chrome_icon(ChromeIcon::ChevronUp, palette()));
+    m_previous_button->setToolTip("Find Previous Match");
+    m_previous_button->setFlat(true);
+    connect(m_previous_button, &QPushButton::clicked, this, [this] {
+        m_content_view->find_in_page_previous_match();
+    });
+
+    m_next_button = new QPushButton(this);
+    m_next_button->setFixedWidth(30);
+    m_next_button->setIcon(create_chrome_icon(ChromeIcon::ChevronDown, palette()));
+    m_next_button->setToolTip("Find Next Match");
+    m_next_button->setFlat(true);
+    connect(m_next_button, &QPushButton::clicked, this, [this] {
+        m_content_view->find_in_page_next_match();
+    });
+
+    m_exit_button = new QPushButton(this);
+    m_exit_button->setFixedWidth(30);
+    m_exit_button->setIcon(create_chrome_icon(ChromeIcon::Close, palette()));
+    m_exit_button->setToolTip("Close Search Bar");
+    m_exit_button->setFlat(true);
+    connect(m_exit_button, &QPushButton::clicked, this, [this] {
+        close_bar();
+    });
+
+    m_highlight_all = new QCheckBox(this);
+    m_highlight_all->setText("Highlight &All");
+    m_highlight_all->setChecked(false);
+    connect(m_highlight_all, &QCheckBox::checkStateChanged, this, [this] {
+        find_text_changed();
+    });
+
+    m_match_case = new QCheckBox(this);
+    m_match_case->setText("Match &Case");
+    m_match_case->setChecked(false);
+    connect(m_match_case, &QCheckBox::checkStateChanged, this, [this] {
+        find_text_changed();
+    });
+
+    m_result_label = new QLabel(this);
+    m_result_label->setVisible(false);
+    m_result_label->setStyleSheet("font-weight: bold;");
+
+    layout->addWidget(m_find_text, 1);
+    layout->addWidget(m_previous_button);
+    layout->addWidget(m_next_button);
+    layout->addWidget(m_highlight_all);
+    layout->addWidget(m_match_case);
+    layout->addWidget(m_result_label);
+    layout->addStretch(1);
+    layout->addWidget(m_exit_button);
+}
+
+FindInPageWidget::~FindInPageWidget() = default;
+
+bool FindInPageWidget::event(QEvent* event)
+{
+    if (event->type() == QEvent::PaletteChange) {
+        update_chrome_style();
+        m_previous_button->setIcon(create_chrome_icon(ChromeIcon::ChevronUp, palette()));
+        m_next_button->setIcon(create_chrome_icon(ChromeIcon::ChevronDown, palette()));
+        m_exit_button->setIcon(create_chrome_icon(ChromeIcon::Close, palette()));
+    }
+
+    return QWidget::event(event);
+}
+
+void FindInPageWidget::update_chrome_style()
+{
+    if (m_is_updating_chrome_style)
+        return;
+
+    m_is_updating_chrome_style = true;
+    setStyleSheet(ChromeStyle::find_in_page_style_sheet(palette()));
+    m_is_updating_chrome_style = false;
+}
+
+void FindInPageWidget::find_text_changed()
+{
+    auto query = utf16_string_from_qstring(m_find_text->text());
+    if (query.is_empty())
+        set_dynamic_property_if_needed(*m_find_text, FIND_TEXT_NO_RESULTS_PROPERTY, false);
+
+    auto case_sensitive = m_match_case->isChecked() ? CaseSensitivity::CaseSensitive : CaseSensitivity::CaseInsensitive;
+    m_content_view->find_in_page(query, case_sensitive, m_highlight_all->isChecked());
+}
+
+void FindInPageWidget::keyPressEvent(QKeyEvent* event)
+{
+    switch (event->key()) {
+    case Qt::Key_Escape:
+        close_bar();
+        break;
+    case Qt::Key_Return:
+        if (event->modifiers().testFlag(Qt::ShiftModifier))
+            m_previous_button->click();
+        else
+            m_next_button->click();
+        break;
+    default:
+        event->ignore();
+        break;
+    }
+}
+
+void FindInPageWidget::close_bar()
+{
+    ++m_selected_text_request_id;
+    m_content_view->find_in_page_end();
+    setVisible(false);
+    m_content_view->setFocus();
+}
+
+void FindInPageWidget::focusInEvent(QFocusEvent* event)
+{
+    QWidget::focusInEvent(event);
+    m_find_text->setFocus();
+    auto find_text_before_request = m_find_text->text();
+    auto request_id = ++m_selected_text_request_id;
+    m_content_view->selected_text()->when_resolved([guarded_this = QPointer<FindInPageWidget> { this }, request_id, find_text_before_request = AK::move(find_text_before_request)](auto& selected_text) {
+        if (!guarded_this || request_id != guarded_this->m_selected_text_request_id || guarded_this->m_find_text->text() != find_text_before_request)
+            return;
+        if (!selected_text.is_empty()) {
+            guarded_this->m_find_text->setText(qstring_from_ak_string(selected_text));
+            if (guarded_this->m_find_text->text() == find_text_before_request)
+                guarded_this->find_text_changed();
+        }
+        guarded_this->m_find_text->selectAll();
+    });
+    m_find_text->selectAll();
+}
+
+void FindInPageWidget::showEvent(QShowEvent*)
+{
+    if (m_tab && m_tab->isVisible())
+        m_tab->update_hover_label();
+}
+
+void FindInPageWidget::hideEvent(QHideEvent*)
+{
+    if (m_tab && m_tab->isVisible())
+        m_tab->update_hover_label();
+}
+
+void FindInPageWidget::update_result_label(size_t current_match_index, Optional<size_t> const& total_match_count)
+{
+    if (total_match_count.has_value()) {
+        set_dynamic_property_if_needed(*m_find_text, FIND_TEXT_NO_RESULTS_PROPERTY, total_match_count.value() == 0);
+
+        auto label_text = "Phrase not found"_string;
+        if (total_match_count.value() > 0)
+            label_text = MUST(String::formatted("{} of {} matches", current_match_index + 1, total_match_count.value()));
+
+        m_result_label->setText(qstring_from_ak_string(label_text));
+        m_result_label->setVisible(true);
+    } else {
+        set_dynamic_property_if_needed(*m_find_text, FIND_TEXT_NO_RESULTS_PROPERTY, false);
+        m_result_label->setVisible(false);
+    }
+}
+
+void FindInPageWidget::find_previous()
+{
+    m_previous_button->click();
+}
+
+void FindInPageWidget::find_next()
+{
+    m_next_button->click();
+}
+
+}
