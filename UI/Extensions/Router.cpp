@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <AK/Array.h>
 #include <AK/StringBuilder.h>
 #include <LibWebView/Application.h>
 #include <UI/Extensions/Browser.h>
@@ -95,7 +96,7 @@ JsonObject Router::config_for(Extension const& extension, ContextKind kind, URL:
     config.set("uiLanguage"sv, extension.locales().ui_language());
     config.set("acceptLanguages"sv, accept_languages());
     config.set("platform"sv, platform_info());
-    config.set("permissions"sv, string_array(extension.manifest().permissions));
+    config.set("permissions"sv, string_array(extension.permissions()));
     config.set("contextType"sv, context_kind_name(kind));
     config.set("isBackground"sv, kind == ContextKind::Background);
     config.set("url"sv, url.serialize());
@@ -305,6 +306,10 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
         send_runtime_message(context, id, args.is_empty() ? JsonValue {} : args.at(0));
         return;
     }
+    if (name == "permissions.request"sv) {
+        request_permissions(context, id, args);
+        return;
+    }
 
     ErrorOr<JsonValue, String> result = MUST(String::formatted("{} isn't supported yet.", name));
     if (name.starts_with_bytes("storage."sv))
@@ -313,6 +318,8 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
         result = handle_alarms_call(context, name, args);
     else if (name.starts_with_bytes("permissions."sv))
         result = handle_permissions_call(context, name, args);
+    else if (name.starts_with_bytes("privacy."sv))
+        result = handle_privacy_call(context, name, args);
     else if (name.starts_with_bytes("runtime."sv) || name.starts_with_bytes("management."sv) || name.starts_with_bytes("idle."sv) || name.starts_with_bytes("offscreen."sv) || name.starts_with_bytes("commands."sv))
         result = handle_runtime_call(context, name, args);
     else if (name.starts_with_bytes("tabs."sv) || name.starts_with_bytes("windows."sv) || name.starts_with_bytes("action."sv) || name.starts_with_bytes("webNavigation."sv))
@@ -340,7 +347,7 @@ static Optional<Vector<String>> keys_argument(JsonValue const& value)
 ErrorOr<JsonValue, String> Router::handle_storage_call(Context& context, String const& name, JsonArray const& args)
 {
     auto const& extension = *context.extension;
-    if (!extension.manifest().has_permission("storage"sv))
+    if (!extension.has_permission("storage"sv))
         return "The 'storage' permission is required."_string;
 
     // FIXME: Honor storage.session's access level once content scripts can reach storage.
@@ -394,7 +401,7 @@ ErrorOr<JsonValue, String> Router::handle_storage_call(Context& context, String 
 ErrorOr<JsonValue, String> Router::handle_alarms_call(Context& context, String const& name, JsonArray const& args)
 {
     auto const& extension = *context.extension;
-    if (!extension.manifest().has_permission("alarms"sv))
+    if (!extension.has_permission("alarms"sv))
         return "The 'alarms' permission is required."_string;
 
     auto& alarms = *m_alarms.ensure(extension.id(), [&] {
@@ -430,53 +437,250 @@ ErrorOr<JsonValue, String> Router::handle_alarms_call(Context& context, String c
     return MUST(String::formatted("{} isn't supported.", name));
 }
 
-// Unpacked extensions get every permission they ask for when they load, as in Chrome, and optional permissions only
-// when granted.
+static Vector<String> string_list(JsonObject const& object, StringView key)
+{
+    Vector<String> list;
+    if (auto values = object.get_array(key); values.has_value()) {
+        for (auto const& value : values->values()) {
+            if (value.is_string())
+                list.append(value.as_string());
+        }
+    }
+    return list;
+}
+
+static JsonObject object_argument(JsonArray const& args, size_t index)
+{
+    return index < args.size() && args.at(index).is_object() ? args.at(index).as_object() : JsonObject {};
+}
+
+struct PermissionWarning {
+    StringView permission;
+    StringView warning;
+};
+
+// What Chrome's prompt says a permission lets an extension do. It doesn't ask about those it says nothing about, and
+// Xenon asks about any it doesn't know by name.
+static Optional<String> permission_warning(StringView permission)
+{
+    static constexpr Array without_warnings = {
+        "activeTab"sv, "alarms"sv, "background"sv, "contextMenus"sv, "cookies"sv, "declarativeContent"sv,
+        "declarativeNetRequestWithHostAccess"sv, "dns"sv, "fontSettings"sv, "gcm"sv, "identity"sv, "idle"sv,
+        "offscreen"sv, "power"sv, "scripting"sv, "search"sv, "sidePanel"sv, "storage"sv, "system.cpu"sv,
+        "system.display"sv, "system.memory"sv, "tts"sv, "unlimitedStorage"sv, "webRequest"sv, "webRequestAuthProvider"sv,
+        "webRequestBlocking"sv
+    };
+    static constexpr Array warnings {
+        PermissionWarning { "bookmarks"sv, "Read and change your bookmarks"sv },
+        PermissionWarning { "clipboardRead"sv, "Read data you copy and paste"sv },
+        PermissionWarning { "clipboardWrite"sv, "Modify data you copy and paste"sv },
+        PermissionWarning { "contentSettings"sv, "Change your settings that control websites' access to features such as cookies, JavaScript, plugins, geolocation, microphone, camera etc."sv },
+        PermissionWarning { "debugger"sv, "Access the page debugger backend"sv },
+        PermissionWarning { "declarativeNetRequest"sv, "Block content on any page"sv },
+        PermissionWarning { "declarativeNetRequestFeedback"sv, "Read your browsing history"sv },
+        PermissionWarning { "desktopCapture"sv, "Capture content of your screen"sv },
+        PermissionWarning { "downloads"sv, "Manage your downloads"sv },
+        PermissionWarning { "geolocation"sv, "Detect your physical location"sv },
+        PermissionWarning { "history"sv, "Read and change your browsing history"sv },
+        PermissionWarning { "management"sv, "Manage your apps, extensions, and themes"sv },
+        PermissionWarning { "nativeMessaging"sv, "Communicate with cooperating native applications"sv },
+        PermissionWarning { "notifications"sv, "Display notifications"sv },
+        PermissionWarning { "pageCapture"sv, "Read and change all your data on all websites"sv },
+        PermissionWarning { "privacy"sv, "Change your privacy-related settings"sv },
+        PermissionWarning { "proxy"sv, "Read and change all your data on all websites"sv },
+        PermissionWarning { "tabCapture"sv, "Read and change all your data on all websites"sv },
+        PermissionWarning { "tabGroups"sv, "View and manage your tab groups"sv },
+        PermissionWarning { "tabs"sv, "Read your browsing history"sv },
+        PermissionWarning { "topSites"sv, "Read a list of your most frequently visited websites"sv },
+        PermissionWarning { "webNavigation"sv, "Read your browsing history"sv },
+    };
+
+    if (without_warnings.contains_slow(permission))
+        return {};
+    for (auto const& warning : warnings) {
+        if (warning.permission == permission)
+            return MUST(String::from_utf8(warning.warning));
+    }
+    return MUST(String::formatted("Use the \"{}\" permission", permission));
+}
+
+// Unpacked extensions get every permission they ask for when they load, as in Chrome, and optional permissions when the
+// user grants them.
 ErrorOr<JsonValue, String> Router::handle_permissions_call(Context& context, String const& name, JsonArray const& args)
 {
-    auto const& manifest = context.extension->manifest();
+    auto& extension = *context.extension;
+    auto const& manifest = extension.manifest();
 
-    auto granted = [&] {
+    if (name == "permissions.getAll"sv) {
         JsonObject all;
-        all.set("permissions"sv, string_array(manifest.permissions));
+        all.set("permissions"sv, string_array(extension.permissions()));
         all.set("origins"sv, string_array(manifest.host_permissions));
-        return all;
-    };
+        return JsonValue { move(all) };
+    }
 
-    if (name == "permissions.getAll"sv)
-        return JsonValue { granted() };
-
-    auto request = !args.is_empty() && args.at(0).is_object() ? args.at(0).as_object() : JsonObject {};
-    auto requested = [&](StringView key) {
-        Vector<String> list;
-        if (auto values = request.get_array(key); values.has_value()) {
-            for (auto const& value : values->values()) {
-                if (value.is_string())
-                    list.append(value.as_string());
-            }
-        }
-        return list;
-    };
+    auto request = object_argument(args, 0);
+    auto permissions = string_list(request, "permissions"sv);
+    auto origins = string_list(request, "origins"sv);
 
     if (name == "permissions.contains"sv) {
-        for (auto const& permission : requested("permissions"sv)) {
-            if (!manifest.permissions.contains_slow(permission))
+        for (auto const& permission : permissions) {
+            if (!extension.has_permission(permission))
                 return JsonValue { false };
         }
-        for (auto const& origin : requested("origins"sv)) {
+        for (auto const& origin : origins) {
             if (!manifest.host_permissions.contains_slow(origin) && !manifest.host_permissions.contains_slow("<all_urls>"_string))
                 return JsonValue { false };
         }
         return JsonValue { true };
     }
 
-    // FIXME: Ask the user for optional permissions (milestone 4).
-    if (name == "permissions.request"sv)
-        return JsonValue { false };
-    if (name == "permissions.remove"sv)
-        return JsonValue { false };
+    if (name == "permissions.remove"sv) {
+        for (auto const& permission : permissions) {
+            if (manifest.permissions.contains_slow(permission))
+                return "You cannot remove required permissions."_string;
+        }
+        for (auto const& origin : origins) {
+            if (manifest.host_permissions.contains_slow(origin))
+                return "You cannot remove required permissions."_string;
+        }
+
+        Vector<String> removed;
+        for (auto const& permission : permissions) {
+            if (extension.granted_optional_permissions().contains_slow(permission))
+                removed.append(permission);
+        }
+        if (!removed.is_empty()) {
+            Registry::the().revoke_optional_permissions(extension.id(), removed);
+            dispatch_permissions_change(extension.id(), "permissions.onRemoved"sv, removed);
+        }
+        return JsonValue { true };
+    }
 
     return MUST(String::formatted("{} isn't supported.", name));
+}
+
+// Asks the user for optional permissions, as Chrome's prompt does, unless the extension has them already or they're
+// ones Chrome doesn't ask about. The extension's open contexts get the permissions' APIs before the call returns.
+void Router::request_permissions(Context& context, u64 call_id, JsonArray const& args)
+{
+    auto const& extension = *context.extension;
+    auto const& manifest = extension.manifest();
+    auto request = object_argument(args, 0);
+    auto permissions = string_list(request, "permissions"sv);
+
+    for (auto const& permission : permissions) {
+        if (!manifest.permissions.contains_slow(permission) && !manifest.optional_permissions.contains_slow(permission)) {
+            reply_with_error(context.endpoint, call_id, MUST(String::formatted("Only permissions specified in the manifest may be requested: '{}'.", permission)));
+            return;
+        }
+    }
+    // FIXME: Optional host permissions.
+    for (auto const& origin : string_list(request, "origins"sv)) {
+        if (!manifest.host_permissions.contains_slow(origin) && !manifest.host_permissions.contains_slow("<all_urls>"_string)) {
+            reply_with_error(context.endpoint, call_id, "Optional host permissions aren't supported yet."sv);
+            return;
+        }
+    }
+
+    Vector<String> missing;
+    Vector<String> warnings;
+    for (auto const& permission : permissions) {
+        if (extension.has_permission(permission) || missing.contains_slow(permission))
+            continue;
+        missing.append(permission);
+        if (auto warning = permission_warning(permission); warning.has_value() && !warnings.contains_slow(*warning))
+            warnings.append(warning.release_value());
+    }
+
+    auto answer = [extension_id = extension.id(), endpoint = context.endpoint, call_id, missing](bool granted) {
+        if (granted && !missing.is_empty()) {
+            Registry::the().grant_optional_permissions(extension_id, missing);
+            Router::the().dispatch_permissions_change(extension_id, "permissions.onAdded"sv, missing);
+        }
+        reply(endpoint, call_id, JsonValue { granted });
+    };
+    if (warnings.is_empty()) {
+        answer(true);
+        return;
+    }
+    Browser::prompt_for_permissions(extension, context.endpoint.view_id(), warnings, move(answer));
+}
+
+void Router::dispatch_permissions_change(StringView extension_id, StringView event_name, Vector<String> const& permissions)
+{
+    auto extension = Registry::the().extension(extension_id);
+    if (!extension)
+        return;
+
+    JsonObject change;
+    change.set("permissions"sv, string_array(permissions));
+    change.set("origins"sv, JsonArray {});
+    JsonArray args;
+    args.must_append(move(change));
+    dispatch_event(*extension, event_name, move(args));
+}
+
+// --- chrome.privacy ----------------------------------------------------------------------------------------------------
+
+// The settings Xenon lets extensions control. It has no password manager or autofill of its own, so they're off, and an
+// extension that sets one only becomes the one controlling it, which is what password managers check for.
+static constexpr Array PRIVACY_SETTINGS = {
+    "privacy.services.passwordSavingEnabled"sv,
+    "privacy.services.autofillEnabled"sv,
+    "privacy.services.autofillAddressEnabled"sv,
+    "privacy.services.autofillCreditCardEnabled"sv,
+};
+
+static JsonObject setting_details(StringView setting, Extension const& extension)
+{
+    auto controlled = Registry::the().controlled_setting(setting);
+
+    JsonObject details;
+    details.set("value"sv, controlled.has_value() ? controlled->value : JsonValue { false });
+    if (!controlled.has_value())
+        details.set("levelOfControl"sv, "controllable_by_this_extension"sv);
+    else if (controlled->extension_id == extension.id())
+        details.set("levelOfControl"sv, "controlled_by_this_extension"sv);
+    else
+        details.set("levelOfControl"sv, "controlled_by_other_extensions"sv);
+    return details;
+}
+
+ErrorOr<JsonValue, String> Router::handle_privacy_call(Context& context, String const& name, JsonArray const& args)
+{
+    auto const& extension = *context.extension;
+    if (!extension.has_permission("privacy"sv))
+        return "The 'privacy' permission is required."_string;
+
+    auto setting = !args.is_empty() && args.at(0).is_string() ? args.at(0).as_string() : String {};
+    if (!PRIVACY_SETTINGS.contains_slow(setting))
+        return MUST(String::formatted("{} isn't supported yet.", setting));
+
+    if (name == "privacy.get"sv)
+        return JsonValue { setting_details(setting, extension) };
+
+    if (name == "privacy.set"sv) {
+        auto value = object_argument(args, 1).get("value"sv);
+        if (!value.has_value() || !value->is_bool())
+            return "The value has to be a boolean."_string;
+        Registry::the().set_controlled_setting(setting, extension, *value);
+    } else if (name == "privacy.clear"sv) {
+        if (!Registry::the().clear_controlled_setting(setting, extension))
+            return JsonValue {};
+    } else {
+        return MUST(String::formatted("{} isn't supported.", name));
+    }
+
+    // Every extension that can see the setting hears it changed, with its own level of control.
+    auto event_name = MUST(String::formatted("{}.onChange", setting));
+    for (auto const& other : Registry::the().extensions()) {
+        if (!other->has_permission("privacy"sv))
+            continue;
+        JsonArray event_args;
+        event_args.must_append(setting_details(setting, *other));
+        dispatch_event(*other, event_name, move(event_args));
+    }
+    return JsonValue {};
 }
 
 JsonArray Router::contexts_of(Extension const& extension) const
@@ -588,7 +792,7 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
         info.set("offlineEnabled"sv, false);
         info.set("optionsUrl"sv, manifest.options_page.has_value() ? extension->url_for(*manifest.options_page).serialize() : String {});
         info.set("installType"sv, "development"sv);
-        info.set("permissions"sv, string_array(manifest.permissions));
+        info.set("permissions"sv, string_array(extension->permissions()));
         info.set("hostPermissions"sv, string_array(manifest.host_permissions));
         return JsonValue { move(info) };
     }
@@ -602,7 +806,7 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
         return JsonValue { 0 };
 
     if (name.starts_with_bytes("offscreen."sv)) {
-        if (!extension->manifest().has_permission("offscreen"sv))
+        if (!extension->has_permission("offscreen"sv))
             return "The 'offscreen' permission is required."_string;
 
         if (name == "offscreen.hasDocument"sv)

@@ -16,6 +16,7 @@
 #include <UI/Extensions/MatchPattern.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
+#include <UI/Popover.h>
 #include <UI/StringUtils.h>
 #include <UI/Tab.h>
 #include <UI/WebContentView.h>
@@ -23,6 +24,8 @@
 #include <QApplication>
 #include <QGuiApplication>
 #include <QKeySequence>
+#include <QLabel>
+#include <QMessageBox>
 #include <QPointer>
 #include <QShortcut>
 #include <QWindow>
@@ -51,6 +54,12 @@ struct ActionState {
     HashMap<i64, ActionProperties> tabs;
 };
 
+// An extension's popup, and the window of the tab its button is in.
+struct PopupView {
+    QPointer<BrowserWindow> window;
+    QPointer<QWidget> popup;
+};
+
 struct State {
     HashMap<Tab const*, i64> tab_ids;
     HashMap<Tab const*, i64> tab_window_ids;
@@ -58,7 +67,7 @@ struct State {
     i64 next_tab_id { 1 };
     i64 next_window_id { 1 };
 
-    HashMap<u64, QPointer<BrowserWindow>> popup_views;
+    HashMap<u64, PopupView> popup_views;
     HashTable<BrowserWindow const*> popup_windows;
     QPointer<BrowserWindow> last_focused_window;
     bool watches_focus { false };
@@ -212,8 +221,8 @@ static BrowserWindow* current_window(Optional<u64> caller_view_id)
     if (caller_view_id.has_value()) {
         if (auto tab = find_tab_for_view(*caller_view_id); tab.has_value())
             return tab->window;
-        if (auto popup = state().popup_views.get(*caller_view_id); popup.has_value() && *popup)
-            return popup->data();
+        if (auto popup = state().popup_views.get(*caller_view_id); popup.has_value() && popup->window)
+            return popup->window.data();
     }
     if (state().last_focused_window)
         return state().last_focused_window.data();
@@ -224,7 +233,7 @@ static BrowserWindow* current_window(Optional<u64> caller_view_id)
 static bool may_see_details(Extension const& extension, URL::URL const& url)
 {
     auto const& manifest = extension.manifest();
-    if (manifest.has_permission("tabs"sv))
+    if (extension.has_permission("tabs"sv))
         return true;
     if (url.scheme() == EXTENSION_SCHEME && url.serialized_host() == extension.id().bytes_as_string_view())
         return true;
@@ -330,9 +339,9 @@ void open_tab(URL::URL const& url)
         Application::the().new_window({ url });
 }
 
-void did_open_popup(u64 view_id, Tab& tab)
+void did_open_popup(u64 view_id, Tab& tab, QWidget& popup)
 {
-    state().popup_views.set(view_id, window_with_tab(tab));
+    state().popup_views.set(view_id, { .window = window_with_tab(tab), .popup = &popup });
 }
 
 void did_close_popup(u64 view_id)
@@ -945,6 +954,73 @@ Function<void(Extension const&)>& open_popup_handler()
     return state().open_popup;
 }
 
+// --- chrome.permissions ------------------------------------------------------------------------------------------------
+
+static constexpr int PERMISSION_PROMPT_WIDTH = 300;
+
+namespace {
+
+// Answers once, with whichever answer comes first.
+class PromptAnswer : public RefCounted<PromptAnswer> {
+public:
+    explicit PromptAnswer(Function<void(bool)> callback)
+        : m_callback(move(callback))
+    {
+    }
+
+    void answer(bool granted)
+    {
+        if (auto callback = move(m_callback))
+            callback(granted);
+    }
+
+private:
+    Function<void(bool)> m_callback;
+};
+
+}
+
+void prompt_for_permissions(Extension const& extension, Optional<u64> caller_view_id, Vector<String> const& warnings, Function<void(bool granted)> on_answer)
+{
+    auto answer = adopt_ref(*new PromptAnswer(move(on_answer)));
+    auto question = qformatted("Allow \u201C{}\u201D to:", extension.manifest().name);
+    QStringList lines;
+    for (auto const& warning : warnings)
+        lines.append(QString::fromUtf8("\u2022 ") + qstring_from_ak_string(warning));
+    auto details = lines.join('\n');
+
+    // A popup asking stays open for the answer: the prompt is a popover of its own, over the popup.
+    QPointer<QWidget> popup;
+    if (caller_view_id.has_value()) {
+        if (auto view = state().popup_views.get(*caller_view_id); view.has_value())
+            popup = view->popup;
+    }
+    if (popup) {
+        auto* prompt = new MessagePopover(popup, PERMISSION_PROMPT_WIDTH, question, details, "Deny", "Allow");
+        prompt->setAttribute(Qt::WA_DeleteOnClose);
+        // The extension's name and the warnings are text, never markup.
+        for (auto* label : prompt->findChildren<QLabel*>())
+            label->setTextFormat(Qt::PlainText);
+        prompt->on_accept = [answer] { answer->answer(true); };
+        prompt->on_dismiss = [answer] { answer->answer(false); };
+        prompt->update_chrome_style(popup->palette());
+        prompt->adjustSize();
+        prompt->move(popup->mapToGlobal(QPoint((popup->width() - prompt->width()) / 2, 24)));
+        prompt->show();
+        prompt->raise();
+        return;
+    }
+
+    auto* box = new QMessageBox(QMessageBox::Question, qstring_from_ak_string(extension.manifest().name), question, QMessageBox::NoButton, Application::the().active_window_if_any());
+    box->setTextFormat(Qt::PlainText);
+    box->setInformativeText(details);
+    auto* allow = box->addButton("Allow", QMessageBox::AcceptRole);
+    box->setDefaultButton(box->addButton("Deny", QMessageBox::RejectRole));
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    QObject::connect(box, &QMessageBox::finished, box, [box, allow, answer] { answer->answer(box->clickedButton() == allow); });
+    box->open();
+}
+
 void action_clicked(Extension const& extension, Tab* tab)
 {
     JsonArray args;
@@ -1080,7 +1156,7 @@ static JsonObject top_frame_to_json(Tab& tab)
 
 static ErrorOr<JsonValue, String> handle_web_navigation_call(Extension const& extension, StringView name, JsonArray const& args)
 {
-    if (!extension.manifest().has_permission("webNavigation"sv))
+    if (!extension.has_permission("webNavigation"sv))
         return "The webNavigation permission is required."_string;
 
     auto details = !args.is_empty() && args.at(0).is_object() ? args.at(0).as_object() : JsonObject {};

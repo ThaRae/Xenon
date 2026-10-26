@@ -142,6 +142,26 @@ async function run() {
     check("tabs.connect disconnects without content scripts", tabPortError?.includes("Receiving end does not exist"));
     check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
 
+    // Optional permissions need the user, so the test can only check what doesn't ask.
+    check("permissions.contains an optional one", (await chrome.permissions.contains({ permissions: ["bookmarks"] })) === false);
+    check("permissions.request needs a user gesture", await chrome.permissions.request({ permissions: ["bookmarks"] }).then(() => false, error => /user gesture/.test(error.message)));
+    check("permissions.remove of a required one", await chrome.permissions.remove({ permissions: ["storage"] }).then(() => false, () => true));
+    check("permissions.getAll", (await chrome.permissions.getAll()).permissions.includes("privacy"));
+
+    // An earlier run may have left the setting controlled.
+    const passwordSaving = chrome.privacy.services.passwordSavingEnabled;
+    await passwordSaving.clear({});
+    check("privacy setting starts controllable", (await passwordSaving.get({})).levelOfControl === "controllable_by_this_extension");
+    const settingChanged = new Promise(resolve => passwordSaving.onChange.addListener(resolve));
+    await passwordSaving.set({ value: false });
+    const controlled = await passwordSaving.get({});
+    check("privacy setting controlled", controlled.levelOfControl === "controlled_by_this_extension" && controlled.value === false);
+    check("privacy setting onChange", (await settingChanged).levelOfControl === "controlled_by_this_extension");
+    check("privacy setting takes booleans", await passwordSaving.set({ value: "no" }).then(() => false, () => true));
+    await passwordSaving.clear({});
+    check("privacy setting cleared", (await passwordSaving.get({})).levelOfControl === "controllable_by_this_extension");
+    check("no native messaging without its permission", chrome.runtime.connectNative === undefined);
+
     // Meta/xenon.py serves JSON with no CORS headers from a host the extension has permission for, which its pages and
     // its background reach as Chrome lets them: without CORS. The header would otherwise need a preflight.
     const dataURL = new URLSearchParams(location.search).get("data");

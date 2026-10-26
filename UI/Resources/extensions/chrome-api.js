@@ -533,7 +533,12 @@ const notifications = {
 const permissions = {
     contains: method("permissions.contains"),
     getAll: method("permissions.getAll"),
-    request: method("permissions.request"),
+    request: api(details => {
+        // As in Chrome, only in answer to the user's click or key press.
+        if (!globalThis.navigator?.userActivation?.isActive)
+            throw new ExtensionError("This function must be called during a user gesture");
+        return call("permissions.request", [toJSON(details)]);
+    }),
     remove: method("permissions.remove"),
     onAdded: event("permissions.onAdded"),
     onRemoved: event("permissions.onRemoved"),
@@ -643,6 +648,14 @@ bridge.onmessage = text => {
             ports.get(message.port)?.closeFromUIProcess(message.error);
             break;
         case "event":
+            if (message.name === "permissions.onAdded" || message.name === "permissions.onRemoved") {
+                const changed = message.args[0]?.permissions ?? [];
+                config.permissions =
+                    message.name === "permissions.onAdded"
+                        ? [...new Set([...config.permissions, ...changed])]
+                        : config.permissions.filter(permission => !changed.includes(permission));
+                installPermittedAPIs();
+            }
             if (message.name === "storage.onChanged") {
                 const [changes, areaName] = message.args;
                 storageAreas[areaName]?.onChanged.dispatch(changes);
@@ -689,21 +702,76 @@ if (config.isBackground) {
     });
 }
 
+// --- chrome.privacy ----------------------------------------------------------------------------------------------------
+
+// A browser setting an extension may control (types.ChromeSetting).
+function chromeSetting(name) {
+    return {
+        get: api(details => call("privacy.get", [name, toJSON(details ?? {})])),
+        set: api(details => call("privacy.set", [name, toJSON(details)]).then(() => undefined)),
+        clear: api(details => call("privacy.clear", [name, toJSON(details ?? {})]).then(() => undefined)),
+        onChange: event(`${name}.onChange`),
+    };
+}
+
+// FIXME: Xenon has no password manager or autofill of its own, so these are off, and an extension that sets one only
+//        becomes the one controlling it. The network and websites settings come with the features they control.
+const privacy = {
+    services: {
+        passwordSavingEnabled: chromeSetting("privacy.services.passwordSavingEnabled"),
+        autofillEnabled: chromeSetting("privacy.services.autofillEnabled"),
+        autofillAddressEnabled: chromeSetting("privacy.services.autofillAddressEnabled"),
+        autofillCreditCardEnabled: chromeSetting("privacy.services.autofillCreditCardEnabled"),
+    },
+};
+
+// --- Native messaging --------------------------------------------------------------------------------------------------
+
+// FIXME: Native messaging hosts (milestone 4). Until then, every host is one that isn't installed.
+const nativeHostNotFound = "Specified native messaging host not found.";
+function connectNative(application) {
+    const port = new Port(crypto.randomUUID(), String(application ?? ""));
+    queueMicrotask(() => port.closeFromUIProcess(nativeHostNotFound));
+    return port;
+}
+const sendNativeMessage = api(() => {
+    throw new ExtensionError(nativeHostNotFound);
+});
+
 // --- chrome ------------------------------------------------------------------------------------------------------------
 
 // Offscreen documents get chrome.runtime alone, as in Chrome.
 const chrome = { runtime };
 if (config.contextType !== "OFFSCREEN_DOCUMENT") {
     Object.assign(chrome, { i18n, tabs, windows, permissions, management, commands, extension });
-    if (hasPermission("storage")) chrome.storage = storage;
-    if (hasPermission("alarms")) chrome.alarms = alarms;
-    if (hasPermission("idle")) chrome.idle = idle;
-    if (hasPermission("offscreen")) chrome.offscreen = offscreen;
-    if (hasPermission("webNavigation")) chrome.webNavigation = webNavigation;
-    if (hasPermission("scripting")) chrome.scripting = scripting;
-    if (hasPermission("webRequest")) chrome.webRequest = webRequest;
-    if (hasPermission("notifications")) chrome.notifications = notifications;
     if (config.manifest.action) chrome.action = action;
 }
+
+// The APIs that come with permissions. An optional permission's API arrives in every open context when the user grants
+// it, and goes when the extension gives it up, as in Chrome.
+const permittedAPIs = {
+    storage,
+    alarms,
+    idle,
+    offscreen,
+    webNavigation,
+    scripting,
+    webRequest,
+    notifications,
+    privacy,
+};
+function installPermittedAPIs() {
+    if (config.contextType === "OFFSCREEN_DOCUMENT") return;
+    for (const [permission, permittedAPI] of Object.entries(permittedAPIs)) {
+        if (hasPermission(permission)) chrome[permission] = permittedAPI;
+        else delete chrome[permission];
+    }
+    if (hasPermission("nativeMessaging")) Object.assign(runtime, { connectNative, sendNativeMessage });
+    else {
+        delete runtime.connectNative;
+        delete runtime.sendNativeMessage;
+    }
+}
+installPermittedAPIs();
 
 Object.defineProperty(globalThis, "chrome", { value: chrome, writable: true, configurable: true, enumerable: false });

@@ -45,6 +45,12 @@ public:
 
     bool is_sandboxed_page(StringView path) const;
 
+    // The manifest's permissions, and the optional ones the user granted (see Registry::grant_optional_permissions()).
+    Vector<String> permissions() const;
+    bool has_permission(StringView) const;
+    Vector<String> const& granted_optional_permissions() const { return m_granted_optional_permissions; }
+    void set_granted_optional_permissions(Vector<String>);
+
 private:
     Extension(String id, ByteString root, Manifest, Locales);
 
@@ -52,6 +58,7 @@ private:
     ByteString m_root;
     Manifest m_manifest;
     Locales m_locales;
+    Vector<String> m_granted_optional_permissions;
 };
 
 // Chrome's extension IDs: the first 128 bits of a SHA-256 hash, as 32 letters from a to p. An extension with a "key" in

@@ -9,6 +9,7 @@
 #include <AK/ByteString.h>
 #include <AK/Function.h>
 #include <AK/HashMap.h>
+#include <AK/JsonValue.h>
 #include <AK/NeverDestroyed.h>
 #include <AK/NonnullOwnPtr.h>
 #include <AK/NonnullRefPtr.h>
@@ -80,6 +81,22 @@ public:
     void close_offscreen_document(Extension const&);
     bool is_offscreen_view(Extension const&, u64 view_id) const;
 
+    // Optional permissions the user granted an extension. They last across sessions and reloads, until the extension
+    // gives them up or is removed.
+    void grant_optional_permissions(StringView id, Vector<String> const&);
+    void revoke_optional_permissions(StringView id, Vector<String> const&);
+
+    // Browser settings extensions control through chrome.privacy. The last extension to set one controls it, until it
+    // clears it or is removed.
+    struct ControlledSetting {
+        String extension_id;
+        JsonValue value;
+    };
+    Optional<ControlledSetting const&> controlled_setting(StringView name) const;
+    void set_controlled_setting(String const& name, Extension const&, JsonValue);
+    // Whether the extension controlled the setting, which it now no longer does.
+    bool clear_controlled_setting(StringView name, Extension const&);
+
     // Called whenever the set of extensions changes, until the listener returns false.
     void on_extensions_change(Function<bool()>);
 
@@ -110,6 +127,9 @@ private:
     Vector<ByteString> m_persisted_directories;
     HashMap<String, String> m_known_versions;
     HashMap<String, InstallReason> m_install_reasons;
+    // By extension ID, and by setting name.
+    HashMap<String, Vector<String>> m_granted_permissions;
+    HashMap<String, ControlledSetting> m_controlled_settings;
 
     bool m_can_start_background_pages { false };
     Optional<Core::AnonymousBuffer> m_theme;

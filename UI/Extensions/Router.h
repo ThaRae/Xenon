@@ -96,6 +96,9 @@ private:
     ErrorOr<JsonValue, String> handle_storage_call(Context&, String const& name, JsonArray const& args);
     ErrorOr<JsonValue, String> handle_alarms_call(Context&, String const& name, JsonArray const& args);
     ErrorOr<JsonValue, String> handle_permissions_call(Context&, String const& name, JsonArray const& args);
+    void request_permissions(Context&, u64 call_id, JsonArray const& args);
+    void dispatch_permissions_change(StringView extension_id, StringView event_name, Vector<String> const& permissions);
+    ErrorOr<JsonValue, String> handle_privacy_call(Context&, String const& name, JsonArray const& args);
     ErrorOr<JsonValue, String> handle_runtime_call(Context&, String const& name, JsonArray const& args);
     JsonArray contexts_of(Extension const&) const;
 

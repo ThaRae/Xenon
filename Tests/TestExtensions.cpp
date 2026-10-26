@@ -264,6 +264,25 @@ TEST_CASE(load_unpacked_extension)
     EXPECT_EQ(extension->url_for("/popup.html"sv).serialize(), MUST(String::formatted("chrome-extension://{}/popup.html", extension->id())));
 }
 
+TEST_CASE(granted_optional_permissions)
+{
+    auto directory = make_extension(R"({
+        "manifest_version": 3, "name": "T", "version": "1",
+        "permissions": ["storage"],
+        "optional_permissions": ["privacy", "nativeMessaging"]
+    })"sv);
+    auto extension = MUST(Extension::load_unpacked(directory.path(), "en-US"sv));
+    EXPECT(extension->has_permission("storage"sv));
+    EXPECT(!extension->has_permission("privacy"sv));
+
+    // Only what the manifest lists as optional can be granted, so a permission an update dropped goes.
+    extension->set_granted_optional_permissions({ "privacy"_string, "tabs"_string });
+    EXPECT(extension->has_permission("privacy"sv));
+    EXPECT(!extension->has_permission("tabs"sv));
+    EXPECT_EQ(extension->granted_optional_permissions(), (Vector { "privacy"_string }));
+    EXPECT_EQ(extension->permissions(), (Vector { "storage"_string, "privacy"_string }));
+}
+
 TEST_CASE(extension_with_key_has_its_id)
 {
     auto directory = make_extension(R"({ "manifest_version": 3, "name": "T", "version": "1", "key": "dGVzdA==" })"sv);

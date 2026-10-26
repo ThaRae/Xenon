@@ -58,7 +58,7 @@ QFrame#XenonExtensionPopup {{
     m_view = new WebContentView(&card());
     layout->addWidget(m_view);
     // NB: Before the page loads, so that its chrome.* knows it's a popup.
-    Browser::did_open_popup(m_view->view_id(), tab);
+    Browser::did_open_popup(m_view->view_id(), tab, *this);
 
     m_view->on_close = [this] {
         close();

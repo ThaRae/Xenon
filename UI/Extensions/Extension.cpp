@@ -227,6 +227,28 @@ ErrorOr<ByteString> Extension::resolve(URL::URL const& url) const
     return real_path;
 }
 
+Vector<String> Extension::permissions() const
+{
+    auto permissions = m_manifest.permissions;
+    for (auto const& permission : m_granted_optional_permissions) {
+        if (!permissions.contains_slow(permission))
+            permissions.append(permission);
+    }
+    return permissions;
+}
+
+bool Extension::has_permission(StringView permission) const
+{
+    return m_manifest.has_permission(permission) || m_granted_optional_permissions.contains_slow(permission);
+}
+
+// Only what the manifest still lists as optional, since an update may drop some.
+void Extension::set_granted_optional_permissions(Vector<String> permissions)
+{
+    permissions.remove_all_matching([&](auto const& permission) { return !m_manifest.optional_permissions.contains_slow(permission); });
+    m_granted_optional_permissions = move(permissions);
+}
+
 bool Extension::is_web_accessible(StringView path, URL::Origin const& requester) const
 {
     while (path.starts_with('/'))

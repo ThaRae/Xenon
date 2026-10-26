@@ -97,6 +97,8 @@ void Registry::add(NonnullRefPtr<Extension> extension)
     // start over, and it keeps its storage.
     stop_background_page(extension->id());
     m_extensions.remove_all_matching([&](auto const& loaded) { return loaded->id() == extension->id(); });
+    if (auto granted = m_granted_permissions.get(extension->id()); granted.has_value())
+        extension->set_granted_optional_permissions(*granted);
     m_extensions.append(extension);
 
     auto const& version = extension->manifest().version;
@@ -125,6 +127,8 @@ void Registry::remove(StringView id)
     m_persisted_directories.remove_all_matching([&](auto const& directory) { return directory == removed->root(); });
     m_known_versions.remove(removed->id());
     m_install_reasons.remove(removed->id());
+    m_granted_permissions.remove(removed->id());
+    m_controlled_settings.remove_all_matching([&](auto const&, auto const& setting) { return setting.extension_id == removed->id(); });
     m_storage.remove_all_matching([&](auto const& key, auto const&) { return key.starts_with(ByteString::formatted("{}/", id)); });
     save_state();
 
@@ -164,7 +168,7 @@ StorageArea& Registry::storage(Extension const& extension, StorageArea::Kind kin
         if (kind == StorageArea::Kind::Local || kind == StorageArea::Kind::Sync)
             file = LexicalPath::join(m_extensions_directory, "Storage"sv, extension.id(), ByteString::formatted("{}.json", storage_area_name(kind))).string();
 
-        auto quota = StorageArea::quota_for(kind, extension.manifest().has_permission("unlimitedStorage"sv));
+        auto quota = StorageArea::quota_for(kind, extension.has_permission("unlimitedStorage"sv));
         return MUST(StorageArea::create(kind, quota, move(file)));
     });
 }
@@ -172,6 +176,56 @@ StorageArea& Registry::storage(Extension const& extension, StorageArea::Kind kin
 Optional<InstallReason> Registry::take_install_reason(StringView id)
 {
     return m_install_reasons.take(MUST(String::from_utf8(id)));
+}
+
+void Registry::grant_optional_permissions(StringView id, Vector<String> const& permissions)
+{
+    auto extension = this->extension(id);
+    if (!extension)
+        return;
+
+    auto granted = extension->granted_optional_permissions();
+    for (auto const& permission : permissions) {
+        if (!granted.contains_slow(permission))
+            granted.append(permission);
+    }
+    extension->set_granted_optional_permissions(move(granted));
+    m_granted_permissions.set(extension->id(), extension->granted_optional_permissions());
+    save_state();
+}
+
+void Registry::revoke_optional_permissions(StringView id, Vector<String> const& permissions)
+{
+    auto extension = this->extension(id);
+    if (!extension)
+        return;
+
+    auto granted = extension->granted_optional_permissions();
+    granted.remove_all_matching([&](auto const& permission) { return permissions.contains_slow(permission); });
+    extension->set_granted_optional_permissions(move(granted));
+    m_granted_permissions.set(extension->id(), extension->granted_optional_permissions());
+    save_state();
+}
+
+Optional<Registry::ControlledSetting const&> Registry::controlled_setting(StringView name) const
+{
+    return m_controlled_settings.get(name);
+}
+
+void Registry::set_controlled_setting(String const& name, Extension const& extension, JsonValue value)
+{
+    m_controlled_settings.set(name, { .extension_id = extension.id(), .value = move(value) });
+    save_state();
+}
+
+bool Registry::clear_controlled_setting(StringView name, Extension const& extension)
+{
+    auto setting = m_controlled_settings.get(name);
+    if (!setting.has_value() || setting->extension_id != extension.id())
+        return false;
+    m_controlled_settings.remove(name);
+    save_state();
+    return true;
 }
 
 void Registry::on_extensions_change(Function<bool()> listener)
@@ -408,6 +462,28 @@ void Registry::load_state()
                 m_known_versions.set(id, version.as_string());
         });
     }
+    if (auto granted = json.value().get_object("granted"sv); granted.has_value()) {
+        granted->for_each_member([&](String const& id, JsonValue const& permissions) {
+            if (!permissions.is_array())
+                return;
+            Vector<String> list;
+            for (auto const& permission : permissions.as_array().values()) {
+                if (permission.is_string())
+                    list.append(permission.as_string());
+            }
+            m_granted_permissions.set(id, move(list));
+        });
+    }
+    if (auto settings = json.value().get_object("settings"sv); settings.has_value()) {
+        settings->for_each_member([&](String const& name, JsonValue const& setting) {
+            if (!setting.is_object())
+                return;
+            auto extension_id = setting.as_object().get_string("extension"sv);
+            auto value = setting.as_object().get("value"sv);
+            if (extension_id.has_value() && value.has_value())
+                m_controlled_settings.set(name, { .extension_id = *extension_id, .value = *value });
+        });
+    }
 }
 
 void Registry::save_state() const
@@ -422,9 +498,26 @@ void Registry::save_state() const
     for (auto const& [id, version] : m_known_versions)
         versions.set(id, version);
 
+    JsonObject granted;
+    for (auto const& [id, permissions] : m_granted_permissions) {
+        JsonArray list;
+        for (auto const& permission : permissions)
+            list.must_append(permission);
+        granted.set(id, move(list));
+    }
+    JsonObject settings;
+    for (auto const& [name, setting] : m_controlled_settings) {
+        JsonObject json;
+        json.set("extension"sv, setting.extension_id);
+        json.set("value"sv, setting.value);
+        settings.set(name, move(json));
+    }
+
     JsonObject state;
     state.set("unpacked"sv, move(directories));
     state.set("versions"sv, move(versions));
+    state.set("granted"sv, move(granted));
+    state.set("settings"sv, move(settings));
 
     auto write = [&]() -> ErrorOr<void> {
         TRY(Core::Directory::create(m_extensions_directory, Core::Directory::CreateDirectories::Yes));

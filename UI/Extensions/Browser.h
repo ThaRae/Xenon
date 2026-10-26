@@ -18,6 +18,8 @@
 
 #include <QColor>
 
+class QWidget;
+
 namespace Ladybird {
 
 class BrowserWindow;
@@ -42,7 +44,7 @@ Optional<JsonObject> tab_json(u64 view_id, Extension const&);
 void open_tab(URL::URL const&);
 
 // Popups are views of their own, whose window is the one their button's tab is in.
-void did_open_popup(u64 view_id, Tab&);
+void did_open_popup(u64 view_id, Tab&, QWidget& popup);
 void did_close_popup(u64 view_id);
 bool is_popup_view(u64 view_id);
 
@@ -66,6 +68,10 @@ ActionAppearance action_appearance(Extension const&, Tab*);
 void on_action_change(Function<bool()>);
 // The current tab's window shows the extension's popup, as action.openPopup() and its keyboard shortcut do.
 Function<void(Extension const&)>& open_popup_handler();
+// Asks the user whether to let an extension do what the warnings say, as Chrome's permission prompt does: over the
+// extension's popup when it asks from there, and in a dialog otherwise.
+void prompt_for_permissions(Extension const&, Optional<u64> caller_view_id, Vector<String> const& warnings, Function<void(bool granted)>);
+
 // A click on a button without a popup.
 void action_clicked(Extension const&, Tab*);
 
