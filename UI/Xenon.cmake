@@ -45,9 +45,11 @@ set(XENON_SOURCES
     Extensions/Locales.cpp
     Extensions/Manifest.cpp
     Extensions/MatchPattern.cpp
+    Extensions/Popup.cpp
     Extensions/Registry.cpp
     Extensions/Router.cpp
     Extensions/Storage.cpp
+    Extensions/Toolbar.cpp
     FilterLists.cpp
     FindInPageWidget.cpp
     Icon.cpp

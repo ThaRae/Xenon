@@ -75,6 +75,10 @@ Optional<String> Router::bootstrap_script(WebView::URLSchemeBridgeEndpoint const
     config.set("platform"sv, platform_info());
     config.set("permissions"sv, string_array(extension->manifest().permissions));
 
+    // NB: A tab can show the popup's page too, as Bitwarden's popout does, so the page only reports its size.
+    auto const& popup = extension->manifest().action.has_value() ? extension->manifest().action->default_popup : Optional<String> {};
+    config.set("isPopup"sv, popup.has_value() && URL::percent_decode(endpoint.url().serialize_path()) == ByteString::formatted("/{}", *popup));
+
     StringBuilder script;
     script.appendff("const config = {};\n", config.serialized());
     script.append(chrome_api_source);
@@ -133,6 +137,11 @@ void Router::on_message(WebView::URLSchemeBridgeEndpoint const& endpoint, String
         auto args = message.get_array("args"sv);
         if (id.has_value() && name.has_value())
             handle_call(*context, *id, *name, args.has_value() ? *args : JsonArray {});
+    } else if (*type == "popup-size"sv) {
+        auto width = message.get_i32("width"sv);
+        auto height = message.get_i32("height"sv);
+        if (auto listener = m_popup_size_listeners.get(context->extension->id()); listener.has_value() && width.has_value() && height.has_value())
+            (*listener)(*width, *height);
     } else if (*type == "response"sv) {
         auto id = message.get_u64("id"sv);
         if (id.has_value())
@@ -242,6 +251,14 @@ ErrorOr<JsonValue, String> Router::handle_storage_call(Context& context, String 
         return changed(area.clear());
 
     return MUST(String::formatted("{} isn't supported.", name));
+}
+
+void Router::set_popup_size_listener(String const& extension_id, Function<void(int width, int height)> listener)
+{
+    if (listener)
+        m_popup_size_listeners.set(extension_id, move(listener));
+    else
+        m_popup_size_listeners.remove(extension_id);
 }
 
 void Router::dispatch_event(Extension const& extension, StringView name, JsonArray args)

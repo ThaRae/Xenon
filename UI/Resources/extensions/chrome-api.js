@@ -323,6 +323,27 @@ bridge.onmessage = text => {
     }
 };
 
+// --- The popup's size --------------------------------------------------------------------------------------------------
+
+// Chrome sizes an action popup to its page. The page's body sets the width when it has one narrower than the popup, and
+// anything wider than the popup widens it; its content sets the height.
+if (config.isPopup) {
+    const reportSize = () => {
+        const body = document.body;
+        if (!body) return;
+        const style = getComputedStyle(body);
+        const rect = body.getBoundingClientRect();
+        const bodyWidth = rect.width + parseFloat(style.marginLeft) + parseFloat(style.marginRight);
+        const width = bodyWidth < innerWidth ? bodyWidth : document.documentElement.scrollWidth;
+        const height = Math.max(rect.bottom + parseFloat(style.marginBottom), body.scrollHeight);
+        post({ type: "popup-size", width: Math.ceil(width), height: Math.ceil(height) });
+    };
+    document.addEventListener("DOMContentLoaded", () => {
+        reportSize();
+        new ResizeObserver(reportSize).observe(document.body);
+    });
+}
+
 // --- chrome ------------------------------------------------------------------------------------------------------------
 
 const chrome = { runtime, i18n };

@@ -74,27 +74,33 @@ outright once upstream has the equivalent. A fork does make engine work a little
 
 ### The patch series
 
-In order. Each is generic: none mentions Chrome extensions, Xenon, or `chrome.*`.
+`Patches/ladybird/`, in order. Each is generic: none mentions Chrome extensions, Xenon, or `chrome.*`.
 
-1. **Embedder URL schemes.** The embedder registers schemes with LibWebView, with three properties each: a tuple
-   origin (`scheme://host`), potentially trustworthy (a secure context), and loaded by the UI process. LibURL's
-   origin computation, SecureContexts, and Fetch's scheme fetch consult the registry. A request for a registered scheme
-   goes from WebContent to the UI process, like a `file://` load does, and the embedder answers it with a status,
-   headers, and a file descriptor or bytes, or refuses it. Navigations, subresources, `fetch()`, and workers all get
-   it.
-2. **User scripts and script worlds.** `ViewImplementation` gains `add_user_script(world, source, url, injection
-   time, all_frames, match)` and a per-world message handler. A world is either the main world or a named isolated
-   world, built on `WrapperWorldType::Extension`: a realm per document and world, whose global wraps the same `Window`,
-   with its own `WindowProxy` from `window_proxy_for()`. Injection times are document start (after the document
-   element exists, before any parser-inserted script runs), document end (after parsing, before `DOMContentLoaded`
-   handlers), and document idle. Each world gets a native `postMessage(json)` to its handler in the UI process and a
-   way for the UI process to call into it. The UI process decides which scripts go into which frames, since it knows
-   every navigable's URL, and the WebContent process that hosts the frame runs them.
-3. **Embedder-owned workers.** The UI process starts a worker with a given script URL (of a registered scheme) and no
-   owning document, in the WebWorker process, with the same user-script and messaging hooks as a world. It lives until
-   the UI process closes it.
-4. **Embedder-chosen processes.** The embedder can say which origins get a process of their own, generalizing what
-   WebUI hosts and `file://` content already get.
+1. **Embedder URL schemes** (`0001`, done). `WebView::register_url_scheme()` registers a scheme the UI process serves.
+   Its URLs get tuple origins (`scheme://host`), are potentially trustworthy (secure contexts), and are fetch schemes,
+   with CORS requests allowed. LibURL's origin computation, SecureContexts, and Fetch consult a registry
+   (`LibURL/EmbedderSchemes.h`), which renderers learn from `--embedder-scheme` arguments. A request for such a URL
+   goes from WebContent to the UI process, as a `file://` load does, and the embedder's handler answers it with a file
+   and headers, or refuses it. The handler learns whether the asking process hosts a document of the URL's origin, and,
+   for a navigation, who started it.
+2. **A script bridge for the embedder's pages** (`0002`, done). `register_url_scheme()` takes an optional
+   `URLSchemeBridge`. Before a document of the scheme may run scripts (at the start of
+   `Document::set_ready_to_run_scripts()`), WebContent asks the UI process for a bootstrap script and runs it as the
+   body of a function given a bridge object, whose `postMessage(string)` reaches the UI process and whose `onmessage`
+   receives its replies. The UI process takes each message's sender from its own records of the documents a page hosts.
+3. **User scripts in isolated worlds** (next, milestone 3). The same bootstrap-and-bridge, for any document and into a
+   world of the embedder's choosing: the main world, or a named isolated world built on
+   `WrapperWorldType::Extension`, a realm per document and world whose global wraps the same `Window`, with its own
+   `WindowProxy` from `window_proxy_for()`. Injection at document start, document end, and document idle, in all frames
+   or only the top one. The UI process decides which scripts go into which frames, since it knows every navigable's URL.
+   The xenon-ublock session is writing a main-world document-start hook for uBlock Origin's scriptlets; this patch
+   should share its injection points rather than add a second set.
+4. **Embedder-owned workers** (milestone 2). The UI process starts a worker with a script URL of a registered scheme and
+   no owning document, in the WebWorker process, with the same bridge. It lives until the UI process closes it. The
+   WebWorker process also needs patch 1's resource requests, which only WebContent has so far.
+
+Site isolation already gives every `chrome-extension://<id>` origin processes of its own, as a site of its own, so
+the "embedder-chosen processes" patch planned at first isn't needed.
 
 Later patches, as the milestones need them: request interception for `webRequest` (in RequestServer, next to the
 content blocker), HTTP auth challenges for `webRequestAuthProvider`, and hidden pages with no tab, for offscreen
@@ -105,12 +111,12 @@ documents.
 ```
  UI process (Xenon)                                     WebContent process, one per extension
  ┌──────────────────────────────────────────┐          ┌──────────────────────────────────────┐
- │ ExtensionRegistry                         │          │ chrome-extension://<id>/popup.html   │
+ │ Extensions::Registry                      │          │ chrome-extension://<id>/popup.html   │
  │  ├ Extension (manifest, id, locales)      │  scheme  │  main world: chrome.* (full)         │
- │  ├ ExtensionStorage (per id, on disk)     │◄────────►│                                      │
- │  ├ ExtensionRouter (messages, ports,      │  JSON    └──────────────────────────────────────┘
+ │  ├ Storage (per id, on disk)              │◄────────►│                                      │
+ │  ├ Router (calls, messages, ports,        │  JSON    └──────────────────────────────────────┘
  │  │   events, sender info)                 │  over    ┌──────────────────────────────────────┐
- │  ├ ExtensionPermissions                   │  IPC     │ WebWorker: background service worker │
+ │  ├ Permissions                            │  IPC     │ WebWorker: background service worker │
  │  └ API handlers: runtime, storage, i18n,  │◄────────►│  chrome.* (full)                     │
  │      tabs, scripting, alarms, ...         │          └──────────────────────────────────────┘
  │ Toolbar: action buttons, popup Popover    │          ┌──────────────────────────────────────┐
@@ -137,8 +143,10 @@ one for a session. Loading:
 3. Loads `_locales/<default_locale>/messages.json` and the UI language's, and resolves `__MSG_name__` in `name`,
    `description`, `action.default_title`, and the other strings Chrome localizes.
 4. Validates paths: every file the manifest names has to exist inside the directory.
-5. Records it in the registry (`<profile>/Extensions/registry.json`): ID, path, enabled, granted permissions, and
-   whether it is unpacked. Unpacked extensions load from their directory; nothing is copied.
+5. Records it in the registry: ID, path, enabled, granted permissions, and whether it is unpacked. Unpacked extensions
+   load from their directory; nothing is copied. For now the registry lasts for the session, as with Chrome's
+   `--load-extension`; keeping it in the profile (`<profile>/Extensions/registry.json`) comes with the Extensions
+   dialog.
 
 **CRX later.** A CRX3 file is a signed header (a protobuf with the public key and signatures) in front of a zip.
 Installing one verifies the signature, derives the ID from the key, unpacks to `<profile>/Extensions/<id>/<version>/`,
@@ -257,16 +265,14 @@ yet, so that an extension's startup doesn't throw. Bitwarden feature-detects `si
 
 | Piece | Engine patch | Xenon |
 | --- | --- | --- |
-| `chrome-extension://` origin, secure context, loading | 1: scheme registry in LibURL, SecureContexts, Fetch, ResourceLoader, LibWebView | `UI/Extensions/ExtensionRegistry`: resolves URLs to files, adds CSP, checks web-accessible resources |
-| Manifest, ID, locales, `__MSG_` | | `UI/Extensions/ExtensionManifest`, `ExtensionLocales` |
-| Isolated worlds and injection timing | 2: `WrapperWorld` realms, user scripts, injection points in the HTML parser and document lifecycle | Content-script matching (`UI/Extensions/MatchPattern`) |
-| The channel to each context | 2 and 3: a per-context IPC endpoint like WebUI's, created with the context | `UI/Extensions/ExtensionRouter`: calls, events, ports, sender info |
-| Background worker | 3: embedder-owned workers | Starts and stops it with the extension |
-| Process per extension | 4 | Asks for it per extension origin |
-| `chrome.*` | | `UI/Resources/extensions/*.js` (the API surface), `UI/Extensions/Api*.cpp` (handlers) |
-| `chrome.storage` | | `UI/Extensions/ExtensionStorage`: a JSON file per extension and area under `<profile>/Extensions/Storage/<id>/`; `session` is in memory |
-| Toolbar and popup | | `UI/Extensions/ExtensionActionButton`, using `UI/Popover` and a `WebContentView` |
-| Managing extensions | | `UI/Extensions/ExtensionsDialog` (Qt) at first. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
+| `chrome-extension://` origin, secure context, loading | 0001 | `UI/Extensions/Registry`: maps URLs to files, adds CSP, decides who may load what |
+| Manifest, ID, locales, `__MSG_`, match patterns | | `UI/Extensions/Manifest`, `Extension`, `Locales`, `MatchPattern` |
+| `chrome.*` in extension pages | 0002 | `UI/Resources/extensions/chrome-api.js` (the API surface, built into the browser), `UI/Extensions/Router` (answers calls, routes messages, sends events) |
+| `chrome.storage` | | `UI/Extensions/Storage`: a JSON file per extension and area under `<profile data>/Extensions/Storage/<id>/`; `session` and `managed` are in memory |
+| Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
+| Content scripts in isolated worlds | 3 | Content-script matching, with `MatchPattern` |
+| Background worker | 4 | Starts and stops it with the extension |
+| Managing extensions | | `--load-extension` for now; an Extensions dialog (Qt) next. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
 
 ### The toolbar and the popup
 
@@ -315,7 +321,23 @@ yet, so that an extension's startup doesn't throw. Bitwarden feature-detects `si
 ## Status
 
 - [x] Engine strategy: a patch series in `Patches/ladybird`, applied by `Meta/patches.py`.
-- [ ] Milestone 1: extension pages
+- [ ] **Milestone 1: extension pages.** Done:
+  - Loading unpacked extensions with `--load-extension=<dir>[,<dir>...]`, with Chrome's validation, IDs, and locales.
+  - `chrome-extension://` pages: their own origin, secure contexts, MV3's CSP, and storage of their own.
+  - `chrome.runtime` (`id`, `getURL`, `getManifest`, `getPlatformInfo`, `sendMessage`, `onMessage`, `lastError`),
+    `chrome.storage` (all four areas, with `onChanged`), and `chrome.i18n`.
+  - A toolbar button per extension, and its popup, sized to its page.
+  - `Meta/xenon.py test` checks the APIs from an extension page, and that a web page reaches neither `chrome.*` nor
+    the extension's files.
+
+  Left:
+  - An Extensions dialog to load, reload, and remove extensions, and toolbar buttons that follow those changes.
+  - Web pages loading `web_accessible_resources` as subresources: the scheme handler needs the request's initiator.
+  - `__MSG_` in extension CSS files, which Chrome localizes as it serves them.
+  - History navigation (back and forward) to extension pages.
+  - The popup's size is measured from its page's body, which suits pages that set their width; Chrome lays out the
+    page at its preferred size instead.
+  - The popup has only been checked by hand so far, by its button showing up; nothing clicks it in a test.
 - [ ] Milestone 2: background
 - [ ] Milestone 3: content scripts
 - [ ] Milestone 4: the rest of Bitwarden

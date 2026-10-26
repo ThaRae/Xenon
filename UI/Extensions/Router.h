@@ -36,6 +36,9 @@ public:
     // Sends an event to every open page of the extension.
     void dispatch_event(Extension const&, StringView name, JsonArray args);
 
+    // The open popup of an extension follows the size its page reports.
+    void set_popup_size_listener(String const& extension_id, Function<void(int width, int height)>);
+
     // The ID of a runtime message travelling to an extension's pages, and of each delivery of it.
     using MessageId = u64;
 
@@ -69,6 +72,7 @@ private:
     Vector<Context> m_contexts;
     HashMap<MessageId, PendingMessage> m_pending_messages;
     MessageId m_next_message_id { 1 };
+    HashMap<String, Function<void(int, int)>> m_popup_size_listeners;
 };
 
 }

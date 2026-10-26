@@ -23,6 +23,7 @@
 #include <UI/ChromeStyle.h>
 #include <UI/ContentBlockingButton.h>
 #include <UI/ContentBlockingPopover.h>
+#include <UI/Extensions/Toolbar.h>
 #include <UI/Icon.h>
 #include <UI/JavaScriptDialog.h>
 #if defined(AK_OS_MACOS)
@@ -847,6 +848,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         show_private_session_popover();
     });
 
+    m_extension_toolbar = new Extensions::ActionToolbar(m_toolbar, *this);
+
     m_content_blocking_button = new ContentBlockingButton(m_toolbar);
     m_content_blocking_button->setToolTip("Ad Block");
     QObject::connect(m_content_blocking_button, &QToolButton::clicked, this, [this] { show_content_blocking_popover(); });
@@ -940,6 +943,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     toolbar_layout->addWidget(m_performance_monitor, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_downloads_button, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_private_badge, 0, Qt::AlignVCenter);
+    toolbar_layout->addWidget(m_extension_toolbar, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_content_blocking_button, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_hamburger_button, 0, Qt::AlignVCenter);
 

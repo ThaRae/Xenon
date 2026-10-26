@@ -39,6 +39,12 @@ class QMessageBox;
 class QTimer;
 class QVariantAnimation;
 
+namespace Ladybird::Extensions {
+
+class ActionToolbar;
+
+}
+
 namespace Ladybird {
 
 class BrowserWindow;
@@ -250,6 +256,7 @@ private:
     QPushButton* m_private_badge { nullptr };
     QToolButton* m_hamburger_button { nullptr };
     ContentBlockingButton* m_content_blocking_button { nullptr };
+    Extensions::ActionToolbar* m_extension_toolbar { nullptr };
     QPointer<ContentBlockingPopover> m_content_blocking_popover;
     Optional<String> m_content_blocking_popover_reload_site;
     QToolButton* m_downloads_button { nullptr };

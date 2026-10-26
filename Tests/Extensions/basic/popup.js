@@ -1,17 +1,9 @@
-// Reports what the page can see of its own origin and of the chrome.* APIs, for Meta/xenon.py test.
-const results = {
-    origin: location.origin,
-    isSecureContext: window.isSecureContext,
-    hasSubtleCrypto: typeof crypto.subtle === "object",
-    hasChrome: typeof chrome === "object",
-};
+// The test extension's popup: a localized greeting, and how often it has been opened, kept in chrome.storage.local.
+document.getElementById("greeting").textContent = chrome.i18n.getMessage("greeting", "Xenon");
+document.getElementById("origin").textContent = location.origin;
+document.getElementById("close").addEventListener("click", () => window.close());
 
-try {
-    localStorage.setItem("xenon-test", "1");
-    results.localStorage = localStorage.getItem("xenon-test") === "1";
-} catch (error) {
-    results.localStorage = String(error);
-}
-
-document.getElementById("status").textContent = "The popup's script ran.";
-document.getElementById("results").textContent = JSON.stringify(results, null, 4);
+chrome.storage.local.get({ opened: 0 }).then(async ({ opened }) => {
+    await chrome.storage.local.set({ opened: opened + 1 });
+    document.getElementById("count").textContent = `Opened ${opened + 1} ${opened === 0 ? "time" : "times"}.`;
+});

@@ -151,6 +151,10 @@ What exists now and what's planned, measured against Helium:
   content blocking is on, which the welcome flow turns on by default. They ship with Xenon in
   `UI/Resources/filter-lists`, so nothing is downloaded. Ladybird's own downloadable catalog stays off, since it holds
   raw copies of the same lists.
+- [ ] **Chrome extensions** (Manifest V3), for password managers first, as Helium offers Bitwarden, Proton Pass, and
+  1Password. In progress; see [Documentation/Extensions.md](Documentation/Extensions.md). So far, unpacked extensions
+  load with `--load-extension=<dir>`, get a toolbar button and popup, and their pages have `chrome.runtime`,
+  `chrome.storage`, and `chrome.i18n`.
 - [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
   surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
   picker. See xenon-ublock's `docs/gap-analysis.md`.
@@ -167,8 +171,7 @@ What exists now and what's planned, measured against Helium:
 - [ ] Xenon's own app icon (the app still uses Ladybird's)
 - [ ] uBlock Origin's filter set for Ladybird's content blocker (being built in a separate repo, `xenon-ublock`)
 
-Helium features that depend on Chromium, like Chrome Web Store extensions and web app installs, are out of scope
-until Ladybird supports them.
+Web app installs, which depend on Chromium in Helium, are out of scope until Ladybird supports them.
 
 ## License
 
