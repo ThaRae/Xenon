@@ -1,0 +1,143 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 14:29:18 -0400
+Subject: [PATCH] LibWeb: Block popups that the content blocker's $popup
+ filters match
+
+Choosing a navigable now receives the URL a new top-level traversable
+would open. When a $popup filter matches it from the current document,
+no traversable is created, as when the popup blocker refuses one, so
+window.open() returns null and links and forms with a _blank target do
+nothing.
+
+A popup opened empty and then sent somewhere (window.open() followed by
+setting its location) is checked against the opener's URL when it
+navigates, and closed if a filter matches.
+---
+ Libraries/LibWeb/DOM/Element.cpp          |  2 +-
+ Libraries/LibWeb/HTML/HTMLFormElement.cpp |  2 +-
+ Libraries/LibWeb/HTML/LocalNavigable.cpp  |  9 ++++++++-
+ Libraries/LibWeb/HTML/LocalNavigable.h    |  3 ++-
+ Libraries/LibWeb/HTML/Navigable.cpp       | 15 +++++++++++++++
+ Libraries/LibWeb/HTML/Window.cpp          |  2 +-
+ 6 files changed, 28 insertions(+), 5 deletions(-)
+
+diff --git a/Libraries/LibWeb/DOM/Element.cpp b/Libraries/LibWeb/DOM/Element.cpp
+index d20e1220d1140e2c9982a5fadbc142077fda3d69..8f89c878bb369f7359c4a1fa970fdfeb4b9879a9 100644
+--- a/Libraries/LibWeb/DOM/Element.cpp
++++ b/Libraries/LibWeb/DOM/Element.cpp
+@@ -650,7 +650,7 @@ void Element::follow_the_hyperlink(Optional<Utf16String> hyperlink_suffix, HTML:
+ 
+     // 7. Let targetNavigable be the first return value of applying the rules for choosing a navigable given
+     //    targetAttributeValue, subject's node navigable, and noopener.
+-    auto target_navigable = document().navigable()->choose_a_navigable(target_attribute_value, noopener).navigable;
++    auto target_navigable = document().navigable()->choose_a_navigable(target_attribute_value, noopener, HTML::ActivateTab::Yes, {}, *url_record).navigable;
+ 
+     // 8. If targetNavigable is null, then return.
+     if (!target_navigable)
+diff --git a/Libraries/LibWeb/HTML/HTMLFormElement.cpp b/Libraries/LibWeb/HTML/HTMLFormElement.cpp
+index d682709a1624d68e9361a03c3330d34d65de4d4c..68e277bdc16e735556b94ccdc519c7bb819ea39c 100644
+--- a/Libraries/LibWeb/HTML/HTMLFormElement.cpp
++++ b/Libraries/LibWeb/HTML/HTMLFormElement.cpp
+@@ -295,7 +295,7 @@ WebIDL::ExceptionOr<void> HTMLFormElement::submit_form(GC::Ref<HTMLElement> subm
+ 
+     // 22. Let targetNavigable be the first return value of applying the rules for choosing a navigable given target,
+     //     form's node navigable, and noopener.
+-    auto target_navigable = form_document->navigable()->choose_a_navigable(target, no_opener).navigable;
++    auto target_navigable = form_document->navigable()->choose_a_navigable(target, no_opener, ActivateTab::Yes, {}, *parsed_action).navigable;
+ 
+     // 23. If targetNavigable is null, then return.
+     if (!target_navigable) {
+diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
+index 30b50766b056206ab5923ca32a783f2d56c2a923..f71a7572362794a93f1fffbeded1c3388551eac0 100644
+--- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
++++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
+@@ -1746,7 +1746,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
+ }
+ 
+ // https://html.spec.whatwg.org/multipage/document-sequences.html#the-rules-for-choosing-a-navigable
+-LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View name, TokenizedFeature::NoOpener no_opener, ActivateTab activate_tab, Optional<TokenizedFeature::Map const&> window_features)
++LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View name, TokenizedFeature::NoOpener no_opener, ActivateTab activate_tab, Optional<TokenizedFeature::Map const&> window_features, Optional<URL::URL const&> url)
+ {
+     // 1. Let chosen be null.
+     GC::Ptr<Navigable> chosen;
+@@ -1852,6 +1852,13 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
+             dbgln("Pop-up blocked!");
+         }
+ 
++        // AD-HOC: --> If the content blocker has a popup filter for the URL the new top-level traversable would open
++        //             from currentNavigable's active document (uBlock Origin's $popup)
++        else if (url.has_value() && active_document() && active_document()->content_blocking_enabled() && ContentBlocker::the().is_popup_filtered(*url, active_document()->url())) {
++            dbgln("Pop-up blocked by the content blocker: {}", *url);
++            page().client().page_did_block_resource();
++        }
++
+         // --> If the user agent has been configured such that in this instance it will create a new top-level traversable
+         else if (auto new_web_view = request_new_web_view(); new_web_view.page) {
+             // 1. Consume user activation of currentNavigable's active window.
+diff --git a/Libraries/LibWeb/HTML/LocalNavigable.h b/Libraries/LibWeb/HTML/LocalNavigable.h
+index 14c1ad8579fa5c78b7e686e2a2950bb068a09c79..7eafa6729fbae3d7d61d0f28b42779d50b0f5d12 100644
+--- a/Libraries/LibWeb/HTML/LocalNavigable.h
++++ b/Libraries/LibWeb/HTML/LocalNavigable.h
+@@ -173,7 +173,8 @@ public:
+         WindowType window_type;
+     };
+ 
+-    ChosenNavigable choose_a_navigable(Utf16View name, TokenizedFeature::NoOpener no_opener, ActivateTab = ActivateTab::Yes, Optional<TokenizedFeature::Map const&> window_features = {});
++    // NB: url is the URL a new top-level traversable would open, for the content blocker's popup filters.
++    ChosenNavigable choose_a_navigable(Utf16View name, TokenizedFeature::NoOpener no_opener, ActivateTab = ActivateTab::Yes, Optional<TokenizedFeature::Map const&> window_features = {}, Optional<URL::URL const&> url = {});
+ 
+     GC::Ptr<Navigable> find_a_navigable_by_target_name(Utf16View name);
+     bool is_familiar_with(Navigable&);
+diff --git a/Libraries/LibWeb/HTML/Navigable.cpp b/Libraries/LibWeb/HTML/Navigable.cpp
+index 57e4acca5f9db89517bf8068b7a3ffbde6c7d1c3..15c91a3019390d7d9e565295abd653885d37464c 100644
+--- a/Libraries/LibWeb/HTML/Navigable.cpp
++++ b/Libraries/LibWeb/HTML/Navigable.cpp
+@@ -7,12 +7,14 @@
+ #include <LibWeb/DOM/Document.h>
+ #include <LibWeb/HTML/BrowsingContext.h>
+ #include <LibWeb/HTML/LocalNavigable.h>
++#include <LibWeb/HTML/LocalTraversableNavigable.h>
+ #include <LibWeb/HTML/Navigable.h>
+ #include <LibWeb/HTML/NavigableContainer.h>
+ #include <LibWeb/HTML/PreparedNavigationDescriptor.h>
+ #include <LibWeb/HTML/RemoteNavigable.h>
+ #include <LibWeb/HTML/SourceSnapshotParams.h>
+ #include <LibWeb/HTML/UserNavigationInvolvement.h>
++#include <LibWeb/Loader/ContentBlocker.h>
+ #include <LibWeb/Page/Page.h>
+ #include <LibWeb/WebIDL/DOMException.h>
+ #include <LibWebCommon/HTML/SandboxingFlagSet.h>
+@@ -213,6 +215,19 @@ WebIDL::ExceptionOr<void> Navigable::navigate(NavigateParams params)
+             // 2. Return.
+             return {};
+         }
++
++        // AD-HOC: A popup that its opener opened empty and then sent somewhere (window.open() followed by setting its
++        //         location) gets the content blocker's popup filters too, checked against the opener's URL.
++        if (auto* traversable = as_if<LocalTraversableNavigable>(*this); traversable && traversable->is_created_by_web_content()) {
++            auto document = traversable->active_document();
++            if (document && document->is_initial_about_blank() && source_document->content_blocking_enabled()
++                && ContentBlocker::the().is_popup_filtered(params.url, source_document->url())) {
++                dbgln("Pop-up blocked by the content blocker: {}", params.url);
++                source_document->page().client().page_did_block_resource();
++                traversable->close_top_level_traversable();
++                return {};
++            }
++        }
+     }
+ 
+     // AD-HOC: Nothing the browser process can see names this URL's blob URL entry until the navigation commits, so
+diff --git a/Libraries/LibWeb/HTML/Window.cpp b/Libraries/LibWeb/HTML/Window.cpp
+index 22a88a965d7b3e845ce8485db8adece649f58c1e..930354e5a9e6ca4134bb3f7c4ed9547952d4d74d 100644
+--- a/Libraries/LibWeb/HTML/Window.cpp
++++ b/Libraries/LibWeb/HTML/Window.cpp
+@@ -515,7 +515,7 @@ WebIDL::ExceptionOr<Window::OpenedWindow> Window::window_open_steps_internal(Utf
+         : UserNavigationInvolvement::None;
+     // 13. Let targetNavigable and windowType be the result of applying the rules for choosing a navigable given target, sourceDocument's node navigable, and noopener.
+     VERIFY(source_document.navigable());
+-    auto [target_navigable, window_type] = source_document.navigable()->choose_a_navigable(target, no_opener, ActivateTab::Yes, tokenized_features);
++    auto [target_navigable, window_type] = source_document.navigable()->choose_a_navigable(target, no_opener, ActivateTab::Yes, tokenized_features, url_record);
+ 
+     // 14. If targetNavigable is null, then return null.
+     if (target_navigable == nullptr)

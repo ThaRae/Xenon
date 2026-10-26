@@ -1,0 +1,662 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 14:40:36 -0400
+Subject: [PATCH] RequestServer+LibWeb: Uncloak CNAMEs for the content blocker
+
+Trackers hide behind first-party names: metrics.example.com is a CNAME
+for a tracker's host, so filters for the tracker never see it. uBlock
+Origin uncloaks these on Firefox, and Helium patches Chromium's DNS API
+so its fork can do the same.
+
+A request can now ask RequestServer to check where its host's aliases
+lead. When DNS shows the host to be an alias of another name,
+RequestServer tells the client and waits before connecting. WebContent
+asks its content blocker, which follows uBlock Origin's defaults: only
+requests that no filter matched are uncloaked, aliases within the same
+site and requests to the page's own host are left alone, the uncloaked
+check uses the alias target's origin, and $cname exceptions apply. A
+blocked request fails with a new BlockedByContentBlocker network error.
+
+Only requests with content blocking on, whose host turns out to be an
+alias, pay the round trip. The filters stay in WebContent, so
+RequestServer does not keep a copy per site, and the per-site toggle
+applies as for any other request.
+
+DNS from a configured server already carries the CNAME chain. For the
+system resolver, which only gives addresses, LibCore can now ask
+getaddrinfo for the canonical name (AI_CANONNAME), and LibDNS records
+it as a one-step CNAME.
+---
+ Libraries/LibCore/Socket.cpp                  | 22 ++++++--
+ Libraries/LibCore/Socket.h                    |  7 +++
+ Libraries/LibCore/SocketWindows.cpp           |  6 +++
+ Libraries/LibDNS/Resolver.h                   | 14 +++--
+ Libraries/LibRequests/NetworkError.h          |  3 ++
+ Libraries/LibRequests/Request.cpp             |  6 +++
+ Libraries/LibRequests/Request.h               |  4 ++
+ Libraries/LibRequests/RequestClient.cpp       | 18 ++++++-
+ Libraries/LibRequests/RequestClient.h         | 11 +++-
+ Libraries/LibWeb/Loader/ContentBlocker.cpp    | 11 ++++
+ Libraries/LibWeb/Loader/ContentBlocker.h      |  4 ++
+ Libraries/LibWeb/Loader/ResourceLoader.cpp    | 24 ++++++++-
+ .../RequestServer/ConnectionFromClient.cpp    | 10 +++-
+ Services/RequestServer/ConnectionFromClient.h |  3 +-
+ Services/RequestServer/Request.cpp            | 53 ++++++++++++++++++-
+ Services/RequestServer/Request.h              | 10 +++-
+ Services/RequestServer/RequestClient.ipc      |  3 ++
+ Services/RequestServer/RequestServer.ipc      |  4 +-
+ .../RequestServer/TestContentCodingRetry.cpp  |  2 +-
+ Tests/RequestServer/TestCookieResponses.cpp   |  2 +-
+ Tests/RequestServer/TestDiskCacheWaiters.cpp  |  2 +-
+ Tests/RequestServer/TestExportImport.cpp      |  2 +-
+ Tests/RequestServer/TestRequestTimingInfo.cpp |  2 +-
+ Tests/RequestServer/TestSiteBinding.cpp       |  2 +-
+ 24 files changed, 202 insertions(+), 23 deletions(-)
+
+diff --git a/Libraries/LibCore/Socket.cpp b/Libraries/LibCore/Socket.cpp
+index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc94603440 100644
+--- a/Libraries/LibCore/Socket.cpp
++++ b/Libraries/LibCore/Socket.cpp
+@@ -49,8 +49,11 @@ ErrorOr<int> Socket::create_fd(SocketDomain domain, SocketType type)
+ #endif
+ }
+ 
+-ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteString const& host, SocketType type, AddressFamily address_family)
++static ErrorOr<Socket::ResolvedHost> resolve_host_with_flags(ByteString const& host, Socket::SocketType type, Socket::AddressFamily address_family, int flags)
+ {
++    using SocketType = Socket::SocketType;
++    using AddressFamily = Socket::AddressFamily;
++
+     int socket_type;
+     switch (type) {
+     case SocketType::Stream:
+@@ -81,12 +84,15 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
+     struct addrinfo hints = {};
+     hints.ai_family = ai_family;
+     hints.ai_socktype = socket_type;
+-    hints.ai_flags = 0;
++    hints.ai_flags = flags;
+     hints.ai_protocol = 0;
+ 
+     auto const results = TRY(Core::System::getaddrinfo(host.characters(), nullptr, hints));
+ 
+     Vector<Variant<IPv4Address, IPv6Address>> addresses;
++    Optional<ByteString> canonical_name;
++    if (!results.addresses().is_empty() && results.addresses().first().ai_canonname)
++        canonical_name = ByteString { results.addresses().first().ai_canonname };
+ 
+     for (auto const& result : results.addresses()) {
+         if (result.ai_family == AF_INET6) {
+@@ -105,7 +111,17 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
+     if (addresses.is_empty())
+         return Error::from_string_literal("Could not resolve to IPv4 or IPv6 address");
+ 
+-    return addresses;
++    return Socket::ResolvedHost { move(addresses), move(canonical_name) };
++}
++
++ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteString const& host, SocketType type, AddressFamily address_family)
++{
++    return TRY(resolve_host_with_flags(host, type, address_family, 0)).addresses;
++}
++
++ErrorOr<Socket::ResolvedHost> Socket::resolve_host_and_canonical_name(ByteString const& host, SocketType type, AddressFamily address_family)
++{
++    return resolve_host_with_flags(host, type, address_family, AI_CANONNAME);
+ }
+ 
+ ErrorOr<void> Socket::connect_local(int fd, ByteString const& path)
+diff --git a/Libraries/LibCore/Socket.h b/Libraries/LibCore/Socket.h
+index c73a4204239a4cfafdc19e686eb4ac7f42863f24..816676aca6dee3a14ef39d5bd4e143edf0a745e8 100644
+--- a/Libraries/LibCore/Socket.h
++++ b/Libraries/LibCore/Socket.h
+@@ -71,6 +71,13 @@ public:
+     //        base class for all address types is appropriate.
+     static ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> resolve_host(ByteString const&, SocketType, AddressFamily = AddressFamily::Unspecified);
+ 
++    struct ResolvedHost {
++        Vector<Variant<IPv4Address, IPv6Address>> addresses;
++        // The name the host's aliases (CNAME records) lead to, as the system resolver reports it.
++        Optional<ByteString> canonical_name;
++    };
++    static ErrorOr<ResolvedHost> resolve_host_and_canonical_name(ByteString const&, SocketType, AddressFamily = AddressFamily::Unspecified);
++
+     Function<void()> on_ready_to_read;
+ 
+ protected:
+diff --git a/Libraries/LibCore/SocketWindows.cpp b/Libraries/LibCore/SocketWindows.cpp
+index 31181bccc5f53bdd24aa3b94ac2db3560e8311b5..2a8b8c92fc2475f75058a9324ba1e8187b7976f1 100644
+--- a/Libraries/LibCore/SocketWindows.cpp
++++ b/Libraries/LibCore/SocketWindows.cpp
+@@ -286,6 +286,12 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
+     return addresses;
+ }
+ 
++ErrorOr<Socket::ResolvedHost> Socket::resolve_host_and_canonical_name(ByteString const& host, SocketType type, AddressFamily address_family)
++{
++    // FIXME: Ask for the canonical name (AI_CANONNAME) here too.
++    return ResolvedHost { TRY(resolve_host(host, type, address_family)), {} };
++}
++
+ ErrorOr<void> Socket::connect_inet(int fd, SocketAddress const& address)
+ {
+     if (address.type() == SocketAddress::Type::IPv6) {
+diff --git a/Libraries/LibDNS/Resolver.h b/Libraries/LibDNS/Resolver.h
+index f1c7e55a26fd0d38c4263d1044a7d8bbed05aff1..059d1cf7556647a2496c1eca6622db49a8c4ff8a 100644
+--- a/Libraries/LibDNS/Resolver.h
++++ b/Libraries/LibDNS/Resolver.h
+@@ -484,7 +484,7 @@ public:
+                     [this, name, state = our_state, family,
+                         &main_thread_event_loop]() mutable {
+                         auto worker_started_at = MonotonicTime::now();
+-                        auto record_or_error = Core::Socket::resolve_host(name, Core::Socket::SocketType::Stream, family);
++                        auto record_or_error = Core::Socket::resolve_host_and_canonical_name(name, Core::Socket::SocketType::Stream, family);
+                         auto worker_finished_at = MonotonicTime::now();
+                         PendingSystemResolution::SideTiming timing {
+                             .queue_ms = (worker_started_at - state->dispatched_at).to_milliseconds(),
+@@ -871,7 +871,7 @@ private:
+         ByteString const& name,
+         PendingSystemResolution& state,
+         Core::Socket::AddressFamily family,
+-        ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> record_or_error,
++        ErrorOr<Core::Socket::ResolvedHost> record_or_error,
+         PendingSystemResolution::SideTiming timing)
+     {
+         (family == Core::Socket::AddressFamily::IPv4Only ? state.a : state.aaaa) = timing;
+@@ -881,7 +881,15 @@ private:
+         bool got_records_this_side = false;
+         if (!record_or_error.is_error()) {
+             constexpr u32 SYSTEM_RESOLVER_SYNTHETIC_TTL_SECONDS = 60;
+-            for (auto const& record : record_or_error.value()) {
++            // The system resolver does not hand out the CNAME chain, only where it ends. Record that as one alias, so
++            // callers (content blocking's CNAME uncloaking) can see it as they would a configured server's answer.
++            if (auto const& canonical_name = record_or_error.value().canonical_name; canonical_name.has_value()) {
++                auto canonical = Messages::DomainName::from_string(*canonical_name);
++                auto queried = Messages::DomainName::from_string(name);
++                if (canonical.to_canonical_string() != queried.to_canonical_string() && state.result->records(Messages::ResourceType::CNAME).is_empty())
++                    state.result->add_record({ .name = move(queried), .type = Messages::ResourceType::CNAME, .class_ = Messages::Class::IN, .ttl = SYSTEM_RESOLVER_SYNTHETIC_TTL_SECONDS, .record = Messages::Records::CNAME { move(canonical) }, .raw = {} });
++            }
++            for (auto const& record : record_or_error.value().addresses) {
+                 record.visit(
+                     [&](IPv4Address const& address) {
+                         state.result->add_record({ .name = {}, .type = Messages::ResourceType::A, .class_ = Messages::Class::IN, .ttl = SYSTEM_RESOLVER_SYNTHETIC_TTL_SECONDS, .record = Messages::Records::A { address }, .raw = {} });
+diff --git a/Libraries/LibRequests/NetworkError.h b/Libraries/LibRequests/NetworkError.h
+index ddeb9b60bef425613e4c653f970bb3d7cbe0d0f7..e9e3ca3d1cbcd3a3cb91f7f1ec3dd8bf203f83d6 100644
+--- a/Libraries/LibRequests/NetworkError.h
++++ b/Libraries/LibRequests/NetworkError.h
+@@ -23,6 +23,7 @@ enum class NetworkError {
+     InvalidContentEncoding,
+     RequestServerDied,
+     CacheReadFailed,
++    BlockedByContentBlocker,
+     Unknown,
+ };
+ 
+@@ -53,6 +54,8 @@ constexpr StringView network_error_to_string(NetworkError network_error)
+         return "RequestServer is currently unavailable"sv;
+     case NetworkError::CacheReadFailed:
+         return "RequestServer encountered an error reading a cached HTTP response"sv;
++    case NetworkError::BlockedByContentBlocker:
++        return "The content blocker blocked the request"sv;
+     case NetworkError::Unknown:
+         return "An unexpected network error occurred"sv;
+     }
+diff --git a/Libraries/LibRequests/Request.cpp b/Libraries/LibRequests/Request.cpp
+index 9178d280fff700cbd6966f9ee2dd8b0c4f6e7cef..54ca4cc7f901cf727400b4d19d90acbdd882665a 100644
+--- a/Libraries/LibRequests/Request.cpp
++++ b/Libraries/LibRequests/Request.cpp
+@@ -67,6 +67,12 @@ int Request::request_server_client_id() const
+     return m_client->request_server_client_id();
+ }
+ 
++void Request::continue_after_alias_check(bool block)
++{
++    if (auto client = m_client.strong_ref())
++        client->continue_request_after_alias_check({}, *this, block);
++}
++
+ bool Request::stop()
+ {
+     RefPtr keep_alive = *this;
+diff --git a/Libraries/LibRequests/Request.h b/Libraries/LibRequests/Request.h
+index 18a059165e91b6b6f4d94e11b4a1055d717650a8..88dc47ae155c380b23592539db6729167b9cd8cc 100644
+--- a/Libraries/LibRequests/Request.h
++++ b/Libraries/LibRequests/Request.h
+@@ -124,6 +124,10 @@ public:
+ 
+     Function<void()> on_requires_network;
+ 
++    // See RequestClient::CheckResolvedAlias. The handler must answer with continue_after_alias_check().
++    Function<void(Request&, ByteString const& alias_target)> on_resolved_alias;
++    void continue_after_alias_check(bool block);
++
+     // Invoked at most once, when the request drops its delivery callbacks without a finish: a stop() or a transfer.
+     Function<void()> on_teardown;
+ 
+diff --git a/Libraries/LibRequests/RequestClient.cpp b/Libraries/LibRequests/RequestClient.cpp
+index d117eb55dbd7cb9ca18e47babca9b6acfe63bcb4..0b0581809efc13fb756fd8cf005d2ecdd68f2d30 100644
+--- a/Libraries/LibRequests/RequestClient.cpp
++++ b/Libraries/LibRequests/RequestClient.cpp
+@@ -79,7 +79,7 @@ void RequestClient::die()
+     }
+ }
+ 
+-RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL const& url, Optional<HTTP::HeaderList const&> request_headers, ReadonlyBytes request_body, HTTP::CacheMode cache_mode, HTTP::Cookie::IncludeCredentials include_credentials, TransferLease transfer_lease, Optional<u32> address_selection_hint, CacheMissNotification cache_miss_notification, u64 originating_page_id, Optional<HTTP::NetworkIsolationKey> network_isolation_key)
++RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL const& url, Optional<HTTP::HeaderList const&> request_headers, ReadonlyBytes request_body, HTTP::CacheMode cache_mode, HTTP::Cookie::IncludeCredentials include_credentials, TransferLease transfer_lease, Optional<u32> address_selection_hint, CacheMissNotification cache_miss_notification, u64 originating_page_id, Optional<HTTP::NetworkIsolationKey> network_isolation_key, CheckResolvedAlias check_resolved_alias)
+ {
+     auto request_id = m_next_request_id++;
+     auto headers = request_headers.map([](auto const& headers) { return headers.headers().span(); }).value_or({});
+@@ -87,7 +87,7 @@ RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL
+     auto transfer_lease_key = transfer_lease == TransferLease::Yes
+         ? Optional<RequestTransferLeaseKey> { { m_request_server_client_id, request_id } }
+         : Optional<RequestTransferLeaseKey> {};
+-    IPCProxy::async_start_request(request_id, method, url, headers, request_body, cache_mode, move(network_isolation_key), include_credentials, transfer_lease_key.has_value(), address_selection_hint, cache_miss_notification == CacheMissNotification::Yes, Core::System::getpid(), originating_page_id);
++    IPCProxy::async_start_request(request_id, method, url, headers, request_body, cache_mode, move(network_isolation_key), include_credentials, transfer_lease_key.has_value(), address_selection_hint, cache_miss_notification == CacheMissNotification::Yes, Core::System::getpid(), originating_page_id, check_resolved_alias == CheckResolvedAlias::Yes);
+     auto request = Request::create_from_id({}, *this, request_id, move(transfer_lease_key));
+     m_requests.set(request_id, request);
+     return request;
+@@ -182,6 +182,20 @@ void RequestClient::ensure_connection(URL::URL const& url, RequestServer::CacheL
+     async_ensure_connection(request_id, url, cache_level);
+ }
+ 
++void RequestClient::continue_request_after_alias_check(Badge<Request>, Request& request, bool block)
++{
++    async_continue_request_after_alias_check(request.id(), block);
++}
++
++void RequestClient::request_resolved_alias(u64 request_id, ByteString alias_target)
++{
++    if (auto request = m_requests.get(request_id); request.has_value() && (*request)->on_resolved_alias) {
++        (*request)->on_resolved_alias(**request, alias_target);
++        return;
++    }
++    async_continue_request_after_alias_check(request_id, false);
++}
++
+ void RequestClient::request_requires_network(u64 request_id)
+ {
+     if (auto request = m_requests.get(request_id); request.has_value()) {
+diff --git a/Libraries/LibRequests/RequestClient.h b/Libraries/LibRequests/RequestClient.h
+index 3946c33fa586429ed00994089258a716db74ed7a..10a71e4c395d0789af17915ebd6385896ae5886d 100644
+--- a/Libraries/LibRequests/RequestClient.h
++++ b/Libraries/LibRequests/RequestClient.h
+@@ -51,7 +51,14 @@ public:
+     virtual ~RequestClient() override;
+ 
+     // Best-effort index into the resolved address pool.
+-    RefPtr<Request> start_request(ByteString const& method, URL::URL const&, Optional<HTTP::HeaderList const&> request_headers = {}, ReadonlyBytes request_body = {}, HTTP::CacheMode = HTTP::CacheMode::Default, HTTP::Cookie::IncludeCredentials = HTTP::Cookie::IncludeCredentials::Yes, TransferLease = TransferLease::No, Optional<u32> address_selection_hint = {}, CacheMissNotification = CacheMissNotification::No, u64 originating_page_id = 0, Optional<HTTP::NetworkIsolationKey> = {});
++    enum class CheckResolvedAlias {
++        No,
++        Yes,
++    };
++
++    // With CheckResolvedAlias::Yes, a request whose host DNS shows to be an alias calls its on_resolved_alias, and waits
++    // for continue_after_alias_check() before it connects.
++    RefPtr<Request> start_request(ByteString const& method, URL::URL const&, Optional<HTTP::HeaderList const&> request_headers = {}, ReadonlyBytes request_body = {}, HTTP::CacheMode = HTTP::CacheMode::Default, HTTP::Cookie::IncludeCredentials = HTTP::Cookie::IncludeCredentials::Yes, TransferLease = TransferLease::No, Optional<u32> address_selection_hint = {}, CacheMissNotification = CacheMissNotification::No, u64 originating_page_id = 0, Optional<HTTP::NetworkIsolationKey> = {}, CheckResolvedAlias = CheckResolvedAlias::No);
+     RefPtr<Request> adopt_request(int source_client_id, u64 source_request_id, TransferLease = TransferLease::No);
+ 
+     // Moves a response between RequestServers. The request leaves this client on export; the imported one is a new
+@@ -59,6 +66,7 @@ public:
+     ErrorOr<ExportedRequest> export_request(Request&);
+     RefPtr<Request> import_request(ExportedRequest, TransferLease = TransferLease::No);
+     bool stop_request(Badge<Request>, Request&);
++    void continue_request_after_alias_check(Badge<Request>, Request&, bool block);
+     void release_request_transfer_lease(Badge<Request>, Request&, RequestTransferLeaseKey);
+     void release_request_transfer_lease(RequestTransferLeaseKey);
+     void ensure_connection(URL::URL const&, RequestServer::CacheLevel);
+@@ -77,6 +85,7 @@ private:
+     virtual void die() override;
+ 
+     virtual void request_requires_network(u64 request_id) override;
++    virtual void request_resolved_alias(u64 request_id, ByteString alias_target) override;
+     virtual void request_started(u64 request_id, IPC::File) override;
+     virtual void request_body_file_available(u64 request_id, IPC::File, u64 offset, u64 size) override;
+     virtual void request_cached_body_file_available(u64 request_id, IPC::File, u64 offset, u64 size) override;
+diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
+index 3961e0b793727137e175ea8eb041742231afb5ba..5c3be7593acaeb49d8f60c7c1cf9f80782ead3fa 100644
+--- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
++++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
+@@ -267,6 +267,17 @@ bool ContentBlocker::is_popup_filtered(URL::URL const& url, URL::URL const& open
+     return ContentBlocking::FFI::rust_content_blocker_matches_popup(m_engine, url_string.bytes(), opener_url_string.bytes());
+ }
+ 
++bool ContentBlocker::is_uncloaked_request_filtered(URL::URL const& url, StringView alias_target, URL::URL const& source_url, ResourceType resource_type) const
++{
++    if (!m_engine)
++        return false;
++
++    auto url_string = serialized_url_for_matching(url);
++    auto source_url_string = serialized_url_for_matching(source_url_for_matching(source_url));
++    auto request_type = resource_type_to_adblock_request_type(resource_type);
++    return ContentBlocking::FFI::rust_content_blocker_matches_uncloaked(m_engine, url_string.bytes(), alias_target.bytes(), source_url_string.bytes(), request_type.bytes());
++}
++
+ void ContentBlocker::run_page_script(DOM::Document& document) const
+ {
+     // Scriptlets and procedural filters are cosmetic filters (##+js(), ##...:has-text()).
+diff --git a/Libraries/LibWeb/Loader/ContentBlocker.h b/Libraries/LibWeb/Loader/ContentBlocker.h
+index 4ea71815c02582f91e20cb52b19bcb2bb43b811a..f8eb77c9d68e5336ed2da73d01fe929a59ee1c06 100644
+--- a/Libraries/LibWeb/Loader/ContentBlocker.h
++++ b/Libraries/LibWeb/Loader/ContentBlocker.h
+@@ -75,6 +75,10 @@ public:
+     // Whether a $popup filter keeps a page at the opener URL from opening a new window at the URL.
+     bool is_popup_filtered(URL::URL const&, URL::URL const& opener_url) const;
+ 
++    // Whether a request whose host DNS showed to be an alias (CNAME) of alias_target must be blocked (uBlock Origin's
++    // CNAME uncloaking).
++    bool is_uncloaked_request_filtered(URL::URL const&, StringView alias_target, URL::URL const& source_url, ResourceType) const;
++
+     // Runs the document's scriptlets and procedural cosmetic filters. Called before any of the document's own
+     // scripts can run, once per Window.
+     void run_page_script(DOM::Document&) const;
+diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
+index b7fe074afee5d1b172961970d3b809ffc2188f5e..b7cd0883e491ac76a27443dbd980f9b80846f36e 100644
+--- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
++++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
+@@ -578,8 +578,11 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+     auto protocol_complete = [this, on_complete = move(on_complete), request, &protocol_request = *protocol_request](u64 total_size, Requests::RequestTimingInfo const& timing_info, Optional<Requests::NetworkError> const& network_error) {
+         finish_network_request(protocol_request);
+ 
+-        if (auto page = request.page())
++        if (auto page = request.page()) {
+             page->client().page_did_finish_network_request(protocol_request.id(), total_size, timing_info, network_error);
++            if (network_error == Requests::NetworkError::BlockedByContentBlocker)
++                page->client().page_did_block_resource();
++        }
+ 
+         if (!network_error.has_value()) {
+             log_success(request);
+@@ -630,12 +633,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
+     //     requests are attributed through the worker process's browser-level owners.
+     auto originating_page_id = request.page() && request.page()->has_top_level_traversable() ? request.page()->client().id().value() : 0;
+     auto headers = headers_with_normalized_values(request.headers());
+-    auto protocol_request = m_request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key());
++
++    // Content blocking uncloaks CNAMEs: if DNS shows the host to be an alias, the filters also see where it leads.
++    auto check_resolved_alias = Requests::RequestClient::CheckResolvedAlias::No;
++    if (ContentBlocker::the().has_rules() && (!request.page() || request.page()->content_blocking_enabled_for_url(request.top_level_creation_url())))
++        check_resolved_alias = Requests::RequestClient::CheckResolvedAlias::Yes;
++
++    auto protocol_request = m_request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key(), check_resolved_alias);
+     if (!protocol_request) {
+         log_failure(request, "Failed to initiate load"sv);
+         return nullptr;
+     }
+ 
++    if (check_resolved_alias == Requests::RequestClient::CheckResolvedAlias::Yes) {
++        auto source_url = request.source_url().value_or(request.url().value());
++        auto resource_type = ContentBlocker::resource_type_from_fetch_metadata(request.destination(), request.initiator_type(), request.request_mode());
++        protocol_request->on_resolved_alias = [url = request.url().value(), source_url = move(source_url), resource_type](Requests::Request& protocol_request, ByteString const& alias_target) {
++            auto block = ContentBlocker::the().is_uncloaked_request_filtered(url, alias_target, source_url, resource_type);
++            if (block)
++                dbgln("ResourceLoader: Filtered request to: \"{}\", an alias of {}", sanitized_url_for_logging(url), alias_target);
++            protocol_request.continue_after_alias_check(block);
++        };
++    }
++
+     if (auto page = request.page()) {
+         Optional<String> initiator_type_string;
+         if (request.initiator_type().has_value())
+diff --git a/Services/RequestServer/ConnectionFromClient.cpp b/Services/RequestServer/ConnectionFromClient.cpp
+index b2ac2ddcf223bc6bba9141ed2eefe7fee4d7f414..fb1dc30c7774035f3a56501836cad28a27b85378 100644
+--- a/Services/RequestServer/ConnectionFromClient.cpp
++++ b/Services/RequestServer/ConnectionFromClient.cpp
+@@ -293,7 +293,7 @@ bool ConnectionFromClient::is_live_request_id(u64 request_id) const
+     return m_active_requests.contains(request_id) || m_request_transfer_leases.contains({ client_id(), request_id });
+ }
+ 
+-void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id)
++void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, bool check_resolved_alias)
+ {
+     note_event_tick("ipc-start-request"sv);
+     dbgln_if(REQUESTSERVER_DEBUG, "RequestServer: start_request({}, {})", request_id, url);
+@@ -345,7 +345,7 @@ void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL:
+     auto transfer_lease = create_transfer_lease
+         ? Optional<Requests::RequestTransferLeaseKey> { lease_key }
+         : Optional<Requests::RequestTransferLeaseKey> {};
+-    auto request = Request::fetch(request_id, m_disk_cache, move(network_isolation_key), cache_mode, *this, m_curl_multi, m_resolver, move(url), move(method), HTTP::HeaderList::create(move(request_headers)), move(request_body), include_credentials, transfer_lease, address_selection_hint, notify_on_cache_miss);
++    auto request = Request::fetch(request_id, m_disk_cache, move(network_isolation_key), cache_mode, *this, m_curl_multi, m_resolver, move(url), move(method), HTTP::HeaderList::create(move(request_headers)), move(request_body), include_credentials, transfer_lease, address_selection_hint, notify_on_cache_miss, check_resolved_alias);
+     request->set_performance_origin(originating_process_id, originating_page_id);
+     m_active_requests.set(request_id, move(request));
+ 
+@@ -729,6 +729,12 @@ void ConnectionFromClient::fail_websocket(u64 websocket_id, Requests::WebSocket:
+     async_websocket_closed(websocket_id, to_underlying(WebSocket::CloseStatusCode::AbnormalClosure), {}, false);
+ }
+ 
++void ConnectionFromClient::continue_request_after_alias_check(u64 request_id, bool block)
++{
++    if (auto request = m_active_requests.get(request_id); request.has_value())
++        (*request)->continue_after_alias_check(block);
++}
++
+ Messages::RequestServer::StopRequestResponse ConnectionFromClient::stop_request(u64 request_id)
+ {
+     auto request = m_active_requests.take(request_id);
+diff --git a/Services/RequestServer/ConnectionFromClient.h b/Services/RequestServer/ConnectionFromClient.h
+index 675be55f1a3d74b84ca9d6e412fa9768662e7163..fde1688c4baed69c89157c02f44fb338cd09b788 100644
+--- a/Services/RequestServer/ConnectionFromClient.h
++++ b/Services/RequestServer/ConnectionFromClient.h
+@@ -86,7 +86,8 @@ private:
+ 
+     virtual Messages::RequestServer::IsSupportedProtocolResponse is_supported_protocol(ByteString) override;
+     virtual Messages::RequestServer::GetClientIdResponse get_client_id() override;
+-    virtual void start_request(u64 request_id, ByteString, URL::URL, Vector<HTTP::Header>, ByteBuffer, HTTP::CacheMode, Optional<HTTP::NetworkIsolationKey>, HTTP::Cookie::IncludeCredentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id) override;
++    virtual void start_request(u64 request_id, ByteString, URL::URL, Vector<HTTP::Header>, ByteBuffer, HTTP::CacheMode, Optional<HTTP::NetworkIsolationKey>, HTTP::Cookie::IncludeCredentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, bool check_resolved_alias) override;
++    virtual void continue_request_after_alias_check(u64 request_id, bool block) override;
+     virtual void adopt_request(int source_client_id, u64 source_request_id, u64 target_request_id, bool preserve_transfer_lease) override;
+     virtual void release_request_transfer_lease(int source_client_id, u64 source_request_id) override;
+     virtual Messages::RequestServer::StopRequestResponse stop_request(u64 request_id) override;
+diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
+index b8053954b5248b2d34d8ce5b4250c1abfccd35da..9d9a905c8c2da10e54fbf03362d1181570ad5a51 100644
+--- a/Services/RequestServer/Request.cpp
++++ b/Services/RequestServer/Request.cpp
+@@ -464,11 +464,13 @@ NonnullOwnPtr<Request> Request::fetch(
+     HTTP::Cookie::IncludeCredentials include_credentials,
+     Optional<Requests::RequestTransferLeaseKey> transfer_lease,
+     Optional<u32> address_selection_hint,
+-    bool notify_on_cache_miss)
++    bool notify_on_cache_miss,
++    bool check_resolved_alias)
+ {
+     auto request = adopt_own(*new Request { request_id, RequestType::Fetch, disk_cache, move(network_isolation_key), cache_mode, client, curl_multi, resolver, move(url), move(method), move(request_headers), move(request_body), include_credentials, move(transfer_lease) });
+     request->m_address_selection_hint = address_selection_hint;
+     request->m_notify_on_cache_miss = notify_on_cache_miss;
++    request->m_check_resolved_alias = check_resolved_alias;
+     request->process();
+ 
+     return request;
+@@ -1331,10 +1333,59 @@ void Request::handle_dns_lookup_state()
+                 return;
+             }
+             self.m_dns_result = move(dns_result);
++
++            // The client's content blocker checks where the host's aliases lead before the request goes out.
++            if (auto alias_target = self.resolved_alias_target(); alias_target.has_value()) {
++                self.m_waiting_for_alias_check = true;
++                self.m_client->async_request_resolved_alias(self.m_request_id, alias_target.release_value());
++                return;
++            }
+             self.continue_after_dns_lookup();
+         }));
+ }
+ 
++// The name the request's host is an alias (CNAME) of, if the client asked to check it and DNS showed one.
++Optional<ByteString> Request::resolved_alias_target() const
++{
++    if (!m_check_resolved_alias || !m_dns_result || connect_host() != m_url.serialized_host())
++        return {};
++
++    auto cname_records = m_dns_result->records(DNS::Messages::ResourceType::CNAME);
++    if (cname_records.is_empty())
++        return {};
++
++    auto host = DNS::Messages::DomainName::from_string(connect_host()).to_canonical_string();
++    auto name = host;
++    // Follow the chain from the host to its end, staying clear of loops.
++    for (size_t i = 0; i < cname_records.size(); ++i) {
++        auto next = cname_records.first_matching([&](auto const& record) {
++            return record.name.to_canonical_string() == name;
++        });
++        if (!next.has_value())
++            break;
++        name = next->record.template get<DNS::Messages::Records::CNAME>().names.to_canonical_string();
++    }
++
++    auto target = name.trim("."sv, TrimMode::Right);
++    if (target.is_empty() || target == host.trim("."sv, TrimMode::Right))
++        return {};
++    return ByteString { target };
++}
++
++void Request::continue_after_alias_check(bool block)
++{
++    if (!m_waiting_for_alias_check)
++        return;
++    m_waiting_for_alias_check = false;
++
++    if (block) {
++        m_network_error = Requests::NetworkError::BlockedByContentBlocker;
++        transition_to_state(State::Error);
++        return;
++    }
++    continue_after_dns_lookup();
++}
++
+ StringView Request::connect_host() const
+ {
+     if (m_alternative_service.has_value() && !m_alternative_service->host.is_empty())
+diff --git a/Services/RequestServer/Request.h b/Services/RequestServer/Request.h
+index 63fd505c1f48ca06e5a3fe5e8109b833c285314c..0b97b1ae89b024fe016b36f97de63b55d46b8bc1 100644
+--- a/Services/RequestServer/Request.h
++++ b/Services/RequestServer/Request.h
+@@ -64,7 +64,11 @@ public:
+         HTTP::Cookie::IncludeCredentials include_credentials,
+         Optional<Requests::RequestTransferLeaseKey>,
+         Optional<u32> address_selection_hint,
+-        bool notify_on_cache_miss);
++        bool notify_on_cache_miss,
++        bool check_resolved_alias = false);
++
++    // Answers ConnectionFromClient's request_resolved_alias (content blocking's CNAME uncloaking).
++    void continue_after_alias_check(bool block);
+ 
+     static NonnullOwnPtr<Request> connect(
+         u64 request_id,
+@@ -370,6 +374,10 @@ private:
+ 
+     Optional<u32> m_address_selection_hint;
+ 
++    Optional<ByteString> resolved_alias_target() const;
++    bool m_check_resolved_alias { false };
++    bool m_waiting_for_alias_check { false };
++
+     Optional<Requests::RequestTransferLeaseKey> m_transfer_lease;
+     RefPtr<ConnectionFromClient> m_network_connection_keep_alive;
+ 
+diff --git a/Services/RequestServer/RequestClient.ipc b/Services/RequestServer/RequestClient.ipc
+index 59231ebbeaa80520aec6bc9f05d33560f7603eca..88826f0d40ba436c0a233710561d30d0f753ff2f 100644
+--- a/Services/RequestServer/RequestClient.ipc
++++ b/Services/RequestServer/RequestClient.ipc
+@@ -9,6 +9,9 @@
+ endpoint RequestClient
+ {
+     request_requires_network(u64 request_id) =|
++    // DNS showed the host of a request started with check_resolved_alias to be an alias (CNAME) of alias_target. The
++    // request waits for continue_request_after_alias_check, so the client's content blocker can uncloak it.
++    request_resolved_alias(u64 request_id, ByteString alias_target) =|
+     request_started(u64 request_id, IPC::File fd) =|
+     request_body_file_available(u64 request_id, IPC::File fd, u64 offset, u64 size) =|
+     request_cached_body_file_available(u64 request_id, IPC::File fd, u64 offset, u64 size) =|
+diff --git a/Services/RequestServer/RequestServer.ipc b/Services/RequestServer/RequestServer.ipc
+index b7e3d7825a577799e8dfc9ac41a3eafb8565370e..9b860509edac80dedd96ef2c5c5c73ef54df8684 100644
+--- a/Services/RequestServer/RequestServer.ipc
++++ b/Services/RequestServer/RequestServer.ipc
+@@ -17,7 +17,9 @@ endpoint RequestServer
+     is_supported_protocol(ByteString protocol) => (bool supported)
+     get_client_id() => (int client_id)
+ 
+-    start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id) =|
++    start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, bool check_resolved_alias) =|
++    // Answers request_resolved_alias: whether the content blocker blocks the request now that DNS showed its host to be an alias.
++    continue_request_after_alias_check(u64 request_id, bool block) =|
+     adopt_request(int source_client_id, u64 source_request_id, u64 target_request_id, bool preserve_transfer_lease) =|
+     release_request_transfer_lease(int source_client_id, u64 source_request_id) =|
+     stop_request(u64 request_id) => (bool success)
+diff --git a/Tests/RequestServer/TestContentCodingRetry.cpp b/Tests/RequestServer/TestContentCodingRetry.cpp
+index 87161679684ae7f3a72ed6916e85274354507c3e..76e760eba1173a03f2d17ef9ad2223bd605e155a 100644
+--- a/Tests/RequestServer/TestContentCodingRetry.cpp
++++ b/Tests/RequestServer/TestContentCodingRetry.cpp
+@@ -111,7 +111,7 @@ TEST_CASE(content_coding_retry_keeps_client_supplied_cookie_header)
+     UnsupportedCodingServer server;
+     auto message = make<Messages::RequestServer::StartRequest>(
+         0, ByteString { "GET" }, server.url(), Vector<HTTP::Header> { { "Cookie", "supplied=by-the-client" } }, ByteBuffer {},
+-        HTTP::CacheMode::NoStore, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0);
++        HTTP::CacheMode::NoStore, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, false);
+     VERIFY(!MUST(static_cast<RequestServerEndpoint::Stub&>(*connection).handle(move(message))));
+ 
+     event_loop.spin_until([&] { return server.request_heads().size() >= 2; });
+diff --git a/Tests/RequestServer/TestCookieResponses.cpp b/Tests/RequestServer/TestCookieResponses.cpp
+index 119426c92c3973f48471254c08de34e3c48eaf74..47871805eb1eb6ba4567bddf940ecf7a51d865ba 100644
+--- a/Tests/RequestServer/TestCookieResponses.cpp
++++ b/Tests/RequestServer/TestCookieResponses.cpp
+@@ -175,7 +175,7 @@ public:
+     void start_request(u64 request_id, Optional<URL::URL> target_url = {}, ByteString method = "GET"sv, Vector<HTTP::Header> headers = {}, Optional<HTTP::NetworkIsolationKey> network_isolation_key = {})
+     {
+         auto url = target_url.value_or(URL::Parser::basic_parse("http://localhost"sv).release_value());
+-        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(headers), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::Yes, true, Optional<u32> {}, false, 0, 0);
++        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(headers), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::Yes, true, Optional<u32> {}, false, 0, 0, false);
+         auto response = dispatch(move(message));
+         VERIFY(!response);
+     }
+diff --git a/Tests/RequestServer/TestDiskCacheWaiters.cpp b/Tests/RequestServer/TestDiskCacheWaiters.cpp
+index 28115795e7d355ee766eed49642ece75949de110..0a1ffdabfed54ea7dc793336ae3e1eb4d75fb48e 100644
+--- a/Tests/RequestServer/TestDiskCacheWaiters.cpp
++++ b/Tests/RequestServer/TestDiskCacheWaiters.cpp
+@@ -254,7 +254,7 @@ public:
+             { ByteString { HTTP::TEST_CACHE_ENABLED_HEADER }, "1"sv },
+         };
+ 
+-        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(request_headers), ByteBuffer {}, HTTP::CacheMode::Default, test_network_isolation_key(), HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0);
++        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(request_headers), ByteBuffer {}, HTTP::CacheMode::Default, test_network_isolation_key(), HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, false);
+         auto response = MUST(static_cast<RequestServerEndpoint::Stub&>(*m_connection).handle(move(message)));
+         VERIFY(!response);
+     }
+diff --git a/Tests/RequestServer/TestExportImport.cpp b/Tests/RequestServer/TestExportImport.cpp
+index fe1bd1c317c743d2bd74a100aad2b36b4a76c076..5dead3a4ebbf5e9e82fbbf4a0eb8b85f139bbb80 100644
+--- a/Tests/RequestServer/TestExportImport.cpp
++++ b/Tests/RequestServer/TestExportImport.cpp
+@@ -98,7 +98,7 @@ public:
+ 
+     void start_request(u64 request_id, URL::URL url, HTTP::NetworkIsolationKey network_isolation_key, bool create_transfer_lease)
+     {
+-        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), cacheable_request_headers(), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::No, create_transfer_lease, Optional<u32> {}, false, 0, 0);
++        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), cacheable_request_headers(), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::No, create_transfer_lease, Optional<u32> {}, false, 0, 0, false);
+         VERIFY(!dispatch(move(message)));
+     }
+ 
+diff --git a/Tests/RequestServer/TestRequestTimingInfo.cpp b/Tests/RequestServer/TestRequestTimingInfo.cpp
+index 3610ac83f15ab207f8b35300dab3c50673cd65df..41752c5e75afeff8e7ce229e2fcb5d76ba2dfdf2 100644
+--- a/Tests/RequestServer/TestRequestTimingInfo.cpp
++++ b/Tests/RequestServer/TestRequestTimingInfo.cpp
+@@ -145,7 +145,7 @@ public:
+         auto started_at = MonotonicTime::now();
+         m_started_at.set(request_id, started_at);
+ 
+-        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), Vector<HTTP::Header> {}, ByteBuffer {}, HTTP::CacheMode::Default, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0);
++        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), Vector<HTTP::Header> {}, ByteBuffer {}, HTTP::CacheMode::Default, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, false);
+         auto response = MUST(static_cast<RequestServerEndpoint::Stub&>(*m_connection).handle(move(message)));
+         VERIFY(!response);
+ 
+diff --git a/Tests/RequestServer/TestSiteBinding.cpp b/Tests/RequestServer/TestSiteBinding.cpp
+index 1849e806c44f5b4146ad1284e84f31962d114f89..0fa017924e0cde4699723d2e42b4fb08799cace4 100644
+--- a/Tests/RequestServer/TestSiteBinding.cpp
++++ b/Tests/RequestServer/TestSiteBinding.cpp
+@@ -103,7 +103,7 @@ struct TestServer {
+     {
+         auto message = make<Messages::RequestServer::StartRequest>(
+             request_id, ByteString { "GET" }, URL::Parser::basic_parse(url).release_value(), Vector<HTTP::Header> {}, ByteBuffer {},
+-            HTTP::CacheMode::NoStore, network_isolation_key, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0);
++            HTTP::CacheMode::NoStore, network_isolation_key, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, false);
+         VERIFY(!MUST(static_cast<RequestServerEndpoint::Stub&>(*connection).handle(move(message))));
+     }
+ 
