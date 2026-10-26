@@ -21,6 +21,8 @@ and the feature checklist.
 - Settings that Ladybird already has stay in `WebView::Application::settings()`. Xenon-only settings go through
   `UI/XenonSettings`, which is backed by QSettings.
 - New source files go in `UI/Xenon.cmake`.
+- The app icon's PNGs (`UI/Icons/xenon.png` and `UI/Icons/macos/app_icon.iconset`) are generated. Change
+  `UI/Icons/xenon.svg` (or `xenon-small.svg`, used at 32px and below) and rerun `Meta/generate-app-icon.py`.
 - The filter lists in `UI/Resources/filter-lists` are generated. Refresh them with `Meta/update-filter-lists.py`
   (from xenon-ublock), never by hand. Xenon passes them to Ladybird as `--content-blocker-list` arguments
   (`UI/FilterLists.cpp`). Lists added in `create_platform_options()` instead are dropped the first time a blocking

@@ -11,6 +11,7 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good commit. It isn't modified. |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
 | `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, and the shared web UI stylesheet), with `xenon.css` for what its own pages share, and the bundled filter lists. The build ships these in place of upstream's copies, which stay untouched. |
+| `UI/Icons/` | The app icon. `xenon.svg` is the artwork and `xenon-small.svg` its version for 32px and below; `Meta/generate-app-icon.py` renders the macOS iconset and the window icon from them. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 
@@ -146,7 +147,7 @@ What exists now and what's planned, measured against Helium:
 - [ ] A separate profile directory (LibWebView currently hardcodes `Ladybird` in profile paths)
 - [x] Xenon's own palette, built around **#ff0050** (`UI/BrandColors.h` for the chrome, `UI/Resources/about-pages/webui.css`
   for the internal pages)
-- [ ] Xenon's own app icon (the app still uses Ladybird's)
+- [x] Xenon's own app icon: two orbits woven around a nucleus, in white and rose
 - [ ] uBlock Origin's filter set for Ladybird's content blocker (being built in a separate repo, `xenon-ublock`)
 
 Helium features that depend on Chromium, like Chrome Web Store extensions and web app installs, are out of scope
