@@ -102,16 +102,18 @@ def check_includes(checks: Checks):
 
 def check_build_lists_every_source(checks: Checks):
     build_file = (UI_DIR / "Xenon.cmake").read_text()
-    listed = set(re.findall(r"\b([A-Za-z0-9_]+\.(?:cpp|mm))\b", build_file))
+    # Sources are listed relative to UI/ (Bangs.cpp, Extensions/Manifest.cpp), or by a path ending in Tests/ or UI/.
+    listed = {name.removeprefix("/") for name in re.findall(r"([A-Za-z0-9_/]+\.(?:cpp|mm))\b", build_file)}
+    listed = {name.split("/UI/")[-1].removeprefix("UI/") for name in listed}
 
     for path in ui_sources(".cpp", ".mm"):
-        if path.parent != UI_DIR:
-            continue
-        if path.name not in listed and path.name not in PLATFORM_SOURCES:
+        name = str(path.relative_to(UI_DIR))
+        if name not in listed and name not in PLATFORM_SOURCES:
             checks.fail("sources", f"{relative(path)} isn't built; add it to UI/Xenon.cmake")
 
     for name in sorted(listed):
-        if not (UI_DIR / name).exists() and not (XENON_SOURCE_DIR / "Tests" / name).exists():
+        test_name = name.split("Tests/")[-1]
+        if not (UI_DIR / name).exists() and not (XENON_SOURCE_DIR / "Tests" / test_name).exists():
             checks.fail("sources", f"UI/Xenon.cmake lists {name}, which doesn't exist in UI/ or Tests/")
 
 

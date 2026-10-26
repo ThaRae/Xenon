@@ -41,6 +41,11 @@ set(XENON_SOURCES
     DevToolsBanner.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
+    Extensions/Extension.cpp
+    Extensions/Locales.cpp
+    Extensions/Manifest.cpp
+    Extensions/MatchPattern.cpp
+    Extensions/Storage.cpp
     FilterLists.cpp
     FindInPageWidget.cpp
     Icon.cpp
@@ -147,7 +152,7 @@ qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
-target_link_libraries(xenon PRIVATE AK LibCore LibFileSystem LibGfx LibIPC LibMain LibWebView LibURL LibWakeLock)
+target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibIPC LibMain LibWebView LibURL LibWakeLock)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL)
 # NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
 #     tree, so Xenon's root comes first.
@@ -264,4 +269,14 @@ ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBangs.cpp" Xenon NAME TestXenonBang
 target_sources(TestXenonBangs PRIVATE "${XENON_UI_DIR}/Bangs.cpp")
 target_include_directories(TestXenonBangs BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs)
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestExtensions.cpp" Xenon NAME TestXenonExtensions LIBS LibCrypto LibFileSystem LibURL)
+target_sources(TestXenonExtensions PRIVATE
+    "${XENON_UI_DIR}/Extensions/Extension.cpp"
+    "${XENON_UI_DIR}/Extensions/Locales.cpp"
+    "${XENON_UI_DIR}/Extensions/Manifest.cpp"
+    "${XENON_UI_DIR}/Extensions/MatchPattern.cpp"
+    "${XENON_UI_DIR}/Extensions/Storage.cpp"
+)
+target_include_directories(TestXenonExtensions BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions)
