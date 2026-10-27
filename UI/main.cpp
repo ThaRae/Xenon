@@ -12,6 +12,7 @@
 #include <LibWebView/URL.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Application.h>
+#include <UI/BlockingDashboard.h>
 #include <UI/BrowserWindow.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
@@ -84,6 +85,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
 #endif
 
     Ladybird::Extensions::Registry::the().register_url_scheme();
+    Ladybird::BlockingDashboard::register_url_scheme();
     Ladybird::install_web_ui_interfaces();
 
     auto app = TRY(Ladybird::Application::create(Ladybird::FilterLists::with_bundled_filter_lists(arguments)));

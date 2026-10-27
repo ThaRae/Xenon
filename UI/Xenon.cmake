@@ -30,6 +30,9 @@ set(XENON_SOURCES
     Application.cpp
     Autocomplete.cpp
     Bangs.cpp
+    Blocking.cpp
+    BlockingDashboard.cpp
+    BlockingPopover.cpp
     BookmarkDialog.cpp
     BookmarksBar.cpp
     BrowserWindow.cpp
@@ -353,6 +356,16 @@ copy_resource_set(xenon/filter-lists
     TARGET xenon
 )
 
+# The blocking dashboard's pages (UI/BlockingDashboard.cpp serves them at xenon://blocking/).
+copy_resource_set(xenon/blocking
+    RESOURCES
+        "${XENON_UI_DIR}/Resources/blocking/dashboard.css"
+        "${XENON_UI_DIR}/Resources/blocking/dashboard.html"
+        "${XENON_UI_DIR}/Resources/blocking/dashboard.js"
+    DESTINATION "${xenon_resource_dir}"
+    TARGET xenon
+)
+
 qt_finalize_target(xenon)
 
 # Xenon's unit tests, which Meta/xenon.py test builds and runs. Each is named TestXenon* to stay clear of Ladybird's.
@@ -394,4 +407,15 @@ target_compile_definitions(TestXenonCRX PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestRecentTabOrder.cpp" Xenon NAME TestXenonRecentTabOrder)
 target_include_directories(TestXenonRecentTabOrder BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonRecentTabOrder)
+# The blocking popover, drawn without a window. With XENON_SCREENSHOT_DIR set, it saves how it looks there.
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBlockingPopover.cpp" Xenon NAME TestXenonBlockingPopover LIBS LibCore LibURL)
+target_sources(TestXenonBlockingPopover PRIVATE
+    "${XENON_UI_DIR}/BlockingPopover.cpp"
+    "${XENON_UI_DIR}/ChromeStyle.cpp"
+    "${XENON_UI_DIR}/Popover.cpp"
+    "${XENON_UI_DIR}/StringUtils.cpp"
+)
+target_include_directories(TestXenonBlockingPopover BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_link_libraries(TestXenonBlockingPopover PRIVATE Qt::Core Qt::Gui Qt::Widgets)
+
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonBlockingPopover TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonRecentTabOrder)

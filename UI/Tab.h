@@ -51,7 +51,7 @@ class BrowserWindow;
 enum class ChromeIcon;
 class DownloadsPopover;
 class ContentBlockingButton;
-class ContentBlockingPopover;
+class BlockingPopover;
 class ReloadButton;
 class JavaScriptDialog;
 class MessagePopover;
@@ -268,7 +268,7 @@ private:
     QToolButton* m_hamburger_button { nullptr };
     ContentBlockingButton* m_content_blocking_button { nullptr };
     Extensions::ActionToolbar* m_extension_toolbar { nullptr };
-    QPointer<ContentBlockingPopover> m_content_blocking_popover;
+    QPointer<BlockingPopover> m_content_blocking_popover;
     Optional<String> m_content_blocking_popover_reload_site;
     QToolButton* m_downloads_button { nullptr };
     QPointer<DownloadsPopover> m_downloads_popover;

@@ -84,6 +84,10 @@ FILTERED_PAGE_EXPECTED = {
     True: {"canRunAds": "true", ".adds-wrapper": "none", ".article": "block"},
 }
 
+# The blocking dashboard (UI/BlockingDashboard.cpp), whose page shows the bundled lists once Xenon sends them.
+BLOCKING_DASHBOARD_URL = "xenon://blocking/"
+FILTER_LIST_MANIFEST = XENON_SOURCE_DIR / "UI" / "Resources" / "filter-lists" / "manifest.json"
+
 # Bundles that a local server publishes to test filter list updates, signed with a key of their own
 # (Tests/FilterListUpdates/make-bundles.py). Each test page prints what it found on a line starting with the marker.
 FILTER_LIST_UPDATES_DIR = XENON_SOURCE_DIR / "Tests" / "FilterListUpdates"
@@ -277,6 +281,10 @@ def test_main(platform: Platform, build_dir: Path):
     print("==> daily filter list updates from a local server", flush=True)
     if not check_filter_list_updates(app_executable(platform, build_dir), env):
         failures.append("filter list updates")
+
+    print("==> the blocking dashboard", flush=True)
+    if not check_blocking_dashboard(app_executable(platform, build_dir), env):
+        failures.append("blocking dashboard")
 
     print("==> extension pages and their chrome.* APIs", flush=True)
     if not check_extensions(app_executable(platform, build_dir), env):
@@ -1022,6 +1030,22 @@ def check_extensions(executable: Path, env: dict) -> bool:
         else:
             print(f"    {name}: {len(checks)} checks passed")
     return passed
+
+
+# Loads the blocking dashboard, whose lists only show up once its page and Xenon have talked over the script bridge.
+def check_blocking_dashboard(executable: Path, env: dict) -> bool:
+    titles = [entry["title"] for entry in json.loads(FILTER_LIST_MANIFEST.read_text())["lists"]]
+    with tempfile.TemporaryDirectory() as profile:
+        loaded, output = run_headless(
+            executable, env, ["--headless=text", "--profile-path", profile, BLOCKING_DASHBOARD_URL]
+        )
+    missing = [title for title in titles if title not in output]
+    if not loaded or missing or f"of {len(titles)} lists in use" not in output:
+        print(output[-4000:], file=sys.stderr)
+        print(f"    missing: {missing}", file=sys.stderr)
+        return False
+    print(f"    shows all {len(titles)} bundled lists")
+    return True
 
 
 def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, str]:

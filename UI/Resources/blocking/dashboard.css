@@ -1,0 +1,222 @@
+/*
+ * Copyright (c) 2026, the Xenon developers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 24px 64px;
+}
+
+.dashboard-header {
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.dashboard-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.dashboard-title h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.dashboard-title .description {
+    margin: 2px 0 0;
+}
+
+/* The popover's power button, small. */
+.power-mark {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    padding: 12px;
+    border-radius: 50%;
+    background: var(--xenon-rose);
+    fill: none;
+    stroke: white;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+}
+
+body:has(#enabled:not(:checked)) .power-mark {
+    background: var(--card-background-color);
+    border: 1px solid var(--border-color);
+    stroke: var(--secondary-text-color);
+}
+
+.global-switch {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+}
+
+.tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--xenon-hairline);
+}
+
+.tabs [role="tab"] {
+    padding: 10px 14px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: none;
+    color: var(--xenon-muted);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.tabs [role="tab"]:hover {
+    color: var(--xenon-ink);
+}
+
+.tabs [role="tab"][aria-selected="true"] {
+    color: var(--xenon-ink);
+    border-bottom-color: var(--xenon-rose);
+}
+
+#lists-summary {
+    margin: 0 0 20px;
+}
+
+.card-subtitle {
+    margin-left: 12px;
+    color: var(--secondary-text-color);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.list-body {
+    padding: 4px 0;
+}
+
+.list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+.list-row + .list-row {
+    border-top: 1px solid var(--separator-color);
+}
+
+.list-row:hover {
+    background: var(--item-hover-color);
+}
+
+.list-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.list-title {
+    font-weight: 500;
+}
+
+.list-meta {
+    color: var(--secondary-text-color);
+    font-size: 13px;
+}
+
+.list-link {
+    margin-left: 8px;
+    color: var(--xenon-rose);
+}
+
+textarea#custom-filters {
+    display: block;
+    width: 100%;
+    min-height: 320px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--input-background-color);
+    color: var(--xenon-ink);
+    font-family: var(--xenon-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    resize: vertical;
+}
+
+textarea#custom-filters:focus {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: -1px;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.add-trusted {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.add-trusted input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--input-background-color);
+    color: var(--xenon-ink);
+    font: inherit;
+}
+
+.add-trusted input:focus {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: -1px;
+}
+
+.trusted-sites {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-background-color);
+}
+
+.trusted-sites:empty {
+    display: none;
+}
+
+.trusted-site {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 8px 8px 16px;
+}
+
+.trusted-site + .trusted-site {
+    border-top: 1px solid var(--separator-color);
+}
+
+.trusted-site-name {
+    font-family: var(--xenon-mono);
+    font-size: 13px;
+}
+
+code {
+    font-family: var(--xenon-mono);
+    font-size: 13px;
+}

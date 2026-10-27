@@ -31,6 +31,11 @@ public:
     // Call it once the application exists, before any page opens.
     static void initialize();
 
+    // The directory of the bundle whose lists Ladybird has: the downloaded one, or the bundled one.
+    static Optional<ByteString> current_directory();
+    // Gives Ladybird the current bundle's lists again, after the lists turned off in the blocking dashboard changed.
+    static void reapply_lists();
+
     struct Bundle {
         ByteString directory;
         BundleManifest manifest;

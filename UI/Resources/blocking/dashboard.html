@@ -1,0 +1,73 @@
+<!doctype html>
+<!--
+Copyright (c) 2026, the Xenon developers.
+SPDX-License-Identifier: BSD-2-Clause
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Content blocking</title>
+        <link rel="stylesheet" href="ladybird.css" />
+        <link rel="stylesheet" href="webui.css" />
+        <link rel="stylesheet" href="xenon.css" />
+        <link rel="stylesheet" href="dashboard.css" />
+        <script src="dashboard.js" defer></script>
+    </head>
+    <body>
+        <main>
+            <header class="dashboard-header">
+                <div class="dashboard-title">
+                    <svg class="power-mark" viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M6.3 5.4a6.5 6.5 0 1 0 7.4 0" />
+                        <path d="M10 2.5v7" />
+                    </svg>
+                    <div>
+                        <h1>Content blocking</h1>
+                        <p id="summary" class="description"></p>
+                    </div>
+                </div>
+                <label class="global-switch">
+                    <span id="enabled-label">On</span>
+                    <input type="checkbox" switch id="enabled" />
+                </label>
+            </header>
+
+            <nav class="tabs" role="tablist">
+                <button type="button" role="tab" data-pane="lists">Filter lists</button>
+                <button type="button" role="tab" data-pane="filters">My filters</button>
+                <button type="button" role="tab" data-pane="trusted">Trusted sites</button>
+            </nav>
+
+            <section id="lists" class="pane" role="tabpanel">
+                <p id="lists-summary" class="description"></p>
+                <div id="list-groups"></div>
+            </section>
+
+            <section id="filters" class="pane hidden" role="tabpanel">
+                <p class="description">
+                    One filter per line, in uBlock Origin's syntax: <code>||ads.example^</code> blocks a domain, and
+                    <code>example.com##.banner</code> hides an element on a site. Block Element… and the popover's site
+                    switches add their filters here.
+                </p>
+                <textarea id="custom-filters" spellcheck="false" aria-label="My filters"></textarea>
+                <div class="actions">
+                    <button type="button" class="secondary-button" id="revert-filters" disabled>Revert</button>
+                    <button type="button" class="primary-button" id="apply-filters" disabled>Apply changes</button>
+                </div>
+            </section>
+
+            <section id="trusted" class="pane hidden" role="tabpanel">
+                <p class="description">
+                    Blocking is off on these sites. The power button in the toolbar's blocking popover adds and removes
+                    sites too.
+                </p>
+                <form id="add-trusted" class="add-trusted">
+                    <input type="text" id="trusted-site" placeholder="example.com" aria-label="Site to trust" />
+                    <button type="submit" class="secondary-button">Add</button>
+                </form>
+                <ul id="trusted-sites" class="trusted-sites"></ul>
+                <p id="no-trusted-sites" class="description hidden">No trusted sites. Blocking is on everywhere.</p>
+            </section>
+        </main>
+    </body>
+</html>
