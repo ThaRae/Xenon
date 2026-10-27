@@ -77,8 +77,7 @@ static JsonArray string_array(Vector<String> const& strings)
     return array;
 }
 
-// Chrome's document IDs and context IDs are opaque strings.
-static String document_id_string(WebView::ScriptBridgeEndpoint const& endpoint)
+String document_id_string(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     auto id = endpoint.document_id();
     return MUST(String::formatted("{:x}-{:x}", id.namespace_id, id.local_id));
@@ -209,9 +208,14 @@ JsonObject Router::sender_for(Context const& context)
 i64 Router::frame_id(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     auto const& navigable = endpoint.navigable();
-    if (!navigable.parent_id.has_value())
+    return frame_id(navigable.id, !navigable.parent_id.has_value());
+}
+
+i64 Router::frame_id(Web::HTML::CrossProcessId navigable_id, bool is_top_level)
+{
+    if (is_top_level)
         return 0;
-    return m_frame_ids.ensure(navigable.id, [&] { return m_next_frame_id++; });
+    return m_frame_ids.ensure(navigable_id, [&] { return m_next_frame_id++; });
 }
 
 void Router::prune_closed_contexts()
@@ -287,7 +291,7 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
             handle_call(*context, *id, *name, args.has_value() ? *args : JsonArray {});
     } else if (*type == "response"sv) {
         if (auto id = message.get_u64("id"sv); id.has_value())
-            handle_response(*context, *id, message.get_bool("handled"sv).value_or(false), message.get("response"sv).value_or(JsonValue {}));
+            handle_response(*context, *id, message.get_bool("handled"sv).value_or(false), message.get_bool("listening"sv).value_or(true), message.get("response"sv).value_or(JsonValue {}));
     } else if (*type == "connect"sv && port_id.has_value()) {
         // A port to a tab (tabs.connect()) goes to the extension's content scripts there; any other port goes to its
         // pages and background (runtime.connect()).
@@ -356,6 +360,10 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
         send_tab_message(context, id, args);
         return;
     }
+    if (name.starts_with_bytes("scripting."sv)) {
+        handle_scripting_call(context, id, name, args);
+        return;
+    }
     if (name == "permissions.request"sv) {
         request_permissions(context, id, args);
         return;
@@ -372,7 +380,9 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
         result = handle_privacy_call(context, name, args);
     else if (name.starts_with_bytes("runtime."sv) || name.starts_with_bytes("management."sv) || name.starts_with_bytes("idle."sv) || name.starts_with_bytes("offscreen."sv) || name.starts_with_bytes("commands."sv))
         result = handle_runtime_call(context, name, args);
-    else if (name.starts_with_bytes("tabs."sv) || name.starts_with_bytes("windows."sv) || name.starts_with_bytes("action."sv) || name.starts_with_bytes("webNavigation."sv))
+    else if (name.starts_with_bytes("webNavigation."sv))
+        result = handle_web_navigation_call(context, name, args);
+    else if (name.starts_with_bytes("tabs."sv) || name.starts_with_bytes("windows."sv) || name.starts_with_bytes("action."sv))
         result = Browser::handle_call(*context.extension, context.endpoint.view_id(), name, args);
 
     if (result.is_error())
@@ -1024,7 +1034,7 @@ void Router::send_tab_message(Context& sender, u64 call_id, JsonArray const& arg
     send_runtime_message(sender, call_id, move(message), move(receivers));
 }
 
-void Router::handle_response(Context& responder, u64 id, bool handled, JsonValue response)
+void Router::handle_response(Context& responder, u64 id, bool handled, bool listening, JsonValue response)
 {
     auto pending = m_pending_messages.get(id);
     if (!pending.has_value())
@@ -1033,6 +1043,7 @@ void Router::handle_response(Context& responder, u64 id, bool handled, JsonValue
     auto awaited = pending->awaiting.remove_all_matching([&](auto const& endpoint) { return endpoint == responder.endpoint; });
     if (!awaited)
         return;
+    pending->any_listening |= listening;
 
     if (handled)
         finish_pending_message(id, move(response));
@@ -1045,6 +1056,12 @@ void Router::finish_pending_message(u64 id, Optional<JsonValue> response)
     auto pending = m_pending_messages.take(id);
     if (!pending.has_value())
         return;
+
+    // As in Chrome, a message that no context had a listener for never connected.
+    if (!response.has_value() && !pending->any_listening) {
+        reply_with_error(pending->sender, pending->call_id, NO_RECEIVER);
+        return;
+    }
 
     JsonObject result;
     result.set("responded"sv, response.has_value());

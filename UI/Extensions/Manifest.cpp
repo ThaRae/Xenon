@@ -433,4 +433,92 @@ bool ContentScript::matches_document(URL::URL const& url, bool is_top_level_fram
     return !any_of(exclude_globs, matches_glob);
 }
 
+// https://developer.chrome.com/docs/extensions/reference/api/scripting#type-RegisteredContentScript
+ErrorOr<RegisteredContentScript, String> RegisteredContentScript::from_json(JsonObject const& object)
+{
+    RegisteredContentScript registered;
+    auto id = TRY(optional_string(object, "id"sv, {}));
+    if (!id.has_value() || id->is_empty())
+        return error("A content script needs an ID.");
+    if (id->starts_with('_'))
+        return error("Content script's ID '{}' must not start with '_'.", *id);
+    registered.id = id.release_value();
+
+    auto context = MUST(String::formatted("content script '{}': ", registered.id));
+    auto& script = registered.script;
+    script.matches = TRY(string_list(object, "matches"sv, context));
+    if (script.matches.is_empty())
+        return error("Script with ID '{}' must specify 'matches'.", registered.id);
+    script.exclude_matches = TRY(string_list(object, "excludeMatches"sv, context));
+    for (auto const& pattern : script.matches) {
+        if (auto parsed = MatchPattern::parse(pattern); parsed.is_error())
+            return error("Script with ID '{}' has an invalid match pattern '{}': {}", registered.id, pattern, parsed.error());
+    }
+    for (auto const& pattern : script.exclude_matches) {
+        if (auto parsed = MatchPattern::parse(pattern); parsed.is_error())
+            return error("Script with ID '{}' has an invalid match pattern '{}': {}", registered.id, pattern, parsed.error());
+    }
+    script.js = TRY(path_list(object, "js"sv, context));
+    script.css = TRY(path_list(object, "css"sv, context));
+    if (script.js.is_empty() && script.css.is_empty())
+        return error("Script with ID '{}' must specify at least one js or css file.", registered.id);
+
+    if (auto run_at = TRY(optional_string(object, "runAt"sv, context)); run_at.has_value()) {
+        if (*run_at == "document_start"sv)
+            script.run_at = RunAt::DocumentStart;
+        else if (*run_at == "document_end"sv)
+            script.run_at = RunAt::DocumentEnd;
+        else if (*run_at == "document_idle"sv)
+            script.run_at = RunAt::DocumentIdle;
+        else
+            return error("Script with ID '{}' has an invalid runAt '{}'.", registered.id, *run_at);
+    }
+    if (auto world = TRY(optional_string(object, "world"sv, context)); world.has_value()) {
+        if (*world == "MAIN"sv)
+            script.world = World::Main;
+        else if (*world != "ISOLATED"sv)
+            return error("Script with ID '{}' has an invalid world '{}'.", registered.id, *world);
+    }
+    script.all_frames = object.get_bool("allFrames"sv).value_or(false);
+    script.match_origin_as_fallback = object.get_bool("matchOriginAsFallback"sv).value_or(false);
+    registered.persist_across_sessions = object.get_bool("persistAcrossSessions"sv).value_or(true);
+    return registered;
+}
+
+JsonObject RegisteredContentScript::to_json() const
+{
+    auto list = [](Vector<String> const& strings) {
+        JsonArray array;
+        for (auto const& string : strings)
+            array.must_append(string);
+        return array;
+    };
+
+    JsonObject object;
+    object.set("id"sv, id);
+    object.set("matches"sv, list(script.matches));
+    if (!script.exclude_matches.is_empty())
+        object.set("excludeMatches"sv, list(script.exclude_matches));
+    if (!script.js.is_empty())
+        object.set("js"sv, list(script.js));
+    if (!script.css.is_empty())
+        object.set("css"sv, list(script.css));
+    object.set("allFrames"sv, script.all_frames);
+    object.set("matchOriginAsFallback"sv, script.match_origin_as_fallback);
+    switch (script.run_at) {
+    case RunAt::DocumentStart:
+        object.set("runAt"sv, "document_start"sv);
+        break;
+    case RunAt::DocumentEnd:
+        object.set("runAt"sv, "document_end"sv);
+        break;
+    case RunAt::DocumentIdle:
+        object.set("runAt"sv, "document_idle"sv);
+        break;
+    }
+    object.set("world"sv, script.world == World::Main ? "MAIN"sv : "ISOLATED"sv);
+    object.set("persistAcrossSessions"sv, persist_across_sessions);
+    return object;
+}
+
 }

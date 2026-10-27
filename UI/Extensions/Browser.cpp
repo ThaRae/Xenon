@@ -315,8 +315,48 @@ static JsonObject window_to_json(BrowserWindow& window, Extension const& extensi
     return json;
 }
 
+// A headless browser, as Meta/xenon.py test runs, has no tabs. The view it loads its page in stands for tab 1 of window
+// 1, so that what extensions do with tabs can be tested there too.
+static constexpr i64 HEADLESS_TAB_ID = 1;
+static constexpr i64 HEADLESS_WINDOW_ID = 1;
+
+static Optional<WebView::ViewImplementation&> headless_tab_view()
+{
+    if (!Application::browser_options().headless_mode.has_value())
+        return {};
+
+    Optional<WebView::ViewImplementation&> found;
+    WebView::ViewImplementation::for_each_view([&](WebView::ViewImplementation& view) {
+        if (Registry::the().is_hidden_view(view.view_id()))
+            return IterationDecision::Continue;
+        found = view;
+        return IterationDecision::Break;
+    });
+    return found;
+}
+
+static Optional<JsonObject> headless_tab_json(Extension const& extension)
+{
+    auto view = headless_tab_view();
+    if (!view.has_value())
+        return {};
+
+    JsonObject json;
+    json.set("id"sv, HEADLESS_TAB_ID);
+    json.set("index"sv, 0);
+    json.set("windowId"sv, HEADLESS_WINDOW_ID);
+    json.set("active"sv, true);
+    json.set("incognito"sv, false);
+    if (may_see_details(extension, view->url()))
+        json.set("url"sv, view->url().serialize());
+    return json;
+}
+
 Optional<TabAndWindowIds> tab_and_window_ids(u64 view_id)
 {
+    if (auto view = headless_tab_view(); view.has_value() && view->view_id() == view_id)
+        return TabAndWindowIds { .tab_id = HEADLESS_TAB_ID, .window_id = HEADLESS_WINDOW_ID };
+
     auto tab = find_tab_for_view(view_id);
     if (!tab.has_value())
         return {};
@@ -325,6 +365,9 @@ Optional<TabAndWindowIds> tab_and_window_ids(u64 view_id)
 
 Optional<JsonObject> tab_json(u64 view_id, Extension const& extension)
 {
+    if (auto view = headless_tab_view(); view.has_value() && view->view_id() == view_id)
+        return headless_tab_json(extension);
+
     auto tab = find_tab_for_view(view_id);
     if (!tab.has_value())
         return {};
@@ -636,6 +679,9 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
     if (name == "tabs.query"sv) {
         auto query = object_argument(args, 0);
         JsonArray tabs;
+        // The headless browser's one tab is the answer to any query.
+        if (auto tab = headless_tab_json(extension); tab.has_value())
+            tabs.must_append(tab.release_value());
         for (auto* window : all_windows()) {
             for (int i = 0; i < window->tab_count(); ++i) {
                 auto* tab = window->tab_at(i);
@@ -650,6 +696,8 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
         auto id = integer_argument(args, 0);
         if (!id.has_value())
             return "tabs.get() needs a tab ID."_string;
+        if (auto tab = headless_tab_json(extension); tab.has_value() && *id == HEADLESS_TAB_ID)
+            return JsonValue { tab.release_value() };
         auto tab = TRY(tab_argument(args, 0, caller_view_id));
         return JsonValue { tab_to_json(*tab.tab, *tab.window, extension) };
     }
@@ -1139,47 +1187,15 @@ static ErrorOr<JsonValue, String> handle_action_call(Extension const& extension,
     return MUST(String::formatted("{} isn't supported yet.", name));
 }
 
-// --- chrome.webNavigation ---------------------------------------------------------------------------------------------
-
-// FIXME: Only a tab's top-level frame, for now. Its frames, and the navigation events, come with content scripts.
-static JsonObject top_frame_to_json(Tab& tab)
+Optional<Vector<WebView::ScriptBridgeEndpoint>> frame_documents(i64 tab_id)
 {
-    JsonObject json;
-    json.set("frameId"sv, 0);
-    json.set("parentFrameId"sv, -1);
-    json.set("url"sv, tab.url().serialize());
-    json.set("errorOccurred"sv, false);
-    json.set("frameType"sv, "outermost_frame"sv);
-    json.set("documentLifecycle"sv, "active"sv);
-    return json;
-}
+    if (auto view = headless_tab_view(); view.has_value() && tab_id == HEADLESS_TAB_ID)
+        return view->frame_document_endpoints();
 
-static ErrorOr<JsonValue, String> handle_web_navigation_call(Extension const& extension, StringView name, JsonArray const& args)
-{
-    if (!extension.has_permission("webNavigation"sv))
-        return "The webNavigation permission is required."_string;
-
-    auto details = !args.is_empty() && args.at(0).is_object() ? args.at(0).as_object() : JsonObject {};
-    auto tab_id_value = details.get_i64("tabId"sv);
-    if (!tab_id_value.has_value())
-        return "tabId is required."_string;
-
-    // As in Chrome, a tab or frame that doesn't exist gives null.
-    auto tab = find_tab(*tab_id_value);
-
-    if (name == "webNavigation.getFrame"sv) {
-        if (!tab.has_value() || details.get_i64("frameId"sv).value_or(0) != 0)
-            return JsonValue {};
-        return top_frame_to_json(*tab->tab);
-    }
-    if (name == "webNavigation.getAllFrames"sv) {
-        if (!tab.has_value())
-            return JsonValue {};
-        JsonArray frames;
-        frames.must_append(top_frame_to_json(*tab->tab));
-        return frames;
-    }
-    return MUST(String::formatted("{} isn't supported yet.", name));
+    auto tab = find_tab(tab_id);
+    if (!tab.has_value())
+        return {};
+    return tab->tab->view().frame_document_endpoints();
 }
 
 ErrorOr<JsonValue, String> handle_call(Extension const& extension, Optional<u64> caller_view_id, StringView name, JsonArray const& args)
@@ -1193,8 +1209,6 @@ ErrorOr<JsonValue, String> handle_call(Extension const& extension, Optional<u64>
         return handle_windows_call(extension, caller_view_id, name, args);
     if (name.starts_with("action."sv))
         return handle_action_call(extension, name, args);
-    if (name.starts_with("webNavigation."sv))
-        return handle_web_navigation_call(extension, name, args);
     return MUST(String::formatted("{} isn't supported yet.", name));
 }
 

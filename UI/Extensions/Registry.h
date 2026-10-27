@@ -80,6 +80,8 @@ public:
     void create_offscreen_document(Extension const&, URL::URL const&);
     void close_offscreen_document(Extension const&);
     bool is_offscreen_view(Extension const&, u64 view_id) const;
+    // Whether a view is one of the hidden views of extensions: a background page or an offscreen document.
+    bool is_hidden_view(u64 view_id) const;
 
     // Optional permissions the user granted an extension. They last across sessions and reloads, until the extension
     // gives them up or is removed.
@@ -96,6 +98,11 @@ public:
     void set_controlled_setting(String const& name, Extension const&, JsonValue);
     // Whether the extension controlled the setting, which it now no longer does.
     bool clear_controlled_setting(StringView name, Extension const&);
+
+    // Content scripts an extension registered with scripting.registerContentScripts(), in order. Those that persist
+    // across sessions last until the extension unregisters them, or is reloaded or removed.
+    Vector<RegisteredContentScript> const& registered_content_scripts(StringView id) const;
+    void set_registered_content_scripts(StringView id, Vector<RegisteredContentScript>);
 
     // Called whenever the set of extensions changes, until the listener returns false.
     void on_extensions_change(Function<bool()>);
@@ -130,6 +137,7 @@ private:
     // By extension ID, and by setting name.
     HashMap<String, Vector<String>> m_granted_permissions;
     HashMap<String, ControlledSetting> m_controlled_settings;
+    HashMap<String, Vector<RegisteredContentScript>> m_registered_content_scripts;
 
     bool m_can_start_background_pages { false };
     Optional<Core::AnonymousBuffer> m_theme;

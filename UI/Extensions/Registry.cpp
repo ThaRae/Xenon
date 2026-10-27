@@ -97,7 +97,9 @@ void Registry::add(NonnullRefPtr<Extension> extension)
     // Loading an extension that's loaded already reloads it, as Chrome's "Load unpacked" does: its pages and background
     // start over, and it keeps its storage.
     stop_background_page(extension->id());
-    m_extensions.remove_all_matching([&](auto const& loaded) { return loaded->id() == extension->id(); });
+    // A reloaded extension starts without the content scripts it registered, as an updated one does in Chrome.
+    if (m_extensions.remove_all_matching([&](auto const& loaded) { return loaded->id() == extension->id(); }))
+        m_registered_content_scripts.remove(extension->id());
     if (auto granted = m_granted_permissions.get(extension->id()); granted.has_value())
         extension->set_granted_optional_permissions(*granted);
     m_extensions.append(extension);
@@ -129,6 +131,7 @@ void Registry::remove(StringView id)
     m_known_versions.remove(removed->id());
     m_install_reasons.remove(removed->id());
     m_granted_permissions.remove(removed->id());
+    m_registered_content_scripts.remove(removed->id());
     m_controlled_settings.remove_all_matching([&](auto const&, auto const& setting) { return setting.extension_id == removed->id(); });
     m_storage.remove_all_matching([&](auto const& key, auto const&) { return key.starts_with(ByteString::formatted("{}/", id)); });
     save_state();
@@ -336,6 +339,17 @@ bool Registry::is_offscreen_view(Extension const& extension, u64 view_id) const
     return view.has_value() && (*view)->view_id() == view_id;
 }
 
+bool Registry::is_hidden_view(u64 view_id) const
+{
+    for (auto const& views : { &m_background_pages, &m_offscreen_documents }) {
+        for (auto const& [id, view] : *views) {
+            if (view->view_id() == view_id)
+                return true;
+        }
+    }
+    return false;
+}
+
 // --- chrome-extension:// -----------------------------------------------------------------------------------------------
 
 // The response body of a generated resource, in an unlinked temporary file, since the renderer reads responses from a
@@ -476,6 +490,20 @@ void Registry::load_state()
             m_granted_permissions.set(id, move(list));
         });
     }
+    if (auto content_scripts = json.value().get_object("contentScripts"sv); content_scripts.has_value()) {
+        content_scripts->for_each_member([&](String const& id, JsonValue const& scripts) {
+            if (!scripts.is_array())
+                return;
+            Vector<RegisteredContentScript> list;
+            for (auto const& script : scripts.as_array().values()) {
+                if (!script.is_object())
+                    continue;
+                if (auto registered = RegisteredContentScript::from_json(script.as_object()); !registered.is_error())
+                    list.append(registered.release_value());
+            }
+            m_registered_content_scripts.set(id, move(list));
+        });
+    }
     if (auto settings = json.value().get_object("settings"sv); settings.has_value()) {
         settings->for_each_member([&](String const& name, JsonValue const& setting) {
             if (!setting.is_object())
@@ -486,6 +514,24 @@ void Registry::load_state()
                 m_controlled_settings.set(name, { .extension_id = *extension_id, .value = *value });
         });
     }
+}
+
+Vector<RegisteredContentScript> const& Registry::registered_content_scripts(StringView id) const
+{
+    static NeverDestroyed<Vector<RegisteredContentScript>> none;
+    if (auto scripts = m_registered_content_scripts.get(id); scripts.has_value())
+        return *scripts;
+    return *none;
+}
+
+void Registry::set_registered_content_scripts(StringView id, Vector<RegisteredContentScript> scripts)
+{
+    if (scripts.is_empty())
+        m_registered_content_scripts.remove(id);
+    else
+        m_registered_content_scripts.set(MUST(String::from_utf8(id)), move(scripts));
+    save_state();
+    ContentScripts::update();
 }
 
 void Registry::save_state() const
@@ -515,10 +561,22 @@ void Registry::save_state() const
         settings.set(name, move(json));
     }
 
+    JsonObject content_scripts;
+    for (auto const& [id, scripts] : m_registered_content_scripts) {
+        JsonArray list;
+        for (auto const& script : scripts) {
+            if (script.persist_across_sessions)
+                list.must_append(script.to_json());
+        }
+        if (!list.is_empty())
+            content_scripts.set(id, move(list));
+    }
+
     JsonObject state;
     state.set("unpacked"sv, move(directories));
     state.set("versions"sv, move(versions));
     state.set("granted"sv, move(granted));
+    state.set("contentScripts"sv, move(content_scripts));
     state.set("settings"sv, move(settings));
 
     auto write = [&]() -> ErrorOr<void> {

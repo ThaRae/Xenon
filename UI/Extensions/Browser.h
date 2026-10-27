@@ -14,6 +14,7 @@
 #include <AK/Optional.h>
 #include <AK/String.h>
 #include <LibURL/URL.h>
+#include <LibWebView/URLSchemeHandler.h>
 #include <UI/Extensions/Extension.h>
 
 #include <QColor>
@@ -27,8 +28,8 @@ class Tab;
 
 }
 
-// chrome.tabs, chrome.windows, chrome.action, and chrome.webNavigation: what extensions see of the browser's windows and
-// tabs, by Chrome's numeric IDs, and the state of their toolbar buttons.
+// chrome.tabs, chrome.windows, and chrome.action: what extensions see of the browser's windows and tabs, by Chrome's
+// numeric IDs, and the state of their toolbar buttons.
 namespace Ladybird::Extensions::Browser {
 
 ErrorOr<JsonValue, String> handle_call(Extension const&, Optional<u64> caller_view_id, StringView name, JsonArray const& args);
@@ -38,6 +39,8 @@ struct TabAndWindowIds {
     i64 window_id { -1 };
 };
 Optional<TabAndWindowIds> tab_and_window_ids(u64 view_id);
+// The documents in a tab's frames, the top-level one first, or none if there's no such tab.
+Optional<Vector<WebView::ScriptBridgeEndpoint>> frame_documents(i64 tab_id);
 // The tab showing a view, as chrome.tabs describes it to the extension.
 Optional<JsonObject> tab_json(u64 view_id, Extension const&);
 

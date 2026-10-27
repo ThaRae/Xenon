@@ -2,6 +2,7 @@
 <!-- Meta/xenon.py test serves this from a local web server, where the test extension's content scripts run in it. It
      prints one line of results, theirs and its own, and closes, which ends the headless browser. -->
 <div id="marker">marker</div>
+<iframe src="/frame"></iframe>
 <script>
     const results = {};
     function check(name, condition) {

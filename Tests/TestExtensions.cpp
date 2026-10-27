@@ -252,6 +252,47 @@ TEST_CASE(content_script_matching)
     EXPECT(!logins.matches_document(url("https://private.example.com/login"sv), true));
 }
 
+TEST_CASE(registered_content_scripts)
+{
+    // Bitwarden's passkey scripts, as it registers them.
+    auto registered = MUST(RegisteredContentScript::from_json(json(R"({
+        "id": "fido2-page-script-registration",
+        "js": ["/content/fido2-page-script.js"],
+        "world": "MAIN",
+        "matches": ["https://*/*"],
+        "excludeMatches": ["https://*/*.xml*"],
+        "allFrames": true,
+        "runAt": "document_start"
+    })"sv)));
+    EXPECT_EQ(registered.id, "fido2-page-script-registration"sv);
+    EXPECT_EQ(registered.script.js[0], "content/fido2-page-script.js"sv);
+    EXPECT(registered.script.world == World::Main);
+    EXPECT(registered.script.run_at == RunAt::DocumentStart);
+    EXPECT(registered.script.all_frames);
+    EXPECT(registered.persist_across_sessions);
+    EXPECT(registered.script.matches_document(url("https://example.com/"sv), false));
+    EXPECT(!registered.script.matches_document(url("https://example.com/feed.xml"sv), true));
+
+    // What getRegisteredContentScripts() gives back reads in again as the same script.
+    auto json_again = registered.to_json();
+    EXPECT_EQ(json_again.get_string("world"sv), "MAIN"sv);
+    EXPECT_EQ(json_again.get_string("runAt"sv), "document_start"sv);
+    auto again = MUST(RegisteredContentScript::from_json(json_again));
+    EXPECT_EQ(again.script.exclude_matches, registered.script.exclude_matches);
+    EXPECT_EQ(again.script.all_frames, registered.script.all_frames);
+
+    auto error = [](StringView text) {
+        auto result = RegisteredContentScript::from_json(json(text));
+        return result.is_error() ? result.error() : String {};
+    };
+    EXPECT(error(R"({"id": "", "matches": ["https://*/*"], "js": ["a.js"]})"sv).contains("needs an ID"sv));
+    EXPECT(error(R"({"id": "_a", "matches": ["https://*/*"], "js": ["a.js"]})"sv).contains("must not start with '_'"sv));
+    EXPECT(error(R"({"id": "a", "js": ["a.js"]})"sv).contains("must specify 'matches'"sv));
+    EXPECT(error(R"({"id": "a", "matches": ["https://*/*"]})"sv).contains("at least one js or css file"sv));
+    EXPECT(error(R"({"id": "a", "matches": ["https://*foo/*"], "js": ["a.js"]})"sv).contains("invalid match pattern"sv));
+    EXPECT(error(R"({"id": "a", "matches": ["https://*/*"], "js": ["a.js"], "runAt": "soon"})"sv).contains("invalid runAt"sv));
+}
+
 static TemporaryDirectory make_extension(StringView manifest)
 {
     TemporaryDirectory directory;

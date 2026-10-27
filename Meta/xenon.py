@@ -431,6 +431,8 @@ def check_extensions(executable: Path, env: dict) -> bool:
                 body, content_type = data, "application/json"
             elif self.path.startswith("/content-scripts"):
                 body, content_type = content_script_page, "text/html"
+            elif self.path.startswith("/frame"):
+                body, content_type = b"<!doctype html><p>A frame of the content script page.</p>", "text/html"
             else:
                 body, content_type = page, "text/html"
             self.send_response(200)

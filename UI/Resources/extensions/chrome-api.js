@@ -479,8 +479,7 @@ const windows = {
 
 // --- chrome.webNavigation and chrome.scripting -------------------------------------------------------------------------
 
-// FIXME: Frames inside pages, and the navigation events, come with content scripts (milestone 3). For now the events
-//        never fire, and a tab has its top-level frame alone.
+// FIXME: The navigation events never fire yet. getFrame() and getAllFrames() see every frame of a tab.
 const webNavigation = {
     getFrame: method("webNavigation.getFrame"),
     getAllFrames: method("webNavigation.getAllFrames"),
@@ -495,21 +494,32 @@ const webNavigation = {
     onHistoryStateUpdated: event("webNavigation.onHistoryStateUpdated"),
 };
 
-// FIXME: Injecting into pages comes with content scripts (milestone 3). Until then, injecting fails, and registered
-//        content scripts are accepted but never run.
-const notSupportedYet = name =>
-    api(() => {
-        throw new ExtensionError(`${name}() isn't supported yet.`);
-    });
+// https://developer.chrome.com/docs/extensions/reference/api/scripting
+// A function to run travels as its source, and its arguments as JSON, as Chrome serializes both.
 const scripting = {
-    executeScript: notSupportedYet("scripting.executeScript"),
-    insertCSS: notSupportedYet("scripting.insertCSS"),
-    removeCSS: notSupportedYet("scripting.removeCSS"),
-    registerContentScripts: api(() => undefined),
-    unregisterContentScripts: api(() => undefined),
-    updateContentScripts: api(() => undefined),
-    getRegisteredContentScripts: api(() => []),
+    executeScript: api(injection => {
+        const details = toJSON({ ...injection, func: undefined, args: undefined });
+        if (injection?.func !== undefined) {
+            if (typeof injection.func !== "function") throw new TypeError("'func' must be a function.");
+            details.funcSource = String(injection.func);
+            details.args = toJSON(injection.args ?? []);
+        }
+        return call("scripting.executeScript", [details]);
+    }),
+    insertCSS: api(injection => call("scripting.insertCSS", [toJSON(injection)]).then(() => undefined)),
+    removeCSS: api(injection => call("scripting.removeCSS", [toJSON(injection)]).then(() => undefined)),
+    registerContentScripts: api(scripts =>
+        call("scripting.registerContentScripts", [toJSON(scripts)]).then(() => undefined)
+    ),
+    unregisterContentScripts: api(filter =>
+        call("scripting.unregisterContentScripts", [toJSON(filter ?? {})]).then(() => undefined)
+    ),
+    updateContentScripts: api(scripts =>
+        call("scripting.updateContentScripts", [toJSON(scripts)]).then(() => undefined)
+    ),
+    getRegisteredContentScripts: api(filter => call("scripting.getRegisteredContentScripts", [toJSON(filter ?? {})])),
     ExecutionWorld: { ISOLATED: "ISOLATED", MAIN: "MAIN" },
+    StyleOrigin: { AUTHOR: "AUTHOR", USER: "USER" },
 };
 
 // --- chrome.webRequest and chrome.notifications ------------------------------------------------------------------------
@@ -613,6 +623,12 @@ const extension = {
 // --- Messages from the UI process --------------------------------------------------------------------------------------
 
 function deliverMessage({ id, message, sender }) {
+    // With no listener, nothing here is a receiving end, which the sender hears if no other context is one either.
+    if (!runtimeOnMessage.hasListeners()) {
+        post({ type: "response", id, handled: false, listening: false });
+        return;
+    }
+
     let responded = false;
     let keepsChannelOpen = false;
     const sendResponse = response => {

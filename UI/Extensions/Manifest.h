@@ -52,6 +52,17 @@ struct ContentScript {
     bool matches_document(URL::URL const&, bool is_top_level_frame) const;
 };
 
+// A content script an extension registers while it runs (scripting.registerContentScripts()), in Chrome's terms.
+struct RegisteredContentScript {
+    String id;
+    ContentScript script;
+    bool persist_across_sessions { true };
+
+    // Chrome's RegisteredContentScript dictionary, as extensions give it and get it back.
+    static ErrorOr<RegisteredContentScript, String> from_json(JsonObject const&);
+    JsonObject to_json() const;
+};
+
 struct WebAccessibleResources {
     Vector<String> resources;
     Vector<String> matches;

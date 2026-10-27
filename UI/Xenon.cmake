@@ -53,6 +53,7 @@ set(XENON_SOURCES
     Extensions/Popup.cpp
     Extensions/Registry.cpp
     Extensions/Router.cpp
+    Extensions/Scripting.cpp
     Extensions/Storage.cpp
     Extensions/Toolbar.cpp
     FilterLists.cpp

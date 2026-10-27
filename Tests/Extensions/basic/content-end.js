@@ -19,6 +19,11 @@
     check("the page's expandos stay out of the content scripts' world", marker.pageExpando === undefined);
     marker.contentExpando = "content";
 
+    // The background's tabs.sendMessage() (see background.js).
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message?.toContentScript === "ping" && sender.id === chrome.runtime.id) sendResponse({ pong: location.pathname });
+    });
+
     // The page posts a message once DOMContentLoaded has fired, which comes after this.
     window.addEventListener("message", event => {
         if (event.source !== window || event.data?.toContentScript !== "ping") return;

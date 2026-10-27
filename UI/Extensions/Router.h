@@ -80,6 +80,8 @@ private:
         WebView::ScriptBridgeEndpoint sender;
         u64 call_id { 0 };
         Vector<WebView::ScriptBridgeEndpoint> awaiting;
+        // Whether any receiver had a runtime.onMessage listener.
+        bool any_listening { false };
     };
 
     // A runtime.connect() port. The opener talks to every context that accepted; each of those talks to the opener.
@@ -98,6 +100,7 @@ private:
     URL::URL context_url(Context const&) const;
     // Chrome's frame IDs: 0 for a tab's top-level frame, and a number of its own for every other frame.
     i64 frame_id(WebView::ScriptBridgeEndpoint const&);
+    i64 frame_id(Web::HTML::CrossProcessId navigable_id, bool is_top_level);
     // An extension's contexts a runtime message or port goes to: its pages and background, or its content scripts in
     // a tab, all of the tab's frames or one.
     Vector<WebView::ScriptBridgeEndpoint> extension_receivers(Context const& sender) const;
@@ -113,9 +116,23 @@ private:
     ErrorOr<JsonValue, String> handle_runtime_call(Context&, String const& name, JsonArray const& args);
     JsonArray contexts_of(Extension const&) const;
 
+    // chrome.scripting, and chrome.webNavigation's frames (UI/Extensions/Scripting.cpp).
+    struct Frame {
+        WebView::ScriptBridgeEndpoint document;
+        i64 frame_id { 0 };
+        i64 parent_frame_id { -1 };
+    };
+    Optional<Vector<Frame>> frames_of_tab(i64 tab_id);
+    ErrorOr<Vector<Frame>, String> injection_frames(Extension const&, Optional<JsonObject const&> target);
+    void handle_scripting_call(Context&, u64 call_id, String const& name, JsonArray const& args);
+    void execute_script(Context&, u64 call_id, JsonObject const& injection);
+    void change_css(Context&, u64 call_id, JsonObject const& injection, bool insert);
+    ErrorOr<JsonValue, String> handle_registered_content_scripts_call(Context&, String const& name, JsonArray const& args);
+    ErrorOr<JsonValue, String> handle_web_navigation_call(Context&, String const& name, JsonArray const& args);
+
     void send_runtime_message(Context&, u64 call_id, JsonValue message, Vector<WebView::ScriptBridgeEndpoint> receivers);
     void send_tab_message(Context&, u64 call_id, JsonArray const& args);
-    void handle_response(Context&, u64 message_id, bool handled, JsonValue response);
+    void handle_response(Context&, u64 message_id, bool handled, bool listening, JsonValue response);
     void finish_pending_message(u64 message_id, Optional<JsonValue> response);
 
     void open_port(Context&, String const& port_id, String const& name, Vector<WebView::ScriptBridgeEndpoint> receivers);
@@ -143,5 +160,7 @@ private:
 };
 
 StringView context_kind_name(ContextKind);
+// Chrome's document IDs and context IDs are opaque strings.
+String document_id_string(WebView::ScriptBridgeEndpoint const&);
 
 }

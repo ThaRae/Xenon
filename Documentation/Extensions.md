@@ -118,9 +118,15 @@ outright once upstream has the equivalent. A fork does make engine work a little
    has its creator's base URL or a navigable, so it can't tell which site's scripts apply. Extension pages are never
    `about:blank`, so patch 2 is fine where it is.
 
-   Still to come, here or in a later patch: running a script in a frame's world and returning its result (for
-   `scripting.executeScript` with `func`), and per-extension stylesheets the page can't see (for `insertCSS` and
-   content scripts' `css`; `Page::set_user_style()` is one per page and has no IPC).
+5. **Running a user script on request** (`0017`, done). `ScriptBridgeEndpoint::run_user_script()` runs a script in a
+   document's world once the document reaches the script's injection time, and gives back its completion value as
+   JSON, once it settles if it's a promise, or that it didn't run because the document has gone.
+   `ViewImplementation::frame_document_endpoints()` lists the documents in a view's frames, wherever site isolation
+   hosts them. This is what `scripting.executeScript()` needs; a script that takes a bridge gives the world one, as at
+   document start.
+
+   Still to come: per-extension stylesheets the page can't see (for `insertCSS` and content scripts' `css`;
+   `Page::set_user_style()` is one per page and has no IPC). For now, both are stylesheets the document adopts.
 
 The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
 no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
@@ -273,9 +279,15 @@ and `data:` frames, and `file:` documents, which Chrome only allows once the use
   them. Chrome adds them as user stylesheets, which needs per-extension user styles in the engine.
 - **Content script ↔ page:** through the shared DOM, `window.postMessage`, and DOM events, which is what Bitwarden's
   autofill and inline menu use. A content script's `fetch()` goes out with the page's origin, as in Chrome MV3.
-- **`chrome.scripting.executeScript` / `insertCSS`** (and `registerContentScripts`) will use the same path, into the
-  extension's isolated world by default, or the main world when an extension asks for `world: "MAIN"`. They're next:
-  Bitwarden's autofill scripts are injected this way, at its content script's request.
+- **`chrome.scripting`:** `executeScript` runs files, or a function with its arguments (both travel as source and
+  JSON, as Chrome serializes them), in the extension's isolated world by default, or the page's world with
+  `world: "MAIN"`, in the top frame, some frames by ID or document, or all of them. A world that doesn't have
+  `chrome.*` yet gets it first. It waits for document idle unless `injectImmediately` is set, and answers with each
+  frame's result, awaiting promises. The extension needs host permission for each frame, from `host_permissions` or
+  its manifest's content scripts. `insertCSS` and `removeCSS` add and take out stylesheets the document adopts, from
+  the extension's world. `registerContentScripts` (and `unregister`, `update`, `getRegistered`) adds scripts that run
+  with the manifest's in documents that load afterwards, kept across sessions when `persistAcrossSessions` is set and
+  cleared when the extension reloads. Bitwarden injects its autofill scripts this way, at its content script's request.
 - **Extension iframes in pages:** Bitwarden's inline autofill menu is an `<iframe credentialless>` of a
   `web_accessible_resources` page (`overlay/menu.html`), in a closed shadow root inside the site. It is an extension
   page with its own origin, process, and full `chrome.*`; the site only sees a cross-origin frame. That page nests a
@@ -336,6 +348,7 @@ for Bitwarden in Chrome.
 | `chrome.storage` | | `UI/Extensions/Storage`: a JSON file per extension and area under `<profile data>/Extensions/Storage/<id>/`; `session` and `managed` are in memory |
 | Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
 | Content scripts in isolated worlds | 0016 | `UI/Extensions/ContentScripts` (which scripts a document gets), `Manifest` (matching a document's URL), `Router` (their contexts, calls, and messages) |
+| `chrome.scripting`, `webNavigation` frames | 0017 | `UI/Extensions/Scripting.cpp` (the `Router`'s injections, registered content scripts, and Chrome's frame IDs), `Registry` (registered scripts that persist) |
 | Background worker, offscreen documents | 0001 (workers' loads) | `UI/Extensions/Registry` (their hidden views and generated files), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
@@ -416,8 +429,9 @@ for Bitwarden in Chrome.
     only with the `tabs` permission or host permission for it.
   - `action`, per tab: badges, titles, icons from paths, popups, `enable`/`disable`, `openPopup`, and `onClicked`.
   - `commands` as shortcuts; `offscreen` documents; `management.getSelf`; `permissions.contains` and `getAll`.
-  - `webNavigation.getFrame` and `getAllFrames` for a tab's top frame. Stubs, so Bitwarden's background gets the
-    objects it uses without checking: `webNavigation` events, `scripting`, `webRequest` events, and `notifications`.
+  - `webNavigation.getFrame` and `getAllFrames` for a tab's top frame (every frame since milestone 3). Stubs, so
+    Bitwarden's background gets the objects it uses without checking: `webNavigation` events, `scripting` (real since
+    milestone 3), `webRequest` events, and `notifications`.
   - Fetching from the hosts in `host_permissions` without CORS (patch 3).
   - Optional permissions: `permissions.request()` asks with Chrome's warnings, over the popup when it asks from there,
     and needs a user gesture; granted ones last across sessions and reach open contexts at once, with `onAdded`;
@@ -465,12 +479,28 @@ for Bitwarden in Chrome.
     result to Bitwarden's content script, which sends it to the background. The background then opens a popout window
     (`windows.create` with `type: "popup"`) that submits the token.
 
+  - `chrome.scripting` (patch 17): `executeScript` with files or a function and its arguments, in the top frame, some
+    frames, or all of them, in the extension's world or the page's, waiting for document idle unless asked not to,
+    with each frame's result, promises awaited; `insertCSS` and `removeCSS`; and `registerContentScripts`,
+    `unregisterContentScripts`, `updateContentScripts`, and `getRegisteredContentScripts`, kept across sessions when
+    asked. `webNavigation.getFrame` and `getAllFrames` for every frame of a tab. A runtime message that no context
+    has a listener for fails with "Receiving end does not exist", as in Chrome.
+  - In a headless browser, the page it loads stands for tab 1 of window 1, for `tabs.get`, `tabs.query`, `sender.tab`,
+    `tabs.sendMessage`, and `scripting`, so that `Meta/xenon.py test` can check them. It checks 41 things on its
+    content script page now, among them `executeScript` in each world and frame, results and promises, CSS, frames,
+    `tabs.sendMessage` to content scripts, and a registered script running in a frame that reloads.
+  - Bitwarden's autofill scripts go in at its content script's request: on a login page, its inline menu shows on the
+    focused field (seen in a headless render with a locked vault: "Unlock your account to view autofill
+    suggestions"). Its frames are `web_accessible_resources` pages, which load in the page.
+
   Left:
-  - `scripting.executeScript`, `insertCSS`, and `removeCSS`, and registered content scripts (Bitwarden injects its
-    autofill scripts with `executeScript`, so autofill and the inline menu wait for it). `webNavigation` events.
-  - `web_accessible_resources` for web pages (Bitwarden's inline menu is one), and sandboxed pages.
+  - Filling in a login from the popup or the inline menu, and saving new logins, need trying by hand with an unlocked
+    vault.
+  - `webNavigation` events, which Bitwarden's autofill and badge listen for.
+  - `web_accessible_resources` as subresources of web pages (frames already load), and sandboxed pages.
   - `match_about_blank`, `match_origin_as_fallback`, and `file:` access. `activeTab`.
-  - Content scripts' stylesheets as user stylesheets. Values the page posts arriving as copies in each world.
-  - Headless tests have no tabs, so `sender.tab`, `frameId`, and `tabs.sendMessage()` are only built, not tested.
+  - Content scripts' and `insertCSS`'s stylesheets as user stylesheets. Values the page posts arriving as copies in
+    each world.
+  - `action` calls for the headless browser's tab (Bitwarden's badge logs "No tab with id: 1" there).
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] Milestone 5: installing from the store

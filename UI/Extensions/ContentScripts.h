@@ -9,6 +9,7 @@
 #include <AK/Vector.h>
 #include <LibWebCommon/HTML/Scripting/UserScript.h>
 #include <LibWebView/URLSchemeHandler.h>
+#include <UI/Extensions/Extension.h>
 
 namespace Ladybird::Extensions {
 
@@ -19,8 +20,13 @@ namespace Ladybird::Extensions {
 class ContentScripts {
 public:
     // Gives the engine a user script handler while any extension has content scripts, so that documents only ask the
-    // UI process for scripts when there may be some. Call it whenever the set of extensions changes.
+    // UI process for scripts when there may be some. Call it whenever the set of extensions, or of the content scripts
+    // they registered, changes.
     static void update();
+
+    // The text of one of the extension's files, as content scripts and scripting.executeScript() run it, or none if it
+    // can't be read as UTF-8.
+    static Optional<String> read_file(Extension const&, StringView path);
 
 private:
     static Vector<Web::HTML::UserScript> scripts_for_document(WebView::ScriptBridgeEndpoint const& document);

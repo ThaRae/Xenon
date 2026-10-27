@@ -38,6 +38,9 @@
         await chrome.storage.local.set({ fromContentScript: 1 });
         check("storage.local", (await chrome.storage.local.get("fromContentScript")).fromContentScript === 1);
         await expectRejection("storage.session is for trusted contexts", chrome.storage.session.get(null), "not allowed");
+
+        // The background checks chrome.scripting against this page's tab.
+        Object.assign(test.results, await chrome.runtime.sendMessage({ toBackground: "scripting" }));
     }
 
     run()

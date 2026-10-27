@@ -23,8 +23,9 @@ static HashMap<ByteString, String>& file_cache()
     return *cache;
 }
 
-static Optional<String> read_extension_file(Extension const& extension, URL::URL const& url)
+Optional<String> ContentScripts::read_file(Extension const& extension, StringView extension_path)
 {
+    auto url = extension.url_for(extension_path);
     auto path = extension.resolve(url);
     if (path.is_error())
         return {};
@@ -69,7 +70,7 @@ void ContentScripts::update()
     file_cache().clear();
 
     auto has_content_scripts = any_of(Registry::the().extensions(), [](auto const& extension) {
-        return !extension->manifest().content_scripts.is_empty();
+        return !extension->manifest().content_scripts.is_empty() || !Registry::the().registered_content_scripts(extension->id()).is_empty();
     });
 
     auto& application = WebView::Application::the();
@@ -97,10 +98,15 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
     auto is_top_level_frame = !document.navigable().parent_id.has_value();
 
     for (auto const& extension : Registry::the().extensions()) {
+        // The manifest's content scripts come first, then those the extension registered, as in Chrome.
         Vector<ContentScript const&> matching;
         for (auto const& content_script : extension->manifest().content_scripts) {
             if (content_script.matches_document(url, is_top_level_frame))
                 matching.append(content_script);
+        }
+        for (auto const& registered : Registry::the().registered_content_scripts(extension->id())) {
+            if (registered.script.matches_document(url, is_top_level_frame))
+                matching.append(registered.script);
         }
         if (matching.is_empty())
             continue;
@@ -128,8 +134,7 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
         // FIXME: Apply them as user stylesheets the page can't see or remove.
         for (auto const& content_script : matching) {
             for (auto const& path : content_script.css) {
-                auto css_url = extension->url_for(path);
-                auto css = read_extension_file(*extension, css_url);
+                auto css = read_file(*extension, path);
                 if (!css.has_value())
                     continue;
                 auto source = MUST(String::formatted(
@@ -138,7 +143,7 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
                 scripts.append({
                     .world = world,
                     .source = move(source),
-                    .url = move(css_url),
+                    .url = extension->url_for(path),
                     .injection_time = Web::HTML::UserScriptInjectionTime::DocumentStart,
                     .takes_bridge = false,
                 });
@@ -147,14 +152,13 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
 
         for (auto const& content_script : matching) {
             for (auto const& path : content_script.js) {
-                auto js_url = extension->url_for(path);
-                auto source = read_extension_file(*extension, js_url);
+                auto source = read_file(*extension, path);
                 if (!source.has_value())
                     continue;
                 scripts.append({
                     .world = world_for(content_script),
                     .source = source.release_value(),
-                    .url = move(js_url),
+                    .url = extension->url_for(path),
                     .injection_time = injection_time(content_script.run_at),
                     .takes_bridge = false,
                 });
