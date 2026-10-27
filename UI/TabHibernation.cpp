@@ -13,6 +13,7 @@
 #include <UI/JavaScriptDialog.h>
 #include <UI/Tab.h>
 #include <UI/TabHibernation.h>
+#include <UI/TabMemory.h>
 #include <UI/XenonSettings.h>
 
 #include <QActionGroup>
@@ -74,6 +75,13 @@ public:
         return tab.can_hibernate();
     }
 
+    Optional<u64> memory_freed(Tab& tab)
+    {
+        if (auto state = m_tabs.get(&tab); state.has_value())
+            return state->memory_freed;
+        return {};
+    }
+
     void hibernate_when_ready(Tab& tab, bool requested_by_user)
     {
         auto& state = state_for(tab);
@@ -111,6 +119,8 @@ private:
         Optional<MonotonicTime> last_audible {};
         bool is_preparing { false };
         bool requested_by_user { false };
+        // What the tab's processes used when it last hibernated.
+        Optional<u64> memory_freed {};
     };
 
     TabState& state_for(Tab& tab)
@@ -199,6 +209,9 @@ private:
         if (!may_hibernate(tab))
             return;
 
+        // Hibernating frees what the tab's processes use, unless it shares one with another tab, which keeps running.
+        auto usage = TabMemory::usage(tab);
+        state->memory_freed = usage.has_value() && !usage->is_estimate ? Optional<u64> { usage->bytes } : Optional<u64> {};
         tab.hibernate();
     }
 
@@ -209,6 +222,13 @@ private:
 void start()
 {
     Hibernator::the().settings_changed();
+}
+
+Optional<u64> memory_freed(Tab& tab)
+{
+    if (!tab.is_hibernated())
+        return {};
+    return Hibernator::the().memory_freed(tab);
 }
 
 static QString timeout_description(AK::Duration timeout)
