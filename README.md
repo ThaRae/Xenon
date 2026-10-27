@@ -242,6 +242,12 @@ What exists now and what's planned, measured against Helium:
   dialog, or holding text typed into a form and not sent. Right-click the tab strip for **Tab Hibernation → Off** or a
   timeout from 15 minutes to 6 hours, or a background tab for **Hibernate Tab** (`UI/TabHibernation.cpp`, engine patch
   `0021`, which saves the scroll position first).
+- [x] **Memory use on hover**, as in Chromium's tab hover cards: hovering a tab, the current one included, shows
+  "Memory usage: 153.8 MB". That's the footprint of the processes serving the tab: its WebContent process, the processes
+  of its cross-site frames, the workers only it runs, and their image decoders. A process that several tabs share, as a
+  page and the popup it opened can, is split between them, and the card says "about". A hibernated tab uses none, and
+  its card says how much hibernating it freed. It's measured as the card shows, at most once a second
+  (`UI/TabMemory.cpp`, and engine patch `0022`, which lets the UI see which tab a worker belongs to).
 - [x] **Tab groups**: right-click a tab and pick **Add Tab to New Group** (or **Add Tab to Group** when there are
   groups already). A group has a title and one of nine colors picked to sit with the rose, and shows as a chip before its
   tabs with a line below them, or as a header row above them in the sidebar. Click the chip to collapse or open the
