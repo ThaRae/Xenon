@@ -168,7 +168,7 @@ locally, with no request to a search engine, from Kagi's list of about 13,400 tr
 
 The lists Helium's uBlock Origin fork turns on (uBlock filters, EasyList, EasyPrivacy, AdGuard, URLhaus, and the
 cookie banner and annoyance lists), converted for Ladybird's content blocker by
-[xenon-ublock](https://git.avx512.dev/tharae/xenon-ublock). They keep 99.3% of their filters (378,644 of 381,140), with
+[xenon-ublock](https://github.com/ThaRae/xenon-ublock). They keep 99.3% of their filters (378,644 of 381,140), with
 uBlock Origin's scriptlets and redirect resources.
 
 They block ads, trackers, malware sites, and cookie banners whenever content blocking is on, which the welcome flow
@@ -201,7 +201,7 @@ need engine work.
 
 ### Daily filter list updates
 
-[xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds the lists every day and signs them. Once
+[xenon-filter-lists](https://github.com/ThaRae/xenon-filter-lists) rebuilds the lists every day and signs them. Once
 a day Xenon downloads the lists that changed, checks them against the signed manifest, and switches to them without a
 restart. It falls back to the bundled lists if anything fails.
 

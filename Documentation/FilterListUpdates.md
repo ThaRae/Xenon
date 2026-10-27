@@ -1,21 +1,22 @@
 # Filter list updates
 
-Xenon ships uBlock Origin's filter lists, converted for Ladybird by [xenon-ublock](https://git.avx512.dev/tharae/xenon-ublock), in
-`UI/Resources/filter-lists`. Upstream lists change every day, so Xenon fetches them every day between releases.
-The lists come from a public repository on git.avx512.dev, which rebuilds them daily and signs them.
+Xenon ships uBlock Origin's filter lists, converted for Ladybird by [xenon-ublock](https://github.com/ThaRae/xenon-ublock),
+in `UI/Resources/filter-lists`. Upstream lists change every day, so Xenon fetches them every day between releases.
+The lists come from a public repository on GitHub, which rebuilds them daily and signs them.
 
 ## The published lists
 
-[tharae/xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) is public, so that Xenon can fetch from it
-without an account. Xenon and xenon-ublock stay private. Its workflow (`.gitea/workflows/update.yml`, copied from
-`Meta/ci/filter-lists-workflow.yml` here) runs at 05:17 UTC every day on slab, and can be run by hand. It:
+[ThaRae/xenon-filter-lists](https://github.com/ThaRae/xenon-filter-lists) is public, so that Xenon can fetch from it
+without an account. Its workflow (`.github/workflows/update.yml`, copied from `Meta/ci/filter-lists-workflow.yml` here)
+runs at 05:17 UTC every day on GitHub's `ubuntu-latest` runners, and can be run by hand, with `xenon_ref` naming a Xenon
+branch to build with. It:
 
-1. clones Xenon and xenon-ublock with a read-only token;
+1. checks out Xenon and xenon-ublock, which are public too;
 2. runs `Meta/ci/publish-filter-lists.sh`, which runs `Meta/update-filter-lists.py --output` into the checkout. That is
    the same build, exclusions and license checks as the lists Xenon bundles;
 3. signs `manifest.json` with Ed25519 into `manifest.json.sig`, and checks the signature against the public key in
    `UI/FilterListUpdates.cpp` before going on;
-4. commits the result to `main`, one commit a day.
+4. commits the result to `main` with the job's `GITHUB_TOKEN`, one commit a day.
 
 The repository's root is a bundle, laid out like `UI/Resources/filter-lists`:
 
@@ -28,16 +29,18 @@ The repository's root is a bundle, laid out like `UI/Resources/filter-lists`:
 | `resources/ublock-resources.json` | uBO's scriptlets and redirect surrogates, passed as `--content-blocker-resources` |
 | `NOTICE.txt`, `LICENSE-GPL-3.0.txt` | Each list's source and license |
 
-Xenon fetches each file from `https://git.avx512.dev/tharae/xenon-filter-lists/raw/branch/main/<path>`.
+Xenon fetches each file from `https://raw.githubusercontent.com/ThaRae/xenon-filter-lists/main/<path>`.
 
-### Secrets
+### The signing key
 
-On tharae/xenon-filter-lists, under Settings → Actions → Secrets:
+The workflow's one secret is `FILTER_LISTS_SIGNING_KEY`: the Ed25519 private key, in PEM
+(`openssl genpkey -algorithm ed25519`). Set it with:
 
-- `XENON_READ_TOKEN`: a Gitea access token with `read:repository`, to clone Xenon and xenon-ublock. The job's own token
-  pushes the lists.
-- `FILTER_LISTS_SIGNING_KEY`: the Ed25519 private key, in PEM (`openssl genpkey -algorithm ed25519`). Keep a copy
-  somewhere safe. Without it, new lists need a new key, and a Xenon release that has it.
+```bash
+gh secret set FILTER_LISTS_SIGNING_KEY --repo ThaRae/xenon-filter-lists < key.pem
+```
+
+Keep a copy somewhere safe. Without it, new lists need a new key, and a Xenon release that has it.
 
 To change the key, generate a new one and put its public half in `PUBLIC_KEY` in `UI/FilterListUpdates.cpp`:
 
@@ -74,8 +77,8 @@ Xenon update with newer bundled lists goes back to those.
 
 Anything that fails, such as the network, a signature, a hash, or the disk, leaves the lists in use as they were, and
 Xenon tries again an hour later. A file whose hash doesn't match can also mean the repository moved on between the
-manifest and the file, which the next try sorts out. Gitea marks raw files cacheable for six hours, so a cache in
-between can delay an update by up to that long.
+manifest and the file, which the next try sorts out. raw.githubusercontent.com serves files with a five-minute
+`max-age`, so its cache can only cause that just after the daily commit.
 
 Downloads go through RequestServer, with no cookies and no HTTP cache, and follow up to five redirects (HTTPS only).
 

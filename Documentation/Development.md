@@ -146,7 +146,7 @@ applies, builds, and lists those UI changes, so a bump holds no surprises.
 ./Meta/update-filter-lists.py --no-build   # copies what ../xenon-ublock last built
 ```
 
-The lists come from [xenon-ublock](https://git.avx512.dev/tharae/xenon-ublock), which converts uBlock Origin's lists
+The lists come from [xenon-ublock](https://github.com/ThaRae/xenon-ublock), which converts uBlock Origin's lists
 for Ladybird's content blocker. The script expects its checkout next to this one, at `../xenon-ublock`. Xenon ships its `helium` preset, except for Peter Lowe's list, which states no license, and Helium's own two
 lists (AGPL-3.0, and almost nothing survives conversion). The content blocker patches (`Patches/ladybird`
 `0004`–`0009`) let the lists keep scriptlets, procedural filters, and `$redirect`, `$removeparam`, `$popup` and CNAME
@@ -159,8 +159,8 @@ the lists without being given any, with blocking on and off: requests that EasyL
 scriptlet and a hiding rule for a listed site, on a page served locally at that site's address.
 
 Between releases, Xenon fetches the lists daily from
-[tharae/xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists). That public repository's workflow (kept
-here as `Meta/ci/filter-lists-workflow.yml`) runs the same script every day with `--output`, through
+[ThaRae/xenon-filter-lists](https://github.com/ThaRae/xenon-filter-lists). That public repository's GitHub Actions
+workflow (kept here as `Meta/ci/filter-lists-workflow.yml`) runs the same script every day with `--output`, through
 `Meta/ci/publish-filter-lists.sh`, and signs the manifest. See [FilterListUpdates.md](FilterListUpdates.md).
 
 ## Updating the !bangs

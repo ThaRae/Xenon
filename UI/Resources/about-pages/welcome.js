@@ -221,7 +221,7 @@ function updateBlockingDetails() {
     filterListUpdates.classList.toggle("hidden", !blockingEnabled());
     filterListsNote.classList.toggle("hidden", !blockingEnabled());
     filterListsNote.textContent = filterListUpdatesEnabled.checked
-        ? "Once a day, Xenon downloads the latest lists from git.avx512.dev, and uses them only if they carry Xenon's signature."
+        ? "Once a day, Xenon downloads the latest lists from GitHub, and uses them only if they carry Xenon's signature."
         : "The lists come with Xenon and update when Xenon does.";
 }
 

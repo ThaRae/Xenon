@@ -1,12 +1,11 @@
 name: Update
 
 # xenon-filter-lists' workflow, kept in Xenon (Meta/ci/filter-lists-workflow.yml) and copied to
-# .gitea/workflows/update.yml there. Every day it rebuilds Xenon's filter lists from uBlock Origin's with xenon-ublock,
+# .github/workflows/update.yml there. Every day it rebuilds Xenon's filter lists from uBlock Origin's with xenon-ublock,
 # signs their manifest, and commits them, where Xenon fetches them (UI/FilterListUpdates.h,
 # Documentation/FilterListUpdates.md).
 #
-# Runs on slab (2 vCPU, 4 GB, Ubuntu 24.04). The job's own token pushes the lists to this repository. Secrets:
-#   XENON_READ_TOKEN          a Gitea token with read:repository, to clone Xenon and xenon-ublock, which are private
+# Xenon and xenon-ublock are public, so checking them out needs no token, and GITHUB_TOKEN pushes the lists. Secret:
 #   FILTER_LISTS_SIGNING_KEY  the Ed25519 private key, in PEM, whose public half Xenon checks manifest.json with
 on:
   schedule:
@@ -26,34 +25,31 @@ permissions:
 
 jobs:
   update:
-    runs-on: slab
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Check out the published lists
-        uses: builtin:checkout   # built into Gitea Runner: no Node, no action download
+        uses: actions/checkout@v4
 
-      - name: Check out Xenon and xenon-ublock
-        env:
-          XENON_READ_TOKEN: ${{ secrets.XENON_READ_TOKEN }}
-          XENON_REF: ${{ inputs.xenon_ref || 'main' }}
-        run: |
-          auth=$(printf 'tharae:%s' "$XENON_READ_TOKEN" | base64 -w0)
-          for repository in Xenon xenon-ublock; do
-            ref=main
-            [[ $repository == Xenon ]] && ref=$XENON_REF
-            git -c http.extraHeader="Authorization: Basic $auth" clone -q --depth 1 --branch "$ref" \
-              "https://git.avx512.dev/tharae/$repository.git" ".build/$repository"
-            echo "$repository $ref $(git -C ".build/$repository" rev-parse --short HEAD)"
-          done
+      - name: Check out Xenon
+        uses: actions/checkout@v4
+        with:
+          repository: ThaRae/Xenon
+          ref: ${{ inputs.xenon_ref || 'main' }}
+          path: .build/Xenon
+          persist-credentials: false
 
-      - name: Install the converter's tools
+      - name: Check out xenon-ublock
+        uses: actions/checkout@v4
+        with:
+          repository: ThaRae/xenon-ublock
+          path: .build/xenon-ublock
+          persist-credentials: false
+
+      - name: Update Rust
         # tools/build.py checks every filter with a probe built on the engine's adblock crate (Rust, edition 2024), and
-        # builds uBlock Origin's scriptlets with Node.js.
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q build-essential nodejs
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y -q --profile minimal
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        # builds uBlock Origin's scriptlets with Node.js. The runner image has both, and Python and OpenSSL 3.
+        run: rustup update stable --no-self-update
 
       - name: Build and sign the lists
         env:
@@ -61,13 +57,10 @@ jobs:
         run: .build/Xenon/Meta/ci/publish-filter-lists.sh .
 
       - name: Publish them
-        env:
-          TOKEN: ${{ github.token }}
         run: |
           git add -A manifest.json manifest.json.sig NOTICE.txt LICENSE-GPL-3.0.txt lists trusted-lists resources
           generated_at=$(python3 -c 'import json; print(json.load(open("manifest.json"))["generated_at"])')
-          git -c user.name="xenon-filter-lists" -c user.email="xenon-filter-lists@git.avx512.dev" \
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -q -m "Lists generated $generated_at"
-          auth=$(printf 'xenon-filter-lists:%s' "$TOKEN" | base64 -w0)
-          git -c http.extraHeader="Authorization: Basic $auth" push -q origin HEAD:main
+          git push -q origin HEAD:main
           git diff --stat HEAD~1 HEAD | tail -1
