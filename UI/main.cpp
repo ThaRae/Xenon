@@ -14,6 +14,7 @@
 #include <UI/Application.h>
 #include <UI/BrowserWindow.h>
 #include <UI/Extensions/Registry.h>
+#include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
 #if defined(LADYBIRD_QT_HAVE_POSITIONING)
 #    include <UI/GeolocationProviderQt.h>
@@ -89,6 +90,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
         outln("Opening in existing process");
         return 0;
     }
+
+    Ladybird::FilterLists::Updater::initialize();
 
     auto& browser_process = app->browser_process();
 

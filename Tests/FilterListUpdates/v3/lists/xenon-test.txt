@@ -1,0 +1,3 @@
+! Xenon's filter list update test
+/xenon-update-test.js
+/xenon-update-test-4.gif

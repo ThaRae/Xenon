@@ -102,6 +102,12 @@ source and license. The GPL-3.0 text ships beside them. `Meta/check.py` fails if
 license. `./Meta/xenon.py test` checks that Xenon blocks with them, given no list arguments, by loading a local page
 with blocking on and off.
 
+Between releases, Xenon fetches the lists daily from
+[tharae/xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists). That public repository's workflow (kept
+here as `Meta/ci/filter-lists-workflow.yml`) runs the same script every day with `--output`, through
+`Meta/ci/publish-filter-lists.sh`, and signs the manifest. See
+[Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
+
 ## Changing the engine
 
 ```bash
@@ -184,7 +190,7 @@ What exists now and what's planned, measured against Helium:
   EasyList, EasyPrivacy, AdGuard, URLhaus, and the cookie banner and annoyance lists), converted for Ladybird's content
   blocker by [xenon-ublock](../xenon-ublock). They block ads, trackers, malware sites, and cookie banners whenever
   content blocking is on, which the welcome flow turns on by default. They ship with Xenon in
-  `UI/Resources/filter-lists`, so nothing is downloaded. Ladybird's own downloadable catalog stays off, since it holds
+  `UI/Resources/filter-lists`, and update daily (below). Ladybird's own downloadable catalog stays off, since it holds
   raw copies of the same lists.
 - [ ] **Chrome extensions** (Manifest V3), for password managers first, as Helium offers Bitwarden, Proton Pass, and
   1Password. In progress; see [Documentation/Extensions.md](Documentation/Extensions.md). So far, unpacked extensions
@@ -196,7 +202,10 @@ What exists now and what's planned, measured against Helium:
 - [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
   surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
   picker. See xenon-ublock's `docs/gap-analysis.md`.
-- [ ] Daily filter list updates, which need a host for xenon-ublock's converted lists.
+- [x] **Daily filter list updates**: [xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds
+  the lists every day and signs them. Once a day Xenon downloads the lists that changed, checks them against the signed
+  manifest, and switches to them without a restart. It falls back to the bundled lists if anything fails. The welcome
+  flow and Settings → Services turn updates off. See [Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [ ] Split view
 - [ ] MRU tab switching (<kbd>Ctrl</kbd><kbd>Tab</kbd> in most-recently-used order)

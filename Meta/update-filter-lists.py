@@ -6,6 +6,7 @@
 #   Meta/update-filter-lists.py                       rebuild the lists in ../xenon-ublock, then copy them here
 #   Meta/update-filter-lists.py --no-build            copy what ../xenon-ublock last built
 #   Meta/update-filter-lists.py --xenon-ublock PATH   use another checkout
+#   Meta/update-filter-lists.py --output DIR          write the bundle elsewhere, as xenon-filter-lists' daily build does
 #
 # Xenon ships the lists Helium's uBlock Origin fork turns on (xenon-ublock's "helium" preset), except the ones in
 # EXCLUDED. Every shipped list's file records its source, its license, and what the conversion kept.
@@ -30,6 +31,11 @@ OUTPUT_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "filter-lists"
 PRESET = "helium"
 ENGINE = "xenon"
 
+# The bundle's layout, and the engine features its lists rely on, as Xenon reads them (BUNDLE_FORMAT in
+# UI/FilterListBundle.h). Bump both together whenever a Xenon built before the change couldn't use the new output: a new
+# kind of file, or lists that need engine patches it lacks. Xenon only downloads bundles in the format it reads.
+FORMAT = 1
+
 # Lists in the preset that Xenon doesn't ship, and why.
 EXCLUDED = {
     "plowe-0": "Peter Lowe's list states no license, so it needs its author's permission to redistribute",
@@ -39,10 +45,13 @@ EXCLUDED = {
 
 
 def main():
+    global OUTPUT_DIR
     parser = argparse.ArgumentParser(description="Refresh Xenon's bundled filter lists from xenon-ublock")
     parser.add_argument("--xenon-ublock", type=Path, default=XENON_SOURCE_DIR.parent / "xenon-ublock")
     parser.add_argument("--no-build", action="store_true", help="copy the lists xenon-ublock last built")
+    parser.add_argument("--output", type=Path, default=OUTPUT_DIR, help="where to write the bundle")
     args = parser.parse_args()
+    OUTPUT_DIR = args.output.resolve()
 
     converter = args.xenon_ublock.resolve()
     if not (converter / "tools" / "build.py").exists():
@@ -75,6 +84,7 @@ def main():
         ["git", "rev-parse", "--short", "HEAD"], cwd=converter, capture_output=True, text=True
     ).stdout.strip()
     bundle_manifest = {
+        "format": FORMAT,
         "generated_at": manifest["generated_at"],
         "engine": manifest["engine"],
         "resources": {**resources, "file": "resources/ublock-resources.json"},
@@ -88,7 +98,7 @@ def main():
     (OUTPUT_DIR / "NOTICE.txt").write_text(notice(shipped, resources, manifest["generated_at"], commit))
 
     total = sum((OUTPUT_DIR / entry["file"]).stat().st_size for entry in shipped)
-    print(f"Copied {len(shipped)} lists ({total / 1e6:.1f} MB) into {OUTPUT_DIR.relative_to(XENON_SOURCE_DIR)}")
+    print(f"Copied {len(shipped)} lists ({total / 1e6:.1f} MB) into {OUTPUT_DIR}")
     for list_id, reason in EXCLUDED.items():
         print(f"  left out {list_id}: {reason}")
 
