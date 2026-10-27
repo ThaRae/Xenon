@@ -77,6 +77,7 @@ set(XENON_SOURCES
     ScreenshotSelectionOverlay.cpp
     ScreenshotViewer.cpp
     SelectDropdown.cpp
+    SplitView.cpp
     StringUtils.cpp
     Tab.cpp
     TabBar.cpp

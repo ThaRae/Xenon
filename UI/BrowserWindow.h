@@ -151,6 +151,7 @@ public:
     int tab_index(Tab*);
     Tab* tab_at(int index) const { return m_tabs_container->tab(index); }
     TabGroups& tab_groups() const { return m_tabs_container->tab_groups(); }
+    TabStack& tab_stack() const { return m_tabs_container->tab_stack(); }
 
     // Pinned tabs always fill the start of the strip: indices [0, pinned_tab_count()).
     int pinned_tab_count() const;
