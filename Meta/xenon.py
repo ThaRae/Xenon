@@ -96,6 +96,11 @@ EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
 # A page that tries WebAuthn and prints what it found on a line starting with this.
 WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
 
+# Stand-ins for the password managers, served from a stand-in for the Chrome Web Store and signed with keys of their own
+# (Tests/ExtensionStore/make-crxs.py). The page that looks for them prints what it found on a line starting with this.
+EXTENSION_STORE_DIR = XENON_SOURCE_DIR / "Tests" / "ExtensionStore"
+PASSWORD_MANAGER_TEST_MARKER = "XENON-PASSWORD-MANAGER-TEST "
+
 
 def main():
     parser = argparse.ArgumentParser(description="Build and run Xenon")
@@ -280,6 +285,10 @@ def test_main(platform: Platform, build_dir: Path):
     print("==> WebAuthn requests reach the UI process", flush=True)
     if not check_web_authn(app_executable(platform, build_dir), env):
         failures.append("WebAuthn")
+
+    print("==> password managers from a stand-in for the Chrome Web Store", flush=True)
+    if not check_password_managers(app_executable(platform, build_dir), env):
+        failures.append("password managers")
 
     if failures:
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
@@ -648,6 +657,223 @@ def check_web_authn(executable: Path, env: dict) -> bool:
 
 
 # Chrome's ID for an unpacked extension without a key: its directory's path, hashed (see UI/Extensions/Extension.cpp).
+# Installs, updates, switches, and removes password managers, as the welcome page and the Extensions window do, through
+# --password-manager. A local server answers update checks the way the Chrome Web Store does, with the test CRX files.
+def check_password_managers(executable: Path, env: dict) -> bool:
+    keys = json.loads((EXTENSION_STORE_DIR / "keys.json").read_text())
+    bitwarden, proton_pass = keys["bitwarden"], keys["proton-pass"]
+    # The version of each extension the store offers, and its file.
+    published = {bitwarden: ("1.0", "bitwarden-1.0.crx"), proton_pass: ("1.0", "proton-pass-1.0.crx")}
+    requested: list[str] = []
+
+    # Reloads until a password manager's content script marks the page, up to the number of tries asked for, then stays
+    # open as long as asked (past the time the daily update check starts) and reports the mark.
+    page = f"""<!doctype html><script>
+        const params = new URLSearchParams(location.search);
+        const attempt = Number(params.get("attempt") ?? 0);
+        addEventListener("load", () => setTimeout(() => {{
+            const found = document.documentElement.dataset.xenonPasswordManager ?? null;
+            if (!found && attempt < Number(params.get("tries"))) {{
+                params.set("attempt", attempt + 1);
+                setTimeout(() => (location.search = params.toString()), 250);
+                return;
+            }}
+            setTimeout(() => {{
+                console.log("{PASSWORD_MANAGER_TEST_MARKER}" + JSON.stringify(found));
+                window.close();
+            }}, Number(params.get("linger")));
+        }}));
+    </script>"""
+
+    def version_numbers(version: str) -> tuple:
+        return tuple(int(number) for number in version.split(".")) + (0,) * (4 - len(version.split(".")))
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            url = urllib.parse.urlsplit(self.path)
+            requested.append(url.path)
+            status, content_type, body = 200, "text/html", b""
+            if url.path == "/page":
+                body = page.encode()
+            elif url.path == "/service/update2/crx":
+                extension = urllib.parse.parse_qs(urllib.parse.parse_qs(url.query)["x"][0])
+                id, version_had = extension["id"][0], extension["v"][0]
+                version, file = published[id]
+                crx = (EXTENSION_STORE_DIR / file).read_bytes()
+                if version_numbers(version) > version_numbers(version_had):
+                    update_check = (
+                        f'<updatecheck codebase="{origin}/crx/{file}" hash_sha256="{hashlib.sha256(crx).hexdigest()}"'
+                        f' size="{len(crx)}" status="ok" version="{version}"/>'
+                    )
+                else:
+                    update_check = '<updatecheck status="noupdate"/>'
+                content_type = "text/xml"
+                body = (
+                    '<?xml version="1.0" encoding="UTF-8"?><gupdate xmlns="http://www.google.com/update2/response"'
+                    f' protocol="2.0" server="prod"><app appid="{id}" status="ok">{update_check}</app></gupdate>'
+                ).encode()
+            elif url.path.startswith("/crx/") and "/" not in url.path.removeprefix("/crx/"):
+                content_type, body = (
+                    "application/x-chrome-extension",
+                    (EXTENSION_STORE_DIR / url.path.removeprefix("/crx/")).read_bytes(),
+                )
+            else:
+                status = 404
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    origin = f"http://127.0.0.1:{server.server_address[1]}"
+    store_env = {
+        **env,
+        "XENON_EXTENSION_STORE_URL": f"{origin}/service/update2/crx",
+        "XENON_EXTENSION_STORE_PUBLISHER_KEY_HASH": keys["publisherKeyHash"],
+        "XENON_PASSWORD_MANAGER_IDS": f"bitwarden={bitwarden},proton-pass={proton_pass}",
+    }
+    no_report = "(no report)"
+
+    def run(profile: str, *args: str, tries: int = 0, linger: int = 0) -> tuple[str | None, str]:
+        requested.clear()
+        command = [
+            str(executable),
+            "--headless=manual",
+            "--profile-path",
+            profile,
+            *args,
+            f"{origin}/page?tries={tries}&linger={linger}",
+        ]
+        try:
+            result = subprocess.run(command, env=store_env, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired:
+            return no_report, "timed out"
+        output = result.stdout + result.stderr
+        for line in output.splitlines():
+            if PASSWORD_MANAGER_TEST_MARKER in line:
+                return json.loads(line.split(PASSWORD_MANAGER_TEST_MARKER, 1)[1].rstrip().removesuffix('"')), output
+        return no_report, output
+
+    passed = True
+
+    def expect(step: str, ok: bool, output: str, details: str = ""):
+        nonlocal passed
+        if ok:
+            print(f"    {step}")
+            return
+        print(output[-4000:], file=sys.stderr)
+        print(f"    FAIL: {step} {details}", file=sys.stderr)
+        passed = False
+
+    try:
+        with tempfile.TemporaryDirectory() as profile:
+
+            def installed() -> dict:
+                return {
+                    id_directory.name: sorted(version.name for version in id_directory.iterdir())
+                    for directory in Path(profile).rglob("Extensions/Installed")
+                    for id_directory in directory.iterdir()
+                }
+
+            def a_day_passes():
+                file = next(Path(profile).rglob("Extensions/password-manager-updates.json"))
+                file.write_text(json.dumps({"checkedAt": 0}))
+
+            def downloads() -> list[str]:
+                return [path for path in requested if path.startswith("/crx/")]
+
+            found, output = run(profile, "--password-manager=bitwarden", tries=40)
+            expect(
+                "installs the chosen one from the store, and it runs at once",
+                found == "Test Bitwarden 1.0" and installed() == {bitwarden: ["1.0"]},
+                output,
+                f"{found}, {installed()}",
+            )
+
+            found, output = run(profile)
+            expect(
+                "loads it at the next start, without downloading it again",
+                found == "Test Bitwarden 1.0" and not downloads(),
+                output,
+                f"{found}, fetched {downloads()}",
+            )
+
+            for directory in Path(profile).rglob(f"Extensions/Installed/{bitwarden}"):
+                shutil.rmtree(directory)
+            found, output = run(profile, tries=40)
+            expect(
+                "installs it again if its files are gone",
+                found == "Test Bitwarden 1.0"
+                and downloads() == ["/crx/bitwarden-1.0.crx"]
+                and installed() == {bitwarden: ["1.0"]},
+                output,
+                f"{found}, fetched {downloads()}, {installed()}",
+            )
+
+            a_day_passes()
+            published[bitwarden] = ("2.0", "bitwarden-2.0.crx")
+            found, output = run(profile, linger=8000)
+            expect(
+                "downloads the next day's new version, and keeps the one running",
+                found == "Test Bitwarden 1.0" and downloads() == ["/crx/bitwarden-2.0.crx"],
+                output,
+                f"{found}, fetched {downloads()}",
+            )
+            found, output = run(profile)
+            expect(
+                "runs the new version from the next start, and deletes the old one",
+                found == "Test Bitwarden 2.0" and installed() == {bitwarden: ["2.0"]},
+                output,
+                f"{found}, {installed()}",
+            )
+
+            a_day_passes()
+            published[bitwarden] = ("3.0", "bitwarden-3.0-tampered.crx")
+            found, output = run(profile, linger=8000)
+            tampered_output = output
+            found, output = run(profile)
+            expect(
+                "turns down a version whose signature doesn't match, and keeps the one it has",
+                "signatures isn't valid" in tampered_output
+                and found == "Test Bitwarden 2.0"
+                and installed() == {bitwarden: ["2.0"]},
+                tampered_output + output,
+                f"{found}, {installed()}",
+            )
+
+            found, output = run(profile, "--password-manager=proton-pass", tries=40)
+            expect(
+                "switches to another, and removes the first",
+                found == "Test Proton Pass 1.0" and installed() == {proton_pass: ["1.0"]},
+                output,
+                f"{found}, {installed()}",
+            )
+
+            published[bitwarden] = ("3.0", "bitwarden-3.0-unpublished.crx")
+            found, output = run(profile, "--password-manager=bitwarden", tries=8)
+            expect(
+                "turns down one the store didn't sign, and keeps the one it has",
+                "isn't signed by the Chrome Web Store" in output
+                and found == "Test Proton Pass 1.0"
+                and installed() == {proton_pass: ["1.0"]},
+                output,
+                f"{found}, {installed()}",
+            )
+
+            found, output = run(profile, "--password-manager=none")
+            expect(
+                "removes it when none is chosen", found is None and installed() == {}, output, f"{found}, {installed()}"
+            )
+    finally:
+        server.shutdown()
+    return passed
+
+
 def unpacked_extension_id(directory: Path) -> str:
     digest = hashlib.sha256(str(directory.resolve()).encode()).hexdigest()[:32]
     return "".join(chr(ord("a") + int(digit, 16)) for digit in digest)

@@ -122,21 +122,6 @@ main {
     color: var(--xenon-ink);
 }
 
-.hint {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 6px 14px;
-    padding: 0 24px 28px;
-    font-size: 13px;
-    color: var(--xenon-muted);
-}
-
-.bang {
-    white-space: nowrap;
-}
-
 @media (max-width: 600px) {
     .top-sites {
         grid-template-columns: repeat(2, 112px);

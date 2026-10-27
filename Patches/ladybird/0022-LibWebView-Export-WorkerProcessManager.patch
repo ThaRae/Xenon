@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Tue, 27 Oct 2026 09:44:28 -0400
+Subject: [PATCH] LibWebView: Export WorkerProcessManager
+
+A UI that shows how much memory a tab uses, as in a tab's hover card,
+counts the worker processes that only that tab runs, which
+WorkerProcessManager::exclusive_performance_owner() tells it. Export
+the class, as the rest of LibWebView's process bookkeeping is, so that
+the UI can ask.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/WorkerProcessManager.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/Libraries/LibWebView/WorkerProcessManager.h b/Libraries/LibWebView/WorkerProcessManager.h
+index 5087ff7ca41648796b35470029e722d9cf124580..6abd34722f9dd2886712a5ccc6a2651872c188d3 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.h
++++ b/Libraries/LibWebView/WorkerProcessManager.h
+@@ -26,11 +26,12 @@
+ #include <LibWebCommon/Page/PageId.h>
+ #include <LibWebView/BlobURLStore.h>
+ #include <LibWebView/BrowsingSession.h>
++#include <LibWebView/Export.h>
+ #include <LibWebView/Forward.h>
+ 
+ namespace WebView {
+ 
+-class WorkerProcessManager {
++class WEBVIEW_API WorkerProcessManager {
+ public:
+     AK_ALLOC_WITH_KMALLOC;
+ 

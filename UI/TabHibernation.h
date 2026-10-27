@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <AK/Optional.h>
 #include <AK/Span.h>
 #include <AK/Types.h>
 
@@ -36,6 +37,9 @@ QMenu* create_settings_menu(QWidget& parent);
 
 // The tab's context menu entry that hibernates it right away, if nothing keeps it awake.
 QAction* create_hibernate_tab_action(Tab&, QMenu& context_menu);
+
+// What the tab's processes used when it hibernated, if it's hibernated and they were its alone.
+Optional<u64> memory_freed(Tab&);
 
 // A hibernated tab's favicon turns grey in the tab strip, so that it's clear which tabs are asleep.
 QIcon hibernated_tab_icon(QIcon const& favicon);

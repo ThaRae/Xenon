@@ -11,7 +11,7 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good upstream commit. |
 | `Patches/ladybird/` | Xenon's changes to the engine, as a patch series applied to the pinned commit at build time (`Meta/patches.py`). |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
-| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, and the shared web UI stylesheet), with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
+| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon. `xenon.svg` is the artwork and `xenon-small.svg` its version for 32px and below; `Meta/generate-app-icon.py` renders the macOS iconset and the window icon from them. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
@@ -187,7 +187,8 @@ What exists now and what's planned, measured against Helium:
   - A sidebar of sections that follows the scroll, and **Find a setting**, which hides everything that doesn't match.
   - The page is Xenon's `UI/Resources/about-pages/settings.*`. It runs Ladybird's own settings scripts, by their element
     ids, for Ladybird's settings. `UI/SettingsPage.cpp` answers it about Xenon's (`UI/XenonSettings`), through engine
-    patch `0022`, which lets the browser give WebUI pages interfaces of its own (`UI/WebUIInterfaces.cpp`).
+    patch `0022` (`LibWebView: Let the embedder add interfaces to its WebUI pages`), which lets the browser give WebUI
+    pages interfaces of its own (`UI/WebUIInterfaces.cpp`).
 - [x] **Layouts**: right-click the tab strip or window frame and pick **Layout → Classic / Compact / Vertical Tabs**, or
   pick one in **Settings → Look and layout**.
   - Classic: the tab strip above the toolbar.
@@ -205,8 +206,8 @@ What exists now and what's planned, measured against Helium:
   where a search goes, and whether to block ads and trackers (on by default, with all three filter lists). Nothing is
   saved until you finish.
 - [x] **New tab page**: your eight most visited sites, one per site with its favicon, ranked by Ladybird's
-  decaying visit score, plus a reminder of the !bangs. Private windows say so instead and show no history. The page is
-  static, so Xenon's UI hands it the sites once it has loaded (`UI/NewTabPage.cpp`).
+  decaying visit score. Private windows say so instead and show no history. The page is static, so Xenon's UI hands it
+  the sites once it has loaded (`UI/NewTabPage.cpp`).
 - [x] **Quick link copy**: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> copies the current page's URL.
   (DevTools stays on <kbd>⌘</kbd><kbd>⇧</kbd><kbd>I</kbd> and <kbd>F12</kbd>.)
 - [x] **uBlock Origin's filter lists, built in**: the lists Helium's uBlock Origin fork turns on (uBlock filters,
@@ -222,7 +223,9 @@ What exists now and what's planned, measured against Helium:
   `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for. Their content scripts run
   in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and stylesheets on request.
   Bitwarden logs in (with a security key too) and autofills logins. Proton Pass signs in through Proton's account page,
-  unlocks with its extra password, autofills logins, and saves new ones.
+  unlocks with its extra password, autofills logins, and saves new ones. The welcome page offers both, as Helium's
+  setup does: Xenon installs the one picked from the Chrome Web Store, after checking its signatures, and keeps it up to
+  date. **Settings → Password manager** and the Extensions window switch or remove it.
 - [x] **uBlock Origin's engine features**: scriptlets (YouTube ads, anti-adblock walls), `$redirect` surrogates,
   `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and an element picker
   (**Block Element...** in a page's context menu). Engine patches `0004`–`0009`, from xenon-ublock. They follow the
@@ -256,9 +259,15 @@ What exists now and what's planned, measured against Helium:
   for two hours gives up its WebContent process, and its favicon turns grey. It keeps its title, favicon, URL, back/forward
   history, and scroll position, and reloads when you select it. A window's current tab never hibernates, and neither do
   pinned tabs, tabs playing audio (or that were a minute ago), with picture-in-picture or DevTools open, waiting on a
-  dialog, or holding text typed into a form and not sent. Right-click the tab strip (or open **Settings → Tabs**) for **Tab Hibernation → Off** or a
-  timeout from 15 minutes to 6 hours, or a background tab for **Hibernate Tab** (`UI/TabHibernation.cpp`, engine patch
-  `0021`, which saves the scroll position first).
+  dialog, or holding text typed into a form and not sent. Right-click the tab strip (or open **Settings → Tabs**) for
+  **Tab Hibernation → Off** or a timeout from 15 minutes to 6 hours, or a background tab for **Hibernate Tab**
+  (`UI/TabHibernation.cpp`, engine patch `0021`, which saves the scroll position first).
+- [x] **Memory use on hover**, as in Chromium's tab hover cards: hovering a tab, the current one included, shows
+  "Memory usage: 153.8 MB". That's the footprint of the processes serving the tab: its WebContent process, the processes
+  of its cross-site frames, the workers only it runs, and their image decoders. A process that several tabs share, as a
+  page and the popup it opened can, is split between them, and the card says "about". A hibernated tab uses none, and
+  its card says how much hibernating it freed. It's measured as the card shows, at most once a second
+  (`UI/TabMemory.cpp`, and engine patch `0022`, which lets the UI see which tab a worker belongs to).
 - [x] **Tab groups**: right-click a tab and pick **Add Tab to New Group** (or **Add Tab to Group** when there are
   groups already). A group has a title and one of nine colors picked to sit with the rose, and shows as a chip before its
   tabs with a line below them, or as a header row above them in the sidebar. Click the chip to collapse or open the
