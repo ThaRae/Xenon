@@ -25,6 +25,7 @@
 #include <UI/StringUtils.h>
 #include <UI/TabBar.h>
 #include <UI/TabGroupEditor.h>
+#include <UI/TabMemory.h>
 #include <UI/WindowControlButton.h>
 
 #include <QApplication>
@@ -596,13 +597,19 @@ public:
         m_url_label->setFixedWidth(TAB_PREVIEW_THUMBNAIL_WIDTH);
         m_url_label->setTextFormat(Qt::PlainText);
 
+        m_memory_label = new QLabel(m_card);
+        m_memory_label->setObjectName("LadybirdTabPreviewMemory");
+        m_memory_label->setFixedWidth(TAB_PREVIEW_THUMBNAIL_WIDTH);
+        m_memory_label->setTextFormat(Qt::PlainText);
+
         card_layout->addWidget(m_thumbnail);
         card_layout->addWidget(m_title_label);
         card_layout->addWidget(m_url_label);
+        card_layout->addWidget(m_memory_label);
         outer_layout->addWidget(m_card);
     }
 
-    void set_preview(QPalette const& palette, QString title, QString url, Optional<QPixmap const&> thumbnail)
+    void set_preview(QPalette const& palette, QString title, QString url, QString memory, Optional<QPixmap const&> thumbnail)
     {
         update_chrome_style(palette);
 
@@ -617,6 +624,8 @@ public:
             m_thumbnail->set_pixmap(*thumbnail);
         m_title_label->setText(title_metrics.elidedText(title, Qt::ElideRight, TAB_PREVIEW_THUMBNAIL_WIDTH));
         m_url_label->setText(url_metrics.elidedText(url, Qt::ElideMiddle, TAB_PREVIEW_THUMBNAIL_WIDTH));
+        m_memory_label->setVisible(!memory.isEmpty());
+        m_memory_label->setText(memory);
         adjustSize();
     }
 
@@ -644,7 +653,7 @@ QLabel#LadybirdTabPreviewTitle {{
     font-weight: 600;
 }}
 
-QLabel#LadybirdTabPreviewURL {{
+QLabel#LadybirdTabPreviewURL, QLabel#LadybirdTabPreviewMemory {{
     color: {};
 }}
 )",
@@ -655,6 +664,7 @@ QLabel#LadybirdTabPreviewURL {{
     TabPreviewThumbnail* m_thumbnail { nullptr };
     QLabel* m_title_label { nullptr };
     QLabel* m_url_label { nullptr };
+    QLabel* m_memory_label { nullptr };
 };
 
 class TabDragCancellationFilter final : public QObject {
@@ -942,9 +952,9 @@ bool TabBar::event(QEvent* event)
             return true;
         }
         auto hovered_tab = tab_index_at(help_event->pos());
-        if (hovered_tab >= 0 && hovered_tab != currentIndex()) {
+        if (hovered_tab >= 0) {
             if (auto* tab = m_tab_widget ? m_tab_widget->tab(hovered_tab) : nullptr) {
-                if (!tab->is_loaded() || tab->view().tab_preview_pixmap({ TAB_PREVIEW_THUMBNAIL_WIDTH, TAB_PREVIEW_THUMBNAIL_HEIGHT }).has_value()) {
+                if (!tab->is_loaded() || hovered_tab == currentIndex() || tab->view().tab_preview_pixmap({ TAB_PREVIEW_THUMBNAIL_WIDTH, TAB_PREVIEW_THUMBNAIL_HEIGHT }).has_value()) {
                     event->accept();
                     return true;
                 }
@@ -1988,7 +1998,7 @@ void TabBar::schedule_tab_preview(int index)
     if (!m_tab_preview_timer || !m_tab_preview_popup)
         return;
 
-    if (!m_tab_widget || index < 0 || index == currentIndex() || index >= count() || m_pressed_tab) {
+    if (!m_tab_widget || index < 0 || index >= count() || m_pressed_tab) {
         hide_tab_preview();
         return;
     }
@@ -2008,7 +2018,7 @@ void TabBar::show_tab_preview()
         return;
 
     auto index = m_tab_preview_index;
-    if (index < 0 || index != m_hovered_tab_index || index == currentIndex() || index >= count()) {
+    if (index < 0 || index != m_hovered_tab_index || index >= count()) {
         hide_tab_preview();
         return;
     }
@@ -2019,9 +2029,10 @@ void TabBar::show_tab_preview()
         return;
     }
 
-    // A tab that hasn't loaded has no page to show, so its preview is its title and URL.
-    if (!tab->is_loaded()) {
-        m_tab_preview_popup->set_preview(palette(), tab->title(), qstring_from_ak_string(tab->url().serialize()), {});
+    // A tab that hasn't loaded has no page to show, and the current tab's page is in view, so their previews are their
+    // title, URL, and memory use.
+    if (!tab->is_loaded() || index == currentIndex()) {
+        m_tab_preview_popup->set_preview(palette(), tab->title(), qstring_from_ak_string(tab->url().serialize()), TabMemory::description(*tab), {});
         m_tab_preview_popup->move(tab_preview_position_for(index, m_tab_preview_popup->sizeHint()));
         m_tab_preview_popup->show();
         m_tab_preview_popup->raise();
@@ -2040,7 +2051,7 @@ void TabBar::show_tab_preview()
     if (!thumbnail.has_value())
         return;
 
-    m_tab_preview_popup->set_preview(palette(), tab->title(), qstring_from_ak_string(tab->view().url().serialize()), *thumbnail);
+    m_tab_preview_popup->set_preview(palette(), tab->title(), qstring_from_ak_string(tab->view().url().serialize()), TabMemory::description(*tab), *thumbnail);
     m_tab_preview_popup->move(tab_preview_position_for(index, m_tab_preview_popup->sizeHint()));
     m_tab_preview_popup->show();
     m_tab_preview_popup->raise();
@@ -2049,10 +2060,10 @@ void TabBar::show_tab_preview()
 void TabBar::hide_tab_preview()
 {
     disconnect(m_tab_preview_paint_connection);
-    if (m_previewed_tab) {
+    // A tab can hibernate while its preview shows, which takes its view with it.
+    if (m_previewed_tab && m_previewed_tab->is_loaded())
         m_previewed_tab->view().set_system_visibility_state(m_previewed_tab->view().isVisible() ? Web::HTML::VisibilityState::Visible : Web::HTML::VisibilityState::Hidden);
-        m_previewed_tab = nullptr;
-    }
+    m_previewed_tab = nullptr;
 
     if (m_tab_preview_timer)
         m_tab_preview_timer->stop();
