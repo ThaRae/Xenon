@@ -206,7 +206,7 @@ void ExtensionsDialog::update_password_manager()
     m_password_manager->setEnabled(!installing.has_value());
 
     if (installing.has_value())
-        m_password_manager_status->setText(qformatted("Installing {} from the Chrome Web Store…", installing->name));
+        m_password_manager_status->setText(tr("Installing %1 from the Chrome Web Store…").arg(qstring_from_ak_string(installing->name)));
     else if (auto const& error = password_managers.error(); error.has_value())
         m_password_manager_status->setText(qstring_from_ak_string(*error));
     else if (current.has_value())
