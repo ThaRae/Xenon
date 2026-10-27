@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <AK/AnyOf.h>
 #include <AK/Array.h>
 #include <AK/StringBuilder.h>
 #include <LibWebView/Application.h>
 #include <UI/Extensions/Browser.h>
+#include <UI/Extensions/MatchPattern.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
 
@@ -627,8 +629,16 @@ ErrorOr<JsonValue, String> Router::handle_permissions_call(Context& context, Str
             if (!extension.has_permission(permission))
                 return JsonValue { false };
         }
+        // A pattern is granted when a host permission covers it, as https://*/* covers https://example.com/*.
         for (auto const& origin : origins) {
-            if (!manifest.host_permissions.contains_slow(origin) && !manifest.host_permissions.contains_slow("<all_urls>"_string))
+            auto pattern = MatchPattern::parse(origin);
+            if (pattern.is_error())
+                return MUST(String::formatted("Invalid value for origin pattern {}: {}", origin, pattern.error()));
+            auto is_granted = any_of(manifest.host_permissions, [&](auto const& host_permission) {
+                auto granted = MatchPattern::parse(host_permission);
+                return !granted.is_error() && granted.value().contains(pattern.value());
+            });
+            if (!is_granted)
                 return JsonValue { false };
         }
         return JsonValue { true };

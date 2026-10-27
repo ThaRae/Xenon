@@ -209,6 +209,21 @@ TEST_CASE(match_patterns)
     EXPECT(MatchPattern::parse("https://foo.com"sv).is_error());
     EXPECT(MatchPattern::parse("chrome://settings/*"sv).is_error());
 
+    // What permissions.contains() asks: whether granted host permissions cover a pattern.
+    auto contains = [](StringView granted, StringView asked) {
+        return MUST(MatchPattern::parse(granted)).contains(MUST(MatchPattern::parse(asked)));
+    };
+    EXPECT(contains("https://*/*"sv, "https://account.proton.me/*"sv));
+    EXPECT(contains("*://*/*"sv, "http://example.com/a*"sv));
+    EXPECT(contains("<all_urls>"sv, "https://*/*"sv));
+    EXPECT(contains("https://*.example.com/*"sv, "https://a.example.com/x"sv));
+    EXPECT(contains("https://*.example.com/*"sv, "https://*.a.example.com/*"sv));
+    EXPECT(!contains("https://example.com/*"sv, "https://*.example.com/*"sv));
+    EXPECT(!contains("https://*/*"sv, "http://example.com/*"sv));
+    EXPECT(!contains("https://*/*"sv, "<all_urls>"sv));
+    EXPECT(!contains("https://example.com/foo*"sv, "https://example.com/*"sv));
+    EXPECT(!contains("https://example.com:8080/*"sv, "https://example.com/*"sv));
+
     EXPECT(glob_matches("*.example.com"sv, "www.example.com"sv));
     EXPECT(glob_matches("a?c"sv, "abc"sv, true));
     EXPECT(!glob_matches("a?c"sv, "abc"sv, false));
