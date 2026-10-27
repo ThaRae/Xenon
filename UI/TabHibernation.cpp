@@ -1,0 +1,418 @@
+/*
+ * Copyright (c) 2026, the Xenon developers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#include <AK/HashMap.h>
+#include <AK/Time.h>
+#include <AK/TypeCasts.h>
+#include <AK/Vector.h>
+#include <LibWebView/ViewImplementation.h>
+#include <UI/BrowserWindow.h>
+#include <UI/JavaScriptDialog.h>
+#include <UI/Tab.h>
+#include <UI/TabHibernation.h>
+#include <UI/XenonSettings.h>
+
+#include <QActionGroup>
+#include <QApplication>
+#include <QEvent>
+#include <QIcon>
+#include <QImage>
+#include <QMenu>
+#include <QPixmap>
+#include <QPointer>
+#include <QTimer>
+
+namespace Ladybird {
+
+namespace TabHibernation {
+
+// Like Chromium, a tab that was playing audio a minute ago is still in use, as between two tracks.
+static constexpr auto AUDIO_PROTECTION_TIME = AK::Duration::from_seconds(60);
+
+// The timeouts the menu offers: Chromium's Memory Saver discards after 2, 4, or 6 hours, and shorter ones save more.
+static constexpr i64 TIMEOUT_CHOICES_IN_MINUTES[] = { 15, 30, 60, 2 * 60, 4 * 60, 6 * 60 };
+
+class Hibernator final : public QObject {
+public:
+    static Hibernator& the()
+    {
+        static auto* hibernator = new Hibernator(QApplication::instance());
+        return *hibernator;
+    }
+
+    void settings_changed()
+    {
+        if (!XenonSettings::tab_hibernation_enabled()) {
+            m_timer.stop();
+            return;
+        }
+
+        // Often enough that a tab hibernates close to its time, and no more than twice a minute.
+        auto timeout = XenonSettings::tab_hibernation_timeout().to_milliseconds();
+        m_timer.start(static_cast<int>(clamp<i64>(timeout / 4, 1000, 30 * 1000)));
+    }
+
+    bool may_hibernate(Tab& tab)
+    {
+        auto* window = as_if<BrowserWindow>(tab.window());
+        if (!window || !tab.is_loaded() || is_in_use(*window, tab))
+            return false;
+
+        // Chromium keeps pinned tabs too.
+        if (tab.is_pinned() || tab.is_loading())
+            return false;
+
+        auto& view = tab.view();
+        if (view.audio_play_state() == Web::HTML::AudioPlayState::Playing || view.has_devtools_client() || has_picture_in_picture_window(view))
+            return false;
+        if (auto state = m_tabs.get(&tab); state.has_value() && state->last_audible.has_value() && MonotonicTime::now() - *state->last_audible < AUDIO_PROTECTION_TIME)
+            return false;
+
+        return tab.can_hibernate();
+    }
+
+    void hibernate_when_ready(Tab& tab, bool requested_by_user)
+    {
+        auto& state = state_for(tab);
+        if (state.is_preparing)
+            return;
+        state.is_preparing = true;
+        state.requested_by_user = requested_by_user;
+
+        // The page saves its scroll position to its session history entry first, and says whether it holds input that
+        // hibernating would lose.
+        auto preparation = tab.view().prepare_for_discard();
+        preparation->when_resolved([this, tab = QPointer { &tab }](auto& result) {
+            // The view is in the middle of handling its page's reply here, so it goes once that's done.
+            QTimer::singleShot(0, tab, [this, tab, has_unsubmitted_input = result.has_unsubmitted_input] {
+                finish_hibernating(*tab, has_unsubmitted_input);
+            });
+        });
+        preparation->when_rejected([this, tab = QPointer { &tab }](auto&) {
+            // The page went away first, as it does when it crashes. The tab is checked again later.
+            if (auto tab_state = m_tabs.get(tab.data()); tab_state.has_value())
+                tab_state->is_preparing = false;
+        });
+    }
+
+private:
+    explicit Hibernator(QObject* parent)
+        : QObject(parent)
+    {
+        QObject::connect(&m_timer, &QTimer::timeout, this, [this] { check_tabs(); });
+    }
+
+    struct TabState {
+        // When the tab was last current or shown.
+        MonotonicTime last_used;
+        Optional<MonotonicTime> last_audible {};
+        bool is_preparing { false };
+        bool requested_by_user { false };
+    };
+
+    TabState& state_for(Tab& tab)
+    {
+        return m_tabs.ensure(&tab, [&] {
+            tab.installEventFilter(this);
+            QObject::connect(&tab, &QObject::destroyed, this, [this, tab = &tab] { m_tabs.remove(tab); });
+            return TabState { .last_used = MonotonicTime::now() };
+        });
+    }
+
+    virtual bool eventFilter(QObject* watched, QEvent* event) override
+    {
+        // A tab is shown when it becomes current, and hidden when another tab does.
+        if (event->type() == QEvent::Show || event->type() == QEvent::Hide) {
+            if (auto state = m_tabs.get(static_cast<Tab*>(watched)); state.has_value())
+                state->last_used = MonotonicTime::now();
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+    // Like Chromium, Xenon keeps the current tab of every window, even one that's minimized, and any tab shown beside
+    // it.
+    static bool is_in_use(BrowserWindow& window, Tab& tab)
+    {
+        return window.current_tab() == &tab || tab.isVisible();
+    }
+
+    static bool has_picture_in_picture_window(WebView::ViewImplementation& view)
+    {
+        auto has_window = false;
+        WebView::ViewImplementation::for_each_view([&](auto& other_view) {
+            has_window = other_view.owner_view_id() == view.view_id();
+            return has_window ? IterationDecision::Break : IterationDecision::Continue;
+        });
+        return has_window;
+    }
+
+    void check_tabs()
+    {
+        auto timeout = XenonSettings::tab_hibernation_timeout();
+        auto now = MonotonicTime::now();
+
+        for (auto* widget : QApplication::topLevelWidgets()) {
+            auto* window = as_if<BrowserWindow>(widget);
+            if (!window)
+                continue;
+
+            for (int i = 0; i < window->tab_count(); ++i) {
+                auto& tab = *window->tab_at(i);
+                auto& state = state_for(tab);
+                if (!tab.is_loaded() || state.is_preparing)
+                    continue;
+
+                if (is_in_use(*window, tab)) {
+                    state.last_used = now;
+                    continue;
+                }
+                if (tab.view().audio_play_state() == Web::HTML::AudioPlayState::Playing)
+                    state.last_audible = now;
+
+                if (now - state.last_used >= timeout && may_hibernate(tab))
+                    hibernate_when_ready(tab, false);
+            }
+        }
+    }
+
+    void finish_hibernating(Tab& tab, bool has_unsubmitted_input)
+    {
+        auto state = m_tabs.get(&tab);
+        if (!state.has_value())
+            return;
+        state->is_preparing = false;
+
+        // A tab holding input the user hasn't sent stays awake, and is asked again after another timeout.
+        if (has_unsubmitted_input) {
+            state->last_used = MonotonicTime::now();
+            return;
+        }
+
+        // The tab may have been used while its page answered.
+        if (!state->requested_by_user) {
+            if (!XenonSettings::tab_hibernation_enabled() || MonotonicTime::now() - state->last_used < XenonSettings::tab_hibernation_timeout())
+                return;
+        }
+        if (!may_hibernate(tab))
+            return;
+
+        tab.hibernate();
+    }
+
+    QTimer m_timer;
+    HashMap<Tab*, TabState> m_tabs;
+};
+
+void start()
+{
+    Hibernator::the().settings_changed();
+}
+
+static QString timeout_description(AK::Duration timeout)
+{
+    auto seconds = timeout.to_seconds();
+    if (seconds % (60 * 60) == 0)
+        return seconds == 60 * 60 ? QStringLiteral("After 1 Hour") : QStringLiteral("After %1 Hours").arg(seconds / (60 * 60));
+    if (seconds % 60 == 0)
+        return seconds == 60 ? QStringLiteral("After 1 Minute") : QStringLiteral("After %1 Minutes").arg(seconds / 60);
+    return QStringLiteral("After %1 Seconds").arg(seconds);
+}
+
+QMenu* create_settings_menu(QWidget& parent)
+{
+    auto* menu = new QMenu("Tab &Hibernation", &parent);
+    auto* group = new QActionGroup(menu);
+
+    auto* off_action = menu->addAction("&Off");
+    off_action->setCheckable(true);
+    group->addAction(off_action);
+    QObject::connect(off_action, &QAction::triggered, menu, [] {
+        XenonSettings::set_tab_hibernation_enabled(false);
+        Hibernator::the().settings_changed();
+    });
+    menu->addSeparator();
+
+    auto add_timeout_action = [&](AK::Duration timeout) {
+        auto* action = menu->addAction(timeout_description(timeout));
+        action->setCheckable(true);
+        group->addAction(action);
+        QObject::connect(action, &QAction::triggered, menu, [timeout] {
+            XenonSettings::set_tab_hibernation_enabled(true);
+            XenonSettings::set_tab_hibernation_timeout(timeout);
+            Hibernator::the().settings_changed();
+        });
+        return action;
+    };
+
+    Vector<QAction*> timeout_actions;
+    for (auto minutes : TIMEOUT_CHOICES_IN_MINUTES)
+        timeout_actions.append(add_timeout_action(AK::Duration::from_seconds(minutes * 60)));
+
+    // A timeout set outside this menu, as a short one for testing, shows as an entry of its own.
+    auto* other_timeout_action = menu->addAction(QString {});
+    other_timeout_action->setCheckable(true);
+    other_timeout_action->setEnabled(false);
+    group->addAction(other_timeout_action);
+
+    QObject::connect(menu, &QMenu::aboutToShow, menu, [off_action, other_timeout_action, timeout_actions = move(timeout_actions)] {
+        if (!XenonSettings::tab_hibernation_enabled()) {
+            off_action->setChecked(true);
+            other_timeout_action->setVisible(false);
+            return;
+        }
+
+        auto timeout = XenonSettings::tab_hibernation_timeout();
+        auto* checked_action = other_timeout_action;
+        for (size_t i = 0; i < timeout_actions.size(); ++i) {
+            if (timeout.to_seconds() == TIMEOUT_CHOICES_IN_MINUTES[i] * 60)
+                checked_action = timeout_actions[i];
+        }
+        other_timeout_action->setVisible(checked_action == other_timeout_action);
+        other_timeout_action->setText(timeout_description(timeout));
+        checked_action->setChecked(true);
+    });
+
+    return menu;
+}
+
+QAction* create_hibernate_tab_action(Tab& tab, QMenu& context_menu)
+{
+    auto* action = new QAction("&Hibernate Tab", &tab);
+    action->setToolTip("Free this tab's memory until it's selected again");
+    QObject::connect(action, &QAction::triggered, &tab, [&tab] {
+        if (Hibernator::the().may_hibernate(tab))
+            Hibernator::the().hibernate_when_ready(tab, true);
+    });
+    QObject::connect(&context_menu, &QMenu::aboutToShow, action, [action, &tab] {
+        action->setEnabled(Hibernator::the().may_hibernate(tab));
+    });
+    return action;
+}
+
+QIcon hibernated_tab_icon(QIcon const& favicon)
+{
+    QIcon greyscale;
+    for (auto size : favicon.availableSizes()) {
+        auto image = favicon.pixmap(size).toImage().convertToFormat(QImage::Format_ARGB32);
+        for (int y = 0; y < image.height(); ++y) {
+            auto* pixels = reinterpret_cast<QRgb*>(image.scanLine(y));
+            for (int x = 0; x < image.width(); ++x) {
+                auto grey = qGray(pixels[x]);
+                pixels[x] = qRgba(grey, grey, grey, qAlpha(pixels[x]));
+            }
+        }
+        greyscale.addPixmap(QPixmap::fromImage(image));
+    }
+    return greyscale.isNull() ? favicon : greyscale;
+}
+
+}
+
+bool Tab::can_hibernate() const
+{
+    if (!is_loaded())
+        return false;
+
+    // A review shows what it was handed, which a reload wouldn't bring back.
+    if (m_fixed_title.has_value() || m_report_review_navigation_listener.has_value())
+        return false;
+
+    // Nor would it bring back whatever the tab is waiting on the user for: a dialog the page opened, a picker, a
+    // permission prompt, the check before the tab closes, or a popover such as a security key's prompt.
+    if (m_javascript_dialog->is_open() || m_color_picker_dialog || m_file_picker_dialog || m_external_url_confirmation_dialog)
+        return false;
+    if (!m_pending_permission_requests.is_empty() || m_before_unload_completion || m_already_requested_close || m_window_is_closing)
+        return false;
+    for (auto* child : findChildren<QWidget*>()) {
+        if (child->isWindow() && child->isVisible())
+            return false;
+    }
+    return true;
+}
+
+void Tab::hibernate()
+{
+    VERIFY(is_loaded());
+
+    // The tab strip goes on showing the tab's title and favicon, and the tab restores its history, scroll position
+    // included, when it loads again.
+    m_session_tab_id = view().session_tab_id();
+    m_deferred_tab = DeferredTab {
+        .url = url(),
+        .title = m_title,
+        .favicon = m_favicon,
+        .history = view().session_history_snapshot(),
+    };
+
+    // Everything else initialize() built goes, in the order a closing tab destroys it in, which is the view first.
+    Vector<QPointer<QObject>> built;
+    for (auto* child : children()) {
+        if (!m_tab_shell_children.contains(child))
+            built.append(child);
+    }
+    for (auto* child : m_toolbar_container->children())
+        built.append(child);
+    for (auto& object : built)
+        delete object.data();
+#ifdef AK_OS_MACOS
+    delete m_view_layout;
+    m_view_layout = nullptr;
+#endif
+
+    m_view = nullptr;
+    m_javascript_dialog = nullptr;
+    m_find_in_page = nullptr;
+    m_toolbar = nullptr;
+    m_performance_monitor = nullptr;
+    m_toolbar_window_controls_separator = nullptr;
+    m_toolbar_window_controls = nullptr;
+    m_minimize_window_button = nullptr;
+    m_maximize_window_button = nullptr;
+    m_close_window_button = nullptr;
+    m_bookmarks_bar = nullptr;
+    m_bookmarks_bar_container = nullptr;
+    m_bookmarks_bar_hover_expand_timer = nullptr;
+    m_bookmarks_bar_hover_collapse_timer = nullptr;
+    m_bookmarks_bar_hover_expand_animation = nullptr;
+    m_private_badge = nullptr;
+    m_hamburger_button = nullptr;
+    m_content_blocking_button = nullptr;
+    m_extension_toolbar = nullptr;
+    m_downloads_button = nullptr;
+    m_location_edit = nullptr;
+    m_hover_label = nullptr;
+    m_loading_animation_timer = nullptr;
+    m_page_context_menu = nullptr;
+    m_link_context_menu = nullptr;
+    m_selected_text_link_context_menu = nullptr;
+    m_image_context_menu = nullptr;
+    m_media_context_menu = nullptr;
+    m_navigate_back_action = nullptr;
+    m_navigate_forward_action = nullptr;
+    m_reload_action = nullptr;
+    m_reload_bypassing_cache_action = nullptr;
+    m_stop_action = nullptr;
+    m_reload_button = nullptr;
+    m_open_downloads_page_action = nullptr;
+
+    m_is_loading = false;
+    m_loading_animation_frame = 0;
+    m_bookmarks_bar_hover_expanded = false;
+    m_bookmarks_bar_hover_expand_progress = 0.0;
+    m_is_updating_chrome_style = false;
+    m_screen_display_sleep_inhibitor.clear();
+    m_content_blocking_popover_reload_site.clear();
+    m_downloads_button_icon.clear();
+    m_downloads_button_tooltip = {};
+    m_suppress_javascript_dialogs_until_navigation = false;
+    m_preserve_close_retry_state_on_dialog_dismissal = false;
+
+    // The title loses the WebContent process ID it may have shown, and the favicon turns grey.
+    update_tab_title();
+    update_tab_icon();
+}
+
+}

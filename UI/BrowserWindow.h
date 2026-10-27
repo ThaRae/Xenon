@@ -150,6 +150,7 @@ public:
     int tab_count() { return m_tabs_container->count(); }
     int tab_index(Tab*);
     Tab* tab_at(int index) const { return m_tabs_container->tab(index); }
+    TabGroups& tab_groups() const { return m_tabs_container->tab_groups(); }
 
     // Pinned tabs always fill the start of the strip: indices [0, pinned_tab_count()).
     int pinned_tab_count() const;
@@ -172,6 +173,8 @@ public:
     // Brings the window forward for a page's beforeunload prompt during an application-wide close check.
     void raise_for_close_prompt();
     bool is_window_close_approved() const { return m_window_close_approved; }
+    // While the window checks whether its pages let it close, it shows each of them in turn.
+    bool is_checking_whether_to_close() const { return m_window_close_coordinator.is_running(); }
     void report_activation_to_session_store();
     void cancel_window_close_preflight();
     void on_tab_load_start(Tab&);
@@ -312,6 +315,7 @@ private:
     QAction* m_classic_layout_action { nullptr };
     QAction* m_compact_layout_action { nullptr };
     QAction* m_vertical_layout_action { nullptr };
+    QAction* m_recently_used_tab_order_action { nullptr };
     QPushButton* m_zoom_level { nullptr };
 
     IsPopupWindow m_is_popup_window { IsPopupWindow::No };

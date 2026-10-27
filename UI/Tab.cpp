@@ -34,6 +34,7 @@
 #include <UI/NewTabPage.h>
 #include <UI/Popover.h>
 #include <UI/StringUtils.h>
+#include <UI/TabHibernation.h>
 #include <UI/WebAuthnPopover.h>
 #include <UI/WindowControlButton.h>
 
@@ -708,6 +709,7 @@ void Tab::create_tab_shell()
     m_toolbar_container->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
     create_tab_context_menu();
+    m_tab_shell_children = children();
 }
 
 void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
@@ -1461,6 +1463,8 @@ void Tab::create_tab_context_menu()
     m_context_menu->addAction(create_application_action(*this, application.reload_action(), IncludeActionIcon::No));
     m_context_menu->addAction(duplicate_tab_action);
     m_context_menu->addAction(m_pin_tab_action);
+    m_context_menu->addAction(TabHibernation::create_hibernate_tab_action(*this, *m_context_menu));
+    add_tab_group_actions(*m_context_menu, *this);
     m_context_menu->addSeparator();
     auto* move_tab_menu = m_context_menu->addMenu("Mo&ve Tab");
     move_tab_menu->addAction(move_to_start_action);
@@ -1490,6 +1494,7 @@ void Tab::ensure_loaded()
 
     // Until initialize() has built the view, url() reads the deferred tab's URL, so the deferred tab stays until then.
     auto deferred_url = m_deferred_tab->url;
+    auto history = AK::move(m_deferred_tab->history);
     // initialize() hides the toolbar's window controls, which overwrites the visibility TabWidget last asked for.
     auto toolbar_window_controls_visible = m_toolbar_window_controls_visible;
     initialize({});
@@ -1504,8 +1509,7 @@ void Tab::ensure_loaded()
         view().set_session_tab_id(*m_session_tab_id);
     emit loaded();
 
-    Optional<WebView::SessionHistorySnapshot> history;
-    if (m_session_tab_id.has_value())
+    if (!history.has_value() && m_session_tab_id.has_value())
         history = m_window->session().session_store->load_tab_history(*m_session_tab_id);
     if (!history.has_value() || view().restore_session_history_from_snapshot(history.release_value()).is_error())
         navigate(deferred_url);
@@ -1733,6 +1737,8 @@ QIcon Tab::tab_icon() const
 {
     if (m_is_loading)
         return loading_spinner_icon(palette(), m_loading_animation_frame);
+    if (m_deferred_tab.has_value() && m_deferred_tab->history.has_value())
+        return TabHibernation::hibernated_tab_icon(m_favicon);
     return m_favicon;
 }
 

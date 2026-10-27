@@ -97,10 +97,13 @@ starts cold and takes a couple of hours.
 ```
 
 It ships xenon-ublock's `helium` preset, except for Peter Lowe's list, which states no license, and Helium's own two
-lists (AGPL-3.0, and almost nothing survives conversion). `UI/Resources/filter-lists/NOTICE.txt` credits every list's
-source and license. The GPL-3.0 text ships beside them. `Meta/check.py` fails if a list ships without a cleared
-license. `./Meta/xenon.py test` checks that Xenon blocks with them, given no list arguments, by loading a local page
-with blocking on and off.
+lists (AGPL-3.0, and almost nothing survives conversion). They're converted for Ladybird with the content blocker
+patches (`Patches/ladybird` `0004`–`0009`), so they keep scriptlets, procedural filters, and `$redirect`,
+`$removeparam`, `$popup` and CNAME filters. uBlock Origin's own lists go in `trusted-lists/`, and its scriptlets and
+redirect surrogates in `resources/`. `UI/Resources/filter-lists/NOTICE.txt` credits every list's source and license.
+The GPL-3.0 text ships beside them. `Meta/check.py` fails if a list ships without a cleared license. `./Meta/xenon.py test` checks that Xenon
+applies them, given no list arguments, with blocking on and off: requests that EasyList and EasyPrivacy block, and a
+scriptlet and a hiding rule for a listed site, on a page served locally at that site's address.
 
 Between releases, Xenon fetches the lists daily from
 [tharae/xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists). That public repository's workflow (kept
@@ -203,18 +206,38 @@ What exists now and what's planned, measured against Helium:
   in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and stylesheets on request.
   Bitwarden logs in (with a security key too) and autofills logins. Proton Pass signs in through Proton's account page,
   unlocks with its extra password, autofills logins, and saves new ones.
-- [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
-  surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
-  picker. See xenon-ublock's `docs/gap-analysis.md`.
+- [x] **uBlock Origin's engine features**: scriptlets (YouTube ads, anti-adblock walls), `$redirect` surrogates,
+  `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and an element picker
+  (**Block Element...** in a page's context menu). Engine patches `0004`–`0009`, from xenon-ublock. They follow the
+  same on/off switch and per-site toggle as the rest of blocking. What's still missing is in xenon-ublock's
+  `docs/gap-analysis.md`.
 - [x] **Daily filter list updates**: [xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds
   the lists every day and signs them. Once a day Xenon downloads the lists that changed, checks them against the signed
   manifest, and switches to them without a restart. It falls back to the bundled lists if anything fails. The welcome
   flow and Settings → Services turn updates off. See [Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [ ] Split view
-- [ ] MRU tab switching (<kbd>Ctrl</kbd><kbd>Tab</kbd> in most-recently-used order)
-- [ ] Tab hibernation
-- [ ] Tab groups
+- [x] **MRU tab switching**: hold <kbd>Ctrl</kbd> and press <kbd>Tab</kbd> to walk back through a window's tabs in the
+  order you last used them, and let go to stay on one. One quick press flips between the last two tabs, and
+  <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>Tab</kbd> walks the other way, from the least recently used tab. On macOS it's the
+  Control key, as in Helium. Tabs opened in the background join the end of the order. As in Helium, there's no switcher
+  overlay: each press shows its tab. The other next and previous tab shortcuts (<kbd>Ctrl</kbd><kbd>PgDn</kbd>, and
+  <kbd>⌘</kbd><kbd>⇧</kbd><kbd>]</kbd> on macOS) still follow the tab strip. So does Ctrl+Tab, if you untick **Cycle Tabs
+  in Recently Used Order** in the tab strip's context menu.
+- [x] **Tab hibernation**, Xenon's take on the Memory Saver that Helium has from Chromium: a background tab left unused
+  for two hours gives up its WebContent process, and its favicon turns grey. It keeps its title, favicon, URL, back/forward
+  history, and scroll position, and reloads when you select it. A window's current tab never hibernates, and neither do
+  pinned tabs, tabs playing audio (or that were a minute ago), with picture-in-picture or DevTools open, waiting on a
+  dialog, or holding text typed into a form and not sent. Right-click the tab strip for **Tab Hibernation → Off** or a
+  timeout from 15 minutes to 6 hours, or a background tab for **Hibernate Tab** (`UI/TabHibernation.cpp`, engine patch
+  `0021`, which saves the scroll position first).
+- [x] **Tab groups**: right-click a tab and pick **Add Tab to New Group** (or **Add Tab to Group** when there are
+  groups already). A group has a title and one of nine colors picked to sit with the rose, and shows as a chip before its
+  tabs with a line below them, or as a header row above them in the sidebar. Click the chip to collapse or open the
+  group; right-click it to rename, recolor, ungroup, or close the group, open a new tab in it, or move it to a new
+  window. Drag a tab between two of a group's tabs to add it, or out of the group to take it out. Tabs opened from a
+  grouped tab join its group, Ctrl+Tab passes over collapsed groups, and groups come back with a restored session
+  (`UI/TabGroups.cpp`).
 - [x] The DuckDuckGo-style bang list (13,000+ triggers), plus a keyword chip in the address bar while a bang is typed.
   The list is Kagi's (MIT), which has 12,484 of DuckDuckGo's 13,566 triggers. Xenon doesn't ship the other 1,082: 889 are
   not in Kagi's list, and 193 are Kagi's own services or site-restricted searches that the script leaves out. DuckDuckGo
@@ -224,7 +247,8 @@ What exists now and what's planned, measured against Helium:
 - [x] Xenon's own palette, built around **#ff0050** (`UI/BrandColors.h` for the chrome, `UI/Resources/about-pages/webui.css`
   for the internal pages)
 - [x] Xenon's own app icon: two orbits woven around a nucleus, in white and rose
-- [ ] uBlock Origin's filter set for Ladybird's content blocker (being built in a separate repo, `xenon-ublock`)
+- [x] uBlock Origin's filter set for Ladybird's content blocker, from `xenon-ublock`: the bundled lists keep 99.3% of
+  their filters (378,644 of 381,140), with uBlock Origin's scriptlets and redirect resources
 - [x] **WebAuthn with security keys** (macOS): sites and password managers can register a USB security key and sign in
   with it (`navigator.credentials.create()`/`get()`), PINs included, and in cross-origin frames that are allowed to.
   A prompt over the page says what the key needs. Engine patches `0010`–`0015`; see `Documentation/WebAuthn.md`.

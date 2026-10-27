@@ -30,6 +30,8 @@
 #    include <UI/MacWindow.h>
 #endif
 #include <UI/TabBar.h>
+#include <UI/TabCycler.h>
+#include <UI/TabHibernation.h>
 #include <UI/WebContentView.h>
 #include <UI/WindowControlButton.h>
 #include <UI/XenonSettings.h>
@@ -275,6 +277,8 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
         fullscreen_mode().exit(FullscreenMode::ExitInitiatedBy::UI);
     });
     QObject::connect(m_tabs_container, &TabWidget::tab_close_requested, this, &BrowserWindow::request_to_close_tab);
+    // Ctrl+Tab, in the order the tabs were last used. The window owns it.
+    new TabCycler(*this, *m_tabs_container);
     QObject::connect(m_tabs_container->tab_bar(), &QTabBar::tabMoved, this, [this](int, int) {
         sync_session_tab_order();
     });
@@ -500,6 +504,11 @@ void BrowserWindow::initialize_window_context_menu()
     m_classic_layout_action = add_layout_action("&Classic", XenonSettings::ChromeLayout::Classic);
     m_compact_layout_action = add_layout_action("C&ompact", XenonSettings::ChromeLayout::Compact);
     m_vertical_layout_action = add_layout_action("&Vertical Tabs", XenonSettings::ChromeLayout::Vertical);
+
+    m_recently_used_tab_order_action = m_window_context_menu->addAction("&Cycle Tabs in Recently Used Order");
+    m_recently_used_tab_order_action->setCheckable(true);
+    QObject::connect(m_recently_used_tab_order_action, &QAction::triggered, this, &XenonSettings::set_cycle_tabs_in_recently_used_order);
+    m_window_context_menu->addMenu(TabHibernation::create_settings_menu(*m_window_context_menu));
 }
 
 void BrowserWindow::show_window_context_menu(QPoint global_position)
@@ -511,6 +520,7 @@ void BrowserWindow::show_window_context_menu(QPoint global_position)
     m_classic_layout_action->setChecked(chrome_layout == XenonSettings::ChromeLayout::Classic);
     m_compact_layout_action->setChecked(chrome_layout == XenonSettings::ChromeLayout::Compact);
     m_vertical_layout_action->setChecked(chrome_layout == XenonSettings::ChromeLayout::Vertical);
+    m_recently_used_tab_order_action->setChecked(XenonSettings::cycle_tabs_in_recently_used_order());
 
     execute_context_menu(*m_window_context_menu, global_position);
 }
@@ -603,6 +613,9 @@ void BrowserWindow::restore_tabs(Vector<WebView::RestoredSessionTab> const& tabs
         if (i != active_index)
             create_restored_tab(tabs[i], static_cast<int>(i), !tabs[i].pinned);
     }
+
+    if (m_session_window_id.has_value())
+        tab_groups().restore(*m_session_window_id);
 }
 
 Tab& BrowserWindow::create_restored_tab(WebView::RestoredSessionTab const& restored, int index, bool defer)
@@ -711,6 +724,10 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
 
     initialize_tab(tab);
 
+    // A tab opened beside another, such as its duplicate, joins its tab group.
+    if (location.kind() == TabLocation::Kind::AfterTab && location.tab())
+        tab_groups().add_opened_tab(*location.tab(), *tab);
+
     return *tab;
 }
 
@@ -743,8 +760,8 @@ void BrowserWindow::initialize_tab(Tab* tab)
 
     if (tab->is_loaded())
         initialize_tab_view(tab);
-    else
-        QObject::connect(tab, &Tab::loaded, this, [this, tab] { initialize_tab_view(tab); }, Qt::SingleShotConnection);
+    // A tab loads again after it hibernates, with a new view.
+    QObject::connect(tab, &Tab::loaded, this, [this, tab] { initialize_tab_view(tab); });
 
     initialize_tab_buttons(tab);
 
@@ -779,6 +796,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
             return window.current_tab()->view().handle();
         }
         auto& new_tab = create_new_tab(activate_tab, traversable);
+        tab_groups().add_opened_tab(*tab, new_tab);
         return new_tab.view().handle();
     };
 }
@@ -995,6 +1013,7 @@ void BrowserWindow::pin_tab(Tab& tab, Optional<int> pinned_index)
     if (index < 0 || tab.is_pinned())
         return;
 
+    tab_groups().will_pin_tab(tab);
     auto pinned_count = pinned_tab_count();
     auto destination = clamp(pinned_index.value_or(pinned_count), 0, pinned_count);
     tab.set_pinned(true);
@@ -1341,9 +1360,11 @@ void BrowserWindow::open_next_tab()
     if (m_tabs_container->count() <= 1)
         return;
 
-    auto next_index = m_tabs_container->current_index() + 1;
-    if (next_index >= m_tabs_container->count())
-        next_index = 0;
+    // Tabs in collapsed tab groups are passed over.
+    auto next_index = m_tabs_container->current_index();
+    do {
+        next_index = (next_index + 1) % m_tabs_container->count();
+    } while (!m_tabs_container->tab_bar()->isTabVisible(next_index));
     m_tabs_container->set_current_index(next_index);
 }
 
@@ -1352,9 +1373,10 @@ void BrowserWindow::open_previous_tab()
     if (m_tabs_container->count() <= 1)
         return;
 
-    auto next_index = m_tabs_container->current_index() - 1;
-    if (next_index < 0)
-        next_index = m_tabs_container->count() - 1;
+    auto next_index = m_tabs_container->current_index();
+    do {
+        next_index = (next_index + m_tabs_container->count() - 1) % m_tabs_container->count();
+    } while (!m_tabs_container->tab_bar()->isTabVisible(next_index));
     m_tabs_container->set_current_index(next_index);
 }
 
