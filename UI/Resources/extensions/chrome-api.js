@@ -192,6 +192,9 @@ function messageReply(promise, callback) {
 
 const runtimeOnMessage = event("runtime.onMessage");
 const runtimeOnConnect = event("runtime.onConnect");
+// Messages and ports from the web pages that externally_connectable lets reach the extension.
+const runtimeOnMessageExternal = event("runtime.onMessageExternal");
+const runtimeOnConnectExternal = event("runtime.onConnectExternal");
 
 const runtime = {
     id: config.id,
@@ -242,8 +245,8 @@ const runtime = {
 
     onMessage: runtimeOnMessage,
     onConnect: runtimeOnConnect,
-    onMessageExternal: event("runtime.onMessageExternal"),
-    onConnectExternal: event("runtime.onConnectExternal"),
+    onMessageExternal: runtimeOnMessageExternal,
+    onConnectExternal: runtimeOnConnectExternal,
     onInstalled: event("runtime.onInstalled"),
     onStartup: event("runtime.onStartup"),
     onSuspend: event("runtime.onSuspend"),
@@ -623,9 +626,11 @@ const extension = {
 
 // --- Messages from the UI process --------------------------------------------------------------------------------------
 
-function deliverMessage({ id, message, sender }) {
+function deliverMessage({ id, message, sender, external }) {
+    const onMessage = external ? runtimeOnMessageExternal : runtimeOnMessage;
+
     // With no listener, nothing here is a receiving end, which the sender hears if no other context is one either.
-    if (!runtimeOnMessage.hasListeners()) {
+    if (!onMessage.hasListeners()) {
         post({ type: "response", id, handled: false, listening: false });
         return;
     }
@@ -638,7 +643,7 @@ function deliverMessage({ id, message, sender }) {
         post({ type: "response", id, handled: true, response: toJSON(response) });
     };
 
-    for (const result of runtimeOnMessage.dispatch(message, sender, sendResponse)) {
+    for (const result of onMessage.dispatch(message, sender, sendResponse)) {
         if (result === true) keepsChannelOpen = true;
         // A listener may also answer with a promise, as in Firefox and with Chrome's polyfill.
         else if (result && typeof result.then === "function") {
@@ -650,14 +655,15 @@ function deliverMessage({ id, message, sender }) {
     if (!responded && !keepsChannelOpen) post({ type: "response", id, handled: false });
 }
 
-function acceptConnection({ port: id, name, sender }) {
-    if (!runtimeOnConnect.hasListeners()) {
+function acceptConnection({ port: id, name, sender, external }) {
+    const onConnect = external ? runtimeOnConnectExternal : runtimeOnConnect;
+    if (!onConnect.hasListeners()) {
         post({ type: "connected", port: id, accepted: false });
         return;
     }
     const port = new Port(id, name, sender);
     post({ type: "connected", port: id, accepted: true });
-    runtimeOnConnect.dispatch(port);
+    onConnect.dispatch(port);
 }
 
 bridge.onmessage = text => {

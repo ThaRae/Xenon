@@ -252,6 +252,30 @@ TEST_CASE(content_script_matching)
     EXPECT(!logins.matches_document(url("https://private.example.com/login"sv), true));
 }
 
+TEST_CASE(externally_connectable)
+{
+    // Proton Pass's, and patterns Chrome ignores, for every site.
+    auto manifest = MUST(parse(R"({
+        "manifest_version": 3, "name": "Test", "version": "1",
+        "externally_connectable": {
+            "matches": ["https://account.proton.me/*", "https://*.proton.dev/*", "<all_urls>", "*://*/*"]
+        }
+    })"sv));
+    auto const& externally_connectable = manifest.externally_connectable.value();
+
+    EXPECT_EQ(externally_connectable.matches.size(), 2u);
+    EXPECT_EQ(manifest.warnings.size(), 2u);
+    EXPECT(manifest.warnings.first().contains("externally_connectable.matches[2]"sv));
+    EXPECT(externally_connectable.matches_document(url("https://account.proton.me/authorize?app=proton-pass-extension"sv)));
+    EXPECT(externally_connectable.matches_document(url("https://pass.proton.dev/"sv)));
+    EXPECT(!externally_connectable.matches_document(url("https://pass.proton.me/"sv)));
+    EXPECT(!externally_connectable.matches_document(url("http://account.proton.me/"sv)));
+
+    EXPECT(!MUST(parse(R"({ "manifest_version": 3, "name": "Test", "version": "1" })"sv)).externally_connectable.has_value());
+    EXPECT(parse(R"({ "manifest_version": 3, "name": "Test", "version": "1", "externally_connectable": { "matches": ["https://*foo.com/*"] } })"sv).is_error());
+    EXPECT(parse(R"({ "manifest_version": 3, "name": "Test", "version": "1", "externally_connectable": [] })"sv).is_error());
+}
+
 TEST_CASE(registered_content_scripts)
 {
     // Bitwarden's passkey scripts, as it registers them.

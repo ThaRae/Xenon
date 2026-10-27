@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <AK/AnyOf.h>
 #include <AK/JsonArray.h>
 #include <AK/JsonObject.h>
 #include <AK/JsonValue.h>
@@ -405,15 +406,18 @@ ErrorOr<WebView::URLSchemeResponse> Registry::respond(WebView::URLSchemeRequest 
     auto path = URL::percent_decode(request.url.serialize_path());
 
     // An extension's own pages may load any of its files, and the user may open any of its pages. Other pages may only
-    // reach what it lists in web_accessible_resources for them, and only by navigating for now.
-    // FIXME: Let other pages load web accessible resources as subresources, which needs the request's initiator.
+    // reach what it lists in web_accessible_resources for them.
+    // FIXME: A subresource request names every origin of the page that asks, in its process, not the one document that
+    //        asks, so one of a page's frames could load what web_accessible_resources only lets a frame of another
+    //        origin of the same site have.
     bool allowed = false;
     if (request.is_navigation) {
         allowed = !request.navigation_initiator.has_value()
             || request.navigation_initiator->is_same_origin(request.url.origin())
             || extension->is_web_accessible(path, *request.navigation_initiator);
     } else {
-        allowed = request.from_same_origin_process;
+        allowed = request.from_same_origin_process
+            || any_of(request.requester_origins, [&](auto const& origin) { return extension->is_web_accessible(path, origin); });
     }
     if (!allowed)
         return Error::from_errno(EACCES);

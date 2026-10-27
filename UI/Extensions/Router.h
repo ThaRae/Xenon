@@ -23,13 +23,15 @@
 
 namespace Ladybird::Extensions {
 
-// The kinds of extension contexts, as runtime.getContexts() reports them, and content scripts, which it doesn't.
+// The kinds of extension contexts, as runtime.getContexts() reports them, and content scripts and the web pages that
+// externally_connectable lets message an extension, which it doesn't.
 enum class ContextKind : u8 {
     Tab,
     Popup,
     Background,
     Offscreen,
     ContentScript,
+    ExternalPage,
 };
 
 // Carries chrome.* between an extension's contexts (its pages, its background worker through its background page, and
@@ -50,6 +52,9 @@ public:
     String background_worker_script(Extension const&);
     // The script that installs chrome.* in the extension's isolated world in a document, before its content scripts.
     String content_script_bootstrap(NonnullRefPtr<Extension>, WebView::ScriptBridgeEndpoint const& world);
+    // The script that relays a web page's runtime.sendMessage() and runtime.connect() to the extension, when its
+    // externally_connectable matches the page, from an isolated world of its own (see ContentScripts).
+    String externally_connectable_relay(NonnullRefPtr<Extension>, WebView::ScriptBridgeEndpoint const& world, StringView event_name);
     void on_message(WebView::ScriptBridgeEndpoint const&, String const& message);
 
     // Sends an event to the extension's open contexts, or only to those of one kind.

@@ -138,6 +138,11 @@ outright once upstream has the equivalent. A fork does make engine work a little
    it (`WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy`). Without it, a site with
    `frame-src 'self'` blocks Bitwarden's inline menu and its bar that offers to save a login. The embedder's handler
    still decides which pages may load which files (`web_accessible_resources`).
+8. **Who may ask for a subresource** (`0020`, done). For a subresource, the scheme handler's `URLSchemeRequest` names
+   the origins that may be asking: a worker's, or those of the documents the asking process hosts for its page. The
+   UI process knows those documents from its own records but not which one asks, and site isolation keeps them to one
+   site. Proton Pass draws its icon in login fields with a web accessible image as the field's background, which a
+   web page could only load in a frame before.
 
 The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
 no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
@@ -324,7 +329,17 @@ renderer to another directly.
 - **Routing:** `runtime.sendMessage` goes to every extension page and the background worker of the same extension,
   except the sender, and resolves with the first response. `tabs.sendMessage` goes to that tab's content scripts (one
   frame with `frameId`). `runtime.connect` and `tabs.connect` open ports, which the UI process tracks and closes when
-  either end's context goes away (`onDisconnect`). `runtime.onMessageExternal` and `externally_connectable` come later.
+  either end's context goes away (`onDisconnect`).
+- **Web pages** (`externally_connectable`): a page whose URL an extension's `externally_connectable.matches` covers gets
+  `chrome.runtime` in its own world, with `sendMessage` and `connect` to that extension by its ID, and `lastError`.
+  Proton Pass needs this to sign in: Proton's account page hands it the new session with
+  `chrome.runtime.sendMessage(extensionId, ...)`. Patch 16 gives only isolated worlds a bridge, so the page's
+  `chrome.runtime` (`externally-connectable.js`) sends its messages as DOM events to a relay of Xenon's
+  (`externally-connectable-relay.js`), in an isolated world of its own per extension, which has a bridge. The page can
+  see and forge those events, as it could call `chrome.runtime` anyway; the UI process knows which document each relay
+  is in and only lets it send messages and open ports to its extension, which get them through `runtime.onMessageExternal`
+  and `onConnectExternal`, from a `sender` with no `id`. As in Chrome, a pattern for every host (`<all_urls>`,
+  `*://*/*`) is ignored, with a warning. Other extensions can't message an extension yet (`ids`).
 
 ### The `chrome.*` API, in milestone order
 
@@ -359,6 +374,8 @@ for Bitwarden in Chrome.
 | `chrome.storage` | | `UI/Extensions/Storage`: a JSON file per extension and area under `<profile data>/Extensions/Storage/<id>/`; `session` and `managed` are in memory |
 | Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
 | Content scripts in isolated worlds | 0016 | `UI/Extensions/ContentScripts` (which scripts a document gets), `Manifest` (matching a document's URL), `Router` (their contexts, calls, and messages) |
+| Web pages messaging an extension (`externally_connectable`) | | `UI/Extensions/ContentScripts` (the page's `chrome.runtime` and a relay world per extension), `Router` (their `ExternalPage` contexts), `UI/Resources/extensions/externally-connectable.js` and `externally-connectable-relay.js` |
+| Web accessible resources as web pages' subresources | 0020 | `UI/Extensions/Registry` |
 | `chrome.scripting`, `webNavigation` frames | 0017 | `UI/Extensions/Scripting.cpp` (the `Router`'s injections, registered content scripts, and Chrome's frame IDs), `Registry` (registered scripts that persist) |
 | Background worker, offscreen documents | 0001 (workers' loads) | `UI/Extensions/Registry` (their hidden views and generated files), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
@@ -464,7 +481,6 @@ for Bitwarden in Chrome.
   - `tabs.captureVisibleTab` and `action.setIcon` with `imageData` fail. `tabs.onDetached`, `onMoved`, `onReplaced`,
     and `onHighlighted`, and `permissions.onAdded` and `onRemoved`, exist but never fire.
   - A background page whose process crashes isn't restarted until the extension is reloaded.
-  - Web pages loading `web_accessible_resources` as subresources: the scheme handler needs the request's initiator.
   - `__MSG_` in extension CSS files, which Chrome localizes as it serves them.
   - History navigation (back and forward) to extension pages.
   - The popup's size is measured from its page's body, which suits pages that set their width; Chrome lays out the
@@ -515,8 +531,7 @@ for Bitwarden in Chrome.
   Left:
   - `webNavigation`'s `onCreatedNavigationTarget` and `onTabReplaced`, and real error names (Chrome's
     `net::ERR_NAME_NOT_RESOLVED` and the like) and transition types.
-  - `web_accessible_resources` as subresources of web pages (frames load, under any CSP the page has), and sandboxed
-    pages.
+  - Sandboxed extension pages (`sandbox.pages`).
   - `match_about_blank`, `match_origin_as_fallback`, and `file:` access. `activeTab`.
   - Content scripts' and `insertCSS`'s stylesheets as user stylesheets. Values the page posts arriving as copies in
     each world.
