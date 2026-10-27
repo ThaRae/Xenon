@@ -56,6 +56,11 @@ void set_split_view_drag_and_drop(bool);
 bool bangs_enabled();
 void set_bangs_enabled(bool);
 
+// Whether Xenon updates itself (UI/Updater.h): it checks for a new version at launch and once a day, downloads it in the
+// background, and installs it when Xenon quits. On by default. Off, it updates only when asked to, from the menu.
+bool automatic_updates_enabled();
+void set_automatic_updates_enabled(bool);
+
 // The ids of the bundled filter lists (UI/Resources/filter-lists/manifest.json) turned off in the blocking dashboard,
 // which UI/FilterLists.cpp leaves out of what it gives the content blocker. Every list is on until it's turned off.
 HashTable<String> disabled_filter_lists();

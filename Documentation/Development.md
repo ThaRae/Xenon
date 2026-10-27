@@ -11,6 +11,7 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 - [Updating the filter lists](#updating-the-filter-lists)
 - [Updating the !bangs](#updating-the-bangs)
 - [The app icon](#the-app-icon)
+- [Releases](#releases)
 
 ## How the repo fits together
 
@@ -25,8 +26,10 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 | `Meta/xenon.py` | Builds, runs, and tests Xenon. |
 | `Meta/check.py` | Fast checks: formatting, and the mistakes that break Xenon quietly. |
 | `Meta/patches.py` | Applies and exports the engine patch series. |
+| `Meta/release.py` | Packages, publishes and tests releases, on macOS. |
+| `VERSION.txt` | Xenon's version. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
-| `Documentation/` | This file, the [feature notes](Features.md), and the deeper write-ups on extensions, WebAuthn, and filter list updates. |
+| `Documentation/` | This file, the [feature notes](Features.md), and the deeper write-ups on extensions, WebAuthn, filter list updates, and releases. |
 
 The submodule always points at an upstream commit. Xenon's engine changes live in `Patches/ladybird` as
 `git format-patch` files, which `Meta/xenon.py` applies with `git am` on a local `xenon-patches` branch before it
@@ -189,3 +192,18 @@ rerun:
 It renders the macOS iconset, the window icon, and Xenon's versions of Ladybird's logo in `UI/Resources/icons`, which
 the build ships in place of Ladybird's (internal pages use them as their favicon). It needs `rsvg-convert`
 (`brew install librsvg`).
+
+## Releases
+
+Xenon updates itself on macOS with Sparkle, from releases published to
+[tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases). They're made on a Mac:
+
+```bash
+./Meta/release.py test       # a release updates itself to the next, and turns down tampered ones
+./Meta/release.py package    # builds Xenon, and writes a signed Xenon.app, its archive and the appcast to Build/distribution
+./Meta/release.py publish    # publishes them, and tags the commit
+```
+
+Bump `VERSION.txt` first. Releases are signed with a self-signed certificate and an update key, both in the login
+keychain of the Mac they're made on. [Updates.md](Updates.md) covers setting those up, what Xenon checks, and the test.
+The build fetches Sparkle's release (`UI/Xenon.cmake`) by itself, on macOS.

@@ -15,6 +15,9 @@ of its own:
 
 **Settings → Profile and files** lists the running profile's directories, with a button that shows each one.
 
+On macOS, the updater keeps its state in `~/Library/Preferences/org.xenon.Xenon.plist`, and the update it downloaded in
+`~/Library/Caches/org.xenon.Xenon` ([Updates.md](Updates.md)).
+
 ## Moving it
 
 `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` move these directories, on macOS too. Two options change the

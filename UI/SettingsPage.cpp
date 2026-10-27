@@ -24,6 +24,7 @@
 #include <UI/SettingsPage.h>
 #include <UI/StringUtils.h>
 #include <UI/TabHibernation.h>
+#include <UI/Updater.h>
 #include <UI/XenonSettings.h>
 
 #include <QApplication>
@@ -155,6 +156,39 @@ static void show_location(StringView name)
     QDesktopServices::openUrl(QUrl::fromLocalFile(qstring_from_ak_string(*path)));
 }
 
+static StringView availability_name(Updater::Availability availability)
+{
+    switch (availability) {
+    case Updater::Availability::Available:
+        return "available"sv;
+    case Updater::Availability::DevelopmentBuild:
+        return "developmentBuild"sv;
+    case Updater::Availability::UnsupportedPlatform:
+        return "unsupportedPlatform"sv;
+    }
+    VERIFY_NOT_REACHED();
+}
+
+static JsonObject updates()
+{
+    auto status = Updater::status();
+    auto version = Updater::version();
+
+    JsonObject updates;
+    updates.set("version"sv, version.view());
+    updates.set("availability"sv, availability_name(status.availability));
+    updates.set("automatic"sv, XenonSettings::automatic_updates_enabled());
+    updates.set("backgroundConnections"sv, WebView::Application::settings().background_networking_enabled());
+    updates.set("checking"sv, status.checking);
+    if (status.ready_version.has_value())
+        updates.set("readyVersion"sv, status.ready_version->view());
+    if (status.checked_at.has_value())
+        updates.set("checkedAt"sv, status.checked_at->milliseconds_since_epoch());
+    if (status.error.has_value())
+        updates.set("error"sv, status.error->view());
+    return updates;
+}
+
 static JsonObject bang_object(Bangs::Bang const& bang)
 {
     JsonObject object;
@@ -216,6 +250,12 @@ public:
             bridge->send_settings();
             return true;
         });
+        Updater::on_status_change([bridge = bridge->make_weak_ptr()] {
+            if (!bridge)
+                return false;
+            bridge->send_settings();
+            return true;
+        });
         return bridge;
     }
 
@@ -269,6 +309,7 @@ private:
         }
 
         settings.set("blockingDashboard"sv, Blocking::dashboard_url().serialize());
+        settings.set("updates"sv, updates());
 
         settings.set("extensions"sv, extensions());
         settings.set("profile"sv, profile());
@@ -339,6 +380,19 @@ void register_interfaces(WebView::WebUI& web_ui)
     web_ui.register_interface("xenon/checkFilterLists"sv, [bridge](auto const&) {
         FilterLists::Updater::check_now();
         bridge->send_settings();
+    });
+
+    web_ui.register_interface("xenon/setAutomaticUpdates"sv, [](auto const& data) {
+        if (data.is_bool())
+            XenonSettings::set_automatic_updates_enabled(data.as_bool());
+    });
+
+    web_ui.register_interface("xenon/checkForUpdates"sv, [](auto const&) {
+        Updater::check_for_updates();
+    });
+
+    web_ui.register_interface("xenon/installUpdate"sv, [](auto const&) {
+        Updater::install_and_relaunch();
     });
 
     web_ui.register_interface("xenon/showExtensions"sv, [](auto const&) {

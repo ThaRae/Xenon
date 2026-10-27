@@ -44,3 +44,5 @@ the architecture and workflow, and `Documentation/Features.md` what each feature
   (unit tests in `Tests/`, then Xenon run headless against local test pages and servers).
 - New unit tests are `Tests/Test*.cpp`, registered in `UI/Xenon.cmake` as `TestXenon*` targets under `xenon-tests`.
 - `./Meta/patches.py apply` / `export` / `pin` / `status`: the engine patch series (see the top of the script).
+- `./Meta/release.py test` / `package` / `publish`: macOS releases, which Xenon updates itself from
+  (`Documentation/Updates.md`). Publishing is outward-facing: only when asked.

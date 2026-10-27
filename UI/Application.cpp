@@ -22,6 +22,7 @@
 #include <UI/PictureInPictureWindow.h>
 #include <UI/ProcessManagerWindow.h>
 #include <UI/StringUtils.h>
+#include <UI/Updater.h>
 #include <UI/WebContentView.h>
 
 #if defined(AK_OS_MACOS)
@@ -408,6 +409,9 @@ public:
         m_help_menu->addAction(create_application_action(*m_application_widget, application.report_website_issue_action(), IncludeActionIcon::No));
         m_help_menu->addSeparator();
         m_help_menu->addAction(create_application_action(*m_application_widget, application.open_about_page_action(), IncludeActionIcon::No));
+        // Xenon: macOS shows Check for Updates… in the application menu.
+        if (auto* check_for_updates_action = Updater::create_check_for_updates_action(*m_application_widget))
+            m_help_menu->addAction(check_for_updates_action);
     }
 
 #if defined(AK_OS_MACOS)

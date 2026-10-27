@@ -316,6 +316,58 @@ filterListUpdates.addEventListener("change", () => {
     if (XENON) renderFilterLists();
 });
 
+// Updates, which Xenon gets from Sparkle on macOS (UI/Updater.h).
+const updatesVersion = document.querySelector("#updates-version");
+const updatesStatus = document.querySelector("#updates-status");
+const checkForUpdates = document.querySelector("#check-for-updates");
+const installUpdate = document.querySelector("#install-update");
+const automaticUpdatesRow = document.querySelector("#automatic-updates-row");
+const automaticUpdates = document.querySelector("#automatic-updates");
+const automaticUpdatesDescription = document.querySelector("#automatic-updates-description");
+const automaticUpdatesText = automaticUpdatesDescription.textContent;
+
+function updatesStatusText(updates) {
+    switch (updates.availability) {
+        case "developmentBuild":
+            return "This development build doesn't update itself. Releases packaged by Meta/release.py do.";
+        case "unsupportedPlatform":
+            return "Xenon updates itself on macOS. Here, update it the way you installed it.";
+    }
+    if (updates.readyVersion) return `Xenon ${updates.readyVersion} is ready, and installs when you quit Xenon.`;
+    if (updates.checking) return "Checking for a new version…";
+    if (updates.error) return `The last check failed: ${updates.error}`;
+    if (updates.checkedAt) return `Up to date. Checked ${formatDate(new Date(updates.checkedAt))}.`;
+    return "Not checked yet.";
+}
+
+// The updater tells the page whenever its status changes, so nothing here asks again.
+function renderUpdates() {
+    const updates = XENON.updates;
+
+    const available = updates.availability === "available";
+    const ready = updates.readyVersion !== undefined;
+    updatesVersion.textContent = `Xenon ${updates.version}`;
+    updatesStatus.textContent = updatesStatusText(updates);
+
+    checkForUpdates.hidden = !available || ready;
+    checkForUpdates.disabled = updates.checking;
+    checkForUpdates.textContent = updates.checking ? "Checking…" : "Check now";
+    installUpdate.hidden = !available || !ready;
+
+    automaticUpdatesRow.hidden = !available;
+    automaticUpdates.checked = updates.automatic;
+    automaticUpdatesDescription.textContent =
+        updates.automatic && !updates.backgroundConnections
+            ? "Paused while Xenon can't connect on its own (Privacy and data). Check now still works."
+            : automaticUpdatesText;
+}
+
+checkForUpdates.addEventListener("click", () => ladybird.sendMessage("xenon/checkForUpdates"));
+installUpdate.addEventListener("click", () => ladybird.sendMessage("xenon/installUpdate"));
+automaticUpdates.addEventListener("change", () => {
+    ladybird.sendMessage("xenon/setAutomaticUpdates", automaticUpdates.checked);
+});
+
 // Extensions.
 const extensionList = document.querySelector("#extension-list");
 
@@ -491,6 +543,7 @@ function render() {
     renderFilterLists();
     renderBlockingDashboard();
     renderExtensions();
+    renderUpdates();
     renderProfile();
     if (findSetting.value) applyFind();
 }

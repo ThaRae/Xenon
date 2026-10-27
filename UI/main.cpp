@@ -19,6 +19,7 @@
 #include <UI/FilterLists.h>
 #include <UI/PasswordManagers.h>
 #include <UI/TabHibernation.h>
+#include <UI/Updater.h>
 #include <UI/WebUIInterfaces.h>
 #if defined(LADYBIRD_QT_HAVE_POSITIONING)
 #    include <UI/GeolocationProviderQt.h>
@@ -106,6 +107,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
 #if defined(AK_OS_MACOS)
         Ladybird::set_profile_application_icon(Ladybird::Application::profile());
 #endif
+        Ladybird::Updater::initialize();
 
         app->on_open_file = [&](auto const& file_url) {
             if (auto* window = app->non_private_window_if_any()) {
