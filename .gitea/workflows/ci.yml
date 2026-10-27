@@ -21,6 +21,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   # Formatting and Xenon's invariants (Meta/check.py, the same script the pre-push hook runs): includes that would
@@ -51,22 +52,40 @@ jobs:
     runs-on: slab-large
     timeout-minutes: 240
     steps:
+      # A pull request's build can wait hours for slab-large behind others. If the pull request was merged or closed in
+      # the meantime, building it would only hold up the queue, so the build stops here.
+      - name: Check that the pull request is still open
+        id: wanted
+        if: github.event_name == 'pull_request'
+        env:
+          TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}
+        run: |
+          state=$(curl -sf -H "Authorization: token $TOKEN" "$PULL_REQUEST" | python3 -c 'import json, sys; print(json.load(sys.stdin)["state"])') || state=
+          echo "The pull request is ${state:-in an unknown state, so it's built}."
+          if [ "$state" = closed ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out the repository
+        if: steps.wanted.outputs.skip != 'true'
         uses: builtin:checkout
 
       - name: Check out Ladybird (the pinned submodule)
+        if: steps.wanted.outputs.skip != 'true'
         run: |
           git submodule update --init --depth 1 ladybird
           echo "ladybird $(git -C ladybird rev-parse --short HEAD), CI image $(cat ladybird/Meta/Docker/ci/VERSION)"
 
       - name: Build Xenon and run its tests
+        if: steps.wanted.outputs.skip != 'true'
         env:
           CCACHE_TOKEN: ${{ secrets.CCACHE_TOKEN }}
           CACHE_READ_ONLY: ${{ github.event_name == 'pull_request' }}
         run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/build-and-test.sh
 
       - name: Summary
-        if: always()
+        if: always() && steps.wanted.outputs.skip != 'true'
         run: |
           summary=${GITEA_STEP_SUMMARY:-${GITHUB_STEP_SUMMARY:-/dev/null}}
           {
@@ -86,7 +105,7 @@ jobs:
           } >> "$summary"
 
       - name: Upload the dependency build logs
-        if: failure()
+        if: failure() && steps.wanted.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: vcpkg-build-logs
@@ -95,7 +114,7 @@ jobs:
           retention-days: 7
 
       - name: Upload the welcome page render
-        if: always()
+        if: always() && steps.wanted.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: welcome-render
