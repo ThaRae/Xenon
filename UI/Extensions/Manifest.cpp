@@ -334,6 +334,27 @@ ErrorOr<Manifest, String> Manifest::parse(JsonObject json)
         }
     }
 
+    if (auto externally_connectable = json.get("externally_connectable"sv); externally_connectable.has_value()) {
+        if (!externally_connectable->is_object())
+            return error("Invalid value for 'externally_connectable'.");
+
+        ExternallyConnectable parsed;
+        auto patterns = TRY(string_list(externally_connectable->as_object(), "matches"sv, "externally_connectable."sv));
+        for (auto const& [index, pattern] : enumerate(patterns)) {
+            auto parsed_pattern = MatchPattern::parse(pattern);
+            if (parsed_pattern.is_error())
+                return error("Invalid value for 'externally_connectable.matches[{}]': {}", index, parsed_pattern.error());
+            // As in Chrome, a page has to be of a site the extension names, so a pattern for every host is ignored.
+            // FIXME: Chrome ignores patterns for every host under a public suffix, like "https://*.com/*", too.
+            if (parsed_pattern.value().matches_all_urls() || parsed_pattern.value().host().is_empty()) {
+                manifest.warnings.append(error("Wildcard domain patterns such as \"<all_urls>\" are not allowed in 'externally_connectable.matches[{}]'.", index));
+                continue;
+            }
+            parsed.matches.append(pattern);
+        }
+        manifest.externally_connectable = move(parsed);
+    }
+
     if (auto options_ui = json.get_object("options_ui"sv); options_ui.has_value()) {
         if (auto page = TRY(optional_string(*options_ui, "page"sv, "options_ui."sv)); page.has_value())
             manifest.options_page = normalized_path(*page);
@@ -431,6 +452,14 @@ bool ContentScript::matches_document(URL::URL const& url, bool is_top_level_fram
     if (!include_globs.is_empty() && !any_of(include_globs, matches_glob))
         return false;
     return !any_of(exclude_globs, matches_glob);
+}
+
+bool ExternallyConnectable::matches_document(URL::URL const& url) const
+{
+    return any_of(matches, [&](auto const& pattern) {
+        auto parsed = MatchPattern::parse(pattern);
+        return !parsed.is_error() && parsed.value().matches(url);
+    });
 }
 
 // https://developer.chrome.com/docs/extensions/reference/api/scripting#type-RegisteredContentScript

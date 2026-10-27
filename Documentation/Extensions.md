@@ -138,6 +138,11 @@ outright once upstream has the equivalent. A fork does make engine work a little
    it (`WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy`). Without it, a site with
    `frame-src 'self'` blocks Bitwarden's inline menu and its bar that offers to save a login. The embedder's handler
    still decides which pages may load which files (`web_accessible_resources`).
+8. **Who may ask for a subresource** (`0020`, done). For a subresource, the scheme handler's `URLSchemeRequest` names
+   the origins that may be asking: a worker's, or those of the documents the asking process hosts for its page. The
+   UI process knows those documents from its own records but not which one asks, and site isolation keeps them to one
+   site. Proton Pass draws its icon in login fields with a web accessible image as the field's background, which a
+   web page could only load in a frame before.
 
 The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
 no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
@@ -247,6 +252,19 @@ Xenon runs the background script the way Chrome ran MV2 background pages, with a
   reads responses from a file descriptor.
 - `runtime.onInstalled` (`install`, or `update` with `previousVersion`) or `runtime.onStartup` fires once the worker's
   script has run, so its top-level listeners are in place, as in Chrome.
+- Before that, the worker gets a service worker's `install` and `activate` events (with a `waitUntil()` that nothing
+  waits for), and `skipWaiting()`, which install handlers call. The worker is a new one each time the browser starts,
+  so it is installed each time. An MV3 service worker may only import a new script while it installs, so extensions
+  load the rest of their code then: Proton Pass imports its chunks from `oninstall`. A script imported later, from a
+  promise's reaction, never finishes loading. Ladybird spins the event loop for `importScripts()`'s fetch, and inside
+  a microtask checkpoint the fetch's own microtasks can't run, so the worker hangs. An extension that imports scripts
+  that way still hangs its background; Chrome would refuse such an import outright.
+- Runtime messages and ports for the extension's pages and background wait until its script has run, or 10 seconds in
+  case it never does, as Chrome holds them while it starts a service worker. Tabs that load as the browser starts
+  would otherwise find no receiver for their content scripts' first messages.
+- The worker gets no `fetch` events for the extension's own URLs, which a service worker gets. Proton Pass serves the
+  item icons in its popup that way (`/api-proxy/...`), so they don't load. The scheme handler would have to wait for
+  the worker's answer, which patch 1's synchronous `URLSchemeHandler` can't.
 - It stays running, as an MV2 background page did. Chrome stops idle service workers after 30 seconds and restarts them
   on an event; an extension that survives being stopped also survives not being stopped. Stopping idle workers is a
   memory optimization for later.
@@ -324,7 +342,17 @@ renderer to another directly.
 - **Routing:** `runtime.sendMessage` goes to every extension page and the background worker of the same extension,
   except the sender, and resolves with the first response. `tabs.sendMessage` goes to that tab's content scripts (one
   frame with `frameId`). `runtime.connect` and `tabs.connect` open ports, which the UI process tracks and closes when
-  either end's context goes away (`onDisconnect`). `runtime.onMessageExternal` and `externally_connectable` come later.
+  either end's context goes away (`onDisconnect`).
+- **Web pages** (`externally_connectable`): a page whose URL an extension's `externally_connectable.matches` covers gets
+  `chrome.runtime` in its own world, with `sendMessage` and `connect` to that extension by its ID, and `lastError`.
+  Proton Pass needs this to sign in: Proton's account page hands it the new session with
+  `chrome.runtime.sendMessage(extensionId, ...)`. Patch 16 gives only isolated worlds a bridge, so the page's
+  `chrome.runtime` (`externally-connectable.js`) sends its messages as DOM events to a relay of Xenon's
+  (`externally-connectable-relay.js`), in an isolated world of its own per extension, which has a bridge. The page can
+  see and forge those events, as it could call `chrome.runtime` anyway; the UI process knows which document each relay
+  is in and only lets it send messages and open ports to its extension, which get them through `runtime.onMessageExternal`
+  and `onConnectExternal`, from a `sender` with no `id`. As in Chrome, a pattern for every host (`<all_urls>`,
+  `*://*/*`) is ignored, with a warning. Other extensions can't message an extension yet (`ids`).
 
 ### The `chrome.*` API, in milestone order
 
@@ -340,7 +368,7 @@ yet, so that an extension's startup doesn't throw. Bitwarden feature-detects `si
 | **2. Background** | The background service worker. `runtime`: `connect`/`onConnect` and ports (`sender` with `tab`, `frameId`, `url`, `origin`, `documentId`), `onInstalled`, `onStartup`, `getContexts`, `reload`, `openOptionsPage`, `setUninstallURL`. `alarms`. `tabs`: `query` (with URL patterns), `get`, `getCurrent`, `create`, `update`, `remove`, `sendMessage`, `connect`, `captureVisibleTab`, `onActivated`, `onAttached`, `onCreated`, `onDetached`, `onRemoved`, `onReplaced`, `onUpdated`. `windows`: `getAll`, `get`, `getCurrent`, `getLastFocused`, `create` (including `type: "popup"`, for Bitwarden's popout), `update`, `remove`, `onCreated`, `onFocusChanged`, `onRemoved`. `action`: `setIcon`, `setBadgeText`, `setBadgeBackgroundColor`, `setTitle`, `setPopup`, `openPopup`. `commands`. `idle` (with the `locked` state). `permissions`: `contains`, `getAll`, `request`, `onAdded`. `offscreen` and the clipboard. `management.getSelf`. | Bitwarden's popup reaches its unlock screen; Bitwarden unlocks, syncs, and keeps its vault in the background; the badge shows matching logins |
 | **3. Content scripts** | Isolated worlds, `content_scripts` (Bitwarden's two, at `document_start`, one in all frames), `web_accessible_resources` (with `use_dynamic_url`), sandboxed pages. `scripting`: `executeScript` (`files`, `func` with results, `allFrames`/`frameIds`, `injectImmediately`, `world: "MAIN"`), `insertCSS`, `removeCSS`, `registerContentScripts`/`unregisterContentScripts` (Bitwarden's passkey support registers a `world: "MAIN"` script). `webNavigation`: `getFrame`, `getAllFrames`, `onCommitted`, `onCompleted`, `onErrorOccurred`, `onBeforeNavigate`. `tabs.sendMessage` with `frameId`. `activeTab`. | Autofill, the inline menu, saving new logins, and passkeys |
 | **4. The rest of Bitwarden** | `contextMenus`. `notifications` (with buttons). `webRequest`: `onAuthRequired` with `asyncBlocking` (`webRequestAuthProvider`, for HTTP auth dialogs), and the non-blocking `onBeforeRequest`, `onBeforeRedirect`, `onHeadersReceived` (with `responseHeaders`), `onCompleted`, `onErrorOccurred`. `sidePanel`. `privacy.services` `passwordSavingEnabled`, `autofillAddressEnabled`, `autofillCreditCardEnabled` (stubs: Ladybird has no password manager or autofill of its own to turn off). `nativeMessaging` (`connectNative("com.8bit.bitwarden")`), for unlocking through the desktop app. Web Push for the background. | Feature parity with Bitwarden in Chrome |
-| **5. Installing from the store** | CRX3 install and updates, the Chrome Web Store, offering password managers in the welcome flow as Helium does. Then whatever Proton Pass and 1Password use beyond the above, found the same way Bitwarden's needs were. | The setup flow Helium has |
+| **5. Installing from the store** | CRX3 install and updates, the Chrome Web Store, offering password managers in the welcome flow as Helium does. Then whatever 1Password uses beyond the above, found the way Bitwarden's and Proton Pass's needs were. | The setup flow Helium has |
 
 Passkeys need more than Bitwarden's scripts: Ladybird's `navigator.credentials` rejects `get()`, `store()`, and
 `create()` as not implemented, and there is no `PublicKeyCredential`. Bitwarden's passkey support replaces
@@ -359,6 +387,8 @@ for Bitwarden in Chrome.
 | `chrome.storage` | | `UI/Extensions/Storage`: a JSON file per extension and area under `<profile data>/Extensions/Storage/<id>/`; `session` and `managed` are in memory |
 | Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
 | Content scripts in isolated worlds | 0016 | `UI/Extensions/ContentScripts` (which scripts a document gets), `Manifest` (matching a document's URL), `Router` (their contexts, calls, and messages) |
+| Web pages messaging an extension (`externally_connectable`) | | `UI/Extensions/ContentScripts` (the page's `chrome.runtime` and a relay world per extension), `Router` (their `ExternalPage` contexts), `UI/Resources/extensions/externally-connectable.js` and `externally-connectable-relay.js` |
+| Web accessible resources as web pages' subresources | 0020 | `UI/Extensions/Registry` |
 | `chrome.scripting`, `webNavigation` frames | 0017 | `UI/Extensions/Scripting.cpp` (the `Router`'s injections, registered content scripts, and Chrome's frame IDs), `Registry` (registered scripts that persist) |
 | Background worker, offscreen documents | 0001 (workers' loads) | `UI/Extensions/Registry` (their hidden views and generated files), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
@@ -464,7 +494,6 @@ for Bitwarden in Chrome.
   - `tabs.captureVisibleTab` and `action.setIcon` with `imageData` fail. `tabs.onDetached`, `onMoved`, `onReplaced`,
     and `onHighlighted`, and `permissions.onAdded` and `onRemoved`, exist but never fire.
   - A background page whose process crashes isn't restarted until the extension is reloaded.
-  - Web pages loading `web_accessible_resources` as subresources: the scheme handler needs the request's initiator.
   - `__MSG_` in extension CSS files, which Chrome localizes as it serves them.
   - History navigation (back and forward) to extension pages.
   - The popup's size is measured from its page's body, which suits pages that set their width; Chrome lays out the
@@ -515,11 +544,35 @@ for Bitwarden in Chrome.
   Left:
   - `webNavigation`'s `onCreatedNavigationTarget` and `onTabReplaced`, and real error names (Chrome's
     `net::ERR_NAME_NOT_RESOLVED` and the like) and transition types.
-  - `web_accessible_resources` as subresources of web pages (frames load, under any CSP the page has), and sandboxed
-    pages.
+  - Sandboxed extension pages (`sandbox.pages`).
   - `match_about_blank`, `match_origin_as_fallback`, and `file:` access. `activeTab`.
   - Content scripts' and `insertCSS`'s stylesheets as user stylesheets. Values the page posts arriving as copies in
     each world.
   - `action` calls for the headless browser's tab (Bitwarden's badge logs "No tab with id: 1" there).
+- [x] **Proton Pass**, 1.43.0 from the Chrome Web Store (GPL-3.0; its source is `applications/pass-extension` in
+  ProtonMail/WebClients), loaded unpacked from the CRX's zip. Its manifest's `key` gives it Chrome's ID,
+  `ghmbeldphafepmbegfdlkpapadhbakde`, which Proton's account pages message. Tried by hand with a real account:
+  - Its background starts, and its popup renders.
+  - The popup's **Sign in with Proton** opens Proton's account page, which hands Pass the new session through
+    `externally_connectable`. Pass then asks for the account's Pass extra password, checks it (SRP), and the vault
+    shows in the popup.
+  - On a local login page, Pass's icon shows in the fields, focusing one opens its dropdown with the matching login,
+    and choosing it fills both fields. Signing in with a new login offers to save it, and saving works.
+
+  What it needed beyond Bitwarden: web pages messaging an extension (`externally_connectable`), web accessible images
+  as web pages' subresources (patch 20), `permissions.contains()` matching patterns as Chrome does (Pass asks about
+  `https://account.proton.me/*`, which `https://*/*` covers), the service worker's install event (where it imports its
+  chunks), and runtime messages that wait for the background as it starts. `Meta/xenon.py test` checks each of them
+  with the test extension, on a page its `externally_connectable` matches too.
+
+  Left:
+  - The item icons in the popup, which Pass's service worker answers `fetch` events for (see
+    [Background context](#background-context)).
+  - `webRequest` events never fire (milestone 4). Pass uses them to follow logins sent with XHR and main-frame loads
+    that fail; the save prompt after a plain form post doesn't need them.
+  - Signing in from the onboarding tab Pass opens on install led to Proton's Pass web app, which doesn't sign the
+    extension in; the popup's button does. Not compared with Chrome.
+  - Not tried yet: passkeys, credit cards and identities, one-time codes, aliases, the settings page, importing and
+    exporting, and copying to the clipboard (through its offscreen document).
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] Milestone 5: installing from the store

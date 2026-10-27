@@ -1,0 +1,2 @@
+! Xenon's filter list update test, as a trusted list
+example.invalid##.xenon-update-test

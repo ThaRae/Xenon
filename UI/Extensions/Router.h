@@ -23,13 +23,15 @@
 
 namespace Ladybird::Extensions {
 
-// The kinds of extension contexts, as runtime.getContexts() reports them, and content scripts, which it doesn't.
+// The kinds of extension contexts, as runtime.getContexts() reports them, and content scripts and the web pages that
+// externally_connectable lets message an extension, which it doesn't.
 enum class ContextKind : u8 {
     Tab,
     Popup,
     Background,
     Offscreen,
     ContentScript,
+    ExternalPage,
 };
 
 // Carries chrome.* between an extension's contexts (its pages, its background worker through its background page, and
@@ -50,6 +52,9 @@ public:
     String background_worker_script(Extension const&);
     // The script that installs chrome.* in the extension's isolated world in a document, before its content scripts.
     String content_script_bootstrap(NonnullRefPtr<Extension>, WebView::ScriptBridgeEndpoint const& world);
+    // The script that relays a web page's runtime.sendMessage() and runtime.connect() to the extension, when its
+    // externally_connectable matches the page, from an isolated world of its own (see ContentScripts).
+    String externally_connectable_relay(NonnullRefPtr<Extension>, WebView::ScriptBridgeEndpoint const& world, StringView event_name);
     void on_message(WebView::ScriptBridgeEndpoint const&, String const& message);
 
     // Sends an event to the extension's open contexts, or only to those of one kind.
@@ -59,6 +64,10 @@ public:
 
     // The open popup of an extension follows the size its page reports.
     void set_popup_size_listener(String const& extension_id, Function<void(int width, int height)>);
+
+    // The extension's background page is about to start. Runtime messages and ports for the extension wait until its
+    // background script has run, as Chrome holds them while it starts a service worker, so that its listeners get them.
+    void background_will_start(Extension const&);
 
     // Closes the extension's contexts' ports and pending messages, and cancels its alarms, as it goes away.
     void forget_extension(Extension const&);
@@ -135,6 +144,10 @@ private:
     ErrorOr<JsonValue, String> handle_web_navigation_call(Context&, String const& name, JsonArray const& args);
     void did_navigate(WebView::CanonicalNavigable const&, StringView webdriver_bidi_event, URL::URL const&);
 
+    // What waits for the background of the sender's extension to run its script, if it hasn't yet.
+    Optional<Vector<Function<void()>>&> waiting_for_background(Context const& sender);
+    void background_did_run(String const& extension_id);
+
     void send_runtime_message(Context&, u64 call_id, JsonValue message, Vector<WebView::ScriptBridgeEndpoint> receivers);
     void send_tab_message(Context&, u64 call_id, JsonArray const& args);
     void handle_response(Context&, u64 message_id, bool handled, bool listening, JsonValue response);
@@ -162,6 +175,12 @@ private:
     i64 m_next_frame_id { 1 };
     // Pages say when they go away, but not always: a crashed process doesn't.
     RefPtr<Core::Timer> m_prune_timer;
+    // The backgrounds that have started but not run their script, and what waits for them to.
+    struct StartingBackground {
+        Vector<Function<void()>> waiting;
+        NonnullRefPtr<Core::Timer> timeout;
+    };
+    HashMap<String, StartingBackground> m_starting_backgrounds;
 };
 
 StringView context_kind_name(ContextKind);

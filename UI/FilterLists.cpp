@@ -21,7 +21,7 @@ static constexpr auto CONTENT_BLOCKER_RESOURCES_OPTION = "--content-blocker-reso
 
 // The lists live in the application's resources, which Ladybird looks for next to the executable: in the bundle's
 // Resources on macOS, and in share/Lagom under the install prefix elsewhere (see WebView::platform_init()).
-static Optional<ByteString> bundled_lists_directory()
+Optional<ByteString> bundled_lists_directory()
 {
     auto executable = Core::System::current_executable_path();
     if (executable.is_error())
@@ -39,6 +39,35 @@ static Optional<ByteString> bundled_lists_directory()
     return directory.string();
 }
 
+static Vector<ByteString> lists_in(StringView directory, StringView subdirectory)
+{
+    Vector<ByteString> list_paths;
+    auto lists_directory = LexicalPath::join(directory, subdirectory).string();
+    if (!FileSystem::is_directory(lists_directory))
+        return list_paths;
+
+    Core::DirIterator iterator(lists_directory, Core::DirIterator::SkipDots);
+    while (iterator.has_next()) {
+        auto path = iterator.next_full_path();
+        if (path.ends_with(".txt"sv) && FileSystem::is_regular_file(path))
+            list_paths.append(move(path));
+    }
+    quick_sort(list_paths);
+    return list_paths;
+}
+
+ContentBlockers content_blockers_in(StringView directory)
+{
+    ContentBlockers content_blockers;
+    content_blockers.lists = lists_in(directory, "lists"sv);
+    content_blockers.trusted_lists = lists_in(directory, "trusted-lists"sv);
+
+    auto resources = LexicalPath::join(directory, "resources/ublock-resources.json"sv).string();
+    if (FileSystem::is_regular_file(resources))
+        content_blockers.resources = move(resources);
+    return content_blockers;
+}
+
 Main::Arguments with_bundled_filter_lists(Main::Arguments arguments)
 {
     // NB: Main::Arguments only views its strings, and the browser holds on to them, so they have to outlive main().
@@ -54,35 +83,18 @@ Main::Arguments with_bundled_filter_lists(Main::Arguments arguments)
     // The lists go right after the program name, so that they are options however the user's own arguments end.
     strings.append(arguments.strings[0]);
 
-    auto add_lists = [&](StringView subdirectory, StringView option) {
-        auto lists_directory = LexicalPath::join(*directory, subdirectory).string();
-        if (!FileSystem::is_directory(lists_directory))
-            return;
-
-        Vector<ByteString> list_paths;
-        Core::DirIterator iterator(lists_directory, Core::DirIterator::SkipDots);
-        while (iterator.has_next()) {
-            auto path = iterator.next_full_path();
-            if (path.ends_with(".txt"sv) && FileSystem::is_regular_file(path))
-                list_paths.append(move(path));
-        }
-        quick_sort(list_paths);
-
-        for (auto& path : list_paths) {
-            paths.append(move(path));
-            strings.append(option);
-            strings.append(paths.last());
-        }
-    };
-    add_lists("lists"sv, CONTENT_BLOCKER_LIST_OPTION);
-    add_lists("trusted-lists"sv, TRUSTED_CONTENT_BLOCKER_LIST_OPTION);
-
-    auto resources = LexicalPath::join(*directory, "resources/ublock-resources.json"sv).string();
-    if (FileSystem::is_regular_file(resources)) {
-        paths.append(move(resources));
-        strings.append(CONTENT_BLOCKER_RESOURCES_OPTION);
+    auto content_blockers = content_blockers_in(*directory);
+    auto add = [&](StringView option, ByteString path) {
+        paths.append(move(path));
+        strings.append(option);
         strings.append(paths.last());
-    }
+    };
+    for (auto& path : content_blockers.lists)
+        add(CONTENT_BLOCKER_LIST_OPTION, move(path));
+    for (auto& path : content_blockers.trusted_lists)
+        add(TRUSTED_CONTENT_BLOCKER_LIST_OPTION, move(path));
+    if (content_blockers.resources.has_value())
+        add(CONTENT_BLOCKER_RESOURCES_OPTION, content_blockers.resources.release_value());
 
     strings.extend(Vector<StringView> { arguments.strings.slice(1) });
 

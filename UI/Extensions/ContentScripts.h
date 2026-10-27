@@ -28,8 +28,13 @@ public:
     // can't be read as UTF-8.
     static Optional<String> read_file(Extension const&, StringView path);
 
+    // The isolated world of a document that relays the messages of a web page the extension's externally_connectable
+    // matches.
+    static String externally_connectable_world(Extension const&);
+
 private:
     static Vector<Web::HTML::UserScript> scripts_for_document(WebView::ScriptBridgeEndpoint const& document);
+    static Vector<Web::HTML::UserScript> externally_connectable_scripts(WebView::ScriptBridgeEndpoint const& document);
 };
 
 }
