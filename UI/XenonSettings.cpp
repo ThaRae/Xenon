@@ -156,6 +156,19 @@ void set_bangs_enabled(bool enabled)
     notify_observers();
 }
 
+static constexpr auto AUTOMATIC_UPDATES_KEY = "updates/automatic";
+
+bool automatic_updates_enabled()
+{
+    return settings().value(AUTOMATIC_UPDATES_KEY, true).toBool();
+}
+
+void set_automatic_updates_enabled(bool enabled)
+{
+    settings().setValue(AUTOMATIC_UPDATES_KEY, enabled);
+    notify_observers();
+}
+
 static constexpr auto DISABLED_FILTER_LISTS_KEY = "blocking/disabledFilterLists";
 static constexpr auto BLOCKED_REQUEST_TOTAL_KEY = "blocking/blockedRequestTotal";
 

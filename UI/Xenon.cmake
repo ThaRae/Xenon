@@ -8,6 +8,13 @@
 
 set(XENON_UI_DIR "${XENON_SOURCE_DIR}/UI")
 
+# Xenon's version, which Meta/release.py releases it as, and which the updater compares (UI/Updater.h).
+file(STRINGS "${XENON_SOURCE_DIR}/VERSION.txt" XENON_VERSION LIMIT_COUNT 1)
+if (NOT XENON_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR "VERSION.txt must be major.minor.patch: ${XENON_VERSION}")
+endif()
+set_property(DIRECTORY "${CMAKE_SOURCE_DIR}" APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${XENON_SOURCE_DIR}/VERSION.txt")
+
 find_package(Qt6 6.10 REQUIRED COMPONENTS Core Widgets)
 
 if (NOT APPLE)
@@ -117,9 +124,14 @@ if (LINUX AND NOT ANDROID)
     list(APPEND XENON_SOURCES ExternalURLActivationToken.cpp ExternalURLHandler.cpp X11Window.cpp)
 endif()
 
+if (NOT APPLE)
+    list(APPEND XENON_SOURCES Updater.cpp)
+endif()
+
 set(XENON_ARC_SOURCES
     LadybirdAccessibilityElement.mm
     SpellCheckerMac.mm
+    Updater.mm
     WebContentViewAccessibility.mm
 )
 
@@ -208,6 +220,7 @@ target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL ZLIB::ZLIB)
 #     tree, so Xenon's root comes first.
 target_include_directories(xenon BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_include_directories(xenon PRIVATE ${LADYBIRD_SOURCE_DIR} ${LADYBIRD_SOURCE_DIR}/Services/ ${XENON_GENERATED_DIR})
+target_compile_definitions(xenon PRIVATE XENON_VERSION="${XENON_VERSION}")
 add_dependencies(xenon xenon_generate_bang_table)
 
 if (Qt6Positioning_FOUND)
@@ -229,6 +242,22 @@ endif()
 if (APPLE)
     target_link_libraries(xenon PRIVATE Qt::GuiPrivate "-framework ApplicationServices" "-framework Cocoa" "-framework IOSurface" "-framework QuartzCore")
     set_source_files_properties(${XENON_ARC_SOURCES} PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+
+    # Sparkle, which Xenon updates itself with (UI/Updater.mm), as Helium does: its release, pinned by hash. The bundle
+    # carries the framework in Contents/Frameworks.
+    set(XENON_SPARKLE_VERSION 2.10.1)
+    set(XENON_SPARKLE_SHA256 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27)
+    set(XENON_SPARKLE_DIR "${CMAKE_BINARY_DIR}/Xenon/Sparkle-${XENON_SPARKLE_VERSION}")
+    if (NOT EXISTS "${XENON_SPARKLE_DIR}/Sparkle.framework")
+        set(sparkle_archive "${CMAKE_BINARY_DIR}/Xenon/Sparkle-${XENON_SPARKLE_VERSION}.tar.xz")
+        file(DOWNLOAD "https://github.com/sparkle-project/Sparkle/releases/download/${XENON_SPARKLE_VERSION}/Sparkle-${XENON_SPARKLE_VERSION}.tar.xz"
+            "${sparkle_archive}" EXPECTED_HASH SHA256=${XENON_SPARKLE_SHA256} TLS_VERIFY ON)
+        file(ARCHIVE_EXTRACT INPUT "${sparkle_archive}" DESTINATION "${XENON_SPARKLE_DIR}")
+        file(REMOVE "${sparkle_archive}")
+    endif()
+    target_compile_options(xenon PRIVATE "-F${XENON_SPARKLE_DIR}")
+    target_link_options(xenon PRIVATE "-F${XENON_SPARKLE_DIR}" "-Wl,-rpath,@executable_path/../Frameworks")
+    target_link_libraries(xenon PRIVATE "-framework Sparkle")
 endif()
 
 if (WIN32)
@@ -242,8 +271,8 @@ endif()
 set_target_properties(xenon PROPERTIES
     OUTPUT_NAME "Xenon"
     MACOSX_BUNDLE_GUI_IDENTIFIER org.xenon.Xenon
-    MACOSX_BUNDLE_BUNDLE_VERSION ${LADYBIRD_BUNDLE_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${LADYBIRD_BUNDLE_VERSION}
+    MACOSX_BUNDLE_BUNDLE_VERSION ${XENON_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${XENON_VERSION}
     MACOSX_BUNDLE_INFO_PLIST "${XENON_UI_DIR}/Info.plist"
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
@@ -331,7 +360,11 @@ if (APPLE)
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${xenon_bundle_dir}/Contents/Resources"
         COMMAND iconutil --convert icns "${XENON_UI_DIR}/Icons/macos/app_icon.iconset" --output "${xenon_bundle_dir}/Contents/Resources/app_icon.icns"
         # Not relocatable: the bundle links against libraries in the build directory, like Ladybird's dev bundle.
+        # Meta/release.py makes a copy that is.
         COMMAND "${CMAKE_COMMAND}" -E create_symlink "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}" "${xenon_bundle_dir}/Contents/lib"
+        # NB: ditto keeps the framework's symlinks, which its signature covers.
+        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${xenon_bundle_dir}/Contents/Frameworks/Sparkle.framework"
+        COMMAND ditto "${XENON_SPARKLE_DIR}/Sparkle.framework" "${xenon_bundle_dir}/Contents/Frameworks/Sparkle.framework"
         # Sign last, after the helper processes (a dependency of this target) have been linked into the bundle.
         COMMAND codesign -s - -v -f --entitlements "${XENON_ENTITLEMENTS_FILE}" "${xenon_bundle_dir}"
         VERBATIM

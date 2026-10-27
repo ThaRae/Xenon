@@ -10,6 +10,7 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
   updates
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden and Proton Pass,
   security keys
+- [Updates](#updates): Xenon updating itself
 - [Look](#look): palette and icon
 - [Not done yet](#not-done-yet)
 
@@ -46,6 +47,8 @@ below them. Every change applies at once, and the page follows changes made from
   - **Ads and trackers**: blocking, which lists are in use and when they were last checked, daily updates with
     **Check now**, subscriptions and local lists, and links into the blocking dashboard.
   - **Password manager** and **Extensions**.
+  - **Updates**: the version, whether a new one is ready, automatic updates, and **Check now** or **Relaunch to
+    update**.
 - Browsing: startup and the new tab page, languages, privacy and browsing data, background connections, site
   permissions, DNS, where the profile keeps its files (each with **Show**), and Ladybird's configuration keys.
 - A sidebar of sections that follows the scroll, and **Find a setting**, which hides everything that doesn't match.
@@ -234,6 +237,18 @@ remove it.
 On macOS, sites and password managers can register a USB security key and sign in with it
 (`navigator.credentials.create()` and `get()`), PINs included, and in cross-origin frames that are allowed to. A prompt
 over the page says what the key needs. It comes from engine patches `0010`–`0015`; see [WebAuthn.md](WebAuthn.md).
+
+## Updates
+
+On macOS, Xenon checks for a new version when it starts and once a day, downloads it in the background, and installs it
+when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch
+to update**, and turns automatic updates off. **Check for Updates…** in the Xenon menu checks at once.
+
+Releases come from [tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases). Xenon only installs one
+whose archive is signed with its update key, from a signed appcast, and the installer swaps the new app in at once, so
+a failed update leaves the old one as it was. Development builds,
+and Xenon elsewhere than macOS, don't update themselves. `UI/Updater.mm` runs Sparkle, and `Meta/release.py` makes and
+publishes the releases; see [Updates.md](Updates.md).
 
 ## Look
 

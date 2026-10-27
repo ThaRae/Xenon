@@ -62,6 +62,7 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                     <a href="#blocking">Ads and trackers</a>
                     <a href="#passwords">Password manager</a>
                     <a href="#extensions">Extensions</a>
+                    <a href="#updates">Updates</a>
                     <p class="nav-group">Browsing</p>
                     <a href="#startup">Startup and pages</a>
                     <a href="#privacy">Privacy and data</a>
@@ -521,6 +522,39 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                     <p class="description">Load an unpacked extension, reload one, or remove one.</p>
                                 </label>
                                 <button id="show-extensions" class="secondary-button">Open…</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="updates" aria-labelledby="updates-title">
+                    <h1 id="updates-title">Updates</h1>
+                    <p class="lede">New versions of Xenon, from git.avx512.dev.</p>
+
+                    <div class="group">
+                        <div class="rows">
+                            <div class="row" data-keywords="version update check release">
+                                <div class="label">
+                                    <span id="updates-version">Xenon</span>
+                                    <p id="updates-status" class="description status-line" role="status"></p>
+                                </div>
+                                <div class="control-pair">
+                                    <button id="check-for-updates" class="secondary-button" hidden>Check now</button>
+                                    <button id="install-update" class="secondary-button" hidden>
+                                        Relaunch to update
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="row" id="automatic-updates-row" data-keywords="update automatic install" hidden>
+                                <label for="automatic-updates">
+                                    Update Xenon automatically
+                                    <p id="automatic-updates-description" class="description">
+                                        Xenon checks when it starts and once a day, downloads new versions in the
+                                        background, and installs them when you quit. It only installs versions that
+                                        carry its signature.
+                                    </p>
+                                </label>
+                                <input id="automatic-updates" type="checkbox" switch />
                             </div>
                         </div>
                     </div>

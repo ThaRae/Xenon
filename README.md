@@ -39,6 +39,7 @@ It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 - A welcome flow that asks three questions (search engine, blocking, password manager) or takes Xenon's picks
 - A new tab page with your most visited sites
 - A settings page with Xenon's own settings first
+- Updates itself on macOS, from signed releases, when you quit
 
 [Documentation/Features.md](Documentation/Features.md) describes each feature: how to use it, what it does in edge
 cases, and where it lives in the code.
@@ -69,6 +70,7 @@ incremental. The app ends up at `Build/release/bin/Xenon.app`.
 | [Extensions.md](Documentation/Extensions.md) | How Chrome extensions run in Xenon, and how far each password manager gets |
 | [WebAuthn.md](Documentation/WebAuthn.md) | Security key support |
 | [FilterListUpdates.md](Documentation/FilterListUpdates.md) | How the daily filter list updates are built, signed, and checked |
+| [Updates.md](Documentation/Updates.md) | How releases are made and signed, and how Xenon updates itself |
 | [CLAUDE.md](CLAUDE.md) | The rules for changing Xenon |
 
 ## Contributing
