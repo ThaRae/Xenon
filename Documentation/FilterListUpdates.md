@@ -1,6 +1,6 @@
 # Filter list updates
 
-Xenon ships uBlock Origin's filter lists, converted for Ladybird by [xenon-ublock](../../xenon-ublock), in
+Xenon ships uBlock Origin's filter lists, converted for Ladybird by [xenon-ublock](https://git.avx512.dev/tharae/xenon-ublock), in
 `UI/Resources/filter-lists`. Upstream lists change every day, so Xenon fetches them every day between releases.
 The lists come from a public repository on git.avx512.dev, which rebuilds them daily and signs them.
 

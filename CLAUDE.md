@@ -1,7 +1,7 @@
 # Xenon
 
-A browser frontend for the Ladybird engine, with Helium browser's feature set. See README.md for the architecture
-and the feature checklist.
+A browser frontend for the Ladybird engine, with Helium browser's feature set. `Documentation/Development.md` covers
+the architecture and workflow, and `Documentation/Features.md` what each feature does and where it lives.
 
 ## Rules
 
@@ -30,6 +30,9 @@ and the feature checklist.
   (from xenon-ublock), never by hand. Xenon passes them to Ladybird as `--content-blocker-list` arguments
   (`UI/FilterLists.cpp`). Lists added in `create_platform_options()` instead are dropped the first time a blocking
   setting changes.
+- The README is for people deciding whether to use Xenon. When a feature lands, give it one plain line in the README's
+  list, and put the details (how to reach it, edge cases, files, patches) in `Documentation/Features.md`. Build and
+  workflow changes go in `Documentation/Development.md`.
 
 ## Commands
 
@@ -38,6 +41,6 @@ and the feature checklist.
 - `./Meta/xenon.py run`: build and launch `Build/release/bin/Xenon.app`.
 - `ninja -C Build/release xenon`: incremental rebuild once configured.
 - `./Meta/check.py` (`--fix` to format): run before committing. CI runs it too, along with `./Meta/xenon.py test`
-  (unit tests in `Tests/`, plus a headless render of about:welcome).
+  (unit tests in `Tests/`, then Xenon run headless against local test pages and servers).
 - New unit tests are `Tests/Test*.cpp`, registered in `UI/Xenon.cmake` as `TestXenon*` targets under `xenon-tests`.
 - `./Meta/patches.py apply` / `export` / `pin` / `status`: the engine patch series (see the top of the script).
