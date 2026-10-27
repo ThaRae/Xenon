@@ -18,6 +18,8 @@ const filterLists = document.querySelector("#filter-lists");
 const filterListUpdates = document.querySelector("#filter-list-updates");
 const filterListUpdatesEnabled = document.querySelector("#filter-list-updates-enabled");
 const filterListsNote = document.querySelector("#filter-lists-note");
+const passwordManagerList = document.querySelector("#password-managers");
+const passwordManagerNote = document.querySelector("#password-manager-note");
 const startBrowsing = document.querySelector("#start-browsing");
 const saveStatus = document.querySelector("#save-status");
 
@@ -38,8 +40,17 @@ const engineInfo = {
     Yandex: { group: "mainstream", note: "", host: "yandex.com/search/?text=" },
 };
 
+// The password managers Xenon offers (UI/PasswordManagers.h), and who makes each one.
+const passwordManagerInfo = {
+    bitwarden: { note: "Open source, can be self-hosted", developer: "Bitwarden" },
+    "proton-pass": { note: "Open source, with email aliases", developer: "Proton" },
+};
+
 let settings;
 let engines;
+let passwordManagers;
+// The password manager finishing waits to have installed (or removed, as ""), if it waits for one.
+let awaitedPasswordManager;
 let initialized = false;
 
 function showStep(name, { focus = true } = {}) {
@@ -143,6 +154,64 @@ function populateEngines() {
     addEngine(mainstreamEngines, "", "Addresses only", false, false);
 }
 
+function selectedPasswordManager() {
+    return document.querySelector('input[name="password-manager"]:checked')?.value ?? "";
+}
+
+function passwordManagerName(id) {
+    return passwordManagers.choices.find(choice => choice.id === id)?.name ?? id;
+}
+
+function populatePasswordManagers() {
+    const current = passwordManagers.current ?? "";
+    const rows = [...passwordManagers.choices.map(choice => [choice.id, choice.name]), ["", "None"]];
+    for (const [id, name] of rows) {
+        const row = document.createElement("label");
+        row.className = "choice";
+
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "password-manager";
+        radio.value = id;
+        radio.checked = id === current;
+        radio.addEventListener("change", updatePasswordManagerDetails);
+
+        const marker = document.createElement("span");
+        marker.className = "marker";
+        marker.setAttribute("aria-hidden", "true");
+
+        const label = document.createElement("span");
+        label.className = "choice-name";
+        label.textContent = name;
+
+        const detail = document.createElement("span");
+        detail.className = "choice-note";
+        detail.textContent = id ? (passwordManagerInfo[id]?.note ?? "") : "Not now";
+
+        row.append(radio, marker, label, detail);
+        passwordManagerList.append(row);
+    }
+}
+
+function updatePasswordManagerDetails() {
+    const id = selectedPasswordManager();
+    const current = passwordManagers.current ?? "";
+
+    const notes = [];
+    if (id && id !== current) {
+        const name = passwordManagerName(id);
+        const developer = passwordManagerInfo[id]?.developer ?? name;
+        notes.push(
+            `Xenon downloads ${name} from the Chrome Web Store, checks that ${developer} signed it, and looks for ` +
+                "updates once a day. To fill in your logins, it can read and change the sites you visit."
+        );
+    }
+    if (id && id === current) notes.push(`${passwordManagerName(id)} is installed, and Xenon keeps it up to date.`);
+    if (current && id !== current) notes.push(`${passwordManagerName(current)} is removed, with its data in Xenon.`);
+    if (!id && !current) notes.push("You can add one later from Extensions, in the toolbar's menu.");
+    passwordManagerNote.textContent = notes.join(" ");
+}
+
 function blockingEnabled() {
     return document.querySelector('input[name="ad-blocking"]:checked').value === "on";
 }
@@ -157,7 +226,7 @@ function updateBlockingDetails() {
 }
 
 function initialize() {
-    if (initialized || !settings || !engines) return;
+    if (initialized || !settings || !engines || !passwordManagers) return;
     initialized = true;
 
     populateEngines();
@@ -166,14 +235,49 @@ function initialize() {
 
     updateBlockingDetails();
 
+    populatePasswordManagers();
+    updatePasswordManagerDetails();
+
     for (const button of document.querySelectorAll("button")) button.disabled = false;
 }
 
-// Nothing is saved until the user is done, so the choices shown here only take effect with their go-ahead.
+function showSaveStatus(text, { inProgress = false } = {}) {
+    saveStatus.textContent = text;
+    saveStatus.classList.toggle("in-progress", inProgress);
+}
+
+// Nothing is saved until the user is done, so the choices shown here only take effect with their go-ahead. A new
+// password manager goes in first, since it's the one choice that can fail, and the rest is saved once it's in.
 function finish() {
     for (const button of document.querySelectorAll("button")) button.disabled = true;
-    saveStatus.textContent = "";
+    showSaveStatus("");
 
+    const passwordManager = selectedPasswordManager();
+    if (passwordManager === (passwordManagers.current ?? "")) {
+        saveSettings();
+        return;
+    }
+
+    awaitedPasswordManager = passwordManager;
+    if (passwordManager) showSaveStatus(`Installing ${passwordManagerName(passwordManager)}…`, { inProgress: true });
+    ladybird.sendMessage("setPasswordManager", passwordManager || null);
+}
+
+function passwordManagersChanged() {
+    if (awaitedPasswordManager === undefined || passwordManagers.installing) return;
+
+    const awaited = awaitedPasswordManager;
+    awaitedPasswordManager = undefined;
+    if ((passwordManagers.current ?? "") === awaited) {
+        saveSettings();
+        return;
+    }
+
+    showSaveStatus(passwordManagers.error ?? "Xenon couldn't change your password manager. Please try again.");
+    for (const button of document.querySelectorAll("button")) button.disabled = false;
+}
+
+function saveSettings() {
     ladybird.sendMessage("setSearchEngineSettings", {
         engine: selectedEngine()?.value || null,
         suggestions: searchSuggestions.checked && !searchSuggestions.disabled,
@@ -223,6 +327,7 @@ showStep(location.hash.slice(1), { focus: false });
 document.addEventListener("WebUILoaded", () => {
     ladybird.sendMessage("loadAvailableEngines");
     ladybird.sendMessage("loadCurrentSettings");
+    ladybird.sendMessage("loadPasswordManagers");
 });
 
 document.addEventListener("WebUIMessage", event => {
@@ -232,10 +337,13 @@ document.addEventListener("WebUIMessage", event => {
         settings = { ...settings, ...data };
     } else if (name === "loadEngines") {
         engines = data;
+    } else if (name === "passwordManagers") {
+        passwordManagers = data;
+        passwordManagersChanged();
     } else if (name === "firstRunCompleted") {
         location.replace(data);
     } else if (name === "firstRunError") {
-        saveStatus.textContent = data;
+        showSaveStatus(data);
         for (const button of document.querySelectorAll("button")) button.disabled = false;
     }
 

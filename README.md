@@ -205,7 +205,9 @@ What exists now and what's planned, measured against Helium:
   `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for. Their content scripts run
   in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and stylesheets on request.
   Bitwarden logs in (with a security key too) and autofills logins. Proton Pass signs in through Proton's account page,
-  unlocks with its extra password, autofills logins, and saves new ones.
+  unlocks with its extra password, autofills logins, and saves new ones. The welcome page offers both, as Helium's
+  setup does: Xenon installs the one picked from the Chrome Web Store, after checking its signatures, and keeps it up to
+  date. The Extensions window switches or removes it.
 - [x] **uBlock Origin's engine features**: scriptlets (YouTube ads, anti-adblock walls), `$redirect` surrogates,
   `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and an element picker
   (**Block Element...** in a page's context menu). Engine patches `0004`–`0009`, from xenon-ublock. They follow the

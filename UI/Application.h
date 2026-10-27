@@ -58,6 +58,8 @@ public:
     void open_startup_tabs(BrowserWindow&, Vector<URL::URL> const&);
     virtual WebView::SessionLaunchPolicy launch_restore_policy() const override;
 
+    Optional<ByteString> const& password_manager_choice() const { return m_password_manager_choice; }
+
     void open_new_tab();
     void open_new_window(WebView::IsPrivate);
     void reopen_recently_closed_tab(BrowserWindow* target_window);
@@ -202,6 +204,8 @@ private:
     OwnPtr<QApplication> m_application;
     // Unpacked extensions to load for this session (Xenon's --load-extension, as in Chrome).
     Vector<ByteString> m_extensions_to_load;
+    // The password manager to install (Xenon's --password-manager).
+    Optional<ByteString> m_password_manager_choice;
     BrowserWindow* m_active_window { nullptr };
     OwnPtr<ProcessManagerWindow> m_process_manager_window;
     CrashReportNotifier m_crash_report_notifier;
