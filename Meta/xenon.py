@@ -62,6 +62,28 @@ WELCOME_SCREENSHOT_DELAY_SECONDS = 4
 BLOCKED_REQUESTS = {"/jquery.popunder.js": "script", "/site-tracking-pixel.gif": "img"}
 ALLOWED_REQUESTS = {"/app.js": "script", "/logo.gif": "img"}
 
+# A page at a site the bundled lists have a scriptlet and a hiding rule for (AdGuard's list:
+# citationmachine.net##+js(set-constant, canRunAds, true); AdGuard's and EasyList: citationmachine.net##.adds-wrapper).
+# Xenon serves it from a local file at the site's own address (--resource-map), so nothing goes to the network. The
+# page writes what it found into its text, on a line starting with FILTERED_PAGE_MARKER, which a text-mode run prints.
+FILTERED_PAGE_URL = "https://citationmachine.net/"
+FILTERED_PAGE_MARKER = "XENON-CONTENT-BLOCKING "
+FILTERED_PAGE = f"""<!doctype html><title>Xenon content blocking</title>
+<div class="adds-wrapper">ad</div><div class="article">article</div>
+<script>
+    // The site's ad script would set this; its adblock detection reads it.
+    const found = {{
+        "canRunAds": String(window.canRunAds),
+        ".adds-wrapper": getComputedStyle(document.querySelector(".adds-wrapper")).display,
+        ".article": getComputedStyle(document.querySelector(".article")).display,
+    }};
+    document.body.append("{FILTERED_PAGE_MARKER}" + JSON.stringify(found));
+</script>"""
+FILTERED_PAGE_EXPECTED = {
+    False: {"canRunAds": "undefined", ".adds-wrapper": "block", ".article": "block"},
+    True: {"canRunAds": "true", ".adds-wrapper": "none", ".article": "block"},
+}
+
 # Bundles that a local server publishes to test filter list updates, signed with a key of their own
 # (Tests/FilterListUpdates/make-bundles.py). Each test page prints what it found on a line starting with the marker.
 FILTER_LIST_UPDATES_DIR = XENON_SOURCE_DIR / "Tests" / "FilterListUpdates"
@@ -304,8 +326,9 @@ def check_profile_directory(platform: Platform, executable: Path, env: dict) -> 
         return True
 
 
-# Loads a local page with blocking on and off, in a throwaway profile, and checks which of its requests reach the server.
-# Xenon is given no lists here, so this also proves it loads its bundled ones by itself.
+# Loads a local page with blocking on and off, in a throwaway profile, and checks which of its requests reach the server,
+# then loads FILTERED_PAGE and checks that a scriptlet and a hiding rule apply only with blocking on. Xenon is given no
+# lists here, so this also proves it loads its bundled ones, and uBlock Origin's resources, by itself.
 def check_content_blocking(executable: Path, env: dict) -> bool:
     requested: set[str] = set()
     tags = "".join(f'<{tag} src="{path}"></{tag}>' for path, tag in {**BLOCKED_REQUESTS, **ALLOWED_REQUESTS}.items())
@@ -330,30 +353,56 @@ def check_content_blocking(executable: Path, env: dict) -> bool:
 
     passed = True
     try:
-        for blocking in (False, True):
-            requested.clear()
-            with tempfile.TemporaryDirectory() as profile:
-                (Path(profile) / "config").mkdir()
-                (Path(profile) / "config" / "Settings.json").write_text(
-                    json.dumps({"contentBlockers": {"enabled": blocking}})
-                )
-                command = [str(executable), "--headless=text", "--profile-path", profile, url]
-                try:
-                    subprocess.run(command, env=env, capture_output=True, timeout=120)
-                except subprocess.TimeoutExpired:
-                    print("    timed out loading the test page", file=sys.stderr)
-                    return False
+        with tempfile.TemporaryDirectory() as pages:
+            filtered_page = Path(pages) / "filtered.html"
+            filtered_page.write_text(FILTERED_PAGE)
+            substitution = {"url": FILTERED_PAGE_URL, "file": str(filtered_page), "content_type": "text/html"}
+            resource_map = Path(pages) / "resource-map.json"
+            resource_map.write_text(json.dumps({"substitutions": [substitution]}))
 
-            expected_blocked = set(BLOCKED_REQUESTS) if blocking else set()
-            reached = {path for path in (*BLOCKED_REQUESTS, *ALLOWED_REQUESTS) if path in requested}
-            wrongly_blocked = set(ALLOWED_REQUESTS) - reached
-            wrongly_allowed = (set(BLOCKED_REQUESTS) - reached) ^ expected_blocked
-            label = "blocking on " if blocking else "blocking off"
-            if "/" not in requested or wrongly_blocked or wrongly_allowed:
-                print(f"    {label}: page loaded={'/' in requested}, reached={sorted(reached)}", file=sys.stderr)
-                passed = False
-            else:
-                print(f"    {label}: reached {sorted(reached)}")
+            for blocking in (False, True):
+                requested.clear()
+                with tempfile.TemporaryDirectory() as profile:
+                    (Path(profile) / "config").mkdir()
+                    (Path(profile) / "config" / "Settings.json").write_text(
+                        json.dumps({"contentBlockers": {"enabled": blocking}})
+                    )
+                    command = [str(executable), "--headless=text", "--profile-path", profile]
+                    try:
+                        subprocess.run([*command, url], env=env, capture_output=True, timeout=120)
+                        filtered = subprocess.run(
+                            [*command, "--resource-map", str(resource_map), FILTERED_PAGE_URL],
+                            env=env,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                        )
+                    except subprocess.TimeoutExpired:
+                        print("    timed out loading a test page", file=sys.stderr)
+                        return False
+
+                expected_blocked = set(BLOCKED_REQUESTS) if blocking else set()
+                reached = {path for path in (*BLOCKED_REQUESTS, *ALLOWED_REQUESTS) if path in requested}
+                wrongly_blocked = set(ALLOWED_REQUESTS) - reached
+                wrongly_allowed = (set(BLOCKED_REQUESTS) - reached) ^ expected_blocked
+                label = "blocking on " if blocking else "blocking off"
+                if "/" not in requested or wrongly_blocked or wrongly_allowed:
+                    print(f"    {label}: page loaded={'/' in requested}, reached={sorted(reached)}", file=sys.stderr)
+                    passed = False
+                else:
+                    print(f"    {label}: reached {sorted(reached)}")
+
+                found = None
+                for line in (filtered.stdout + filtered.stderr).splitlines():
+                    if FILTERED_PAGE_MARKER in line:
+                        found = json.loads(line.split(FILTERED_PAGE_MARKER, 1)[1])
+                if found != FILTERED_PAGE_EXPECTED[blocking]:
+                    print(f"    {label}: {FILTERED_PAGE_URL} found {found}", file=sys.stderr)
+                    if found is None:
+                        print((filtered.stdout + filtered.stderr)[-4000:], file=sys.stderr)
+                    passed = False
+                else:
+                    print(f"    {label}: {FILTERED_PAGE_URL} found {found}")
     finally:
         server.shutdown()
     return passed
