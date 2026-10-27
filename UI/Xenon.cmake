@@ -56,6 +56,8 @@ set(XENON_SOURCES
     Extensions/Scripting.cpp
     Extensions/Storage.cpp
     Extensions/Toolbar.cpp
+    FilterListBundle.cpp
+    FilterListUpdates.cpp
     FilterLists.cpp
     FindInPageWidget.cpp
     Icon.cpp
@@ -166,14 +168,17 @@ set(XENON_GENERATED_DIR "${CMAKE_BINARY_DIR}/Xenon")
 embed_as_string(xenon_chrome_api "${XENON_UI_DIR}/Resources/extensions/chrome-api.js" "${XENON_GENERATED_DIR}/ChromeAPI.cpp" chrome_api_source NAMESPACE "Ladybird::Extensions")
 embed_as_string(xenon_background_page "${XENON_UI_DIR}/Resources/extensions/background-page.js" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" background_page_source NAMESPACE "Ladybird::Extensions")
 embed_as_string(xenon_worker_bridge "${XENON_UI_DIR}/Resources/extensions/worker-bridge.js" "${XENON_GENERATED_DIR}/WorkerBridge.cpp" worker_bridge_source NAMESPACE "Ladybird::Extensions")
+embed_as_string(xenon_externally_connectable "${XENON_UI_DIR}/Resources/extensions/externally-connectable.js" "${XENON_GENERATED_DIR}/ExternallyConnectable.cpp" externally_connectable_source NAMESPACE "Ladybird::Extensions")
+embed_as_string(xenon_externally_connectable_relay "${XENON_UI_DIR}/Resources/extensions/externally-connectable-relay.js" "${XENON_GENERATED_DIR}/ExternallyConnectableRelay.cpp" externally_connectable_relay_source NAMESPACE "Ladybird::Extensions")
 list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" "${XENON_GENERATED_DIR}/WorkerBridge.cpp")
+list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ExternallyConnectable.cpp" "${XENON_GENERATED_DIR}/ExternallyConnectableRelay.cpp")
 
 # NB: Qt finalizes executables in a deferred call by default, and we are already running deferred, so finalize by hand.
 qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
-target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibWebView LibURL LibWakeLock)
+target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibRequests LibWebView LibURL LibWakeLock)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL)
 # NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
 #     tree, so Xenon's root comes first.
@@ -317,6 +322,11 @@ ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBangs.cpp" Xenon NAME TestXenonBang
 target_sources(TestXenonBangs PRIVATE "${XENON_UI_DIR}/Bangs.cpp")
 target_include_directories(TestXenonBangs BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestFilterLists.cpp" Xenon NAME TestXenonFilterLists LIBS LibCrypto)
+target_sources(TestXenonFilterLists PRIVATE "${XENON_UI_DIR}/FilterListBundle.cpp")
+target_include_directories(TestXenonFilterLists BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_compile_definitions(TestXenonFilterLists PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestExtensions.cpp" Xenon NAME TestXenonExtensions LIBS LibCrypto LibFileSystem LibURL)
 target_sources(TestXenonExtensions PRIVATE
     "${XENON_UI_DIR}/Extensions/Extension.cpp"
@@ -327,4 +337,4 @@ target_sources(TestXenonExtensions PRIVATE
 )
 target_include_directories(TestXenonExtensions BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions)
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions TestXenonFilterLists)

@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <AK/AnyOf.h>
 #include <AK/Array.h>
 #include <AK/StringBuilder.h>
 #include <LibWebView/Application.h>
 #include <UI/Extensions/Browser.h>
+#include <UI/Extensions/MatchPattern.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
 
@@ -17,9 +19,12 @@ namespace Ladybird::Extensions {
 extern String const& chrome_api_source;
 extern String const& background_page_source;
 extern String const& worker_bridge_source;
+extern String const& externally_connectable_relay_source;
 
 static constexpr auto NO_RECEIVER = "Could not establish connection. Receiving end does not exist."sv;
 static constexpr auto PRUNE_INTERVAL = AK::Duration::from_seconds(5);
+// How long messages wait for a background that has started to run its script, in case it never does.
+static constexpr auto BACKGROUND_START_TIMEOUT = AK::Duration::from_seconds(10);
 
 StringView context_kind_name(ContextKind kind)
 {
@@ -34,6 +39,8 @@ StringView context_kind_name(ContextKind kind)
         return "OFFSCREEN_DOCUMENT"sv;
     case ContextKind::ContentScript:
         return "CONTENT_SCRIPT"sv;
+    case ContextKind::ExternalPage:
+        return "WEB_PAGE"sv;
     }
     VERIFY_NOT_REACHED();
 }
@@ -170,6 +177,17 @@ String Router::content_script_bootstrap(NonnullRefPtr<Extension> extension, WebV
     return script.to_string_without_validation();
 }
 
+String Router::externally_connectable_relay(NonnullRefPtr<Extension> extension, WebView::ScriptBridgeEndpoint const& world, StringView event_name)
+{
+    prune_closed_contexts();
+    m_contexts.append({ extension, world, ContextKind::ExternalPage });
+
+    JsonObject config;
+    config.set("extensionId"sv, extension->id());
+    config.set("eventName"sv, event_name);
+    return MUST(String::formatted("const config = {};\n{}", config.serialized(), externally_connectable_relay_source));
+}
+
 Optional<Router::Context&> Router::context_for(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     for (auto& context : m_contexts) {
@@ -191,7 +209,9 @@ URL::URL Router::context_url(Context const& context) const
 JsonObject Router::sender_for(Context const& context)
 {
     JsonObject sender;
-    sender.set("id"sv, context.extension->id());
+    // A web page's messages have no extension ID, which is how extensions tell them apart.
+    if (context.kind != ContextKind::ExternalPage)
+        sender.set("id"sv, context.extension->id());
     sender.set("url"sv, context_url(context).serialize());
     sender.set("origin"sv, context.endpoint.origin().serialize());
     if (context.kind != ContextKind::Background) {
@@ -199,7 +219,7 @@ JsonObject Router::sender_for(Context const& context)
         sender.set("documentLifecycle"sv, "active"sv);
     }
 
-    auto is_in_tab = context.kind == ContextKind::Tab || context.kind == ContextKind::ContentScript;
+    auto is_in_tab = context.kind == ContextKind::Tab || context.kind == ContextKind::ContentScript || context.kind == ContextKind::ExternalPage;
     if (auto view_id = context.endpoint.view_id(); view_id.has_value() && is_in_tab) {
         if (auto tab = Browser::tab_json(*view_id, *context.extension); tab.has_value()) {
             sender.set("tab"sv, tab.release_value());
@@ -269,6 +289,8 @@ void Router::forget_extension(Extension const& extension)
         forget_endpoint(endpoint);
     m_alarms.remove(extension.id());
     m_popup_size_listeners.remove(extension.id());
+    if (auto starting = m_starting_backgrounds.take(extension.id()); starting.has_value())
+        starting->timeout->stop();
 }
 
 void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String const& text)
@@ -283,6 +305,10 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
     auto const& message = json.value().as_object();
     auto type = message.get_string("type"sv);
     if (!type.has_value())
+        return;
+
+    // A web page may only message the extension, and use the ports it opened.
+    if (context->kind == ContextKind::ExternalPage && !type->is_one_of("call"sv, "connect"sv, "port-message"sv, "port-disconnect"sv, "closing"sv))
         return;
 
     auto port_id = message.get_string("port"sv);
@@ -300,11 +326,19 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
         // A port to a tab (tabs.connect()) goes to the extension's content scripts there; any other port goes to its
         // pages and background (runtime.connect()).
         auto name = message.get_string("name"sv).value_or({});
-        if (auto tab_id = message.get_integer<i64>("tabId"sv); tab_id.has_value() && context->kind != ContextKind::ContentScript) {
+        auto may_connect_to_tabs = context->kind != ContextKind::ContentScript && context->kind != ContextKind::ExternalPage;
+        if (auto tab_id = message.get_integer<i64>("tabId"sv); tab_id.has_value() && may_connect_to_tabs) {
             auto receivers = content_script_receivers(*context->extension, *tab_id, message.get_integer<i64>("frameId"sv), message.get_string("documentId"sv));
             open_port(*context, *port_id, name, move(receivers));
         } else {
-            open_port(*context, *port_id, name, extension_receivers(*context));
+            Function<void()> open = [this, endpoint, port_id = *port_id, name] {
+                if (auto opener = context_for(endpoint); opener.has_value())
+                    open_port(*opener, port_id, name, extension_receivers(*opener));
+            };
+            if (auto waiting = waiting_for_background(*context); waiting.has_value())
+                waiting->append(move(open));
+            else
+                open();
         }
     } else if (*type == "connected"sv && port_id.has_value()) {
         handle_port_accepted(*context, *port_id, message.get_bool("accepted"sv).value_or(false));
@@ -355,9 +389,21 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
         reply_with_error(context.endpoint, id, MUST(String::formatted("{} isn't available to content scripts.", name)));
         return;
     }
+    if (context.kind == ContextKind::ExternalPage && name != "runtime.sendMessage"sv) {
+        reply_with_error(context.endpoint, id, MUST(String::formatted("{} isn't available to web pages.", name)));
+        return;
+    }
 
     if (name == "runtime.sendMessage"sv) {
-        send_runtime_message(context, id, args.is_empty() ? JsonValue {} : args.at(0), extension_receivers(context));
+        auto message = args.is_empty() ? JsonValue {} : args.at(0);
+        Function<void()> send = [this, endpoint = context.endpoint, id, message] {
+            if (auto sender = context_for(endpoint); sender.has_value())
+                send_runtime_message(*sender, id, message, extension_receivers(*sender));
+        };
+        if (auto waiting = waiting_for_background(context); waiting.has_value())
+            waiting->append(move(send));
+        else
+            send();
         return;
     }
     if (name == "tabs.sendMessage"sv) {
@@ -602,8 +648,16 @@ ErrorOr<JsonValue, String> Router::handle_permissions_call(Context& context, Str
             if (!extension.has_permission(permission))
                 return JsonValue { false };
         }
+        // A pattern is granted when a host permission covers it, as https://*/* covers https://example.com/*.
         for (auto const& origin : origins) {
-            if (!manifest.host_permissions.contains_slow(origin) && !manifest.host_permissions.contains_slow("<all_urls>"_string))
+            auto pattern = MatchPattern::parse(origin);
+            if (pattern.is_error())
+                return MUST(String::formatted("Invalid value for origin pattern {}: {}", origin, pattern.error()));
+            auto is_granted = any_of(manifest.host_permissions, [&](auto const& host_permission) {
+                auto granted = MatchPattern::parse(host_permission);
+                return !granted.is_error() && granted.value().contains(pattern.value());
+            });
+            if (!is_granted)
                 return JsonValue { false };
         }
         return JsonValue { true };
@@ -762,7 +816,7 @@ JsonArray Router::contexts_of(Extension const& extension) const
 {
     JsonArray contexts;
     for (auto const& context : m_contexts) {
-        if (context.extension->id() != extension.id() || context.kind == ContextKind::ContentScript)
+        if (context.extension->id() != extension.id() || context.kind == ContextKind::ContentScript || context.kind == ContextKind::ExternalPage)
             continue;
 
         JsonObject json;
@@ -795,6 +849,7 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
     if (name == "runtime.backgroundReady"sv) {
         if (context.kind != ContextKind::Background)
             return JsonValue {};
+        Core::deferred_invoke([this, id = extension->id()] { background_did_run(id); });
 
         JsonObject details;
         if (auto reason = Registry::the().take_install_reason(extension->id()); reason.has_value()) {
@@ -942,6 +997,8 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
             continue;
         if (kind.has_value() && context.kind != *kind)
             continue;
+        if (context.kind == ContextKind::ExternalPage)
+            continue;
         // Content scripts have chrome.storage's events alone, and learn of changed permissions for chrome.storage's sake.
         if (context.kind == ContextKind::ContentScript && !name.starts_with("storage."sv) && !name.starts_with("permissions."sv))
             continue;
@@ -957,13 +1014,15 @@ void Router::dispatch_event_to_all(StringView name, JsonArray args)
 
 // --- runtime.sendMessage -----------------------------------------------------------------------------------------------
 
-// runtime.sendMessage() and runtime.connect() reach the extension's pages and background, but not its content scripts,
-// and never the sender itself.
+// runtime.sendMessage() and runtime.connect() reach the extension's pages and background, but not its content scripts
+// or the web pages that message it, and never the sender itself.
 Vector<WebView::ScriptBridgeEndpoint> Router::extension_receivers(Context const& sender) const
 {
     Vector<WebView::ScriptBridgeEndpoint> receivers;
     for (auto const& context : m_contexts) {
-        if (context.extension->id() != sender.extension->id() || context.endpoint == sender.endpoint || context.kind == ContextKind::ContentScript)
+        if (context.extension->id() != sender.extension->id() || context.endpoint == sender.endpoint)
+            continue;
+        if (context.kind == ContextKind::ContentScript || context.kind == ContextKind::ExternalPage)
             continue;
         receivers.append(context.endpoint);
     }
@@ -993,6 +1052,33 @@ Vector<WebView::ScriptBridgeEndpoint> Router::content_script_receivers(Extension
     return receivers;
 }
 
+void Router::background_will_start(Extension const& extension)
+{
+    auto timeout = Core::Timer::create_single_shot(BACKGROUND_START_TIMEOUT, [this, id = extension.id()] { background_did_run(id); });
+    timeout->start();
+    m_starting_backgrounds.set(extension.id(), { .waiting = {}, .timeout = move(timeout) });
+}
+
+Optional<Vector<Function<void()>>&> Router::waiting_for_background(Context const& sender)
+{
+    if (sender.kind == ContextKind::Background)
+        return {};
+    auto starting = m_starting_backgrounds.get(sender.extension->id());
+    if (!starting.has_value())
+        return {};
+    return starting->waiting;
+}
+
+void Router::background_did_run(String const& extension_id)
+{
+    auto starting = m_starting_backgrounds.take(extension_id);
+    if (!starting.has_value())
+        return;
+    starting->timeout->stop();
+    for (auto& action : starting->waiting)
+        action();
+}
+
 // https://developer.chrome.com/docs/extensions/reference/api/runtime#method-sendMessage
 // The message goes to each receiver, and the first answer is the response.
 void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue message, Vector<WebView::ScriptBridgeEndpoint> receivers)
@@ -1007,6 +1093,8 @@ void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue messag
     delivery.set("id"sv, id);
     delivery.set("message"sv, move(message));
     delivery.set("sender"sv, sender_for(sender));
+    // A web page's messages go to runtime.onMessageExternal.
+    delivery.set("external"sv, sender.kind == ContextKind::ExternalPage);
     auto serialized = delivery.serialized();
 
     for (auto const& receiver : receivers) {
@@ -1090,6 +1178,8 @@ void Router::open_port(Context& opener, String const& port_id, String const& nam
     connect.set("port"sv, port_id);
     connect.set("name"sv, name);
     connect.set("sender"sv, sender_for(opener));
+    // A web page's ports go to runtime.onConnectExternal.
+    connect.set("external"sv, opener.kind == ContextKind::ExternalPage);
     auto serialized = connect.serialized();
 
     for (auto const& receiver : receivers) {

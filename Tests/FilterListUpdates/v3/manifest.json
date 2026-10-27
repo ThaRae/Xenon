@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "generated_at": "2099-01-03 00:00 UTC",
+  "resources": {
+    "file": "resources/ublock-resources.json",
+    "bytes": 3,
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "lists": [
+    {
+      "id": "xenon-test",
+      "file": "lists/xenon-test.txt",
+      "bytes": 81,
+      "sha256": "e53554c562545110d6fcafcdc8a078b184da212edc101e4de7a8a88e738d1046",
+      "trusted": false
+    },
+    {
+      "id": "xenon-test-trusted",
+      "file": "trusted-lists/xenon-test-trusted.txt",
+      "bytes": 89,
+      "sha256": "592560dbb92c636b3e577b26c06e363457f3a93a9282e895f52477553876ae13",
+      "trusted": true
+    }
+  ]
+}

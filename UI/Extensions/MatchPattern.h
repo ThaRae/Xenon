@@ -24,6 +24,9 @@ public:
     bool matches(URL::URL const&) const;
     // Whether the pattern matches some URL of the origin, ignoring its path.
     bool matches_origin(URL::Origin const&) const;
+    // Whether this pattern matches every URL the other one does, as Chrome decides whether the host permissions it
+    // granted cover those an extension asks about (permissions.contains()).
+    bool contains(MatchPattern const&) const;
 
     bool matches_all_urls() const { return m_all_urls; }
     bool matches_scheme(StringView) const;

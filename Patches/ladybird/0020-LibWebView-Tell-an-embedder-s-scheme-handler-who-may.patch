@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 22:40:26 -0400
+Subject: [PATCH] LibWebView: Tell an embedder's scheme handler who may ask for
+ a subresource
+
+A browser lets web pages load some of an extension's files, those the
+extension lists as web accessible for the page's origin, as images,
+stylesheets, and scripts. The scheme handler only learned whether the
+asking process hosts a document of the URL's own origin, and for a
+navigation, who started it, so it couldn't let a page load such a file
+as a subresource.
+
+URLSchemeRequest now names the origins that may be asking for a
+subresource: a worker's own, or those of the documents the asking
+process hosts for its page. The UI process knows which documents those
+are from its own records, but not which of them asks, so this is as
+close to the request's initiator as it can get without trusting the
+renderer. Site isolation keeps them to one site.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/URLSchemeHandler.h       |  5 +++++
+ Libraries/LibWebView/WebContentPage.cpp       | 11 ++++++++++-
+ Libraries/LibWebView/WorkerProcessManager.cpp |  1 +
+ 3 files changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
+index 29f3cab80d12c5a7280145f57851eaab00ce34cf..0b5bc6d988baf5001186956a628358ddb184c9f9 100644
+--- a/Libraries/LibWebView/URLSchemeHandler.h
++++ b/Libraries/LibWebView/URLSchemeHandler.h
+@@ -37,6 +37,11 @@ struct URLSchemeRequest {
+     bool is_navigation { false };
+     // The origin of the document that started the navigation, or none if the user started it from the browser's UI.
+     Optional<URL::Origin> navigation_initiator;
++
++    // For a subresource, the origins that may be asking for it: a worker's, or those of the documents the asking process
++    // hosts for its page. The UI process knows which documents those are, but not which one asks, so this is as close
++    // to the request's initiator as it gets. Site isolation keeps them to one site.
++    Vector<URL::Origin> requester_origins;
+ };
+ 
+ struct URLSchemeResponse {
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 9ff2c6a130ba064d858d0db9bd3c8c1a66243cac..b06b7a6610ac5a830575b13fd1354553ccf77251 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -1553,7 +1553,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+         return;
+     }
+ 
+-    URLSchemeRequest request { .url = url, .from_same_origin_process = client().hosts_a_document_of_origin(url.origin()), .is_navigation = false, .navigation_initiator = {} };
++    URLSchemeRequest request { .url = url, .from_same_origin_process = client().hosts_a_document_of_origin(url.origin()), .is_navigation = false, .navigation_initiator = {}, .requester_origins = {} };
+     traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
+         auto navigation = navigable.uncommitted_navigation();
+         if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
+@@ -1565,6 +1565,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+         return IterationDecision::Break;
+     });
+ 
++    if (!request.is_navigation) {
++        for_each_hosted_document([&](CanonicalDocument& document) {
++            auto const& origin = document.origin();
++            if (!request.requester_origins.contains_slow(origin))
++                request.requester_origins.append(origin);
++            return IterationDecision::Continue;
++        });
++    }
++
+     auto response = (*handler)(request);
+     if (response.is_error()) {
+         async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
+diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
+index 36805f3a3a0d9e7a25a187135a0c62a9e6778281..974f52a70779f30642a4e5ba09acfda6d12d16cb 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.cpp
++++ b/Libraries/LibWebView/WorkerProcessManager.cpp
+@@ -706,6 +706,7 @@ void WorkerProcessManager::worker_did_request_embedder_resource(Web::HTML::Worke
+         .from_same_origin_process = agent.inside_settings->origin().is_same_origin(url.origin()),
+         .is_navigation = false,
+         .navigation_initiator = {},
++        .requester_origins = { agent.inside_settings->origin() },
+     };
+     auto response = (*handler)(request);
+     if (response.is_error()) {

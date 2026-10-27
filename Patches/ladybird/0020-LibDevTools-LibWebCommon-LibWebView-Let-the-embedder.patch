@@ -1,0 +1,186 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 22:28:00 -0400
+Subject: [PATCH] LibDevTools+LibWebCommon+LibWebView: Let the embedder name
+ its directories
+
+Profiles, crash reports, and the DevTools Firefox profile go in a
+directory named "Ladybird" under the platform's config, data, cache, and
+runtime directories. Another browser built on LibWebView shares them
+with Ladybird when both are installed: their settings, history, and
+cookies mix, each recovers the other's crash reports, and launching one
+while the other runs on the same profile opens its URLs in the other.
+
+WebView::set_application_name() names that directory instead. The
+embedder calls it before anything reads it, which is before it creates
+its Application, since the browser's crash handler is set up first.
+Profiles given with --profile-path are where they were.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibDevTools/FirefoxClient.cpp      |  3 ++-
+ Libraries/LibWebCommon/WebView/Utilities.cpp | 13 +++++++++++
+ Libraries/LibWebCommon/WebView/Utilities.h   |  6 +++++
+ Libraries/LibWebView/CrashReportStore.cpp    |  3 ++-
+ Libraries/LibWebView/Profile.cpp             | 11 +++++-----
+ Tests/LibWebView/TestProfile.cpp             | 23 ++++++++++++++++++++
+ 6 files changed, 52 insertions(+), 7 deletions(-)
+
+diff --git a/Libraries/LibDevTools/FirefoxClient.cpp b/Libraries/LibDevTools/FirefoxClient.cpp
+index 8e31417547fa06ab1759fab4c782acee19753f0b..64cf5b83c6b1c83d112e50aa44c9239ece8dfa5d 100644
+--- a/Libraries/LibDevTools/FirefoxClient.cpp
++++ b/Libraries/LibDevTools/FirefoxClient.cpp
+@@ -20,6 +20,7 @@
+ #    include <LibDevTools/LaunchApplicationMacOS.h>
+ #endif
+ #include <LibFileSystem/FileSystem.h>
++#include <LibWebCommon/WebView/Utilities.h>
+ 
+ #if !defined(AK_OS_WINDOWS)
+ #    include <unistd.h>
+@@ -60,7 +61,7 @@ static constexpr auto USER_CHROME_CSS = R"~~~(
+ 
+ static LexicalPath const& profile_directory()
+ {
+-    static NeverDestroyed<LexicalPath> path = LexicalPath::join(Core::StandardPaths::user_data_directory(), "Ladybird"sv, "DevTools"sv, "firefox-profile"sv);
++    static NeverDestroyed<LexicalPath> path = LexicalPath::join(Core::StandardPaths::user_data_directory(), WebView::application_name(), "DevTools"sv, "firefox-profile"sv);
+     return *path;
+ }
+ 
+diff --git a/Libraries/LibWebCommon/WebView/Utilities.cpp b/Libraries/LibWebCommon/WebView/Utilities.cpp
+index 1afa64a04985104ecc813e514963347c37f93e94..773baeabe348095beb6bfb4f8a1c5ea3bc083076 100644
+--- a/Libraries/LibWebCommon/WebView/Utilities.cpp
++++ b/Libraries/LibWebCommon/WebView/Utilities.cpp
+@@ -49,6 +49,19 @@ ByteString mach_server_name_for_process(StringView process_name, pid_t pid)
+     return ByteString::formatted("org.ladybird.{}.helper.{}", process_name, pid);
+ }
+ 
++static auto& s_application_name = *new ByteString { "Ladybird"sv };
++
++StringView application_name()
++{
++    return s_application_name;
++}
++
++void set_application_name(ByteString name)
++{
++    VERIFY(!name.is_empty());
++    s_application_name = move(name);
++}
++
+ static ErrorOr<ByteString> application_directory()
+ {
+     if (s_ladybird_binary_path.has_value())
+diff --git a/Libraries/LibWebCommon/WebView/Utilities.h b/Libraries/LibWebCommon/WebView/Utilities.h
+index bd493c671915852725945e10d7f303da57dcafb0..d532b1ed5292251633c18bc6877b7e8988f6047c 100644
+--- a/Libraries/LibWebCommon/WebView/Utilities.h
++++ b/Libraries/LibWebCommon/WebView/Utilities.h
+@@ -26,4 +26,10 @@ WEBCOMMON_API ByteString mach_server_name_for_process(StringView process_name, p
+ 
+ WEBCOMMON_API ErrorOr<void> handle_attached_debugger();
+ 
++// The name of the directory the browser keeps its profiles and crash reports in, under each of the platform's config,
++// data, cache, and runtime directories. It defaults to "Ladybird". Other browsers built on LibWebView set their own name
++// before creating their Application, so that their data stays apart from Ladybird's.
++WEBCOMMON_API StringView application_name();
++WEBCOMMON_API void set_application_name(ByteString);
++
+ }
+diff --git a/Libraries/LibWebView/CrashReportStore.cpp b/Libraries/LibWebView/CrashReportStore.cpp
+index 81da143c75179d1df241625c145a816b78b4da06..5410c6b68641d4a5060d662886bb77d133c266f3 100644
+--- a/Libraries/LibWebView/CrashReportStore.cpp
++++ b/Libraries/LibWebView/CrashReportStore.cpp
+@@ -20,6 +20,7 @@
+ #include <LibCore/Process.h>
+ #include <LibCore/StandardPaths.h>
+ #include <LibCore/System.h>
++#include <LibWebCommon/WebView/Utilities.h>
+ #include <LibWebView/CrashReport.h>
+ #include <LibWebView/CrashReportStore.h>
+ #include <LibWebView/ProcessManager.h>
+@@ -38,7 +39,7 @@ using namespace Core::CrashReportData;
+ 
+ ByteString CrashReportStore::default_directory()
+ {
+-    return LexicalPath::join(Core::StandardPaths::user_data_directory(), "Ladybird"sv, "CrashReports"sv).string();
++    return LexicalPath::join(Core::StandardPaths::user_data_directory(), WebView::application_name(), "CrashReports"sv).string();
+ }
+ 
+ // The browser's own store lives under the user data directory.
+diff --git a/Libraries/LibWebView/Profile.cpp b/Libraries/LibWebView/Profile.cpp
+index 5407a6cded5ecd9384e3fd581922a34cbaa435b1..674f5df9edc38fa1b664b83ad21ed3d8f65c52d7 100644
+--- a/Libraries/LibWebView/Profile.cpp
++++ b/Libraries/LibWebView/Profile.cpp
+@@ -11,13 +11,14 @@
+ #include <LibCore/Directory.h>
+ #include <LibCrypto/Hash/SHA2.h>
+ #include <LibFileSystem/FileSystem.h>
++#include <LibWebCommon/WebView/Utilities.h>
+ #include <LibWebView/Profile.h>
+ 
+ namespace WebView {
+ 
+ static ByteString profile_path(StringView root, StringView identifier)
+ {
+-    return LexicalPath::join(root, "Ladybird"sv, "Profiles"sv, identifier).string();
++    return LexicalPath::join(root, application_name(), "Profiles"sv, identifier).string();
+ }
+ 
+ static ErrorOr<void> create_profile_directories(ProfilePaths const& paths)
+@@ -161,11 +162,11 @@ ErrorOr<Profile> Profile::create(ProfileSelection const& selection, ProfileRoots
+ ErrorOr<Profile> Profile::create_legacy(ProfileRoots const& roots)
+ {
+     ProfilePaths paths {
+-        .config = LexicalPath::join(roots.config, "Ladybird"sv).string(),
+-        .data = LexicalPath::join(roots.data, "Ladybird"sv).string(),
+-        .cache = LexicalPath::join(roots.cache, "Ladybird"sv).string(),
++        .config = LexicalPath::join(roots.config, application_name()).string(),
++        .data = LexicalPath::join(roots.data, application_name()).string(),
++        .cache = LexicalPath::join(roots.cache, application_name()).string(),
+         .runtime = roots.runtime,
+-        .identity = LexicalPath::join(roots.data, "Ladybird"sv).string(),
++        .identity = LexicalPath::join(roots.data, application_name()).string(),
+     };
+ 
+     TRY(create_profile_directories(paths));
+diff --git a/Tests/LibWebView/TestProfile.cpp b/Tests/LibWebView/TestProfile.cpp
+index 5df347c1321154bf3a2ee287becffa7a4040b99a..91deb0d4db1d2e086b2ed53a9f086476037f3afc 100644
+--- a/Tests/LibWebView/TestProfile.cpp
++++ b/Tests/LibWebView/TestProfile.cpp
+@@ -19,6 +19,7 @@
+ #include <LibHTTP/NetworkIsolationKey.h>
+ #include <LibTest/TestCase.h>
+ #include <LibURL/Parser.h>
++#include <LibWebCommon/WebView/Utilities.h>
+ #include <LibWebView/BookmarkStore.h>
+ #include <LibWebView/CookieJar.h>
+ #include <LibWebView/FaviconStore.h>
+@@ -125,6 +126,28 @@ TEST_CASE(legacy_layout)
+     remove_test_root();
+ }
+ 
++TEST_CASE(embedder_application_name)
++{
++    remove_test_root();
++    auto profile_roots = roots();
++    WebView::set_application_name("Embedder");
++
++    auto profile = MUST(WebView::Profile::create({}, profile_roots));
++    EXPECT_EQ(profile.paths().config, LexicalPath::join(profile_roots.config, "Embedder/Profiles/default"sv).string());
++    EXPECT_EQ(profile.paths().data, LexicalPath::join(profile_roots.data, "Embedder/Profiles/default"sv).string());
++    EXPECT_EQ(profile.paths().cache, LexicalPath::join(profile_roots.cache, "Embedder/Profiles/default"sv).string());
++    EXPECT_EQ(profile.paths().runtime, LexicalPath::join(profile_roots.runtime, "Embedder/Profiles/default"sv).string());
++    EXPECT(!FileSystem::exists(LexicalPath::join(profile_roots.config, "Ladybird"sv).string()));
++    EXPECT(!FileSystem::exists(LexicalPath::join(profile_roots.data, "Ladybird"sv).string()));
++    EXPECT(!FileSystem::exists(LexicalPath::join(profile_roots.cache, "Ladybird"sv).string()));
++
++    auto legacy_profile = MUST(WebView::Profile::create_legacy(profile_roots));
++    EXPECT_EQ(legacy_profile.paths().config, LexicalPath::join(profile_roots.config, "Embedder"sv).string());
++
++    WebView::set_application_name("Ladybird");
++    remove_test_root();
++}
++
+ TEST_CASE(invalid_selection)
+ {
+     remove_test_root();

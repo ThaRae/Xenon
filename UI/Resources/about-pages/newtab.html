@@ -16,15 +16,28 @@ SPDX-License-Identifier: BSD-2-Clause
         <script src="resource://ladybird/about-pages/newtab.js"></script>
     </head>
     <body>
-        <div class="glow" aria-hidden="true"></div>
-
-        <span class="element element-small corner-mark" aria-hidden="true">
-            <span class="element-number">54</span>
-            <span class="element-symbol">Xe</span>
-        </span>
+        <div class="orbits" aria-hidden="true">
+            <svg viewBox="0 0 100 100">
+                <ellipse class="orbit" cx="50" cy="50" rx="35" ry="12.5" transform="rotate(45 50 50)" />
+                <ellipse class="orbit orbit-rose" cx="50" cy="50" rx="35" ry="12.5" transform="rotate(-45 50 50)" />
+            </svg>
+        </div>
 
         <main>
             <h1 class="visually-hidden">New Tab</h1>
+            <svg class="mark page-mark" viewBox="0 0 100 100" aria-hidden="true">
+                <path
+                    class="orbit"
+                    stroke-width="5"
+                    d="M44.82 62.32A35 12.5 45 0 1 44.49 29.46M55.18 37.68A35 12.5 45 0 1 55.51 70.54"
+                />
+                <path
+                    class="orbit orbit-rose"
+                    stroke-width="5"
+                    d="M62.32 55.18A35 12.5 -45 0 1 29.46 55.51M37.68 44.82A35 12.5 -45 0 1 70.54 44.49"
+                />
+                <circle class="nucleus" cx="50" cy="50" r="5" />
+            </svg>
             <ol id="top-sites" class="top-sites" aria-label="Your most visited sites"></ol>
             <p id="no-sites" class="note" hidden>Sites you visit often will show up here.</p>
             <p id="private-window" class="note" hidden>
