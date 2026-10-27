@@ -214,7 +214,13 @@ What exists now and what's planned, measured against Helium:
   flow and Settings → Services turn updates off. See [Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [ ] Split view
-- [ ] MRU tab switching (<kbd>Ctrl</kbd><kbd>Tab</kbd> in most-recently-used order)
+- [x] **MRU tab switching**: hold <kbd>Ctrl</kbd> and press <kbd>Tab</kbd> to walk back through a window's tabs in the
+  order you last used them, and let go to stay on one. One quick press flips between the last two tabs, and
+  <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>Tab</kbd> walks the other way, from the least recently used tab. On macOS it's the
+  Control key, as in Helium. Tabs opened in the background join the end of the order. As in Helium, there's no switcher
+  overlay: each press shows its tab. The other next and previous tab shortcuts (<kbd>Ctrl</kbd><kbd>PgDn</kbd>, and
+  <kbd>⌘</kbd><kbd>⇧</kbd><kbd>]</kbd> on macOS) still follow the tab strip. So does Ctrl+Tab, if you untick **Cycle Tabs
+  in Recently Used Order** in the tab strip's context menu.
 - [ ] Tab hibernation
 - [ ] Tab groups
 - [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed

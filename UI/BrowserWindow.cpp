@@ -30,6 +30,7 @@
 #    include <UI/MacWindow.h>
 #endif
 #include <UI/TabBar.h>
+#include <UI/TabCycler.h>
 #include <UI/WebContentView.h>
 #include <UI/WindowControlButton.h>
 #include <UI/XenonSettings.h>
@@ -275,6 +276,8 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
         fullscreen_mode().exit(FullscreenMode::ExitInitiatedBy::UI);
     });
     QObject::connect(m_tabs_container, &TabWidget::tab_close_requested, this, &BrowserWindow::request_to_close_tab);
+    // Ctrl+Tab, in the order the tabs were last used. The window owns it.
+    new TabCycler(*this, *m_tabs_container);
     QObject::connect(m_tabs_container->tab_bar(), &QTabBar::tabMoved, this, [this](int, int) {
         sync_session_tab_order();
     });
@@ -500,6 +503,10 @@ void BrowserWindow::initialize_window_context_menu()
     m_classic_layout_action = add_layout_action("&Classic", XenonSettings::ChromeLayout::Classic);
     m_compact_layout_action = add_layout_action("C&ompact", XenonSettings::ChromeLayout::Compact);
     m_vertical_layout_action = add_layout_action("&Vertical Tabs", XenonSettings::ChromeLayout::Vertical);
+
+    m_recently_used_tab_order_action = m_window_context_menu->addAction("&Cycle Tabs in Recently Used Order");
+    m_recently_used_tab_order_action->setCheckable(true);
+    QObject::connect(m_recently_used_tab_order_action, &QAction::triggered, this, &XenonSettings::set_cycle_tabs_in_recently_used_order);
 }
 
 void BrowserWindow::show_window_context_menu(QPoint global_position)
@@ -511,6 +518,7 @@ void BrowserWindow::show_window_context_menu(QPoint global_position)
     m_classic_layout_action->setChecked(chrome_layout == XenonSettings::ChromeLayout::Classic);
     m_compact_layout_action->setChecked(chrome_layout == XenonSettings::ChromeLayout::Compact);
     m_vertical_layout_action->setChecked(chrome_layout == XenonSettings::ChromeLayout::Vertical);
+    m_recently_used_tab_order_action->setChecked(XenonSettings::cycle_tabs_in_recently_used_order());
 
     execute_context_menu(*m_window_context_menu, global_position);
 }

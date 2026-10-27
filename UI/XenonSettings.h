@@ -27,4 +27,9 @@ void set_chrome_layout(ChromeLayout);
 // back to horizontal tabs returns to the layout used before.
 bool compact_toolbar();
 
+// Whether Ctrl+Tab switches tabs in the order they were last used, like Helium's "Cycle through tabs in most recently
+// used order", rather than in the tab strip's order. On by default.
+bool cycle_tabs_in_recently_used_order();
+void set_cycle_tabs_in_recently_used_order(bool);
+
 }

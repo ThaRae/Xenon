@@ -312,6 +312,7 @@ private:
     QAction* m_classic_layout_action { nullptr };
     QAction* m_compact_layout_action { nullptr };
     QAction* m_vertical_layout_action { nullptr };
+    QAction* m_recently_used_tab_order_action { nullptr };
     QPushButton* m_zoom_level { nullptr };
 
     IsPopupWindow m_is_popup_window { IsPopupWindow::No };
