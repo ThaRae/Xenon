@@ -97,10 +97,13 @@ starts cold and takes a couple of hours.
 ```
 
 It ships xenon-ublock's `helium` preset, except for Peter Lowe's list, which states no license, and Helium's own two
-lists (AGPL-3.0, and almost nothing survives conversion). `UI/Resources/filter-lists/NOTICE.txt` credits every list's
-source and license. The GPL-3.0 text ships beside them. `Meta/check.py` fails if a list ships without a cleared
-license. `./Meta/xenon.py test` checks that Xenon blocks with them, given no list arguments, by loading a local page
-with blocking on and off.
+lists (AGPL-3.0, and almost nothing survives conversion). They're converted for Ladybird with the content blocker
+patches (`Patches/ladybird` `0004`–`0009`), so they keep scriptlets, procedural filters, and `$redirect`,
+`$removeparam`, `$popup` and CNAME filters. uBlock Origin's own lists go in `trusted-lists/`, and its scriptlets and
+redirect surrogates in `resources/`. `UI/Resources/filter-lists/NOTICE.txt` credits every list's source and license.
+The GPL-3.0 text ships beside them. `Meta/check.py` fails if a list ships without a cleared license. `./Meta/xenon.py test` checks that Xenon
+applies them, given no list arguments, with blocking on and off: requests that EasyList and EasyPrivacy block, and a
+scriptlet and a hiding rule for a listed site, on a page served locally at that site's address.
 
 ## Changing the engine
 
@@ -162,9 +165,11 @@ What exists now and what's planned, measured against Helium:
   `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for. Their content scripts run
   in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and stylesheets on request.
   Bitwarden logs in (with a security key too) and autofills logins.
-- [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
-  surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
-  picker. See xenon-ublock's `docs/gap-analysis.md`.
+- [x] **uBlock Origin's engine features**: scriptlets (YouTube ads, anti-adblock walls), `$redirect` surrogates,
+  `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and an element picker
+  (**Block Element...** in a page's context menu). Engine patches `0004`–`0009`, from xenon-ublock. They follow the
+  same on/off switch and per-site toggle as the rest of blocking. What's still missing is in xenon-ublock's
+  `docs/gap-analysis.md`.
 - [ ] Daily filter list updates, which need a host for xenon-ublock's converted lists.
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [ ] Split view
@@ -176,7 +181,8 @@ What exists now and what's planned, measured against Helium:
 - [x] Xenon's own palette, built around **#ff0050** (`UI/BrandColors.h` for the chrome, `UI/Resources/about-pages/webui.css`
   for the internal pages)
 - [x] Xenon's own app icon: two orbits woven around a nucleus, in white and rose
-- [ ] uBlock Origin's filter set for Ladybird's content blocker (being built in a separate repo, `xenon-ublock`)
+- [x] uBlock Origin's filter set for Ladybird's content blocker, from `xenon-ublock`: the bundled lists keep 99.3% of
+  their filters (378,644 of 381,140), with uBlock Origin's scriptlets and redirect resources
 - [x] **WebAuthn with security keys** (macOS): sites and password managers can register a USB security key and sign in
   with it (`navigator.credentials.create()`/`get()`), PINs included, and in cross-origin frames that are allowed to.
   A prompt over the page says what the key needs. Engine patches `0010`–`0015`; see `Documentation/WebAuthn.md`.
