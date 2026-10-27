@@ -407,7 +407,7 @@ index 47d92356048972f7a6a86a779a5c3d0d079fee4f..061cdb71672c74340cda0c0a846c9a89
  };
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index b31e4658f4a96568a65f465515e1ac2fa7ad7a38..558e8b2d7c2c7f2e3e458a5bded9a871daba5604 100644
+index f2450c2d1525622510166194e9d6160de91e37b6..378935f86903042c44935f24dd3df88c2dc665c3 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -1093,6 +1093,12 @@ void WebContentPage::did_get_hovered_node_id(Web::UniqueNodeID node_id)
@@ -424,7 +424,7 @@ index b31e4658f4a96568a65f465515e1ac2fa7ad7a38..558e8b2d7c2c7f2e3e458a5bded9a871
  {
      if (displays_tab()) {
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index f2222d065db9f778c989c94a90241a97534a2443..1069e103c0ec2b671dd9551d09242c38f67541a9 100644
+index 2bb2e10f5188d494b6f87b07aa2d9e612a660331..09cd4a3ebd0f701971ade28ed36cceb4b88faef0 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
 @@ -212,6 +212,7 @@ private:

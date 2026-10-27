@@ -423,10 +423,16 @@ def check_extensions(executable: Path, env: dict) -> bool:
         }});
     </script>""".encode()
     data = b'{"ok": true}'
+    content_script_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "content-scripts.html").read_bytes()
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            body, content_type = (data, "application/json") if self.path == "/data.json" else (page, "text/html")
+            if self.path == "/data.json":
+                body, content_type = data, "application/json"
+            elif self.path.startswith("/content-scripts"):
+                body, content_type = content_script_page, "text/html"
+            else:
+                body, content_type = page, "text/html"
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
@@ -469,17 +475,23 @@ def check_extensions(executable: Path, env: dict) -> bool:
         # exemption from CORS.
         page_url = f"http://127.0.0.1:{page_server.server_address[1]}/?data={urllib.parse.quote(data_url, safe='')}"
         results = run_extension_test_page(executable, env, page_url)
+
+        # A web page that the extension's content scripts match gets them, each in its world, at its time.
+        content_script_url = f"http://127.0.0.1:{page_server.server_address[1]}/content-scripts"
+        content_script_results = run_extension_test_page(executable, env, content_script_url)
     finally:
         for server in (page_server, data_server):
             server.shutdown()
-    if results is None:
-        return False
-    failed = sorted(name for name, ok in results.items() if ok is not True)
-    if failed:
-        print(f"    web page: failed {failed}", file=sys.stderr)
-        passed = False
-    else:
-        print(f"    web page: {len(results)} checks passed")
+
+    for name, page_results in (("web page", results), ("content scripts", content_script_results)):
+        if page_results is None:
+            return False
+        failed = sorted(name for name, ok in page_results.items() if ok is not True)
+        if failed:
+            print(f"    {name}: failed {failed}", file=sys.stderr)
+            passed = False
+        else:
+            print(f"    {name}: {len(page_results)} checks passed")
     return passed
 
 

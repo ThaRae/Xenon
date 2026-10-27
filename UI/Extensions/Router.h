@@ -7,6 +7,7 @@
 #pragma once
 
 #include <AK/HashMap.h>
+#include <AK/HashTable.h>
 #include <AK/JsonArray.h>
 #include <AK/JsonObject.h>
 #include <AK/JsonValue.h>
@@ -22,18 +23,20 @@
 
 namespace Ladybird::Extensions {
 
-// The kinds of extension contexts, as runtime.getContexts() reports them.
+// The kinds of extension contexts, as runtime.getContexts() reports them, and content scripts, which it doesn't.
 enum class ContextKind : u8 {
     Tab,
     Popup,
     Background,
     Offscreen,
+    ContentScript,
 };
 
-// Carries chrome.* between an extension's contexts (its pages, and its background worker through its background page)
-// and the UI process. Each context talks to the router over its script bridge (see UI/Resources/extensions/), and the
-// router knows from the bridge, not from the message, which extension and context sent each call. It answers calls,
-// delivers runtime messages and ports between an extension's contexts, and sends them events.
+// Carries chrome.* between an extension's contexts (its pages, its background worker through its background page, and
+// its content scripts' isolated worlds) and the UI process. Each context talks to the router over its script bridge
+// (see UI/Resources/extensions/), and the router knows from the bridge, not from the message, which extension, context,
+// and frame sent each call. It answers calls, delivers runtime messages and ports between an extension's contexts, and
+// sends them events.
 class Router {
     AK_MAKE_NONCOPYABLE(Router);
 
@@ -42,10 +45,12 @@ public:
 
     // The script that installs chrome.* in an extension page, or that starts the background worker in its page, before
     // the page's own scripts.
-    Optional<String> bootstrap_script(WebView::URLSchemeBridgeEndpoint const&);
+    Optional<String> bootstrap_script(WebView::ScriptBridgeEndpoint const&);
     // The script that installs chrome.* in the extension's background worker.
     String background_worker_script(Extension const&);
-    void on_message(WebView::URLSchemeBridgeEndpoint const&, String const& message);
+    // The script that installs chrome.* in the extension's isolated world in a document, before its content scripts.
+    String content_script_bootstrap(NonnullRefPtr<Extension>, WebView::ScriptBridgeEndpoint const& world);
+    void on_message(WebView::ScriptBridgeEndpoint const&, String const& message);
 
     // Sends an event to the extension's open contexts, or only to those of one kind.
     void dispatch_event(Extension const&, StringView name, JsonArray args, Optional<ContextKind> = {});
@@ -67,30 +72,36 @@ private:
 
     struct Context {
         NonnullRefPtr<Extension> extension;
-        WebView::URLSchemeBridgeEndpoint endpoint;
+        WebView::ScriptBridgeEndpoint endpoint;
         ContextKind kind { ContextKind::Tab };
     };
 
     struct PendingMessage {
-        WebView::URLSchemeBridgeEndpoint sender;
+        WebView::ScriptBridgeEndpoint sender;
         u64 call_id { 0 };
-        Vector<WebView::URLSchemeBridgeEndpoint> awaiting;
+        Vector<WebView::ScriptBridgeEndpoint> awaiting;
     };
 
     // A runtime.connect() port. The opener talks to every context that accepted; each of those talks to the opener.
     struct Port {
         String extension_id;
-        WebView::URLSchemeBridgeEndpoint opener;
-        Vector<WebView::URLSchemeBridgeEndpoint> awaiting;
-        Vector<WebView::URLSchemeBridgeEndpoint> receivers;
+        WebView::ScriptBridgeEndpoint opener;
+        Vector<WebView::ScriptBridgeEndpoint> awaiting;
+        Vector<WebView::ScriptBridgeEndpoint> receivers;
         // What the opener posted before every context answered, for each one that accepts.
         Vector<String> early_messages;
     };
 
-    Optional<Context&> context_for(WebView::URLSchemeBridgeEndpoint const&);
+    Optional<Context&> context_for(WebView::ScriptBridgeEndpoint const&);
     JsonObject config_for(Extension const&, ContextKind, URL::URL const& url);
-    JsonObject sender_for(Context const&) const;
+    JsonObject sender_for(Context const&);
     URL::URL context_url(Context const&) const;
+    // Chrome's frame IDs: 0 for a tab's top-level frame, and a number of its own for every other frame.
+    i64 frame_id(WebView::ScriptBridgeEndpoint const&);
+    // An extension's contexts a runtime message or port goes to: its pages and background, or its content scripts in
+    // a tab, all of the tab's frames or one.
+    Vector<WebView::ScriptBridgeEndpoint> extension_receivers(Context const& sender) const;
+    Vector<WebView::ScriptBridgeEndpoint> content_script_receivers(Extension const&, i64 tab_id, Optional<i64> frame_id, Optional<String const&> document_id);
 
     void handle_call(Context&, u64 id, String const& name, JsonArray const& args);
     ErrorOr<JsonValue, String> handle_storage_call(Context&, String const& name, JsonArray const& args);
@@ -102,19 +113,20 @@ private:
     ErrorOr<JsonValue, String> handle_runtime_call(Context&, String const& name, JsonArray const& args);
     JsonArray contexts_of(Extension const&) const;
 
-    void send_runtime_message(Context&, u64 call_id, JsonValue message);
+    void send_runtime_message(Context&, u64 call_id, JsonValue message, Vector<WebView::ScriptBridgeEndpoint> receivers);
+    void send_tab_message(Context&, u64 call_id, JsonArray const& args);
     void handle_response(Context&, u64 message_id, bool handled, JsonValue response);
     void finish_pending_message(u64 message_id, Optional<JsonValue> response);
 
-    void open_port(Context&, String const& port_id, String const& name);
+    void open_port(Context&, String const& port_id, String const& name, Vector<WebView::ScriptBridgeEndpoint> receivers);
     void handle_port_accepted(Context&, String const& port_id, bool accepted);
     void handle_port_message(Context&, String const& port_id, JsonValue message);
     void handle_port_disconnect(Context&, String const& port_id);
-    void close_port_end(WebView::URLSchemeBridgeEndpoint const&, String const& port_id, Optional<StringView> error = {});
-    void forget_endpoint(WebView::URLSchemeBridgeEndpoint const&);
+    void close_port_end(WebView::ScriptBridgeEndpoint const&, String const& port_id, Optional<StringView> error = {});
+    void forget_endpoint(WebView::ScriptBridgeEndpoint const&);
 
-    static void reply(WebView::URLSchemeBridgeEndpoint const&, u64 id, JsonValue result);
-    static void reply_with_error(WebView::URLSchemeBridgeEndpoint const&, u64 id, StringView error);
+    static void reply(WebView::ScriptBridgeEndpoint const&, u64 id, JsonValue result);
+    static void reply_with_error(WebView::ScriptBridgeEndpoint const&, u64 id, StringView error);
 
     Vector<Context> m_contexts;
     HashMap<u64, PendingMessage> m_pending_messages;
@@ -122,6 +134,10 @@ private:
     HashMap<String, Port> m_ports;
     HashMap<String, Function<void(int, int)>> m_popup_size_listeners;
     HashMap<String, NonnullOwnPtr<Alarms>> m_alarms;
+    // Extensions that let their content scripts use storage.session (storage.setAccessLevel()).
+    HashTable<String> m_session_storage_open_to_content_scripts;
+    HashMap<Web::HTML::CrossProcessId, i64> m_frame_ids;
+    i64 m_next_frame_id { 1 };
     // Pages say when they go away, but not always: a crashed process doesn't.
     RefPtr<Core::Timer> m_prune_timer;
 };

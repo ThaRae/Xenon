@@ -35,6 +35,30 @@
     "background": {
         "service_worker": "background.js"
     },
+    "content_scripts": [
+        {
+            "matches": ["http://127.0.0.1/content-scripts*"],
+            "js": ["content-start.js"],
+            "css": ["content.css"],
+            "run_at": "document_start"
+        },
+        {
+            "matches": ["http://127.0.0.1/content-scripts*"],
+            "js": ["content-main.js"],
+            "run_at": "document_start",
+            "world": "MAIN"
+        },
+        {
+            "matches": ["http://127.0.0.1/content-scripts*"],
+            "js": ["content-end.js"],
+            "run_at": "document_end"
+        },
+        {
+            "matches": ["http://127.0.0.1/content-scripts*"],
+            "exclude_globs": ["*?exclude*"],
+            "js": ["content-idle.js"]
+        }
+    ],
     "optional_permissions": [
         "bookmarks"
     ]

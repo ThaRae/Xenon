@@ -44,6 +44,7 @@ set(XENON_SOURCES
     EventLoopImplementationQtEventTarget.cpp
     Extensions/Alarms.cpp
     Extensions/Browser.cpp
+    Extensions/ContentScripts.cpp
     Extensions/Dialog.cpp
     Extensions/Extension.cpp
     Extensions/Locales.cpp

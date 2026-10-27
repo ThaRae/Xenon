@@ -74,7 +74,7 @@ index f695ce40fe1aed4afea908d19d8f18da66d95e68..401a793cc92b527166906802f4ef57f3
      virtual void request_embedder_resource(EmbedderResourceRequest request) { request.on_complete(Error::from_errno(ENOTSUP)); }
  
 diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
-index fd107545c9fefd072f77296494bcc78c77a4bebe..1af8cfee26db69525ce16fc05448ccfb8581b651 100644
+index fd107545c9fefd072f77296494bcc78c77a4bebe..43a6678142343d70e85fa46ab3b5c1bd7e47cce8 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.cpp
 +++ b/Libraries/LibWebView/URLSchemeHandler.cpp
 @@ -7,12 +7,15 @@
@@ -120,7 +120,7 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..1af8cfee26db69525ce16fc05448ccfb
 +    return nullptr;
 +}
 +
-+URLSchemeBridgeEndpoint::URLSchemeBridgeEndpoint(WebContentPage& page, Web::HTML::CrossProcessId document_id, URL::URL url, URL::Origin origin)
++ScriptBridgeEndpoint::ScriptBridgeEndpoint(WebContentPage& page, Web::HTML::CrossProcessId document_id, URL::URL url, URL::Origin origin)
 +    : m_page(page)
 +    , m_document_id(document_id)
 +    , m_url(move(url))
@@ -128,13 +128,13 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..1af8cfee26db69525ce16fc05448ccfb
 +{
 +}
 +
-+bool URLSchemeBridgeEndpoint::is_open() const
++bool ScriptBridgeEndpoint::is_open() const
 +{
 +    auto page = m_page.strong_ref();
 +    return page && page->embedder_bridge_endpoint(m_document_id).has_value();
 +}
 +
-+Optional<u64> URLSchemeBridgeEndpoint::view_id() const
++Optional<u64> ScriptBridgeEndpoint::view_id() const
 +{
 +    if (!is_open())
 +        return {};
@@ -143,20 +143,20 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..1af8cfee26db69525ce16fc05448ccfb
 +    return {};
 +}
 +
-+void URLSchemeBridgeEndpoint::post_message(String message) const
++void ScriptBridgeEndpoint::post_message(String message) const
 +{
 +    if (auto page = m_page.strong_ref())
 +        page->async_post_embedder_message(m_document_id, move(message));
 +}
 +
-+bool URLSchemeBridgeEndpoint::operator==(URLSchemeBridgeEndpoint const& other) const
++bool ScriptBridgeEndpoint::operator==(ScriptBridgeEndpoint const& other) const
 +{
 +    return m_page.ptr() == other.m_page.ptr() && m_document_id == other.m_document_id;
 +}
 +
  }
 diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
-index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..b64c44a2dcce7786642a3a3bf795dbb2d0db70f0 100644
+index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..7916cd15b545b7407dd048b6fe1193ec4601ac29 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.h
 +++ b/Libraries/LibWebView/URLSchemeHandler.h
 @@ -11,11 +11,14 @@
@@ -178,11 +178,11 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..b64c44a2dcce7786642a3a3bf795dbb2
  
  using URLSchemeHandler = Function<ErrorOr<URLSchemeResponse>(URLSchemeRequest const&)>;
  
-+// A document of a scheme with a script bridge, as the UI process knows it: its URL and origin come from the UI process's
-+// own records, never from the renderer.
-+class WEBVIEW_API URLSchemeBridgeEndpoint {
++// A document with a script bridge to the UI process, as the UI process knows it: its URL and origin come from the UI
++// process's own records, never from the renderer.
++class WEBVIEW_API ScriptBridgeEndpoint {
 +public:
-+    URLSchemeBridgeEndpoint(WebContentPage&, Web::HTML::CrossProcessId document_id, URL::URL, URL::Origin);
++    ScriptBridgeEndpoint(WebContentPage&, Web::HTML::CrossProcessId document_id, URL::URL, URL::Origin);
 +
 +    Web::HTML::CrossProcessId document_id() const { return m_document_id; }
 +    URL::URL const& url() const { return m_url; }
@@ -194,7 +194,7 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..b64c44a2dcce7786642a3a3bf795dbb2
 +    Optional<u64> view_id() const;
 +    void post_message(String) const;
 +
-+    bool operator==(URLSchemeBridgeEndpoint const&) const;
++    bool operator==(ScriptBridgeEndpoint const&) const;
 +
 +private:
 +    WeakPtr<WebContentPage> m_page;
@@ -205,10 +205,10 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..b64c44a2dcce7786642a3a3bf795dbb2
 +
 +// A script bridge between the UI process and the scheme's documents. Before a document's own scripts run, its bootstrap
 +// script runs as the body of a function given the bridge: an object whose postMessage(string) calls on_message, and
-+// whose onmessage, if the script sets it, receives what URLSchemeBridgeEndpoint::post_message() sends.
++// whose onmessage, if the script sets it, receives what ScriptBridgeEndpoint::post_message() sends.
 +struct URLSchemeBridge {
-+    Function<Optional<String>(URLSchemeBridgeEndpoint const&)> bootstrap_script;
-+    Function<void(URLSchemeBridgeEndpoint const&, String message)> on_message;
++    Function<Optional<String>(ScriptBridgeEndpoint const&)> bootstrap_script;
++    Function<void(ScriptBridgeEndpoint const&, String message)> on_message;
 +};
 +
  // Serves a URL scheme from the UI process, as a browser serves its extension pages. The scheme's URLs get tuple origins
@@ -252,7 +252,7 @@ index 181fe16e93f1aa50bb179874d43bb50a1f4cbd16..e72d5f151cbf9045ed90efffa4b69976
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 4a0a67384565fa986f3951279df2ca0400d128d5..b31e4658f4a96568a65f465515e1ac2fa7ad7a38 100644
+index 4a0a67384565fa986f3951279df2ca0400d128d5..f2450c2d1525622510166194e9d6160de91e37b6 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -1549,6 +1549,44 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
@@ -260,20 +260,20 @@ index 4a0a67384565fa986f3951279df2ca0400d128d5..b31e4658f4a96568a65f465515e1ac2f
  }
  
 +// A document of this page whose scheme has a script bridge, which the page hosts or is creating.
-+Optional<URLSchemeBridgeEndpoint> WebContentPage::embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id)
++Optional<ScriptBridgeEndpoint> WebContentPage::embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id)
 +{
 +    // NB: A page that has closed, or whose traversable has gone, hosts nothing, though it may live on a little longer.
 +    if (!m_is_open || !m_traversable)
 +        return {};
 +
-+    Optional<URLSchemeBridgeEndpoint> endpoint;
++    Optional<ScriptBridgeEndpoint> endpoint;
 +    for_each_hosted_document([&](CanonicalDocument& document) {
 +        if (document.id() != document_id)
 +            return IterationDecision::Continue;
 +
 +        auto const& origin = document.origin();
 +        if (!origin.is_opaque() && origin.scheme().has_value() && url_scheme_bridge(*origin.scheme()))
-+            endpoint = URLSchemeBridgeEndpoint { *this, document_id, document.creation_url(), origin };
++            endpoint = ScriptBridgeEndpoint { *this, document_id, document.creation_url(), origin };
 +        return IterationDecision::Break;
 +    });
 +    return endpoint;
@@ -301,7 +301,7 @@ index 4a0a67384565fa986f3951279df2ca0400d128d5..b31e4658f4a96568a65f465515e1ac2f
  {
      view().did_request_color_picker({}, *this, current_color);
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 6945989cd227dff33e4ee90d20feddd398da9935..f2222d065db9f778c989c94a90241a97534a2443 100644
+index 6945989cd227dff33e4ee90d20feddd398da9935..2bb2e10f5188d494b6f87b07aa2d9e612a660331 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
 @@ -25,6 +25,7 @@
@@ -325,7 +325,7 @@ index 6945989cd227dff33e4ee90d20feddd398da9935..f2222d065db9f778c989c94a90241a97
      void reset_session_history_for_testing();
  
 +    // A document of this page whose scheme has a script bridge, which the page hosts or is creating.
-+    Optional<URLSchemeBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
++    Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
 +
  private:
      void relay_finished_input_event(WebContentPage const& reporting_page, u64 event_id, Web::EventResult);

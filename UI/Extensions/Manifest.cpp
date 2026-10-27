@@ -5,12 +5,14 @@
  */
 
 #include <AK/AllOf.h>
+#include <AK/AnyOf.h>
 #include <AK/CharacterTypes.h>
 #include <AK/Enumerate.h>
 #include <AK/JsonArray.h>
 #include <AK/QuickSort.h>
 #include <AK/StringBuilder.h>
 #include <UI/Extensions/Manifest.h>
+#include <UI/Extensions/MatchPattern.h>
 
 namespace Ladybird::Extensions {
 
@@ -401,6 +403,34 @@ Optional<String> best_icon(Vector<Icon> const& icons, u32 size)
             return icon.path;
     }
     return icons.last().path;
+}
+
+// https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts#matchAndGlob
+bool ContentScript::matches_document(URL::URL const& url, bool is_top_level_frame) const
+{
+    if (!all_frames && !is_top_level_frame)
+        return false;
+
+    // FIXME: Chrome runs content scripts in file: documents once the user allows the extension to, and in about:blank
+    //        and other documents without a URL of their own when the extension asks for it (match_about_blank,
+    //        match_origin_as_fallback).
+    if (url.scheme() == "file"sv)
+        return false;
+
+    auto matches_any = [&](Vector<String> const& patterns) {
+        return any_of(patterns, [&](auto const& pattern) {
+            auto parsed = MatchPattern::parse(pattern);
+            return !parsed.is_error() && parsed.value().matches(url);
+        });
+    };
+    if (!matches_any(matches) || matches_any(exclude_matches))
+        return false;
+
+    auto serialized = url.serialize();
+    auto matches_glob = [&](auto const& glob) { return glob_matches(glob, serialized, true); };
+    if (!include_globs.is_empty() && !any_of(include_globs, matches_glob))
+        return false;
+    return !any_of(exclude_globs, matches_glob);
 }
 
 }

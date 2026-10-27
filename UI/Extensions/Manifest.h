@@ -11,6 +11,7 @@
 #include <AK/Optional.h>
 #include <AK/String.h>
 #include <AK/Vector.h>
+#include <LibURL/URL.h>
 
 namespace Ladybird::Extensions {
 
@@ -46,6 +47,9 @@ struct ContentScript {
     bool match_about_blank { false };
     bool match_origin_as_fallback { false };
     World world { World::Isolated };
+
+    // Whether this runs in a document of the URL, in a tab's top-level frame or in a frame inside it.
+    bool matches_document(URL::URL const&, bool is_top_level_frame) const;
 };
 
 struct WebAccessibleResources {

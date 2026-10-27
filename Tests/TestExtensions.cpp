@@ -214,6 +214,44 @@ TEST_CASE(match_patterns)
     EXPECT(!glob_matches("a?c"sv, "abc"sv, false));
 }
 
+TEST_CASE(content_script_matching)
+{
+    // Bitwarden's, and one with Chrome's other ways of narrowing them down.
+    auto manifest = MUST(parse(R"({
+        "manifest_version": 3, "name": "Test", "version": "1",
+        "content_scripts": [
+            {
+                "matches": ["*://*/*", "file:///*"],
+                "exclude_matches": ["*://*/*.xml*", "file:///*.xml*"],
+                "js": ["content/content-message-handler.js"],
+                "run_at": "document_start"
+            },
+            {
+                "matches": ["https://*.example.com/*"],
+                "exclude_matches": ["https://private.example.com/*"],
+                "include_globs": ["*/login*", "*/signin*"],
+                "exclude_globs": ["*?skip*"],
+                "all_frames": true,
+                "js": ["login.js"]
+            }
+        ]
+    })"sv));
+    auto const& all_sites = manifest.content_scripts[0];
+    auto const& logins = manifest.content_scripts[1];
+
+    EXPECT(all_sites.matches_document(url("https://vault.bitwarden.com/webauthn-fallback-connector.html"sv), true));
+    EXPECT(!all_sites.matches_document(url("https://example.com/feed.xml"sv), true));
+    EXPECT(!all_sites.matches_document(url("https://example.com/frame.html"sv), false));
+    EXPECT(!all_sites.matches_document(url("file:///Users/a.html"sv), true));
+    EXPECT(!all_sites.matches_document(url("chrome-extension://abc/popup.html"sv), true));
+
+    EXPECT(logins.matches_document(url("https://www.example.com/login"sv), true));
+    EXPECT(logins.matches_document(url("https://example.com/account/signin?next=/"sv), false));
+    EXPECT(!logins.matches_document(url("https://www.example.com/about"sv), true));
+    EXPECT(!logins.matches_document(url("https://www.example.com/login?skip=1"sv), true));
+    EXPECT(!logins.matches_document(url("https://private.example.com/login"sv), true));
+}
+
 static TemporaryDirectory make_extension(StringView manifest)
 {
     TemporaryDirectory directory;

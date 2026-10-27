@@ -2343,7 +2343,7 @@ index 0000000000000000000000000000000000000000..bfd39cfcfc12ae4ff3e82254ad9b5151
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 558e8b2d7c2c7f2e3e458a5bded9a871daba5604..8f5d2fb601a44c9d0c37050f7e17d5182cb27edf 100644
+index 378935f86903042c44935f24dd3df88c2dc665c3..7a02c67695045fe89df3210ac6f1a91f88d10bf6 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -11,9 +11,11 @@
@@ -2464,7 +2464,7 @@ index 558e8b2d7c2c7f2e3e458a5bded9a871daba5604..8f5d2fb601a44c9d0c37050f7e17d518
  {
      if (view().on_cancel_geolocation_position_request)
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 1069e103c0ec2b671dd9551d09242c38f67541a9..b519bcc3b9310a5bfb0d96b344bb403e5cc1d156 100644
+index 09cd4a3ebd0f701971ade28ed36cceb4b88faef0..59db0ff524b10f6cfbb178b1f95ae90acec081d7 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
 @@ -26,6 +26,7 @@
@@ -2476,7 +2476,7 @@ index 1069e103c0ec2b671dd9551d09242c38f67541a9..b519bcc3b9310a5bfb0d96b344bb403e
  #include <WebContent/WebContentServerEndpoint.h>
  #include <WebContent/WebContentTestClientEndpoint.h>
 @@ -161,6 +162,9 @@ public:
-     Optional<URLSchemeBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
+     Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
  
  private:
 +    // The caller of a WebAuthn ceremony, from this process's records of the documents a page hosts, or the error to

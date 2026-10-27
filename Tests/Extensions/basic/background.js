@@ -18,6 +18,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case "events":
             sendResponse(events);
             return undefined;
+        case "sender":
+            sendResponse({ id: sender.id, url: sender.url, origin: sender.origin });
+            return undefined;
         case "set-alarm":
             chrome.alarms.create("test", { when: Date.now() + 100 }).then(() => sendResponse(true));
             return true;

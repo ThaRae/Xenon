@@ -1,9 +1,10 @@
-// The chrome.* API of Xenon's extension pages and background workers.
+// The chrome.* API of Xenon's extension pages, background workers, and content scripts.
 //
 // This runs before an extension's own scripts, given `bridge`, the context's channel to Xenon's UI process
 // (bridge.postMessage(string) and bridge.onmessage), and `config`, what it needs to answer synchronously: the
 // extension's ID, manifest, and messages, and what kind of context this is. Everything else is a call to the UI
-// process, which knows which extension and context sent it and checks what that extension may do.
+// process, which knows which extension and context sent it and checks what that extension may do. Content scripts run
+// it in their extension's isolated world in a page, which the page's own scripts can't reach.
 //
 // https://developer.chrome.com/docs/extensions/reference/api
 
@@ -167,6 +168,28 @@ class Port {
     }
 }
 
+// What runtime.sendMessage() and tabs.sendMessage() give back: the first response, to a callback if there is one.
+function messageReply(promise, callback) {
+    if (!callback) return promise.then(reply => reply.response);
+    promise.then(
+        reply => {
+            if (!reply.responded) {
+                withLastError(new ExtensionError("The message port closed before a response was received."), () =>
+                    callback()
+                );
+                return;
+            }
+            try {
+                callback(reply.response);
+            } catch (error) {
+                reportListenerError(error);
+            }
+        },
+        error => withLastError(error, () => callback())
+    );
+    return undefined;
+}
+
 const runtimeOnMessage = event("runtime.onMessage");
 const runtimeOnConnect = event("runtime.onConnect");
 
@@ -202,25 +225,7 @@ const runtime = {
                 throw new ExtensionError("Messaging other extensions isn't supported yet.");
             return call("runtime.sendMessage", [toJSON(message)]);
         });
-
-        if (!callback) return promise.then(reply => reply.response);
-        promise.then(
-            reply => {
-                if (!reply.responded) {
-                    withLastError(new ExtensionError("The message port closed before a response was received."), () =>
-                        callback()
-                    );
-                    return;
-                }
-                try {
-                    callback(reply.response);
-                } catch (error) {
-                    reportListenerError(error);
-                }
-            },
-            error => withLastError(error, () => callback())
-        );
-        return undefined;
+        return messageReply(promise, callback);
     },
 
     connect(...args) {
@@ -420,13 +425,27 @@ const tabs = {
         return call("tabs.reload", [tabId]).then(() => undefined);
     }),
     duplicate: method("tabs.duplicate"),
-    // FIXME: Messages and ports to tabs need content scripts, which come with milestone 3.
-    sendMessage: api(() => {
-        throw new ExtensionError("Could not establish connection. Receiving end does not exist.");
-    }),
+    // Messages and ports to a tab go to the extension's content scripts in it.
+    sendMessage(tabId, message, ...args) {
+        const callback = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
+        const options = args[0] ?? {};
+        const promise = Promise.resolve().then(() =>
+            call("tabs.sendMessage", [tabId, toJSON(message), toJSON(options)])
+        );
+        return messageReply(promise, callback);
+    },
     connect(tabId, connectInfo) {
-        const port = new Port(crypto.randomUUID(), String(connectInfo?.name ?? ""));
-        queueMicrotask(() => port.closeFromUIProcess("Could not establish connection. Receiving end does not exist."));
+        const id = crypto.randomUUID();
+        const name = String(connectInfo?.name ?? "");
+        const port = new Port(id, name);
+        post({
+            type: "connect",
+            port: id,
+            name,
+            tabId,
+            frameId: connectInfo?.frameId,
+            documentId: connectInfo?.documentId,
+        });
         return port;
     },
     captureVisibleTab: method("tabs.captureVisibleTab"),
@@ -740,9 +759,16 @@ const sendNativeMessage = api(() => {
 
 // --- chrome ------------------------------------------------------------------------------------------------------------
 
-// Offscreen documents get chrome.runtime alone, as in Chrome.
-const chrome = { runtime };
-if (config.contextType !== "OFFSCREEN_DOCUMENT") {
+// Offscreen documents get chrome.runtime alone, and content scripts a few of its members, chrome.i18n, and
+// chrome.storage, as in Chrome.
+const isContentScript = config.contextType === "CONTENT_SCRIPT";
+const contentScriptRuntime = {};
+for (const name of ["id", "getURL", "getManifest", "sendMessage", "connect", "onMessage", "onConnect", "lastError"])
+    Object.defineProperty(contentScriptRuntime, name, Object.getOwnPropertyDescriptor(runtime, name));
+
+const chrome = { runtime: isContentScript ? contentScriptRuntime : runtime };
+if (isContentScript) chrome.i18n = i18n;
+else if (config.contextType !== "OFFSCREEN_DOCUMENT") {
     Object.assign(chrome, { i18n, tabs, windows, permissions, management, commands, extension });
     if (config.manifest.action) chrome.action = action;
 }
@@ -762,6 +788,11 @@ const permittedAPIs = {
 };
 function installPermittedAPIs() {
     if (config.contextType === "OFFSCREEN_DOCUMENT") return;
+    if (isContentScript) {
+        if (hasPermission("storage")) chrome.storage = storage;
+        else delete chrome.storage;
+        return;
+    }
     for (const [permission, permittedAPI] of Object.entries(permittedAPIs)) {
         if (hasPermission(permission)) chrome[permission] = permittedAPI;
         else delete chrome[permission];

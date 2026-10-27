@@ -19,6 +19,7 @@
 #include <LibWebView/Application.h>
 #include <LibWebView/HeadlessWebView.h>
 #include <LibWebView/Utilities.h>
+#include <UI/Extensions/ContentScripts.h>
 #include <UI/Extensions/MatchPattern.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
@@ -37,8 +38,8 @@ Registry& Registry::the()
 void Registry::register_url_scheme()
 {
     WebView::URLSchemeBridge bridge {
-        .bootstrap_script = [](WebView::URLSchemeBridgeEndpoint const& endpoint) { return Router::the().bootstrap_script(endpoint); },
-        .on_message = [](WebView::URLSchemeBridgeEndpoint const& endpoint, String message) { Router::the().on_message(endpoint, message); },
+        .bootstrap_script = [](WebView::ScriptBridgeEndpoint const& endpoint) { return Router::the().bootstrap_script(endpoint); },
+        .on_message = [](WebView::ScriptBridgeEndpoint const& endpoint, String message) { Router::the().on_message(endpoint, message); },
     };
 
     auto handler = [this](WebView::URLSchemeRequest const& request) { return respond(request); };
@@ -262,6 +263,7 @@ void Registry::update_origin_access_allow_list()
 void Registry::notify_extensions_changed()
 {
     update_origin_access_allow_list();
+    ContentScripts::update();
     m_change_listeners.remove_all_matching([](auto& listener) { return !listener(); });
 }
 

@@ -32,6 +32,8 @@ StringView context_kind_name(ContextKind kind)
         return "BACKGROUND"sv;
     case ContextKind::Offscreen:
         return "OFFSCREEN_DOCUMENT"sv;
+    case ContextKind::ContentScript:
+        return "CONTENT_SCRIPT"sv;
     }
     VERIFY_NOT_REACHED();
 }
@@ -76,7 +78,7 @@ static JsonArray string_array(Vector<String> const& strings)
 }
 
 // Chrome's document IDs and context IDs are opaque strings.
-static String document_id_string(WebView::URLSchemeBridgeEndpoint const& endpoint)
+static String document_id_string(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     auto id = endpoint.document_id();
     return MUST(String::formatted("{:x}-{:x}", id.namespace_id, id.local_id));
@@ -106,7 +108,7 @@ JsonObject Router::config_for(Extension const& extension, ContextKind kind, URL:
     return config;
 }
 
-Optional<String> Router::bootstrap_script(WebView::URLSchemeBridgeEndpoint const& endpoint)
+Optional<String> Router::bootstrap_script(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     auto extension = Registry::the().extension_for_url(endpoint.url());
     if (!extension)
@@ -154,7 +156,18 @@ String Router::background_worker_script(Extension const& extension)
     return script.to_string_without_validation();
 }
 
-Optional<Router::Context&> Router::context_for(WebView::URLSchemeBridgeEndpoint const& endpoint)
+String Router::content_script_bootstrap(NonnullRefPtr<Extension> extension, WebView::ScriptBridgeEndpoint const& world)
+{
+    prune_closed_contexts();
+    m_contexts.append({ extension, world, ContextKind::ContentScript });
+
+    StringBuilder script;
+    script.appendff("const config = {};\n", config_for(*extension, ContextKind::ContentScript, world.url()).serialized());
+    script.append(chrome_api_source);
+    return script.to_string_without_validation();
+}
+
+Optional<Router::Context&> Router::context_for(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     for (auto& context : m_contexts) {
         if (context.endpoint == endpoint)
@@ -172,26 +185,38 @@ URL::URL Router::context_url(Context const& context) const
     return context.endpoint.url();
 }
 
-JsonObject Router::sender_for(Context const& context) const
+JsonObject Router::sender_for(Context const& context)
 {
     JsonObject sender;
     sender.set("id"sv, context.extension->id());
     sender.set("url"sv, context_url(context).serialize());
     sender.set("origin"sv, context.endpoint.origin().serialize());
-    if (context.kind != ContextKind::Background)
+    if (context.kind != ContextKind::Background) {
         sender.set("documentId"sv, document_id_string(context.endpoint));
-    if (auto view_id = context.endpoint.view_id(); view_id.has_value() && context.kind == ContextKind::Tab) {
+        sender.set("documentLifecycle"sv, "active"sv);
+    }
+
+    auto is_in_tab = context.kind == ContextKind::Tab || context.kind == ContextKind::ContentScript;
+    if (auto view_id = context.endpoint.view_id(); view_id.has_value() && is_in_tab) {
         if (auto tab = Browser::tab_json(*view_id, *context.extension); tab.has_value()) {
             sender.set("tab"sv, tab.release_value());
-            sender.set("frameId"sv, 0);
+            sender.set("frameId"sv, frame_id(context.endpoint));
         }
     }
     return sender;
 }
 
+i64 Router::frame_id(WebView::ScriptBridgeEndpoint const& endpoint)
+{
+    auto const& navigable = endpoint.navigable();
+    if (!navigable.parent_id.has_value())
+        return 0;
+    return m_frame_ids.ensure(navigable.id, [&] { return m_next_frame_id++; });
+}
+
 void Router::prune_closed_contexts()
 {
-    Vector<WebView::URLSchemeBridgeEndpoint> closed;
+    Vector<WebView::ScriptBridgeEndpoint> closed;
     m_contexts.remove_all_matching([&](Context const& context) {
         if (context.endpoint.is_open())
             return false;
@@ -203,7 +228,7 @@ void Router::prune_closed_contexts()
 }
 
 // A context that went away answers no runtime messages, and its ports close.
-void Router::forget_endpoint(WebView::URLSchemeBridgeEndpoint const& endpoint)
+void Router::forget_endpoint(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     Vector<u64> finished;
     for (auto& [id, pending] : m_pending_messages) {
@@ -225,7 +250,7 @@ void Router::forget_endpoint(WebView::URLSchemeBridgeEndpoint const& endpoint)
 
 void Router::forget_extension(Extension const& extension)
 {
-    Vector<WebView::URLSchemeBridgeEndpoint> endpoints;
+    Vector<WebView::ScriptBridgeEndpoint> endpoints;
     m_contexts.remove_all_matching([&](Context const& context) {
         if (context.extension->id() != extension.id())
             return false;
@@ -238,7 +263,7 @@ void Router::forget_extension(Extension const& extension)
     m_popup_size_listeners.remove(extension.id());
 }
 
-void Router::on_message(WebView::URLSchemeBridgeEndpoint const& endpoint, String const& text)
+void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String const& text)
 {
     auto context = context_for(endpoint);
     if (!context.has_value())
@@ -264,7 +289,15 @@ void Router::on_message(WebView::URLSchemeBridgeEndpoint const& endpoint, String
         if (auto id = message.get_u64("id"sv); id.has_value())
             handle_response(*context, *id, message.get_bool("handled"sv).value_or(false), message.get("response"sv).value_or(JsonValue {}));
     } else if (*type == "connect"sv && port_id.has_value()) {
-        open_port(*context, *port_id, message.get_string("name"sv).value_or({}));
+        // A port to a tab (tabs.connect()) goes to the extension's content scripts there; any other port goes to its
+        // pages and background (runtime.connect()).
+        auto name = message.get_string("name"sv).value_or({});
+        if (auto tab_id = message.get_integer<i64>("tabId"sv); tab_id.has_value() && context->kind != ContextKind::ContentScript) {
+            auto receivers = content_script_receivers(*context->extension, *tab_id, message.get_integer<i64>("frameId"sv), message.get_string("documentId"sv));
+            open_port(*context, *port_id, name, move(receivers));
+        } else {
+            open_port(*context, *port_id, name, extension_receivers(*context));
+        }
     } else if (*type == "connected"sv && port_id.has_value()) {
         handle_port_accepted(*context, *port_id, message.get_bool("accepted"sv).value_or(false));
     } else if (*type == "port-message"sv && port_id.has_value()) {
@@ -282,7 +315,7 @@ void Router::on_message(WebView::URLSchemeBridgeEndpoint const& endpoint, String
     }
 }
 
-void Router::reply(WebView::URLSchemeBridgeEndpoint const& endpoint, u64 id, JsonValue result)
+void Router::reply(WebView::ScriptBridgeEndpoint const& endpoint, u64 id, JsonValue result)
 {
     JsonObject message;
     message.set("type"sv, "reply"sv);
@@ -291,7 +324,7 @@ void Router::reply(WebView::URLSchemeBridgeEndpoint const& endpoint, u64 id, Jso
     endpoint.post_message(message.serialized());
 }
 
-void Router::reply_with_error(WebView::URLSchemeBridgeEndpoint const& endpoint, u64 id, StringView error)
+void Router::reply_with_error(WebView::ScriptBridgeEndpoint const& endpoint, u64 id, StringView error)
 {
     JsonObject message;
     message.set("type"sv, "reply"sv);
@@ -300,10 +333,27 @@ void Router::reply_with_error(WebView::URLSchemeBridgeEndpoint const& endpoint, 
     endpoint.post_message(message.serialized());
 }
 
+// What Chrome gives content scripts of chrome.*, besides i18n, which needs no calls.
+static bool is_available_to_content_scripts(StringView name)
+{
+    return name == "runtime.sendMessage"sv || name.starts_with("storage."sv);
+}
+
 void Router::handle_call(Context& context, u64 id, String const& name, JsonArray const& args)
 {
+    // NB: A content script's renderer is a web page's, so what it may ask for is checked here, not just left out of
+    //     its chrome.*.
+    if (context.kind == ContextKind::ContentScript && !is_available_to_content_scripts(name)) {
+        reply_with_error(context.endpoint, id, MUST(String::formatted("{} isn't available to content scripts.", name)));
+        return;
+    }
+
     if (name == "runtime.sendMessage"sv) {
-        send_runtime_message(context, id, args.is_empty() ? JsonValue {} : args.at(0));
+        send_runtime_message(context, id, args.is_empty() ? JsonValue {} : args.at(0), extension_receivers(context));
+        return;
+    }
+    if (name == "tabs.sendMessage"sv) {
+        send_tab_message(context, id, args);
         return;
     }
     if (name == "permissions.request"sv) {
@@ -350,13 +400,24 @@ ErrorOr<JsonValue, String> Router::handle_storage_call(Context& context, String 
     if (!extension.has_permission("storage"sv))
         return "The 'storage' permission is required."_string;
 
-    // FIXME: Honor storage.session's access level once content scripts can reach storage.
-    if (name == "storage.setAccessLevel"sv)
+    // Content scripts may use storage.session only once the extension lets them, as in Chrome.
+    if (name == "storage.setAccessLevel"sv) {
+        auto options = !args.is_empty() && args.at(0).is_object() ? args.at(0).as_object() : JsonObject {};
+        auto level = options.get_string("accessLevel"sv);
+        if (level == "TRUSTED_AND_UNTRUSTED_CONTEXTS"sv)
+            m_session_storage_open_to_content_scripts.set(extension.id());
+        else if (level == "TRUSTED_CONTEXTS"sv)
+            m_session_storage_open_to_content_scripts.remove(extension.id());
+        else
+            return "storage.setAccessLevel() takes an accessLevel of TRUSTED_CONTEXTS or TRUSTED_AND_UNTRUSTED_CONTEXTS."_string;
         return JsonValue {};
+    }
 
     if (args.is_empty() || !args.at(0).is_string())
         return "Missing storage area."_string;
     auto const& area_name = args.at(0).as_string();
+    if (context.kind == ContextKind::ContentScript && area_name == storage_area_name(StorageArea::Kind::Session) && !m_session_storage_open_to_content_scripts.contains(extension.id()))
+        return "Access to storage is not allowed from this context."_string;
 
     Optional<StorageArea::Kind> kind;
     for (auto candidate : { StorageArea::Kind::Local, StorageArea::Kind::Session, StorageArea::Kind::Sync, StorageArea::Kind::Managed }) {
@@ -687,7 +748,7 @@ JsonArray Router::contexts_of(Extension const& extension) const
 {
     JsonArray contexts;
     for (auto const& context : m_contexts) {
-        if (context.extension->id() != extension.id())
+        if (context.extension->id() != extension.id() || context.kind == ContextKind::ContentScript)
             continue;
 
         JsonObject json;
@@ -867,6 +928,9 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
             continue;
         if (kind.has_value() && context.kind != *kind)
             continue;
+        // Content scripts have chrome.storage's events alone, and learn of changed permissions for chrome.storage's sake.
+        if (context.kind == ContextKind::ContentScript && !name.starts_with("storage."sv) && !name.starts_with("permissions."sv))
+            continue;
         context.endpoint.post_message(serialized);
     }
 }
@@ -879,9 +943,45 @@ void Router::dispatch_event_to_all(StringView name, JsonArray args)
 
 // --- runtime.sendMessage -----------------------------------------------------------------------------------------------
 
+// runtime.sendMessage() and runtime.connect() reach the extension's pages and background, but not its content scripts,
+// and never the sender itself.
+Vector<WebView::ScriptBridgeEndpoint> Router::extension_receivers(Context const& sender) const
+{
+    Vector<WebView::ScriptBridgeEndpoint> receivers;
+    for (auto const& context : m_contexts) {
+        if (context.extension->id() != sender.extension->id() || context.endpoint == sender.endpoint || context.kind == ContextKind::ContentScript)
+            continue;
+        receivers.append(context.endpoint);
+    }
+    return receivers;
+}
+
+// tabs.sendMessage() and tabs.connect() reach the extension's content scripts in the tab's frames, or in one of them.
+Vector<WebView::ScriptBridgeEndpoint> Router::content_script_receivers(Extension const& extension, i64 tab_id, Optional<i64> wanted_frame_id, Optional<String const&> wanted_document_id)
+{
+    prune_closed_contexts();
+
+    Vector<WebView::ScriptBridgeEndpoint> receivers;
+    for (auto const& context : m_contexts) {
+        if (context.extension->id() != extension.id() || context.kind != ContextKind::ContentScript)
+            continue;
+        auto view_id = context.endpoint.view_id();
+        if (!view_id.has_value())
+            continue;
+        if (auto ids = Browser::tab_and_window_ids(*view_id); !ids.has_value() || ids->tab_id != tab_id)
+            continue;
+        if (wanted_frame_id.has_value() && frame_id(context.endpoint) != *wanted_frame_id)
+            continue;
+        if (wanted_document_id.has_value() && document_id_string(context.endpoint) != *wanted_document_id)
+            continue;
+        receivers.append(context.endpoint);
+    }
+    return receivers;
+}
+
 // https://developer.chrome.com/docs/extensions/reference/api/runtime#method-sendMessage
-// The message goes to every other context of the extension, and the first answer is the response.
-void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue message)
+// The message goes to each receiver, and the first answer is the response.
+void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue message, Vector<WebView::ScriptBridgeEndpoint> receivers)
 {
     prune_closed_contexts();
 
@@ -895,11 +995,11 @@ void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue messag
     delivery.set("sender"sv, sender_for(sender));
     auto serialized = delivery.serialized();
 
-    for (auto const& context : m_contexts) {
-        if (context.extension->id() != sender.extension->id() || context.endpoint == sender.endpoint)
+    for (auto const& receiver : receivers) {
+        if (!receiver.is_open())
             continue;
-        pending.awaiting.append(context.endpoint);
-        context.endpoint.post_message(serialized);
+        pending.awaiting.append(receiver);
+        receiver.post_message(serialized);
     }
 
     if (pending.awaiting.is_empty()) {
@@ -907,6 +1007,21 @@ void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue messag
         return;
     }
     m_pending_messages.set(id, move(pending));
+}
+
+// https://developer.chrome.com/docs/extensions/reference/api/tabs#method-sendMessage
+void Router::send_tab_message(Context& sender, u64 call_id, JsonArray const& args)
+{
+    if (args.is_empty() || !args.at(0).is_integer<i64>()) {
+        reply_with_error(sender.endpoint, call_id, "tabs.sendMessage() needs a tab ID."sv);
+        return;
+    }
+    auto tab_id = args.at(0).as_integer<i64>();
+    auto message = args.size() > 1 ? args.at(1) : JsonValue {};
+    auto options = args.size() > 2 && args.at(2).is_object() ? args.at(2).as_object() : JsonObject {};
+
+    auto receivers = content_script_receivers(*sender.extension, tab_id, options.get_integer<i64>("frameId"sv), options.get_string("documentId"sv));
+    send_runtime_message(sender, call_id, move(message), move(receivers));
 }
 
 void Router::handle_response(Context& responder, u64 id, bool handled, JsonValue response)
@@ -940,8 +1055,8 @@ void Router::finish_pending_message(u64 id, Optional<JsonValue> response)
 // --- runtime.connect ---------------------------------------------------------------------------------------------------
 
 // https://developer.chrome.com/docs/extensions/develop/concepts/messaging#connect
-// A port reaches every other context of the extension with a runtime.onConnect listener.
-void Router::open_port(Context& opener, String const& port_id, String const& name)
+// A port reaches each receiver with a runtime.onConnect listener.
+void Router::open_port(Context& opener, String const& port_id, String const& name, Vector<WebView::ScriptBridgeEndpoint> receivers)
 {
     prune_closed_contexts();
     if (m_ports.contains(port_id))
@@ -956,11 +1071,11 @@ void Router::open_port(Context& opener, String const& port_id, String const& nam
     connect.set("sender"sv, sender_for(opener));
     auto serialized = connect.serialized();
 
-    for (auto const& context : m_contexts) {
-        if (context.extension->id() != opener.extension->id() || context.endpoint == opener.endpoint)
+    for (auto const& receiver : receivers) {
+        if (!receiver.is_open())
             continue;
-        port.awaiting.append(context.endpoint);
-        context.endpoint.post_message(serialized);
+        port.awaiting.append(receiver);
+        receiver.post_message(serialized);
     }
 
     if (port.awaiting.is_empty()) {
@@ -1030,13 +1145,13 @@ void Router::handle_port_disconnect(Context& context, String const& port_id)
 
 // One end of a port closed, or went away. The opener closing closes it for everyone; a receiver closing closes it for
 // the opener once no receiver is left.
-void Router::close_port_end(WebView::URLSchemeBridgeEndpoint const& endpoint, String const& port_id, Optional<StringView> error)
+void Router::close_port_end(WebView::ScriptBridgeEndpoint const& endpoint, String const& port_id, Optional<StringView> error)
 {
     auto port = m_ports.get(port_id);
     if (!port.has_value())
         return;
 
-    auto disconnect = [&](WebView::URLSchemeBridgeEndpoint const& other) {
+    auto disconnect = [&](WebView::ScriptBridgeEndpoint const& other) {
         JsonObject message;
         message.set("type"sv, "port-disconnect"sv);
         message.set("port"sv, port_id);
