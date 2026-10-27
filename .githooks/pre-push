@@ -2,4 +2,12 @@
 # Runs Xenon's fast checks (Meta/check.py) before every push, the same ones CI's first job runs.
 # Enable once per clone with: git config core.hooksPath .githooks
 # Skip for one push with: git push --no-verify
-exec "$(git rev-parse --show-toplevel)/Meta/check.py"
+toplevel="$(git rev-parse --show-toplevel)"
+
+# git runs hooks with GIT_DIR and the like set, and in a worktree GIT_DIR is absolute. check.py's own git commands,
+# such as those it runs in ladybird/, would then all read this repository, so it starts without them.
+for variable in $(git rev-parse --local-env-vars); do
+    unset "$variable"
+done
+
+cd "$toplevel" && exec ./Meta/check.py
