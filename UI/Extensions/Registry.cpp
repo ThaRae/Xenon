@@ -5,11 +5,13 @@
  */
 
 #include <AK/AnyOf.h>
+#include <AK/Base64.h>
 #include <AK/JsonArray.h>
 #include <AK/JsonObject.h>
 #include <AK/JsonValue.h>
 #include <AK/LexicalPath.h>
 #include <AK/NeverDestroyed.h>
+#include <AK/ScopeGuard.h>
 #include <LibCore/Directory.h>
 #include <LibCore/File.h>
 #include <LibCore/StandardPaths.h>
@@ -20,12 +22,18 @@
 #include <LibWebView/Application.h>
 #include <LibWebView/HeadlessWebView.h>
 #include <LibWebView/Utilities.h>
+#include <UI/Extensions/CRX.h>
 #include <UI/Extensions/ContentScripts.h>
 #include <UI/Extensions/MatchPattern.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
 
 namespace Ladybird::Extensions {
+
+// Installed extensions are unpacked into <extensions directory>/Installed/<id>/<version>, by way of a staging directory
+// beside the versions.
+static constexpr auto INSTALLED_DIRECTORY = "Installed"sv;
+static constexpr auto STAGING_DIRECTORY = "staging"sv;
 
 // The background page's view lays nothing out that anyone sees.
 static constexpr Web::DevicePixelSize BACKGROUND_PAGE_SIZE { 800, 600 };
@@ -52,10 +60,17 @@ void Registry::initialize(ByteString profile_data_directory, Vector<ByteString> 
     m_extensions_directory = LexicalPath::join(profile_data_directory, "Extensions"sv).string();
     m_ui_language = move(ui_language);
     load_state();
+    remove_stale_installed_files();
 
     for (auto const& directory : m_persisted_directories.span()) {
         if (auto extension = load_unpacked(directory, Persist::No); extension.is_error())
             warnln("Could not load the extension in {}: {}", directory, extension.error());
+    }
+    // NB: Installed extensions come after unpacked ones, so an installed extension wins over an unpacked copy of itself.
+    for (auto const& [id, version] : HashMap { m_installed_versions }) {
+        auto directory = LexicalPath::join(installed_extension_directory(id), version).string();
+        if (auto extension = load_unpacked(directory, Persist::No); extension.is_error())
+            warnln("Could not load the installed extension {} {}: {}", id, version, extension.error());
     }
     for (auto const& directory : command_line_extensions) {
         if (auto extension = load_unpacked(directory, Persist::No); extension.is_error())
@@ -122,26 +137,156 @@ void Registry::add(NonnullRefPtr<Extension> extension)
 void Registry::remove(StringView id)
 {
     auto removed = extension(id);
-    if (!removed)
+    auto installed = m_installed_versions.remove(id);
+    if (!removed && !installed)
         return;
 
     stop_background_page(id);
-    Router::the().forget_extension(*removed);
-    m_extensions.remove_all_matching([&](auto const& loaded) { return loaded->id() == id; });
-    m_persisted_directories.remove_all_matching([&](auto const& directory) { return directory == removed->root(); });
-    m_known_versions.remove(removed->id());
-    m_install_reasons.remove(removed->id());
-    m_granted_permissions.remove(removed->id());
-    m_registered_content_scripts.remove(removed->id());
-    m_controlled_settings.remove_all_matching([&](auto const&, auto const& setting) { return setting.extension_id == removed->id(); });
+    if (removed) {
+        Router::the().forget_extension(*removed);
+        m_extensions.remove_all_matching([&](auto const& loaded) { return loaded->id() == id; });
+        m_persisted_directories.remove_all_matching([&](auto const& directory) { return directory == removed->root(); });
+    }
+    m_known_versions.remove(id);
+    m_install_reasons.remove(id);
+    m_granted_permissions.remove(id);
+    m_registered_content_scripts.remove(id);
+    m_controlled_settings.remove_all_matching([&](auto const&, auto const& setting) { return setting.extension_id == id; });
     m_storage.remove_all_matching([&](auto const& key, auto const&) { return key.starts_with(ByteString::formatted("{}/", id)); });
     save_state();
 
     auto storage = LexicalPath::join(m_extensions_directory, "Storage"sv, id).string();
     if (FileSystem::exists(storage))
         (void)FileSystem::remove(storage, FileSystem::RecursionMode::Allowed);
+    if (auto files = installed_extension_directory(id); installed && FileSystem::exists(files))
+        (void)FileSystem::remove(files, FileSystem::RecursionMode::Allowed);
 
     notify_extensions_changed();
+}
+
+// Chrome keeps the developer's key as an installed extension's "key", which gives the extension its ID wherever it's
+// loaded from. Xenon writes it into the manifest.
+static ErrorOr<void, String> write_manifest_key(ByteString const& directory, PackedExtension const& packed)
+{
+    auto path = LexicalPath::join(directory, "manifest.json"sv).string();
+    auto manifest = TRY(read_extension_json(path, directory));
+    if (auto key = manifest.get_string("key"sv); key.has_value()) {
+        if (extension_id_from_key(*key) != packed.id)
+            return "Its manifest's key is another extension's."_string;
+        return {};
+    }
+
+    auto key = encode_base64(packed.public_key);
+    if (key.is_error())
+        return "There's no memory for its key."_string;
+    manifest.set("key"sv, key.release_value());
+
+    auto write = [&]() -> ErrorOr<void> {
+        auto file = TRY(Core::File::open(path, Core::File::OpenMode::Write | Core::File::OpenMode::Truncate));
+        auto serialized = manifest.serialized();
+        TRY(file->write_until_depleted(serialized.bytes()));
+        return {};
+    };
+    if (auto result = write(); result.is_error())
+        return MUST(String::formatted("Its manifest can't be written: {}", result.error()));
+    return {};
+}
+
+ErrorOr<Registry::Installed, String> Registry::install(ReadonlyBytes crx, StringView expected_id, ReadonlyBytes publisher_key_hash)
+{
+    if (m_extensions_directory.is_empty())
+        return "There's no profile to install it in."_string;
+    auto packed = TRY(verify_crx(crx, expected_id, publisher_key_hash));
+
+    auto directory = installed_extension_directory(packed.id);
+    auto staging = LexicalPath::join(directory, STAGING_DIRECTORY).string();
+    auto remove_staging = [&] {
+        if (FileSystem::exists(staging))
+            (void)FileSystem::remove(staging, FileSystem::RecursionMode::Allowed);
+    };
+    remove_staging();
+    ScopeGuard remove_staging_when_done { remove_staging };
+
+    TRY(unpack_zip(packed.archive, staging));
+    TRY(write_manifest_key(staging, packed));
+    auto unpacked = TRY(Extension::load_unpacked(staging, m_ui_language));
+    auto const& version = unpacked->manifest().version;
+
+    auto running = extension(packed.id);
+    auto running_installed_version = running && is_installed(*running) ? Optional<String const&> { running->manifest().version } : Optional<String const&> {};
+    if (running_installed_version == version)
+        return Installed::Now;
+
+    auto destination = LexicalPath::join(directory, version).string();
+    if (FileSystem::exists(destination))
+        (void)FileSystem::remove(destination, FileSystem::RecursionMode::Allowed);
+    if (auto result = Core::System::rename(staging, destination); result.is_error())
+        return MUST(String::formatted("It can't be moved into place: {}", result.error()));
+
+    m_installed_versions.set(packed.id, version);
+    // An unpacked copy of the extension gives way to the installed one from now on.
+    if (running && !running_installed_version.has_value())
+        m_persisted_directories.remove_all_matching([&](auto const& persisted) { return persisted == running->root(); });
+    save_state();
+
+    if (running_installed_version.has_value()) {
+        dbgln("Installed {} {} for the next session", packed.id, version);
+        return Installed::NextSession;
+    }
+    (void)TRY(load_unpacked(destination, Persist::No));
+    return Installed::Now;
+}
+
+Optional<String const&> Registry::installed_version(StringView id) const
+{
+    return m_installed_versions.get(id);
+}
+
+bool Registry::is_installed(Extension const& extension) const
+{
+    if (!m_installed_versions.contains(extension.id()))
+        return false;
+    // NB: An unpacked copy of an installed extension has its ID too.
+    auto directory = FileSystem::real_path(installed_extension_directory(extension.id()));
+    return !directory.is_error() && extension.root().starts_with(ByteString::formatted("{}/", directory.value()));
+}
+
+ByteString Registry::installed_extension_directory(StringView id) const
+{
+    return LexicalPath::join(m_extensions_directory, INSTALLED_DIRECTORY, id).string();
+}
+
+// Removes whatever of the installed extensions' files won't load: earlier versions, extensions that were removed, and
+// installs that stopped partway.
+void Registry::remove_stale_installed_files() const
+{
+    auto installed = LexicalPath::join(m_extensions_directory, INSTALLED_DIRECTORY).string();
+    if (!FileSystem::is_directory(installed))
+        return;
+
+    Vector<ByteString> stale;
+    auto result = Core::Directory::for_each_entry(installed, Core::DirIterator::SkipParentAndBaseDir, [&](auto const& entry, auto const&) -> ErrorOr<IterationDecision> {
+        auto id_directory = LexicalPath::join(installed, entry.name).string();
+        auto id = String::from_byte_string(entry.name);
+        auto version = id.is_error() ? Optional<String const&> {} : m_installed_versions.get(id.value());
+        if (!version.has_value()) {
+            stale.append(id_directory);
+            return IterationDecision::Continue;
+        }
+        TRY(Core::Directory::for_each_entry(id_directory, Core::DirIterator::SkipParentAndBaseDir, [&](auto const& version_entry, auto const&) -> ErrorOr<IterationDecision> {
+            if (version_entry.name != version->bytes_as_string_view())
+                stale.append(LexicalPath::join(id_directory, version_entry.name).string());
+            return IterationDecision::Continue;
+        }));
+        return IterationDecision::Continue;
+    });
+    if (result.is_error())
+        warnln("Extensions: unable to look through {}: {}", installed, result.error());
+
+    for (auto const& path : stale) {
+        if (auto removed = FileSystem::remove(path, FileSystem::RecursionMode::Allowed); removed.is_error())
+            warnln("Extensions: unable to remove {}: {}", path, removed.error());
+    }
 }
 
 RefPtr<Extension> Registry::extension(StringView id) const
@@ -155,7 +300,7 @@ RefPtr<Extension> Registry::extension(StringView id) const
 
 bool Registry::is_persisted(Extension const& extension) const
 {
-    return m_persisted_directories.contains_slow(extension.root());
+    return m_persisted_directories.contains_slow(extension.root()) || is_installed(extension);
 }
 
 RefPtr<Extension> Registry::extension_for_url(URL::URL const& url) const
@@ -480,6 +625,12 @@ void Registry::load_state()
                 m_persisted_directories.append(directory.as_string().to_byte_string());
         }
     }
+    if (auto installed = json.value().get_object("installed"sv); installed.has_value()) {
+        installed->for_each_member([&](String const& id, JsonValue const& version) {
+            if (is_valid_extension_id(id) && version.is_string() && !version.as_string().is_empty() && !version.as_string().contains('/') && !version.as_string().starts_with('.'))
+                m_installed_versions.set(id, version.as_string());
+        });
+    }
     if (auto versions = json.value().get_object("versions"sv); versions.has_value()) {
         versions->for_each_member([&](String const& id, JsonValue const& version) {
             if (version.is_string())
@@ -550,6 +701,9 @@ void Registry::save_state() const
     JsonArray directories;
     for (auto const& directory : m_persisted_directories)
         directories.must_append(MUST(String::from_byte_string(directory)));
+    JsonObject installed;
+    for (auto const& [id, version] : m_installed_versions)
+        installed.set(id, version);
     JsonObject versions;
     for (auto const& [id, version] : m_known_versions)
         versions.set(id, version);
@@ -582,6 +736,7 @@ void Registry::save_state() const
 
     JsonObject state;
     state.set("unpacked"sv, move(directories));
+    state.set("installed"sv, move(installed));
     state.set("versions"sv, move(versions));
     state.set("granted"sv, move(granted));
     state.set("contentScripts"sv, move(content_scripts));

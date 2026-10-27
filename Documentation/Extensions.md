@@ -143,6 +143,10 @@ outright once upstream has the equivalent. A fork does make engine work a little
    UI process knows those documents from its own records but not which one asks, and site isolation keeps them to one
    site. Proton Pass draws its icon in login fields with a web accessible image as the field's background, which a
    web page could only load in a frame before.
+9. **The embedder's own WebUI messages** (`0022`, done). `WebUI::set_embedder_interfaces()` lets the embedder give
+   WebUI pages (`about:settings`, `about:welcome`) interfaces of its own, beside the engine's, as each page is created.
+   It isn't about extensions: Xenon's welcome page uses it to offer password managers, which it installs from the
+   Chrome Web Store (see [CRX files](#loading-extensions)).
 
 The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
 no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
@@ -200,10 +204,36 @@ Renderers only carry messages.
    version, which decides `onInstalled`'s `reason` and `onStartup`); those from `--load-extension` last for the
    session, as in Chrome.
 
-**CRX later.** A CRX3 file is a signed header (a protobuf with the public key and signatures) in front of a zip.
-Installing one verifies the signature, derives the ID from the key, unpacks to `<profile>/Extensions/<id>/<version>/`,
-and then takes the unpacked path. The Chrome Web Store serves CRX files at a public update URL, and its update
-protocol tells Xenon when to fetch a new version. Both come after the password managers work unpacked.
+**CRX files.** Extensions from the Chrome Web Store are CRX3 files: a signed header (a protobuf of public keys and
+signatures, and the extension's ID) in front of a zip. Only the password managers Xenon offers are installed this way
+for now (`UI/PasswordManagers`):
+
+1. **Fetching** (`UI/Extensions/WebStore`). Xenon asks the store's update URL, as Chrome's extension updater does
+   (Omaha's protocol 2.0, `clients2.google.com/service/update2/crx`), which version of the extension it offers and
+   where its file is, giving the Chrome version from its user agent and the version it has. The file comes over HTTPS
+   only, and has to have the size and SHA-256 hash the answer gave.
+2. **Verifying** (`UI/Extensions/CRX`, `verify_crx()`), as Chrome does for a store install
+   (`CRX3_WITH_PUBLISHER_PROOF` in `components/crx_file/crx_verifier.cc`): every signature in the header has to be
+   valid (RSA PKCS #1 v1.5 or ECDSA, over `"CRX3 SignedData\0"`, the signed header's size and the signed header, and
+   the zip), one has to be by the key whose SHA-256 hash gives the ID Xenon asked for, which only the extension's
+   developer holds, and one by the store's own key. Headers that a zip reader could take for the end of the archive
+   are turned down, as Chrome does.
+3. **Unpacking** (`unpack_zip()`) into a staging directory: stored or deflated plain files only, each name a relative
+   path that stays inside it, each file new (so nothing writes through a link), its size and CRC checked, and no more
+   than 512 MiB in all. The developer's key goes into the manifest as its `"key"`, as Chrome keeps it, so the
+   extension has its store ID wherever it loads from: the IDs Proton's pages message and Bitwarden's passkey scripts
+   expect.
+4. **Installing** (`Registry::install()`): the staging directory is loaded as an unpacked extension to check it, then
+   moved to `<profile data>/Extensions/Installed/<id>/<version>`, and `extensions.json` records the version to load.
+   An installed extension loads every session, after the unpacked ones (so it wins over an unpacked copy of itself),
+   until it's removed, which deletes its files with its storage. A new version of an extension that's running waits for
+   the next start, as Chrome waits for an extension to be idle; the start after removes the old version's files.
+
+Xenon bundles neither password manager. Bitwarden's extension is GPL-3.0, with parts under the Bitwarden License,
+and Bitwarden grants no rights to its marks; Proton Pass is GPL-3.0. Fetching the developers' own store builds, at the
+user's choice, means Xenon redistributes nothing, and the page names them in plain text, with no logos. Helium
+installs them from the store too, through a proxy of its own that keeps Google from seeing which extensions a user
+installs; Xenon asks the store directly, and the welcome page says so.
 
 ### Serving `chrome-extension://`
 
@@ -394,6 +424,8 @@ for Bitwarden in Chrome.
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
 | Managing extensions | | `UI/Extensions/Dialog` (Qt), and `--load-extension`. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
+| Installing from the Chrome Web Store | | `UI/Extensions/WebStore` (update checks and downloads), `CRX` (verifying CRX3 files and unpacking their zip), `Registry` (installed extensions, under `<profile data>/Extensions/Installed/`) |
+| Choosing a password manager | 0022 | `UI/PasswordManagers` (installs, switches, removes, and updates them daily; the `loadPasswordManagers` and `setPasswordManager` WebUI messages), `UI/WebUIInterfaces`, the welcome page's last step, the Extensions dialog's picker, and `--password-manager` |
 
 ### The toolbar and the popup
 
@@ -414,8 +446,9 @@ for Bitwarden in Chrome.
 ### Security
 
 - **Permissions** are granted at load. Unpacked extensions are developer-loaded, so loading one grants its required
-  `permissions` and `host_permissions`, as Chrome does. CRX installs (milestone 5) ask first, listing what the
-  extension can do in plain words. `optional_permissions` need `permissions.request()` and a user gesture, and ask.
+  `permissions` and `host_permissions`, as Chrome does. The password managers are installed from the store only when
+  the user picks one, on a page that says, in plain words, what it can do: read and change the sites they visit, to
+  fill in logins. `optional_permissions` need `permissions.request()` and a user gesture, and ask.
   Every API handler checks the calling extension's permissions in the UI process; a missing `chrome.foo` in the
   bootstrap is a convenience, not the check.
 - **Host access** is checked at injection time and per call (`scripting`, `tabs` URL fields, `webRequest`), and
@@ -446,6 +479,15 @@ for Bitwarden in Chrome.
   `--load-extension`, opens its page, and checks what its scripts report through `chrome.*` and storage. It also
   serves `Tests/Extensions/content-scripts.html` from a local server, where the test extension's content scripts run,
   and checks them from both sides.
+- `TestXenonCRX` checks `verify_crx()` and `unpack_zip()` with CRX files that `Tests/ExtensionStore/make-crxs.py`
+  signs with test keys: a valid one, one for another extension, one changed after it was signed, one the store didn't
+  sign, and one whose zip has an entry named `../escape.txt`. It checks the store's update check answers and version
+  comparisons too. `Meta/xenon.py test` serves the same files from a stand-in for the store, and, with
+  `--password-manager`, installs a stand-in for Bitwarden, finds it running at once and at the next start, installs it
+  again once its files are deleted, updates it a day later from the next start, turns down a tampered update and one
+  the store didn't sign, switches to a stand-in for Proton Pass, and removes it.
+- The real store, by hand: Bitwarden 2026.10.0 and Proton Pass 1.43.0 install from it with their store IDs, which
+  checks Google's publisher key and the store's real files.
 - Real extensions: Bitwarden's unpacked Chrome MV3 build (`npm run build:chrome` in `bitwarden/clients/apps/browser`)
   is the target for milestones 1 to 4, checked by hand against a test vault.
 
@@ -575,4 +617,6 @@ for Bitwarden in Chrome.
   - Not tried yet: passkeys, credit cards and identities, one-time codes, aliases, the settings page, importing and
     exporting, and copying to the clipboard (through its offscreen document).
 - [ ] Milestone 4: the rest of Bitwarden
-- [ ] Milestone 5: installing from the store
+- [ ] **Milestone 5: installing from the store** (under way). Done: CRX3 installs, updates once a day, and removal,
+  for the password managers the welcome page offers, Bitwarden and Proton Pass. Left: installing any extension from
+  the store (from its page or ID), and 1Password.

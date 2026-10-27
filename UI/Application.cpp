@@ -565,6 +565,18 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
         },
         .hide_mode = Core::ArgsParser::OptionHideMode::None,
     });
+    args_parser.add_option(Core::ArgsParser::Option {
+        .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
+        .help_string = "Install this password manager (bitwarden or proton-pass) in place of the profile's, or remove it with none",
+        .long_name = "password-manager",
+        .short_name = 0,
+        .value_name = "name",
+        .accept_value = [this](StringView name) -> ErrorOr<bool> {
+            m_password_manager_choice = name;
+            return true;
+        },
+        .hide_mode = Core::ArgsParser::OptionHideMode::None,
+    });
 }
 
 void Application::create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&)
@@ -671,8 +683,13 @@ Vector<String> Application::platform_preferred_languages() const
 {
     // The system's UI languages, most preferred first, as BCP 47 tags ("en-US", then "en").
     Vector<String> languages;
-    for (auto const& language : QLocale::system().uiLanguages())
+    for (auto const& language : QLocale::system().uiLanguages()) {
+        // With no locale set (LANG unset, as in a container), Qt reports the C locale, which names no language. Leaving
+        // it out lets the defaults apply instead, as Chromium falls back to en-US.
+        if (language == QLatin1StringView("C") || language == QLatin1StringView("POSIX"))
+            continue;
         languages.append(ak_string_from_qstring(language));
+    }
     return languages;
 }
 

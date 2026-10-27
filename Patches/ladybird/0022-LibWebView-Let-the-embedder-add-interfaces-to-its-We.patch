@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Tue, 27 Oct 2026 09:48:32 -0400
+Subject: [PATCH] LibWebView: Let the embedder add interfaces to its WebUI
+ pages
+
+An embedder with internal pages of its own, or with features the engine
+doesn't have, can now give WebUI pages more interfaces to talk to it. Its
+callback runs as each page is created, after the page has registered the
+engine's interfaces.
+---
+ Libraries/LibWebView/WebUI.cpp | 14 ++++++++++++++
+ Libraries/LibWebView/WebUI.h   | 11 ++++++++---
+ 2 files changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/Libraries/LibWebView/WebUI.cpp b/Libraries/LibWebView/WebUI.cpp
+index b781558f03c683f33d4ec8ee08fe3c49d0e73919..95d24c5a3125221043d111e77fede9358963a69d 100644
+--- a/Libraries/LibWebView/WebUI.cpp
++++ b/Libraries/LibWebView/WebUI.cpp
+@@ -4,6 +4,7 @@
+  * SPDX-License-Identifier: BSD-2-Clause
+  */
+ 
++#include <AK/NeverDestroyed.h>
+ #include <LibIPC/Transport.h>
+ #include <LibIPC/TransportHandle.h>
+ #include <LibWebView/WebContentClient.h>
+@@ -29,6 +30,17 @@ static constexpr auto s_pages = to_array<WebUI::Page>({
+     { "welcome"sv, "Welcome"sv, WebUI::PageType::Dynamic },
+ });
+ 
++static WebUI::EmbedderInterfaces& embedder_interfaces()
++{
++    static NeverDestroyed<WebUI::EmbedderInterfaces> embedder_interfaces;
++    return *embedder_interfaces;
++}
++
++void WebUI::set_embedder_interfaces(EmbedderInterfaces interfaces)
++{
++    embedder_interfaces() = move(interfaces);
++}
++
+ ReadonlySpan<WebUI::Page> WebUI::pages()
+ {
+     return s_pages;
+@@ -78,6 +90,8 @@ ErrorOr<RefPtr<WebUI>> WebUI::create(WebContentClient& client, Web::PageId page_
+ 
+     VERIFY(web_ui);
+     web_ui->register_interfaces();
++    if (auto const& interfaces = embedder_interfaces())
++        interfaces(*web_ui);
+ 
+     return web_ui;
+ }
+diff --git a/Libraries/LibWebView/WebUI.h b/Libraries/LibWebView/WebUI.h
+index cabd23c968fd34de5439242cdaeccec2bfdc995f..bafeeb706665d05e02bac057c142b26b8c790dc9 100644
+--- a/Libraries/LibWebView/WebUI.h
++++ b/Libraries/LibWebView/WebUI.h
+@@ -49,6 +49,14 @@ public:
+     String const& host() const { return m_host; }
+     Web::PageId page_id() const { return m_page_id; }
+ 
++    using Interface = Function<void(JsonValue)>;
++    void register_interface(StringView name, Interface);
++
++    // Lets the embedder give WebUI pages interfaces of its own, beside the engine's. It's called for each page as the
++    // page is created, after the page has registered its own.
++    using EmbedderInterfaces = Function<void(WebUI&)>;
++    static void set_embedder_interfaces(EmbedderInterfaces);
++
+ protected:
+     WebUI(WebContentClient&, Web::PageId, NonnullOwnPtr<IPC::Transport>, String host);
+ 
+@@ -57,10 +65,7 @@ protected:
+     WebContentClient& client() const { return *m_client; }
+     bool has_client() const { return !m_client.is_null(); }
+ 
+-    using Interface = Function<void(JsonValue)>;
+-
+     virtual void register_interfaces() { }
+-    void register_interface(StringView name, Interface);
+ 
+ private:
+     virtual void die() override;

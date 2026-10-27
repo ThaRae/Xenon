@@ -60,8 +60,21 @@ public:
     // as one loaded from the Extensions dialog does; one from the command line is for this session only.
     ErrorOr<NonnullRefPtr<Extension>, String> load_unpacked(StringView directory, Persist);
     ErrorOr<NonnullRefPtr<Extension>, String> reload(StringView id);
-    // Unloads an extension, and deletes its storage.
+    // Unloads an extension, and deletes its storage, and its files if it was installed.
     void remove(StringView id);
+
+    // Installs an extension from a CRX file once verify_crx() accepts it for the expected ID. It's unpacked into the
+    // profile, and loads every session until it's removed. An installed extension that's running keeps the version it
+    // has, and the new one takes over next session, as Chrome waits for an extension to go idle to update it.
+    enum class Installed : u8 {
+        Now,
+        NextSession,
+    };
+    ErrorOr<Installed, String> install(ReadonlyBytes crx, StringView expected_id, ReadonlyBytes publisher_key_hash);
+    // The version of an installed extension that loads next session, if the extension was installed rather than loaded
+    // unpacked. It's installed even if it didn't load.
+    Optional<String const&> installed_version(StringView id) const;
+    bool is_installed(Extension const&) const;
 
     RefPtr<Extension> extension(StringView id) const;
     Vector<NonnullRefPtr<Extension>> const& extensions() const { return m_extensions; }
@@ -120,6 +133,9 @@ private:
     OwnPtr<WebView::HeadlessWebView> create_hidden_view(URL::URL const&);
     static void close_hidden_view(NonnullOwnPtr<WebView::HeadlessWebView>);
 
+    ByteString installed_extension_directory(StringView id) const;
+    void remove_stale_installed_files() const;
+
     void load_state();
     void save_state() const;
     void notify_extensions_changed();
@@ -130,8 +146,10 @@ private:
     Vector<NonnullRefPtr<Extension>> m_extensions;
     HashMap<ByteString, NonnullOwnPtr<StorageArea>> m_storage;
 
-    // The directories of the extensions to load every session, and each extension's version when last loaded.
+    // The directories of the unpacked extensions to load every session, the version of each installed extension to load,
+    // and each extension's version when last loaded.
     Vector<ByteString> m_persisted_directories;
+    HashMap<String, String> m_installed_versions;
     HashMap<String, String> m_known_versions;
     HashMap<String, InstallReason> m_install_reasons;
     // By extension ID, and by setting name.

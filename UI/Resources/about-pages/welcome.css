@@ -321,6 +321,17 @@ button.primary-button:disabled {
     color: var(--xenon-rose);
 }
 
+/* Work in progress, like a password manager's download, isn't an error. */
+.save-status.in-progress {
+    color: var(--xenon-muted);
+}
+
+.password-manager-note {
+    max-width: 420px;
+    margin: 18px 10px 0;
+    font-size: 13px;
+}
+
 .after-actions {
     margin-top: 32px;
     font-size: 13px;
