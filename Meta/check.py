@@ -47,6 +47,9 @@ PLATFORM_SOURCES = {
 # Upstream's chart colors in the performance monitor; Xenon's chrome itself uses the rose scale.
 LADYBIRD_BRAND_COLOR_ALLOWED_IN = {"BrandColors.h", "PerformanceMonitorWidget.cpp"}
 
+# Kagi's format flags for a bang (its "fmt"), which Bangs::Format implements.
+BANG_FORMAT_FLAGS = ("open_base_path", "open_snap_domain", "url_encode_placeholder", "url_encode_space_to_plus")
+
 # Config shared with Ladybird, linked from the submodule so that tools find it from anywhere in Xenon's tree.
 REQUIRED_SYMLINKS = {
     ".clang-format": "ladybird/.clang-format",
@@ -149,23 +152,41 @@ def check_about_page_overrides(checks: Checks):
 
 
 def check_bangs(checks: Checks):
-    source = (UI_DIR / "Bangs.cpp").read_text()
-    bangs = re.findall(r'\{\s*"([^"]*)"sv,\s*"([^"]*)"sv,\s*"([^"]*)"sv\s*\}', source)
-    if not bangs:
-        checks.fail("bangs", "found no bangs in UI/Bangs.cpp")
+    # The bangs Xenon ships (Meta/update-bangs.py writes them), which the build turns into UI/Bangs.cpp's lookup table.
+    directory = UI_DIR / "Resources" / "bangs"
+    try:
+        bangs = json.loads((directory / "bangs.json").read_text())
+    except (OSError, ValueError) as error:
+        checks.fail("bangs", f"UI/Resources/bangs/bangs.json can't be read ({error}); run Meta/update-bangs.py")
+        return
+    if not (directory / "NOTICE.txt").exists():
+        checks.fail("bangs", "UI/Resources/bangs/NOTICE.txt is missing; the list's license requires it")
 
     seen: dict[str, str] = {}
-    for trigger, name, query_url in bangs:
-        key = trigger.lower()
-        if key in seen:
-            checks.fail("bangs", f"!{trigger} ({name}) duplicates !{key} ({seen[key]})")
-        seen[key] = name
-        if not re.fullmatch(r"[a-z0-9.]+", trigger):
-            checks.fail("bangs", f"!{trigger} should be lowercase letters and digits, without the !")
+    for bang in bangs:
+        name, query_url = bang["s"], bang["u"]
+        for trigger in (bang["t"], *bang.get("ts", [])):
+            if trigger in seen:
+                checks.fail("bangs", f"!{trigger} ({name}) duplicates !{trigger} ({seen[trigger]})")
+            seen[trigger] = name
+            if not trigger or trigger != trigger.lower() or trigger.startswith("!") or re.search(r"\s", trigger):
+                checks.fail("bangs", f"!{trigger} should be lowercase, without spaces, and without the !")
         if not query_url.startswith("https://"):
-            checks.fail("bangs", f"!{trigger} doesn't use https: {query_url}")
-        if query_url.count("%s") != 1:
-            checks.fail("bangs", f"!{trigger} needs exactly one %s in {query_url}")
+            checks.fail("bangs", f"!{bang['t']} doesn't use https: {query_url}")
+        if "{{{s}}}" not in query_url:
+            checks.fail("bangs", f"!{bang['t']} has no {{{{{{s}}}}}} for the query in {query_url}")
+        unknown_flags = set(bang.get("fmt", [])) - set(BANG_FORMAT_FLAGS)
+        if unknown_flags:
+            checks.fail(
+                "bangs", f"!{bang['t']} has format flags Xenon doesn't know: {', '.join(sorted(unknown_flags))}"
+            )
+
+    # The bangs Xenon's own pages suggest.
+    for path in web_sources():
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            for trigger in re.findall(r"<kbd>!([^\s<]+)", line):
+                if trigger.lower() not in seen:
+                    checks.fail("bangs", f"{relative(path)}:{number} suggests !{trigger}, which isn't a bang")
 
 
 def check_palette(checks: Checks):

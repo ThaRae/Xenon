@@ -4,107 +4,87 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <AK/Array.h>
+#include <AK/BinarySearch.h>
+#include <AK/ByteString.h>
 #include <AK/CharacterTypes.h>
 #include <AK/String.h>
 #include <AK/StringBuilder.h>
 #include <AK/Vector.h>
 #include <LibURL/Parser.h>
+#include <UI/BangTable.h>
 #include <UI/Bangs.h>
 
 namespace Ladybird::Bangs {
 
 static constexpr char BANG_PREFIX = '!';
+static constexpr auto QUERY_PLACEHOLDER = "{{{s}}}"sv;
 
-// FIXME: Helium resolves DuckDuckGo's full list of 13,000+ bangs. Import that list instead of curating our own.
-static constexpr auto s_builtin_bangs = to_array<Bang>({
-    // Search engines
-    { "g"sv, "Google"sv, "https://www.google.com/search?q=%s"sv },
-    { "ddg"sv, "DuckDuckGo"sv, "https://duckduckgo.com/?q=%s"sv },
-    { "b"sv, "Bing"sv, "https://www.bing.com/search?q=%s"sv },
-    { "k"sv, "Kagi"sv, "https://kagi.com/search?q=%s"sv },
-    { "brave"sv, "Brave Search"sv, "https://search.brave.com/search?q=%s"sv },
-    { "sp"sv, "Startpage"sv, "https://www.startpage.com/do/search?q=%s"sv },
-    { "e"sv, "Ecosia"sv, "https://www.ecosia.org/search?q=%s"sv },
-    { "qw"sv, "Qwant"sv, "https://www.qwant.com/?q=%s"sv },
-    { "ya"sv, "Yandex"sv, "https://yandex.com/search/?text=%s"sv },
-    { "gi"sv, "Google Images"sv, "https://www.google.com/search?tbm=isch&q=%s"sv },
-    { "gn"sv, "Google News"sv, "https://news.google.com/search?q=%s"sv },
-    { "gs"sv, "Google Scholar"sv, "https://scholar.google.com/scholar?q=%s"sv },
-    { "gm"sv, "Google Maps"sv, "https://www.google.com/maps/search/%s"sv },
-    { "osm"sv, "OpenStreetMap"sv, "https://www.openstreetmap.org/search?query=%s"sv },
-
-    // Reference
-    { "w"sv, "Wikipedia"sv, "https://en.wikipedia.org/wiki/Special:Search?search=%s"sv },
-    { "wt"sv, "Wiktionary"sv, "https://en.wiktionary.org/wiki/Special:Search?search=%s"sv },
-    { "wa"sv, "Wolfram Alpha"sv, "https://www.wolframalpha.com/input?i=%s"sv },
-    { "mw"sv, "Merriam-Webster"sv, "https://www.merriam-webster.com/dictionary/%s"sv },
-    { "ud"sv, "Urban Dictionary"sv, "https://www.urbandictionary.com/define.php?term=%s"sv },
-    { "gt"sv, "Google Translate"sv, "https://translate.google.com/?sl=auto&tl=en&text=%s"sv },
-    { "wb"sv, "Wayback Machine"sv, "https://web.archive.org/web/*/%s"sv },
-    { "arxiv"sv, "arXiv"sv, "https://arxiv.org/search/?query=%s&searchtype=all"sv },
-    { "imdb"sv, "IMDb"sv, "https://www.imdb.com/find/?q=%s"sv },
-    { "gr"sv, "Goodreads"sv, "https://www.goodreads.com/search?q=%s"sv },
-
-    // AI assistants
-    { "claude"sv, "Claude"sv, "https://claude.ai/new?q=%s"sv },
-    { "cgpt"sv, "ChatGPT"sv, "https://chatgpt.com/?q=%s"sv },
-    { "ppx"sv, "Perplexity"sv, "https://www.perplexity.ai/search?q=%s"sv },
-
-    // Development
-    { "gh"sv, "GitHub"sv, "https://github.com/search?q=%s"sv },
-    { "gl"sv, "GitLab"sv, "https://gitlab.com/search?search=%s"sv },
-    { "so"sv, "Stack Overflow"sv, "https://stackoverflow.com/search?q=%s"sv },
-    { "mdn"sv, "MDN Web Docs"sv, "https://developer.mozilla.org/en-US/search?q=%s"sv },
-    { "caniuse"sv, "Can I use"sv, "https://caniuse.com/?search=%s"sv },
-    { "npm"sv, "npm"sv, "https://www.npmjs.com/search?q=%s"sv },
-    { "pypi"sv, "PyPI"sv, "https://pypi.org/search/?q=%s"sv },
-    { "crates"sv, "crates.io"sv, "https://crates.io/search?q=%s"sv },
-    { "rust"sv, "Rust std docs"sv, "https://doc.rust-lang.org/std/?search=%s"sv },
-    { "docker"sv, "Docker Hub"sv, "https://hub.docker.com/search?q=%s"sv },
-    { "aw"sv, "ArchWiki"sv, "https://wiki.archlinux.org/index.php?search=%s"sv },
-    { "hn"sv, "Hacker News"sv, "https://hn.algolia.com/?q=%s"sv },
-
-    // Media and social
-    { "yt"sv, "YouTube"sv, "https://www.youtube.com/results?search_query=%s"sv },
-    { "ytm"sv, "YouTube Music"sv, "https://music.youtube.com/search?q=%s"sv },
-    { "r"sv, "Reddit"sv, "https://www.reddit.com/search/?q=%s"sv },
-    { "x"sv, "X"sv, "https://x.com/search?q=%s"sv },
-    { "bs"sv, "Bluesky"sv, "https://bsky.app/search?q=%s"sv },
-    { "twitch"sv, "Twitch"sv, "https://www.twitch.tv/search?term=%s"sv },
-    { "spotify"sv, "Spotify"sv, "https://open.spotify.com/search/%s"sv },
-    { "genius"sv, "Genius"sv, "https://genius.com/search?q=%s"sv },
-    { "nebula"sv, "Nebula"sv, "https://nebula.tv/search?q=%s"sv },
-    { "li"sv, "LinkedIn"sv, "https://www.linkedin.com/search/results/all/?keywords=%s"sv },
-    { "pin"sv, "Pinterest"sv, "https://www.pinterest.com/search/pins/?q=%s"sv },
-
-    // Shopping
-    { "a"sv, "Amazon"sv, "https://www.amazon.com/s?k=%s"sv },
-    { "ebay"sv, "eBay"sv, "https://www.ebay.com/sch/i.html?_nkw=%s"sv },
-    { "etsy"sv, "Etsy"sv, "https://www.etsy.com/search?q=%s"sv },
-    { "steam"sv, "Steam"sv, "https://store.steampowered.com/search/?term=%s"sv },
-    { "yelp"sv, "Yelp"sv, "https://www.yelp.com/search?find_desc=%s"sv },
-});
-
-ReadonlySpan<Bang> builtin_bangs()
+static constexpr StringView table_string(u32 offset, size_t length)
 {
-    return s_builtin_bangs.span();
+    return { Table::strings + offset, length };
 }
 
-Optional<Bang const&> find_bang(StringView trigger)
+size_t bang_count()
 {
-    for (auto const& bang : s_builtin_bangs) {
-        if (bang.trigger.equals_ignoring_ascii_case(trigger))
-            return bang;
+    return Table::entries.size();
+}
+
+Bang bang_at(size_t index)
+{
+    auto const& entry = Table::entries[index];
+    return {
+        .trigger = table_string(entry.trigger_offset, entry.trigger_length),
+        .name = table_string(entry.name_offset, entry.name_length),
+        .query_url = table_string(entry.query_url_offset, entry.query_url_length),
+        .snap_domain = table_string(entry.snap_domain_offset, entry.snap_domain_length),
+        .format = static_cast<Format>(entry.format),
+    };
+}
+
+// The table's triggers are lowercase and sorted by their bytes, so this compares the trigger as if it were lowercase.
+static int compare_with_entry(StringView trigger, Table::Entry const& entry)
+{
+    auto entry_trigger = table_string(entry.trigger_offset, entry.trigger_length);
+    auto length = min(trigger.length(), entry_trigger.length());
+    for (size_t i = 0; i < length; ++i) {
+        auto byte = static_cast<u8>(to_ascii_lowercase(static_cast<u8>(trigger[i])));
+        auto entry_byte = static_cast<u8>(entry_trigger[i]);
+        if (byte != entry_byte)
+            return byte < entry_byte ? -1 : 1;
     }
-    return {};
+    if (trigger.length() == entry_trigger.length())
+        return 0;
+    return trigger.length() < entry_trigger.length() ? -1 : 1;
 }
 
-static Optional<Bang const&> bang_for_word(StringView word)
+Optional<Bang> find_bang(StringView trigger)
+{
+    size_t index = 0;
+    if (!binary_search(Table::entries, trigger, &index, compare_with_entry))
+        return {};
+    return bang_at(index);
+}
+
+Optional<Bang> bang_for_word(StringView word)
 {
     if (word.length() < 2 || word[0] != BANG_PREFIX)
         return {};
     return find_bang(word.substring_view(1));
+}
+
+Optional<LeadingBang> leading_bang(StringView input)
+{
+    size_t word_length = 0;
+    while (word_length < input.length() && !is_ascii_space(input[word_length]))
+        ++word_length;
+
+    // Without the space after it, the bang may still be being typed, so there is no chip yet.
+    if (word_length == input.length())
+        return {};
+    auto bang = bang_for_word(input.substring_view(0, word_length));
+    if (!bang.has_value())
+        return {};
+    return LeadingBang { .bang = *bang, .length = word_length + 1 };
 }
 
 // The site's front page, which is the query URL up to the end of its host.
@@ -114,8 +94,39 @@ static StringView front_page_url(StringView query_url)
     if (!host_start.has_value())
         return query_url;
 
-    auto path_start = query_url.find('/', *host_start + 3);
-    return query_url.substring_view(0, path_start.value_or(query_url.length()));
+    auto after_scheme = query_url.substring_view(*host_start + 3);
+    auto host_end = after_scheme.find_any_of("/?#"sv);
+    return query_url.substring_view(0, *host_start + 3 + host_end.value_or(after_scheme.length()));
+}
+
+Optional<URL::URL> url_for_query(Bang const& bang, StringView query)
+{
+    if (query.is_empty()) {
+        if (has_flag(bang.format, Format::OpenSnapDomain) && !bang.snap_domain.is_empty())
+            return URL::Parser::basic_parse(ByteString::formatted("https://{}", bang.snap_domain));
+        if (has_flag(bang.format, Format::OpenBasePath)) {
+            // A placeholder in the host ("https://{s}.example.com/") leaves no front page to open, so the bang alone
+            // doesn't resolve, and the text is searched as typed.
+            auto front_page = front_page_url(bang.query_url);
+            if (front_page.contains("{{{s}}}"sv))
+                return {};
+            return URL::Parser::basic_parse(front_page);
+        }
+    }
+
+    auto space_as_plus = has_flag(bang.format, Format::SpaceToPlus) ? URL::SpaceAsPlus::Yes : URL::SpaceAsPlus::No;
+    String encoded_query;
+    if (has_flag(bang.format, Format::EncodeQuery)) {
+        // NB: The query is one URL component, so it is encoded as one: "&" or "#" left as they are would end it early.
+        encoded_query = URL::percent_encode(query, URL::PercentEncodeSet::Component, space_as_plus);
+    } else {
+        encoded_query = MUST(String::from_utf8(query));
+        if (space_as_plus == URL::SpaceAsPlus::Yes)
+            encoded_query = MUST(encoded_query.replace(" "sv, "+"sv, ReplaceMode::All));
+    }
+
+    auto query_url = MUST(String::from_utf8(bang.query_url));
+    return URL::Parser::basic_parse(MUST(query_url.replace(QUERY_PLACEHOLDER, encoded_query, ReplaceMode::All)));
 }
 
 Optional<BangNavigation> resolve(StringView input)
@@ -137,19 +148,10 @@ Optional<BangNavigation> resolve(StringView input)
 
     words.remove(bang_index);
 
-    Optional<URL::URL> url;
-    if (words.is_empty()) {
-        url = URL::Parser::basic_parse(front_page_url(bang->query_url));
-    } else {
-        StringBuilder query;
-        query.join(' ', words);
+    StringBuilder query;
+    query.join(' ', words);
 
-        auto query_url = MUST(String::from_utf8(bang->query_url));
-        // NB: The query is one URL component, so it is encoded as one: "&" or "#" left as they are would end it early.
-        auto encoded_query = URL::percent_encode(query.string_view(), URL::PercentEncodeSet::Component);
-        url = URL::Parser::basic_parse(MUST(query_url.replace("%s"sv, encoded_query, ReplaceMode::All)));
-    }
-
+    auto url = url_for_query(*bang, query.string_view());
     if (!url.has_value())
         return {};
     return BangNavigation { .bang = *bang, .url = url.release_value() };
