@@ -671,8 +671,13 @@ Vector<String> Application::platform_preferred_languages() const
 {
     // The system's UI languages, most preferred first, as BCP 47 tags ("en-US", then "en").
     Vector<String> languages;
-    for (auto const& language : QLocale::system().uiLanguages())
+    for (auto const& language : QLocale::system().uiLanguages()) {
+        // With no locale set (LANG unset, as in a container), Qt reports the C locale, which names no language. Leaving
+        // it out lets the defaults apply instead, as Chromium falls back to en-US.
+        if (language == QLatin1StringView("C") || language == QLatin1StringView("POSIX"))
+            continue;
         languages.append(ak_string_from_qstring(language));
+    }
     return languages;
 }
 
