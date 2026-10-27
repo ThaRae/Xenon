@@ -62,6 +62,11 @@ WELCOME_SCREENSHOT_DELAY_SECONDS = 4
 BLOCKED_REQUESTS = {"/jquery.popunder.js": "script", "/site-tracking-pixel.gif": "img"}
 ALLOWED_REQUESTS = {"/app.js": "script", "/logo.gif": "img"}
 
+# Bundles that a local server publishes to test filter list updates, signed with a key of their own
+# (Tests/FilterListUpdates/make-bundles.py). Each test page prints what it found on a line starting with the marker.
+FILTER_LIST_UPDATES_DIR = XENON_SOURCE_DIR / "Tests" / "FilterListUpdates"
+FILTER_LIST_UPDATES_MARKER = "XENON-FILTER-LIST-UPDATES-TEST "
+
 # A test extension whose pages check the chrome.* APIs and print what they found on a line starting with this.
 TEST_EXTENSION_DIR = XENON_SOURCE_DIR / "Tests" / "Extensions" / "basic"
 EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
@@ -234,9 +239,17 @@ def test_main(platform: Platform, build_dir: Path):
             print(output[-4000:], file=sys.stderr)
             failures.append("headless render of about:welcome")
 
+    print("==> a fresh start keeps to Xenon's directories", flush=True)
+    if not check_profile_directory(platform, app_executable(platform, build_dir), env):
+        failures.append("profile directory")
+
     print("==> content blocking with the bundled filter lists", flush=True)
     if not check_content_blocking(app_executable(platform, build_dir), env):
         failures.append("content blocking")
+
+    print("==> daily filter list updates from a local server", flush=True)
+    if not check_filter_list_updates(app_executable(platform, build_dir), env):
+        failures.append("filter list updates")
 
     print("==> extension pages and their chrome.* APIs", flush=True)
     if not check_extensions(app_executable(platform, build_dir), env):
@@ -250,6 +263,45 @@ def test_main(platform: Platform, build_dir: Path):
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
         sys.exit(1)
     print("All tests passed.")
+
+
+# Starts Xenon as on a fresh install, with no profile arguments and a home directory of its own, and checks that its
+# profile and crash reports go in Xenon's directories and that nothing goes in Ladybird's.
+def check_profile_directory(platform: Platform, executable: Path, env: dict) -> bool:
+    with tempfile.TemporaryDirectory() as temporary_home:
+        home = Path(temporary_home).resolve()
+        fresh_env = dict(env, HOME=str(home))
+        for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"):
+            fresh_env.pop(name, None)
+
+        if platform.host_system == HostSystem.macOS:
+            config, data, cache = "Library/Preferences", "Library/Application Support", "Library/Caches"
+            roots = [config, data, cache]
+        else:
+            config, data, cache = ".config", ".local/share", ".cache"
+            # The runtime directory isn't under the home directory by default. Moving it moves Wayland's socket too.
+            (home / "runtime").mkdir(mode=0o700)
+            fresh_env["XDG_RUNTIME_DIR"] = str(home / "runtime")
+            fresh_env["QT_QPA_PLATFORM"] = "offscreen"
+            roots = [config, data, cache, "runtime"]
+
+        loaded, output = run_headless(executable, fresh_env, ["--headless=text", "about:blank"])
+        expected = [home / root / "Xenon" / "Profiles" / "default" for root in roots]
+        expected.append(home / data / "Xenon" / "CrashReports")
+        missing = [path for path in expected if not path.is_dir()]
+        ladybird = [path for path in home.rglob("Ladybird") if path.is_dir()]
+
+        if not loaded:
+            print(output[-4000:], file=sys.stderr)
+        for path in missing:
+            print(f"    missing {path.relative_to(home)}", file=sys.stderr)
+        for path in ladybird:
+            print(f"    created {path.relative_to(home)}", file=sys.stderr)
+        if not loaded or missing or ladybird:
+            return False
+
+        print(f"    {', '.join(f'~/{root}/Xenon' for root in roots)}, and no Ladybird directory")
+        return True
 
 
 # Loads a local page with blocking on and off, in a throwaway profile, and checks which of its requests reach the server.
@@ -302,6 +354,178 @@ def check_content_blocking(executable: Path, env: dict) -> bool:
                 passed = False
             else:
                 print(f"    {label}: reached {sorted(reached)}")
+    finally:
+        server.shutdown()
+    return passed
+
+
+# Daily filter list updates (UI/FilterListUpdates.h), from a local server publishing the bundles in
+# Tests/FilterListUpdates, through one profile's life:
+#   1. it takes v1 while it runs, and blocks what v1 blocks from then on;
+#   2. at its next start it uses v1 in place of the bundled lists, and fetches nothing, since a day hasn't passed;
+#   3. a day later it takes v2, downloading only the list that changed;
+#   4. it turns down v3, whose list isn't the one its manifest describes, and keeps v2.
+def check_filter_list_updates(executable: Path, env: dict) -> bool:
+    published = {"version": "v1"}
+    requested: list[str] = []
+
+    report = f"""function report(results) {{
+        console.log("{FILTER_LIST_UPDATES_MARKER}" + JSON.stringify(results));
+        window.close();
+    }}
+    function load(src) {{
+        return new Promise(resolve => {{
+            const script = document.createElement("script");
+            script.src = src;
+            script.onload = () => resolve("loaded");
+            script.onerror = () => resolve("blocked");
+            document.head.append(script);
+        }});
+    }}
+    const sources = new URLSearchParams(location.search).getAll("src");"""
+    pages = {
+        # Loads a script until the content blocker stops it, which it does once the update is in.
+        "/poll": f"""{report}
+            const deadline = Date.now() + 60000;
+            (async () => {{
+                for (let attempt = 0; Date.now() < deadline; ++attempt) {{
+                    if (await load(`${{sources[0]}}?attempt=${{attempt}}`) === "blocked")
+                        return report({{ blocked: true, attempts: attempt }});
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                }}
+                report({{ blocked: false }});
+            }})();""",
+        # Loads each script once, then stays open past the time a check would start (FIRST_CHECK_DELAY).
+        "/wait": f"""{report}
+            (async () => {{
+                const results = {{}};
+                for (const src of sources)
+                    results[src] = await load(src);
+                setTimeout(() => report(results), 8000);
+            }})();""",
+    }
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            path = urllib.parse.urlsplit(self.path).path
+            requested.append(path)
+            status, content_type, body = 200, "application/javascript", b""
+            if path in pages:
+                content_type, body = "text/html", f"<!doctype html><script>{pages[path]}</script>".encode()
+            elif path.startswith("/bundle/"):
+                file = FILTER_LIST_UPDATES_DIR / published["version"] / path.removeprefix("/bundle/")
+                if ".." in path or not file.is_file():
+                    status = 404
+                else:
+                    content_type, body = "text/plain", file.read_bytes()
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    origin = f"http://127.0.0.1:{server.server_address[1]}"
+    update_env = {
+        **env,
+        "XENON_FILTER_LIST_UPDATES_URL": f"{origin}/bundle/",
+        "XENON_FILTER_LIST_UPDATES_PUBLIC_KEY": (FILTER_LIST_UPDATES_DIR / "public-key.b64").read_text().strip(),
+    }
+
+    def run(profile: str, page: str, *sources: str) -> tuple[dict | None, str]:
+        requested.clear()
+        query = urllib.parse.urlencode([("src", source) for source in sources])
+        command = [str(executable), "--headless=manual", "--profile-path", profile, f"{origin}{page}?{query}"]
+        try:
+            result = subprocess.run(command, env=update_env, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired:
+            return None, "timed out"
+        output = result.stdout + result.stderr
+        for line in output.splitlines():
+            if FILTER_LIST_UPDATES_MARKER in line:
+                return json.loads(line.split(FILTER_LIST_UPDATES_MARKER, 1)[1].rstrip().removesuffix('"')), output
+        return None, output
+
+    def downloads() -> list[str]:
+        return sorted(path.removeprefix("/bundle/") for path in requested if path.startswith("/bundle/"))
+
+    passed = True
+
+    def expect(step: str, ok: bool, output: str, details: str = ""):
+        nonlocal passed
+        if ok:
+            print(f"    {step}")
+            return
+        print(output[-4000:], file=sys.stderr)
+        print(f"    FAIL: {step} {details}", file=sys.stderr)
+        passed = False
+
+    try:
+        with tempfile.TemporaryDirectory() as profile:
+            (Path(profile) / "config").mkdir()
+            (Path(profile) / "config" / "Settings.json").write_text(
+                json.dumps(
+                    {
+                        "contentBlockers": {"enabled": True},
+                        "backgroundNetworking": {
+                            "enabled": True,
+                            "features": {"contentBlockerSubscriptionUpdates": True},
+                        },
+                    }
+                )
+            )
+
+            def state() -> dict:
+                files = list(Path(profile).rglob("ContentBlocking/Xenon/state.json"))
+                return json.loads(files[0].read_text()) if files else {}
+
+            def a_day_passes():
+                file = next(Path(profile).rglob("ContentBlocking/Xenon/state.json"))
+                file.write_text(json.dumps({**state(), "checkedAt": 0}))
+
+            results, output = run(profile, "/poll", "/xenon-update-test.js")
+            expect(
+                "takes the first update while it runs",
+                (results or {}).get("blocked") is True and state().get("active") == "209901010000",
+                output,
+                f"{results}, {state()}",
+            )
+
+            results, output = run(profile, "/wait", "/xenon-update-test.js", "/jquery.popunder.js")
+            expect(
+                "uses it in place of the bundled lists at the next start, and fetches nothing",
+                results == {"/xenon-update-test.js": "blocked", "/jquery.popunder.js": "loaded"} and not downloads(),
+                output,
+                f"{results}, fetched {downloads()}",
+            )
+
+            a_day_passes()
+            published["version"] = "v2"
+            results, output = run(profile, "/poll", "/xenon-update-test-2.gif")
+            expect(
+                "takes the next day's update, downloading only the list that changed",
+                (results or {}).get("blocked") is True
+                and downloads() == ["lists/xenon-test.txt", "manifest.json", "manifest.json.sig"]
+                and state().get("active") == "209901020000",
+                output,
+                f"{results}, fetched {downloads()}, {state()}",
+            )
+
+            a_day_passes()
+            published["version"] = "v3"
+            results, output = run(profile, "/wait", "/xenon-update-test-2.gif", "/xenon-update-test-4.gif")
+            expect(
+                "turns down a list that doesn't match its manifest, and keeps the lists it has",
+                results == {"/xenon-update-test-2.gif": "blocked", "/xenon-update-test-4.gif": "loaded"}
+                and "lists/xenon-test.txt" in downloads()
+                and state().get("active") == "209901020000",
+                output,
+                f"{results}, fetched {downloads()}, {state()}",
+            )
     finally:
         server.shutdown()
     return passed
@@ -440,6 +664,7 @@ def check_extensions(executable: Path, env: dict) -> bool:
     </script>""".encode()
     data = b'{"ok": true}'
     content_script_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "content-scripts.html").read_bytes()
+    connectable_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "externally-connectable.html").read_bytes()
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
@@ -447,6 +672,8 @@ def check_extensions(executable: Path, env: dict) -> bool:
                 body, content_type = data, "application/json"
             elif self.path.startswith("/content-scripts"):
                 body, content_type = content_script_page, "text/html"
+            elif self.path.startswith("/connectable"):
+                body, content_type = connectable_page, "text/html"
             elif self.path.startswith("/frame"):
                 body, content_type = b"<!doctype html><p>A frame of the content script page.</p>", "text/html"
             else:
@@ -497,11 +724,19 @@ def check_extensions(executable: Path, env: dict) -> bool:
         # A web page that the extension's content scripts match gets them, each in its world, at its time.
         content_script_url = f"http://127.0.0.1:{page_server.server_address[1]}/content-scripts"
         content_script_results = run_extension_test_page(executable, env, content_script_url)
+
+        # A web page that the extension's externally_connectable matches messages it with chrome.runtime.
+        connectable_url = f"http://127.0.0.1:{page_server.server_address[1]}/connectable?id={extension_id}"
+        connectable_results = run_extension_test_page(executable, env, connectable_url)
     finally:
         for server in (page_server, data_server):
             server.shutdown()
 
-    for name, page_results in (("web page", results), ("content scripts", content_script_results)):
+    for name, page_results in (
+        ("web page", results),
+        ("content scripts", content_script_results),
+        ("externally connectable page", connectable_results),
+    ):
         if page_results is None:
             return False
         checks = {check: ok for check, ok in page_results.items() if not check.startswith("info: ")}

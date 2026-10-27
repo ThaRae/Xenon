@@ -70,6 +70,16 @@ struct WebAccessibleResources {
     bool use_dynamic_url { false };
 };
 
+// Which web pages may message the extension (runtime.sendMessage() and runtime.connect() with its ID), as Chrome
+// reads externally_connectable. Other extensions can't message one yet, so `ids` isn't kept.
+// https://developer.chrome.com/docs/extensions/reference/manifest/externally-connectable
+struct ExternallyConnectable {
+    Vector<String> matches;
+
+    // Whether a document of the URL, in any frame, may message the extension.
+    bool matches_document(URL::URL const&) const;
+};
+
 struct Action {
     Optional<String> default_popup;
     Optional<String> default_title;
@@ -106,6 +116,7 @@ struct Manifest {
     bool background_is_module { false };
     Vector<ContentScript> content_scripts;
     Vector<WebAccessibleResources> web_accessible_resources;
+    Optional<ExternallyConnectable> externally_connectable;
     Optional<String> options_page;
     Vector<Command> commands;
 

@@ -2,6 +2,14 @@
 const events = [];
 
 chrome.runtime.onInstalled.addListener(details => events.push(`installed:${details.reason}`));
+
+// A service worker's lifecycle events, before onInstalled and onStartup. Proton Pass imports its chunks from oninstall.
+self.oninstall = () => {
+    importScripts("installed-chunk.js");
+    events.push(`install:${self.xenonInstalledChunk === true}`);
+    return self.skipWaiting();
+};
+self.addEventListener("activate", event => events.push(`activate:${typeof event.waitUntil}`));
 chrome.runtime.onStartup.addListener(() => events.push("startup"));
 chrome.alarms.onAlarm.addListener(alarm => events.push(`alarm:${alarm.name}`));
 
@@ -11,6 +19,7 @@ for (const name of ["onBeforeNavigate", "onCommitted", "onDOMContentLoaded", "on
     chrome.webNavigation[name].addListener(details => navigationEvents.push({ name, ...details }));
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.id === undefined) events.push("onMessage got a web page's message");
     switch (message?.toBackground) {
         case "ping":
             sendResponse({
@@ -47,6 +56,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.runtime.onConnect.addListener(port => {
     port.onMessage.addListener(message => port.postMessage({ echo: message, name: port.name }));
+});
+
+// Meta/xenon.py's externally connectable page (externally-connectable.html), a web page that messages the extension.
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    switch (message?.toBackground) {
+        case "ping": {
+            const { id, url, origin, frameId } = sender;
+            sendResponse({ pong: true, sender: { id, url, origin, frameId, tabId: sender.tab?.id } });
+            return undefined;
+        }
+        case "later":
+            setTimeout(() => sendResponse({ later: true }), 10);
+            return true;
+        case "events":
+            sendResponse(events);
+            return undefined;
+        default:
+            return undefined;
+    }
+});
+
+chrome.runtime.onConnectExternal.addListener(port => {
+    port.onMessage.addListener(message =>
+        port.postMessage({ echo: message, name: port.name, hasSenderId: "id" in port.sender })
+    );
 });
 
 // chrome.scripting and chrome.webNavigation, run against the tab of the content script that asks (content-idle.js), on

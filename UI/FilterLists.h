@@ -6,6 +6,9 @@
 
 #pragma once
 
+#include <AK/ByteString.h>
+#include <AK/Optional.h>
+#include <AK/Vector.h>
 #include <LibMain/Main.h>
 
 namespace Ladybird::FilterLists {
@@ -18,6 +21,20 @@ namespace Ladybird::FilterLists {
 // uBlock Origin's own lists go in as --trusted-content-blocker-list, which lets them use the scriptlets uBO reserves
 // for its lists, and uBO's scriptlets and redirect surrogates as --content-blocker-resources. Both options come with
 // the content blocker patches in Xenon's patch series (Patches/ladybird).
+//
+// Newer lists downloaded since (UI/FilterListUpdates.h) replace these once the browser has started.
 Main::Arguments with_bundled_filter_lists(Main::Arguments);
+
+// The lists and resources in a bundle's directory, in the order Ladybird gets them: lists/*.txt, trusted-lists/*.txt,
+// and resources/ublock-resources.json.
+struct ContentBlockers {
+    Vector<ByteString> lists;
+    Vector<ByteString> trusted_lists;
+    Optional<ByteString> resources;
+};
+ContentBlockers content_blockers_in(StringView directory);
+
+// The bundle that comes with Xenon, in the application's resources.
+Optional<ByteString> bundled_lists_directory();
 
 }

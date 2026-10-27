@@ -146,6 +146,32 @@ bool MatchPattern::matches(URL::URL const& url) const
     return glob_matches(m_path, path.string_view());
 }
 
+// https://source.chromium.org/chromium/chromium/src/+/main:extensions/common/url_pattern.cc (URLPattern::Contains)
+bool MatchPattern::contains(MatchPattern const& other) const
+{
+    if (m_all_urls)
+        return other.m_all_urls || (other.m_scheme == "*"sv ? true : ALL_URLS_SCHEMES.contains_slow(other.m_scheme));
+    if (other.m_all_urls)
+        return false;
+
+    if (m_scheme != other.m_scheme && !(m_scheme == "*"sv && other.m_scheme.is_one_of("http"sv, "https"sv)))
+        return false;
+
+    if (!m_host.is_empty()) {
+        if (other.m_host.is_empty() || (other.m_match_subdomains && !m_match_subdomains) || !matches_host(other.m_host))
+            return false;
+    }
+
+    if (!m_any_port && (other.m_any_port || other.m_port != m_port))
+        return false;
+
+    // Chrome drops the other path's trailing wildcard and matches what's left against this path.
+    auto other_path = other.m_path.bytes_as_string_view();
+    if (other_path.ends_with('*'))
+        other_path = other_path.substring_view(0, other_path.length() - 1);
+    return glob_matches(m_path, other_path);
+}
+
 bool MatchPattern::matches_origin(URL::Origin const& origin) const
 {
     if (origin.is_opaque() || !origin.scheme().has_value())

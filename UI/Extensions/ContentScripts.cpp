@@ -8,6 +8,7 @@
 #include <AK/HashMap.h>
 #include <AK/JsonValue.h>
 #include <AK/NeverDestroyed.h>
+#include <AK/Random.h>
 #include <LibCore/File.h>
 #include <LibWebView/Application.h>
 #include <UI/Extensions/ContentScripts.h>
@@ -15,6 +16,9 @@
 #include <UI/Extensions/Router.h>
 
 namespace Ladybird::Extensions {
+
+// UI/Resources/extensions/externally-connectable.js, which the build embeds.
+extern String const& externally_connectable_source;
 
 // Each extension file a content script needs, read once while the extensions stay as they are.
 static HashMap<ByteString, String>& file_cache()
@@ -70,7 +74,8 @@ void ContentScripts::update()
     file_cache().clear();
 
     auto has_content_scripts = any_of(Registry::the().extensions(), [](auto const& extension) {
-        return !extension->manifest().content_scripts.is_empty() || !Registry::the().registered_content_scripts(extension->id()).is_empty();
+        return !extension->manifest().content_scripts.is_empty() || !Registry::the().registered_content_scripts(extension->id()).is_empty()
+            || extension->manifest().externally_connectable.has_value();
     });
 
     auto& application = WebView::Application::the();
@@ -165,7 +170,64 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
             }
         }
     }
+
+    scripts.extend(externally_connectable_scripts(document));
     return scripts;
+}
+
+// A web page that an extension's externally_connectable matches gets chrome.runtime in its own world, to message the
+// extension with. The page's world can't have a bridge, so its chrome.runtime talks over DOM events to a relay in an
+// isolated world of its own for each extension, which has one, and which the router only lets message that extension.
+// https://developer.chrome.com/docs/extensions/develop/concepts/messaging#external-webpage
+Vector<Web::HTML::UserScript> ContentScripts::externally_connectable_scripts(WebView::ScriptBridgeEndpoint const& document)
+{
+    auto const& url = document.url();
+    if (!url.scheme().is_one_of("http"sv, "https"sv))
+        return {};
+
+    Vector<NonnullRefPtr<Extension>> extensions;
+    for (auto const& extension : Registry::the().extensions()) {
+        auto const& externally_connectable = extension->manifest().externally_connectable;
+        if (externally_connectable.has_value() && externally_connectable->matches_document(url))
+            extensions.append(extension);
+    }
+    if (extensions.is_empty())
+        return {};
+
+    // The events get a name of their own in each document, so that they don't meet the page's own events by chance.
+    auto event_name = MUST(String::formatted("xenon-externally-connectable-{:016x}", get_random<u64>()));
+
+    Vector<Web::HTML::UserScript> scripts;
+    JsonArray extension_ids;
+    for (auto const& extension : extensions) {
+        auto world = externally_connectable_world(*extension);
+        scripts.append({
+            .world = world,
+            .source = Router::the().externally_connectable_relay(extension, document.in_world(world), event_name),
+            .url = extension->url_for("_generated_externally_connectable_relay.js"sv),
+            .injection_time = Web::HTML::UserScriptInjectionTime::DocumentStart,
+            .takes_bridge = true,
+        });
+        extension_ids.must_append(extension->id());
+    }
+
+    JsonObject config;
+    config.set("extensionIds"sv, move(extension_ids));
+    config.set("eventName"sv, event_name);
+    scripts.append({
+        .world = {},
+        .source = MUST(String::formatted("(config => {{\n{}\n}})({});", externally_connectable_source, config.serialized())),
+        // NB: The script is the browser's, not any one extension's, but its errors need a URL.
+        .url = extensions.first()->url_for("_generated_externally_connectable.js"sv),
+        .injection_time = Web::HTML::UserScriptInjectionTime::DocumentStart,
+        .takes_bridge = false,
+    });
+    return scripts;
+}
+
+String ContentScripts::externally_connectable_world(Extension const& extension)
+{
+    return MUST(String::formatted("{}-externally-connectable", extension.id()));
 }
 
 }
