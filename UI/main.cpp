@@ -57,6 +57,9 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
 {
     AK::set_rich_debug_enabled(true);
 
+    // Profiles and crash reports go under Xenon's own directories, apart from Ladybird's.
+    WebView::set_application_name("Xenon"sv);
+
     if (auto result = WebView::CrashReportStore::the().initialize_browser_crash_handler(); result.is_error())
         warnln("Could not prepare Browser crash reporting: {}", result.error());
 

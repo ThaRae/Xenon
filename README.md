@@ -135,6 +135,37 @@ If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon l
 changes into `UI/`. The weekly Upstream workflow applies the series to `master`, names any patch that no longer
 applies, builds, and lists those UI changes, so a bump holds no surprises.
 
+## Where Xenon keeps its data
+
+The default profile is split across the platform's usual directories, each in a `Xenon` folder of its own:
+
+| What | macOS | Linux |
+| --- | --- | --- |
+| Settings and bookmarks | `~/Library/Preferences/Xenon/Profiles/default` | `~/.config/Xenon/Profiles/default` |
+| History, cookies, sessions, extensions | `~/Library/Application Support/Xenon/Profiles/default` | `~/.local/share/Xenon/Profiles/default` |
+| HTTP cache | `~/Library/Caches/Xenon/Profiles/default` | `~/.cache/Xenon/Profiles/default` |
+| The running browser's lock and socket | `~/Library/Application Support/Xenon/Profiles/default` | `$XDG_RUNTIME_DIR/Xenon/Profiles/default` |
+| Crash reports | `~/Library/Application Support/Xenon/CrashReports` | `~/.local/share/Xenon/CrashReports` |
+| Xenon's own settings (layout and the like) | `~/Library/Preferences/com.xenon.Xenon.plist` | `~/.config/Xenon/Xenon.conf` |
+
+`XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` move them, on macOS too. `--profile <name>` uses
+`Profiles/<name>` instead of `Profiles/default`, and `--profile-path <dir>` keeps a whole profile in `config/`, `data/`,
+`cache/` and `runtime/` under one directory, which the tests use. Crash reports and Xenon's own settings stay where they
+are with either. Ladybird's engine still names its database in the profile `Ladybird.db`.
+
+LibWebView put every profile under `Ladybird`, until engine patch `0020` let the browser name the directory.
+Xenon names it in `UI/main.cpp`, before anything reads it.
+
+Xenon doesn't bring over the profile that earlier builds kept in Ladybird's directories. Nothing there says
+whether Xenon or Ladybird wrote it, so moving it could take Ladybird's history and cookies away, and copying it would
+give them to Xenon. Xenon starts on a new profile instead, with the welcome flow. If only Xenon ever used the old one,
+move it yourself before this version of Xenon first starts (on Linux, with `~/.config`, `~/.local/share` and
+`~/.cache`):
+
+```bash
+for root in ~/Library/Preferences ~/Library/"Application Support" ~/Library/Caches; do mkdir -p "$root/Xenon/Profiles" && mv -n "$root/Ladybird/Profiles/default" "$root/Xenon/Profiles/"; done
+```
+
 ## Features
 
 What exists now and what's planned, measured against Helium:
@@ -181,7 +212,8 @@ What exists now and what's planned, measured against Helium:
 - [ ] Tab hibernation
 - [ ] Tab groups
 - [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed
-- [ ] A separate profile directory (LibWebView currently hardcodes `Ladybird` in profile paths)
+- [x] **Its own profile directory**: Xenon keeps its settings, history, cookies, extensions, cache, and crash reports
+  apart from Ladybird's, so the two can be installed side by side. See [Where Xenon keeps its data](#where-xenon-keeps-its-data).
 - [x] Xenon's own palette, built around **#ff0050** (`UI/BrandColors.h` for the chrome, `UI/Resources/about-pages/webui.css`
   for the internal pages)
 - [x] Xenon's own app icon: two orbits woven around a nucleus, in white and rose
