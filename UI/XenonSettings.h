@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <AK/HashTable.h>
+#include <AK/String.h>
 #include <AK/Time.h>
 #include <AK/Types.h>
 
@@ -39,5 +41,14 @@ bool tab_hibernation_enabled();
 void set_tab_hibernation_enabled(bool);
 AK::Duration tab_hibernation_timeout();
 void set_tab_hibernation_timeout(AK::Duration);
+
+// The ids of the bundled filter lists (UI/Resources/filter-lists/manifest.json) turned off in the blocking dashboard,
+// which UI/FilterLists.cpp leaves out of what it gives the content blocker. Every list is on until it's turned off.
+HashTable<String> disabled_filter_lists();
+void set_filter_list_enabled(StringView id, bool);
+
+// How many requests content blocking has blocked since Xenon was first run, as uBlock Origin counts "since install".
+u64 blocked_request_total();
+void add_to_blocked_request_total(u64);
 
 }

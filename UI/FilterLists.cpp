@@ -12,6 +12,7 @@
 #include <LibCore/System.h>
 #include <LibFileSystem/FileSystem.h>
 #include <UI/FilterLists.h>
+#include <UI/XenonSettings.h>
 
 namespace Ladybird::FilterLists {
 
@@ -39,7 +40,7 @@ Optional<ByteString> bundled_lists_directory()
     return directory.string();
 }
 
-static Vector<ByteString> lists_in(StringView directory, StringView subdirectory)
+static Vector<ByteString> lists_in(StringView directory, StringView subdirectory, HashTable<String> const& disabled_ids)
 {
     Vector<ByteString> list_paths;
     auto lists_directory = LexicalPath::join(directory, subdirectory).string();
@@ -49,8 +50,12 @@ static Vector<ByteString> lists_in(StringView directory, StringView subdirectory
     Core::DirIterator iterator(lists_directory, Core::DirIterator::SkipDots);
     while (iterator.has_next()) {
         auto path = iterator.next_full_path();
-        if (path.ends_with(".txt"sv) && FileSystem::is_regular_file(path))
-            list_paths.append(move(path));
+        if (!path.ends_with(".txt"sv) || !FileSystem::is_regular_file(path))
+            continue;
+        // Each list's file is named after its id in the manifest.
+        if (disabled_ids.contains(MUST(String::from_utf8(LexicalPath { path }.title()))))
+            continue;
+        list_paths.append(move(path));
     }
     quick_sort(list_paths);
     return list_paths;
@@ -58,9 +63,11 @@ static Vector<ByteString> lists_in(StringView directory, StringView subdirectory
 
 ContentBlockers content_blockers_in(StringView directory)
 {
+    auto disabled_ids = XenonSettings::disabled_filter_lists();
+
     ContentBlockers content_blockers;
-    content_blockers.lists = lists_in(directory, "lists"sv);
-    content_blockers.trusted_lists = lists_in(directory, "trusted-lists"sv);
+    content_blockers.lists = lists_in(directory, "lists"sv, disabled_ids);
+    content_blockers.trusted_lists = lists_in(directory, "trusted-lists"sv, disabled_ids);
 
     auto resources = LexicalPath::join(directory, "resources/ublock-resources.json"sv).string();
     if (FileSystem::is_regular_file(resources))

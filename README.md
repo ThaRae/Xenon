@@ -211,6 +211,11 @@ What exists now and what's planned, measured against Helium:
   (**Block Element...** in a page's context menu). Engine patches `0004`–`0009`, from xenon-ublock. They follow the
   same on/off switch and per-site toggle as the rest of blocking. What's still missing is in xenon-ublock's
   `docs/gap-analysis.md`.
+- [x] **uBlock Origin's popup and dashboard**: the toolbar shield opens a popup laid out like uBlock Origin's, with a
+  power button for the site, what was blocked on the page and since install, the domains the page connected to, the
+  element picker and zapper, and switches that block a site's pop-ups or remote fonts. Its dashboard,
+  `xenon://blocking/`, has the filter lists (each can be turned off), My filters, and trusted sites. uBO's switches for
+  large media, cosmetic filtering and JavaScript, and which domains had requests blocked, need engine work.
 - [x] **Daily filter list updates**: [xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds
   the lists every day and signs them. Once a day Xenon downloads the lists that changed, checks them against the signed
   manifest, and switches to them without a restart. It falls back to the bundled lists if anything fails. The welcome

@@ -18,11 +18,12 @@
 #include <LibWebView/Utilities.h>
 #include <LibWebView/WebContentClient.h>
 #include <UI/Application.h>
+#include <UI/Blocking.h>
+#include <UI/BlockingPopover.h>
 #include <UI/BrowserWindow.h>
 #include <UI/ChromeLayout.h>
 #include <UI/ChromeStyle.h>
 #include <UI/ContentBlockingButton.h>
-#include <UI/ContentBlockingPopover.h>
 #include <UI/ElementPicker.h>
 #include <UI/Extensions/Toolbar.h>
 #include <UI/Icon.h>
@@ -859,7 +860,10 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     m_content_blocking_button = new ContentBlockingButton(m_toolbar);
     m_content_blocking_button->setToolTip("Ad Block");
     QObject::connect(m_content_blocking_button, &QToolButton::clicked, this, [this] { show_content_blocking_popover(); });
-    view().on_content_blocking_change = [this](auto const& snapshot) { update_content_blocking_controls(snapshot); };
+    view().on_content_blocking_change = [this](auto const& snapshot) {
+        Blocking::count_blocked_requests(view(), snapshot);
+        update_content_blocking_controls(snapshot);
+    };
     view().on_element_picker_filter = [this](auto const& filter) { ElementPicker::confirm_filter(*this, filter); };
     update_content_blocking_controls(view().content_blocking_snapshot());
     content_blocker_count_visibility_changed();
@@ -2224,7 +2228,8 @@ void Tab::show_content_blocking_popover()
         return;
 
     if (!m_content_blocking_popover) {
-        m_content_blocking_popover = new ContentBlockingPopover(this);
+        m_content_blocking_popover = new BlockingPopover(this);
+        Blocking::connect_popover(*this, *m_content_blocking_popover);
         m_content_blocking_popover->on_visibility_change = [this, button = QPointer(m_content_blocking_button)](bool visible) {
             if (button)
                 button->setDown(visible);

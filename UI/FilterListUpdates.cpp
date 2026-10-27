@@ -295,6 +295,23 @@ Optional<Updater::Bundle> Updater::load_bundle(ByteString directory, bool downlo
     return Bundle { move(directory), manifest.release_value(), downloaded };
 }
 
+Optional<ByteString> Updater::current_directory()
+{
+    // Without the updater (in test mode, or with content blocking off from the start), the bundled lists are in use.
+    if (s_updater && s_updater->m_current.has_value())
+        return s_updater->m_current->directory;
+    return bundled_lists_directory();
+}
+
+void Updater::reapply_lists()
+{
+    auto directory = current_directory();
+    if (!directory.has_value())
+        return;
+    auto content_blockers = content_blockers_in(*directory);
+    WebView::Application::the().set_explicit_content_blockers(move(content_blockers.lists), move(content_blockers.trusted_lists), move(content_blockers.resources));
+}
+
 void Updater::use_bundle(Bundle bundle)
 {
     auto content_blockers = content_blockers_in(bundle.directory);
