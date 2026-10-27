@@ -255,6 +255,35 @@ Updater::Updater(ByteString directory, URL::URL base_url, ByteBuffer public_key)
     m_first_check->start();
 }
 
+Optional<Updater::Status> Updater::status()
+{
+    if (!s_updater || !s_updater->m_current.has_value())
+        return {};
+
+    auto const& current = *s_updater->m_current;
+    Status status;
+    status.generated_at = current.manifest.generated_at;
+    for (auto const& file : current.manifest.files) {
+        if (file.path.ends_with(".txt"sv))
+            ++status.list_count;
+    }
+    status.downloaded = current.downloaded;
+    status.checked_at = s_updater->m_checked_at;
+    status.checking = s_updater->m_updating;
+    status.error = s_updater->m_error;
+    return status;
+}
+
+void Updater::check_now()
+{
+    if (!s_updater || s_updater->m_updating)
+        return;
+
+    auto const& settings = WebView::Application::settings();
+    if (settings.automatic_filter_list_updates_allowed() && settings.content_blocker_enabled())
+        s_updater->check();
+}
+
 void Updater::background_networking_settings_changed()
 {
     Core::deferred_invoke([this] { check_if_due(); });
@@ -415,6 +444,7 @@ void Updater::did_download_manifest(ByteBuffer manifest, ByteBuffer signature)
         if (new_bundle.value().format != BUNDLE_FORMAT)
             dbgln("The latest filter lists are for a newer version of Xenon");
         m_checked_at = UnixDateTime::now();
+        m_error.clear();
         save_state();
         m_updating = false;
         return;
@@ -522,6 +552,7 @@ void Updater::finish_update()
     auto generated_at = bundle->manifest.generated_at;
     use_bundle(bundle.release_value());
     m_checked_at = UnixDateTime::now();
+    m_error.clear();
     save_state();
 
     // Ladybird has read the new lists, so the older ones can go.
@@ -547,6 +578,7 @@ void Updater::fail(Error const& error)
 void Updater::fail(StringView reason)
 {
     warnln("Unable to update the filter lists: {}", reason);
+    m_error = ByteString { reason };
 
     auto staging = LexicalPath::join(m_directory, STAGING_NAME).string();
     if (FileSystem::exists(staging))

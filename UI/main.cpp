@@ -17,6 +17,7 @@
 #include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
 #include <UI/TabHibernation.h>
+#include <UI/WebUIInterfaces.h>
 #if defined(LADYBIRD_QT_HAVE_POSITIONING)
 #    include <UI/GeolocationProviderQt.h>
 #endif
@@ -82,6 +83,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
 #endif
 
     Ladybird::Extensions::Registry::the().register_url_scheme();
+    Ladybird::install_web_ui_interfaces();
 
     auto app = TRY(Ladybird::Application::create(Ladybird::FilterLists::with_bundled_filter_lists(arguments)));
 #if defined(AK_OS_MACOS)

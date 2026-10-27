@@ -14,6 +14,7 @@
 #include <UI/StringUtils.h>
 #include <UI/Tab.h>
 #include <UI/TabBar.h>
+#include <UI/XenonSettings.h>
 
 #include <QAction>
 #include <QApplication>
@@ -1126,7 +1127,7 @@ Optional<SplitViewSide> TabStack::drop_side_at(QPoint const& position) const
 
 bool TabStack::handle_tab_drag(QDropEvent& event, QPoint const& position)
 {
-    if (!event.mimeData()->hasFormat(LADYBIRD_TAB_MIME_TYPE))
+    if (!event.mimeData()->hasFormat(LADYBIRD_TAB_MIME_TYPE) || !XenonSettings::split_view_drag_and_drop())
         return false;
 
     auto* dragged_tab = tab_being_dragged();

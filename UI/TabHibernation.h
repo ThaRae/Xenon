@@ -6,6 +6,9 @@
 
 #pragma once
 
+#include <AK/Span.h>
+#include <AK/Types.h>
+
 class QAction;
 class QIcon;
 class QMenu;
@@ -24,6 +27,9 @@ namespace Ladybird::TabHibernation {
 
 // Starts checking every window's tabs, as XenonSettings says to.
 void start();
+
+// The timeouts the menus offer, shortest first.
+ReadonlySpan<i64> timeout_choices_in_minutes();
 
 // The window frame's Tab Hibernation menu, which turns hibernation off or picks its timeout.
 QMenu* create_settings_menu(QWidget& parent);
