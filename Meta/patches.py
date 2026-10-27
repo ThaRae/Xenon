@@ -19,6 +19,8 @@
 # then export and pin, and commit both. .gitmodules sets the submodule to ignore=all, so that the patched checkout never
 # shows as a change in Xenon and `git commit -a` can't pin a commit that only exists locally; pin is how it moves.
 
+from __future__ import annotations
+
 import argparse
 import os
 import subprocess

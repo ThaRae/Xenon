@@ -6,6 +6,8 @@
 # project() call so the Xenon frontend is added once every engine library and helper process exists. Xenon's patches
 # to the engine (Patches/ladybird) are applied first, if ladybird/ doesn't have them yet; see Meta/patches.py.
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import http.server

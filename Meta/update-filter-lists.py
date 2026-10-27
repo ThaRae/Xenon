@@ -15,6 +15,8 @@
 # lists go in trusted-lists/, which may use the scriptlets uBO reserves for its lists, and uBO's scriptlets and
 # redirect surrogates in resources/.
 
+from __future__ import annotations
+
 import argparse
 import json
 import shutil

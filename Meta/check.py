@@ -12,6 +12,8 @@
 # The formatters are the versions Ladybird's own CI uses, read from the submodule, so bumping Ladybird bumps them too.
 # clang-format and ruff are installed into Build/tools on first use; prettier runs through npx.
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
