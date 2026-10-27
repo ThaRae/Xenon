@@ -95,27 +95,32 @@ outright once upstream has the equivalent. A fork does make engine work a little
    kind of list for browser extensions. An entry is a source origin, a destination scheme and host (or any host), and
    whether the host's subdomains count; ports aren't compared. Main fetch treats a matching request as same-origin, and
    `Application::set_origin_access_allow_list()` gives the list to every WebContent and WebWorker process.
-4. **User scripts in isolated worlds** (next, milestone 3). The same bootstrap-and-bridge, for any document and into a
-   world of the embedder's choosing: the main world, or a named isolated world built on
-   `WrapperWorldType::Extension`, a realm per document and world whose global wraps the same `Window`, with its own
-   `WindowProxy` from `window_proxy_for()`. `Tests/LibWeb/TestWindowProxyWorld.cpp` builds exactly such a realm over a
-   live document, and shows DOM events crossing into it: `create_a_new_javascript_realm()` with
-   `create_global_object_wrapper(realm, window)` and `window_proxy_for(world, realm)`, a `HostDefined` with the
-   window's principal realm, then `cache_global_object_wrapper()` and `initialize_window_web_interfaces()`. Nothing
-   outside the tests creates one yet. Injection at document start, document end, and document idle, in all frames or
-   only the top one. The UI process decides which scripts go into which frames, since it knows every navigable's URL.
-   The patch also needs a way to run a script in a frame's world and return its result (for
-   `scripting.executeScript` with `func`), and per-extension stylesheets (for `insertCSS`; `Page::set_user_style()` is
-   one per page and has no IPC). The xenon-ublock session's patches run uBlock Origin's scriptlets at document start in
-   every frame, at the three places WebDriver BiDi's `document_is_ready_for_scripts` fires:
-   `Document::update_for_history_step_application` (navigated documents), `LocalNavigable::initialize_navigable` (a
-   child navigable's first `about:blank`), and `LocalTraversableNavigable::create_for_new_web_view` (popups). This patch
-   should add one `PageClient::page_document_is_ready_for_scripts(Document&)` hook called at those three, which
-   uBlock's scriptlets then move onto, rather than a second set of injection points. Patch 2's hook, at the start of
-   `Document::set_ready_to_run_scripts()`, won't do for content scripts: `create_a_new_browsing_context_and_document()`
-   calls it for an initial `about:blank` before that document has its creator's base URL or a navigable, so it can't
-   tell which site's scripts apply (`match_about_blank`). Extension pages are never `about:blank`, so patch 2 is fine
-   where it is.
+4. **User scripts in isolated worlds** (`0016`, done). Between it and patch 3 come the six content blocker patches
+   from xenon-ublock and the six WebAuthn patches, `0004` to `0015`, which their own documents describe. The embedder
+   sets a `WebView::UserScriptHandler`, as WebKit's `WKUserContentController`. While it has one, each document asks the
+   UI process for its scripts once, as it becomes ready for scripts, at the three places uBlock Origin's scriptlets
+   run (the places WebDriver BiDi's `document_is_ready_for_scripts` fires): `Document::update_for_history_step_application`
+   (navigated documents), `LocalNavigable::initialize_navigable` (a child navigable's first `about:blank`), and
+   `LocalTraversableNavigable::create_for_new_web_view` (popups). A `Web::HTML::UserScript` names its world (the
+   document's own, or an isolated world by the embedder's name for it), its injection time (`DocumentStart`;
+   `DocumentEnd`, once DOMContentLoaded has fired; `DocumentIdle`, once the document has loaded, or 200 ms after
+   `DocumentEnd` as in Chromium), and whether it takes its world's bridge to the UI process, as patch 2's pages do.
+   Only isolated worlds get a bridge. The UI process only takes messages from the worlds it gave one, and names their
+   sender from its own records of the document's URL, origin, and navigable. `ScriptBridgeEndpoint`, patch 2's
+   endpoint, names the world and the navigable too. `HTML::IsolatedWorld` is the realm
+   `Tests/LibWeb/TestWindowProxyWorld.cpp` builds: `create_a_new_javascript_realm()` with
+   `create_global_object_wrapper(realm, window)` and `window_proxy_for(world, realm)` on a `WrapperWorldType::Extension`
+   world, a `HostDefined` with the window's principal realm, then `cache_global_object_wrapper()` and
+   `initialize_window_web_interfaces()`. Its exceptions and unhandled rejections only go to the console, since the
+   page's `error` and `unhandledrejection` handlers would get its objects, and its wrappers are detached when its
+   document is destroyed. Patch 2's hook, at the start of `Document::set_ready_to_run_scripts()`, wouldn't do for user
+   scripts: `create_a_new_browsing_context_and_document()` calls it for an initial `about:blank` before that document
+   has its creator's base URL or a navigable, so it can't tell which site's scripts apply. Extension pages are never
+   `about:blank`, so patch 2 is fine where it is.
+
+   Still to come, here or in a later patch: running a script in a frame's world and returning its result (for
+   `scripting.executeScript` with `func`), and per-extension stylesheets the page can't see (for `insertCSS` and
+   content scripts' `css`; `Page::set_user_style()` is one per page and has no IPC).
 
 The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
 no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
@@ -146,8 +151,8 @@ LibWebView's `HeadlessWebView` already hosts a page with no window.
  │ Extensions dialog (load, reload, remove)  │          └──────────────────────────────────────┘
  └───────────────────────────────────────────┘          ┌──────────────────────────────────────┐
                                                  ◄─────►│ WebContent for https://example.com   │
-                                              milestone │  main world: the page                │
-                                                      3 │  isolated world per extension:       │
+                                           user scripts │  main world: the page                │
+                                                        │  isolated world per extension:       │
                                                         │   content scripts, chrome.* (subset) │
                                                         └──────────────────────────────────────┘
 ```
@@ -242,22 +247,35 @@ the API has to be there with the background.
 
 ### Content scripts and isolation
 
-For each navigation, `ExtensionRegistry` matches every enabled extension's `content_scripts` against the frame's URL:
-`matches` and `exclude_matches` (match patterns), `include_globs` and `exclude_globs`, `all_frames`, and
-`match_about_blank` / `match_origin_as_fallback` for `about:blank` and `blob:` frames. It also checks the extension
-has host permission for the URL. Matching scripts go to the frame's WebContent process as user scripts (patch 4) at
-the requested `run_at`: `document_start`, `document_end`, or `document_idle` (the default).
+As each document becomes ready for scripts, the engine asks the UI process for its user scripts (patch 16), and
+`ContentScripts` matches every extension's `content_scripts` against the document's URL, from the UI process's records
+rather than the renderer's word: `matches` and `exclude_matches` (match patterns), `include_globs` and
+`exclude_globs`, and `all_frames`. A matching extension's world gets its `chrome.*` at document start, whenever its
+scripts run, then the stylesheets, then the scripts at their `run_at`: `document_start`, `document_end`, or
+`document_idle` (the default). Not yet: `match_about_blank` and `match_origin_as_fallback`, for `about:blank`, `blob:`,
+and `data:` frames, and `file:` documents, which Chrome only allows once the user turns it on for the extension.
 
-- **Isolation:** each extension gets its own isolated world per frame. The world shares the DOM with the page but
-  nothing else: its own globals, its own prototypes, and its own wrappers, so expando properties and monkey-patched
-  builtins in the page are invisible to it, and the other way round. Ladybird's wrapper worlds already give each world
-  its own wrappers for the same DOM object, which is the hard part.
+- **Isolation:** each extension gets its own isolated world per document, named by its ID. The world shares the DOM
+  with the page but nothing else: its own globals, its own prototypes, and its own wrappers, so expando properties and
+  monkey-patched builtins in the page are invisible to it, and the other way round. Ladybird's wrapper worlds give each
+  world its own wrappers for the same DOM object, which is the hard part. The world's exceptions and unhandled
+  rejections stay out of the page's `error` and `unhandledrejection` handlers. One gap: a value the page posts with
+  `postMessage`, like any `any`-typed attribute, reaches the world as the page's own object, where Chrome deserializes
+  a copy for each world. Reading strings and numbers from it, as Bitwarden does, is safe; calling its methods runs the
+  page's code.
 - **`chrome.*` in content scripts:** the subset Chrome gives them: `runtime` (`id`, `getURL`, `getManifest`,
-  `sendMessage`, `connect`, `onMessage`, `onConnect`), `storage`, and `i18n`. Nothing else is installed.
+  `sendMessage`, `connect`, `onMessage`, `onConnect`, `lastError`), `storage`, and `i18n`. `storage.session` answers
+  only once the extension has called `storage.setAccessLevel()` with `TRUSTED_AND_UNTRUSTED_CONTEXTS`. Nothing else is
+  installed, and the router refuses anything else a content script's bridge asks for, since its renderer is the
+  page's.
+- **`world: "MAIN"`** scripts run in the page's own world, with the page's globals and no `chrome.*`.
+- **Stylesheets** go in at document start as stylesheets the document adopts, so for now the page can see and remove
+  them. Chrome adds them as user stylesheets, which needs per-extension user styles in the engine.
 - **Content script ↔ page:** through the shared DOM, `window.postMessage`, and DOM events, which is what Bitwarden's
   autofill and inline menu use. A content script's `fetch()` goes out with the page's origin, as in Chrome MV3.
-- **`chrome.scripting.executeScript` / `insertCSS`** (and `registerContentScripts`) use the same path, into the
-  extension's isolated world by default, or the main world when an extension asks for `world: "MAIN"`.
+- **`chrome.scripting.executeScript` / `insertCSS`** (and `registerContentScripts`) will use the same path, into the
+  extension's isolated world by default, or the main world when an extension asks for `world: "MAIN"`. They're next:
+  Bitwarden's autofill scripts are injected this way, at its content script's request.
 - **Extension iframes in pages:** Bitwarden's inline autofill menu is an `<iframe credentialless>` of a
   `web_accessible_resources` page (`overlay/menu.html`), in a closed shadow root inside the site. It is an extension
   page with its own origin, process, and full `chrome.*`; the site only sees a cross-origin frame. That page nests a
@@ -317,7 +335,7 @@ for Bitwarden in Chrome.
 | `chrome.*` in extension pages | 0002 | `UI/Resources/extensions/chrome-api.js` (the API surface, built into the browser), `UI/Extensions/Router` (answers calls, routes messages, sends events) |
 | `chrome.storage` | | `UI/Extensions/Storage`: a JSON file per extension and area under `<profile data>/Extensions/Storage/<id>/`; `session` and `managed` are in memory |
 | Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
-| Content scripts in isolated worlds | 4 | Content-script matching, with `MatchPattern` |
+| Content scripts in isolated worlds | 0016 | `UI/Extensions/ContentScripts` (which scripts a document gets), `Manifest` (matching a document's URL), `Router` (their contexts, calls, and messages) |
 | Background worker, offscreen documents | 0001 (workers' loads) | `UI/Extensions/Registry` (their hidden views and generated files), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
@@ -371,7 +389,9 @@ for Bitwarden in Chrome.
   IDs Chrome computes for the same keys), locales and `__MSG_`, match patterns, URL-to-file resolution including path
   traversal, and storage.
 - `Tests/Extensions/` holds small test extensions. `Meta/xenon.py test` loads one headlessly with
-  `--load-extension`, opens its page, and checks what its scripts report through `chrome.*` and storage.
+  `--load-extension`, opens its page, and checks what its scripts report through `chrome.*` and storage. It also
+  serves `Tests/Extensions/content-scripts.html` from a local server, where the test extension's content scripts run,
+  and checks them from both sides.
 - Real extensions: Bitwarden's unpacked Chrome MV3 build (`npm run build:chrome` in `bitwarden/clients/apps/browser`)
   is the target for milestones 1 to 4, checked by hand against a test vault.
 
@@ -413,9 +433,6 @@ for Bitwarden in Chrome.
     config, and its popup page shows the welcome screen (seen in a headless render at popup size).
 
   Left from milestones 1 and 2:
-  - `tabs.sendMessage` and `tabs.connect` fail as if the tab had no listener, until content scripts (milestone 3).
-    So do `scripting.executeScript`, `insertCSS`, and `removeCSS`; registered content scripts never run;
-    `webNavigation` events never fire.
   - `webRequest` events never fire, and notifications are never shown (milestone 4).
   - Optional host permissions (`origins` in `permissions.request`). `idle` always reports `active`.
   - The permission prompt has only been built, not clicked: headless tests have no user gestures.
@@ -431,6 +448,27 @@ for Bitwarden in Chrome.
     side, and they've only been built and seen in the toolbar.
   - Bitwarden logs in and works from its popup (tried by hand). Making it the default password manager needed the
     optional `privacy` permission, which the prompt now grants; that path hasn't been tried by hand yet.
-- [ ] Milestone 3: content scripts
+- [ ] **Milestone 3: content scripts** (under way).
+  - Manifest `content_scripts` in an isolated world per extension and document (patch 16), at `document_start`,
+    `document_end`, or `document_idle`, in the top frame or all frames, with globs, and in the MAIN world when asked.
+    Their stylesheets, as adopted stylesheets.
+  - `chrome.runtime` (`sendMessage`, `connect`, and their events), `storage`, and `i18n` in content scripts. Their
+    messages and ports reach the extension's pages and background, with `sender.tab`, `frameId`, `url`, `origin`, and
+    `documentId`. `tabs.sendMessage()` and `tabs.connect()` reach the content scripts in a tab, in all its frames or
+    one.
+  - `Meta/xenon.py test` checks 22 things on a page the test extension's content scripts match: when each runs, what
+    each world can see of the other (globals, expandos, errors, rejections), the shared DOM, `postMessage` from the
+    page, stylesheets, messages and ports to the background, and storage.
+  - Bitwarden's content scripts run: on a page that asks, its message handler answers that Bitwarden is installed.
+    That handler is what carries a security key's answer from the web vault back to the extension in Bitwarden's
+    two-step login, which needs the WebAuthn patches too.
+
+  Left:
+  - `scripting.executeScript`, `insertCSS`, and `removeCSS`, and registered content scripts (Bitwarden injects its
+    autofill scripts with `executeScript`, so autofill and the inline menu wait for it). `webNavigation` events.
+  - `web_accessible_resources` for web pages (Bitwarden's inline menu is one), and sandboxed pages.
+  - `match_about_blank`, `match_origin_as_fallback`, and `file:` access. `activeTab`.
+  - Content scripts' stylesheets as user stylesheets. Values the page posts arriving as copies in each world.
+  - Headless tests have no tabs, so `sender.tab`, `frameId`, and `tabs.sendMessage()` are only built, not tested.
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] Milestone 5: installing from the store
