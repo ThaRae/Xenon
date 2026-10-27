@@ -109,6 +109,21 @@ def check_includes(checks: Checks):
                 checks.fail("includes", f"{relative(path)}:{number} includes from UI/Qt/; use <UI/...>")
 
 
+def check_format_strings(checks: Checks):
+    # qformatted() and Utf16String::formatted() copy a format string's literal text into a UTF-16 builder one ASCII
+    # character at a time, and assert on anything else, so a "…" or "—" in one crashes the moment it's formatted.
+    # Non-ASCII text goes through tr("…%1").arg() instead.
+    call = re.compile(r'\b(qformatted|Utf16String::formatted)\s*\(\s*"((?:[^"\\]|\\.)*)"')
+    for path in cxx_sources():
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            for match in call.finditer(line):
+                if not match.group(2).isascii():
+                    checks.fail(
+                        "format strings",
+                        f'{relative(path)}:{number} formats a string with non-ASCII text; use tr("...%1").arg()',
+                    )
+
+
 def check_build_lists_every_source(checks: Checks):
     build_file = (UI_DIR / "Xenon.cmake").read_text()
     # Sources are listed relative to UI/ (Bangs.cpp, Extensions/Manifest.cpp), or by a path ending in Tests/ or UI/.
@@ -436,6 +451,7 @@ def main():
 
     checks = Checks(fix=args.fix)
     check_includes(checks)
+    check_format_strings(checks)
     check_build_lists_every_source(checks)
     check_about_page_overrides(checks)
     check_bangs(checks)
