@@ -28,6 +28,7 @@ static constexpr auto CYCLE_MODIFIER_KEY = Qt::Key_Control;
 TabCycler::TabCycler(BrowserWindow& window, TabWidget& tabs_container)
     : QObject(&window)
     , m_window(window)
+    , m_tabs_container(tabs_container)
 {
     auto add_action = [&](char const* text, Qt::KeyboardModifiers modifiers, Order::Direction direction) {
         auto* action = new QAction(text, this);
@@ -67,6 +68,13 @@ void TabCycler::step(Order::Direction direction)
     update_order();
     auto was_cycling = m_order.is_cycling();
     auto tab = m_order.step(direction);
+
+    // Tabs in collapsed tab groups are passed over, as open_next_tab() passes over them. If every other tab is in one,
+    // the step lands on one anyway, and its group opens.
+    auto is_shown = [&](Tab* candidate) { return m_tabs_container.tab_bar()->isTabVisible(m_window.tab_index(candidate)); };
+    for (size_t attempt = 1; tab.has_value() && !is_shown(*tab) && attempt < m_order.tabs().size(); ++attempt)
+        tab = m_order.step(direction);
+
     if (!tab.has_value())
         return;
 

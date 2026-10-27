@@ -613,6 +613,9 @@ void BrowserWindow::restore_tabs(Vector<WebView::RestoredSessionTab> const& tabs
         if (i != active_index)
             create_restored_tab(tabs[i], static_cast<int>(i), !tabs[i].pinned);
     }
+
+    if (m_session_window_id.has_value())
+        tab_groups().restore(*m_session_window_id);
 }
 
 Tab& BrowserWindow::create_restored_tab(WebView::RestoredSessionTab const& restored, int index, bool defer)
@@ -721,6 +724,10 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
 
     initialize_tab(tab);
 
+    // A tab opened beside another, such as its duplicate, joins its tab group.
+    if (location.kind() == TabLocation::Kind::AfterTab && location.tab())
+        tab_groups().add_opened_tab(*location.tab(), *tab);
+
     return *tab;
 }
 
@@ -789,6 +796,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
             return window.current_tab()->view().handle();
         }
         auto& new_tab = create_new_tab(activate_tab, traversable);
+        tab_groups().add_opened_tab(*tab, new_tab);
         return new_tab.view().handle();
     };
 }
@@ -1005,6 +1013,7 @@ void BrowserWindow::pin_tab(Tab& tab, Optional<int> pinned_index)
     if (index < 0 || tab.is_pinned())
         return;
 
+    tab_groups().will_pin_tab(tab);
     auto pinned_count = pinned_tab_count();
     auto destination = clamp(pinned_index.value_or(pinned_count), 0, pinned_count);
     tab.set_pinned(true);
@@ -1351,9 +1360,11 @@ void BrowserWindow::open_next_tab()
     if (m_tabs_container->count() <= 1)
         return;
 
-    auto next_index = m_tabs_container->current_index() + 1;
-    if (next_index >= m_tabs_container->count())
-        next_index = 0;
+    // Tabs in collapsed tab groups are passed over.
+    auto next_index = m_tabs_container->current_index();
+    do {
+        next_index = (next_index + 1) % m_tabs_container->count();
+    } while (!m_tabs_container->tab_bar()->isTabVisible(next_index));
     m_tabs_container->set_current_index(next_index);
 }
 
@@ -1362,9 +1373,10 @@ void BrowserWindow::open_previous_tab()
     if (m_tabs_container->count() <= 1)
         return;
 
-    auto next_index = m_tabs_container->current_index() - 1;
-    if (next_index < 0)
-        next_index = m_tabs_container->count() - 1;
+    auto next_index = m_tabs_container->current_index();
+    do {
+        next_index = (next_index + m_tabs_container->count() - 1) % m_tabs_container->count();
+    } while (!m_tabs_container->tab_bar()->isTabVisible(next_index));
     m_tabs_container->set_current_index(next_index);
 }
 

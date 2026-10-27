@@ -1464,6 +1464,7 @@ void Tab::create_tab_context_menu()
     m_context_menu->addAction(duplicate_tab_action);
     m_context_menu->addAction(m_pin_tab_action);
     m_context_menu->addAction(TabHibernation::create_hibernate_tab_action(*this, *m_context_menu));
+    add_tab_group_actions(*m_context_menu, *this);
     m_context_menu->addSeparator();
     auto* move_tab_menu = m_context_menu->addMenu("Mo&ve Tab");
     move_tab_menu->addAction(move_to_start_action);

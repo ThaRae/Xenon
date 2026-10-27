@@ -14,6 +14,7 @@
 #include <AK/kmalloc.h>
 #include <LibWebView/Settings.h>
 #include <UI/Tab.h>
+#include <UI/TabGroups.h>
 
 #include <QHash>
 #include <QPointer>
@@ -33,6 +34,7 @@ class QDropEvent;
 class QEvent;
 class QIcon;
 class QMouseEvent;
+class QPainter;
 class QPaintEvent;
 class QPixmap;
 class QResizeEvent;
@@ -43,8 +45,10 @@ class QWheelEvent;
 
 namespace Ladybird {
 
+class TabGroupEditor;
 class TabPreviewPopup;
 class TabWidget;
+enum class TabBarEdge : u8;
 
 static constexpr int TAB_ICON_SIZE = 16;
 
@@ -84,6 +88,11 @@ public:
     void update_drop_preview(QPoint const&);
     void hide_drop_preview();
 
+    // Xenon's tab groups.
+    void tab_groups_changed();
+    void show_tab_group_editor(TabGroup&, bool focus_title);
+    int preferred_horizontal_width() const;
+
 private:
     virtual QSize sizeHint() const override;
     virtual QSize minimumSizeHint() const override;
@@ -116,15 +125,18 @@ private:
     };
     struct DropPreview {
         Vector<TabShift> tab_shifts;
+        // How far the header of each tab group moves, along the strip.
+        QHash<TabGroup const*, qreal> group_header_shifts;
         qreal strip_growth { 0 };
         qreal pinned_region_growth { 0 };
     };
 
     Optional<int> dragged_tab_index() const;
     bool dragging_pinned_tab() const;
-    QRect incoming_drop_layout_rect(int position) const;
+    QRect incoming_drop_layout_rect(Optional<int> index, int slot) const;
     int drop_slot_at(QPoint const&) const;
     void set_drop_slot(Optional<int>);
+    void update_drop_group(QPoint const&);
     void clear_drop_preview();
     DropPreview drop_preview_for_slot(Optional<int>) const;
     DropPreview current_drop_preview() const;
@@ -164,6 +176,39 @@ private:
 
     QRect visual_tab_rect(int index) const;
     int tab_index_at(QPoint const&) const;
+
+    // Xenon's tab groups. A group's header sits before its first tab, in a horizontal tab's place in the strip or in a
+    // row of its own above the vertical tabs, and the tabs of a collapsed group don't show.
+    struct TabGroupHeader {
+        TabGroup* group { nullptr };
+        int first { 0 };
+        int last { 0 };
+        // The tab whose place in the horizontal strip holds the header: the group's first tab that shows, or else the
+        // last tab in the strip that does.
+        int owner { -1 };
+        bool trailing { false };
+        int width { 0 };
+        QRect rect;
+    };
+    Vector<TabGroupHeader> tab_group_headers(bool with_rects = true) const;
+    struct HorizontalGroupRoom {
+        int leading { 0 };
+        int trailing { 0 };
+    };
+    HorizontalGroupRoom horizontal_group_room(int index) const;
+    TabBarEdge horizontal_tab_edges(int index) const;
+    bool is_tab_hidden(int index) const;
+    int first_visible_tab_index() const;
+    int last_visible_tab_index() const;
+    int vertical_unpinned_offset(int index) const;
+    QRect vertical_unpinned_tab_rect(int index, PinnedRegion const&, int extra_offset = 0) const;
+    TabGroup* tab_group_header_at(QPoint const&) const;
+    QRect tab_group_chip_rect(TabGroupHeader const&, QRect const& header_rect) const;
+    qreal current_group_header_shift(TabGroup const*) const;
+    int dragged_tab_stride() const;
+    bool is_dragging_whole_group() const;
+    void paint_tab_groups(QPainter&, QRect const& unpinned_clip);
+    void set_hovered_tab_group(TabGroup*);
     QSize vertical_size_hint(int tab_count) const;
     bool vertical_tabs_are_on_right() const;
 
@@ -190,6 +235,11 @@ private:
     QVariantAnimation* m_hover_animation { nullptr };
 
     Optional<int> m_drop_slot;
+    QPointer<TabGroup> m_drop_group;
+    bool m_drop_group_at_start { false };
+    QPointer<TabGroup> m_hovered_tab_group;
+    QPointer<TabGroup> m_pressed_tab_group;
+    TabGroupEditor* m_tab_group_editor { nullptr };
     DropPreview m_drop_preview_start;
     DropPreview m_drop_preview_target;
     qreal m_drop_preview_progress { 1.0 };
@@ -224,6 +274,7 @@ public:
 
     TabBar* tab_bar() const { return m_tab_bar; }
     QWidget* tab_bar_row() const { return m_tab_bar_row; }
+    TabGroups& tab_groups() const { return *m_tab_groups; }
 
     void add_tab(Tab* widget, QString const& label);
     void insert_tab(int index, Tab* widget, QString const& label);
@@ -323,6 +374,7 @@ private:
     void accept_tab_drop(QDropEvent*, int index);
 
     TabBar* m_tab_bar { nullptr };
+    TabGroups* m_tab_groups { nullptr };
     void size_hidden_pages_like_the_current_one();
 
     QStackedWidget* m_stacked_widget { nullptr };
