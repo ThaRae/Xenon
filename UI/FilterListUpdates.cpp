@@ -335,14 +335,17 @@ void Updater::load_state()
 void Updater::save_state()
 {
     JsonObject state;
-    if (m_current.has_value() && m_current->downloaded)
-        state.set("active"sv, LexicalPath::basename(m_current->directory).view());
+    if (m_current.has_value() && m_current->downloaded) {
+        auto active = LexicalPath::basename(m_current->directory);
+        state.set("active"sv, active.view());
+    }
     if (m_checked_at.has_value())
         state.set("checkedAt"sv, m_checked_at->seconds_since_epoch());
 
     auto result = [&]() -> ErrorOr<void> {
         TRY(Core::Directory::create(m_directory, Core::Directory::CreateDirectories::Yes));
-        TRY(write_file(LexicalPath::join(m_directory, STATE_NAME).string(), state.serialized().bytes()));
+        auto serialized = state.serialized();
+        TRY(write_file(LexicalPath::join(m_directory, STATE_NAME).string(), serialized.bytes()));
         return {};
     }();
     if (result.is_error())

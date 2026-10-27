@@ -92,7 +92,8 @@ TEST_CASE(signature_is_checked_against_the_key)
     auto private_key = MUST(curve.generate_private_key());
     auto public_key = MUST(curve.generate_public_key(private_key));
     auto manifest = manifest_with(list("lists/a.txt"sv));
-    auto signature = MUST(encode_base64(MUST(curve.sign(private_key, manifest.bytes()))));
+    auto signature_bytes = MUST(curve.sign(private_key, manifest.bytes()));
+    auto signature = MUST(encode_base64(signature_bytes));
 
     EXPECT(bundle_signature_is_valid(manifest.bytes(), signature, public_key));
     // manifest.json.sig may end with a newline.
@@ -101,7 +102,8 @@ TEST_CASE(signature_is_checked_against_the_key)
     auto tampered = manifest_with(list("lists/b.txt"sv));
     EXPECT(!bundle_signature_is_valid(tampered.bytes(), signature, public_key));
 
-    auto other_public_key = MUST(curve.generate_public_key(MUST(curve.generate_private_key())));
+    auto other_private_key = MUST(curve.generate_private_key());
+    auto other_public_key = MUST(curve.generate_public_key(other_private_key));
     EXPECT(!bundle_signature_is_valid(manifest.bytes(), signature, other_public_key));
 
     EXPECT(!bundle_signature_is_valid(manifest.bytes(), "not base64!"sv, public_key));
