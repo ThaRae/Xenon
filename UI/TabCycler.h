@@ -40,6 +40,7 @@ private:
     void end_cycle();
 
     BrowserWindow& m_window;
+    TabWidget& m_tabs_container;
     Order m_order;
 };
 
