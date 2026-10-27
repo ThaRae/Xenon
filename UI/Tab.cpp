@@ -1759,7 +1759,7 @@ QIcon Tab::tab_icon() const
 {
     if (m_is_loading)
         return loading_spinner_icon(palette(), m_loading_animation_frame);
-    if (m_deferred_tab.has_value() && m_deferred_tab->history.has_value())
+    if (is_hibernated())
         return TabHibernation::hibernated_tab_icon(m_favicon);
     return m_favicon;
 }

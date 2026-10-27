@@ -116,6 +116,7 @@ public:
     bool is_loaded() const { return m_view != nullptr; }
     // Builds the tab's view and toolbar, and restores its history, if it hasn't loaded yet.
     void ensure_loaded();
+    bool is_hibernated() const { return m_deferred_tab.has_value() && m_deferred_tab->history.has_value(); }
     // Whether the tab holds nothing that hibernating would lose, like a dialog the page opened (TabHibernation.cpp).
     bool can_hibernate() const;
     // Gives up the tab's view and toolbar, and with them its WebContent process, which leaves the tab as a restored tab
