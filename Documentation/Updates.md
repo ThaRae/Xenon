@@ -47,7 +47,28 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
    `v<version>` in Xenon. It publishes the appcast only once the archive it names is up, and refuses a tree with
    uncommitted changes.
 
-CI runs on Linux, so releases are made on a Mac. A macOS runner could run the same script.
+### On GitHub's runners
+
+`.github/workflows/release.yml` does step 2 on one of GitHub's `macos-26` runners, when it's run by hand, from
+**Actions → Release → Run workflow** or with:
+
+```bash
+gh workflow run release.yml --repo ThaRae/Xenon --ref main
+```
+
+It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A cold build doesn't fit
+in one run, so with no caches to start from, it stops at once. It runs `Meta/release.py test` with the release
+certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote:
+
+- the archive's and the appcast's signatures, with `sign_update --verify`;
+- that the app's `SUPublicEDKey` is the update key's public half, and that it's signed with **Xenon Release**, the
+  certificate whose SHA-1 is [below](#setting-up-a-mac-to-release-from), so a secret holding another key fails the run.
+
+`Xenon-<version>.tar.xz` and `appcast.xml` are the run's artifact, `Xenon-<version>`, for 30 days, with the archive's
+SHA-256 in the run's summary. The workflow doesn't publish: that's still `Meta/release.py publish`, from the Mac's
+`Build/distribution`. The certificate and the update key are the repository's secrets
+([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The run imports the certificate into a keychain
+of its own, and deletes the keychain and the key's file when it's done.
 
 ## Signing
 
@@ -126,7 +147,7 @@ and runs Xenon with a profile of its own:
 3. and 0.0.3 signed with another key.
 
 It opens Xenon's windows while it runs, and needs **Update Xenon automatically** on, since Xenon's own settings aren't
-the profile's. CI can't run it, so run it before a release.
+the profile's. CI's builds don't run it; the release workflow does, before it packages. Run it before a release.
 
 ## Setting up a Mac to release from
 
@@ -148,6 +169,19 @@ security import "Xenon Release.p12" -k ~/Library/Keychains/login.keychain-db -T 
 `security find-identity -p codesigning` then lists **Xenon Release** as `CSSMERR_TP_NOT_TRUSTED`, as a self-signed
 certificate is, and `codesign` signs with it all the same. `tea` needs a login named `avx512` that can create releases
 on tharae/xenon-releases.
+
+### Releasing from GitHub's runners
+
+The release workflow reads the same backups from the repository's secrets. From the folder that holds them:
+
+```bash
+base64 -i "Xenon Release.p12" | gh secret set XENON_RELEASE_P12 --repo ThaRae/Xenon
+gh secret set XENON_RELEASE_P12_PASSWORD --repo ThaRae/Xenon    # asks for it
+gh secret set XENON_UPDATE_KEY --repo ThaRae/Xenon < xenon-update-key.txt
+```
+
+After making a new key or certificate, set its secret again, and change `UPDATE_PUBLIC_KEY` or `CERTIFICATE_SHA1` in
+the workflow to match.
 
 If either is ever lost, make a new one: `generate_keys --account xenon` for the key, or a self-signed code signing
 certificate named **Xenon Release**, from Keychain Access's Certificate Assistant or OpenSSL. A new certificate only

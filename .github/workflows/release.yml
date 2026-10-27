@@ -1,0 +1,184 @@
+name: Release
+
+# Packages a macOS release on GitHub's runners, as Meta/release.py package does on a Mac, and keeps the archive and the
+# appcast it writes as the run's artifact. It doesn't publish: that stays Meta/release.py publish, on the Mac
+# (Documentation/Updates.md).
+#
+# It builds as ci.yml's macos job does, from the build caches main's builds saved, and doesn't save its own. A cold
+# build doesn't fit in one run, so with no caches to start from, it stops at once.
+#
+# The release certificate and the update key come from the repository's secrets: XENON_RELEASE_P12 (the certificate
+# and its private key, a .p12 in base64) with XENON_RELEASE_P12_PASSWORD, and XENON_UPDATE_KEY (the key, as
+# generate_keys -x writes it). The certificate goes into a keychain of the run's own, and both are deleted at the end.
+on:
+  workflow_dispatch:
+    inputs:
+      test:
+        description: Run Meta/release.py test first, which opens Xenon's windows
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: macos-26
+    timeout-minutes: 360
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/Build/caches/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 3G
+      # The keys installed Xenons know (Documentation/Updates.md). A secret that holds another key fails the run,
+      # rather than making a release that Xenon turns down, or that macOS takes for another app.
+      UPDATE_PUBLIC_KEY: o7cmjh8R2wfWfRfJOTcyLisyoRVEEQIxi7L+SFWXUNI=
+      CERTIFICATE_SHA1: EB4C4127CEA7DA5990952E139293BA15C0BA1D37
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: |
+          git submodule update --init --depth 1 ladybird
+          echo "VERSION=$(cat VERSION.txt)" >> "$GITHUB_ENV"
+
+      # The Xcode and the packages ci.yml's macos job uses, so that the caches it saved fit.
+      - name: Select Xcode
+        run: |
+          version=$(sed -n "s/.*xcode-version: *'\{0,1\}\([0-9.]*\)'\{0,1\}.*/\1/p" ladybird/.github/actions/setup/action.yml)
+          xcode=/Applications/Xcode_$version.app
+          if [ ! -d "$xcode" ]; then
+            echo "::warning::Xcode $version isn't on this runner; using the newest one"
+            xcode=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          fi
+          sudo xcode-select --switch "$xcode"
+          echo "XCODE_VERSION=$(xcodebuild -version | head -n 1)" >> "$GITHUB_ENV"
+          xcodebuild -version
+
+      - name: Install dependencies
+        run: |
+          brew update --quiet
+          brew unlink openssl@3 || true
+          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool llvm@22 nasm ninja pkg-config unzip
+
+      - name: Restore the build caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: macos-${{ env.XCODE_VERSION }}-${{ github.sha }}
+          restore-keys: macos-${{ env.XCODE_VERSION }}-
+          fail-on-cache-miss: true
+
+      - name: Build Xenon
+        run: |
+          mkdir -p "$CCACHE_DIR"
+          ccache --zero-stats > /dev/null
+          time ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" build
+          ccache --show-stats
+
+      # A keychain of the run's own, on the search list, where codesign finds the certificate. The partition list lets
+      # Apple's tools use its key without asking.
+      - name: Import the release certificate
+        env:
+          XENON_RELEASE_P12: ${{ secrets.XENON_RELEASE_P12 }}
+          XENON_RELEASE_P12_PASSWORD: ${{ secrets.XENON_RELEASE_P12_PASSWORD }}
+        run: |
+          if [ -z "$XENON_RELEASE_P12" ] || [ -z "$XENON_RELEASE_P12_PASSWORD" ]; then
+            echo "::error::XENON_RELEASE_P12 or XENON_RELEASE_P12_PASSWORD isn't set (Documentation/Updates.md)"
+            exit 1
+          fi
+          keychain=$RUNNER_TEMP/release.keychain-db
+          password=$(uuidgen)
+          echo "::add-mask::$password"
+          security create-keychain -p "$password" "$keychain"
+          echo "KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          (umask 077 && printf '%s' "$XENON_RELEASE_P12" | base64 --decode > "$RUNNER_TEMP/release.p12")
+          security import "$RUNNER_TEMP/release.p12" -k "$keychain" -P "$XENON_RELEASE_P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/release.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          identities=$(security find-identity -p codesigning)
+          echo "$identities"
+          if ! grep -q "$CERTIFICATE_SHA1 \"Xenon Release\"" <<< "$identities"; then
+            echo "::error::XENON_RELEASE_P12 isn't the Xenon Release certificate, $CERTIFICATE_SHA1"
+            exit 1
+          fi
+
+      - name: Meta/release.py test
+        if: inputs.test
+        run: ./Meta/release.py test --no-build --sign "Xenon Release"
+
+      - name: Meta/release.py package
+        env:
+          XENON_UPDATE_KEY: ${{ secrets.XENON_UPDATE_KEY }}
+        run: |
+          if [ -z "$XENON_UPDATE_KEY" ]; then
+            echo "::error::The XENON_UPDATE_KEY secret isn't set (Documentation/Updates.md)"
+            exit 1
+          fi
+          (umask 077 && printf '%s\n' "$XENON_UPDATE_KEY" > "$RUNNER_TEMP/update-key.txt")
+          ./Meta/release.py package --no-build --update-key "$RUNNER_TEMP/update-key.txt"
+
+      # The archive's and the appcast's signatures, against the key the app was given, which must be the one installed
+      # Xenons know; and the app's code signature, with the release certificate.
+      - name: Verify the release
+        run: |
+          app=Build/distribution/Xenon.app
+          archive=Build/distribution/Xenon-$VERSION.tar.xz
+          appcast=Build/distribution/appcast.xml
+          public_key=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$app/Contents/Info.plist")
+          if [ "$public_key" != "$UPDATE_PUBLIC_KEY" ]; then
+            echo "::error::XENON_UPDATE_KEY isn't Xenon's update key: its public half is $public_key"
+            exit 1
+          fi
+          sign_update=$(ls Build/release/Xenon/Sparkle-*/bin/sign_update | tail -n 1)
+          signature=$(sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p' "$appcast")
+          "$sign_update" --verify --ed-key-file "$RUNNER_TEMP/update-key.txt" "$archive" "$signature"
+          "$sign_update" --verify --ed-key-file "$RUNNER_TEMP/update-key.txt" "$appcast"
+          codesign --verify --deep --strict "$app"
+          if ! grep -qx "Authority=Xenon Release" <<< "$(codesign -dvv "$app" 2>&1)"; then
+            echo "::error::The app isn't signed with the Xenon Release certificate"
+            exit 1
+          fi
+          echo "The archive's and the appcast's signatures, and the app's code signature, check out."
+
+      - name: Upload the release
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xenon-${{ env.VERSION }}
+          path: |
+            Build/distribution/Xenon-${{ env.VERSION }}.tar.xz
+            Build/distribution/appcast.xml
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Delete the keychain and the update key
+        if: always()
+        run: |
+          if [ -n "${KEYCHAIN:-}" ]; then
+            security delete-keychain "$KEYCHAIN" || true
+          fi
+          rm -f "$RUNNER_TEMP/release.p12" "$RUNNER_TEMP/update-key.txt"
+
+      - name: Summary
+        if: always()
+        run: |
+          archive=Build/distribution/Xenon-$VERSION.tar.xz
+          {
+            echo "### Xenon $VERSION"
+            echo
+            echo "Built from \`$(git rev-parse --short HEAD)\`, with Ladybird \`$(git -C ladybird rev-parse --short HEAD)\` and $XCODE_VERSION"
+            if [ -f "$archive" ]; then
+              echo
+              echo "\`$(basename "$archive")\`: $(stat -f '%z' "$archive") bytes, SHA-256 \`$(shasum -a 256 "$archive" | cut -d ' ' -f 1)\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
