@@ -21,6 +21,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import venv
 
 from pathlib import Path
@@ -32,6 +33,9 @@ LADYBIRD_SOURCE_DIR = XENON_SOURCE_DIR / "ladybird"
 UI_DIR = XENON_SOURCE_DIR / "UI"
 TOOLS_DIR = XENON_SOURCE_DIR / "Build" / "tools"
 LADYBIRD_UPSTREAM = "https://github.com/LadybirdBrowser/ladybird.git"
+
+# For reading the workflows, whose shell steps are checked like the scripts.
+PYYAML_VERSION = "6.0.2"
 
 # Sources in UI/ that UI/Xenon.cmake builds only on some platforms, or not yet at all.
 PLATFORM_SOURCES = {
@@ -298,7 +302,7 @@ def ladybird_ci_versions() -> dict[str, str]:
 
 
 def tools_venv(versions: dict[str, str]) -> Path:
-    stamp = f"clang-format~={versions['llvm']}.1 ruff=={versions['ruff']}"
+    stamp = f"clang-format~={versions['llvm']}.1 ruff=={versions['ruff']} pyyaml=={PYYAML_VERSION}"
     bin_dir = TOOLS_DIR / "venv" / "bin"
     stamp_file = TOOLS_DIR / "venv" / "xenon-tools"
 
@@ -367,6 +371,51 @@ def check_formatting(checks: Checks):
         run_formatter(checks, "shellcheck", ["shellcheck"], ["shellcheck"], shell_sources())
     else:
         print("note: shellcheck isn't installed; skipping the shell scripts (CI checks them)")
+
+    check_workflow_steps(checks, bin_dir / "python")
+
+
+# Prints the shell steps of the workflows named on the command line as JSON: [where, script] pairs. It runs in the tools
+# venv, which has PyYAML.
+WORKFLOW_STEPS_PROGRAM = """
+import json, sys, yaml
+steps = []
+for path in sys.argv[1:]:
+    for job_name, job in yaml.safe_load(open(path)).get("jobs", {}).items():
+        for number, step in enumerate(job.get("steps", []), 1):
+            if "run" in step:
+                steps.append([f"{path}, job {job_name}, step '{step.get('name', number)}'", step["run"]])
+print(json.dumps(steps))
+"""
+
+
+# A workflow's shell step that doesn't parse only fails once a runner reaches it, which on slab-large can be hours later.
+# Each step is checked as Gitea runs it, by bash, with its ${{ }} expressions filled in by a placeholder.
+def check_workflow_steps(checks: Checks, python: Path):
+    workflows = [relative(path) for path in sorted((XENON_SOURCE_DIR / ".gitea" / "workflows").glob("*.yml"))]
+    result = subprocess.run(
+        [str(python), "-c", WORKFLOW_STEPS_PROGRAM, *workflows], cwd=XENON_SOURCE_DIR, capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        checks.fail("workflows", f"couldn't read the workflows: {result.stderr.strip()[-600:]}")
+        return
+
+    with tempfile.TemporaryDirectory() as temporary:
+        script_path = Path(temporary) / "step.sh"
+        for where, script in json.loads(result.stdout):
+            script_path.write_text(re.sub(r"\$\{\{.*?\}\}", "placeholder", script))
+            parsed = subprocess.run(["bash", "-n", str(script_path)], capture_output=True, text=True)
+            if parsed.returncode != 0:
+                error = parsed.stderr.strip().replace(str(script_path), "step")
+                checks.fail("workflows", f"{where} doesn't parse: {error}")
+            elif shutil.which("shellcheck"):
+                linted = subprocess.run(
+                    ["shellcheck", "--shell=bash", "--severity=warning", "--format=gcc", str(script_path)],
+                    capture_output=True,
+                    text=True,
+                )
+                if linted.returncode != 0:
+                    checks.fail("workflows", f"{where}: {linted.stdout.strip().replace(str(script_path), 'step')}")
 
 
 def git(*args: str) -> str:
