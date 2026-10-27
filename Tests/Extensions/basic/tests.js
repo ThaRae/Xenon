@@ -106,6 +106,10 @@ async function run() {
     const backgroundEvents = await chrome.runtime.sendMessage({ toBackground: "events" });
     results["info: background events"] = backgroundEvents;
     check("background gets onInstalled or onStartup", backgroundEvents?.includes("installed:install") || backgroundEvents?.includes("startup"));
+    check(
+        "background is installed and activated first, and imports scripts while installing",
+        backgroundEvents?.[0] === "install:true" && backgroundEvents[1] === "activate:function"
+    );
 
     const port = chrome.runtime.connect({ name: "test-port" });
     const echo = await new Promise(resolve => {

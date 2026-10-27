@@ -2,6 +2,14 @@
 const events = [];
 
 chrome.runtime.onInstalled.addListener(details => events.push(`installed:${details.reason}`));
+
+// A service worker's lifecycle events, before onInstalled and onStartup. Proton Pass imports its chunks from oninstall.
+self.oninstall = () => {
+    importScripts("installed-chunk.js");
+    events.push(`install:${self.xenonInstalledChunk === true}`);
+    return self.skipWaiting();
+};
+self.addEventListener("activate", event => events.push(`activate:${typeof event.waitUntil}`));
 chrome.runtime.onStartup.addListener(() => events.push("startup"));
 chrome.alarms.onAlarm.addListener(alarm => events.push(`alarm:${alarm.name}`));
 

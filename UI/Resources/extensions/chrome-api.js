@@ -731,14 +731,36 @@ if (config.isPopup) {
 // A page that goes away says so, so that its ports close and messages stop waiting for it.
 if (typeof document !== "undefined") addEventListener("pagehide", () => post({ type: "closing" }));
 
+// A service worker's install and activate events, as ExtendableEvents whose waitUntil() Xenon doesn't wait for.
+function dispatchLifecycleEvent(type) {
+    const event = new Event(type);
+    event.waitUntil = () => {};
+    try {
+        // NB: Workers have no oninstall or onactivate event handler attributes, so a function set as one is called here.
+        if (typeof self[`on${type}`] === "function") self[`on${type}`](event);
+    } catch (error) {
+        reportListenerError(error);
+    }
+    self.dispatchEvent(event);
+}
+
 // The background worker's script runs right after this, and once it has, the UI process sends runtime.onInstalled or
 // runtime.onStartup (see /_generated_background_worker.js).
 if (config.isBackground) {
+    // Install handlers call skipWaiting() to take over from the service worker before them, which this one has none of.
+    Object.defineProperty(self, "skipWaiting", { configurable: true, writable: true, value: () => Promise.resolve() });
+
     const ready = Symbol.for("xenon.background.ready");
     Object.defineProperty(self, ready, {
         configurable: true,
         value() {
             delete self[ready];
+            // A service worker is installed and activated once its script has run. This worker is a new one each time
+            // the browser starts, so it is each time. MV3 extensions load the rest of their code with importScripts()
+            // while installing, the only time a service worker may import a new script, as Proton Pass does with its
+            // chunks. Loaded later, from a promise's reaction, Ladybird would never finish loading them.
+            dispatchLifecycleEvent("install");
+            dispatchLifecycleEvent("activate");
             post({ type: "call", id: nextCallId++, name: "runtime.backgroundReady", args: [] });
         },
     });
