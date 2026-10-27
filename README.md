@@ -221,7 +221,13 @@ What exists now and what's planned, measured against Helium:
   overlay: each press shows its tab. The other next and previous tab shortcuts (<kbd>Ctrl</kbd><kbd>PgDn</kbd>, and
   <kbd>⌘</kbd><kbd>⇧</kbd><kbd>]</kbd> on macOS) still follow the tab strip. So does Ctrl+Tab, if you untick **Cycle Tabs
   in Recently Used Order** in the tab strip's context menu.
-- [ ] Tab hibernation
+- [x] **Tab hibernation**, Xenon's take on the Memory Saver that Helium has from Chromium: a background tab left unused
+  for two hours gives up its WebContent process, and its favicon turns grey. It keeps its title, favicon, URL, back/forward
+  history, and scroll position, and reloads when you select it. A window's current tab never hibernates, and neither do
+  pinned tabs, tabs playing audio (or that were a minute ago), with picture-in-picture or DevTools open, waiting on a
+  dialog, or holding text typed into a form and not sent. Right-click the tab strip for **Tab Hibernation → Off** or a
+  timeout from 15 minutes to 6 hours, or a background tab for **Hibernate Tab** (`UI/TabHibernation.cpp`, engine patch
+  `0021`, which saves the scroll position first).
 - [ ] Tab groups
 - [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed
 - [x] **Its own profile directory**: Xenon keeps its settings, history, cookies, extensions, cache, and crash reports

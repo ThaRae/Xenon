@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <AK/Time.h>
 #include <AK/Types.h>
 
 // Settings for Xenon's own features. Settings that Ladybird already has, like vertical tabs, stay in its settings store.
@@ -31,5 +32,12 @@ bool compact_toolbar();
 // used order", rather than in the tab strip's order. On by default.
 bool cycle_tabs_in_recently_used_order();
 void set_cycle_tabs_in_recently_used_order(bool);
+
+// Whether background tabs left unused for the hibernation timeout give up their WebContent process, as Chromium's Memory
+// Saver discards them (UI/TabHibernation.cpp). A hibernated tab loads again when it's selected.
+bool tab_hibernation_enabled();
+void set_tab_hibernation_enabled(bool);
+AK::Duration tab_hibernation_timeout();
+void set_tab_hibernation_timeout(AK::Duration);
 
 }
