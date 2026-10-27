@@ -211,7 +211,13 @@ What exists now and what's planned, measured against Helium:
 - [ ] Split view
 - [ ] MRU tab switching (<kbd>Ctrl</kbd><kbd>Tab</kbd> in most-recently-used order)
 - [ ] Tab hibernation
-- [ ] Tab groups
+- [x] **Tab groups**: right-click a tab and pick **Add Tab to New Group** (or **Add Tab to Group** when there are
+  groups already). A group has a title and one of nine colors picked to sit with the rose, and shows as a chip before its
+  tabs with a line below them, or as a header row above them in the sidebar. Click the chip to collapse or open the
+  group; right-click it to rename, recolor, ungroup, or close the group, open a new tab in it, or move it to a new
+  window. Drag a tab between two of a group's tabs to add it, or out of the group to take it out. Tabs opened from a
+  grouped tab join its group, Ctrl+Tab passes over collapsed groups, and groups come back with a restored session
+  (`UI/TabGroups.cpp`).
 - [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed
 - [x] **Its own profile directory**: Xenon keeps its settings, history, cookies, extensions, cache, and crash reports
   apart from Ladybird's, so the two can be installed side by side. See [Where Xenon keeps its data](#where-xenon-keeps-its-data).
