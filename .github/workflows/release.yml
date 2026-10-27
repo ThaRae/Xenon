@@ -10,6 +10,9 @@ name: Release
 # The release certificate and the update key come from the repository's secrets: XENON_RELEASE_P12 (the certificate
 # and its private key, a .p12 in base64) with XENON_RELEASE_P12_PASSWORD, and XENON_UPDATE_KEY (the key, as
 # generate_keys -x writes it). The certificate goes into a keychain of the run's own, and both are deleted at the end.
+#
+# Runs by hand, and on pull requests that change this workflow. GitHub only lets a workflow be run by hand on a branch
+# once it's on main or has run some other way, which the pull request that adds it does.
 on:
   workflow_dispatch:
     inputs:
@@ -17,10 +20,12 @@ on:
         description: Run Meta/release.py test first, which opens Xenon's windows
         type: boolean
         default: true
+  pull_request:
+    paths: [.github/workflows/release.yml]
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -38,6 +43,22 @@ jobs:
       UPDATE_PUBLIC_KEY: o7cmjh8R2wfWfRfJOTcyLisyoRVEEQIxi7L+SFWXUNI=
       CERTIFICATE_SHA1: EB4C4127CEA7DA5990952E139293BA15C0BA1D37
     steps:
+      # Before the build, so that a run without them stops at once. Pull requests from forks don't get them.
+      - name: Check the secrets
+        env:
+          XENON_RELEASE_P12: ${{ secrets.XENON_RELEASE_P12 }}
+          XENON_RELEASE_P12_PASSWORD: ${{ secrets.XENON_RELEASE_P12_PASSWORD }}
+          XENON_UPDATE_KEY: ${{ secrets.XENON_UPDATE_KEY }}
+        run: |
+          missing=0
+          for secret in XENON_RELEASE_P12 XENON_RELEASE_P12_PASSWORD XENON_UPDATE_KEY; do
+            if [ -z "${!secret}" ]; then
+              echo "::error::The $secret secret isn't set (Documentation/Updates.md)"
+              missing=1
+            fi
+          done
+          exit $missing
+
       - name: Check out the repository
         uses: actions/checkout@v4
 
@@ -89,10 +110,6 @@ jobs:
           XENON_RELEASE_P12: ${{ secrets.XENON_RELEASE_P12 }}
           XENON_RELEASE_P12_PASSWORD: ${{ secrets.XENON_RELEASE_P12_PASSWORD }}
         run: |
-          if [ -z "$XENON_RELEASE_P12" ] || [ -z "$XENON_RELEASE_P12_PASSWORD" ]; then
-            echo "::error::XENON_RELEASE_P12 or XENON_RELEASE_P12_PASSWORD isn't set (Documentation/Updates.md)"
-            exit 1
-          fi
           keychain=$RUNNER_TEMP/release.keychain-db
           password=$(uuidgen)
           echo "::add-mask::$password"
@@ -113,17 +130,13 @@ jobs:
           fi
 
       - name: Meta/release.py test
-        if: inputs.test
+        if: github.event_name != 'workflow_dispatch' || inputs.test
         run: ./Meta/release.py test --no-build --sign "Xenon Release"
 
       - name: Meta/release.py package
         env:
           XENON_UPDATE_KEY: ${{ secrets.XENON_UPDATE_KEY }}
         run: |
-          if [ -z "$XENON_UPDATE_KEY" ]; then
-            echo "::error::The XENON_UPDATE_KEY secret isn't set (Documentation/Updates.md)"
-            exit 1
-          fi
           (umask 077 && printf '%s\n' "$XENON_UPDATE_KEY" > "$RUNNER_TEMP/update-key.txt")
           ./Meta/release.py package --no-build --update-key "$RUNNER_TEMP/update-key.txt"
 

@@ -56,9 +56,10 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
 gh workflow run release.yml --repo ThaRae/Xenon --ref main
 ```
 
-It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A cold build doesn't fit
-in one run, so with no caches to start from, it stops at once. It runs `Meta/release.py test` with the release
-certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote:
+It also runs on pull requests that change it. It builds Xenon as CI's macOS job does, starting from the build caches
+`main`'s builds saved. A cold build doesn't fit in one run, so with no caches to start from, it stops at once. It
+runs `Meta/release.py test` with the release certificate (untick **test** to skip it), then `Meta/release.py package`,
+and checks what that wrote:
 
 - the archive's and the appcast's signatures, with `sign_update --verify`;
 - that the app's `SUPublicEDKey` is the update key's public half, and that it's signed with **Xenon Release**, the
