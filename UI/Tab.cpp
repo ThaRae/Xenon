@@ -31,6 +31,7 @@
 #    include <UI/MacWindow.h>
 #endif
 #include <UI/Menu.h>
+#include <UI/NewTabPage.h>
 #include <UI/Popover.h>
 #include <UI/StringUtils.h>
 #include <UI/WebAuthnPopover.h>
@@ -1002,8 +1003,10 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     };
     set_loading(view().is_loading());
 
-    view().on_load_finish = [this](auto const&) {
+    view().on_load_finish = [this](auto const& url) {
         m_suppress_javascript_dialogs_until_navigation = false;
+        if (NewTabPage::is_new_tab_page(url))
+            NewTabPage::populate(view(), m_window->session());
     };
 
     view().on_top_level_navigation_commit = [this] {

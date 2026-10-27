@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+Copyright (c) 2026, the Xenon developers.
+
+SPDX-License-Identifier: BSD-2-Clause
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>New Tab</title>
+        <link rel="stylesheet" href="resource://ladybird/ladybird.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/webui.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/xenon.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/newtab.css" />
+        <script src="resource://ladybird/about-pages/newtab.js"></script>
+    </head>
+    <body>
+        <div class="glow" aria-hidden="true"></div>
+
+        <span class="element element-small corner-mark" aria-hidden="true">
+            <span class="element-number">54</span>
+            <span class="element-symbol">Xe</span>
+        </span>
+
+        <main>
+            <h1 class="visually-hidden">New Tab</h1>
+            <ol id="top-sites" class="top-sites" aria-label="Your most visited sites"></ol>
+            <p id="no-sites" class="note" hidden>Sites you visit often will show up here.</p>
+            <p id="private-window" class="note" hidden>
+                <strong>This is a private window.</strong>
+                Nothing you do here is saved to your history, and its cookies go when you close it.
+            </p>
+        </main>
+
+        <footer class="hint">
+            Skip the search engine with a !bang:
+            <span class="bang"><kbd>!w</kbd> Wikipedia</span>
+            <span class="bang"><kbd>!gh</kbd> GitHub</span>
+            <span class="bang"><kbd>!yt</kbd> YouTube</span>
+            <span class="bang"><kbd>!r</kbd> Reddit</span>
+        </footer>
+    </body>
+</html>

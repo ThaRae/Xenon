@@ -198,7 +198,7 @@ static QIcon const& app_icon()
     static QIcon icon;
     if (icon.isNull()) {
         QPixmap pixmap;
-        pixmap.load(":/Icons/ladybird.png");
+        pixmap.load(":/Icons/xenon.png");
         icon = QIcon(pixmap);
     }
     return icon;

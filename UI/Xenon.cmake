@@ -66,6 +66,7 @@ set(XENON_SOURCES
     Menu.cpp
     NativeWindowContainer.cpp
     NativeTextEditingLineEdit.cpp
+    NewTabPage.cpp
     ProcessManagerWindow.cpp
     PerformanceMonitorWidget.cpp
     PictureInPictureWindow.cpp
@@ -220,18 +221,37 @@ set_target_properties(xenon PROPERTIES
 # The engine's helper processes (WebContent, RequestServer, ...) live next to the browser executable.
 if (APPLE OR WIN32)
     set_target_properties(${ladybird_helper_processes} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:xenon>")
+else()
+    # Elsewhere, Ladybird's own ladybird target puts its resources and helpers in the build directory's share/Lagom and
+    # libexec, and Xenon's would be the same files, which ninja refuses. So Xenon gets an install prefix of its own,
+    # which is where the engine looks for them, relative to the executable (see WebView::platform_init()). Its lib links
+    # back to the build's libraries, as the binaries' rpath is $ORIGIN/../lib.
+    set(XENON_PREFIX_DIR "${CMAKE_BINARY_DIR}/xenon")
+    set_target_properties(xenon PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_BINDIR}")
+    set_target_properties(${ladybird_helper_processes} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_LIBEXECDIR}")
+    add_custom_command(TARGET xenon POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E create_symlink "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}" "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_LIBDIR}"
+        VERBATIM
+    )
 endif()
 add_dependencies(xenon ${ladybird_helper_processes})
 
 # NB: Ladybird's resource lists are variables of its UI directory, which don't reach this one.
 include("${LADYBIRD_SOURCE_DIR}/UI/cmake/ResourceFiles.cmake")
 
-# Xenon ships its own versions of some of Ladybird's internal pages, which take the place of upstream's in the bundle.
+# Xenon ships its own versions of some of Ladybird's internal pages, which take the place of upstream's in the bundle,
+# and adds a few files of its own beside them.
 set(XENON_ABOUT_PAGE_OVERRIDES
+    newtab.html
     webui.css
     welcome.css
     welcome.html
     welcome.js
+)
+set(XENON_ABOUT_PAGE_ADDITIONS
+    newtab.css
+    newtab.js
+    xenon.css
 )
 foreach (page IN LISTS XENON_ABOUT_PAGE_OVERRIDES)
     list(FIND ABOUT_PAGES "${LADYBIRD_SOURCE_DIR}/Base/res/ladybird/about-pages/${page}" index)
@@ -240,6 +260,9 @@ foreach (page IN LISTS XENON_ABOUT_PAGE_OVERRIDES)
     endif()
     list(REMOVE_AT ABOUT_PAGES ${index})
     list(INSERT ABOUT_PAGES ${index} "${XENON_UI_DIR}/Resources/about-pages/${page}")
+endforeach()
+foreach (page IN LISTS XENON_ABOUT_PAGE_ADDITIONS)
+    list(APPEND ABOUT_PAGES "${XENON_UI_DIR}/Resources/about-pages/${page}")
 endforeach()
 
 if (APPLE)
@@ -263,7 +286,7 @@ if (APPLE)
         VERBATIM
     )
 else()
-    set(xenon_resource_dir "${CMAKE_BINARY_DIR}/${IN_BUILD_PREFIX}${CMAKE_INSTALL_DATADIR}/Lagom")
+    set(xenon_resource_dir "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_DATADIR}/Lagom")
 endif()
 
 copy_resources_to_build("${xenon_resource_dir}" xenon)

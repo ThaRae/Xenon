@@ -5,58 +5,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-:root {
-    --page: #faf8f9;
-    --ink: #1a1517;
-    --muted: #6e6569;
-    --hairline: rgba(26, 21, 23, 0.12);
-    --row-hover: rgba(26, 21, 23, 0.04);
-    --row-selected: rgba(255, 0, 80, 0.06);
-    --glow: rgba(255, 0, 80, 0.1);
-
-    --sans: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        --page: #110e10;
-        --ink: #f4eff1;
-        --muted: #a39a9e;
-        --hairline: rgba(244, 239, 241, 0.12);
-        --row-hover: rgba(244, 239, 241, 0.05);
-        --row-selected: rgba(255, 0, 80, 0.1);
-        --glow: rgba(255, 0, 80, 0.16);
-    }
-}
-
-html {
-    background-color: var(--page);
-}
-
-body {
-    max-width: none;
-    min-height: 100vh;
-    margin: 0;
-    padding: 0;
-    font-family: var(--sans);
-    font-size: 15px;
-    line-height: 1.5;
-    color: var(--ink);
-    background-color: var(--page);
-}
-
-/* A single soft light in one corner, rather than color on every surface. */
-.glow {
-    position: fixed;
-    top: -30vh;
-    right: -20vw;
-    width: 80vw;
-    height: 80vh;
-    background: radial-gradient(closest-side, var(--glow), transparent);
-    pointer-events: none;
-}
-
 .topbar {
     position: fixed;
     top: 0;
@@ -69,9 +17,9 @@ body {
 }
 
 .step-counter {
-    font-family: var(--mono);
+    font-family: var(--xenon-mono);
     font-size: 13px;
-    color: var(--muted);
+    color: var(--xenon-muted);
 }
 
 form {
@@ -121,70 +69,7 @@ h1:focus {
     max-width: 34em;
     margin: 0 0 36px;
     font-size: 19px;
-    color: var(--muted);
-}
-
-/*
- * The mark is a cell from the periodic table, the way xenon itself appears there.
- */
-.element {
-    display: inline-grid;
-    color: var(--ink);
-    border: 2px solid var(--xenon-rose);
-    border-radius: 4px;
-}
-
-.element-large {
-    grid-template-rows: auto 1fr auto auto;
-    width: 104px;
-    height: 118px;
-    padding: 8px 10px 9px;
-}
-
-.element-large .element-number {
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.element-large .element-symbol {
-    align-self: center;
-    font-size: 44px;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.02em;
-}
-
-.element-large .element-name {
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.element-large .element-weight {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-}
-
-.element-small {
-    grid-template-rows: auto 1fr;
-    width: 30px;
-    height: 34px;
-    padding: 2px 4px 3px;
-    border-width: 1.5px;
-    border-radius: 3px;
-}
-
-.element-small .element-number {
-    font-size: 7px;
-    font-weight: 600;
-    line-height: 1;
-}
-
-.element-small .element-symbol {
-    align-self: end;
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1;
+    color: var(--xenon-muted);
 }
 
 /* The greeting shows the large mark, so the corner one waits for the questions. */
@@ -212,7 +97,7 @@ legend {
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: var(--xenon-muted);
 }
 
 .choice {
@@ -222,20 +107,20 @@ legend {
     align-items: center;
     gap: 12px;
     padding: 11px 10px;
-    border-top: 1px solid var(--hairline);
+    border-top: 1px solid var(--xenon-hairline);
     cursor: pointer;
 }
 
 .choice:last-child {
-    border-bottom: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--xenon-hairline);
 }
 
 .choice:hover {
-    background-color: var(--row-hover);
+    background-color: var(--xenon-row-hover);
 }
 
 .choice:has(input:checked) {
-    background-color: var(--row-selected);
+    background-color: var(--xenon-row-selected);
 }
 
 .choice:has(input:focus-visible) {
@@ -253,7 +138,7 @@ legend {
 .marker {
     width: 14px;
     height: 14px;
-    border: 1.5px solid var(--muted);
+    border: 1.5px solid var(--xenon-muted);
     border-radius: 50%;
     box-sizing: border-box;
 }
@@ -269,7 +154,7 @@ legend {
 
 .choice-note {
     font-size: 13px;
-    color: var(--muted);
+    color: var(--xenon-muted);
 }
 
 .choice-list {
@@ -279,23 +164,13 @@ legend {
 .search-preview {
     margin: 24px 0 18px;
     font-size: 14px;
-    color: var(--muted);
-}
-
-kbd {
-    padding: 2px 7px;
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--ink);
-    background-color: var(--row-hover);
-    border: 1px solid var(--hairline);
-    border-radius: 6px;
+    color: var(--xenon-muted);
 }
 
 .preview-url {
-    font-family: var(--mono);
+    font-family: var(--xenon-mono);
     font-size: 13px;
-    color: var(--ink);
+    color: var(--xenon-ink);
     text-decoration: underline;
     text-decoration-color: var(--xenon-rose);
     text-decoration-thickness: 1.5px;
@@ -318,13 +193,13 @@ kbd {
 
 .check-option:has(input:disabled) {
     cursor: default;
-    color: var(--muted);
+    color: var(--xenon-muted);
 }
 
 .aside {
     margin: 20px 0 0;
     font-size: 14px;
-    color: var(--muted);
+    color: var(--xenon-muted);
 }
 
 .filter-lists {
@@ -346,7 +221,7 @@ kbd {
 .filter-list dd {
     margin: 0;
     font-size: 13px;
-    color: var(--muted);
+    color: var(--xenon-muted);
     text-align: right;
 }
 
@@ -381,14 +256,14 @@ button.primary-button:disabled {
     padding: 13px 2px;
     font: inherit;
     font-size: 15px;
-    color: var(--muted);
+    color: var(--xenon-muted);
     background: none;
     border: none;
     cursor: pointer;
 }
 
 .text-button:hover:not(:disabled) {
-    color: var(--ink);
+    color: var(--xenon-ink);
 }
 
 .save-status:empty {
