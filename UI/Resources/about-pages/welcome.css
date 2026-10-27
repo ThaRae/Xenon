@@ -16,6 +16,39 @@
     padding: 22px 32px;
 }
 
+.wordmark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+
+.wordmark .mark {
+    width: 26px;
+    height: 26px;
+}
+
+/* The orbits sit off to the right, turning slowly, so the questions stay on a quiet part of the page. */
+.orbits {
+    top: 50%;
+    right: -38vmin;
+    width: 140vmin;
+    height: 140vmin;
+    margin-top: -70vmin;
+}
+
+.orbits svg {
+    animation: orbit-turn 240s linear infinite;
+}
+
+@keyframes orbit-turn {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .step-counter {
     font-family: var(--xenon-mono);
     font-size: 13px;
@@ -60,9 +93,18 @@ h1:focus {
     outline: none;
 }
 
+.hero-mark {
+    width: 112px;
+    height: 112px;
+}
+
 [data-step="hello"] h1 {
-    margin-top: 36px;
+    margin-top: 40px;
     font-size: 76px;
+}
+
+.full-stop {
+    color: var(--xenon-rose);
 }
 
 .lede {
@@ -72,8 +114,8 @@ h1:focus {
     color: var(--xenon-muted);
 }
 
-/* The greeting shows the large mark, so the corner one waits for the questions. */
-body[data-step="hello"] .element-small {
+/* The greeting shows the icon itself, so the wordmark waits for the questions. */
+body[data-step="hello"] .wordmark {
     visibility: hidden;
 }
 
@@ -285,7 +327,8 @@ button.primary-button:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .step:not([hidden]) {
+    .step:not([hidden]),
+    .orbits svg {
         animation: none;
     }
 }
@@ -309,5 +352,10 @@ button.primary-button:disabled {
 
     .engine-columns {
         grid-template-columns: 1fr;
+    }
+
+    .hero-mark {
+        width: 88px;
+        height: 88px;
     }
 }
