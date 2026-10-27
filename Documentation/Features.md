@@ -244,7 +244,7 @@ On macOS, Xenon checks for a new version when it starts and once a day, download
 when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch
 to update**, and turns automatic updates off. **Check for Updates…** in the Xenon menu checks at once.
 
-Releases come from [tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases). Xenon only installs one
+Releases come from [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases) on GitHub. Xenon only installs one
 whose archive is signed with its update key, from a signed appcast, and the installer swaps the new app in at once, so
 a failed update leaves the old one as it was. Development builds,
 and Xenon elsewhere than macOS, don't update themselves. `UI/Updater.mm` runs Sparkle, and `Meta/release.py` makes and
