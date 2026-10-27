@@ -23,6 +23,8 @@ extern String const& externally_connectable_relay_source;
 
 static constexpr auto NO_RECEIVER = "Could not establish connection. Receiving end does not exist."sv;
 static constexpr auto PRUNE_INTERVAL = AK::Duration::from_seconds(5);
+// How long messages wait for a background that has started to run its script, in case it never does.
+static constexpr auto BACKGROUND_START_TIMEOUT = AK::Duration::from_seconds(10);
 
 StringView context_kind_name(ContextKind kind)
 {
@@ -287,6 +289,8 @@ void Router::forget_extension(Extension const& extension)
         forget_endpoint(endpoint);
     m_alarms.remove(extension.id());
     m_popup_size_listeners.remove(extension.id());
+    if (auto starting = m_starting_backgrounds.take(extension.id()); starting.has_value())
+        starting->timeout->stop();
 }
 
 void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String const& text)
@@ -327,7 +331,14 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
             auto receivers = content_script_receivers(*context->extension, *tab_id, message.get_integer<i64>("frameId"sv), message.get_string("documentId"sv));
             open_port(*context, *port_id, name, move(receivers));
         } else {
-            open_port(*context, *port_id, name, extension_receivers(*context));
+            Function<void()> open = [this, endpoint, port_id = *port_id, name] {
+                if (auto opener = context_for(endpoint); opener.has_value())
+                    open_port(*opener, port_id, name, extension_receivers(*opener));
+            };
+            if (auto waiting = waiting_for_background(*context); waiting.has_value())
+                waiting->append(move(open));
+            else
+                open();
         }
     } else if (*type == "connected"sv && port_id.has_value()) {
         handle_port_accepted(*context, *port_id, message.get_bool("accepted"sv).value_or(false));
@@ -384,7 +395,15 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
     }
 
     if (name == "runtime.sendMessage"sv) {
-        send_runtime_message(context, id, args.is_empty() ? JsonValue {} : args.at(0), extension_receivers(context));
+        auto message = args.is_empty() ? JsonValue {} : args.at(0);
+        Function<void()> send = [this, endpoint = context.endpoint, id, message] {
+            if (auto sender = context_for(endpoint); sender.has_value())
+                send_runtime_message(*sender, id, message, extension_receivers(*sender));
+        };
+        if (auto waiting = waiting_for_background(context); waiting.has_value())
+            waiting->append(move(send));
+        else
+            send();
         return;
     }
     if (name == "tabs.sendMessage"sv) {
@@ -830,6 +849,7 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
     if (name == "runtime.backgroundReady"sv) {
         if (context.kind != ContextKind::Background)
             return JsonValue {};
+        Core::deferred_invoke([this, id = extension->id()] { background_did_run(id); });
 
         JsonObject details;
         if (auto reason = Registry::the().take_install_reason(extension->id()); reason.has_value()) {
@@ -1030,6 +1050,33 @@ Vector<WebView::ScriptBridgeEndpoint> Router::content_script_receivers(Extension
         receivers.append(context.endpoint);
     }
     return receivers;
+}
+
+void Router::background_will_start(Extension const& extension)
+{
+    auto timeout = Core::Timer::create_single_shot(BACKGROUND_START_TIMEOUT, [this, id = extension.id()] { background_did_run(id); });
+    timeout->start();
+    m_starting_backgrounds.set(extension.id(), { .waiting = {}, .timeout = move(timeout) });
+}
+
+Optional<Vector<Function<void()>>&> Router::waiting_for_background(Context const& sender)
+{
+    if (sender.kind == ContextKind::Background)
+        return {};
+    auto starting = m_starting_backgrounds.get(sender.extension->id());
+    if (!starting.has_value())
+        return {};
+    return starting->waiting;
+}
+
+void Router::background_did_run(String const& extension_id)
+{
+    auto starting = m_starting_backgrounds.take(extension_id);
+    if (!starting.has_value())
+        return;
+    starting->timeout->stop();
+    for (auto& action : starting->waiting)
+        action();
 }
 
 // https://developer.chrome.com/docs/extensions/reference/api/runtime#method-sendMessage

@@ -307,6 +307,7 @@ void Registry::start_background_page(Extension const& extension)
 {
     if (!m_can_start_background_pages || !extension.manifest().background_service_worker.has_value())
         return;
+    Router::the().background_will_start(extension);
     if (auto view = create_hidden_view(extension.url_for(BACKGROUND_PAGE_PATH)))
         m_background_pages.set(extension.id(), view.release_nonnull());
 }
