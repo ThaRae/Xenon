@@ -11,6 +11,7 @@
 #include <UI/Extensions/Router.h>
 #include <UI/StringUtils.h>
 #include <UI/Tab.h>
+#include <UI/WebAuthnPopover.h>
 #include <UI/WebContentView.h>
 
 #include <QFrame>
@@ -63,6 +64,7 @@ QFrame#XenonExtensionPopup {{
     m_view->on_close = [this] {
         close();
     };
+    WebAuthnPopover::attach(*m_view);
 
     Router::the().set_popup_size_listener(m_extension->id(), [popup = QPointer(this)](int width, int height) {
         if (popup)

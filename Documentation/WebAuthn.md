@@ -61,7 +61,7 @@ addition later.
 │  navigator.credentials.create/get    │      │  WebContentPage: is the document hosted here, active,    │
 │   → Credential Management algorithms │ IPC  │    allowed by its permissions policy? What's its origin, │
 │   → PublicKeyCredential [[Create]] / │─────►│    top-level origin, sameOriginWithAncestors?            │
-│     [[DiscoverFromExternalSource]]:  │      │  WebAuthn::Coordinator: one ceremony per request         │
+│     [[DiscoverFromExternalSource]]:  │      │  WebAuthnCoordinator: one ceremony per tab               │
 │     arguments, RP ID, timeouts,      │      │   ├ builds clientDataJSON and its hash                   │
 │     extensions                       │◄─────│   ├ timeout, cancellation, navigation away               │
 │   ← PublicKeyCredential with its     │      │   ├ drives the prompt (ViewImplementation callbacks)     │
@@ -146,12 +146,11 @@ the way `did_completely_finish_loading()` does:
 3. The document's permissions policy allows `publickey-credentials-create` or `publickey-credentials-get`.
 4. `sameOriginWithAncestors` comes from the canonical ancestors' active documents, and the top-level origin from the
    top-level document.
-5. The view is allowed to start a ceremony: the embedder says whether it's focused and visible (Chromium has the same
-   rule), and no other ceremony is running in its window.
+5. The view is visible and focused, as the frontend reports to the traversable (Chromium has the same rule), and its
+   tab has no other ceremony running.
 
 A failed check rejects with the exception the spec gives for it (`NotAllowedError` or `SecurityError`), so honest
-pages see the same error as from the renderer's own checks. Then `WebAuthn::Coordinator` (in `Application`) runs the
-ceremony:
+pages see the same error as from the renderer's own checks. Then `WebAuthnCoordinator` runs the ceremony:
 
 - It builds `clientDataJSON` from the canonical origin, `crossOrigin` and `topOrigin`, with the spec's
   JSON-compatible serialization of client data, and hashes it. The authenticator only ever sees the hash.
@@ -168,21 +167,26 @@ ceremony:
   already registered (`excludeCredentials`), the user is told and can try another key, and the page hears nothing
   until the user cancels or the timeout ends. A page can't use the timing to find out whether a credential exists.
 
-`WebAuthn::Authenticator` is the interface to an authenticator: `make_credential()`, `get_assertion()`, `cancel()`,
-and what it supports (from `authenticatorGetInfo`). Two implementations: one per USB key, and a virtual one.
+`Authenticator` is the interface to an authenticator: `make_credential()`, `get_assertion()`, `wait_for_touch()`,
+`get_pin_retries()`, `cancel()`, and what it supports (from `authenticatorGetInfo`). An `AuthenticatorSource` reports
+the authenticators a ceremony may use, for as long as the ceremony holds the discovery it got. There are two sources:
+USB security keys (`HIDAuthenticators`) and virtual authenticators (`VirtualAuthenticators`).
 
 The prompt is the embedder's, through `ViewImplementation`, as with permission prompts:
 
 ```
-Function<void(WebAuthn::Prompt const&)> on_web_authn_prompt;   // show, or update the shown one
+Function<void(WebAuthnPrompt const&)> on_web_authn_prompt;   // show, or update the shown one
 Function<void()> on_web_authn_prompt_closed;
 void web_authn_cancel();
-void web_authn_provide_pin(String);                            // milestone 1
-void web_authn_choose_account(size_t index);                   // milestone 2
+void web_authn_provide_pin(String);
+void web_authn_choose_account(size_t index);
+void web_authn_allow_attestation(bool);
 ```
 
-`Prompt` says what the ceremony is waiting for (a key to be inserted or touched, a PIN with the retries left, a
-choice of account, or an error with what the user can do about it), for which RP ID, origin, and top-level origin.
+`WebAuthnPrompt` says what the ceremony is waiting for (a key to be inserted or touched, a PIN with the retries left, a
+choice of account, consent to share the key's make and model, or an error with what the user can do about it), for
+which RP ID, origin, and top-level origin. A view without a prompt has no authenticators: its requests fail with
+`NotAllowedError`, as headless views' do.
 The PIN goes from the prompt to the coordinator and the authenticator, is never sent to WebContent or logged, and is
 cleared after use.
 
@@ -191,11 +195,11 @@ cleared after use.
 `HIDAuthenticator`, in LibWebView, wraps `libfido2`:
 
 - Discovery with `fido_dev_info_manifest()`, polled while a ceremony waits, so a key plugged in late is used.
-- Each key gets a worker thread for its ceremony, since `fido_dev_make_cred()` and `fido_dev_get_assert()` block until
-  the key is touched. The result goes back to the main event loop. `fido_dev_cancel()` stops it from the main thread.
-- `fido_dev_get_cbor_info()` says what the key supports: `clientPin`, built-in `uv`, `rk`, `makeCredUvNotRqd`,
-  `alwaysUv`, algorithms, extensions, transports. Keys that only speak U2F go through libfido2's U2F path, with
-  `fido-u2f` attestation.
+- Each operation runs on a thread of its own, since `fido_dev_make_cred()` and `fido_dev_get_assert()` block until the
+  key is touched. The thread opens the key, makes the request, and closes the key again, so other programs can use it
+  in between. The result goes back to the main event loop, and `fido_dev_cancel()` stops an operation from there.
+- `fido_dev_get_cbor_info()` says what the key supports: `clientPin`, built-in `uv`, `rk`, `makeCredUvNotRqd`, and its
+  algorithms. Keys that only speak U2F go through libfido2's U2F path, with `fido-u2f` attestation.
 - User verification follows Chromium's rules. A key with a fingerprint reader verifies on the key. When UV is
   `required` or `preferred` and the key has a PIN, the prompt asks for it. When UV is `required` and the key has no PIN
   and no reader, the prompt says to set a PIN first (milestone 2 adds setting one). With several keys and a PIN to
@@ -203,8 +207,9 @@ cleared after use.
 - `appid`: when `allowCredentials` isn't found under the RP ID, it tries again with the `appid` URL as the RP. A
   credential registered over U2F was made with `SHA-256(appid)` as its application parameter, and CTAP2 keys accept
   it through `getAssertion` the same way. The `appid` extension output then says which one was used.
-- The `attestationObject` is put back together with libcbor from what libfido2 returns (`fmt`, the raw `attStmt`, and
-  the raw authenticator data), since libfido2 doesn't keep the original bytes.
+- The `attestationObject` is put back together from what libfido2 returns (`fmt`, the raw `attStmt`, and the raw
+  authenticator data), since libfido2 doesn't keep the original bytes. LibWebView has a little CBOR of its own for
+  that, for reading credential public keys, and for the virtual authenticators.
 
 **Why libfido2.** It's the CTAP client OpenSSH and systemd use, maintained by Yubico, under Ladybird's license, and
 it already handles CTAPHID framing and keep-alives, both PIN protocols, U2F fallback, and years of quirks in real
@@ -220,39 +225,44 @@ Input Monitoring permission that keyboards do.
 
 ### Prompts (Xenon)
 
-`UI/WebAuthnDialog.{h,cpp}`, a sheet on the tab's window, like the permission prompt in `Tab.cpp`, in Xenon's rose
-palette. It shows:
+`UI/WebAuthnPopover.{h,cpp}`: a popover over the view whose page asked, centered near its top, in Xenon's rose
+palette. `Tab.cpp` and the extension popup each attach it to their view with one line. It shows:
 
-- **Insert or touch your security key**: "Use a security key with vault.bitwarden.com", the RP ID in bold. For a
-  cross-origin frame, also the site in the address bar ("on chrome-extension://…" or "on example.com"), which the
-  spec asks for when creating. Cancel rejects the request with `NotAllowedError`.
-- **Enter the key's PIN**, with the attempts left, and what to do when the key is blocked.
-- **Choose an account** (milestone 2), for a key holding several discoverable credentials for the site.
+- **Insert and touch your security key**: "Sign in to vault.bitwarden.com with a security key", or "Register a
+  security key with ..." with the account being registered. For a cross-origin frame, also the origin asking and the
+  site in the address bar ("Asked by https://vault.bitwarden.com, in a frame on chrome-extension://..."), which the
+  spec asks for when creating.
+- **Enter the key's PIN**, with the attempts left, and whether the last one was wrong; then **touch the key** to
+  finish.
+- **Choose an account**, for a key holding several discoverable credentials for the site.
+- **Share the key's make and model?**, when the site asks for direct attestation.
 - **Errors**: this key isn't registered with the site (try another), this key is already registered, set a PIN
-  first, too many attempts, the key doesn't support what the site asked for.
+  first, too many wrong PINs, the key can't do what the site asked, and no built-in authenticator.
 
-An extension's action popup is a `Qt::Popup`, which closes when another window takes focus, and its page goes with
-it. A request from a popup (Bitwarden's two-step login) therefore shows its prompt inside the popup, over the page,
-rather than as a sheet on the browser window. That hookup lands with whichever of this work and the extensions branch
-merges second.
+Leaving the popover, by clicking elsewhere or pressing Escape, cancels the ceremony, as Cancel does.
+
+It is a popover rather than a sheet because of extension popups. An action popup is a `Qt::Popup`, which closes when
+another window takes focus, and its page goes with it; a sheet on the browser window would end Bitwarden's two-step
+login the moment it appeared. A popover opened over the popup stacks on it, the way Qt nests popups, and the popup
+stays open underneath.
 
 ### Where each piece lives
 
 | Piece | Engine patch | Xenon |
 | --- | --- | --- |
-| Credential Management's algorithms in `get()` and `create()` | 1 | |
-| `publickey-credentials-create` and `-get` features | 2 | |
-| `PublicKeyCredential`, the responses, the options, the JSON methods, `[[Create]]` and `[[DiscoverFromExternalSource]]` up to the client data | 3 | |
-| IPC, the UI process's checks, client data, `Coordinator`, `Authenticator`, the prompt callbacks | 4 | |
-| Virtual authenticators and WebAuthn's WebDriver commands, imported WPT tests | 5 | `Meta/xenon.py test` runs a create and a get with one |
-| USB security keys through libfido2, and the vcpkg dependency | 6 | |
-| The prompts | | `UI/WebAuthnDialog`, hooked up in `UI/Tab.cpp` (a few lines) and in the extension popup |
+| Credential Management's algorithms in `get()` and `create()` | 0010 | |
+| `publickey-credentials-create` and `-get` features | 0011 | |
+| `PublicKeyCredential`, the responses, the options, the JSON methods, `[[Create]]` and `[[DiscoverFromExternalSource]]` up to the client data | 0012 | |
+| IPC, the UI process's checks, client data, `WebAuthnCoordinator`, `Authenticator`, the prompt callbacks | 0013 | |
+| Virtual authenticators and WebAuthn's WebDriver commands, the tests | 0014 | `Meta/xenon.py test` checks that requests reach the UI process in Xenon's build |
+| USB security keys through libfido2, and the vcpkg dependency | 0015 | |
+| The prompts | | `UI/WebAuthnPopover`, attached in `UI/Tab.cpp` and `UI/Extensions/Popup.cpp` (a line each) |
 
 ## The patch series
 
-Each patch is generic and could go upstream as it is: none mentions Xenon, Bitwarden, or extensions. They go in
-`Patches/ladybird` through `Meta/patches.py`, numbered after whatever the base branch carries when they're written,
-and renumbered when branches merge. None depends on the extensions branch's patches or on xenon-ublock's.
+Each patch is generic and could go upstream as it is: none mentions Xenon, Bitwarden, or extensions. They are
+`Patches/ladybird/0010` to `0015`, after the extensions branch's `0001`–`0003` and xenon-ublock's `0004`–`0009`, and
+none depends on those.
 
 1. **LibWeb: Implement Credential Management's request and create algorithms.** `get()` and `create()` stop rejecting
    as not implemented. Testable on its own with WPT's `credential-management` tests.
@@ -264,18 +274,19 @@ and renumbered when branches merge. None depends on the extensions branch's patc
 4. **LibURL+LibWeb+LibWebView+WebContent: Run WebAuthn ceremonies in the UI process.** The IPC, the checks against
    canonical documents, client data, `Coordinator`, `Authenticator`, and the `ViewImplementation` callbacks. Moves
    `is_a_registrable_domain_suffix_of_or_is_equal_to()` into LibURL.
-5. **LibWeb+LibWebCommon+LibWebView+WebDriver: Add WebAuthn virtual authenticators.** A software CTAP2 authenticator
-   (ES256, discoverable credentials, UV on demand), WebAuthn's WebDriver extension (§11: add and remove
-   authenticators, credentials, user verification), the `testdriver-vendor.js` and `Internals` hookup, and WPT's
-   `webauthn` tests.
-6. **LibWebView: Use USB security keys through libfido2.** Adds `libfido2` to `vcpkg.json`.
+5. **LibWeb+LibWebCommon+LibWebView+WebDriver: Add WebAuthn virtual authenticators.** Software CTAP1/U2F and CTAP2
+   authenticators (ES256, discoverable credentials, UV on demand), WebAuthn's WebDriver extension (§11: add and remove
+   authenticators, credentials, user verification, credential properties), the `testdriver-vendor.js` and `Internals`
+   hookup, and the tests. A tab with virtual authenticators uses only those, and runs its ceremonies without a
+   prompt. Authenticators a test adds through `Internals` are its tab's alone, since test-web runs tests side by side.
+6. **LibWebView: Use USB security keys through libfido2.** Adds `libfido2` to `vcpkg.json`, on macOS for now.
 
 ## Milestones
 
 | Milestone | What | Done when |
 | --- | --- | --- |
-| **1. Security keys** | Patches 1–6 and the Xenon prompt. On macOS: `create()`, and `get()` with `allowCredentials`. CTAP2 and U2F keys, PIN entry when a key needs one, keys with fingerprint readers, several keys at once. `residentKey` as Chromium treats it (`"required"` makes a discoverable credential; `"preferred"` makes one when the user is entering the key's PIN anyway). `appid`, `credProps`, `none` and `direct` attestation, `toJSON()` and the `parse*FromJSON()` methods, cross-origin iframes with `allow`. `isUserVerifyingPlatformAuthenticatorAvailable()` and `isConditionalMediationAvailable()` resolve `false`. | A USB security key registers and signs in on webauthn.io in Xenon. Bitwarden's WebAuthn two-step login completes in its popup. WPT's `webauthn` tests pass with a virtual authenticator, apart from those for later milestones. |
-| **2. Passkeys on security keys** | `get()` without `allowCredentials` (discoverable credentials), with the account chooser. Setting and changing a PIN. A **Security keys** section in settings: reset a key, list and delete its passkeys (`credMgmt`). `prf`/`hmac-secret`, `largeBlob`, `credProtect`, `minPinLength`, `appidExclude`. `getClientCapabilities()` reporting all of it. Linux. | Sign in to a site with a passkey on a YubiKey without typing a username. The same on Linux. |
+| **1. Security keys** | Patches `0010`–`0015` and the Xenon prompt. On macOS: `create()`, and `get()` with or without `allowCredentials`, choosing among a key's accounts. CTAP2 and U2F keys, PIN entry when a key needs one, keys with fingerprint readers, several keys at once. `residentKey` as Chromium treats it (`"required"` makes a discoverable credential; `"preferred"` makes one when the user is entering the key's PIN anyway). `appid`, `credProps`, `none` and `direct` attestation, `toJSON()` and the `parse*FromJSON()` methods, cross-origin iframes with `allow`. `isUserVerifyingPlatformAuthenticatorAvailable()` and `isConditionalMediationAvailable()` resolve `false`. | A USB security key registers and signs in on webauthn.io in Xenon. Bitwarden's WebAuthn two-step login completes in its popup. WPT's `webauthn` tests pass with a virtual authenticator, apart from those for later milestones. |
+| **2. Passkeys on security keys** | Setting and changing a PIN. A **Security keys** section in settings: reset a key, list and delete its passkeys (`credMgmt`). `prf`/`hmac-secret`, `largeBlob`, `credProtect`, `minPinLength`, `appidExclude`. `getClientCapabilities()` reporting all of it. Linux. | Sign in to a site with a passkey on a YubiKey without typing a username. The same on Linux. |
 | **3. Platform passkeys** (only with Apple's entitlement) | See below. | Sign in with an iCloud Keychain passkey, and with a phone. |
 
 PIN entry is in milestone 1 rather than with discoverable credentials. Any key that has held a passkey has a PIN
@@ -325,7 +336,7 @@ Keychain on the Mac itself.
   frame can't pass itself off as the page the user sees.
 - **Focus and visibility.** Only a focused, visible view starts a ceremony. A background tab's request rejects with
   `NotAllowedError`, as in Chromium. Hiding or closing the tab, or navigating away, cancels the ceremony on the key.
-  One ceremony per window at a time, so a page can't stack prompts.
+  One ceremony per tab at a time, so a page can't stack prompts.
 - **Timeouts.** Clamped to the spec's recommended 5 to 10 minutes, 5 by default.
 - **No probing for credentials.** "Not registered here" and "already registered" go to the user, not the page, until
   the user ends the ceremony, so the page can't tell from the result or its timing whether a credential exists.
@@ -342,17 +353,22 @@ Keychain on the Mac itself.
 
 ## Testing
 
-- **Unit tests** (Ladybird's `Tests/LibWeb`, `Tests/LibURL`): RP ID validation against the public suffix list
-  (including IP addresses, `localhost`, and suffixes like `github.io`), `clientDataJSON` serialization against the
-  spec's §16 test vectors, `none` attestation rewriting, COSE to SPKI conversion for `getPublicKey()`, and the
-  base64url JSON round trips.
-- **WPT with a virtual authenticator**: WPT's `webauthn` directory, imported into
-  `Tests/LibWeb/Text/input/wpt-import/webauthn` and served through test-web's echo server. `testdriver-vendor.js`
-  implements `add_virtual_authenticator()` and the rest through `Internals`. The same tests run in Ladybird's full WPT
-  runs (`Meta/WPT.sh`) through the WebDriver extension. Tests for later milestones stay expected failures until then.
-- **Xenon**: `Meta/xenon.py test` starts Xenon with a virtual authenticator (through a testing switch that patch 5
-  adds), loads a local page on a `*.localhost` origin that registers and then signs in, and checks the results,
-  including a cross-origin iframe with and without `allow`.
+- **Unit tests** (`Tests/LibWebView/TestWebAuthn.cpp`): `clientDataJSON` serialization and the attestation object
+  against the spec's §16 test vectors, COSE to SPKI conversion for `getPublicKey()`, self attestation, malformed CBOR,
+  and RP ID validation against the public suffix list (IP addresses, `localhost`, and suffixes like `github.io`).
+- **Web tests with a virtual authenticator** (`Tests/LibWeb/Text/input/WebAuthn`, served through test-web's echo
+  server): registering and signing in, with the assertion's signature checked through WebCrypto; the exclude list;
+  an unknown credential; a cross-origin iframe with and without `allow="publickey-credentials-get"`, whose client data
+  says `crossOrigin` and names the top origin; and the argument errors.
+- **WPT**: eight of WPT's `webauthn` tests, imported, with `testdriver-vendor.js` implementing
+  `add_virtual_authenticator()` and the rest through `Internals`. All 124 subtests pass. Ladybird's full WPT runs reach
+  the same authenticators through the WebDriver extension.
+- **WebDriver** (`Tests/LibWebView/test-webdriver-webauthn.py`): adds a virtual authenticator over WebDriver,
+  registers a discoverable credential and signs in with it, lists it, adds one with its private key, and checks user
+  verification and removal.
+- **Xenon**: `Meta/xenon.py test` loads a page in headless Xenon that checks the API is there, that a request reaches
+  the UI process (which answers `NotAllowedError`, a headless view having no prompt), and that another site's RP ID is
+  refused.
 - **By hand, with real keys** (a YubiKey 5 with and without a PIN, a U2F-only key, and two at once):
   - webauthn.io: register and authenticate with the defaults; then with UV required; then with discoverable credentials
     (milestone 2).
@@ -372,12 +388,10 @@ Keychain on the Mac itself.
 ## Status
 
 - [x] Design (this document).
-- [ ] Milestone 1: security keys.
-- [ ] Milestone 2: passkeys on security keys, and Linux.
+- [x] Milestone 1, built: patches `0010`–`0015` and `UI/WebAuthnPopover`. Its tests pass with virtual authenticators.
+  Discoverable sign-in with the account chooser came along with it. Not yet verified: a real security key on
+  webauthn.io, and Bitwarden's two-step login in its popup, both by hand.
+- [ ] Milestone 2: setting and changing a PIN, managing a key's passkeys, the remaining extensions, and Linux.
 - [ ] Milestone 3: platform passkeys (undecided).
 
-This branch starts from `main`, which doesn't have `Patches/` and `Meta/patches.py` yet. The series so far is on
-other branches: `claude/webextensions-42c7aa` has `0001`–`0003`, and the `xenon-ublock` branch adds xenon-ublock's
-engine patches on top as `0004`–`0009`. Milestone 1 starts by basing this work on those patches, so WebAuthn's six
-come after `0009`, or by bringing over the tooling alone (`8d4bd1f`) and renumbering after `0009` when the branches
-merge. On a base older than `c517088`, `Meta/patches.py` isn't executable; run it as `python3 Meta/patches.py`.
+This branch is based on the `xenon-ublock` branch, so that the WebAuthn patches come after its `0009`.

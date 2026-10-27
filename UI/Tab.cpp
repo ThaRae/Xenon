@@ -33,6 +33,7 @@
 #include <UI/Menu.h>
 #include <UI/Popover.h>
 #include <UI/StringUtils.h>
+#include <UI/WebAuthnPopover.h>
 #include <UI/WindowControlButton.h>
 
 #include <LibWebView/TabPerformanceMonitor.h>
@@ -1202,6 +1203,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
         dialog->open();
     };
+
+    WebAuthnPopover::attach(view());
 
     view().on_request_permission = [this](auto const& name, auto const& origin, auto on_decided) {
         auto requester = origin.is_opaque() ? "this page"_string : origin.serialize();
