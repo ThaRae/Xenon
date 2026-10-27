@@ -34,7 +34,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Libraries/LibWebCommon/WebDriver/Client.h     |  10 +
  Libraries/LibWebView/Application.cpp          |   3 +
  Libraries/LibWebView/CMakeLists.txt           |   1 +
- Libraries/LibWebView/WebAuthn/Coordinator.cpp |  62 +-
+ Libraries/LibWebView/WebAuthn/Coordinator.cpp |  70 +-
  .../WebAuthn/VirtualAuthenticator.cpp         | 603 ++++++++++++++++
  .../WebAuthn/VirtualAuthenticator.h           | 120 ++++
  Libraries/LibWebView/WebContentTestClient.cpp |  11 +
@@ -77,7 +77,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  .../Text/input/wpt-import/webauthn/helpers.js | 679 ++++++++++++++++++
  Tests/LibWebView/CMakeLists.txt               |   6 +
  Tests/LibWebView/test-webdriver-webauthn.py   | 140 ++++
- 51 files changed, 2788 insertions(+), 8 deletions(-)
+ 51 files changed, 2795 insertions(+), 9 deletions(-)
  create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
  create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
  create mode 100644 Tests/LibWeb/Text/data/webauthn-get-in-frame.html
@@ -258,7 +258,7 @@ index 8b84a1a14cf5da6bd5f5e2b3e81f385f943fc7b3..bf1f33edfc44e375966d35c02cadc519
      WebContentClient.cpp
      WebContentPage.cpp
 diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.cpp b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
-index 14a098cc789c647c3ea75fec25219563d9b2d320..737212b1d0745299a487fde4c5699c74930f0827 100644
+index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e048ce014 100644
 --- a/Libraries/LibWebView/WebAuthn/Coordinator.cpp
 +++ b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
 @@ -15,6 +15,7 @@
@@ -367,6 +367,21 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..737212b1d0745299a487fde4c5699c74
      }
  
      if (any_of(m_ceremonies, [&](auto const& ceremony) { return ceremony->page() && &ceremony->page()->traversable() == &traversable; })) {
+@@ -839,7 +885,13 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
+ 
+     auto ceremony = adopt_ref(*new Ceremony(page, request_id, move(context), move(request)));
+     m_ceremonies.append(ceremony);
+-    ceremony->start(m_sources);
++
++    // NB: As in other browsers, a tab with virtual authenticators uses only those, so that the authenticators plugged
++    //     into the machine running the tests can't change what the tests see.
++    if (VirtualAuthenticators::the().is_enabled_for(traversable))
++        ceremony->start({ &VirtualAuthenticators::the() });
++    else
++        ceremony->start(m_sources);
+ }
+ 
+ void WebAuthnCoordinator::ceremony_ended(Ceremony& ceremony)
 diff --git a/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd283f54b1
