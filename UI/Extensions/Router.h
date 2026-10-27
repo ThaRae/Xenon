@@ -66,6 +66,10 @@ public:
     // A context that may have gone away, such as a popup that closed.
     void prune_closed_contexts();
 
+    // Follows navigations for webNavigation's events while any extension has the permission for them. Call it whenever
+    // the set of extensions, or their permissions, changes.
+    void update_navigation_events();
+
 private:
     friend class AK::NeverDestroyed<Router>;
     Router();
@@ -129,6 +133,7 @@ private:
     void change_css(Context&, u64 call_id, JsonObject const& injection, bool insert);
     ErrorOr<JsonValue, String> handle_registered_content_scripts_call(Context&, String const& name, JsonArray const& args);
     ErrorOr<JsonValue, String> handle_web_navigation_call(Context&, String const& name, JsonArray const& args);
+    void did_navigate(WebView::CanonicalNavigable const&, StringView webdriver_bidi_event, URL::URL const&);
 
     void send_runtime_message(Context&, u64 call_id, JsonValue message, Vector<WebView::ScriptBridgeEndpoint> receivers);
     void send_tab_message(Context&, u64 call_id, JsonArray const& args);
@@ -161,6 +166,7 @@ private:
 
 StringView context_kind_name(ContextKind);
 // Chrome's document IDs and context IDs are opaque strings.
+String document_id_string(Web::HTML::CrossProcessId document_id);
 String document_id_string(WebView::ScriptBridgeEndpoint const&);
 
 }

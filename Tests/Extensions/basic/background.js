@@ -5,6 +5,11 @@ chrome.runtime.onInstalled.addListener(details => events.push(`installed:${detai
 chrome.runtime.onStartup.addListener(() => events.push("startup"));
 chrome.alarms.onAlarm.addListener(alarm => events.push(`alarm:${alarm.name}`));
 
+// What runScriptingTests() checks of webNavigation's events.
+const navigationEvents = [];
+for (const name of ["onBeforeNavigate", "onCommitted", "onDOMContentLoaded", "onCompleted", "onErrorOccurred"])
+    chrome.webNavigation[name].addListener(details => navigationEvents.push({ name, ...details }));
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message?.toBackground) {
         case "ping":
@@ -171,5 +176,45 @@ async function runScriptingTests(sender) {
 
     await chrome.scripting.unregisterContentScripts({ ids: ["registered"] });
     check("unregisterContentScripts", (await chrome.scripting.getRegisteredContentScripts()).length === 0);
+
+    // webNavigation's events follow the frame as it navigates, and when a navigation fails.
+    const waitFor = async condition => {
+        for (let tries = 0; tries < 100 && !condition(); ++tries) await new Promise(resolve => setTimeout(resolve, 50));
+        return condition();
+    };
+    const navigate = url =>
+        chrome.scripting.executeScript({
+            target: { tabId, frameIds: [child?.frameId] },
+            func: url => {
+                location.href = url;
+            },
+            args: [url],
+        });
+    const eventsFor = suffix => navigationEvents.filter(event => event.frameId === child?.frameId && event.url.endsWith(suffix));
+
+    await navigate("/frame?navigated");
+    await waitFor(() => eventsFor("?navigated").some(event => event.name === "onCompleted"));
+    const sequence = eventsFor("?navigated");
+    results["info: navigation events"] = sequence.map(event => event.name);
+    check(
+        "webNavigation events come in order",
+        sequence.map(event => event.name).join() === "onBeforeNavigate,onCommitted,onDOMContentLoaded,onCompleted"
+    );
+    const committed = sequence.find(event => event.name === "onCommitted");
+    const completed = sequence.find(event => event.name === "onCompleted");
+    check(
+        "webNavigation events' details",
+        sequence.every(event => event.tabId === tabId && event.parentFrameId === 0 && event.frameType === "sub_frame") &&
+            committed?.transitionType === "auto_subframe" &&
+            typeof committed.documentId === "string" &&
+            committed.documentId === completed?.documentId
+    );
+
+    await navigate("http://127.0.0.1:1/");
+    check(
+        "webNavigation.onErrorOccurred",
+        await waitFor(() => eventsFor("127.0.0.1:1/").some(event => event.name === "onErrorOccurred" && event.error))
+    );
+    results["info: failed navigation events"] = eventsFor("127.0.0.1:1/").map(event => event.name);
     return results;
 }

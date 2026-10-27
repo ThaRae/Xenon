@@ -127,6 +127,12 @@ outright once upstream has the equivalent. A fork does make engine work a little
 
    Still to come: per-extension stylesheets the page can't see (for `insertCSS` and content scripts' `css`;
    `Page::set_user_style()` is one per page and has no IPC). For now, both are stylesheets the document adopts.
+6. **Navigation events for the embedder** (`0018`, done). `Application::set_navigation_event_handler()` gives the
+   embedder every navigation event WebDriver BiDi gets, by BiDi's names, with the navigable it's about: navigations
+   starting and failing in the browser process, and committing, firing DOMContentLoaded, loading, failing, and being
+   aborted in the processes hosting web content. Those processes only reported them during a BiDi session; while the
+   embedder has a handler, `WebDriver::BiDi::reports_navigation_events()` is true for them too, and nothing else of
+   BiDi runs. Xenon makes `webNavigation`'s events of them.
 
 The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
 no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
@@ -485,10 +491,15 @@ for Bitwarden in Chrome.
     `unregisterContentScripts`, `updateContentScripts`, and `getRegisteredContentScripts`, kept across sessions when
     asked. `webNavigation.getFrame` and `getAllFrames` for every frame of a tab. A runtime message that no context
     has a listener for fails with "Receiving end does not exist", as in Chrome.
+  - `webNavigation` events (patch 18), for every frame of a tab: `onBeforeNavigate`, `onCommitted`,
+    `onDOMContentLoaded`, `onCompleted`, `onErrorOccurred` (`net::ERR_FAILED`, or `net::ERR_ABORTED`),
+    `onReferenceFragmentUpdated`, and `onHistoryStateUpdated`, with the tab, frame, parent frame, document, and
+    Chrome's other details. They're followed while any extension has the `webNavigation` permission.
   - In a headless browser, the page it loads stands for tab 1 of window 1, for `tabs.get`, `tabs.query`, `sender.tab`,
-    `tabs.sendMessage`, and `scripting`, so that `Meta/xenon.py test` can check them. It checks 41 things on its
+    `tabs.sendMessage`, and `scripting`, so that `Meta/xenon.py test` can check them. It checks 44 things on its
     content script page now, among them `executeScript` in each world and frame, results and promises, CSS, frames,
-    `tabs.sendMessage` to content scripts, and a registered script running in a frame that reloads.
+    `tabs.sendMessage` to content scripts, a registered script running in a frame that reloads, and the
+    `webNavigation` events of a frame's navigation and of one that fails.
   - Bitwarden's autofill scripts go in at its content script's request: on a login page, its inline menu shows on the
     focused field (seen in a headless render with a locked vault: "Unlock your account to view autofill
     suggestions"). Its frames are `web_accessible_resources` pages, which load in the page. With the vault unlocked,
@@ -496,7 +507,8 @@ for Bitwarden in Chrome.
 
   Left:
   - Saving new logins (Bitwarden's notification bar) hasn't been checked on its own.
-  - `webNavigation` events, which Bitwarden's autofill and badge listen for.
+  - `webNavigation`'s `onCreatedNavigationTarget` and `onTabReplaced`, and real error names (Chrome's
+    `net::ERR_NAME_NOT_RESOLVED` and the like) and transition types.
   - `web_accessible_resources` as subresources of web pages (frames already load), and sandboxed pages.
   - `match_about_blank`, `match_origin_as_fallback`, and `file:` access. `activeTab`.
   - Content scripts' and `insertCSS`'s stylesheets as user stylesheets. Values the page posts arriving as copies in

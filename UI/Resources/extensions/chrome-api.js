@@ -479,7 +479,8 @@ const windows = {
 
 // --- chrome.webNavigation and chrome.scripting -------------------------------------------------------------------------
 
-// FIXME: The navigation events never fire yet. getFrame() and getAllFrames() see every frame of a tab.
+// The events follow every frame of a tab (onCreatedNavigationTarget and onTabReplaced never fire), and getFrame() and
+// getAllFrames() see every frame.
 const webNavigation = {
     getFrame: method("webNavigation.getFrame"),
     getAllFrames: method("webNavigation.getAllFrames"),

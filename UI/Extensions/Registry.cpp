@@ -196,6 +196,7 @@ void Registry::grant_optional_permissions(StringView id, Vector<String> const& p
     extension->set_granted_optional_permissions(move(granted));
     m_granted_permissions.set(extension->id(), extension->granted_optional_permissions());
     save_state();
+    Router::the().update_navigation_events();
 }
 
 void Registry::revoke_optional_permissions(StringView id, Vector<String> const& permissions)
@@ -209,6 +210,7 @@ void Registry::revoke_optional_permissions(StringView id, Vector<String> const& 
     extension->set_granted_optional_permissions(move(granted));
     m_granted_permissions.set(extension->id(), extension->granted_optional_permissions());
     save_state();
+    Router::the().update_navigation_events();
 }
 
 Optional<Registry::ControlledSetting const&> Registry::controlled_setting(StringView name) const
@@ -267,6 +269,7 @@ void Registry::notify_extensions_changed()
 {
     update_origin_access_allow_list();
     ContentScripts::update();
+    Router::the().update_navigation_events();
     m_change_listeners.remove_all_matching([](auto& listener) { return !listener(); });
 }
 

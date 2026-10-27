@@ -77,10 +77,14 @@ static JsonArray string_array(Vector<String> const& strings)
     return array;
 }
 
+String document_id_string(Web::HTML::CrossProcessId id)
+{
+    return MUST(String::formatted("{:x}-{:x}", id.namespace_id, id.local_id));
+}
+
 String document_id_string(WebView::ScriptBridgeEndpoint const& endpoint)
 {
-    auto id = endpoint.document_id();
-    return MUST(String::formatted("{:x}-{:x}", id.namespace_id, id.local_id));
+    return document_id_string(endpoint.document_id());
 }
 
 static JsonArray accept_languages()

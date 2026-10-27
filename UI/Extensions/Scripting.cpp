@@ -9,7 +9,10 @@
 #include <AK/RefCounted.h>
 #include <AK/StringBuilder.h>
 #include <LibFileSystem/FileSystem.h>
+#include <LibWebView/Application.h>
+#include <LibWebView/CanonicalTraversable.h>
 #include <LibWebView/UserScriptHandler.h>
+#include <LibWebView/ViewImplementation.h>
 #include <UI/Extensions/Browser.h>
 #include <UI/Extensions/ContentScripts.h>
 #include <UI/Extensions/MatchPattern.h>
@@ -469,8 +472,7 @@ ErrorOr<JsonValue, String> Router::handle_registered_content_scripts_call(Contex
 
 // --- chrome.webNavigation ---------------------------------------------------------------------------------------------
 
-// FIXME: The navigation events. A frame's URL is the one its document was created with; Chrome follows same-document
-//        navigations too.
+// FIXME: A frame's URL is the one its document was created with; Chrome follows same-document navigations too.
 ErrorOr<JsonValue, String> Router::handle_web_navigation_call(Context& context, String const& name, JsonArray const& args)
 {
     if (!context.extension->has_permission("webNavigation"sv))
@@ -525,6 +527,87 @@ ErrorOr<JsonValue, String> Router::handle_web_navigation_call(Context& context, 
     }
 
     return MUST(String::formatted("{} isn't supported yet.", name));
+}
+
+void Router::update_navigation_events()
+{
+    auto any_extension_wants_them = any_of(Registry::the().extensions(), [](auto const& extension) {
+        return extension->has_permission("webNavigation"sv);
+    });
+    if (!any_extension_wants_them) {
+        WebView::Application::the().set_navigation_event_handler({});
+        return;
+    }
+    WebView::Application::the().set_navigation_event_handler([](WebView::CanonicalNavigable const& navigable, StringView event, URL::URL const& url) {
+        Router::the().did_navigate(navigable, event, url);
+    });
+}
+
+// The webNavigation events of a tab's frames, from the navigation events WebDriver BiDi has.
+// https://developer.chrome.com/docs/extensions/reference/api/webNavigation#event-order
+void Router::did_navigate(WebView::CanonicalNavigable const& navigable, StringView webdriver_bidi_event, URL::URL const& url)
+{
+    struct EventName {
+        StringView webdriver_bidi;
+        StringView web_navigation;
+    };
+    static constexpr auto event_names = to_array<EventName>({
+        { "browsingContext.navigationStarted"sv, "webNavigation.onBeforeNavigate"sv },
+        { "browsingContext.navigationCommitted"sv, "webNavigation.onCommitted"sv },
+        { "browsingContext.domContentLoaded"sv, "webNavigation.onDOMContentLoaded"sv },
+        { "browsingContext.load"sv, "webNavigation.onCompleted"sv },
+        { "browsingContext.navigationFailed"sv, "webNavigation.onErrorOccurred"sv },
+        { "browsingContext.navigationAborted"sv, "webNavigation.onErrorOccurred"sv },
+        { "browsingContext.fragmentNavigated"sv, "webNavigation.onReferenceFragmentUpdated"sv },
+        { "browsingContext.historyUpdated"sv, "webNavigation.onHistoryStateUpdated"sv },
+    });
+    StringView event;
+    for (auto const& name : event_names) {
+        if (name.webdriver_bidi == webdriver_bidi_event)
+            event = name.web_navigation;
+    }
+    if (event.is_empty())
+        return;
+
+    // Only tabs' navigations, not those of extensions' hidden views or popups.
+    auto view = navigable.top_level_traversable().view();
+    if (!view.has_value())
+        return;
+    auto ids = Browser::tab_and_window_ids(view->view_id());
+    if (!ids.has_value())
+        return;
+
+    auto is_top_level = navigable.is_top_level_traversable();
+    auto const* parent = navigable.parent();
+
+    JsonObject details;
+    details.set("tabId"sv, ids->tab_id);
+    details.set("frameId"sv, frame_id(navigable.id(), is_top_level));
+    details.set("parentFrameId"sv, parent ? frame_id(parent->id(), parent->is_top_level_traversable()) : -1);
+    details.set("url"sv, url.serialize());
+    details.set("timeStamp"sv, static_cast<double>(UnixDateTime::now().milliseconds_since_epoch()));
+    details.set("processId"sv, -1);
+    details.set("frameType"sv, is_top_level ? "outermost_frame"sv : "sub_frame"sv);
+    details.set("documentLifecycle"sv, "active"sv);
+    if (parent)
+        details.set("parentDocumentId"sv, document_id_string(parent->active_document().id()));
+    // Before a navigation, the document is the one it navigates away from, which Chrome leaves out.
+    if (event != "webNavigation.onBeforeNavigate"sv)
+        details.set("documentId"sv, document_id_string(navigable.active_document().id()));
+    if (event == "webNavigation.onCommitted"sv) {
+        details.set("transitionType"sv, is_top_level ? "link"sv : "auto_subframe"sv);
+        details.set("transitionQualifiers"sv, JsonArray {});
+    }
+    if (event == "webNavigation.onErrorOccurred"sv)
+        details.set("error"sv, webdriver_bidi_event == "browsingContext.navigationAborted"sv ? "net::ERR_ABORTED"sv : "net::ERR_FAILED"sv);
+
+    for (auto const& extension : Registry::the().extensions()) {
+        if (!extension->has_permission("webNavigation"sv))
+            continue;
+        JsonArray args;
+        args.must_append(details);
+        dispatch_event(extension, event, move(args));
+    }
 }
 
 }

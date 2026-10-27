@@ -488,12 +488,13 @@ def check_extensions(executable: Path, env: dict) -> bool:
     for name, page_results in (("web page", results), ("content scripts", content_script_results)):
         if page_results is None:
             return False
-        failed = sorted(name for name, ok in page_results.items() if ok is not True)
+        checks = {check: ok for check, ok in page_results.items() if not check.startswith("info: ")}
+        failed = sorted(check for check, ok in checks.items() if ok is not True)
         if failed:
             print(f"    {name}: failed {failed}", file=sys.stderr)
             passed = False
         else:
-            print(f"    {name}: {len(page_results)} checks passed")
+            print(f"    {name}: {len(checks)} checks passed")
     return passed
 
 
