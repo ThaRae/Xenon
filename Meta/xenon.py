@@ -6,6 +6,8 @@
 # project() call so the Xenon frontend is added once every engine library and helper process exists. Xenon's patches
 # to the engine (Patches/ladybird) are applied first, if ladybird/ doesn't have them yet; see Meta/patches.py.
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import http.server
@@ -57,6 +59,9 @@ ALLOWED_REQUESTS = {"/app.js": "script", "/logo.gif": "img"}
 # A test extension whose pages check the chrome.* APIs and print what they found on a line starting with this.
 TEST_EXTENSION_DIR = XENON_SOURCE_DIR / "Tests" / "Extensions" / "basic"
 EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
+
+# A page that tries WebAuthn and prints what it found on a line starting with this.
+WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
 
 
 def main():
@@ -221,6 +226,10 @@ def test_main(platform: Platform, build_dir: Path):
     if not check_extensions(app_executable(platform, build_dir), env):
         failures.append("extensions")
 
+    print("==> WebAuthn requests reach the UI process", flush=True)
+    if not check_web_authn(app_executable(platform, build_dir), env):
+        failures.append("WebAuthn")
+
     if failures:
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
         sys.exit(1)
@@ -280,6 +289,73 @@ def check_content_blocking(executable: Path, env: dict) -> bool:
     finally:
         server.shutdown()
     return passed
+
+
+# The WebAuthn engine patches are in the build: the API is there, and requests go to the UI process, which checks them
+# against its own records of the page and runs the ceremony. A headless browser has no prompt to ask the user with,
+# so it answers as a browser with no authenticators does. The ceremonies themselves are tested in the engine, with
+# virtual authenticators (Tests/LibWeb/Text/input/WebAuthn).
+def check_web_authn(executable: Path, env: dict) -> bool:
+    page = f"""<!doctype html><script>
+        const outcome = promise => promise.then(() => "resolved", error => error.name);
+        const publicKey = {{
+            rp: {{ name: "Xenon" }},
+            user: {{ id: new Uint8Array([1]), name: "user", displayName: "User" }},
+            challenge: new Uint8Array(32),
+            pubKeyCredParams: [{{ type: "public-key", alg: -7 }}],
+        }};
+        // NB: One at a time, since a window may only have one request for a credential type pending.
+        (async () => [
+            await outcome(navigator.credentials.create({{ publicKey }})),
+            await outcome(navigator.credentials.get({{ publicKey: {{ challenge: new Uint8Array(32), rpId: "example.com" }} }})),
+            await PublicKeyCredential.getClientCapabilities(),
+        ])().then(([create, otherSite, capabilities]) => {{
+            const results = {{
+                "PublicKeyCredential": typeof PublicKeyCredential === "function",
+                "no authenticators": create === "NotAllowedError",
+                "another site's RP ID": otherSite === "SecurityError",
+                "appid extension": capabilities["extension:appid"] === true,
+            }};
+            console.log("{WEB_AUTHN_TEST_MARKER}" + JSON.stringify(results));
+            window.close();
+        }});
+    </script>""".encode()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(page)))
+            self.end_headers()
+            self.wfile.write(page)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        # WebAuthn needs a secure context whose host is a domain: localhost is both.
+        url = f"http://localhost:{server.server_address[1]}/"
+        with tempfile.TemporaryDirectory() as profile:
+            command = [str(executable), "--headless=manual", "--profile-path", profile, url]
+            try:
+                result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)
+            except subprocess.TimeoutExpired:
+                print("    timed out on the WebAuthn page", file=sys.stderr)
+                return False
+    finally:
+        server.shutdown()
+
+    output = result.stdout + result.stderr
+    for line in output.splitlines():
+        if WEB_AUTHN_TEST_MARKER in line:
+            results = json.loads(line.split(WEB_AUTHN_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
+            for name, passed in results.items():
+                print(f"    {'pass' if passed else 'FAIL'}: {name}")
+            return all(results.values())
+    print(output[-4000:], file=sys.stderr)
+    return False
 
 
 # Chrome's ID for an unpacked extension without a key: its directory's path, hashed (see UI/Extensions/Extension.cpp).

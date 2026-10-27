@@ -2,8 +2,8 @@
 ! Source: https://ublockorigin.github.io/uAssets/thirdparties/easylist-notifications.txt
 ! Homepage: https://easylist.to/
 ! License: GPL-3.0-or-later OR CC-BY-SA-3.0-or-later (https://easylist.to/pages/licence.html)
-! Converted by xenon-ublock on 2026-10-26 17:30 UTC for adblock 0.13.3, as built into Ladybird's LibWeb/ContentBlocker.
-! Kept 1595 of 1686 upstream filters, as 1591 filters; the rest cannot take
+! Converted by xenon-ublock on 2026-10-26 18:47 UTC for Ladybird's content blocker with xenon-ublock's engine/patches (adblock 0.13.3 with css-validation, uBlock Origin's resources).
+! Kept 1686 of 1686 upstream filters, as 1682 filters; the rest cannot take
 ! effect in Ladybird. See report.md and dropped/ next to this file for what was dropped and why.
 !
 -push-notification.$domain=~github.com
@@ -1408,11 +1408,13 @@ delta.com##idp-dynamic-banner
 google.*##mobile-promo
 m.yelp.*##section:has([data-testid="pitch-link"])
 reddit.com##shreddit-experience-tree[active-experiences*="app_selector"]
+sixt.*##.jyjDHO:has-text(SIXT App)
 weatherbug.com##smart-app-banner
 fedex.com##trk-shared-smart-app-banner
 voicy.jp##v-sp-download
 msn.com##views-chrome-extension
 msn.com##views-promo-card
+wnky.com##.vc_btn3-center:has-text(Download)
 reddit.com##xpromo-app-selector
 reddit.com##xpromo-top-button
 gemini.google.com##.cdk-overlay-container:has(.get-app-mobile-dialog)
@@ -1424,19 +1426,52 @@ axios.com##.mt-6:has(> [href="https://www.axios.com/newsletters"])
 sp.nicovideo.jp##div[style="height: 56px;"]:has(> a[href^="https://nicovideo.applink.nicovideo.jp/?link"])
 anglers.jp##nav.navbar-expand-sm:has(> a[href^="https://anglers.go.link?deep_link="][style="width: 100%;"])
 channel.rakuten.co.jp##rch-app > div[class]:has(> a[rel][href^="https://rchannel.onelink.me/"])
+7news.com.au##.e1s06mna1:has-text(Know the news)
+abc.net.au##[data-component="RelatedCard"]:has-text(Stream your favourite shows)
+chatgpt.com##.z-20.bottom-full:has-text(Get Extension)
+dailynews24.in##.gb-button:has-text(Open App)
+delish.com##section[data-lazy-id*="P0-"]:has-text(Cooking is easier on the app.)
+etuovi.com##.mui-style-fyvzvi:has-text(Uutta! Lataa ilmainen Etuovi.com-sovellus!)
+facebook.com##div[style="pointer-events: none; flex-grow: 1; justify-content: inherit; flex-direction: column;"]:has-text(Get Facebook)
+foxnews.com##strong:has-text(GET THE FOX NEWS APP)
+kayak.com##.gkz0-toast:has-text(Get Price Alerts)
+linkedin.com##.top-level-modal-container:has-text(Get the full app experience)
+linkedin.com##div#public_post_contextual-sign-in:has-text(Sign in to view more content)
+m.facebook.com,www.facebook.com##.bottom.fixed-container.m:has-text(Get the best experience)
+mail.proton.me##[aria-label="Notification"]:has-text(app)
+news.bitcoin.com##.cwDafx:has-text(Continue in the Bitcoin.com App)
+safeswim.org.nz##.px-10:has-text(Download it now)
+thepointsguy.com##.noVerticalPad:has-text(Download the TPG App)
+x.com##.r-13qz1uu.r-1xcajam:has-text(See more on)
+downace.com##+js(acis, requestPermission)
+news18.com##+js(acis, serviceworker.register)
 puuilo.fi##.cf-container-wrapper
 puuilo.fi##body:style(overflow: auto !important)
+noovo.info##+js(set-cookie, pushNotifications_popup_displayed_v2, true)
 autoevolution.com###notif_asker_div
 autoevolution.com##body,html:style(height: auto !important; overflow: auto !important)
+threads.net##+js(set-session-storage-item, barcelona_mobile_upsell_state, 1)
 phonearena.com###pa-survey-modal
 phonearena.com##.pa-modal-backdrop
 phonearena.com##body:style(overflow: auto !important; position: initial !important;)
+instagram.com##+js(set-session-storage-item, lodum, 1)
+instagram.com##+js(set-session-storage-item, loggedOutCTAIsShown, 1)
+ktoo.org##+js(set-cookie, modalDismissed, 1)
+threads.com##+js(set-session-storage-item, barcelona_mobile_upsell_state, 1)
+livesportsontv.com##+js(set-local-storage-item, promotion-popup-closed, 1)
+gq.co.za##+js(set-cookie, PromptLater, true)
 ask.fm##.lightbox_overlay
 ask.fm##body:style(overflow: auto !important)
+cosmos.so##+js(set, Object.prototype.disablePaginationLimitForLoggedOut, true)
 speedtest.net##body:style(overflow: auto !important)
+speedtest.net##.\!z-\[3500\]:has-text(Speedtest is better with the app)
+goodreads.com##+js(set-cookie, blocking_sign_in_interstitial, true)
 reddit.com###app-upsell-blocking-bottom-sheet-seo
 reddit.com###configured-xpromo-mweb3x_mid_funnel_blocking_v1_30s
 reddit.com###xpromo-small-header.mr-xs
+reddit.com##+js(aeld, block-body-scrolling)
+reddit.com##+js(rc, scroll-disabled, body, stay)
+reddit.com##+js(set-local-storage-item, xpromo-consolidation, 1)
 amp.reddit.com##.AppSelectorModal__body
 reddit.com##.PreviewDrawer
 reddit.com##.XPromoBlockingModalRpl
@@ -1450,12 +1485,25 @@ reddit.com##.v2 > shreddit-async-loader
 reddit.com##body.scroll-disabled:style(overflow: visible!important; position: static!important;)
 reddit.com##body:style(pointer-events:auto !important;)
 reddit.com##shreddit-async-loader[bundlename="app_selector"]
+reddit.com##shreddit-async-loader[bundlename="app_selector"]:remove()
 reddit.com##shreddit-experience-tree
+reddit.com##+js(prevent-addEventListener, touchmove)
+reddit.com##+js(remove-class, rpl-scroll-lock, body, stay)
+reddit.com##+js(remove-class, scroll-is-blocked, body, stay)
+reddit.com##.rpl-bottom-sheet:has-text(Get the app)
+facebook.com##+js(rc, prevent-scrolling, body, stay)
+facebook.com##.bottom.fixed-container.m:has(span.f2:has-text(Open app))
+facebook.com##.dialog-screen.bg-s1.m:has(span.f2:has-text(Get app))
+tiktok.com##+js(set-session-storage-item, webapp_first_open_cta, 1)
 tiktok.com##.e1pecv674.css-99ed1t-DivFooterGuide
 tiktok.com##.e1x4pa920.css-18fyv6p-DivFloatButtonWrapper
+m.twitch.tv##+js(set-session-storage-item, twilight.custom-smart-banner-dismissed, true)
+perplexity.ai##+js(set-session-storage-item, appDownloadBannerDismissed, true)
+app.uniswap.org##+js(set-session-storage-item, hideMobileAppPromoBanner, true)
 lightnovelworld.com###lnwappmsg
 lightnovelworld.com##html:style(overflow: auto !important;)
 bestbuy.com###smartbannerContainer
+bestbuy.com##+js(set-local-storage-item, smartBannerDismissed, 1)
 bestbuy.com##body:style(margin-top:0px !important)
 expedia.at,expedia.co.id,expedia.co.in,expedia.co.jp,expedia.co.kr,expedia.co.nz,expedia.co.th,expedia.co.uk,expedia.com,expedia.com.ar,expedia.com.au,expedia.com.hk,expedia.com.sg,expedia.de,expedia.dk,expedia.es,expedia.fi,expedia.fr,expedia.it,expedia.nl,expedia.no,expedia.se,hotels.com###app-layer-customer-notification-centered-sheet-dialog
 expedia.at,expedia.co.id,expedia.co.in,expedia.co.jp,expedia.co.kr,expedia.co.nz,expedia.co.th,expedia.co.uk,expedia.com,expedia.com.ar,expedia.com.au,expedia.com.hk,expedia.com.sg,expedia.de,expedia.dk,expedia.es,expedia.fi,expedia.fr,expedia.it,expedia.nl,expedia.no,expedia.se,hotels.com##body,html:style(overflow: auto !important; position: initial !important;)
@@ -1465,13 +1513,21 @@ asia.nikkei.com,businesspost.ie,rappler.com##body:style(height: auto !important;
 levels.fyi##.download-app-promo-module-scss-module__g5Zuta__downloadAppPromoContent
 levels.fyi##.modal-module-scss-module__jIc2SW__overlay
 levels.fyi##body:style(overflow: auto !important; position: initial !important;)
+google.com##+js(set-local-storage-item, mapslitepromosdismissed, 1)
 behance.net##.js-vue-mobile-app-upsell
 behance.net##body,html:style(overflow: auto !important; position: initial !important;)
+m.economictimes.com##+js(set-session-storage-item, nudgeStickyBannerHide, true)
+mypenndentist.org##+js(set-cookie, undefinedpopup-pdfpcouponoffer, 1)
 ifunny.co##.aq4y._0sJI
 ifunny.co##body,html:style(overflow: auto !important; position: initial !important;)
 x.com##html:style(overflow: auto !important;)
+x.com##[role="dialog"]:has-text(See this post in the app)
 opentable.com##[data-testid="app-download-toast"]
 opentable.com##body:style(overflow: auto !important;)
+crunchbase.com##+js(set-local-storage-item, entity-limiter-views, $remove$)
+themonthly.com.au##+js(set-local-storage-item, rn, $remove$)
+tunein.com##+js(set-cookie, hideMacDesktopDialog, true)
+tunein.com##+js(set-cookie, navBasedDialogManager, true)
 sprintmedical.in##.react-responsive-modal-root
 sprintmedical.in##body:style(height: auto !important; overflow: auto !important)
 trip.com##.tcp-h5-install-pop
@@ -1479,7 +1535,10 @@ trip.com##body:style(overflow: auto !important; position: initial !important;)
 player.fm##.bottom-promo
 player.fm##.bottom-promo-overlay
 player.fm##body,html:style(overflow: auto !important; position: initial !important;)
+wunderground.com##+js(rc, enable-sda, body, stay)
+tubitv.com##+js(set-local-storage-item, windows_prompt_shown_v3, 1)
 makerworld.com##body:style(overflow: auto !important; position: initial !important;)
+makerworld.com##.MuiModal-root.MuiDialog-root:has-text(Open in Bambu Handy)
 m.economictimes.com###prominentOverlay
 m.economictimes.com##body,html:style(overflow: auto !important; position: initial !important;)
 m.yelp.be,m.yelp.ca,m.yelp.co.jp,m.yelp.co.nz,m.yelp.co.uk,m.yelp.com,m.yelp.com.au,m.yelp.com.br,m.yelp.com.mx,m.yelp.com.tr,m.yelp.com.tw,m.yelp.cz,m.yelp.de,m.yelp.dk,m.yelp.es,m.yelp.fi,m.yelp.fr,m.yelp.ie,m.yelp.it,m.yelp.nl,m.yelp.no,m.yelp.pt,m.yelp.se##[aria-label*="Download the Yelp app"]
@@ -1488,6 +1547,7 @@ m.yelp.be,m.yelp.ca,m.yelp.co.jp,m.yelp.co.nz,m.yelp.co.uk,m.yelp.com,m.yelp.com
 m.yelp.be,m.yelp.ca,m.yelp.co.jp,m.yelp.co.nz,m.yelp.co.uk,m.yelp.com,m.yelp.com.au,m.yelp.com.br,m.yelp.com.mx,m.yelp.com.tr,m.yelp.com.tw,m.yelp.cz,m.yelp.de,m.yelp.dk,m.yelp.es,m.yelp.fi,m.yelp.fr,m.yelp.ie,m.yelp.it,m.yelp.nl,m.yelp.no,m.yelp.pt,m.yelp.se##div[class^="overlay-color-"]
 thedesignlove.com##.cp-overlay
 thedesignlove.com##body,html:style(overflow: auto !important; position: initial !important;)
+sigmalive.com##+js(set-local-storage-item, push-notifications, no)
 linkedin.com##.overlay
 linkedin.com##.promo
 linkedin.com##.promo-bottom-sheet
@@ -1504,6 +1564,7 @@ canva.com##.BB_TDQ[style="height: auto; max-height: 66vh;"]
 canva.com##body:style(overflow: auto !important; position: initial !important;)
 ebay.com##.pc-dweb
 ebay.com##html:style(overflow: auto !important; position: initial !important;)
+audius.co##+js(rc, scrollLock, , stay)
 audius.co##[class*="AppRedirectPopover_container_"]
 audius.co##body:style(overflow: scroll !important)
 cnet.com##.c-globalModal
@@ -1525,6 +1586,7 @@ businessinsider.com,insider.com##body:style(overflow: auto !important; position:
 makemytrip.com##.appDnldOffers
 makemytrip.com##.overlay-wrapper
 makemytrip.com##body:style(overflow: unset !important)
+thestar.com##+js(rc, kumulos-background-mask-blur, , stay)
 thestar.com##.kumulos-background-mask
 thestar.com##.kumulos-prompt
 thestar.com##body,html:style(overflow: auto !important; position: initial !important;)
@@ -1532,30 +1594,57 @@ sports.ndtv.com###__cricketsubscribe
 sports.ndtv.com###overlaybtn
 sports.ndtv.com##body,html:style(overflow: auto !important; position: initial !important;)
 inews.hket.com###app-floating-button
+inews.hket.com##+js(rc, no-scroll, html, stay)
 inews.hket.com##.app-redirect-panel
+jp-m.banggood.com##+js(rc, show-app-bar, , stay)
 realestate.co.nz##.z-overlay
 realestate.co.nz##body:style(height: auto !important; overflow: auto !important)
 miravia.es###g_download_bar
 miravia.es##html:style(--g-header-top-pos: 0vw !important;)
 instacart.com###native-app-upsell-interstitial
 instacart.com##body:style(height: auto !important; overflow: auto !important)
+crealitycloud.com##+js(set-local-storage-item, closeGuideRegisterTime, 1)
+crealitycloud.com##+js(set-local-storage-item, permission_open_push, 1)
 thedp.com##.modal
 thedp.com##.modal-backdrop
 thedp.com##body,html:style(overflow: auto !important; position: initial !important;)
 emailnator.com##.modal
 emailnator.com##.modal-backdrop
 emailnator.com##.top-banner
-zillow.com###pfs-upsell
+m.kaskus.co.id##+js(set-session-storage-item, open_in_browser, 1)
+foundit.com.ph##+js(set-session-storage-item, isDownloadAppBannerClosed, true)
+flightradar24.com##+js(set-cookie, map_new_features_new_flightradar24_com_label_options, 1)
+shop-apotheke.com##+js(set-session-storage-item, ErxModal, true)
+fogaonet.com##+js(set-cookie, fn_cookie_whatsapp_alert, 1)
+zillow.com###pfs-upsell:remove()
+zillow.com##+js(aeld, /^(mouseout|mouseleave)$/)
+zillow.com##+js(ra, oncontextmenu|ondragstart|onselectstart|onkeydown|oncopy|oncut|onclick)
 zillow.com##.app-upsell-banner
 zillow.com##.exposed-filters:style(top:0 !important)
+tvtropes.org##+js(set-cookie, app-announcement-banner-count-guest, 1)
+tvtropes.org##+js(set-cookie, app-announcement-banner-guest, true)
 news.bitcoin.com##.hsnyER.sc-fEpuOf:style(top:0 !important)
+deepl.com##+js(set-session-storage-item, LMT_browserExtensionPromo.displayed, true)
+benzinga.com##.shadow-xl:has-text(Would you like to be notified)
+food.ndtv.com##+js(set-cookie, ndtvfood_isSubscribed_elex_v1, no)
+daadscholarship.com##+js(abort-on-property-write, LaraPush)
+sammobile.com##+js(set-local-storage-item, request-permission-modal, 1)
+belstad.com##+js(set-local-storage-item, is_announcement_closed, true)
 temu.com##.sticky-2vWAY:style(top: 0px; transform: translate(-50%, 0rem) !important)
 newsbreak.com##.bottom-0.fixed
 newsbreak.com##body:style(height: auto !important; overflow: auto !important)
+s.tabelog.com##+js(set-cookie, ignore_language_guide, true)
+deribit.com##+js(set-local-storage-item, appCardSeen, true)
 vrbo.com###app-layer-customer-notification-centered-sheet-dialog
+vrbo.com##+js(rc, has-uitk-sheet, body, stay)
+similarweb.com##+js(rc, app-banner-parent, body, stay)
 similarweb.com##.app-header:style(top:0 !important)
 eksisozluk.com###app-suggestion-container
 eksisozluk.com##body,html:style(overflow: auto !important; position: initial !important;)
+mydramalist.com##+js(rc, smartbanner-active, body)
+smocca.jp##+js(set, history.state, undefined)
+patreon.com##+js(aeld, touchmove, preventDefault)
+onedio.com##+js(set-cookie, o-push-alert, 1)
 copilot.microsoft.com##.sac3p_popup_overlay
 copilot.microsoft.com##body,html:style(overflow: auto !important; position: initial !important;)
 izumi.jp###s_header[style="top: 84px;"]:style(top: 0 !important;)
@@ -1565,7 +1654,9 @@ s.tabelog.com###js-webtoapp-floating-banner
 s.tabelog.com###js-webtoapp-floating-banner-overlay
 s.tabelog.com##body,html:style(overflow-y: auto !important;)
 trial-net.co.jp##.app-remind
-genius.com##.android_interstitial
+trial-net.co.jp##.header-app-remind:remove-class(header-app-remind)
+genius.com##.android_interstitial:remove()
+shufoo.net##+js(rc, is-hidden, body)
 shufoo.net##.appdl_modal_overlay
 sp.nicovideo.jp###jsAppModalWithLogin
 sp.nicovideo.jp##.is-fixed body:not(.player-horizontal):has(#jsAppModalWithLogin):style(position: static !important; width: unset !important;)

@@ -1,0 +1,163 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 14:29:17 -0400
+Subject: [PATCH] LibWeb: Answer $redirect filters with surrogates, and apply
+ $removeparam
+
+A request that a $redirect filter blocks is now answered with the
+filter's surrogate (a no-op script, an empty frame, a 1x1 GIF, a stub of
+an ad library), the way uBlock Origin does, instead of failing. Pages
+that depend on the blocked resource keep working. The surrogate gets CORS
+headers for the requesting origin, as the resource it replaces would have
+had.
+
+$removeparam filters take tracking parameters out of a request's URL in
+main fetch, next to the HSTS upgrade. Like that upgrade, this changes the
+request's URL in place, so a navigation's document ends up at the
+cleaned URL.
+
+The blocker now also gets the request method, so $method filters match.
+---
+ Libraries/LibWeb/Fetch/Fetching/Fetching.cpp | 26 +++++++++++
+ Libraries/LibWeb/Loader/ResourceLoader.cpp   | 46 +++++++++++++++++---
+ 2 files changed, 66 insertions(+), 6 deletions(-)
+
+diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+index 7f429be163984f5862f443e35e6b9fd24a171386..f4b0c8ebf6e65884630eec95dc0d6ba681da937d 100644
+--- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
++++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+@@ -62,6 +62,7 @@
+ #include <LibWeb/HTML/WorkerGlobalScope.h>
+ #include <LibWeb/HighResolutionTime/TimeOrigin.h>
+ #include <LibWeb/Infra/SerializedURL.h>
++#include <LibWeb/Loader/ContentBlocker.h>
+ #include <LibWeb/Loader/LoadRequest.h>
+ #include <LibWeb/Loader/ResourceLoader.h>
+ #include <LibWeb/MixedContent/AbstractOperations.h>
+@@ -496,6 +497,29 @@ void populate_request_from_client(Infrastructure::Request& request)
+ }
+ 
+ // https://fetch.spec.whatwg.org/#concept-main-fetch
++static URL::URL content_blocker_source_url_for_request(Infrastructure::Request&);
++
++// Non-standard: Removes tracking parameters that the content blocker's $removeparam filters name from the request's URL,
++// before the request leaves. Like an HSTS upgrade, this changes the URL in place, so a navigation's document ends up
++// at the cleaned URL.
++static void remove_tracking_parameters(JS::Realm& realm, Infrastructure::Request& request)
++{
++    if (!request.current_url().scheme().is_one_of("http"sv, "https"sv))
++        return;
++
++    Optional<URL::URL> top_level_creation_url;
++    if (auto environment = request.reserved_client())
++        top_level_creation_url = environment->top_level_creation_url;
++    else if (auto client = request.client())
++        top_level_creation_url = client->top_level_creation_url;
++    if (!Bindings::principal_host_defined_page(realm).content_blocking_enabled_for_url(top_level_creation_url))
++        return;
++
++    auto decision = ContentBlocker::the().check_request(request.current_url(), content_blocker_source_url_for_request(request), request.destination(), request.initiator_type(), request.mode(), request.method());
++    if (decision.action == ContentBlocker::RequestDecision::Action::Rewrite)
++        request.current_url() = decision.url.release_value();
++}
++
+ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParams const& fetch_params, Recursive recursive)
+ {
+     dbgln_if(WEB_FETCH_DEBUG, "Fetch: Running 'main fetch' with: fetch_params @ {}", &fetch_params);
+@@ -566,6 +590,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+         request->current_url().set_scheme("https"sv);
+     }
+ 
++    remove_tracking_parameters(realm, *request);
++
+     auto get_response = GC::create_function(GC::Heap::the(), [&realm, &fetch_params, request]() -> GC::Ref<PendingResponse> {
+         dbgln_if(WEB_FETCH_DEBUG, "Fetch: Running 'main fetch' get_response() function");
+         auto const* origin = request->origin().get_pointer<URL::Origin>();
+diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
+index 09b91b2b6c3f09ddf39159256acd62f124313a69..b7fe074afee5d1b172961970d3b809ffc2188f5e 100644
+--- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
++++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
+@@ -28,6 +28,7 @@
+ #include <LibWeb/Page/Page.h>
+ #include <LibWeb/Platform/EventLoopPlugin.h>
+ #include <LibWeb/Platform/Timer.h>
++#include <LibWebCommon/Fetch/Infrastructure/DataURL.h>
+ #include <LibWebCommon/Loader/UserAgent.h>
+ 
+ namespace Web {
+@@ -213,7 +214,12 @@ static void log_filtered_request(LoadRequest const& request)
+     dbgln("ResourceLoader: Filtered request to: \"{}\"", url_for_logging);
+ }
+ 
+-static bool should_block_request(LoadRequest const& request)
++struct BlockedRequest {
++    // A content blocker surrogate to answer the request with, as a data: URL ($redirect filters).
++    Optional<URL::URL> surrogate;
++};
++
++static Optional<BlockedRequest> should_block_request(LoadRequest const& request)
+ {
+     auto const& url = request.url().value();
+ 
+@@ -228,20 +234,46 @@ static bool should_block_request(LoadRequest const& request)
+ 
+     if (is_port_blocked(url.port_or_default())) {
+         log_failure(request, ByteString::formatted("Port #{} is blocked", url.port_or_default()));
+-        return true;
++        return BlockedRequest {};
+     }
+ 
+     if (auto page = request.page(); !page || page->content_blocking_enabled_for_url(request.top_level_creation_url())) {
+         auto source_url = request.source_url().value_or(url);
+-        if (ContentBlocker::the().is_filtered(url, source_url, request.destination(), request.initiator_type(), request.request_mode())) {
++        auto decision = ContentBlocker::the().check_request(url, source_url, request.destination(), request.initiator_type(), request.request_mode(), request.method());
++        // NB: Rewrites ($removeparam) happen in main fetch, before the request gets here.
++        if (decision.action == ContentBlocker::RequestDecision::Action::Block || decision.action == ContentBlocker::RequestDecision::Action::Redirect) {
+             log_filtered_request(request);
+             if (page)
+                 page->client().page_did_block_resource();
+-            return true;
++            return BlockedRequest { move(decision.url) };
+         }
+     }
+ 
+-    return false;
++    return {};
++}
++
++// Answers a blocked request with a content blocker surrogate, such as a no-op script, so pages that depend on the
++// blocked resource keep working. Returns false if the surrogate cannot be decoded.
++static bool respond_with_surrogate(LoadRequest const& request, URL::URL const& surrogate, ResourceLoader::OnHeadersReceived& on_headers_received, ResourceLoader::OnDataReceived& on_data_received, ResourceLoader::OnComplete& on_complete)
++{
++    auto data_url = Fetch::Infrastructure::process_data_url(surrogate);
++    if (data_url.is_error())
++        return false;
++
++    auto headers = HTTP::HeaderList::create();
++    headers->append(HTTP::Header::isomorphic_encode("Content-Type"sv, data_url.value().mime_type.serialized()));
++    // The surrogate stands in for a resource that may be cross-origin. Let the request's CORS check pass, as the
++    // resource it replaces would have for this page.
++    if (auto origin = request.headers().get("Origin"sv); origin.has_value()) {
++        headers->append(HTTP::Header::isomorphic_encode("Access-Control-Allow-Origin"sv, *origin));
++        headers->append(HTTP::Header::isomorphic_encode("Access-Control-Allow-Credentials"sv, "true"sv));
++    }
++
++    on_headers_received.function()(nullptr, headers, 200, {}, {}, {}, Requests::CacheState::NotCached);
++    // NB: Fetch only delivers the response once it has seen a body, so send one even if it is empty.
++    on_data_received.function()(Requests::ResponseData::from_bytes(data_url.value().body.bytes()));
++    on_complete.function()(true, {}, {});
++    return true;
+ }
+ 
+ template<typename FileHandler, typename ErrorHandler>
+@@ -436,7 +468,9 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+     log_request_start(request);
+     request.start_timer();
+ 
+-    if (should_block_request(request)) {
++    if (auto blocked = should_block_request(request); blocked.has_value()) {
++        if (blocked->surrogate.has_value() && respond_with_surrogate(request, *blocked->surrogate, *on_headers_received, *on_data_received, *on_complete))
++            return nullptr;
+         on_complete->function()(false, {}, "Request was blocked"sv);
+         return nullptr;
+     }

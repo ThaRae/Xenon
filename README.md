@@ -172,6 +172,11 @@ What exists now and what's planned, measured against Helium:
   for the internal pages)
 - [ ] Xenon's own app icon (the app still uses Ladybird's)
 - [ ] uBlock Origin's filter set for Ladybird's content blocker (being built in a separate repo, `xenon-ublock`)
+- [x] **WebAuthn with security keys** (macOS): sites and password managers can register a USB security key and sign in
+  with it (`navigator.credentials.create()`/`get()`), PINs included, and in cross-origin frames that are allowed to.
+  A prompt over the page says what the key needs. Engine patches `0010`–`0015`; see `Documentation/WebAuthn.md`.
+- [ ] WebAuthn, next: PIN setup and passkey management for security keys, and Linux. Platform passkeys (iCloud Keychain,
+  Touch ID, phones) need an entitlement from Apple.
 
 Web app installs, which depend on Chromium in Helium, are out of scope until Ladybird supports them.
 
