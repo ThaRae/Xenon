@@ -193,5 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListener("xenonblocking", event => {
         if (event.detail?.name === "state") render(event.detail);
     });
+    // The state the page was made with fills it in before it has loaded. The load message signs it up for the changes.
+    render(window.xenonBlocking.initialState);
     send({ name: "load" });
 });

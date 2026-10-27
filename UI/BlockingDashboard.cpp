@@ -31,9 +31,11 @@ static constexpr auto DASHBOARD_HOST = "blocking"sv;
 static constexpr auto CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"sv;
 
 // The dashboard's line to the UI process: window.xenonBlocking.send() takes a message, and the answers arrive as
-// xenonblocking events on the window.
+// xenonblocking events on the window. The state comes along as initialState (a constant put before the script), so
+// that the dashboard is filled in by the time it has loaded, rather than when the answer to its first message arrives.
 static constexpr auto BOOTSTRAP_SCRIPT = R"~~~(
 window.xenonBlocking = Object.freeze({
+    initialState,
     send(message) {
         bridge.postMessage(JSON.stringify(message));
     },
@@ -272,7 +274,8 @@ void register_url_scheme()
         .bootstrap_script = [](WebView::ScriptBridgeEndpoint const& endpoint) -> Optional<String> {
             if (!is_dashboard(endpoint))
                 return {};
-            return MUST(String::from_utf8(BOOTSTRAP_SCRIPT));
+            // NB: The state is JSON, which is also a JavaScript expression.
+            return MUST(String::formatted("const initialState = {};\n{}", dashboard_state(), BOOTSTRAP_SCRIPT));
         },
         .on_message = [](WebView::ScriptBridgeEndpoint const& endpoint, String message) { handle_message(endpoint, message); },
     };
