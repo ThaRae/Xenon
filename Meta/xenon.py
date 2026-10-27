@@ -234,6 +234,10 @@ def test_main(platform: Platform, build_dir: Path):
             print(output[-4000:], file=sys.stderr)
             failures.append("headless render of about:welcome")
 
+    print("==> a fresh start keeps to Xenon's directories", flush=True)
+    if not check_profile_directory(platform, app_executable(platform, build_dir), env):
+        failures.append("profile directory")
+
     print("==> content blocking with the bundled filter lists", flush=True)
     if not check_content_blocking(app_executable(platform, build_dir), env):
         failures.append("content blocking")
@@ -250,6 +254,45 @@ def test_main(platform: Platform, build_dir: Path):
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
         sys.exit(1)
     print("All tests passed.")
+
+
+# Starts Xenon as on a fresh install, with no profile arguments and a home directory of its own, and checks that its
+# profile and crash reports go in Xenon's directories and that nothing goes in Ladybird's.
+def check_profile_directory(platform: Platform, executable: Path, env: dict) -> bool:
+    with tempfile.TemporaryDirectory() as temporary_home:
+        home = Path(temporary_home).resolve()
+        fresh_env = dict(env, HOME=str(home))
+        for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"):
+            fresh_env.pop(name, None)
+
+        if platform.host_system == HostSystem.macOS:
+            config, data, cache = "Library/Preferences", "Library/Application Support", "Library/Caches"
+            roots = [config, data, cache]
+        else:
+            config, data, cache = ".config", ".local/share", ".cache"
+            # The runtime directory isn't under the home directory by default. Moving it moves Wayland's socket too.
+            (home / "runtime").mkdir(mode=0o700)
+            fresh_env["XDG_RUNTIME_DIR"] = str(home / "runtime")
+            fresh_env["QT_QPA_PLATFORM"] = "offscreen"
+            roots = [config, data, cache, "runtime"]
+
+        loaded, output = run_headless(executable, fresh_env, ["--headless=text", "about:blank"])
+        expected = [home / root / "Xenon" / "Profiles" / "default" for root in roots]
+        expected.append(home / data / "Xenon" / "CrashReports")
+        missing = [path for path in expected if not path.is_dir()]
+        ladybird = [path for path in home.rglob("Ladybird") if path.is_dir()]
+
+        if not loaded:
+            print(output[-4000:], file=sys.stderr)
+        for path in missing:
+            print(f"    missing {path.relative_to(home)}", file=sys.stderr)
+        for path in ladybird:
+            print(f"    created {path.relative_to(home)}", file=sys.stderr)
+        if not loaded or missing or ladybird:
+            return False
+
+        print(f"    {', '.join(f'~/{root}/Xenon' for root in roots)}, and no Ladybird directory")
+        return True
 
 
 # Loads a local page with blocking on and off, in a throwaway profile, and checks which of its requests reach the server.
