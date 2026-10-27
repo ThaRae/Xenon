@@ -394,7 +394,7 @@ target_sources(TestXenonExtensions PRIVATE
 )
 target_include_directories(TestXenonExtensions BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-ladybird_test("${XENON_SOURCE_DIR}/Tests/TestCRX.cpp" Xenon NAME TestXenonCRX LIBS LibCrypto LibFileSystem LibRequests LibURL LibWebView LibXML)
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestCRX.cpp" Xenon NAME TestXenonCRX LIBS LibCrypto LibFileSystem LibHTTP LibRequests LibURL LibWebView LibXML)
 target_sources(TestXenonCRX PRIVATE
     "${XENON_UI_DIR}/Download.cpp"
     "${XENON_UI_DIR}/Extensions/CRX.cpp"
