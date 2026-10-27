@@ -11,7 +11,7 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good upstream commit. |
 | `Patches/ladybird/` | Xenon's changes to the engine, as a patch series applied to the pinned commit at build time (`Meta/patches.py`). |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
-| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, and the shared web UI stylesheet), with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
+| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon. `xenon.svg` is the artwork and `xenon-small.svg` its version for 32px and below; `Meta/generate-app-icon.py` renders the macOS iconset and the window icon from them. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |

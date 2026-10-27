@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 # Renders Xenon's app icon from its sources in UI/Icons into the PNGs the build uses: the macOS iconset that
-# UI/Xenon.cmake turns into app_icon.icns, and the window icon (UI/Icons/xenon.png) that xenon.qrc embeds.
+# UI/Xenon.cmake turns into app_icon.icns, the window icon (UI/Icons/xenon.png) that xenon.qrc embeds, and Xenon's
+# versions of Ladybird's logo (UI/Resources/icons), which the build ships in place of Ladybird's.
 #
 #   Meta/generate-app-icon.py
 #
@@ -31,6 +32,13 @@ ICONSET = {f"icon_{size}x{size}.png": size for size in (16, 32, 128, 256, 512)} 
 }
 
 WINDOW_ICON_SIZE = 256
+
+# Ladybird's logo, as its internal pages show it (their favicon, and the picture on an empty history or bookmarks page)
+# and its task manager shows it for the browser, by path under resource://icons, and its size. The 48px one is mostly
+# drawn at 16px, as a favicon, so it takes the small artwork. Ladybird's "-dark" logo is the one for light backgrounds;
+# Xenon's icon brings its own dark square, so it's the same picture.
+LADYBIRD_ICONS_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "icons"
+LADYBIRD_ICONS = {"48x48/app-browser.png": 48, "128x128/app-browser.png": 128, "128x128/app-browser-dark.png": 128}
 
 
 def rounded_square(size: float, offset: float) -> str:
@@ -85,7 +93,15 @@ def main():
             render(small if size <= SMALL_ARTWORK_MAX_SIZE else large, size, ICONSET_DIR / name)
         render(large, WINDOW_ICON_SIZE, ICONS_DIR / "xenon.png")
 
-    print(f"Rendered {len(ICONSET)} iconset sizes and the {WINDOW_ICON_SIZE}px window icon.")
+        for path, size in LADYBIRD_ICONS.items():
+            output = LADYBIRD_ICONS_DIR / path
+            output.parent.mkdir(parents=True, exist_ok=True)
+            render(small if path.startswith("48x48/") else large, size, output)
+
+    print(
+        f"Rendered {len(ICONSET)} iconset sizes, the {WINDOW_ICON_SIZE}px window icon, and {len(LADYBIRD_ICONS)} of"
+        " Ladybird's logo icons."
+    )
 
 
 if __name__ == "__main__":
