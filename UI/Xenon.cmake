@@ -292,6 +292,23 @@ foreach (page IN LISTS XENON_ABOUT_PAGE_ADDITIONS)
     list(APPEND ABOUT_PAGES "${XENON_UI_DIR}/Resources/about-pages/${page}")
 endforeach()
 
+# Ladybird's internal pages show its logo as their favicon and on an empty history or bookmarks page, and so does the
+# task manager. Xenon's versions (rendered by Meta/generate-app-icon.py) take their place.
+set(XENON_ICON_OVERRIDES
+    48x48/app-browser.png
+    128x128/app-browser.png
+    128x128/app-browser-dark.png
+)
+foreach (icon IN LISTS XENON_ICON_OVERRIDES)
+    get_filename_component(icon_size "${icon}" DIRECTORY)
+    list(FIND ${icon_size}_ICONS "${LADYBIRD_SOURCE_DIR}/Base/res/icons/${icon}" index)
+    if (index EQUAL -1)
+        message(FATAL_ERROR "Xenon overrides icons/${icon}, which Ladybird no longer ships. Check upstream's changes.")
+    endif()
+    list(REMOVE_AT ${icon_size}_ICONS ${index})
+    list(INSERT ${icon_size}_ICONS ${index} "${XENON_UI_DIR}/Resources/icons/${icon}")
+endforeach()
+
 if (APPLE)
     # NB: Ladybird sets this in its UI/CMakeLists.txt, whose variables don't reach this directory either.
     if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
