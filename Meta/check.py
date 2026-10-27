@@ -321,7 +321,10 @@ def check_formatting(checks: Checks):
     )
 
     ruff = str(bin_dir / "ruff")
-    ruff_config = ["--config", str(LADYBIRD_SOURCE_DIR / "pyproject.toml")]
+    # isort counts a module as first-party if it's found under `src`, which defaults to the working directory here.
+    # There, `import patches` would find Patches/ on a case-insensitive filesystem (macOS) and nothing on Linux, so the
+    # two would sort Meta/xenon.py's imports differently. Meta/ is where Xenon's scripts import each other from.
+    ruff_config = ["--config", str(LADYBIRD_SOURCE_DIR / "pyproject.toml"), "--config", 'src = ["Meta"]']
     run_formatter(
         checks, "ruff", [ruff, "check", *ruff_config], [ruff, "check", "--fix", *ruff_config], python_sources()
     )
