@@ -404,10 +404,10 @@ print(json.dumps(steps))
 """
 
 
-# A workflow's shell step that doesn't parse only fails once a runner reaches it, which on slab-large can be hours later.
+# A workflow's shell step that doesn't parse only fails once a runner reaches it, which can be hours into a build.
 # Each step is checked as Gitea runs it, by bash, with its ${{ }} expressions filled in by a placeholder.
 def check_workflow_steps(checks: Checks, python: Path):
-    workflows = [relative(path) for path in sorted((XENON_SOURCE_DIR / ".gitea" / "workflows").glob("*.yml"))]
+    workflows = [relative(path) for path in sorted((XENON_SOURCE_DIR / ".github" / "workflows").glob("*.yml"))]
     result = subprocess.run(
         [str(python), "-c", WORKFLOW_STEPS_PROGRAM, *workflows], cwd=XENON_SOURCE_DIR, capture_output=True, text=True
     )
