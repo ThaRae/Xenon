@@ -1,0 +1,258 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 22:42:43 -0400
+Subject: [PATCH] LibWebView+WebContent: Let the UI prepare a tab to be
+ discarded
+
+A UI that discards background tabs to save memory, as Chromium's Memory
+Saver does, restores them later from a snapshot of their session
+history. The current entry's scroll position only reaches that history
+when the user leaves the entry, so a restored tab came back scrolled to
+the top.
+
+ViewImplementation::prepare_for_discard() has the page save its
+persisted state to the active session history entry, as leaving the
+entry does, and says whether a text control holds input that
+discarding the tab would lose, so that the UI can leave such a tab
+alone. The view also says whether a DevTools client is connected.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/CanonicalTraversable.h  |  2 +-
+ Libraries/LibWebView/ViewImplementation.cpp  | 24 +++++++++++
+ Libraries/LibWebView/ViewImplementation.h    | 13 ++++++
+ Libraries/LibWebView/WebContentPage.cpp      |  6 +++
+ Libraries/LibWebView/WebContentPage.h        |  1 +
+ Services/WebContent/ConnectionFromClient.cpp | 43 ++++++++++++++++++++
+ Services/WebContent/ConnectionFromClient.h   |  1 +
+ Services/WebContent/WebContentClient.ipc     |  2 +
+ Services/WebContent/WebContentServer.ipc     |  1 +
+ 9 files changed, 92 insertions(+), 1 deletion(-)
+
+diff --git a/Libraries/LibWebView/CanonicalTraversable.h b/Libraries/LibWebView/CanonicalTraversable.h
+index 65dda1f9ea39eb111c8bb63f81db6d1a9cb250b3..6a25dec18fb147de351293a0cd9782d72ed45306 100644
+--- a/Libraries/LibWebView/CanonicalTraversable.h
++++ b/Libraries/LibWebView/CanonicalTraversable.h
+@@ -181,6 +181,7 @@ public:
+     void reconstruct_the_history_to_step(i32 step);
+     ErrorOr<URL::URL> restore_session_history_from_ui_snapshot(SessionHistorySnapshot);
+     void recover_from_web_content_process_crash();
++    bool update_session_history_entry_persisted_state(CanonicalNavigable&, Web::HTML::SessionHistoryEntryPersistedState const&);
+     void reset_session_history_for_testing(Web::HTML::SessionHistoryEntryDescriptor);
+     bool initialize_session_history_for_testing(Vector<Web::HTML::SessionHistoryEntryDescriptor>, Vector<i32> used_steps, size_t current_used_step_index);
+ 
+@@ -198,7 +199,6 @@ private:
+     HistoryOperation* find_history_operation(Web::HTML::CrossProcessId operation_id);
+     ApplyHistoryStep* find_history_step_run(Web::HTML::CrossProcessId operation_id);
+     RefPtr<CanonicalNavigation> finalized_navigation(HistoryOperation const&) const;
+-    bool update_session_history_entry_persisted_state(CanonicalNavigable&, Web::HTML::SessionHistoryEntryPersistedState const&);
+     void add_history_operation_completion_endpoint(HistoryOperation&, NonnullRefPtr<WebContentPage>);
+     void did_fail_history_navigation_population(HistoryOperation&, ChangingNavigable&);
+     void continue_history_navigation_population(HistoryOperation&, ChangingNavigable&);
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index f9aec74259c5b92f738d2214ac25ee5ecfb2c92a..d870362b6643d7d0ddde868f3b5f8fd377457cea 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -3767,6 +3767,26 @@ ErrorOr<void> ViewImplementation::restore_session_history_from_snapshot(SessionH
+     return {};
+ }
+ 
++NonnullRefPtr<Core::Promise<ViewImplementation::DiscardPreparation>> ViewImplementation::prepare_for_discard()
++{
++    auto promise = Core::Promise<DiscardPreparation>::construct();
++    auto request_id = m_next_discard_preparation_request_id++;
++    m_pending_discard_preparations.set(request_id, promise);
++    page().async_prepare_for_discard(request_id);
++    return promise;
++}
++
++void ViewImplementation::did_prepare_for_discard(Badge<WebContentPage>, u64 request_id, Optional<Web::HTML::SessionHistoryEntryPersistedState> persisted_state, bool has_unsubmitted_input)
++{
++    auto promise = m_pending_discard_preparations.take(request_id);
++    if (!promise.has_value())
++        return;
++
++    if (persisted_state.has_value())
++        traversable().update_session_history_entry_persisted_state(traversable(), *persisted_state);
++    promise.value()->resolve(DiscardPreparation { .has_unsubmitted_input = has_unsubmitted_input });
++}
++
+ bool ViewImplementation::capture_session_history_snapshot_for_testing(Badge<WebContentPage>)
+ {
+     m_captured_session_history_snapshot_for_testing = session_history_snapshot();
+@@ -4792,6 +4812,10 @@ void ViewImplementation::reject_pending_selection_requests()
+     reject_requests(m_pending_selected_text_for_lookup_requests);
+     reject_requests(m_pending_select_word_for_dictionary_lookup_requests);
+     reject_requests(m_pending_cut_selected_text_requests);
++
++    auto pending_discard_preparations = move(m_pending_discard_preparations);
++    for (auto& preparation : pending_discard_preparations)
++        preparation.value->reject(Error::from_string_literal("WebContent was replaced before preparing for a discard"));
+ }
+ 
+ SpellChecker::DocumentTag ViewImplementation::spell_document_tag()
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index 59b948224559b91b6057e4d0a91555b545033b70..c4f9724245865d58848b8da83283148984e098b9 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -203,6 +203,15 @@ public:
+     [[nodiscard]] SessionHistorySnapshot session_history_snapshot() const;
+     [[nodiscard]] ErrorOr<void> restore_session_history_from_snapshot(SessionHistorySnapshot);
+ 
++    struct DiscardPreparation {
++        // Whether a text control of the tab holds input that discarding the tab would lose.
++        bool has_unsubmitted_input { false };
++    };
++    // Before a UI discards the tab, to restore it from a session history snapshot later: saves the scroll position to
++    // the current session history entry, as leaving the entry would, and says what discarding would lose.
++    NonnullRefPtr<Core::Promise<DiscardPreparation>> prepare_for_discard();
++    void did_prepare_for_discard(Badge<WebContentPage>, u64 request_id, Optional<Web::HTML::SessionHistoryEntryPersistedState>, bool has_unsubmitted_input);
++
+     Optional<SessionTabId> session_tab_id() const { return m_session_tab_id; }
+     void set_session_tab_id(SessionTabId session_tab_id) { m_session_tab_id = session_tab_id; }
+     void clear_session_tab_id() { m_session_tab_id = {}; }
+@@ -376,6 +385,7 @@ public:
+     void set_listen_for_dom_mutations(bool);
+     void did_connect_devtools_client();
+     void did_disconnect_devtools_client();
++    bool has_devtools_client() const { return m_devtools_connected; }
+     void get_dom_node_inner_html(Web::UniqueNodeID node_id);
+     void get_dom_node_outer_html(Web::UniqueNodeID node_id);
+     void set_dom_node_outer_html(Web::UniqueNodeID node_id, String const& html);
+@@ -866,6 +876,9 @@ protected:
+     HashMap<u64, NonnullRefPtr<Core::Promise<bool>>> m_pending_select_word_for_dictionary_lookup_requests;
+     HashMap<u64, NonnullRefPtr<Core::Promise<ByteString>>> m_pending_cut_selected_text_requests;
+ 
++    u64 m_next_discard_preparation_request_id { 1 };
++    HashMap<u64, NonnullRefPtr<Core::Promise<DiscardPreparation>>> m_pending_discard_preparations;
++
+     RefPtr<Action> m_take_visible_screenshot_action;
+     RefPtr<Action> m_take_full_screenshot_action;
+     RefPtr<Action> m_report_website_issue_action;
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 9ff2c6a130ba064d858d0db9bd3c8c1a66243cac..3a2b87d83626fd53dc8c9713f8d3c33be3a00acb 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -1189,6 +1189,12 @@ void WebContentPage::did_take_screenshot(Gfx::ShareableBitmap screenshot)
+         view().did_receive_screenshot({}, screenshot);
+ }
+ 
++void WebContentPage::did_prepare_for_discard(u64 request_id, Optional<Web::HTML::SessionHistoryEntryPersistedState> persisted_state, bool has_unsubmitted_input)
++{
++    if (displays_tab())
++        view().did_prepare_for_discard({}, request_id, move(persisted_state), has_unsubmitted_input);
++}
++
+ void WebContentPage::did_get_internal_page_info(WebView::PageInfoType type, Optional<Core::AnonymousBuffer> info)
+ {
+     if (displays_tab())
+diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
+index d01b051b62295eb5dc7146e592d089fac766d85f..4b8de00e8cd3b218cb43589d1f237e67d4916048 100644
+--- a/Libraries/LibWebView/WebContentPage.h
++++ b/Libraries/LibWebView/WebContentPage.h
+@@ -234,6 +234,7 @@ private:
+     virtual void did_resume_debugger() override;
+     virtual void did_complete_debugger_breakpoint_operation(u64 request_id, Optional<String> error) override;
+     virtual void did_take_screenshot(Gfx::ShareableBitmap screenshot) override;
++    virtual void did_prepare_for_discard(u64 request_id, Optional<Web::HTML::SessionHistoryEntryPersistedState> persisted_state, bool has_unsubmitted_input) override;
+     virtual void did_get_internal_page_info(WebView::PageInfoType type, Optional<Core::AnonymousBuffer> info) override;
+     virtual void did_get_selected_text(u64 request_id, ByteString selection) override;
+     virtual void did_get_selected_text_for_lookup(u64 request_id, Optional<DictionaryLookup> lookup) override;
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index dc4870490c6a7899e9f500bb789eac944c3aeed4..605c8dabc9520aa04254f11095533e4322b96968 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -74,6 +74,7 @@
+ #include <LibWeb/HTML/RemoteNavigable.h>
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/Scripting/TemporaryExecutionContext.h>
++#include <LibWeb/HTML/SessionHistoryEntry.h>
+ #include <LibWeb/HTML/Storage.h>
+ #include <LibWeb/HTML/Window.h>
+ #include <LibWeb/HTML/WorkerAgentParent.h>
+@@ -568,6 +569,48 @@ void ConnectionFromClient::stop_loading(Web::PageId page_id)
+         page->page().local_traversable()->stop_loading();
+ }
+ 
++// Whether a text control holds a value the document didn't come with, as one the user typed and hasn't submitted does.
++static bool has_unsubmitted_input(Web::DOM::Document& document)
++{
++    auto has_input = false;
++    document.for_each_in_inclusive_subtree_of_type<Web::HTML::HTMLInputElement>([&](auto& input) {
++        has_input = input.has_selectable_text() && !input.value().is_empty() && input.value() != input.default_value();
++        return has_input ? Web::TraversalDecision::Break : Web::TraversalDecision::Continue;
++    });
++    if (has_input)
++        return true;
++    document.for_each_in_inclusive_subtree_of_type<Web::HTML::HTMLTextAreaElement>([&](auto& text_area) {
++        has_input = !text_area.value().is_empty() && text_area.value() != text_area.default_value();
++        return has_input ? Web::TraversalDecision::Break : Web::TraversalDecision::Continue;
++    });
++    return has_input;
++}
++
++// The UI process is about to discard the tab, to restore it from its session history later. The current entry gets the
++// scroll position that leaving it would have saved, and the UI learns whether the documents this process hosts for the
++// tab hold input that discarding would lose.
++void ConnectionFromClient::prepare_for_discard(Web::PageId page_id, u64 request_id)
++{
++    Optional<Web::HTML::SessionHistoryEntryPersistedState> persisted_state;
++    auto has_input = false;
++
++    if (auto page = this->page(page_id); page.has_value() && page->page().has_local_traversable()) {
++        auto traversable = page->page().local_traversable();
++        traversable->save_persisted_state_to_active_session_history_entry();
++        if (auto entry = traversable->active_session_history_entry())
++            persisted_state = Web::HTML::create_session_history_entry_persisted_state(*entry);
++
++        for (auto& navigable : traversable->hosted_inclusive_descendant_navigables()) {
++            if (auto document = navigable->active_document(); document && has_unsubmitted_input(*document)) {
++                has_input = true;
++                break;
++            }
++        }
++    }
++
++    async_did_prepare_for_discard(page_id, request_id, move(persisted_state), has_input);
++}
++
+ void ConnectionFromClient::cancel_download(Web::PageId page_id, u64 download_id)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 48c0a87d1d50099fd82acb192a9c84a9194bee16..a7d2da39cb28951fc286f31fdbda7712d4a639f5 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -131,6 +131,7 @@ private:
+     virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
+     virtual void populate_navigation(Web::PageId page_id, Web::HTML::NavigationPopulationRequest, Web::HTML::NavigationPopulationResult) override;
+     virtual void stop_loading(Web::PageId page_id) override;
++    virtual void prepare_for_discard(Web::PageId page_id, u64 request_id) override;
+     virtual void cancel_download(Web::PageId page_id, u64 download_id) override;
+     virtual void set_ongoing_navigation(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id) override;
+     virtual void navigate_to_a_fragment(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, URL::URL url, Web::HTML::HistoryHandlingBehavior, Web::HTML::UserNavigationInvolvement, Utf16String navigation_id) override;
+diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
+index fa3ad0089fee063939175a34d1e9c67d92e6a549..d152770f387fafe3211af288418371576a61b04b 100644
+--- a/Services/WebContent/WebContentClient.ipc
++++ b/Services/WebContent/WebContentClient.ipc
+@@ -176,6 +176,8 @@ endpoint WebContentClient routed by Web::PageId page_id
+ 
+     did_take_screenshot(Web::PageId page_id, Gfx::ShareableBitmap screenshot) =|
+ 
++    did_prepare_for_discard(Web::PageId page_id, u64 request_id, Optional<Web::HTML::SessionHistoryEntryPersistedState> persisted_state, bool has_unsubmitted_input) =|
++
+     did_get_internal_page_info(Web::PageId page_id, WebView::PageInfoType type, Optional<Core::AnonymousBuffer> info) =|
+ 
+     did_get_selected_text(Web::PageId page_id, u64 request_id, ByteString selection) =|
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index ee5d0fcb383ed243af8117d26bb839a00b2cb2bb..520557a169de22c356e208f7b3579c12e134a2b8 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -108,6 +108,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+ 
+     populate_navigation(Web::PageId page_id, Web::HTML::NavigationPopulationRequest request, Web::HTML::NavigationPopulationResult result) =|
+     stop_loading(Web::PageId page_id) =|
++    prepare_for_discard(Web::PageId page_id, u64 request_id) =|
+     cancel_download(Web::PageId page_id, u64 download_id) =|
+     set_ongoing_navigation(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id) =|
+     navigate_to_a_fragment(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, URL::URL url, Web::HTML::HistoryHandlingBehavior history_handling, Web::HTML::UserNavigationInvolvement user_involvement, Utf16String navigation_id) =|
