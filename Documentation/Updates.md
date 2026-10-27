@@ -130,17 +130,26 @@ the profile's. CI can't run it, so run it before a release.
 
 ## Setting up a Mac to release from
 
-Once, on the Mac releases are made on, after building Xenon (which fetches Sparkle's tools):
+The update key and the certificate exist, made on 2026-10-27:
+
+| | |
+| --- | --- |
+| Update key | Ed25519, under the account `xenon`. Public half `o7cmjh8R2wfWfRfJOTcyLisyoRVEEQIxi7L+SFWXUNI=` |
+| Release certificate | **Xenon Release**, self-signed RSA 3072 for code signing, valid until 2036-10-24. SHA-1 `EB4C4127CEA7DA5990952E139293BA15C0BA1D37` |
+
+Their backups (`xenon-update-key.txt`, and `Xenon Release.p12` with its password) are kept outside the repository. To
+release from another Mac, build Xenon there (which fetches Sparkle's tools), then import both into its login keychain:
 
 ```bash
-# The update key, in the login keychain. Note the public key it prints.
-Build/release/Xenon/Sparkle-*/bin/generate_keys --account xenon
-# Its backup. Keep it somewhere safe, like a password manager, and delete the file.
-Build/release/Xenon/Sparkle-*/bin/generate_keys --account xenon -x xenon-update-key.txt
+Build/release/Xenon/Sparkle-*/bin/generate_keys --account xenon -f xenon-update-key.txt
+security import "Xenon Release.p12" -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign
 ```
 
-The release certificate: in **Keychain Access → Certificate Assistant → Create a Certificate…**, name it
-`Xenon Release`, with **Identity Type** *Self-Signed Root* and **Certificate Type** *Code Signing*. Export it with its
-private key (**File → Export Items…**, as a `.p12`), and keep that somewhere safe too.
+`security find-identity -p codesigning` then lists **Xenon Release** as `CSSMERR_TP_NOT_TRUSTED`, as a self-signed
+certificate is, and `codesign` signs with it all the same. `tea` needs a login named `avx512` that can create releases
+on tharae/xenon-releases.
 
-`tea` needs a login named `avx512` that can create releases on tharae/xenon-releases.
+If either is ever lost, make a new one: `generate_keys --account xenon` for the key, or a self-signed code signing
+certificate named **Xenon Release**, from Keychain Access's Certificate Assistant or OpenSSL. A new certificate only
+means macOS asks for Xenon's permissions again once; a new update key means everyone installs the next release by hand
+([Signing](#signing)).
