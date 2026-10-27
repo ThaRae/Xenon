@@ -704,6 +704,10 @@ QString location_edit_style_sheet(QPalette const& palette)
     auto zoom_hover = style_sheet_color(dark ? mix(surface_color, chrome_surface_recessed(palette), 0.36) : mix(surface_color, chrome_surface_recessed(palette), 0.20));
     auto zoom_pressed = style_sheet_color(dark ? mix(surface_color, chrome_surface_recessed(palette), 0.44) : mix(surface_color, chrome_surface_recessed(palette), 0.28));
     auto zoom_border = style_sheet_color(dark ? mix(chrome_border(palette), surface_color, 0.38) : mix(chrome_border(palette), surface_color, 0.54));
+    // The bang chip takes its colors from Xenon's rose scale, as the badges do.
+    auto bang_chip_text = style_sheet_color(QColor(dark ? BrandColors::Rose40 : BrandColors::Rose500));
+    auto bang_chip_surface = style_sheet_color(QColor(dark ? BrandColors::Rose950 : BrandColors::Rose10));
+    auto bang_chip_border = style_sheet_color(QColor(dark ? BrandColors::Rose900 : BrandColors::Rose20));
 
     return qformatted(R"(
 QLineEdit#LadybirdLocationEdit {{
@@ -787,9 +791,18 @@ QToolButton#LadybirdLocationAction {{
     margin: 1px;
     padding: 0;
 }}
+
+QLabel#LadybirdLocationBangChip {{
+    color: {22};
+    background: {23};
+    border: 1px solid {24};
+    border-radius: 10px;
+    padding: 0 7px;
+    font-weight: 500;
+}}
 )",
         surface, hover, border, focus_border, text, placeholder, selection, selection_text, hover_border,
-        not_secure_text, not_secure_background, not_secure_hover, not_secure_pressed, not_secure_border, zoom_text, zoom_background, zoom_hover, zoom_pressed, zoom_border, focus, LOCATION_EDIT_CORNER_RADIUS, popup_surface);
+        not_secure_text, not_secure_background, not_secure_hover, not_secure_pressed, not_secure_border, zoom_text, zoom_background, zoom_hover, zoom_pressed, zoom_border, focus, LOCATION_EDIT_CORNER_RADIUS, popup_surface, bang_chip_text, bang_chip_surface, bang_chip_border);
 }
 
 QString bookmarks_bar_style_sheet(QPalette const& palette, int corner_radius)

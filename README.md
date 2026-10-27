@@ -11,7 +11,7 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good upstream commit. |
 | `Patches/ladybird/` | Xenon's changes to the engine, as a patch series applied to the pinned commit at build time (`Meta/patches.py`). |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
-| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, and the shared web UI stylesheet), with `xenon.css` for what its own pages share, and the bundled filter lists. The build ships these in place of upstream's copies, which stay untouched. |
+| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, and the shared web UI stylesheet), with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon. `xenon.svg` is the artwork and `xenon-small.svg` its version for 32px and below; `Meta/generate-app-icon.py` renders the macOS iconset and the window icon from them. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
@@ -178,8 +178,11 @@ What exists now and what's planned, measured against Helium:
   - Compact: the toolbar and the tabs in one row.
   - Vertical: tabs in a collapsible, resizable sidebar (from Ladybird).
 - [x] **!bangs**: `!w ladybird` or `ladybird !w` goes straight to Wikipedia's results, and `!gh` alone opens GitHub.
-  They resolve locally, with no request to a search engine. There's a built-in list of common bangs in
-  `UI/Bangs.cpp`.
+  They resolve locally, with no request to a search engine, from the full list of about 13,400 triggers for 10,700
+  sites (see "Updating the !bangs"). While a bang at the start of the address is typed, a chip names its site, as Chrome
+  does in keyword mode. The chip appears once the space after the bang is typed, and Backspace at the start of the text
+  takes it away, leaving the bang as plain text (Enter then searches the text as typed). A trailing bang like
+  `ladybird !w` resolves on Enter, with no chip.
 - [x] **Welcome/setup flow**: on first run (or any time at `about:welcome`), either take Xenon's picks (DuckDuckGo, with
   blocking on) or answer two questions: which search engine, from a private/mainstream list with a live preview of
   where a search goes, and whether to block ads and trackers (on by default, with all three filter lists). Nothing is
@@ -244,7 +247,10 @@ What exists now and what's planned, measured against Helium:
   window. Drag a tab between two of a group's tabs to add it, or out of the group to take it out. Tabs opened from a
   grouped tab join its group, Ctrl+Tab passes over collapsed groups, and groups come back with a restored session
   (`UI/TabGroups.cpp`).
-- [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed
+- [x] The DuckDuckGo-style bang list (13,000+ triggers), plus a keyword chip in the address bar while a bang is typed.
+  The list is Kagi's (MIT), which has 12,484 of DuckDuckGo's 13,566 triggers. Xenon doesn't ship the other 1,082: 889 are
+  not in Kagi's list, and 193 are Kagi's own services or site-restricted searches that the script leaves out. DuckDuckGo
+  publishes `bang.js` without a license, so it isn't a source.
 - [x] **Its own profile directory**: Xenon keeps its settings, history, cookies, extensions, cache, and crash reports
   apart from Ladybird's, so the two can be installed side by side. See [Where Xenon keeps its data](#where-xenon-keeps-its-data).
 - [x] Xenon's own palette, built around **#ff0050** (`UI/BrandColors.h` for the chrome, `UI/Resources/about-pages/webui.css`
@@ -259,6 +265,19 @@ What exists now and what's planned, measured against Helium:
   Touch ID, phones) need an entitlement from Apple.
 
 Web app installs, which depend on Chromium in Helium, are out of scope until Ladybird supports them.
+
+## Updating the !bangs
+
+```bash
+./Meta/update-bangs.py                      # the latest release of kagisearch/bangs
+./Meta/update-bangs.py --tag 202610261529   # or a given release
+```
+
+It writes `UI/Resources/bangs/bangs.json` and a `NOTICE.txt` with the release's checksum and license. The list is Kagi's
+(MIT), which Helium uses too. DuckDuckGo's own `bang.js` has no license, so Xenon doesn't ship it. The build turns
+`bangs.json` into a table with `Meta/generate-bang-table.py`, and `UI/Bangs.cpp` binary-searches it, so nothing parses
+at startup. `Meta/check.py` checks the list. The script leaves out Kagi's own services (under triggers like `!help`), its
+site-restricted searches, and the few that rewrite the query with a regular expression. It adds `!k` for Kagi itself.
 
 ## License
 
