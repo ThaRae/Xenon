@@ -36,13 +36,23 @@ static constexpr auto AUDIO_PROTECTION_TIME = AK::Duration::from_seconds(60);
 // The timeouts the menu offers: Chromium's Memory Saver discards after 2, 4, or 6 hours, and shorter ones save more.
 static constexpr i64 TIMEOUT_CHOICES_IN_MINUTES[] = { 15, 30, 60, 2 * 60, 4 * 60, 6 * 60 };
 
-class Hibernator final : public QObject {
+ReadonlySpan<i64> timeout_choices_in_minutes()
+{
+    return TIMEOUT_CHOICES_IN_MINUTES;
+}
+
+class Hibernator final
+    : public QObject
+    , public XenonSettings::Observer {
 public:
     static Hibernator& the()
     {
         static auto* hibernator = new Hibernator(QApplication::instance());
         return *hibernator;
     }
+
+    // XenonSettings::Observer
+    virtual void xenon_settings_changed() override { settings_changed(); }
 
     void settings_changed()
     {
@@ -251,7 +261,6 @@ QMenu* create_settings_menu(QWidget& parent)
     group->addAction(off_action);
     QObject::connect(off_action, &QAction::triggered, menu, [] {
         XenonSettings::set_tab_hibernation_enabled(false);
-        Hibernator::the().settings_changed();
     });
     menu->addSeparator();
 
@@ -262,7 +271,6 @@ QMenu* create_settings_menu(QWidget& parent)
         QObject::connect(action, &QAction::triggered, menu, [timeout] {
             XenonSettings::set_tab_hibernation_enabled(true);
             XenonSettings::set_tab_hibernation_timeout(timeout);
-            Hibernator::the().settings_changed();
         });
         return action;
     };

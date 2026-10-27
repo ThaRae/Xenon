@@ -11,7 +11,7 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good upstream commit. |
 | `Patches/ladybird/` | Xenon's changes to the engine, as a patch series applied to the pinned commit at build time (`Meta/patches.py`). |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
-| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
+| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon. `xenon.svg` is the artwork and `xenon-small.svg` its version for 32px and below; `Meta/generate-app-icon.py` renders the macOS iconset and the window icon from them. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
@@ -151,6 +151,8 @@ The default profile is split across the platform's usual directories, each in a 
 | Crash reports | `~/Library/Application Support/Xenon/CrashReports` | `~/.local/share/Xenon/CrashReports` |
 | Xenon's own settings (layout and the like) | `~/Library/Preferences/com.xenon.Xenon.plist` | `~/.config/Xenon/Xenon.conf` |
 
+**Settings → Profile and files** lists the running profile's directories, with a button that shows each one.
+
 `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` move them, on macOS too. `--profile <name>` uses
 `Profiles/<name>` instead of `Profiles/default`, and `--profile-path <dir>` keeps a whole profile in `config/`, `data/`,
 `cache/` and `runtime/` under one directory, which the tests use. Crash reports and Xenon's own settings stay where they
@@ -173,7 +175,22 @@ for root in ~/Library/Preferences ~/Library/"Application Support" ~/Library/Cach
 
 What exists now and what's planned, measured against Helium:
 
-- [x] **Layouts**: right-click the tab strip or window frame and pick **Layout → Classic / Compact / Vertical Tabs**.
+- [x] **Settings page**: `about:settings` (**Settings** in the menu) puts Xenon's own settings first, as Helium's does,
+  and keeps Ladybird's below them. Every change applies at once, and the page follows changes made from the menus.
+  - Xenon: **Look and layout** (the three layouts, the sidebar's side, the bookmarks bar, zoom, dark pages), **Tabs**
+    (recently used order, hibernation and its timeout, dragging a tab to a page's edge to split, groups),
+    **Search and bangs** (the engine, suggestions, bangs on or off, and a lookup of all 13,000), **Ads and trackers**
+    (blocking, which lists are in use and when they were last checked, daily updates with **Check now**, subscriptions
+    and local lists, and links into the blocking dashboard), **Password manager**, and **Extensions**.
+  - Browsing: startup and the new tab page, languages, privacy and browsing data, background connections, site
+    permissions, DNS, where the profile keeps its files (each with **Show**), and Ladybird's configuration keys.
+  - A sidebar of sections that follows the scroll, and **Find a setting**, which hides everything that doesn't match.
+  - The page is Xenon's `UI/Resources/about-pages/settings.*`. It runs Ladybird's own settings scripts, by their element
+    ids, for Ladybird's settings. `UI/SettingsPage.cpp` answers it about Xenon's (`UI/XenonSettings`), through engine
+    patch `0022` (`LibWebView: Let the embedder add interfaces to its WebUI pages`), which lets the browser give WebUI
+    pages interfaces of its own (`UI/WebUIInterfaces.cpp`).
+- [x] **Layouts**: right-click the tab strip or window frame and pick **Layout → Classic / Compact / Vertical Tabs**, or
+  pick one in **Settings → Look and layout**.
   - Classic: the tab strip above the toolbar.
   - Compact: the toolbar and the tabs in one row.
   - Vertical: tabs in a collapsible, resizable sidebar (from Ladybird).
@@ -182,7 +199,8 @@ What exists now and what's planned, measured against Helium:
   sites (see "Updating the !bangs"). While a bang at the start of the address is typed, a chip names its site, as Chrome
   does in keyword mode. The chip appears once the space after the bang is typed, and Backspace at the start of the text
   takes it away, leaving the bang as plain text (Enter then searches the text as typed). A trailing bang like
-  `ladybird !w` resolves on Enter, with no chip.
+  `ladybird !w` resolves on Enter, with no chip. **Settings → Search and bangs** turns bangs off, and looks one up by its
+  trigger or its site's name.
 - [x] **Welcome/setup flow**: on first run (or any time at `about:welcome`), either take Xenon's picks (DuckDuckGo, with
   blocking on) or answer two questions: which search engine, from a private/mainstream list with a live preview of
   where a search goes, and whether to block ads and trackers (on by default, with all three filter lists). Nothing is
@@ -207,7 +225,7 @@ What exists now and what's planned, measured against Helium:
   Bitwarden logs in (with a security key too) and autofills logins. Proton Pass signs in through Proton's account page,
   unlocks with its extra password, autofills logins, and saves new ones. The welcome page offers both, as Helium's
   setup does: Xenon installs the one picked from the Chrome Web Store, after checking its signatures, and keeps it up to
-  date. The Extensions window switches or removes it.
+  date. **Settings → Password manager** and the Extensions window switch or remove it.
 - [x] **uBlock Origin's engine features**: scriptlets (YouTube ads, anti-adblock walls), `$redirect` surrogates,
   `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and an element picker
   (**Block Element...** in a page's context menu). Engine patches `0004`–`0009`, from xenon-ublock. They follow the
@@ -216,12 +234,14 @@ What exists now and what's planned, measured against Helium:
 - [x] **uBlock Origin's popup and dashboard**: the toolbar shield opens a popup laid out like uBlock Origin's, with a
   power button for the site, what was blocked on the page and since install, the domains the page connected to, the
   element picker and zapper, and switches that block a site's pop-ups or remote fonts. Its dashboard,
-  `xenon://blocking/`, has the filter lists (each can be turned off), My filters, and trusted sites. uBO's switches for
-  large media, cosmetic filtering and JavaScript, and which domains had requests blocked, need engine work.
+  `xenon://blocking/`, has the filter lists (each can be turned off), My filters, and trusted sites, and
+  **Settings → Ads and trackers** links to each. uBO's switches for large media, cosmetic filtering and JavaScript, and
+  which domains had requests blocked, need engine work.
 - [x] **Daily filter list updates**: [xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds
   the lists every day and signs them. Once a day Xenon downloads the lists that changed, checks them against the signed
   manifest, and switches to them without a restart. It falls back to the bundled lists if anything fails. The welcome
-  flow and Settings → Services turn updates off. See [Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
+  flow and **Settings → Ads and trackers** turn updates off. Settings also says when the lists in use were made
+  and last checked, and has **Check now**. See [Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [x] **Split view**: two tabs side by side in one window, each with its own page and history (`UI/SplitView.cpp`).
   - Open one from a tab's context menu (**New Split View with Current Tab**, or **Add Tab to New Split View** on the
@@ -229,6 +249,7 @@ What exists now and what's planned, measured against Helium:
     **Open Link in Split View**, or by holding a dragged tab on the left or right edge of a page for half a second.
   - The two tabs sit together in the tab strip. The active page has a rose ring and the toolbar; click the other page to
     switch. The inactive page's corner names it and has the split view's menu.
+  - **Settings → Tabs** turns off opening one by dragging a tab to a page's edge.
   - Drag the divider to resize (it snaps to the middle), or double-click it to swap the pages. **Reverse Views**,
     **Close Left/Right View** and **Separate Views** are in the split button left of the address bar and in the tab's
     context menu. Closing either tab leaves the other as a normal tab.
@@ -239,14 +260,14 @@ What exists now and what's planned, measured against Helium:
   Control key, as in Helium. Tabs opened in the background join the end of the order. As in Helium, there's no switcher
   overlay: each press shows its tab. The other next and previous tab shortcuts (<kbd>Ctrl</kbd><kbd>PgDn</kbd>, and
   <kbd>⌘</kbd><kbd>⇧</kbd><kbd>]</kbd> on macOS) still follow the tab strip. So does Ctrl+Tab, if you untick **Cycle Tabs
-  in Recently Used Order** in the tab strip's context menu.
+  in Recently Used Order** in the tab strip's context menu or in **Settings → Tabs**.
 - [x] **Tab hibernation**, Xenon's take on the Memory Saver that Helium has from Chromium: a background tab left unused
   for two hours gives up its WebContent process, and its favicon turns grey. It keeps its title, favicon, URL, back/forward
   history, and scroll position, and reloads when you select it. A window's current tab never hibernates, and neither do
   pinned tabs, tabs playing audio (or that were a minute ago), with picture-in-picture or DevTools open, waiting on a
-  dialog, or holding text typed into a form and not sent. Right-click the tab strip for **Tab Hibernation → Off** or a
-  timeout from 15 minutes to 6 hours, or a background tab for **Hibernate Tab** (`UI/TabHibernation.cpp`, engine patch
-  `0021`, which saves the scroll position first).
+  dialog, or holding text typed into a form and not sent. Right-click the tab strip (or open **Settings → Tabs**) for
+  **Tab Hibernation → Off** or a timeout from 15 minutes to 6 hours, or a background tab for **Hibernate Tab**
+  (`UI/TabHibernation.cpp`, engine patch `0021`, which saves the scroll position first).
 - [x] **Memory use on hover**, as in Chromium's tab hover cards: hovering a tab, the current one included, shows
   "Memory usage: 153.8 MB". That's the footprint of the processes serving the tab: its WebContent process, the processes
   of its cross-site frames, the workers only it runs, and their image decoders. A process that several tabs share, as a

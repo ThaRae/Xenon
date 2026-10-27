@@ -42,6 +42,23 @@ public:
         bool downloaded { false };
     };
 
+    // What about:settings says about the lists in use and the daily check. There's none while updates can't run at all,
+    // in test mode or with content blocking turned off on the command line.
+    struct Status {
+        // When the lists in use were generated, as their manifest says.
+        ByteString generated_at;
+        size_t list_count { 0 };
+        bool downloaded { false };
+        Optional<UnixDateTime> checked_at;
+        bool checking { false };
+        // Why the last check failed, until one succeeds.
+        Optional<ByteString> error;
+    };
+    static Optional<Status> status();
+
+    // Checks for new lists now, rather than once the day is up, if content blocking and filter list updates are on.
+    static void check_now();
+
 private:
     Updater(ByteString directory, URL::URL base_url, ByteBuffer public_key);
 
@@ -73,6 +90,7 @@ private:
 
     Optional<UnixDateTime> m_checked_at;
     Optional<UnixDateTime> m_attempted_at;
+    Optional<ByteString> m_error;
     RefPtr<Core::Timer> m_timer;
     RefPtr<Core::Timer> m_first_check;
 

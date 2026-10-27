@@ -84,6 +84,7 @@ set(XENON_SOURCES
     ScreenshotSelectionOverlay.cpp
     ScreenshotViewer.cpp
     SelectDropdown.cpp
+    SettingsPage.cpp
     SplitView.cpp
     StringUtils.cpp
     Tab.cpp
@@ -273,6 +274,7 @@ include("${LADYBIRD_SOURCE_DIR}/UI/cmake/ResourceFiles.cmake")
 # and adds a few files of its own beside them.
 set(XENON_ABOUT_PAGE_OVERRIDES
     newtab.html
+    settings.html
     webui.css
     welcome.css
     welcome.html
@@ -281,6 +283,8 @@ set(XENON_ABOUT_PAGE_OVERRIDES
 set(XENON_ABOUT_PAGE_ADDITIONS
     newtab.css
     newtab.js
+    settings.css
+    settings.js
     xenon.css
 )
 foreach (page IN LISTS XENON_ABOUT_PAGE_OVERRIDES)

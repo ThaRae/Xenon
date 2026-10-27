@@ -17,6 +17,7 @@
 #include <UI/LocationEdit.h>
 #include <UI/Menu.h>
 #include <UI/StringUtils.h>
+#include <UI/XenonSettings.h>
 
 #include <QAction>
 #include <QApplication>
@@ -212,7 +213,7 @@ LocationEdit::LocationEdit(QWidget* parent, WebView::IsPrivate is_private)
         clearFocus();
 
         // A !bang goes straight to its site, ahead of the search engine and URL guessing.
-        auto bang_navigation = is_bang_chip_dismissed ? Optional<Bangs::BangNavigation> {} : Bangs::resolve(input);
+        auto bang_navigation = is_bang_chip_dismissed || !XenonSettings::bangs_enabled() ? Optional<Bangs::BangNavigation> {} : Bangs::resolve(input);
         if (bang_navigation.has_value()) {
             set_url(bang_navigation->url);
             if (on_navigation)
@@ -814,7 +815,7 @@ void LocationEdit::update_bang_chip()
     m_has_bang_chip = false;
 
     auto input = ak_string_from_qstring(text());
-    auto leading_bang = m_is_bang_chip_dismissed ? Optional<Bangs::LeadingBang> {} : Bangs::leading_bang(input.bytes_as_string_view());
+    auto leading_bang = m_is_bang_chip_dismissed || !XenonSettings::bangs_enabled() ? Optional<Bangs::LeadingBang> {} : Bangs::leading_bang(input.bytes_as_string_view());
     if (leading_bang.has_value()) {
         m_bang_chip_prefix_length = qstring_offset_for_byte_offset(input, leading_bang->length);
         auto prefix_width = fontMetrics().horizontalAdvance(text().left(m_bang_chip_prefix_length));

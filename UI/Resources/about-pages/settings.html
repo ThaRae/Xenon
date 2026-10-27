@@ -1,0 +1,938 @@
+<!doctype html>
+<!--
+Copyright (c) 2026-present, the Ladybird developers.
+Copyright (c) 2026, the Xenon developers.
+
+SPDX-License-Identifier: BSD-2-Clause
+
+Xenon's settings page. Xenon's own settings come first, from UI/SettingsPage.cpp ("xenon/..." messages, settings.js).
+Ladybird's settings below them keep the element ids of Ladybird's page, so Ladybird's own scripts in about-pages/settings
+run them unchanged, except for tabs.js, whose vertical tabs switch is the layout picker here.
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Settings</title>
+        <link rel="stylesheet" href="resource://ladybird/ladybird.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/webui.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/xenon.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/settings.css" />
+    </head>
+    <body>
+        <div class="orbits" aria-hidden="true">
+            <svg viewBox="0 0 100 100">
+                <ellipse class="orbit" cx="50" cy="50" rx="35" ry="12.5" transform="rotate(45 50 50)" />
+                <ellipse class="orbit orbit-rose" cx="50" cy="50" rx="35" ry="12.5" transform="rotate(-45 50 50)" />
+            </svg>
+        </div>
+
+        <div class="settings">
+            <aside class="sidebar">
+                <a class="wordmark" href="#look">
+                    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+                        <path
+                            class="orbit"
+                            stroke-width="8"
+                            d="M43.01 61.99A33 13.5 45 0 1 42.30 27.68M56.99 38.01A33 13.5 45 0 1 57.70 72.32"
+                        />
+                        <path
+                            class="orbit orbit-rose"
+                            stroke-width="8"
+                            d="M61.99 56.99A33 13.5 -45 0 1 27.68 57.70M38.01 43.01A33 13.5 -45 0 1 72.32 42.30"
+                        />
+                        <circle class="nucleus" cx="50" cy="50" r="5.5" />
+                    </svg>
+                    Settings
+                </a>
+
+                <label class="find" for="find-setting">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="6.5" />
+                        <line x1="16" y1="16" x2="21" y2="21" />
+                    </svg>
+                    <input id="find-setting" type="search" placeholder="Find a setting" autocomplete="off" />
+                </label>
+
+                <nav aria-label="Settings sections">
+                    <p class="nav-group">Xenon</p>
+                    <a href="#look">Look and layout</a>
+                    <a href="#tabs">Tabs</a>
+                    <a href="#search">Search and bangs</a>
+                    <a href="#blocking">Ads and trackers</a>
+                    <a href="#passwords">Password manager</a>
+                    <a href="#extensions">Extensions</a>
+                    <p class="nav-group">Browsing</p>
+                    <a href="#startup">Startup and pages</a>
+                    <a href="#privacy">Privacy and data</a>
+                    <a href="#permissions">Site permissions</a>
+                    <a href="#network">Network</a>
+                    <a href="#profile">Profile and files</a>
+                    <a href="#advanced">Advanced</a>
+                </nav>
+            </aside>
+
+            <main>
+                <p id="no-matches" class="no-matches" hidden>No settings match “<span></span>”.</p>
+
+                <section class="section" id="look" aria-labelledby="look-title">
+                    <h1 id="look-title">Look and layout</h1>
+                    <p class="lede">Where the tabs go, and how pages look.</p>
+
+                    <div class="group">
+                        <h2 class="group-title">Layout</h2>
+                        <div class="layouts" role="radiogroup" aria-label="Layout" data-keywords="tabs toolbar sidebar">
+                            <label class="layout">
+                                <input type="radio" name="layout" value="classic" />
+                                <svg class="layout-art" viewBox="0 0 120 78" aria-hidden="true">
+                                    <rect class="frame" x="1" y="1" width="118" height="76" rx="7" />
+                                    <rect class="tab tab-current" x="8" y="7" width="26" height="9" rx="3" />
+                                    <rect class="tab" x="37" y="7" width="26" height="9" rx="3" />
+                                    <rect class="tab" x="66" y="7" width="20" height="9" rx="3" />
+                                    <line class="rule" x1="1" y1="20" x2="119" y2="20" />
+                                    <rect class="address" x="8" y="24" width="104" height="8" rx="4" />
+                                    <line class="rule" x1="1" y1="36" x2="119" y2="36" />
+                                </svg>
+                                <span class="layout-name"><span class="marker" aria-hidden="true"></span>Classic</span>
+                                <span class="layout-note">Tabs above the toolbar</span>
+                            </label>
+                            <label class="layout">
+                                <input type="radio" name="layout" value="compact" />
+                                <svg class="layout-art" viewBox="0 0 120 78" aria-hidden="true">
+                                    <rect class="frame" x="1" y="1" width="118" height="76" rx="7" />
+                                    <rect class="tab tab-current" x="8" y="8" width="22" height="9" rx="3" />
+                                    <rect class="tab" x="33" y="8" width="22" height="9" rx="3" />
+                                    <rect class="address" x="60" y="8.5" width="52" height="8" rx="4" />
+                                    <line class="rule" x1="1" y1="23" x2="119" y2="23" />
+                                </svg>
+                                <span class="layout-name"><span class="marker" aria-hidden="true"></span>Compact</span>
+                                <span class="layout-note">Tabs and toolbar in one row</span>
+                            </label>
+                            <label class="layout" id="vertical-layout">
+                                <input type="radio" name="layout" value="vertical" />
+                                <svg class="layout-art" viewBox="0 0 120 78" aria-hidden="true">
+                                    <rect class="frame" x="1" y="1" width="118" height="76" rx="7" />
+                                    <line class="rule" x1="31" y1="1" x2="31" y2="77" />
+                                    <rect class="tab tab-current" x="6" y="8" width="20" height="7" rx="2.5" />
+                                    <rect class="tab" x="6" y="18" width="20" height="7" rx="2.5" />
+                                    <rect class="tab" x="6" y="28" width="20" height="7" rx="2.5" />
+                                    <rect class="address" x="37" y="8" width="75" height="8" rx="4" />
+                                    <line class="rule" x1="31" y1="22" x2="119" y2="22" />
+                                </svg>
+                                <span class="layout-name"><span class="marker" aria-hidden="true"></span>Vertical</span>
+                                <span class="layout-note">Tabs in a sidebar</span>
+                            </label>
+                        </div>
+                        <div class="rows">
+                            <div class="row" id="vertical-tabs-position-row" hidden>
+                                <label for="vertical-tabs-position">Sidebar side</label>
+                                <select id="vertical-tabs-position">
+                                    <option value="left">Left</option>
+                                    <option value="right">Right</option>
+                                </select>
+                            </div>
+                            <div class="row" id="vertical-tabs-expand-on-hover-row" hidden>
+                                <label for="vertical-tabs-expand-on-hover">
+                                    Open the sidebar on hover
+                                    <p class="description">
+                                        When it's collapsed, it widens while the pointer is over it.
+                                    </p>
+                                </label>
+                                <input id="vertical-tabs-expand-on-hover" type="checkbox" switch />
+                            </div>
+                            <div class="row" id="show-menu-bar-group">
+                                <label for="show-menu-bar">Show the menu bar</label>
+                                <input id="show-menu-bar" type="checkbox" switch />
+                            </div>
+                            <div class="row">
+                                <label for="show-bookmarks-bar">Show the bookmarks bar</label>
+                                <select id="show-bookmarks-bar">
+                                    <option value="always">Always</option>
+                                    <option value="never">Never</option>
+                                    <option value="onHover">When the pointer is over the toolbar</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">Pages</h2>
+                        <div class="rows">
+                            <div class="row">
+                                <label for="default-zoom-level">Page zoom</label>
+                                <select id="default-zoom-level"></select>
+                            </div>
+                            <div class="row">
+                                <label for="enable-force-dark">
+                                    Dark pages
+                                    <p class="description">
+                                        Darken pages that have no dark theme of their own. Photos stay as they are.
+                                    </p>
+                                </label>
+                                <input id="enable-force-dark" type="checkbox" switch />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="tabs" aria-labelledby="tabs-title">
+                    <h1 id="tabs-title">Tabs</h1>
+                    <p class="lede">Switching between tabs, letting idle ones rest, and keeping them side by side.</p>
+
+                    <div class="group">
+                        <h2 class="group-title">Switching</h2>
+                        <div class="rows">
+                            <div class="row">
+                                <label for="cycle-tabs-in-recently-used-order">
+                                    Cycle tabs in recently used order
+                                    <p class="description">
+                                        <kbd>Ctrl</kbd> <kbd>Tab</kbd> goes back through tabs in the order you last used
+                                        them, and one quick press flips between the last two. Off, it follows the tab
+                                        strip.
+                                    </p>
+                                </label>
+                                <input id="cycle-tabs-in-recently-used-order" type="checkbox" switch disabled />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">Hibernation</h2>
+                        <div class="rows">
+                            <div class="row" data-keywords="memory saver sleep discard">
+                                <label for="tab-hibernation-enabled">
+                                    Hibernate tabs you aren't using
+                                    <p class="description">
+                                        A background tab left alone gives up its memory and its favicon turns grey. It
+                                        reloads where you left it when you come back. Pinned tabs, tabs playing sound,
+                                        and tabs with unsent text in a form stay awake.
+                                    </p>
+                                </label>
+                                <input id="tab-hibernation-enabled" type="checkbox" switch disabled />
+                            </div>
+                            <div class="row" data-keywords="memory saver sleep discard timeout">
+                                <label for="tab-hibernation-timeout">Hibernate a tab after</label>
+                                <select id="tab-hibernation-timeout" disabled></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">Split view</h2>
+                        <div class="rows">
+                            <div class="row">
+                                <label for="split-view-drag-and-drop">
+                                    Drag a tab to a page's edge to split
+                                    <p class="description">
+                                        Hold a dragged tab on the left or right edge of a page to open it beside the
+                                        page. You can also press <kbd data-other="Ctrl">⌘</kbd>
+                                        <kbd data-other="Alt">⌥</kbd> <kbd>N</kbd>, or right-click a tab or a link.
+                                    </p>
+                                </label>
+                                <input id="split-view-drag-and-drop" type="checkbox" switch disabled />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">Groups</h2>
+                        <div class="rows">
+                            <div class="row note-row" data-keywords="tab groups colors">
+                                <p>
+                                    Right-click a tab and choose <strong>Add Tab to New Group</strong>. Click a group's
+                                    name to fold it away. Groups come back with your tabs when Xenon
+                                    <a href="#startup">restores the last session</a>.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="search" aria-labelledby="search-title">
+                    <h1 id="search-title">Search and bangs</h1>
+                    <p class="lede">Where address bar searches go, and the shortcuts that skip the search engine.</p>
+
+                    <div class="group">
+                        <h2 class="group-title">Search engine</h2>
+                        <div class="rows">
+                            <div class="row">
+                                <label for="search-engine">Search with</label>
+                                <div class="control-pair">
+                                    <select id="search-engine">
+                                        <option value="">Don't search from the address bar</option>
+                                        <hr />
+                                    </select>
+                                    <button id="search-settings" class="secondary-button">Edit…</button>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <label for="search-suggestions-enabled">
+                                    Suggest searches while I type
+                                    <p id="search-suggestions-description" class="description"></p>
+                                </label>
+                                <input
+                                    id="search-suggestions-enabled"
+                                    type="checkbox"
+                                    switch
+                                    aria-describedby="search-suggestions-description"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">!bangs</h2>
+                        <div class="rows">
+                            <div class="row">
+                                <label for="bangs-enabled">
+                                    Use !bangs in the address bar
+                                    <p id="bangs-description" class="description">
+                                        <kbd>!w ladybird</kbd> goes straight to Wikipedia's results, and <kbd>!gh</kbd>
+                                        alone opens GitHub. They're looked up on this computer, so the search engine
+                                        never sees them.
+                                    </p>
+                                </label>
+                                <input id="bangs-enabled" type="checkbox" switch disabled />
+                            </div>
+                            <div class="row bang-finder-row" data-keywords="bang lookup trigger">
+                                <label for="bang-finder">
+                                    Look up a bang
+                                    <p class="description">By its trigger or by the site's name.</p>
+                                </label>
+                                <input id="bang-finder" type="search" placeholder="!yt or YouTube" autocomplete="off" />
+                            </div>
+                        </div>
+                        <ol id="bang-results" class="bang-results" aria-live="polite"></ol>
+                    </div>
+                </section>
+
+                <section class="section" id="blocking" aria-labelledby="blocking-title">
+                    <h1 id="blocking-title">Ads and trackers</h1>
+                    <p class="lede">
+                        uBlock Origin's filter lists, built in. They strip ads, trackers, and cookie banners, and
+                        nothing is sent anywhere to do it.
+                    </p>
+
+                    <div class="group">
+                        <div class="rows">
+                            <div class="row" data-keywords="content blocking ad blocker ublock">
+                                <label for="enable-content-blocking">
+                                    Block ads and trackers
+                                    <p class="description">
+                                        To let one site through, use the shield in the address bar.
+                                    </p>
+                                </label>
+                                <input id="enable-content-blocking" type="checkbox" switch />
+                            </div>
+                            <div class="row hidden" id="show-content-blocker-count-setting">
+                                <label for="show-content-blocker-count">Count what's blocked on the shield</label>
+                                <input id="show-content-blocker-count" type="checkbox" switch />
+                            </div>
+                            <div class="row" id="blocking-dashboard-row" hidden>
+                                <div class="label">
+                                    Blocking dashboard
+                                    <p class="description">
+                                        Each filter list, your own filters, and the sites you trust, in one place.
+                                    </p>
+                                </div>
+                                <a id="blocking-dashboard" class="pill-link" href="#blocking">Open</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">Filter lists</h2>
+                        <div class="rows">
+                            <div class="row" data-keywords="ublock easylist easyprivacy adguard">
+                                <div class="label">
+                                    <span id="filter-lists-summary">uBlock Origin's lists</span>
+                                    <p class="description">
+                                        uBlock filters, EasyList, EasyPrivacy, AdGuard, URLhaus, and the cookie banner
+                                        and annoyance lists.
+                                    </p>
+                                    <p id="filter-lists-status" class="description status-line"></p>
+                                </div>
+                                <div class="control-pair">
+                                    <button id="check-filter-lists" class="secondary-button" hidden>Check now</button>
+                                    <a id="choose-filter-lists" class="pill-link" href="#blocking" hidden>Choose…</a>
+                                </div>
+                            </div>
+                            <div class="row" data-keywords="filter list updates services daily">
+                                <label for="filter-list-updates">
+                                    Get new lists every day
+                                    <p class="description">
+                                        Xenon downloads them from git.avx512.dev, and only uses lists that carry its
+                                        signature. Off, the lists update when Xenon does.
+                                    </p>
+                                </label>
+                                <input id="filter-list-updates" type="checkbox" switch />
+                            </div>
+                            <div class="row note-row" data-keywords="element picker hide">
+                                <p>
+                                    Right-click anything on a page and choose <strong>Block Element…</strong> to hide it
+                                    from then on. It goes into
+                                    <span id="element-picker-destination">your own filters below</span>.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <details class="group disclosure">
+                        <summary class="group-title">Subscriptions and local lists</summary>
+                        <div class="rows">
+                            <div class="row stacked" id="custom-filters-row">
+                                <label for="custom-content-blocker-filters">
+                                    Your filters
+                                    <p class="description">Adblock-style rules, one per line.</p>
+                                </label>
+                                <textarea id="custom-content-blocker-filters" rows="8" spellcheck="false"></textarea>
+                                <div class="row-actions">
+                                    <span
+                                        id="custom-content-blocker-filters-status"
+                                        class="description"
+                                        role="status"
+                                    ></span>
+                                    <button id="save-custom-content-blocker-filters" class="secondary-button">
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="row stacked">
+                                <label for="custom-content-blocker-subscription-url">
+                                    Subscribe to a list
+                                    <p class="description">
+                                        From a source you trust. Its updates tell that source your IP address.
+                                    </p>
+                                </label>
+                                <div class="control-pair">
+                                    <input
+                                        id="custom-content-blocker-subscription-url"
+                                        type="url"
+                                        placeholder="https://example.com/filters.txt"
+                                    />
+                                    <button id="add-content-blocker-subscription" class="secondary-button">Add</button>
+                                </div>
+                                <p
+                                    id="custom-content-blocker-subscription-status"
+                                    class="description"
+                                    role="status"
+                                ></p>
+                                <div id="custom-content-blocker-subscriptions" class="list-rows"></div>
+                            </div>
+                            <div class="row stacked">
+                                <div class="row-heading">
+                                    <label>
+                                        Lists on this computer
+                                        <p class="description">Adblock-compatible lists saved as text files.</p>
+                                    </label>
+                                    <input
+                                        id="local-content-blocker-list-picker"
+                                        type="file"
+                                        accept=".txt,text/plain"
+                                        hidden
+                                    />
+                                    <button id="import-local-content-blocker-list" class="secondary-button">
+                                        Import…
+                                    </button>
+                                </div>
+                                <p id="local-content-blocker-list-status" class="description" role="status"></p>
+                                <div id="local-content-blocker-lists" class="list-rows"></div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="group disclosure">
+                        <summary class="group-title">Ladybird's list catalog</summary>
+                        <p class="group-note">
+                            Ladybird's own downloads of the original lists. Xenon's lists above already have them,
+                            converted for Xenon, so turning these on only adds duplicates.
+                        </p>
+                        <div class="rows">
+                            <div class="row stacked">
+                                <div class="row-heading">
+                                    <span>Catalog lists</span>
+                                    <button id="update-content-blocker-lists" class="secondary-button">
+                                        Update enabled lists
+                                    </button>
+                                </div>
+                                <div id="built-in-content-blocker-lists" class="list-rows"></div>
+                                <details class="nested-disclosure">
+                                    <summary>Lists for other languages</summary>
+                                    <div id="language-content-blocker-lists" class="list-rows"></div>
+                                </details>
+                            </div>
+                        </div>
+                    </details>
+
+                    <template id="filter-list-row">
+                        <div class="list-row">
+                            <div>
+                                <label>
+                                    <span class="label"></span>
+                                    <p class="description"></p>
+                                </label>
+                                <p class="description filter-list-metadata"></p>
+                            </div>
+                            <div class="list-row-controls">
+                                <input type="checkbox" switch />
+                                <button class="secondary-button">Remove</button>
+                            </div>
+                        </div>
+                    </template>
+                </section>
+
+                <section class="section" id="passwords" aria-labelledby="passwords-title">
+                    <h1 id="passwords-title">Password manager</h1>
+                    <p class="lede">Xenon fills in passwords through a password manager's extension.</p>
+
+                    <div class="group" id="password-manager-group" hidden>
+                        <div
+                            id="password-manager-choices"
+                            class="rows"
+                            role="radiogroup"
+                            aria-label="Password manager"
+                            data-keywords="bitwarden proton pass 1password"
+                        ></div>
+                        <p id="password-manager-status" class="group-note" role="status"></p>
+                    </div>
+                    <div class="group" id="password-manager-note-group">
+                        <div class="rows">
+                            <div class="row note-row" data-keywords="bitwarden proton pass">
+                                <p>
+                                    Bitwarden and Proton Pass both work in Xenon: load one from
+                                    <a href="#extensions">Extensions</a>, sign in, and it fills in logins and offers to
+                                    save new ones. Sites can also sign you in with a security key.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="extensions" aria-labelledby="extensions-title">
+                    <h1 id="extensions-title">Extensions</h1>
+                    <p class="lede">Chrome extensions, starting with password managers.</p>
+
+                    <div class="group">
+                        <div class="rows">
+                            <div id="extension-list" class="extension-list"></div>
+                            <div class="row">
+                                <label>
+                                    Manage extensions
+                                    <p class="description">Load an unpacked extension, reload one, or remove one.</p>
+                                </label>
+                                <button id="show-extensions" class="secondary-button">Open…</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="startup" aria-labelledby="startup-title">
+                    <h1 id="startup-title">Startup and pages</h1>
+                    <p class="lede">What opens when Xenon starts, and how pages behave.</p>
+
+                    <div class="group">
+                        <h2 class="group-title">Startup</h2>
+                        <div class="rows">
+                            <div class="row">
+                                <label for="restore-previous-session"
+                                    >Restore the last session's windows and tabs</label
+                                >
+                                <input id="restore-previous-session" type="checkbox" switch />
+                            </div>
+                            <div class="row">
+                                <label for="new-tab-page-url">New tab page</label>
+                                <div class="input-with-reset">
+                                    <input id="new-tab-page-url" type="url" placeholder="about:newtab" />
+                                    <button id="new-tab-page-url-reset" class="input-reset-button" title="Use Xenon's">
+                                        &times;
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">Browsing</h2>
+                        <div class="rows">
+                            <div class="row">
+                                <label for="languages-settings">
+                                    Languages
+                                    <p class="description">The languages sites are asked for, in order.</p>
+                                </label>
+                                <button id="languages-settings" class="secondary-button">Edit…</button>
+                            </div>
+                            <div class="row">
+                                <label for="enable-autoscroll">
+                                    Autoscroll
+                                    <p class="description">
+                                        Press the middle mouse button and move the mouse to scroll.
+                                    </p>
+                                </label>
+                                <input id="enable-autoscroll" type="checkbox" switch />
+                            </div>
+                            <div class="row" id="enable-primary-paste-group">
+                                <label for="enable-primary-paste">
+                                    Middle-click to paste
+                                    <p class="description">Paste the selected text with the middle mouse button.</p>
+                                </label>
+                                <input id="enable-primary-paste" type="checkbox" switch />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="privacy" aria-labelledby="privacy-title">
+                    <h1 id="privacy-title">Privacy and data</h1>
+                    <p class="lede">What sites are told, what Xenon keeps, and what it connects to on its own.</p>
+
+                    <div class="group">
+                        <h2 class="group-title">Privacy</h2>
+                        <div class="rows">
+                            <div class="row" data-keywords="gpc do not track">
+                                <label for="global-privacy-control-toggle">
+                                    Global Privacy Control
+                                    <p class="description">Ask sites not to sell or share your data.</p>
+                                </label>
+                                <input id="global-privacy-control-toggle" type="checkbox" switch />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">Browsing data</h2>
+                        <div class="rows">
+                            <div class="row" data-keywords="history cookies cache delete">
+                                <label for="browsing-data-settings">
+                                    Clear browsing data
+                                    <p id="browsing-data-total-size" class="description"></p>
+                                </label>
+                                <button id="browsing-data-settings" class="secondary-button">Clear…</button>
+                            </div>
+                            <div class="row">
+                                <label for="browsing-data-settings-max-disk-cache-size">
+                                    Largest cache
+                                    <p class="description">The most space the HTTP cache may take.</p>
+                                </label>
+                                <div class="control-pair">
+                                    <input id="browsing-data-settings-max-disk-cache-size" type="number" min="1" />
+                                    <select id="browsing-data-settings-max-disk-cache-unit">
+                                        <option value="MiB">MiB</option>
+                                        <option value="GiB">GiB</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <h2 class="group-title">Background connections</h2>
+                        <div class="rows">
+                            <div class="row" data-keywords="services network">
+                                <label for="allow-services-network-access">
+                                    Let Xenon connect on its own
+                                    <p class="description">
+                                        For features you turned on, like daily filter lists. Off, Xenon only connects
+                                        when you browse or ask it to.
+                                    </p>
+                                </label>
+                                <input id="allow-services-network-access" type="checkbox" switch />
+                            </div>
+                            <p id="services-paused-note" class="group-note hidden" role="status">
+                                Paused. Each feature keeps its own setting for when you turn this back on.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="permissions" aria-labelledby="permissions-title">
+                    <h1 id="permissions-title">Site permissions</h1>
+                    <p class="lede">What sites may do without asking.</p>
+
+                    <div class="group">
+                        <div class="rows">
+                            <div class="row">
+                                <label for="autoplay-settings">
+                                    Autoplay
+                                    <p class="description">Which sites may play media as soon as they open.</p>
+                                </label>
+                                <span id="autoplay-forcibly-enabled" class="forcibly-enabled hidden">
+                                    Set on the command line
+                                </span>
+                                <button id="autoplay-settings" class="secondary-button">Edit…</button>
+                            </div>
+                            <div class="row">
+                                <label for="enable-geolocation">
+                                    Location
+                                    <p class="description">Let sites ask for where you are.</p>
+                                </label>
+                                <input id="enable-geolocation" type="checkbox" switch />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="network" aria-labelledby="network-title">
+                    <h1 id="network-title">Network</h1>
+                    <p class="lede">How Xenon looks up the sites you visit.</p>
+
+                    <div class="group">
+                        <h2 class="group-title">DNS</h2>
+                        <p id="dns-forcibly-enabled" class="group-note forcibly-enabled hidden">
+                            Set on the command line.
+                        </p>
+                        <p id="dns-proxy-note" class="group-note hidden"></p>
+                        <div class="rows">
+                            <div class="row" id="dns-settings-container">
+                                <label for="dns-upstream">Look up names with</label>
+                                <select id="dns-upstream">
+                                    <option value="system">The system's DNS</option>
+                                    <option value="custom">A DNS server of my own</option>
+                                </select>
+                            </div>
+                            <div id="custom-dns-settings" class="hidden">
+                                <div class="row">
+                                    <label for="dns-type">Protocol</label>
+                                    <select id="dns-type">
+                                        <option value="udp">UDP</option>
+                                        <option value="tls">TLS</option>
+                                    </select>
+                                </div>
+                                <div class="row">
+                                    <label for="dnssec-toggle">Validate DNSSEC here</label>
+                                    <input id="dnssec-toggle" type="checkbox" switch />
+                                </div>
+                                <div class="row">
+                                    <label for="dns-server">Server (IP address or host name)</label>
+                                    <input id="dns-server" type="text" />
+                                </div>
+                                <div class="row">
+                                    <label for="dns-port">Port</label>
+                                    <input id="dns-port" type="text" placeholder="53" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="profile" aria-labelledby="profile-title">
+                    <h1 id="profile-title">Profile and files</h1>
+                    <p class="lede" id="profile-lede">Where Xenon keeps what it saves.</p>
+
+                    <div class="group">
+                        <div class="rows">
+                            <div class="row location" data-location="config">
+                                <div class="label">
+                                    Settings and bookmarks
+                                    <p class="description path"></p>
+                                </div>
+                                <button class="secondary-button" data-show-location="config">Show</button>
+                            </div>
+                            <div class="row location" data-location="data" data-keywords="history cookies extensions">
+                                <div class="label">
+                                    History, cookies, sessions, and extensions
+                                    <p class="description path"></p>
+                                </div>
+                                <button class="secondary-button" data-show-location="data">Show</button>
+                            </div>
+                            <div class="row location" data-location="cache">
+                                <div class="label">
+                                    Cache
+                                    <p class="description path"></p>
+                                </div>
+                                <button class="secondary-button" data-show-location="cache">Show</button>
+                            </div>
+                            <div class="row location" data-location="xenonSettings" data-keywords="layout preferences">
+                                <div class="label">
+                                    Xenon's own settings
+                                    <p class="description path"></p>
+                                </div>
+                                <button class="secondary-button" data-show-location="xenonSettings">Show</button>
+                            </div>
+                            <div class="row location" data-location="crashReports">
+                                <div class="label">
+                                    Crash reports
+                                    <p class="description path"></p>
+                                    <p id="crash-reports-status" class="description" role="status" hidden></p>
+                                </div>
+                                <button id="open-crash-reports" class="secondary-button">Show</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section" id="advanced" aria-labelledby="advanced-title">
+                    <h1 id="advanced-title">Advanced</h1>
+                    <p class="lede">Every configuration key, for testing and tuning.</p>
+
+                    <div class="group">
+                        <input id="config-filter" type="search" placeholder="Filter configuration keys" />
+                        <div class="rows">
+                            <div id="config-list"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <footer>
+                    <a href="about:version">About this version of Xenon</a>
+                </footer>
+            </main>
+        </div>
+
+        <dialog id="languages-dialog" closedby="any">
+            <div class="dialog-header">
+                <h3 class="dialog-title">Languages</h3>
+                <button id="languages-close" class="close-button dialog-button" aria-label="Close">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <p class="description">The languages sites are asked for, in order of preference.</p>
+                <div id="languages-list" class="dialog-list"></div>
+                <div class="dialog-controls">
+                    <select id="languages-select">
+                        <option value="">Add a language…</option>
+                    </select>
+                    <button id="languages-add" class="primary-button" disabled>Add</button>
+                </div>
+            </div>
+        </dialog>
+
+        <dialog id="search-dialog" closedby="any">
+            <div class="dialog-header">
+                <h3 class="dialog-title">Search engines</h3>
+                <button id="search-close" class="close-button dialog-button" aria-label="Close">&times;</button>
+            </div>
+            <div class="dialog-body" style="height: 260px">
+                <p class="description">Search engines you've added.</p>
+                <div id="search-list" class="dialog-list"></div>
+            </div>
+            <div class="dialog-form">
+                <div class="form-group">
+                    <label for="search-custom-name">Name</label>
+                    <input id="search-custom-name" type="text" placeholder="Example" />
+                </div>
+                <div class="form-group">
+                    <label for="search-custom-url">
+                        Search URL
+                        <p class="description">%s marks where the search goes.</p>
+                    </label>
+                    <input id="search-custom-url" type="url" placeholder="https://example.com/search?q=%s" />
+                </div>
+                <div class="form-group">
+                    <label for="search-custom-suggestions-url">
+                        Suggestions URL (optional)
+                        <p class="description">%s marks the search. It must answer in OpenSearch's JSON format.</p>
+                    </label>
+                    <input
+                        id="search-custom-suggestions-url"
+                        type="url"
+                        placeholder="https://example.com/suggest?q=%s"
+                    />
+                </div>
+                <div class="dialog-controls">
+                    <button id="search-custom-add" class="primary-button">Add</button>
+                </div>
+            </div>
+        </dialog>
+
+        <dialog id="site-settings" closedby="any">
+            <div class="dialog-header">
+                <h3 id="site-settings-title" class="dialog-title"></h3>
+                <button id="site-settings-close" class="close-button dialog-button" aria-label="Close">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <div class="row">
+                    <label for="site-settings-policy">For every site</label>
+                    <select id="site-settings-policy"></select>
+                </div>
+                <p class="dialog-label">Allowed sites</p>
+                <div id="site-settings-list" class="dialog-list"></div>
+                <div class="dialog-controls">
+                    <input id="site-settings-input" type="text" placeholder="example.com" />
+                    <button id="site-settings-add" class="primary-button">Add</button>
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button id="site-settings-remove-all" class="secondary-button">Remove all sites</button>
+            </div>
+        </dialog>
+
+        <dialog id="browsing-data-settings-dialog" closedby="any">
+            <div class="dialog-header">
+                <h3 class="dialog-title">Clear browsing data</h3>
+                <button id="browsing-data-settings-close" class="close-button dialog-button" aria-label="Close">
+                    &times;
+                </button>
+            </div>
+            <div class="dialog-body" style="height: auto">
+                <div class="row">
+                    <label for="clear-browsing-data-time-range">From</label>
+                    <select id="clear-browsing-data-time-range">
+                        <option value="lastHour">The last hour</option>
+                        <option value="last4Hours">The last 4 hours</option>
+                        <option value="today">Today</option>
+                        <option value="all" selected>All time</option>
+                    </select>
+                </div>
+                <label class="check-row">
+                    <input id="clear-browsing-data-cached-files" type="checkbox" checked />
+                    <span>
+                        Cached files<span id="clear-browsing-data-cached-files-size"></span>
+                        <span class="description">What helps pages load faster.</span>
+                    </span>
+                </label>
+                <label class="check-row">
+                    <input id="clear-browsing-data-history" type="checkbox" checked />
+                    <span>
+                        Browsing history
+                        <span class="description">Visited pages, here and in address bar suggestions.</span>
+                    </span>
+                </label>
+                <label class="check-row">
+                    <input id="clear-browsing-data-download-history" type="checkbox" checked />
+                    <span>
+                        Download history
+                        <span class="description">The list of downloads. The files themselves stay.</span>
+                    </span>
+                </label>
+                <label class="check-row">
+                    <input id="clear-browsing-data-site-data" type="checkbox" checked />
+                    <span>
+                        Cookies and site data<span id="clear-browsing-data-site-data-size"></span>
+                        <span class="description">This signs you out of most sites.</span>
+                    </span>
+                </label>
+                <div class="dialog-controls">
+                    <button id="clear-browsing-data-remove-data" class="primary-button">Clear</button>
+                </div>
+            </div>
+        </dialog>
+
+        <script>
+            // Ladybird's settings scripts use these globals of its page.
+            // FIXME: When we support per-glyph font fallbacks, replace these SVGs with analogous code points.
+            //        https://github.com/LadybirdBrowser/ladybird/issues/864
+            const upwardArrowSVG =
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+            const downwardArrowSVG =
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
+            const containsValidURL = input => {
+                return input.value.length !== 0 && input.checkValidity();
+            };
+        </script>
+
+        <script src="resource://ladybird/about-pages/settings/advanced.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/appearance.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/blocking.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/browsing-behavior.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/content.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/geolocation.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/languages.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/network.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/permissions.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/privacy.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/search.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/services.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/startup.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings.js" type="module"></script>
+    </body>
+</html>

@@ -5,6 +5,7 @@
  */
 
 #include <AK/TypeCasts.h>
+#include <AK/Vector.h>
 #include <LibWebView/Application.h>
 #include <UI/BrowserWindow.h>
 #include <UI/StringUtils.h>
@@ -22,6 +23,37 @@ static QSettings& settings()
 {
     static QSettings settings { QStringLiteral("Xenon"), QStringLiteral("Xenon") };
     return settings;
+}
+
+ByteString location()
+{
+    return ak_byte_string_from_qstring(settings().fileName());
+}
+
+static Vector<Observer*>& observers()
+{
+    static Vector<Observer*> observers;
+    return observers;
+}
+
+Observer::Observer()
+{
+    observers().append(this);
+}
+
+Observer::~Observer()
+{
+    observers().remove_first_matching([this](auto* observer) { return observer == this; });
+}
+
+static void notify_observers()
+{
+    // NB: An observer may come or go while it's told.
+    auto observers_to_notify = observers();
+    for (auto* observer : observers_to_notify) {
+        if (observers().contains_slow(observer))
+            observer->xenon_settings_changed();
+    }
 }
 
 bool compact_toolbar()
@@ -52,6 +84,7 @@ void set_chrome_layout(ChromeLayout layout)
         if (auto* window = as_if<BrowserWindow>(widget))
             window->update_tabs_display();
     }
+    notify_observers();
 }
 
 static constexpr auto TAB_HIBERNATION_KEY = "tabs/hibernation";
@@ -71,6 +104,7 @@ bool tab_hibernation_enabled()
 void set_tab_hibernation_enabled(bool enabled)
 {
     settings().setValue(TAB_HIBERNATION_KEY, enabled);
+    notify_observers();
 }
 
 AK::Duration tab_hibernation_timeout()
@@ -82,6 +116,7 @@ AK::Duration tab_hibernation_timeout()
 void set_tab_hibernation_timeout(AK::Duration timeout)
 {
     settings().setValue(TAB_HIBERNATION_TIMEOUT_KEY, static_cast<qlonglong>(timeout.to_seconds()));
+    notify_observers();
 }
 
 bool cycle_tabs_in_recently_used_order()
@@ -92,6 +127,33 @@ bool cycle_tabs_in_recently_used_order()
 void set_cycle_tabs_in_recently_used_order(bool enabled)
 {
     settings().setValue(RECENTLY_USED_TAB_ORDER_KEY, enabled);
+    notify_observers();
+}
+
+static constexpr auto SPLIT_VIEW_DRAG_AND_DROP_KEY = "splitView/dragAndDrop";
+
+bool split_view_drag_and_drop()
+{
+    return settings().value(SPLIT_VIEW_DRAG_AND_DROP_KEY, true).toBool();
+}
+
+void set_split_view_drag_and_drop(bool enabled)
+{
+    settings().setValue(SPLIT_VIEW_DRAG_AND_DROP_KEY, enabled);
+    notify_observers();
+}
+
+static constexpr auto BANGS_KEY = "search/bangs";
+
+bool bangs_enabled()
+{
+    return settings().value(BANGS_KEY, true).toBool();
+}
+
+void set_bangs_enabled(bool enabled)
+{
+    settings().setValue(BANGS_KEY, enabled);
+    notify_observers();
 }
 
 static constexpr auto DISABLED_FILTER_LISTS_KEY = "blocking/disabledFilterLists";
@@ -114,6 +176,7 @@ void set_filter_list_enabled(StringView id, bool enabled)
         ids.append(qid);
     ids.sort();
     settings().setValue(DISABLED_FILTER_LISTS_KEY, ids);
+    notify_observers();
 }
 
 u64 blocked_request_total()

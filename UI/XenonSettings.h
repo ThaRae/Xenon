@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <AK/ByteString.h>
 #include <AK/HashTable.h>
 #include <AK/String.h>
 #include <AK/Time.h>
@@ -13,6 +14,9 @@
 
 // Settings for Xenon's own features. Settings that Ladybird already has, like vertical tabs, stay in its settings store.
 namespace Ladybird::XenonSettings {
+
+// Where these settings are kept: a property list in ~/Library/Preferences on macOS, and a file in ~/.config elsewhere.
+ByteString location();
 
 enum class ChromeLayout : u8 {
     // The tab strip above the toolbar.
@@ -42,6 +46,16 @@ void set_tab_hibernation_enabled(bool);
 AK::Duration tab_hibernation_timeout();
 void set_tab_hibernation_timeout(AK::Duration);
 
+// Whether holding a tab dragged over the left or right edge of a page opens it in a split view beside the page, like
+// Helium's "Allow split view drag and drop". On by default.
+bool split_view_drag_and_drop();
+void set_split_view_drag_and_drop(bool);
+
+// Whether the address bar resolves !bangs (UI/Bangs.h). On by default. With bangs off, "!w ladybird" is searched for as
+// it's typed, like any other text.
+bool bangs_enabled();
+void set_bangs_enabled(bool);
+
 // The ids of the bundled filter lists (UI/Resources/filter-lists/manifest.json) turned off in the blocking dashboard,
 // which UI/FilterLists.cpp leaves out of what it gives the content blocker. Every list is on until it's turned off.
 HashTable<String> disabled_filter_lists();
@@ -50,5 +64,16 @@ void set_filter_list_enabled(StringView id, bool);
 // How many requests content blocking has blocked since Xenon was first run, as uBlock Origin counts "since install".
 u64 blocked_request_total();
 void add_to_blocked_request_total(u64);
+
+// Told whenever one of these settings changes, wherever it was changed from, as WebView::SettingsObserver is for
+// Ladybird's settings. The features follow about:settings through it, and about:settings follows the menus and the
+// blocking dashboard. The blocked request total, which changes with nearly every page, isn't told.
+class Observer {
+public:
+    Observer();
+    virtual ~Observer();
+
+    virtual void xenon_settings_changed() = 0;
+};
 
 }
