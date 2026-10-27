@@ -460,8 +460,10 @@ for Bitwarden in Chrome.
     each world can see of the other (globals, expandos, errors, rejections), the shared DOM, `postMessage` from the
     page, stylesheets, messages and ports to the background, and storage.
   - Bitwarden's content scripts run: on a page that asks, its message handler answers that Bitwarden is installed.
-    That handler is what carries a security key's answer from the web vault back to the extension in Bitwarden's
-    two-step login, which needs the WebAuthn patches too.
+  - With the WebAuthn patches, Bitwarden's two-step login with a USB security key works (tried by hand). The popup
+    opens the web vault's `webauthn-fallback-connector.html` in a tab, where the key answers. The page posts the
+    result to Bitwarden's content script, which sends it to the background. The background then opens a popout window
+    (`windows.create` with `type: "popup"`) that submits the token.
 
   Left:
   - `scripting.executeScript`, `insertCSS`, and `removeCSS`, and registered content scripts (Bitwarden injects its
