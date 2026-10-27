@@ -1,0 +1,136 @@
+<!doctype html>
+<!-- Meta/xenon.py test serves this from a local web server, at a URL the test extension's externally_connectable
+     matches, with the extension's ID in the query. It messages the extension as a web page, prints one line of
+     results, and closes, which ends the headless browser. -->
+<script>
+    const results = {};
+    function check(name, condition) {
+        results[name] = Boolean(condition);
+    }
+
+    const extensionId = new URLSearchParams(location.search).get("id");
+    const absentId = "a".repeat(32);
+
+    check(
+        "chrome.runtime is there before the page's scripts",
+        typeof chrome?.runtime?.sendMessage === "function" && typeof chrome.runtime.connect === "function"
+    );
+    check(
+        "a web page's chrome.runtime is only for messaging",
+        chrome.runtime.id === undefined && chrome.runtime.getURL === undefined && chrome.storage === undefined
+    );
+
+    // The page's world sees the events its chrome.runtime sends, so it can send its own. The UI process still only lets
+    // it message the extension.
+    let requestEventName;
+    const dispatchEvent = EventTarget.prototype.dispatchEvent;
+    EventTarget.prototype.dispatchEvent = function (event) {
+        if (event.type.endsWith("-request")) requestEventName ??= event.type;
+        return dispatchEvent.call(this, event);
+    };
+
+    function forge(message) {
+        return new Promise(resolve => {
+            const replyEventName = requestEventName.replace(/-request$/, "-reply");
+            const onReply = event => {
+                const reply = JSON.parse(event.detail).message;
+                if (reply?.id !== message.id) return;
+                document.removeEventListener(replyEventName, onReply);
+                resolve(reply);
+            };
+            document.addEventListener(replyEventName, onReply);
+            const detail = JSON.stringify({ extensionId, message });
+            document.dispatchEvent(new CustomEvent(requestEventName, { detail }));
+        });
+    }
+
+    function withCallback(send) {
+        return new Promise(resolve =>
+            send(response => resolve({ response, error: chrome.runtime.lastError?.message }))
+        );
+    }
+
+    function loadImage(path) {
+        return new Promise(resolve => {
+            const image = new Image();
+            image.onload = () => resolve(true);
+            image.onerror = () => resolve(false);
+            image.src = `chrome-extension://${extensionId}/${path}`;
+        });
+    }
+
+    async function run() {
+        // Proton Pass draws its icon in login fields with one of its images as the field's background.
+        check("a web page loads web accessible images", await loadImage("icon16.png"));
+        check("but no other files of the extension", !(await loadImage("icon32.png")));
+
+        const reply = await chrome.runtime.sendMessage(extensionId, { toBackground: "ping" });
+        check("sendMessage reaches runtime.onMessageExternal", reply?.pong === true);
+        check("a web page's messages have no sender ID", reply?.sender !== undefined && !("id" in reply.sender));
+        check(
+            "a web page's messages say which page and tab sent them",
+            reply?.sender?.url === location.href &&
+                reply.sender.origin === location.origin &&
+                reply.sender.frameId === 0 &&
+                typeof reply.sender.tabId === "number"
+        );
+
+        const later = await withCallback(callback =>
+            chrome.runtime.sendMessage(extensionId, { toBackground: "later" }, callback)
+        );
+        check("sendMessage with a callback, answered later", later.response?.later === true && !later.error);
+
+        const unanswered = await withCallback(callback =>
+            chrome.runtime.sendMessage(extensionId, { toBackground: "nothing" }, callback)
+        );
+        check("a message nobody answers", unanswered.error?.includes("message port closed"));
+
+        const absent = await withCallback(callback => chrome.runtime.sendMessage(absentId, {}, callback));
+        check("an extension that doesn't take the page's messages", absent.error?.includes("Receiving end does not exist"));
+
+        let threw = false;
+        try {
+            chrome.runtime.sendMessage({ toBackground: "ping" });
+        } catch (error) {
+            threw = error instanceof TypeError;
+        }
+        check("a web page has to name the extension", threw);
+
+        const port = chrome.runtime.connect(extensionId, { name: "external" });
+        const echo = await new Promise(resolve => {
+            port.onMessage.addListener(resolve);
+            port.postMessage({ hello: "port" });
+        });
+        check(
+            "connect reaches runtime.onConnectExternal",
+            echo?.echo?.hello === "port" && echo.name === "external" && echo.hasSenderId === false
+        );
+        port.disconnect();
+
+        const closed = await new Promise(resolve => {
+            const absentPort = chrome.runtime.connect(absentId);
+            absentPort.onDisconnect.addListener(() => resolve(chrome.runtime.lastError?.message));
+        });
+        check("a port to an extension that doesn't take the page's messages", closed?.includes("Receiving end does not exist"));
+
+        const events = await chrome.runtime.sendMessage(extensionId, { toBackground: "events" });
+        check(
+            "a web page's messages stay out of runtime.onMessage",
+            Array.isArray(events) && !events.includes("onMessage got a web page's message")
+        );
+
+        const forged = await forge({ type: "call", id: 100000, name: "tabs.query", args: [{}] });
+        check("a web page can't call other APIs", forged?.error?.includes("isn't available to web pages"));
+
+        console.log("XENON-EXTENSION-TEST " + JSON.stringify(results));
+        window.close();
+    }
+
+    addEventListener("load", () =>
+        run().catch(error => {
+            check(`no exception: ${error}`, false);
+            console.log("XENON-EXTENSION-TEST " + JSON.stringify(results));
+            window.close();
+        })
+    );
+</script>

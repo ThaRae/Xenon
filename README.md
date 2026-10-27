@@ -102,6 +102,12 @@ source and license. The GPL-3.0 text ships beside them. `Meta/check.py` fails if
 license. `./Meta/xenon.py test` checks that Xenon blocks with them, given no list arguments, by loading a local page
 with blocking on and off.
 
+Between releases, Xenon fetches the lists daily from
+[tharae/xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists). That public repository's workflow (kept
+here as `Meta/ci/filter-lists-workflow.yml`) runs the same script every day with `--output`, through
+`Meta/ci/publish-filter-lists.sh`, and signs the manifest. See
+[Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
+
 ## Changing the engine
 
 ```bash
@@ -129,6 +135,37 @@ If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon l
 changes into `UI/`. The weekly Upstream workflow applies the series to `master`, names any patch that no longer
 applies, builds, and lists those UI changes, so a bump holds no surprises.
 
+## Where Xenon keeps its data
+
+The default profile is split across the platform's usual directories, each in a `Xenon` folder of its own:
+
+| What | macOS | Linux |
+| --- | --- | --- |
+| Settings and bookmarks | `~/Library/Preferences/Xenon/Profiles/default` | `~/.config/Xenon/Profiles/default` |
+| History, cookies, sessions, extensions | `~/Library/Application Support/Xenon/Profiles/default` | `~/.local/share/Xenon/Profiles/default` |
+| HTTP cache | `~/Library/Caches/Xenon/Profiles/default` | `~/.cache/Xenon/Profiles/default` |
+| The running browser's lock and socket | `~/Library/Application Support/Xenon/Profiles/default` | `$XDG_RUNTIME_DIR/Xenon/Profiles/default` |
+| Crash reports | `~/Library/Application Support/Xenon/CrashReports` | `~/.local/share/Xenon/CrashReports` |
+| Xenon's own settings (layout and the like) | `~/Library/Preferences/com.xenon.Xenon.plist` | `~/.config/Xenon/Xenon.conf` |
+
+`XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` move them, on macOS too. `--profile <name>` uses
+`Profiles/<name>` instead of `Profiles/default`, and `--profile-path <dir>` keeps a whole profile in `config/`, `data/`,
+`cache/` and `runtime/` under one directory, which the tests use. Crash reports and Xenon's own settings stay where they
+are with either. Ladybird's engine still names its database in the profile `Ladybird.db`.
+
+LibWebView put every profile under `Ladybird`, until engine patch `0020` let the browser name the directory.
+Xenon names it in `UI/main.cpp`, before anything reads it.
+
+Xenon doesn't bring over the profile that earlier builds kept in Ladybird's directories. Nothing there says
+whether Xenon or Ladybird wrote it, so moving it could take Ladybird's history and cookies away, and copying it would
+give them to Xenon. Xenon starts on a new profile instead, with the welcome flow. If only Xenon ever used the old one,
+move it yourself before this version of Xenon first starts (on Linux, with `~/.config`, `~/.local/share` and
+`~/.cache`):
+
+```bash
+for root in ~/Library/Preferences ~/Library/"Application Support" ~/Library/Caches; do mkdir -p "$root/Xenon/Profiles" && mv -n "$root/Ladybird/Profiles/default" "$root/Xenon/Profiles/"; done
+```
+
 ## Features
 
 What exists now and what's planned, measured against Helium:
@@ -153,7 +190,7 @@ What exists now and what's planned, measured against Helium:
   EasyList, EasyPrivacy, AdGuard, URLhaus, and the cookie banner and annoyance lists), converted for Ladybird's content
   blocker by [xenon-ublock](../xenon-ublock). They block ads, trackers, malware sites, and cookie banners whenever
   content blocking is on, which the welcome flow turns on by default. They ship with Xenon in
-  `UI/Resources/filter-lists`, so nothing is downloaded. Ladybird's own downloadable catalog stays off, since it holds
+  `UI/Resources/filter-lists`, and update daily (below). Ladybird's own downloadable catalog stays off, since it holds
   raw copies of the same lists.
 - [ ] **Chrome extensions** (Manifest V3), for password managers first, as Helium offers Bitwarden, Proton Pass, and
   1Password. In progress; see [Documentation/Extensions.md](Documentation/Extensions.md). So far, unpacked extensions
@@ -161,11 +198,15 @@ What exists now and what's planned, measured against Helium:
   background service worker. They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`,
   `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for. Their content scripts run
   in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and stylesheets on request.
-  Bitwarden logs in (with a security key too) and autofills logins.
+  Bitwarden logs in (with a security key too) and autofills logins. Proton Pass signs in through Proton's account page,
+  unlocks with its extra password, autofills logins, and saves new ones.
 - [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
   surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
   picker. See xenon-ublock's `docs/gap-analysis.md`.
-- [ ] Daily filter list updates, which need a host for xenon-ublock's converted lists.
+- [x] **Daily filter list updates**: [xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds
+  the lists every day and signs them. Once a day Xenon downloads the lists that changed, checks them against the signed
+  manifest, and switches to them without a restart. It falls back to the bundled lists if anything fails. The welcome
+  flow and Settings → Services turn updates off. See [Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [ ] Split view
 - [x] **MRU tab switching**: hold <kbd>Ctrl</kbd> and press <kbd>Tab</kbd> to walk back through a window's tabs in the
@@ -178,7 +219,8 @@ What exists now and what's planned, measured against Helium:
 - [ ] Tab hibernation
 - [ ] Tab groups
 - [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed
-- [ ] A separate profile directory (LibWebView currently hardcodes `Ladybird` in profile paths)
+- [x] **Its own profile directory**: Xenon keeps its settings, history, cookies, extensions, cache, and crash reports
+  apart from Ladybird's, so the two can be installed side by side. See [Where Xenon keeps its data](#where-xenon-keeps-its-data).
 - [x] Xenon's own palette, built around **#ff0050** (`UI/BrandColors.h` for the chrome, `UI/Resources/about-pages/webui.css`
   for the internal pages)
 - [x] Xenon's own app icon: two orbits woven around a nucleus, in white and rose

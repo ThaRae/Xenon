@@ -192,6 +192,9 @@ function messageReply(promise, callback) {
 
 const runtimeOnMessage = event("runtime.onMessage");
 const runtimeOnConnect = event("runtime.onConnect");
+// Messages and ports from the web pages that externally_connectable lets reach the extension.
+const runtimeOnMessageExternal = event("runtime.onMessageExternal");
+const runtimeOnConnectExternal = event("runtime.onConnectExternal");
 
 const runtime = {
     id: config.id,
@@ -242,8 +245,8 @@ const runtime = {
 
     onMessage: runtimeOnMessage,
     onConnect: runtimeOnConnect,
-    onMessageExternal: event("runtime.onMessageExternal"),
-    onConnectExternal: event("runtime.onConnectExternal"),
+    onMessageExternal: runtimeOnMessageExternal,
+    onConnectExternal: runtimeOnConnectExternal,
     onInstalled: event("runtime.onInstalled"),
     onStartup: event("runtime.onStartup"),
     onSuspend: event("runtime.onSuspend"),
@@ -623,9 +626,11 @@ const extension = {
 
 // --- Messages from the UI process --------------------------------------------------------------------------------------
 
-function deliverMessage({ id, message, sender }) {
+function deliverMessage({ id, message, sender, external }) {
+    const onMessage = external ? runtimeOnMessageExternal : runtimeOnMessage;
+
     // With no listener, nothing here is a receiving end, which the sender hears if no other context is one either.
-    if (!runtimeOnMessage.hasListeners()) {
+    if (!onMessage.hasListeners()) {
         post({ type: "response", id, handled: false, listening: false });
         return;
     }
@@ -638,7 +643,7 @@ function deliverMessage({ id, message, sender }) {
         post({ type: "response", id, handled: true, response: toJSON(response) });
     };
 
-    for (const result of runtimeOnMessage.dispatch(message, sender, sendResponse)) {
+    for (const result of onMessage.dispatch(message, sender, sendResponse)) {
         if (result === true) keepsChannelOpen = true;
         // A listener may also answer with a promise, as in Firefox and with Chrome's polyfill.
         else if (result && typeof result.then === "function") {
@@ -650,14 +655,15 @@ function deliverMessage({ id, message, sender }) {
     if (!responded && !keepsChannelOpen) post({ type: "response", id, handled: false });
 }
 
-function acceptConnection({ port: id, name, sender }) {
-    if (!runtimeOnConnect.hasListeners()) {
+function acceptConnection({ port: id, name, sender, external }) {
+    const onConnect = external ? runtimeOnConnectExternal : runtimeOnConnect;
+    if (!onConnect.hasListeners()) {
         post({ type: "connected", port: id, accepted: false });
         return;
     }
     const port = new Port(id, name, sender);
     post({ type: "connected", port: id, accepted: true });
-    runtimeOnConnect.dispatch(port);
+    onConnect.dispatch(port);
 }
 
 bridge.onmessage = text => {
@@ -725,14 +731,36 @@ if (config.isPopup) {
 // A page that goes away says so, so that its ports close and messages stop waiting for it.
 if (typeof document !== "undefined") addEventListener("pagehide", () => post({ type: "closing" }));
 
+// A service worker's install and activate events, as ExtendableEvents whose waitUntil() Xenon doesn't wait for.
+function dispatchLifecycleEvent(type) {
+    const event = new Event(type);
+    event.waitUntil = () => {};
+    try {
+        // NB: Workers have no oninstall or onactivate event handler attributes, so a function set as one is called here.
+        if (typeof self[`on${type}`] === "function") self[`on${type}`](event);
+    } catch (error) {
+        reportListenerError(error);
+    }
+    self.dispatchEvent(event);
+}
+
 // The background worker's script runs right after this, and once it has, the UI process sends runtime.onInstalled or
 // runtime.onStartup (see /_generated_background_worker.js).
 if (config.isBackground) {
+    // Install handlers call skipWaiting() to take over from the service worker before them, which this one has none of.
+    Object.defineProperty(self, "skipWaiting", { configurable: true, writable: true, value: () => Promise.resolve() });
+
     const ready = Symbol.for("xenon.background.ready");
     Object.defineProperty(self, ready, {
         configurable: true,
         value() {
             delete self[ready];
+            // A service worker is installed and activated once its script has run. This worker is a new one each time
+            // the browser starts, so it is each time. MV3 extensions load the rest of their code with importScripts()
+            // while installing, the only time a service worker may import a new script, as Proton Pass does with its
+            // chunks. Loaded later, from a promise's reaction, Ladybird would never finish loading them.
+            dispatchLifecycleEvent("install");
+            dispatchLifecycleEvent("activate");
             post({ type: "call", id: nextCallId++, name: "runtime.backgroundReady", args: [] });
         },
     });

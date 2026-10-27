@@ -14,6 +14,7 @@
 #include <UI/Application.h>
 #include <UI/BrowserWindow.h>
 #include <UI/Extensions/Registry.h>
+#include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
 #if defined(LADYBIRD_QT_HAVE_POSITIONING)
 #    include <UI/GeolocationProviderQt.h>
@@ -56,6 +57,9 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
 {
     AK::set_rich_debug_enabled(true);
 
+    // Profiles and crash reports go under Xenon's own directories, apart from Ladybird's.
+    WebView::set_application_name("Xenon"sv);
+
     if (auto result = WebView::CrashReportStore::the().initialize_browser_crash_handler(); result.is_error())
         warnln("Could not prepare Browser crash reporting: {}", result.error());
 
@@ -86,6 +90,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
         outln("Opening in existing process");
         return 0;
     }
+
+    Ladybird::FilterLists::Updater::initialize();
 
     auto& browser_process = app->browser_process();
 
