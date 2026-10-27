@@ -8,9 +8,11 @@
 #include <UI/ChromeStyle.h>
 #include <UI/Extensions/Dialog.h>
 #include <UI/Extensions/Registry.h>
+#include <UI/PasswordManagers.h>
 #include <UI/StringUtils.h>
 
 #include <QAction>
+#include <QComboBox>
 #include <QFileDialog>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -54,6 +56,15 @@ QLabel#XenonExtensionsTitle {{
 QLabel#XenonExtensionDetails,
 QLabel#XenonExtensionsEmpty {{
     color: {1};
+}}
+
+QDialog#XenonExtensionsDialog QComboBox {{
+    color: {0};
+    background: {3};
+    border: 1px solid {6};
+    border-radius: 8px;
+    min-height: 24px;
+    padding: 2px 9px;
 }}
 
 QLabel#XenonExtensionWarning {{
@@ -138,6 +149,21 @@ ExtensionsDialog::ExtensionsDialog(QWidget* parent)
     header->addWidget(load_button);
     layout->addLayout(header);
 
+    auto* password_manager = new QHBoxLayout;
+    password_manager->setSpacing(10);
+    password_manager->addWidget(new QLabel("Password manager", this));
+    m_password_manager = new QComboBox(this);
+    m_password_manager->addItem("None", QString {});
+    for (auto const& choice : PasswordManagers::the().choices())
+        m_password_manager->addItem(qstring_from_ak_string(choice.name), qstring_from_ak_string(choice.id));
+    QObject::connect(m_password_manager, &QComboBox::activated, this, [this](int index) { choose_password_manager(index); });
+    password_manager->addWidget(m_password_manager);
+    m_password_manager_status = new QLabel(this);
+    m_password_manager_status->setObjectName("XenonExtensionDetails");
+    m_password_manager_status->setWordWrap(true);
+    password_manager->addWidget(m_password_manager_status, 1);
+    layout->addLayout(password_manager);
+
     auto* scroll_area = new QScrollArea(this);
     scroll_area->setWidgetResizable(true);
     scroll_area->setFrameShape(QFrame::NoFrame);
@@ -155,7 +181,52 @@ ExtensionsDialog::ExtensionsDialog(QWidget* parent)
         dialog->rebuild();
         return true;
     });
+    PasswordManagers::the().on_change([dialog = QPointer(this)] {
+        if (!dialog)
+            return false;
+        dialog->update_password_manager();
+        return true;
+    });
     rebuild();
+    update_password_manager();
+}
+
+void ExtensionsDialog::update_password_manager()
+{
+    auto& password_managers = PasswordManagers::the();
+    auto current = password_managers.current();
+    auto installing = password_managers.installing();
+
+    StringView shown;
+    if (installing.has_value())
+        shown = installing->id;
+    else if (current.has_value())
+        shown = current->id;
+    m_password_manager->setCurrentIndex(m_password_manager->findData(qstring_from_ak_string(shown)));
+    m_password_manager->setEnabled(!installing.has_value());
+
+    if (installing.has_value())
+        m_password_manager_status->setText(qformatted("Installing {} from the Chrome Web Store…", installing->name));
+    else if (auto const& error = password_managers.error(); error.has_value())
+        m_password_manager_status->setText(qstring_from_ak_string(*error));
+    else if (current.has_value())
+        m_password_manager_status->setText("From the Chrome Web Store, and kept up to date");
+    else
+        m_password_manager_status->setText({});
+}
+
+void ExtensionsDialog::choose_password_manager(int index)
+{
+    auto id = ak_string_from_qstring(m_password_manager->itemData(index).toString());
+    auto current = PasswordManagers::the().current();
+    if (current.has_value() && current->id != id) {
+        auto answer = QMessageBox::question(this, "Change password manager?", qformatted("Remove {}? Its data in Xenon is deleted too, so it would need signing in again.", current->name));
+        if (answer != QMessageBox::Yes) {
+            update_password_manager();
+            return;
+        }
+    }
+    PasswordManagers::the().choose(id.is_empty() ? Optional<StringView> {} : id.bytes_as_string_view());
 }
 
 void ExtensionsDialog::rebuild()
@@ -203,7 +274,10 @@ void ExtensionsDialog::rebuild()
             text->addWidget(description);
         }
 
-        auto* details = new QLabel(qformatted("ID: {}\n{}{}", extension->id(), extension->root(), Registry::the().is_persisted(*extension) ? ""sv : "\nLoaded for this session only"sv), row);
+        auto* details = new QLabel(Registry::the().is_installed(*extension)
+                ? qformatted("ID: {}\nInstalled from the Chrome Web Store", extension->id())
+                : qformatted("ID: {}\n{}{}", extension->id(), extension->root(), Registry::the().is_persisted(*extension) ? ""sv : "\nLoaded for this session only"sv),
+            row);
         details->setObjectName("XenonExtensionDetails");
         details->setTextInteractionFlags(Qt::TextSelectableByMouse);
         details->setWordWrap(true);

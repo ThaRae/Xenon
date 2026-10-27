@@ -39,11 +39,13 @@ set(XENON_SOURCES
     CrashReportNotifier.cpp
     CrashReportReviewWidget.cpp
     DevToolsBanner.cpp
+    Download.cpp
     ElementPicker.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
     Extensions/Alarms.cpp
     Extensions/Browser.cpp
+    Extensions/CRX.cpp
     Extensions/ContentScripts.cpp
     Extensions/Dialog.cpp
     Extensions/Extension.cpp
@@ -56,6 +58,7 @@ set(XENON_SOURCES
     Extensions/Scripting.cpp
     Extensions/Storage.cpp
     Extensions/Toolbar.cpp
+    Extensions/WebStore.cpp
     FilterListBundle.cpp
     FilterListUpdates.cpp
     FilterLists.cpp
@@ -69,6 +72,7 @@ set(XENON_SOURCES
     NativeWindowContainer.cpp
     NativeTextEditingLineEdit.cpp
     NewTabPage.cpp
+    PasswordManagers.cpp
     ProcessManagerWindow.cpp
     PerformanceMonitorWidget.cpp
     PictureInPictureWindow.cpp
@@ -89,6 +93,7 @@ set(XENON_SOURCES
     WebAuthnPopover.cpp
     WebCompatReportReview.cpp
     WebContentView.cpp
+    WebUIInterfaces.cpp
     WindowCloseCoordinator.cpp
     WindowControlButton.cpp
     WindowScreenObserver.cpp
@@ -193,8 +198,8 @@ qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
-target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibRequests LibWebView LibURL LibWakeLock)
-target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL)
+target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibRequests LibWebView LibURL LibWakeLock LibXML)
+target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL ZLIB::ZLIB)
 # NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
 #     tree, so Xenon's root comes first.
 target_include_directories(xenon BEFORE PRIVATE ${XENON_SOURCE_DIR})
@@ -355,7 +360,21 @@ target_sources(TestXenonExtensions PRIVATE
 )
 target_include_directories(TestXenonExtensions BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestCRX.cpp" Xenon NAME TestXenonCRX LIBS LibCrypto LibFileSystem LibRequests LibURL LibWebView LibXML)
+target_sources(TestXenonCRX PRIVATE
+    "${XENON_UI_DIR}/Download.cpp"
+    "${XENON_UI_DIR}/Extensions/CRX.cpp"
+    "${XENON_UI_DIR}/Extensions/Extension.cpp"
+    "${XENON_UI_DIR}/Extensions/Locales.cpp"
+    "${XENON_UI_DIR}/Extensions/Manifest.cpp"
+    "${XENON_UI_DIR}/Extensions/MatchPattern.cpp"
+    "${XENON_UI_DIR}/Extensions/WebStore.cpp"
+)
+target_include_directories(TestXenonCRX BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_link_libraries(TestXenonCRX PRIVATE OpenSSL::Crypto ZLIB::ZLIB)
+target_compile_definitions(TestXenonCRX PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestRecentTabOrder.cpp" Xenon NAME TestXenonRecentTabOrder)
 target_include_directories(TestXenonRecentTabOrder BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions TestXenonFilterLists TestXenonRecentTabOrder)
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonRecentTabOrder)

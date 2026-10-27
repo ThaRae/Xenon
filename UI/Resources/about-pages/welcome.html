@@ -63,8 +63,8 @@ SPDX-License-Identifier: BSD-2-Clause
                 </span>
                 <h1 id="hello-title" tabindex="-1">Hello<span class="full-stop">.</span></h1>
                 <p class="lede">
-                    Xenon is a quiet, fast browser built on Ladybird. Two questions and you're done, or keep our picks:
-                    DuckDuckGo for search, with ads and trackers blocked.
+                    Xenon is a quiet, fast browser built on Ladybird. Three questions and you're done, or keep our
+                    picks: DuckDuckGo for search, with ads and trackers blocked.
                 </p>
                 <div class="actions">
                     <button type="button" class="primary-button" data-go="search" disabled>Choose for myself</button>
@@ -151,10 +151,31 @@ SPDX-License-Identifier: BSD-2-Clause
                 </label>
                 <p id="filter-lists-note" class="aside"></p>
 
+                <div class="actions">
+                    <button type="button" class="primary-button" data-go="passwords">Continue</button>
+                    <button type="button" class="text-button" data-go="search">Back</button>
+                </div>
+            </section>
+
+            <section class="step" data-step="passwords" aria-labelledby="passwords-title" hidden>
+                <h1 id="passwords-title" tabindex="-1">Bring your password manager?</h1>
+                <p class="lede">
+                    Xenon doesn't keep passwords itself. Pick the one you use, and Xenon adds it and keeps it up to
+                    date.
+                </p>
+
+                <div
+                    id="password-managers"
+                    class="choice-list"
+                    role="radiogroup"
+                    aria-labelledby="passwords-title"
+                ></div>
+                <p id="password-manager-note" class="aside password-manager-note"></p>
+
                 <p id="save-status" class="save-status" role="status"></p>
                 <div class="actions">
                     <button type="submit" id="start-browsing" class="primary-button">Start browsing</button>
-                    <button type="button" class="text-button" data-go="search">Back</button>
+                    <button type="button" class="text-button" data-go="blocking">Back</button>
                 </div>
                 <p class="aside after-actions">
                     Compact and vertical tab layouts are a right-click away on the tab strip.

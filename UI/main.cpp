@@ -16,7 +16,9 @@
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
+#include <UI/PasswordManagers.h>
 #include <UI/TabHibernation.h>
+#include <UI/WebUIInterfaces.h>
 #if defined(LADYBIRD_QT_HAVE_POSITIONING)
 #    include <UI/GeolocationProviderQt.h>
 #endif
@@ -82,6 +84,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
 #endif
 
     Ladybird::Extensions::Registry::the().register_url_scheme();
+    Ladybird::install_web_ui_interfaces();
 
     auto app = TRY(Ladybird::Application::create(Ladybird::FilterLists::with_bundled_filter_lists(arguments)));
 #if defined(AK_OS_MACOS)
@@ -93,6 +96,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
     }
 
     Ladybird::FilterLists::Updater::initialize();
+    Ladybird::PasswordManagers::the().initialize(app->password_manager_choice());
 
     auto& browser_process = app->browser_process();
 

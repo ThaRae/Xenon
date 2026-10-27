@@ -565,6 +565,18 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
         },
         .hide_mode = Core::ArgsParser::OptionHideMode::None,
     });
+    args_parser.add_option(Core::ArgsParser::Option {
+        .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
+        .help_string = "Install this password manager (bitwarden or proton-pass) in place of the profile's, or remove it with none",
+        .long_name = "password-manager",
+        .short_name = 0,
+        .value_name = "name",
+        .accept_value = [this](StringView name) -> ErrorOr<bool> {
+            m_password_manager_choice = name;
+            return true;
+        },
+        .hide_mode = Core::ArgsParser::OptionHideMode::None,
+    });
 }
 
 void Application::create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&)
