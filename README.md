@@ -188,8 +188,8 @@ What exists now and what's planned, measured against Helium:
   where a search goes, and whether to block ads and trackers (on by default, with all three filter lists). Nothing is
   saved until you finish.
 - [x] **New tab page**: your eight most visited sites, one per site with its favicon, ranked by Ladybird's
-  decaying visit score, plus a reminder of the !bangs. Private windows say so instead and show no history. The page is
-  static, so Xenon's UI hands it the sites once it has loaded (`UI/NewTabPage.cpp`).
+  decaying visit score. Private windows say so instead and show no history. The page is static, so Xenon's UI hands it
+  the sites once it has loaded (`UI/NewTabPage.cpp`).
 - [x] **Quick link copy**: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> copies the current page's URL.
   (DevTools stays on <kbd>⌘</kbd><kbd>⇧</kbd><kbd>I</kbd> and <kbd>F12</kbd>.)
 - [x] **uBlock Origin's filter lists, built in**: the lists Helium's uBlock Origin fork turns on (uBlock filters,
