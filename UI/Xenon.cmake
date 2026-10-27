@@ -39,6 +39,7 @@ set(XENON_SOURCES
     CrashReportNotifier.cpp
     CrashReportReviewWidget.cpp
     DevToolsBanner.cpp
+    Download.cpp
     ElementPicker.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
