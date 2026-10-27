@@ -15,6 +15,8 @@ const searchPreview = document.querySelector("#search-preview");
 const searchSuggestions = document.querySelector("#search-suggestions-enabled");
 const searchSuggestionsLabel = document.querySelector("#search-suggestions-label");
 const filterLists = document.querySelector("#filter-lists");
+const filterListUpdates = document.querySelector("#filter-list-updates");
+const filterListUpdatesEnabled = document.querySelector("#filter-list-updates-enabled");
 const filterListsNote = document.querySelector("#filter-lists-note");
 const startBrowsing = document.querySelector("#start-browsing");
 const saveStatus = document.querySelector("#save-status");
@@ -147,7 +149,11 @@ function blockingEnabled() {
 
 function updateBlockingDetails() {
     filterLists.classList.toggle("hidden", !blockingEnabled());
+    filterListUpdates.classList.toggle("hidden", !blockingEnabled());
     filterListsNote.classList.toggle("hidden", !blockingEnabled());
+    filterListsNote.textContent = filterListUpdatesEnabled.checked
+        ? "Once a day, Xenon downloads the latest lists from git.avx512.dev, and uses them only if they carry Xenon's signature."
+        : "The lists come with Xenon and update when Xenon does.";
 }
 
 function initialize() {
@@ -174,13 +180,13 @@ function finish() {
     });
 
     // Xenon's own lists (UI/FilterLists.cpp) apply whenever blocking is on. Ladybird's catalog holds the raw upstream
-    // versions of some of them, which would only add duplicates without the fixes for Ladybird, so it stays off, and so
-    // do its daily downloads.
+    // versions of some of them, which would only add duplicates without the fixes for Ladybird, so it stays off. That
+    // leaves Xenon's daily lists (UI/FilterListUpdates.cpp) as all that Ladybird's filter list updates setting fetches.
     for (const list of settings.contentBlockerLists) {
         if (list.enabled)
             ladybird.sendMessage("setContentBlockerListEnabled", { identifier: list.identifier, enabled: false });
     }
-    ladybird.sendMessage("setFilterListUpdatesEnabled", false);
+    ladybird.sendMessage("setFilterListUpdatesEnabled", blockingEnabled() && filterListUpdatesEnabled.checked);
     ladybird.sendMessage("setContentBlockerEnabled", blockingEnabled());
 
     ladybird.sendMessage("completeFirstRun");
@@ -193,6 +199,7 @@ for (const button of document.querySelectorAll("[data-go]")) {
 for (const radio of document.querySelectorAll('input[name="ad-blocking"]')) {
     radio.addEventListener("change", updateBlockingDetails);
 }
+filterListUpdatesEnabled.addEventListener("change", updateBlockingDetails);
 
 useDefaults.addEventListener("click", () => {
     if (!initialized) return;
@@ -201,6 +208,7 @@ useDefaults.addEventListener("click", () => {
     if (defaultEngine) defaultEngine.checked = true;
     updateSearchDetails();
     document.querySelector('input[name="ad-blocking"][value="on"]').checked = true;
+    filterListUpdatesEnabled.checked = true;
     finish();
 });
 

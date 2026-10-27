@@ -1,0 +1,2 @@
+! Xenon's filter list update test
+/xenon-update-test.js
