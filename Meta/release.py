@@ -444,8 +444,12 @@ def publish_main(args):
     if run("git", "-C", XENON_SOURCE_DIR, "status", "--porcelain", "--untracked-files=no").strip():
         sys.exit("Xenon has uncommitted changes, so the release wouldn't match any commit.")
 
+    signing = subprocess.run(["codesign", "-dvv", app], capture_output=True, text=True).stderr
+    authority = re.search(r"^Authority=(.+)$", signing, re.MULTILINE)
+    signed_as = authority.group(1) if authority else "ad hoc"
     if not args.yes:
-        answer = input(f"Publish Xenon {version} ({commit[:10]}) to {RELEASES_REPOSITORY}, and tag it {tag}? [y/N] ")
+        print(f"Xenon {version} from {commit[:10]}, signed {'' if signed_as == 'ad hoc' else 'as '}{signed_as}.")
+        answer = input(f"Publish it to {RELEASES_REPOSITORY}, and tag it {tag}? [y/N] ")
         if answer.strip().lower() != "y":
             sys.exit("Not published.")
 

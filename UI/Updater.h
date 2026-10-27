@@ -17,9 +17,9 @@ class QObject;
 // Keeps Xenon itself up to date, on macOS, with Sparkle, as Helium does. Meta/release.py publishes each release to
 // tharae/xenon-releases on git.avx512.dev, with an appcast that lists it (Documentation/Updates.md).
 //
-// Sparkle checks the appcast's signature, the archive's EdDSA signature against the key in Info.plist, and the new
-// app's code signature against this one's, before it replaces anything. It installs the update when Xenon quits, by
-// swapping the whole app at once, so an update that fails or is refused leaves Xenon as it was.
+// Sparkle checks the appcast's signature, the archive's EdDSA signature against the key in Info.plist before it unpacks
+// anything, and that the new app's code signature is intact, before it replaces anything. It installs the update when
+// Xenon quits, by swapping the whole app at once, so an update that fails or is refused leaves Xenon as it was.
 //
 // Only release builds update themselves: Meta/release.py writes the appcast's URL and the key into their Info.plist.
 // Development builds have neither, and Xenon doesn't update itself elsewhere than macOS yet.

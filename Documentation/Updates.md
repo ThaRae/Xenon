@@ -51,9 +51,7 @@ CI runs on Linux, so releases are made on a Mac. A macOS runner could run the sa
 
 ## Signing
 
-Two keys sign a release, and both live in the login keychain of the Mac that releases are made on. Back them up: an
-installed Xenon only takes updates signed with them, so if they're lost, everyone has to install the next release by
-hand.
+Two keys sign a release, and both live in the login keychain of the Mac that releases are made on. Back them up.
 
 ### The update key
 
@@ -61,14 +59,19 @@ An Ed25519 key, which signs the archive and the appcast. Sparkle's `generate_key
 Its public half goes into each release's `Info.plist` as `SUPublicEDKey`. It's separate from the key the
 [daily filter lists](FilterListUpdates.md) are signed with, which is a CI secret.
 
+An installed Xenon only takes updates signed with the key it has. Sparkle moves to a new key only through a disk image
+signed with the same Developer ID as the installed app, which Xenon's releases don't have, so if the key is lost,
+everyone has to install the next release by hand.
+
 ### The release certificate
 
 Xenon has no Apple Developer ID. Releases are signed with a self-signed code signing certificate, **Xenon Release**,
-rather than ad hoc, because that gives every release the same identity:
+rather than ad hoc, because that gives every release the same identity, so macOS keeps what you allowed Xenon, like
+location or the microphone, across updates. An ad hoc signature is identified by its hash, which changes with every
+release, so macOS would ask again after each update.
 
-- macOS keeps what you allowed Xenon, like location or the microphone, across updates. An ad hoc signature is
-  identified by its hash, which changes with every release, so macOS would ask again after each update.
-- Sparkle checks that each update is signed with the same certificate as the Xenon it replaces.
+Sparkle doesn't hold an update to the certificate: once the update key's signature checks out, it only checks that the
+new app's code signature is intact. A new certificate costs one round of those questions, not the updates.
 
 Without notarization, macOS's Gatekeeper still stops the first launch of a downloaded Xenon. Open it once from
 **System Settings → Privacy & Security → Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Xenon.app`.
@@ -98,7 +101,7 @@ Before Sparkle replaces anything, it checks:
    without release notes or links;
 2. the archive's Ed25519 signature, against `SUPublicEDKey`, before it unpacks anything
    (`SUVerifyUpdateBeforeExtraction`);
-3. the new app's code signature, and that it's signed with the same certificate as the running one;
+3. that the new app is code signed, and its signature is intact;
 4. that it's a newer version.
 
 Its installer waits for Xenon to quit, then swaps the new app in for the old one in a single step, so an update that

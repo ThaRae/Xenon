@@ -245,8 +245,8 @@ when you quit, as Helium does, with Sparkle. **Settings → Updates** says when 
 to update**, and turns automatic updates off. **Check for Updates…** in the Xenon menu checks at once.
 
 Releases come from [tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases). Xenon only installs one
-whose archive is signed with its update key, from a signed appcast, and whose app is signed with the same certificate,
-and the installer swaps the new app in at once, so a failed update leaves the old one as it was. Development builds,
+whose archive is signed with its update key, from a signed appcast, and the installer swaps the new app in at once, so
+a failed update leaves the old one as it was. Development builds,
 and Xenon elsewhere than macOS, don't update themselves. `UI/Updater.mm` runs Sparkle, and `Meta/release.py` makes and
 publishes the releases; see [Updates.md](Updates.md).
 
