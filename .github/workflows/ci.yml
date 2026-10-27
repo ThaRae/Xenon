@@ -1,0 +1,225 @@
+name: CI
+
+# GitHub-hosted runners. The checks run first; then Xenon is built and tested on Linux and macOS side by side.
+#
+# - Linux builds in Ladybird's own CI image (Meta/ci/build-in-ladybird-image.sh), at the version the pinned submodule
+#   names, so Xenon is built with exactly the compilers, Qt, and system libraries Ladybird is tested with.
+# - macOS builds natively, with the Xcode version and Homebrew packages Ladybird's own CI uses
+#   (ladybird/.github/actions/setup), so bumping the submodule bumps them too.
+#
+# ccache's objects (Build/caches) and vcpkg's prebuilt packages (ladybird/Build/caches) are kept in GitHub's cache, one
+# entry per platform. main saves them; a pull request starts from main's, and only saves its own when there were none to
+# start from. A cold build takes a few hours, so the build step stops itself in time for the caches to be saved, and the
+# next run carries on from there.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: git submodule update --init --depth 1 ladybird
+
+      - name: Install the checks' tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q python3-venv shellcheck
+
+      - name: Meta/check.py
+        run: Meta/check.py --online
+
+  linux:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      # The runner starts with about 20 GB free, and a cold build needs more. These are toolchains Xenon doesn't use.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: |
+          git submodule update --init --depth 1 ladybird
+          echo "IMAGE_VERSION=$(cat ladybird/Meta/Docker/ci/VERSION)" >> "$GITHUB_ENV"
+
+      - name: Restore the build caches
+        id: restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: linux-${{ env.IMAGE_VERSION }}-${{ github.sha }}
+          restore-keys: linux-${{ env.IMAGE_VERSION }}-
+
+      - name: Build Xenon and run its tests
+        timeout-minutes: 320
+        run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/build-and-test.sh
+
+      - name: Save the build caches
+        if: always() && (github.event_name != 'pull_request' || steps.restore.outputs.cache-matched-key == '')
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: linux-${{ env.IMAGE_VERSION }}-${{ github.sha }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Linux"
+            echo
+            echo "Ladybird \`$(git -C ladybird rev-parse --short HEAD)\`, CI image \`$IMAGE_VERSION\`"
+            if [ -f Build/release/smoke/welcome.png ]; then
+              echo
+              echo "Headless render of about:welcome: $(stat -c '%s bytes' Build/release/smoke/welcome.png) (artifact \`welcome-render-linux\`)"
+            fi
+            if [ -f Build/release/ccache-stats.txt ]; then
+              echo
+              echo '```'
+              cat Build/release/ccache-stats.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the dependency build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-build-logs-linux
+          path: Build/vcpkg-release/buildtrees/*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the welcome page render
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: welcome-render-linux
+          path: Build/release/smoke/welcome.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+  macos:
+    needs: checks
+    runs-on: macos-26
+    timeout-minutes: 360
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/Build/caches/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 3G
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: git submodule update --init --depth 1 ladybird
+
+      # The Xcode Ladybird's own CI selects, read from the submodule.
+      - name: Select Xcode
+        run: |
+          version=$(sed -n "s/.*xcode-version: *'\{0,1\}\([0-9.]*\)'\{0,1\}.*/\1/p" ladybird/.github/actions/setup/action.yml)
+          xcode=/Applications/Xcode_$version.app
+          if [ ! -d "$xcode" ]; then
+            echo "::warning::Xcode $version isn't on this runner; using the newest one"
+            xcode=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          fi
+          sudo xcode-select --switch "$xcode"
+          echo "XCODE_VERSION=$(xcodebuild -version | head -n 1)" >> "$GITHUB_ENV"
+          xcodebuild -version
+
+      # The packages Ladybird's own CI installs on macOS (ladybird/.github/actions/setup).
+      - name: Install dependencies
+        run: |
+          brew update --quiet
+          brew unlink openssl@3 || true
+          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool llvm@22 nasm ninja pkg-config unzip
+
+      - name: Restore the build caches
+        id: restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: macos-${{ env.XCODE_VERSION }}-${{ github.sha }}
+          restore-keys: macos-${{ env.XCODE_VERSION }}-
+
+      - name: Build Xenon and run its tests
+        timeout-minutes: 320
+        run: |
+          mkdir -p "$CCACHE_DIR"
+          ccache --zero-stats > /dev/null
+          status=0
+          time ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" test || status=$?
+          ccache --show-stats > Build/release/ccache-stats.txt 2>&1 || true
+          exit $status
+
+      - name: Save the build caches
+        if: always() && (github.event_name != 'pull_request' || steps.restore.outputs.cache-matched-key == '')
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: macos-${{ env.XCODE_VERSION }}-${{ github.sha }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### macOS"
+            echo
+            echo "Ladybird \`$(git -C ladybird rev-parse --short HEAD)\`, $XCODE_VERSION"
+            if [ -f Build/release/smoke/welcome.png ]; then
+              echo
+              echo "Headless render of about:welcome: $(stat -f '%z bytes' Build/release/smoke/welcome.png) (artifact \`welcome-render-macos\`)"
+            fi
+            if [ -f Build/release/ccache-stats.txt ]; then
+              echo
+              echo '```'
+              cat Build/release/ccache-stats.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the dependency build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-build-logs-macos
+          path: Build/vcpkg-release/buildtrees/*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the welcome page render
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: welcome-render-macos
+          path: Build/release/smoke/welcome.png
+          if-no-files-found: ignore
+          retention-days: 14

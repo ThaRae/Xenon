@@ -99,18 +99,21 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
 a fresh start writes only to Xenon's directories, and checks content blocking, daily filter list updates, the blocking
 dashboard, extensions, WebAuthn, and password manager installs against pages and servers it starts locally.
 
-CI runs on Gitea Actions at git.avx512.dev, on slab's ephemeral runners:
+CI runs on GitHub Actions, on GitHub's own runners:
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| `.gitea/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online` on `slab`, then a Linux build and `Meta/xenon.py test` on `slab-large`, with the welcome page render as an artifact |
-| `.gitea/workflows/upstream.yml` | weekly, by hand | the same build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
+| `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test`, with the welcome page render as an artifact |
+| `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
 
-The builds run in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
-`ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with. The
-`CCACHE_TOKEN` repository secret points ccache and vcpkg's package cache at slab-ccache; without it, every build starts
-cold and takes a couple of hours. slab-large runs one build at a time, so a pull request's build checks first whether
-the pull request is still open, and skips itself if it was merged or closed while it waited.
+- **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
+  `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
+- **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
+  (`ladybird/.github/actions/setup`).
+- **Caches**: ccache's objects (`Build/caches`) and vcpkg's prebuilt packages (`ladybird/Build/caches`) are kept in
+  GitHub's cache, one entry per platform. Builds on `main` save them, and a pull request starts from `main`'s. A cold
+  build takes a few hours, so the build step stops itself in time to save the caches, and the next run carries on from
+  there.
 
 ## Changing the engine
 
@@ -146,7 +149,7 @@ applies, builds, and lists those UI changes, so a bump holds no surprises.
 ./Meta/update-filter-lists.py --no-build   # copies what ../xenon-ublock last built
 ```
 
-The lists come from [xenon-ublock](https://git.avx512.dev/tharae/xenon-ublock), which converts uBlock Origin's lists
+The lists come from [xenon-ublock](https://github.com/ThaRae/xenon-ublock), which converts uBlock Origin's lists
 for Ladybird's content blocker. The script expects its checkout next to this one, at `../xenon-ublock`. Xenon ships its `helium` preset, except for Peter Lowe's list, which states no license, and Helium's own two
 lists (AGPL-3.0, and almost nothing survives conversion). The content blocker patches (`Patches/ladybird`
 `0004`–`0009`) let the lists keep scriptlets, procedural filters, and `$redirect`, `$removeparam`, `$popup` and CNAME
