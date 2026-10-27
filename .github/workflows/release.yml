@@ -38,8 +38,8 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/Build/caches/ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
       CCACHE_MAXSIZE: 3G
-      # The keys installed Xenons know (Documentation/Updates.md). A secret that holds another key fails the run,
-      # rather than making a release that Xenon turns down, or that macOS takes for another app.
+      # The keys installed Xenons know (Documentation/Updates.md). A secret that holds another key stops the run before
+      # the build, rather than making a release that Xenon turns down, or that macOS takes for another app.
       UPDATE_PUBLIC_KEY: o7cmjh8R2wfWfRfJOTcyLisyoRVEEQIxi7L+SFWXUNI=
       CERTIFICATE_SHA1: EB4C4127CEA7DA5990952E139293BA15C0BA1D37
     steps:
@@ -66,6 +66,45 @@ jobs:
         run: |
           git submodule update --init --depth 1 ladybird
           echo "VERSION=$(cat VERSION.txt)" >> "$GITHUB_ENV"
+
+      # A keychain of the run's own, on the search list, where codesign finds the certificate. The partition list lets
+      # Apple's tools use its key without asking.
+      - name: Import the release certificate
+        env:
+          XENON_RELEASE_P12: ${{ secrets.XENON_RELEASE_P12 }}
+          XENON_RELEASE_P12_PASSWORD: ${{ secrets.XENON_RELEASE_P12_PASSWORD }}
+        run: |
+          keychain=$RUNNER_TEMP/release.keychain-db
+          password=$(uuidgen)
+          echo "::add-mask::$password"
+          security create-keychain -p "$password" "$keychain"
+          echo "KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          (umask 077 && printf '%s' "$XENON_RELEASE_P12" | base64 --decode > "$RUNNER_TEMP/release.p12")
+          security import "$RUNNER_TEMP/release.p12" -k "$keychain" -P "$XENON_RELEASE_P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/release.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          identities=$(security find-identity -p codesigning)
+          echo "$identities"
+          if ! grep -q "$CERTIFICATE_SHA1 \"Xenon Release\"" <<< "$identities"; then
+            echo "::error::XENON_RELEASE_P12 isn't the Xenon Release certificate, $CERTIFICATE_SHA1"
+            exit 1
+          fi
+
+      # The key's public half, from its seed (as Meta/release.py does), must be the one installed Xenons know.
+      - name: Check the update key
+        env:
+          XENON_UPDATE_KEY: ${{ secrets.XENON_UPDATE_KEY }}
+        run: |
+          openssl=/opt/homebrew/opt/openssl@3/bin/openssl
+          public_key=$({ printf 302e020100300506032b657004220420 | xxd -r -p; printf '%s' "$XENON_UPDATE_KEY" | base64 --decode; } |
+            "$openssl" pkey -inform DER -pubout -outform DER | tail -c 32 | base64)
+          if [ "$public_key" != "$UPDATE_PUBLIC_KEY" ]; then
+            echo "::error::XENON_UPDATE_KEY isn't Xenon's update key: its public half is $public_key"
+            exit 1
+          fi
 
       # The Xcode and the packages ci.yml's macos job uses, so that the caches it saved fit.
       - name: Select Xcode
@@ -102,32 +141,6 @@ jobs:
           ccache --zero-stats > /dev/null
           time ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" build
           ccache --show-stats
-
-      # A keychain of the run's own, on the search list, where codesign finds the certificate. The partition list lets
-      # Apple's tools use its key without asking.
-      - name: Import the release certificate
-        env:
-          XENON_RELEASE_P12: ${{ secrets.XENON_RELEASE_P12 }}
-          XENON_RELEASE_P12_PASSWORD: ${{ secrets.XENON_RELEASE_P12_PASSWORD }}
-        run: |
-          keychain=$RUNNER_TEMP/release.keychain-db
-          password=$(uuidgen)
-          echo "::add-mask::$password"
-          security create-keychain -p "$password" "$keychain"
-          echo "KEYCHAIN=$keychain" >> "$GITHUB_ENV"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$password" "$keychain"
-          (umask 077 && printf '%s' "$XENON_RELEASE_P12" | base64 --decode > "$RUNNER_TEMP/release.p12")
-          security import "$RUNNER_TEMP/release.p12" -k "$keychain" -P "$XENON_RELEASE_P12_PASSWORD" -T /usr/bin/codesign
-          rm -f "$RUNNER_TEMP/release.p12"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
-          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
-          identities=$(security find-identity -p codesigning)
-          echo "$identities"
-          if ! grep -q "$CERTIFICATE_SHA1 \"Xenon Release\"" <<< "$identities"; then
-            echo "::error::XENON_RELEASE_P12 isn't the Xenon Release certificate, $CERTIFICATE_SHA1"
-            exit 1
-          fi
 
       - name: Meta/release.py test
         if: github.event_name != 'workflow_dispatch' || inputs.test

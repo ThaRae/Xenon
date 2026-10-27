@@ -56,14 +56,12 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
 gh workflow run release.yml --repo ThaRae/Xenon --ref main
 ```
 
-It also runs on pull requests that change it. It builds Xenon as CI's macOS job does, starting from the build caches
-`main`'s builds saved. A cold build doesn't fit in one run, so with no caches to start from, it stops at once. It
-runs `Meta/release.py test` with the release certificate (untick **test** to skip it), then `Meta/release.py package`,
-and checks what that wrote:
-
-- the archive's and the appcast's signatures, with `sign_update --verify`;
-- that the app's `SUPublicEDKey` is the update key's public half, and that it's signed with **Xenon Release**, the
-  certificate whose SHA-1 is [below](#setting-up-a-mac-to-release-from), so a secret holding another key fails the run.
+It also runs on pull requests that change it. Before it builds, it checks the secrets: the certificate's SHA-1 and the
+update key's public half must be the ones [below](#setting-up-a-mac-to-release-from), so a secret holding another one
+stops the run at once. It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A
+cold build doesn't fit in one run, so with no caches to start from, it stops there. It runs `Meta/release.py test` with
+the release certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote: the
+archive's and the appcast's signatures, with `sign_update --verify`, the app's `SUPublicEDKey`, and its code signature.
 
 `Xenon-<version>.tar.xz` and `appcast.xml` are the run's artifact, `Xenon-<version>`, for 30 days, with the archive's
 SHA-256 in the run's summary. The workflow doesn't publish: that's still `Meta/release.py publish`, from the Mac's
