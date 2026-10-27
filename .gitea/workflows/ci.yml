@@ -62,7 +62,7 @@ jobs:
           PULL_REQUEST: ${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}
         run: |
           state=$(curl -sf -H "Authorization: token $TOKEN" "$PULL_REQUEST" | python3 -c 'import json, sys; print(json.load(sys.stdin)["state"])') || state=
-          echo "The pull request is ${state:-in an unknown state, so it's built}."
+          echo "The pull request is ${state:-in an unknown state, so it is built}."
           if [ "$state" = closed ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
