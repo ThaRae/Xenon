@@ -664,6 +664,7 @@ def check_extensions(executable: Path, env: dict) -> bool:
     </script>""".encode()
     data = b'{"ok": true}'
     content_script_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "content-scripts.html").read_bytes()
+    connectable_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "externally-connectable.html").read_bytes()
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
@@ -671,6 +672,8 @@ def check_extensions(executable: Path, env: dict) -> bool:
                 body, content_type = data, "application/json"
             elif self.path.startswith("/content-scripts"):
                 body, content_type = content_script_page, "text/html"
+            elif self.path.startswith("/connectable"):
+                body, content_type = connectable_page, "text/html"
             elif self.path.startswith("/frame"):
                 body, content_type = b"<!doctype html><p>A frame of the content script page.</p>", "text/html"
             else:
@@ -721,11 +724,19 @@ def check_extensions(executable: Path, env: dict) -> bool:
         # A web page that the extension's content scripts match gets them, each in its world, at its time.
         content_script_url = f"http://127.0.0.1:{page_server.server_address[1]}/content-scripts"
         content_script_results = run_extension_test_page(executable, env, content_script_url)
+
+        # A web page that the extension's externally_connectable matches messages it with chrome.runtime.
+        connectable_url = f"http://127.0.0.1:{page_server.server_address[1]}/connectable?id={extension_id}"
+        connectable_results = run_extension_test_page(executable, env, connectable_url)
     finally:
         for server in (page_server, data_server):
             server.shutdown()
 
-    for name, page_results in (("web page", results), ("content scripts", content_script_results)):
+    for name, page_results in (
+        ("web page", results),
+        ("content scripts", content_script_results),
+        ("externally connectable page", connectable_results),
+    ):
         if page_results is None:
             return False
         checks = {check: ok for check, ok in page_results.items() if not check.startswith("info: ")}

@@ -198,7 +198,8 @@ What exists now and what's planned, measured against Helium:
   background service worker. They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`,
   `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for. Their content scripts run
   in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and stylesheets on request.
-  Bitwarden logs in (with a security key too) and autofills logins.
+  Bitwarden logs in (with a security key too) and autofills logins. Proton Pass signs in through Proton's account page,
+  unlocks with its extra password, autofills logins, and saves new ones.
 - [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
   surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
   picker. See xenon-ublock's `docs/gap-analysis.md`.

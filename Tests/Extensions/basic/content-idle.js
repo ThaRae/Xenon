@@ -21,6 +21,9 @@
     async function run() {
         check("document_idle comes after document_end", test.order.join() === "start,end,idle");
 
+        const early = await test.earlyReply;
+        check("a message sent as the browser starts waits for the background", early?.pong === true);
+
         const sender = await chrome.runtime.sendMessage({ toBackground: "sender" });
         check(
             "runtime.sendMessage reaches the background, which knows the sender",

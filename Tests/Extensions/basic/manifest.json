@@ -35,9 +35,12 @@
     "background": {
         "service_worker": "background.js"
     },
+    "externally_connectable": {
+        "matches": ["http://127.0.0.1/connectable*"]
+    },
     "web_accessible_resources": [
         {
-            "resources": ["accessible.html", "accessible.js"],
+            "resources": ["accessible.html", "accessible.js", "icon16.png"],
             "matches": ["http://127.0.0.1/*"]
         }
     ],

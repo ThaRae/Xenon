@@ -21,6 +21,10 @@
     );
     check("i18n", chrome.i18n.getMessage("name") === "Xenon test extension");
 
+    // Sent as the browser starts, before the background may have run its script. It waits for the background, as in
+    // Chrome, rather than finding no receiver.
+    test.earlyReply = chrome.runtime.sendMessage({ toBackground: "ping" }).catch(error => ({ error: error.message }));
+
     // What the page's own scripts look for: a global, which they mustn't see, and storage, which they share.
     window.xenonContentSecret = "content";
     sessionStorage.setItem("xenonContentStart", "ran");
