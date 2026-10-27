@@ -509,10 +509,10 @@ for Bitwarden in Chrome.
   - Bitwarden's autofill scripts go in at its content script's request: on a login page, its inline menu shows on the
     focused field (seen in a headless render with a locked vault: "Unlock your account to view autofill
     suggestions"). Its frames are `web_accessible_resources` pages, which load in the page. With the vault unlocked,
-    autofill works (tried by hand).
+    autofill works, and so does its bar that offers to save a new login, on a site whose CSP allows only frames of
+    its own too (tried by hand, with patch 19).
 
   Left:
-  - Saving new logins (Bitwarden's notification bar) hasn't been checked on its own.
   - `webNavigation`'s `onCreatedNavigationTarget` and `onTabReplaced`, and real error names (Chrome's
     `net::ERR_NAME_NOT_RESOLVED` and the like) and transition types.
   - `web_accessible_resources` as subresources of web pages (frames load, under any CSP the page has), and sandboxed
