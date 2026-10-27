@@ -176,6 +176,7 @@ void set_filter_list_enabled(StringView id, bool enabled)
         ids.append(qid);
     ids.sort();
     settings().setValue(DISABLED_FILTER_LISTS_KEY, ids);
+    notify_observers();
 }
 
 u64 blocked_request_total()

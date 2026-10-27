@@ -12,12 +12,12 @@
 #include <AK/RefCounted.h>
 #include <AK/Weakable.h>
 #include <LibCore/File.h>
-#include <LibURL/EmbedderSchemes.h>
 #include <LibURL/Parser.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/CrashReportStore.h>
 #include <LibWebView/WebUI.h>
 #include <UI/Bangs.h>
+#include <UI/Blocking.h>
 #include <UI/Extensions/Dialog.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
@@ -258,6 +258,7 @@ private:
             JsonObject filter_lists;
             filter_lists.set("generatedAt"sv, status->generated_at.view());
             filter_lists.set("listCount"sv, status->list_count);
+            filter_lists.set("turnedOff"sv, XenonSettings::disabled_filter_lists().size());
             filter_lists.set("downloaded"sv, status->downloaded);
             if (status->checked_at.has_value())
                 filter_lists.set("checkedAt"sv, status->checked_at->milliseconds_since_epoch());
@@ -267,10 +268,7 @@ private:
             settings.set("filterLists"sv, move(filter_lists));
         }
 
-        // FIXME: Use Blocking::dashboard_url() (UI/Blocking.h) once the dashboard is in. Until then, the xenon: scheme is
-        //        the dashboard's.
-        if (URL::is_embedder_scheme("xenon"sv))
-            settings.set("blockingDashboard"sv, "xenon://blocking/"sv);
+        settings.set("blockingDashboard"sv, Blocking::dashboard_url().serialize());
 
         settings.set("extensions"sv, extensions());
         settings.set("profile"sv, profile());

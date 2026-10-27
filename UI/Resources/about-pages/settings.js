@@ -288,7 +288,12 @@ function renderFilterLists() {
     }
 
     const generatedAt = parseGeneratedAt(lists.generatedAt);
-    filterListsSummary.textContent = `uBlock Origin's ${lists.listCount} lists`;
+    // Lists are turned off one by one in the blocking dashboard.
+    const listsOn = Math.max(lists.listCount - lists.turnedOff, 0);
+    filterListsSummary.textContent =
+        lists.turnedOff > 0
+            ? `uBlock Origin's lists, ${listsOn} of ${lists.listCount} on`
+            : `uBlock Origin's ${lists.listCount} lists`;
 
     const parts = [
         `From ${generatedAt ? formatDate(generatedAt) : lists.generatedAt}`,

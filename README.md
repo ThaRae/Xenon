@@ -180,8 +180,8 @@ What exists now and what's planned, measured against Helium:
   - Xenon: **Look and layout** (the three layouts, the sidebar's side, the bookmarks bar, zoom, dark pages), **Tabs**
     (recently used order, hibernation and its timeout, dragging a tab to a page's edge to split, groups),
     **Search and bangs** (the engine, suggestions, bangs on or off, and a lookup of all 13,000), **Ads and trackers**
-    (blocking, which lists are in use and when they were last checked, daily updates with **Check now**, your own
-    filters and lists), **Password manager**, and **Extensions**.
+    (blocking, which lists are in use and when they were last checked, daily updates with **Check now**, subscriptions
+    and local lists, and links into the blocking dashboard), **Password manager**, and **Extensions**.
   - Browsing: startup and the new tab page, languages, privacy and browsing data, background connections, site
     permissions, DNS, where the profile keeps its files (each with **Show**), and Ladybird's configuration keys.
   - A sidebar of sections that follows the scroll, and **Find a setting**, which hides everything that doesn't match.
@@ -234,8 +234,9 @@ What exists now and what's planned, measured against Helium:
 - [x] **uBlock Origin's popup and dashboard**: the toolbar shield opens a popup laid out like uBlock Origin's, with a
   power button for the site, what was blocked on the page and since install, the domains the page connected to, the
   element picker and zapper, and switches that block a site's pop-ups or remote fonts. Its dashboard,
-  `xenon://blocking/`, has the filter lists (each can be turned off), My filters, and trusted sites. uBO's switches for
-  large media, cosmetic filtering and JavaScript, and which domains had requests blocked, need engine work.
+  `xenon://blocking/`, has the filter lists (each can be turned off), My filters, and trusted sites, and
+  **Settings → Ads and trackers** links to each. uBO's switches for large media, cosmetic filtering and JavaScript, and
+  which domains had requests blocked, need engine work.
 - [x] **Daily filter list updates**: [xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds
   the lists every day and signs them. Once a day Xenon downloads the lists that changed, checks them against the signed
   manifest, and switches to them without a restart. It falls back to the bundled lists if anything fails. The welcome
