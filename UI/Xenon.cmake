@@ -41,6 +41,7 @@ set(XENON_SOURCES
     DevToolsBanner.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
+    FilterLists.cpp
     FindInPageWidget.cpp
     Icon.cpp
     HiddenPageSizing.cpp
@@ -50,6 +51,7 @@ set(XENON_SOURCES
     Menu.cpp
     NativeWindowContainer.cpp
     NativeTextEditingLineEdit.cpp
+    NewTabPage.cpp
     ProcessManagerWindow.cpp
     PerformanceMonitorWidget.cpp
     PictureInPictureWindow.cpp
@@ -108,7 +110,35 @@ if (HAS_DIRECTX)
     list(APPEND XENON_SOURCES WebContentViewWindows.cpp)
 endif()
 
-# FIXME: Port the Vulkan/DMA-BUF presentation path (WebContentViewLinux.cpp + Shaders/) once Xenon targets Linux.
+# Linux presents the page through Vulkan with DMA-BUF images when glslang is around to compile its shaders (see
+# Ladybird's check_for_dependencies.cmake), as upstream's UI/Qt does. The generated headers get their own directory and
+# target name, as upstream's ladybird target generates the same ones.
+if (NOT APPLE AND USE_VULKAN_DMABUF_IMAGES)
+    set(XENON_SHADER_DIR "${CMAKE_BINARY_DIR}/Xenon/Shaders")
+    set(xenon_vert_shader_header "${XENON_SHADER_DIR}/WebContentViewLinuxVertShader.h")
+    set(xenon_frag_shader_header "${XENON_SHADER_DIR}/WebContentViewLinuxFragShader.h")
+    set(xenon_generated_shader_headers "${xenon_vert_shader_header}" "${xenon_frag_shader_header}")
+    foreach (stage IN ITEMS vert frag)
+        set(shader "${XENON_UI_DIR}/Shaders/WebContentViewLinux.${stage}")
+        set(header "${xenon_${stage}_shader_header}")
+        add_custom_command(
+            OUTPUT "${header}"
+            COMMAND ${CMAKE_COMMAND}
+                -DLOG=${XENON_SHADER_DIR}/glslang-webcontent-${stage}.log
+                -P "${LADYBIRD_SOURCE_DIR}/Meta/CMake/run_quiet.cmake"
+                --
+                "${GLSLANG_VALIDATOR}"
+                -V
+                --vn webcontent_${stage}_shader_spv
+                -o "${header}"
+                "${shader}"
+            DEPENDS "${shader}"
+            VERBATIM
+        )
+    endforeach()
+    add_custom_target(xenon_generate_web_content_view_linux_shaders DEPENDS ${xenon_generated_shader_headers})
+    list(APPEND XENON_SOURCES WebContentViewLinux.cpp)
+endif()
 
 list(TRANSFORM XENON_SOURCES PREPEND "${XENON_UI_DIR}/")
 list(TRANSFORM XENON_ARC_SOURCES PREPEND "${XENON_UI_DIR}/")
@@ -118,7 +148,7 @@ qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
-target_link_libraries(xenon PRIVATE AK LibCore LibGfx LibIPC LibMain LibWebView LibURL LibWakeLock)
+target_link_libraries(xenon PRIVATE AK LibCore LibFileSystem LibGfx LibIPC LibMain LibWebView LibURL LibWakeLock)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL)
 # NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
 #     tree, so Xenon's root comes first.
@@ -132,6 +162,13 @@ endif()
 
 if (LINUX AND NOT ANDROID)
     target_link_libraries(xenon PRIVATE LibThreading PkgConfig::GIO PkgConfig::XCB_ICCCM Qt::GuiPrivate)
+endif()
+
+if (TARGET xenon_generate_web_content_view_linux_shaders)
+    target_sources(xenon PRIVATE ${xenon_generated_shader_headers})
+    target_include_directories(xenon PRIVATE "${XENON_SHADER_DIR}")
+    target_link_libraries(xenon PRIVATE Vulkan::Vulkan)
+    add_dependencies(xenon xenon_generate_web_content_view_linux_shaders)
 endif()
 
 if (APPLE)
@@ -160,11 +197,49 @@ set_target_properties(xenon PROPERTIES
 # The engine's helper processes (WebContent, RequestServer, ...) live next to the browser executable.
 if (APPLE OR WIN32)
     set_target_properties(${ladybird_helper_processes} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:xenon>")
+else()
+    # Elsewhere, Ladybird's own ladybird target puts its resources and helpers in the build directory's share/Lagom and
+    # libexec, and Xenon's would be the same files, which ninja refuses. So Xenon gets an install prefix of its own,
+    # which is where the engine looks for them, relative to the executable (see WebView::platform_init()). Its lib links
+    # back to the build's libraries, as the binaries' rpath is $ORIGIN/../lib.
+    set(XENON_PREFIX_DIR "${CMAKE_BINARY_DIR}/xenon")
+    set_target_properties(xenon PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_BINDIR}")
+    set_target_properties(${ladybird_helper_processes} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_LIBEXECDIR}")
+    add_custom_command(TARGET xenon POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E create_symlink "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}" "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_LIBDIR}"
+        VERBATIM
+    )
 endif()
 add_dependencies(xenon ${ladybird_helper_processes})
 
 # NB: Ladybird's resource lists are variables of its UI directory, which don't reach this one.
 include("${LADYBIRD_SOURCE_DIR}/UI/cmake/ResourceFiles.cmake")
+
+# Xenon ships its own versions of some of Ladybird's internal pages, which take the place of upstream's in the bundle,
+# and adds a few files of its own beside them.
+set(XENON_ABOUT_PAGE_OVERRIDES
+    newtab.html
+    webui.css
+    welcome.css
+    welcome.html
+    welcome.js
+)
+set(XENON_ABOUT_PAGE_ADDITIONS
+    newtab.css
+    newtab.js
+    xenon.css
+)
+foreach (page IN LISTS XENON_ABOUT_PAGE_OVERRIDES)
+    list(FIND ABOUT_PAGES "${LADYBIRD_SOURCE_DIR}/Base/res/ladybird/about-pages/${page}" index)
+    if (index EQUAL -1)
+        message(FATAL_ERROR "Xenon overrides about-pages/${page}, which Ladybird no longer ships. Check upstream's changes.")
+    endif()
+    list(REMOVE_AT ABOUT_PAGES ${index})
+    list(INSERT ABOUT_PAGES ${index} "${XENON_UI_DIR}/Resources/about-pages/${page}")
+endforeach()
+foreach (page IN LISTS XENON_ABOUT_PAGE_ADDITIONS)
+    list(APPEND ABOUT_PAGES "${XENON_UI_DIR}/Resources/about-pages/${page}")
+endforeach()
 
 if (APPLE)
     # NB: Ladybird sets this in its UI/CMakeLists.txt, whose variables don't reach this directory either.
@@ -175,7 +250,7 @@ if (APPLE)
     endif()
 
     set(xenon_bundle_dir "$<TARGET_BUNDLE_DIR:xenon>")
-    copy_resources_to_build("${xenon_bundle_dir}/Contents/Resources" xenon)
+    set(xenon_resource_dir "${xenon_bundle_dir}/Contents/Resources")
 
     add_custom_command(TARGET xenon POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${xenon_bundle_dir}/Contents/Resources"
@@ -187,7 +262,29 @@ if (APPLE)
         VERBATIM
     )
 else()
-    copy_resources_to_build("${CMAKE_BINARY_DIR}/${IN_BUILD_PREFIX}${CMAKE_INSTALL_DATADIR}/Lagom" xenon)
+    set(xenon_resource_dir "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_DATADIR}/Lagom")
 endif()
 
+copy_resources_to_build("${xenon_resource_dir}" xenon)
+
+# uBlock Origin's filter lists, converted for Ladybird by xenon-ublock (Meta/update-filter-lists.py refreshes them).
+# UI/FilterLists.cpp hands the lists to the browser at startup; the notice and license travel with them.
+file(GLOB XENON_FILTER_LISTS CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/lists/*.txt")
+copy_resource_set(xenon/filter-lists/lists RESOURCES ${XENON_FILTER_LISTS} DESTINATION "${xenon_resource_dir}" TARGET xenon)
+copy_resource_set(xenon/filter-lists
+    RESOURCES
+        "${XENON_UI_DIR}/Resources/filter-lists/LICENSE-GPL-3.0.txt"
+        "${XENON_UI_DIR}/Resources/filter-lists/NOTICE.txt"
+        "${XENON_UI_DIR}/Resources/filter-lists/manifest.json"
+    DESTINATION "${xenon_resource_dir}"
+    TARGET xenon
+)
+
 qt_finalize_target(xenon)
+
+# Xenon's unit tests, which Meta/xenon.py test builds and runs. Each is named TestXenon* to stay clear of Ladybird's.
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBangs.cpp" Xenon NAME TestXenonBangs LIBS LibURL)
+target_sources(TestXenonBangs PRIVATE "${XENON_UI_DIR}/Bangs.cpp")
+target_include_directories(TestXenonBangs BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
+add_custom_target(xenon-tests DEPENDS TestXenonBangs)

@@ -1,0 +1,1271 @@
+! Title: uBlock filters – Annoyances (for Ladybird)
+! Source: https://ublockorigin.github.io/uAssets/filters/annoyances.txt
+! Homepage: https://github.com/uBlockOrigin/uAssets
+! License: GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+! Converted by xenon-ublock on 2026-10-26 17:30 UTC for adblock 0.13.3, as built into Ladybird's LibWeb/ContentBlocker.
+! Kept 1263 of 3540 upstream filters, as 1263 filters; the rest cannot take
+! effect in Ladybird. See report.md and dropped/ next to this file for what was dropped and why.
+!
+flinsetyadi.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+www-daftarharga.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||vumoo.vip/js/safe.ob.min.js
+eshentai.tv##.aviso
+cristelageorgescu.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+cintateknologi.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+trucksbook.eu##.modal-backdrop
+trucksbook.eu##body:style(overflow: initial !important)
+magesypro.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+psihologiadeazi.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+cafago.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+hollywoodmask.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+playpilot.com##.takeover.modals
+playpilot.com##body:style(overflow: auto !important;)
+messitv.net##.sharepost
+elahmad.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+adpres.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||piano.io^$domain=fastcompany.com
+unikampus.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+whowantstuffs.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+appofmirror.com##body *:style(user-select: auto!important;-webkit-touch-callout: default!important;-webkit-user-select: auto!important;-moz-user-select: auto!important;-ms-user-select: auto!important;)
+themes-dl.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+gooyaabitemplates.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+readm.org##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+androidtvbox.eu##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+gamezop.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+starbene.it##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+youmath.it##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+bloggerspice.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+sysnettechsolutions.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+lataifas.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/wp-content/plugins/append-link-on-copy/js/append_link.js$script,1p
+gsmfirmware.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+truyenbanquyen.com##*:style(-webkit-touch-callout: default!important; -webkit-user-select: auto!important; -moz-user-select: auto!important; -ms-user-select: auto!important;)
+gnt24365.net##*:style(-webkit-touch-callout: default!important;-webkit-user-select: auto!important;-moz-user-select: auto!important;user-select: auto!important;)
+cambiarevita.eu##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+arlinadzgn.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+fmovies.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+vedantu.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+tahmial.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+th-world.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+thezealots.org##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+wouterplanet.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+erexams.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+zdravenportal.eu##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+sachonthi.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+significatocanzoni.it##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+accuweather.com##.privacy-policy-banner
+nandedbazaar.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+objectivequiz.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+teamaretuza.com###consentModal,.modal-backdrop
+teamaretuza.com##body:style(overflow: auto!important)
+loveplay123.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+minecraftquiz.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+magelang1337.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+kijyomatome-ch.com##body:style(user-select:auto !important;-webkit-user-select:auto !important;-ms-user-select:auto !important;-moz-user-select:auto !important;-webkit-user-drag:auto !important)
+irisbuddies.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ggulpass.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+funivie.org##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+tiktok.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+exclusifvoyages.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+everydaynewinfo.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+fraudnavi.com##body:style(-moz-user-select: auto !important;-ms-user-select: auto !important;-webkit-user-select: auto !important;-webkit-touch-callout: default !important;)
+||googleapis.com/loadermain.appspot.com/main.js$domain=javboys.com
+fatgirlskinny.net##.pum
+fatgirlskinny.net##html:style(overflow:auto !important)
+liveroger.com##body:style(-webkit-touch-callout:text !important;-webkit-user-select:text !important;-khtml-user-select:text !important;-moz-user-select:text !important;-ms-user-select:text !important;user-select:text !important)
+free-barcode-generator.net##[id^="reklamy"]
+gomovies.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+thefreethoughtproject.com##.pum
+thefreethoughtproject.com##html:style(overflow:auto !important)
+nytimes.com###modal-portal-regiwall
+nytimes.com##body:style(overflow: initial !important)
+clubulbebelusilor.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+seotechman.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+seotechman.com##*::selection:style(background-color:#338FFF!important)
+katosatoshi.jp##body:style(-webkit-user-select:text!important;-moz-user-select:text!important;-ms-user-select:text!important;user-select:text!important)
+zeeebatch.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+techdracula.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+hibiki-radio.jp##body:style(-webkit-user-select:auto !important; -webkit-touch-callout: default !important;)
+autophorie.de##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+digital.lasegunda.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/wp-content/plugins/secure-copy-content-protection/*$script
+poeapp.com##.sponsor, div.wrapper
+marfilius.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||oggiscuola.com/*/banner$image
+neobux.com##.nosel:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+qualityfilehosting.com##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+androidmtk.com##[id]:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+mio.to##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+husseinezzat.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+bigulnews.tv##*::selection:style(background-color:#338FFF!important)
+informagiovani-italia.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+kangkimin.com##*:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+safirsoft.com##form[id="tfnewsearch"]:style(font-size: 0px !important;)
+safirsoft.com##form[id="tfnewsearch"] > input[id="val"]:style(clip-path: circle(0) !important;)
+kooora4lives.net,kooora4livs.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||discovervalids.com/assets-new/js/block.js$script,1p
+bagaglioamano.io##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/wp-content/plugins/t42-content-protector/js/protector.min.js$script
+csid.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/block-keys.js$script,important,domain=allcryptoz.net|crewbase.net|crewus.net|shinbhu.net|shinchu.net|topcryptoz.net|uniqueten.net|ultraten.net
+/wp-content/plugins/wp-extra/js/copy.min.js$script
+the-masters-voice.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; cursor: auto !important)
+the-masters-voice.com##*::selection:style(background-color: #338FFF !important)
+nullphpscript.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+readawrite.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+novelpub.com,webnovelpub.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+labs.j-novel.club##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+labs.j-novel.club##::selection:style(background: Highlight !important; color: HighlightText !important)
+sdewery.me##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+convenienza.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+theblockcrypto.com##.newsletterModal
+repack-games.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/dev-console-detect.js$script,domain=closeload.com
+sekaikomik.live##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+bingotingo.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+web.telegram.org##div.Message.is-protected:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+sqlserveregitimleri.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+edurev.in##body:style(cursor: revert !important;)
+velicu.eu##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+panorama.it##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+arenavalceana.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+firmwarefile.com###fwrapper, body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+descopera.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+hket.com##.app-redirect-panel
+genesistls.com##html:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+workhouses.org.uk##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||phimlongtieng.net/js/devtool.js
+||phimlongtieng.net/templates/themes/phim/js/antihtml.js
+verselemzes.hu##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+||javhoho.com/wp-content/uploads/*/Upgrade-PREMIUM-
+two9success.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+||icelz.to/tv/global-devtools-blocker.js$script
+revistasufletului.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+substack.com##article.post > div[class*="frontend-components-SubscribePrompt-module"]
+substack.com##body:style(cursor: initial !important;)
+entra.news,microsoftsecurityinsights.com,substack.com##[class*="_coverTheme"]:has(> .intro-popup)
+jojoy.io###ad_block_reminder_dialog
+hayatbilgileri.com##*:style(cursor: revert !important; -webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+walkthrough-indo.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+technologyreview.jp##.meter
+wormate.io###game-wrap:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+celebzcircle.com,pitesti24.ro,samsungtechwin.com,cours-de-droit.net,iptv4best.com,blogvisaodemercado.pt,kapitalis.com,tiempo.hn,winmeen.com,ibps.in,visse.com.br,javsubtitle.co,learninsta.com,licensekeys.org,mediahiburan.my,tipssehatcantik.com,anime-drama.jp,jbjbgame.com,viatasisanatate.com,ziarulargesul.ro,globaldefensecorp.com,gossipnextdoor.com,coffeeapps.ir,media.framu.world,immobiliaremia.com,colegiosconcertados.info,bigdatauni.com,riwyat.com,rukim.id,visefierbinti.ro,cyberkrafttraining.com,theaircurrent.com,ncert-solutions.com,ncertsolutions.guru,clockks.com,ananda-yoga.ro,poolpiscina.com,infodifesa.it,getective.com,flashdumpfiles.com,formatatmak.com,drkrok.com,alphagirlreviews.com,kitchennovel.com,voxvalachorum.ro,day-hoc.org,onlineonderdelenshop.nl,primicia.com.ve,tech-recipes.com,postcourier.com.pg,afrikmag.com,maduras.vip,aprendeinglessila.com,kicknews.today,koalasplayground.com,hellokpop.com,hayatbilgileri.com,moneyexcel.com,placementstore.com,neuroteam-metz.de,codedosa.com,liveyourmaths.com,newspao.gr,ieltsliz.com,programasvirtualespc.net,tempatwisataseru.com,wikiofcelebs.com,jornaljoca.com.br,arcanescans.com,filmzone.com,hiraethtranslation.com,kaystls.site,home.novel-gate.com,plural.jor.br,sinhasannews.com,viewsofgreece.gr,rozbor-dila.cz,kritichno.bg,csiplearninghub.com##body:style(cursor: revert !important; -webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+songs-wayaku.com,famousintel.com,jnews5.com,eurooptyk.com.pl,evreporter.com,tvshowstars.com##html, .unselectable:style(cursor: revert !important; -webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+/wp-content/plugins/wccp-pro/*$domain=ferroviando.com.br|counciloflove.com|infokik.com|kulinarnastronamocy.pl|jafekri.com|reborntrans.com|truyenbanquyen.com|ezmanga.net|secondlifetranslations.com|piklodz.pl|koltry.life|kolnovel.com|theaircurrent.com
+thailandopen.org,theaircurrent.com,freereadnovel.online,piklodz.pl,secondlifetranslations.com,ferroviando.com.br,counciloflove.com,infokik.com,kulinarnastronamocy.pl,jafekri.com,ezmanga.net,reborntrans.com,truyenbanquyen.com,koltry.life,kolnovel.com##*:style(cursor: revert !important; -webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+||freereadnovel.online/*?wccp_ver_num=
+cespun.eu##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+iptvromania.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+iptvromania.ro##::selection:style(background-color:#338FFF!important)
+daotranslate.*##::selection:style(background-color:#338FFF!important)
+daotranslate.*##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+anascrie.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+klartext-ne.de##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+klartext-ne.de##::selection:style(background-color:#338FFF!important)
+terramirabilis.ro##::selection:style(background-color:#338FFF!important)
+terramirabilis.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+macaro-ni.jp#@#.l-main:style(padding-top: 13.4vw !important;)
+teamkong.tk##body * :not(input):not(textarea):style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+rodude.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/wp-content/themes/linhminazmovies/assets/js/dev.js$script,1p
+spares2repair.co.uk##body:style(-webkit-user-select:text !important; -moz-user-select:text !important; user-select:text !important)
+romaniadeazi.biz##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+||jsdelivr.net/npm/disable-devtool@latest/disable-devtool.min.js
+||404le.com/js/disable-devtool.min.js
+||n2olabs.pro/devtool.js
+astoryofmasasstruggles.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+||assets.t3n.de/t3n-de/assets/t3n/2018/scripts/abdtn-$script,1p
+||media.cm/dev.js
+mskmangaz.blogspot.com##.novel-box :not(a):style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+mskmangaz.blogspot.com##.superpowerlol::before:style(content: unset !important;)
+ipphone-warehouse.com##body:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+||ohli365.vip/js/apms.db.js$script
+ncrtsolutions.in##body:style(cursor: revert !important;)
+justspices.de###maincontent:style(user-select: text !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; -o-user-select: text !important;)
+shaalaa.com##*:style(cursor: revert !important; -webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||cdn.jsdelivr.net/npm/devtools-detector$script,domain=asumanaksoy.com|comedyshow.to|freshlifecircle.com|superembeds.com|blsplayer.com|daftmovie.xyz
+||hentaihd.cyou/assets/js/devtools-detector.js$script
+||bhplay.me/player/assets/devtools-detector/$script,1p
+/cdn.jsdelivr.net/npm/disable-devtool$script,domain=simptown.su
+guidingliterature.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+||unic.com.vn/js/disable-copy.js$script
+||unic.com.vn/css/chongcopy.css$css
+unic.com.vn##body:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+tv.bdix.app##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+zigya.com##body:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+teachoo.com##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+classnotes.org.in##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+topperlearning.com##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+hansa-online.de##.td-post-content, .td-post-title:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+||indahonline.com/js/disable-devtool.js$script,1p
+videocardz.com##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+rds.live##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+nihongoaz.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+espressocafe.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+hiphopa.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+samurai.wordoco.com##body * :not(input):not(textarea):style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+infotrucker.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+2mnews.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+adevarurisecrete.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+liddread.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+||cdn.jsdelivr.net/npm/disable-devtool@latest$script,domain=bintvs.fun
+vitsienvitsit.fi##.vitsiUnselectable:style(user-select: text !important)
+gay69.stream##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+evz.ro##body:style(-moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||up4stream.com/js/devtools-detector.js
+||businessworld.in/assets/custom/custom.js$script
+esscctv.com##.track_back:style(background: unset !important;)
+esscctv.com##.pg_main2, .panel_main, .panel_border2:style(background: unset !important; user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+||abstream.to/js/devtools-detector*.js
+||onepiecepower.com/spoiler.js
+e-panigiria.gr###body *:not(input):not(textarea):style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||utaten.com/css/print.css
+utaten.com##.lyricBody:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+oricon.co.jp##.all-lyrics:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+keytube.net###lyrics:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+lyrical-nonsense.com##.olyrictext, .olyrictext-tv, .sbs-row:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+s.awa.fm##div[unselectable="on"] p[class]:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+kashiland.jp###lyric:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+music.j-total.net##.main > p:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+kanogoma.com##.lyrics-section .user-select-none:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+open.spotify.com##.contentSpacing .paywall[data-testid="lyrics-container"] p[data-encore-id="text"]:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+open.spotify.com##.encore-layout-themes[data-testid="embed-widget-container"] div[class^="TrackWidget_singleGridContainer"] div[class^="TrackWidget_metadataWrapper"]:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+police.gov.sg##.slick-slider:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+padlet.com##.select-none.surface-post:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+discord.com##ul[class^="cardsList__"]:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+discord.com##ul[class^="cards__"]:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+massan.jp##.entry-content:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+www.delta.com##.card-chart:style(user-select: text !important; touch-action: auto !important;)
+straitstimes.com##.select-none:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+bookto09.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important; -webkit-user-drag: auto !important; user-drag: auto !important;)
+||canale-tv.net/channel/disy.js^
+hoyolab.com##img.viewer-move:style(pointer-events: auto !important; z-index: 100 !important;)
+homegymreview.co.uk##body * :not(input):not(textarea):style(user-select: text !important; -webkit-touch-callout: text !important; -webkit-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -ms-user-select: text !important)
+apps.apple.com##.body-container > .app-container main.page-container > .default-page-container a, blockquote, body, code, dd, div, dl, dt, embed, fieldset, footer, form, h1, h2, h3, h4, h5, h6, header, html, img, legend, li, ol, p, pre, section, table, td, th, ul:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-user-drag: auto !important; user-drag: auto !important; cursor: revert !important;)
+videohelper.com##body:style(-webkit-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+megatrax.com##.collection-tracks:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-user-drag: auto !important; user-drag: auto !important;)
+posturi.gov.ro##:root:style(user-select: unset !important)
+zgbk.com###words-box:style(user-select: text !important;)
+zgbk.com##.detail .detail-con:not(.copycontent) .art-content p:style(pointer-events: auto !important;)
+||tvzonehd.com/anti-copy.js
+trucoon.com.br##*:style(-webkit-touch-callout: auto !important; -moz-touch-callout: auto !important; -ms-touch-callout: auto !important; -o-touch-callout: auto !important; touch-callout: auto !important; -webkit-user-select: auto !important; -moz-user-select: auto !important; -ms-user-select: auto !important; -o-user-select: auto !important; user-select: auto !important; -ms-touch-action: auto)
+voedingswaardetabel.nl##*:style(-webkit-touch-callout: auto !important; -moz-touch-callout: auto !important; -ms-touch-callout: auto !important; -o-touch-callout: auto !important; touch-callout: auto !important; -webkit-user-select: auto !important; -moz-user-select: auto !important; -ms-user-select: auto !important; -o-user-select: auto !important; user-select: auto !important; -ms-touch-action: auto)
+@@||socialblade.com^$ghide
+socialblade.com##.cas-container
+socialblade.com##.cas-wide-container
+socialblade.com##div[style^="width: 300px; height: 250px;"][style*="background: #fff;"]
+socialblade.com##div[style^="width: 860px; min-height: 90px"]
+socialblade.com###bottomAd:style(position: absolute !important; left: -4000px !important;)
+||naturalhomes.org/img/adblock.gif
+airnavradar.com##.history-ad
+airnavradar.com##section > #content > div[class]:has(> #ads)
+airnavradar.com###ads
+cyanlabs.net#@#ins.adsbygoogle[data-ad-slot]
+cyanlabs.net#@#ins.adsbygoogle[data-ad-client]
+abcya.com##.modal-overlay.wrapper
+abcya.com##body:style(overflow: auto !important)
+abcya.com##.a-adhesion
+||2game.info/ad/failed_ad_view.js
+studydrive.net##.w-full.flex:has(> div[id^="billboard_btf"])
+videohelp.com###topmenu:has(> .contentlink[href="https://www.videohelp.com/donate"])
+/invoke.js^$script,3p,domain=asiaflix.net,redirect=noopjs
+iosgods.com###iGSupport
+mvlempyr.*##.ChapterContentWrapper > .ct-div-block:has(.report-ad)
+mvlempyr.*##.notice-outer-wrapper:has([src*="a-ads.com"])
+mvlempyr.*##.ContentContainer > div > div:has(img[src*="ads-loading"])
+||pubfuture-ad.com^$script,redirect=noopjs,domain=mvlempyr.io|mvlempyr.com
+||pubfuture-ad.com^$xhr,redirect=nooptext,domain=mvlempyr.io|mvlempyr.com
+||ad.a-ads.com^$subdocument,redirect=noopframe,domain=mvlempyr.io|mvlempyr.com
+##.inset-x-0[x-data="adblockBanner()"]
+###steadyAdblockContainer
+vodafone.de###adbl
+th.gl#@#.hidden.border
+th.gl#@#.fixed.border
+th.gl#@#script[src^="https://s.nitropay.com/"] + div
+th.gl#@#next-route-announcer[style="position: absolute;"] + div
+@@||jigsawplanet.com^$ghide
+anizone.to##div[x-data*=".offsetHeight"]
+civitai.com,civitai.red##a[href="/pricing"] img
+civitai.com,civitai.red##div.relative.flex[style="min-height:90px"]:has(> button[aria-label="Close ad"])
+hymnary.org##div#blockbanner
+tarnkappe.info###article .entry-content section[data-nosnippet][class$="-only"]
+igorslab.de##.ilab-adblocker-notice
+ftbucket.info###adblock-banner
+||holyclock.com^$3p
+||shomershabes.com^$3p
+||shomershabes.co.il^$3p
+pinterest.*##[data-test-giftwrap]
+pinterest.*###desktopWrapper:style(position: static !important;)
+pinterest.*##.gridCentered:style(margin-top: auto !important;)
+pinterest.*##div[data-test-id="giftWrap"]
+pinterest.*##div[class="Closeup__wrapper"] > div > div[style^="cursor: default"]
+pinterest.*##div[class="GrowthUnauthPinImage__imageDim"]
+pinterest.*##.GrowthUnauthPinImage > a > div[class^="Jea"]:has(button[class^="noButtonStyles "])
+pinterest.*##.Hsu.iyn.zI7:nth-of-type(2) > div > .FullPageModal__scroller
+pinterest.*##.PinCard__imageWrapper div[class][style="background-color: rgba(17, 17, 17, 0.4); width: 100%;"]:has(> div:empty)
+files.minecraftforge.net##.promo-container
+tv.mademyday.com##.blnotice
+experts-exchange.com###topHeaderBannerWrap
+experts-exchange.com##.navigationWrapper:style(top: 0px !important;)
+*/lib.ucopy/ucopy.js$script,domain=uol.com.br
+ne10.uol.com.br##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||umterps.com^$ghide
+umterps.com##.single-ad
+cars.com##.dialog
+cars.com##body:style(overflow: auto !important; position: initial !important;)
+planete-205.com###nonono
+@@||ps3-infos.fr^$ghide
+zerohedge.com###abd-banner
+zerohedge.com##.modal__overlay
+@@||racefans.net^$ghide
+racefans.net##.textwidget
+foodnetwork.com##.o-AdhesionNotifier
+gaypornmasters.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+braziljournal.com##body:style(overflow: auto !important;)
+braziljournal.com##.in.fade
+@@||radioline.co/*/ad$1p
+nytimes.com##.ReactModalPortal:has(.welcomeAd)
+@@||xiaomitoday.com^$ghide
+||googlesyndication.com/pagead/js/adsbygoogle.js$xhr,redirect=noop.js,domain=unknowncheats.me
+@@||knshow.com^$ghide
+knshow.com##.adsbygoogle
+knshow.com##div[id^="div-gpt-ad-"]
+classicreload.com###sliding-popup.sliding-popup-bottom
+@@||justtrucks.com.au^$ghide
+@@||justtrucks.com.au^$image
+omr.com###dsgvoModal
+omr.com##.modal-backdrop
+omr.com##body:style(overflow: auto !important;)
+||adsrt.com/assets/js/particles.min.js$script
+||tours.fr/include/js/tagAnalyticsCNIL.php$script,1p
+masternodes.pro###adblocker
+petrimazepa.com##.ui-dialog[tabindex="-1"]
+sabishiidesu.com##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+livetennis.it##p:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+tinyppt.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+@@||schnauzer-forum.co.uk^$ghide
+investmentnews.com###blocker
+/wp-content/plugins/simple-adblock-notice/*$~css
+centrumher.eu##[class^="san_howtowhitelist_"]
+droidtekno.com##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+community.simtropolis.com##.ipsModal
+community.simtropolis.com##.ipsDialog
+basilmarket.com##[id*="cdm-zone"]
+@@||enfsolar.com^$ghide
+@@||brightonandhovenews.org^$ghide
+remotelyawesomejobs.com###ad-plea
+@@||rightwingtribune.com^$ghide
+htmlreference.io##.header-carbon
+topomap.co.nz###modal-adblocker, .in.fade.modal-backdrop
+@@||gamerotic.com^$ghide
+me3tweaks.com###support_banner
+@@||resdz.com^$ghide
+@@||ricochet.media^$ghide
+stoneyroads.com##.ad-container
+businessemailetiquette.com##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+evades.io##.disable-prompt-header
+@@||orlygift.com^$ghide
+orlygift.com##.ad-container-responsive
+orlygift.com##div[id^="div-gpt-ad"]
+heroescommunity.com###he1
+||navcomic.com/wp-content/uploads/*/ad-blocking.gif$image,1p
+hindi-gk.com##p:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+newsbook.pl##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+carsguide.com.au###adBlockMessage
+@@||dermatologytimes.com^$ghide
+motherjones.com##.mj-adblock-widget
+techtrickseo.com##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+##.adblock-whitelist-messaging__article-wrapper
+##.adblock-whitelist-messaging__wrapper
+proxfree.com###pftop:style(height: auto !important;padding-bottom:5px !important)
+proxfree.com##.pflrgAds
+instagram.com##[class]:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||md5hashing.net^$ghide
+md5hashing.net##.alert-danger.alert
+md5hashing.net##.red.b.center.mute
+jobsbotswana.info##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+||algosit.com^
+republicadecuritiba.net##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+merchoid.com###message-purchased
+gaypornwave.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||topspeed.com^$ghide
+topspeed.com##.adsninja-ad-zone
+topspeed.com##.txt-ad
+topspeed.com##.daily-vid-ad
+topspeed.com##.top-horizontal-ad-content
+@@||mywrestling.com.pl^$ghide
+forum.sbenny.com##.message-inner:has(.ads)
+||wp.com/wp-content/themes/vip/pmc-plugins/$script,domain=deadline.com
+@@||bigleaguepolitics.com^$ghide
+/wp-content/plugins/christmasify/*
+@@||soundonsound.com^$ghide
+@@||jrocknews.com^$ghide
+aulete.com.br##.definicao_verbete_homologado_interna:style(height:100% !important;)
+*.gif$image,domain=runningnews.gr
+*/wp-content/plugins/wp-content-copy-protection/*
+mercurynews.com##.Mg2-connext, .connext-modal-backdrop, .modal-scrollable
+mercurynews.com##body.modal-open:style(overflow-x: hidden !important; overflow-y: scroll !important;)
+@@||creditonebank.com^$ghide
+r7.com###inner-ad-container
+insurance-corporate.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+fanfiction.net,fictionpress.com##.storytextp:style(user-select: text !important; -webkit-user-select: text !important;)
+@@||pagead2.googlesyndication.com/pagead/*$image,domain=free-scores.com
+polskacanada.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+windowscentral.com##.swal-modal, .swal-overlay
+randaris.app##.adblock-box
+||coffeeforums.co.uk/banners/$image
+@@||nachrichten.at^$ghide
+satcesc.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||bdcraft.net^$ghide
+bdcraft.net##.cc-banner
+bdcraft.net##.hostBtn
+bdcraft.net##.adsbygoogle
+bdcraft.net###bottombanner
+bdcraft.net###header > .wrapper > [class]
+||athletic.net/css/signedOutBlur
+athletic.net##[href*="/result"]:style(text-shadow: none !important; color: #8b0000 !important;)
+athletic.net##[href*="/meet"]:style(text-shadow: none !important; color: #8b0000 !important;)
+athletic.net##[_ngcontent-serverapp-c135]:style(text-shadow: none !important; color: #000 !important;)
+athletic.net##[ngbtooltip]:style(text-shadow: none !important; color: #6c757d !important;)
+athletic.net##.hiddenRanking:style(text-shadow: none !important; color: #6c757d !important;)
+athletic.net##*:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+athletic.net##.ng-star-inserted.sign-up-box
+athletic.net##[_ngcontent-serverapp-c134]:style(text-shadow: none !important; color: #000 !important;)
+@@||pagead2.googlesyndication.com/pagead/js/adsbygoogle.js$script,domain=yellowbridge.com
+diynetwork.com##.o-AdhesionNotifier
+androidcentral.com##.swal-overlay
+instagram.com##nav > div[class^="_"] > div[class^="_"] > div[class^="_"] > div[class^="_"] > div[class^="_"] > div[class] > div[class^=" _"][style="width: 100%;"]:only-child
+instagram.com###react-root ~ div[class*=" "][class$=" "][role="presentation"]:has(a[href^="/accounts/"][href*="signup/"]):not(:has(button[type="button"] > div > svg[aria-label][width="18"][height="18"][viewBox*="48"]))
+@@||eppingforestguardian.co.uk^$ghide
+eppingforestguardian.co.uk##.dfp-ad
+eppingforestguardian.co.uk##.mar-block-ad
+||code.adsales.snidigital.com/lib/*/sni-ads.min.js$script,domain=travelchannel.com
+mrfood.com##.in-content-container-coverage
+mrfood.com###newsletterSignUpDivAnime
+mrfood.com###viewportGreyout
+thredup.com##.modal-underlay
+thredup.com##.redux-modal
+@@||quizlet.com^$ghide
+quizlet.com##.SetPageTerm:style(display: block !important)
+quizlet.com##.SignupWallInline-overlay
+feedspot.com##.blackout
+feedspot.com##.fadeIn.animated
+feedspot.com##.fixedBar
+feedspot.com##.mfp-container
+feedspot.com##.regoverlay
+volunteermatch.org###req_login_reg_interrupt
+volunteermatch.org###window_overlay
+theclever.com###overlay_search
+discussion.evernote.com,prestashop.com##.cTopicPostArea:has(.cGuestTeaser)
+bookbub.com##.blur.signup-gate
+bookbub.com##.post-section:style(filter: none !important; -webkit-filter: none !important; pointer-events: all !important)
+ndtv.com###___ndtvpushdiv
+facebook.com,facebookcorewwwi.onion,facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion##._5hn6
+touch.facebook.com,mtouch.facebook.com,x.facebook.com,iphone.facebook.com,m.beta.facebook.com,touch.beta.facebook.com,mtouch.beta.facebook.com,x.beta.facebook.com,iphone.beta.facebook.com,touch.facebookcorewwwi.onion,mtouch.facebookcorewwwi.onion,x.facebookcorewwwi.onion,iphone.facebookcorewwwi.onion,touch.beta.facebookcorewwwi.onion,m.facebook.com,m.facebookcorewwwi.onion,b-m.facebook.com,b-m.facebookcorewwwi.onion,mobile.facebook.com,mobile.facebookcorewwwi.onion,touch.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion,mtouch.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion,x.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion,iphone.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion,touch.beta.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion,m.facebook.com,m.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion,b-m.facebook.com,b-m.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion,mobile.facebook.com,mobile.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion##div[style^="background: none;"]:has(#mobile_login_bar)
+quora.com##body > div[id]:has(.modal_signup_dialog)
+quora.com##.new_signup_dialog.modal_bg
+quora.com##.signup_wall_prevent_scroll #root:style(filter: none !important;)
+quora.com##.signup_wall_prevent_scroll:style(position: unset !important; padding-right: 0 !important;)
+revolvermag.com##.emma-show
+revolvermag.com##body:style(overflow-x: hidden !important; overflow-y: scroll !important;)
+/emma-content-aggregates-prd.
+knowablemagazine.org##.modal
+knowablemagazine.org##body:style(overflow-x: hidden !important; overflow-y: scroll !important;)
+insidesources.com##.fancybox, .fancybox-overlay, .fancybox-wrap
+insidesources.com##html:style(overflow-x: hidden !important; overflow-y: scroll !important;)
+flashbak.com,geneticliteracyproject.org,marijuanamoment.net,naturalblaze.com,saludmovil.com,thebaffler.com,undark.org,wealthydoc.org###boxzilla-overlay, .boxzilla-container
+thebaffler.com##.boxzilla-overlay
+thebaffler.com##html,body:style(overflow: auto !important;)
+airfactsjournal.com,newmatilda.com###newsletter-popup-container, #newsletter-popup-overlay
+kqed.org##[class*="modal"]
+behance.net##[class*="ImageElement-blockPointerEvents-"]:style(pointer-events: auto !important)
+behance.net##[class*="Module-blockGridPointerEvents-"] .grid__item-image:style(pointer-events: auto !important)
+behance.net##[class*="Search-contentBlocker-"]
+behance.net###lightbox-wrap img:style(pointer-events: auto !important)
+behance.net##.Popup-popup-T3F
+kpopjjang.com##*::selection:style(background-color:#338FFF !important;)
+fantricks.com##body:style(-webkit-touch-callout: default !important;-webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+steelersdepot.com##.modal, .modal-backdrop
+musicbusinessworldwide.com##.mb-interstitial
+psychologiazycia.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+thedisconnect.co###notice-root
+thedisconnect.co##*:style(filter: none !important)
+breakingdefense.com###simplemodal-container, #simplemodal-overlay
+breakingdefense.com##body:style(overflow-x: hidden !important; overflow-y: scroll !important;)
+theintercept.com###offer-0-lwmcg
+theintercept.com###third-party--viewport-takeover
+||prod.theintercept.com^$subdocument,1p
+theintercept.com##.Post-body--truncated:style(max-height: unset !important;)
+salary.com###sgpb-popup-dialog-main-div-wrapper, .sgpb-theme-1-overlay
+fearlesssalarynegotiation.com##.seva-overlay
+postandcourier.com##.tp-backdrop, .tp-modal
+*/bioep.js$script,domain=~tomshw.it
+ionos.de##body:style(overflow: auto !important)
+ionos.de###bio_ep
+ionos.de###bio_ep_bg
+autoblog.com##.modal, .modal-backdrop
+autoblog.com##body:style(overflow-x: hidden !important; overflow-y: scroll !important; padding-right: 0 !important;)
+||emeraldchat.com/user_is_temp
+||emeraldchat.com/sw.js$script,1p
+@@||globalnews.ca^$ghide
+globalnews.ca##.ad-container
+globalnews.ca###headerAd
+fmovies.*#@#.fa-rss
+software-on.com##*::selection:style(background-color:#338FFF!important)
+software-on.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+linkedin.com##.global-alert--yield.global-alert, #global-alert-queue
+@@||dcdirtylaundry.com^$ghide
+@@||sostariffe.it^$ghide
+tabonitobrasil.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+auepaisagismo.com,auepaisajismo.com##body:style(overflow: auto !important;)
+@@||metabattle.com^$ghide
+discordapp.com##[class^="buttonWrapper"][tabindex="2"]
+medicalnewstoday.com##.sticky_ad_container
+m.youtube.com,music.youtube.com,tv.youtube.com,www.youtube.com,youtubekids.com##ytd-popup-container > .ytd-popup-container > #contentWrapper > .ytd-popup-container[position-type="OPEN_POPUP_POSITION_BOTTOMLEFT"]
+m.youtube.com###mealbar\:3 > ytm-mealbar.mealbar-promo-renderer
+buienradar.nl###adholderContainerHeader
+||lightboxcdn.com^$domain=foreignpolicy.com
+foreignpolicy.com##.fb_lightbox-lock:style(overflow-x: hidden !important; overflow-y: scroll !important;)
+foreignpolicy.com##.fb_lightbox-overlay-fixed.fb_lightbox-overlay
+dostfilms.*,kimovil.*##*:style(-webkit-touch-callout: default!important; -webkit-user-drag: element!important; -webkit-user-select: text!important; -moz-user-select: text!important; -ms-user-select: text!important; user-select: text!important;)
+dispatch.com##.tp-modal
+dispatch.com##.tp-active.tp-backdrop
+dispatch.com##body:style(overflow: auto !important;)
+australianfrequentflyer.com.au##.focus-guest-alert
+dev.mysql.com##.login-callout
+context.reverso.net##.blocked:style(filter: none !important;)
+context.reverso.net##.blocked .text:style(filter: none!important;-webkit-filter: none!important;)
+context.reverso.net###blocked-results-banner
+hardware.info##.sidebar_right_bottom
+hardware.info##.sidebar_right_top
+@@||mentalmars.com^$ghide
+neowin.net##[class^="sp_veil"]
+neowin.net##[id^="sp_message_panel_id"]
+@@||independent.ie^$ghide
+softwaretestinghelp.com##.Campaign
+softwaretestinghelp.com##body:style(overflow: auto !important;)
+@@||nzz.ch^$ghide
+nzz.ch###adnz_maxiboard_1
+babel.com##[id^=adReplacement]
+babel.com##.infopub
+@@||airbnbhell.com^$ghide
+yeane.org##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+bitblokes.de##[href^="https://airvpn.org/"]
+@@||cdnjs.cloudflare.com/ajax/libs/blockadblock/*/blockadblock.min.js$script,domain=starblast.io
+@@||starblast.io^$ghide
+vedbex.com##.in.fade
+vedbex.com##body:style(overflow: auto !important;)
+||vedbex.com/*banners$image
+||vedbex.com/*/sponsers$image
+||pagead2.googlesyndication.com/pagead/js/adsbygoogle.js$script,redirect=noopjs,domain=files2zip.com
+files2zip.com##div.black.banner
+enotes.com##.obscured:style(color: black !important;text-shadow: none !important; filter: none !important)
+enotes.com##.paywall-mount
+@@||wired.com^$ghide
+@@||belfasttelegraph.co.uk^$ghide
+answersafrica.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+/wp-content/plugins/content-protector-pack/*
+@@||flightaware.com^$ghide
+@@||typing-speed.net^$ghide
+plagiarisma.net###noty_bottom_layout_container
+practicetestgeeks.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+chowhound.com##.fb_lightbox-overlay
+chowhound.com##.preloaded_lightbox
+chowhound.com##.fb_lightbox-lock:style(overflow-x: hidden !important; overflow-y: scroll !important;)
+mainframestechhelp.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||as.com^$ghide
+as.com##.publi
+digicular.com##html:style(overflow: hidden !important;)
+tunein.com##.dark-theme-dialog__dialogBody___106Di
+mountaintopwebdesign.com###wmpci-popup-wrp
+mountaintopwebdesign.com##html:style(overflow: auto !important;)
+r7.com##.floating.share-btn
+@@||minecraft-schematics.com^$ghide
+minecraft-schematics.com##.adsbygoogle
+minecraft-schematics.com##[href^="http://www.pingperfect.com/aff.php"]
+gagetmatome.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+mbahhanif.site##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+@@||dumpert.nl^$ghide
+@@||beinsports.com^$ghide
+@@||mizonatv.com^$ghide
+govtech.com###interstitial
+/google-funding-choices.js$script,domain=foxnews.com
+nfltraderumors.co##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+musixmatch.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+ecosia.org##.notice
+ecosia.org##.result-snippet:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+canondrivers.org##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+||maskmagazine.com/assets/substrate.png$image,1p
+pehawe.me##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+kimkazandi.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+kimkazandi.com##.autoplay
+@@||puhutv.com^$ghide
+ilturista.info##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+imaginetricks.com##body>div:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+sigma4pc.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+kurazone.net##.post-body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+@@||edmontonjournal.com^$ghide
+www.reddit.com##div[id*="_xpromo_nsfw_blocking_"]
+www.reddit.com###blocking-modal, body > div[style="position: fixed; inset: 0px; backdrop-filter: blur(4px);"], #nsfw-qr-dialog
+www.reddit.com##body[style*="overflow"]:style(overflow: auto !important;)
+www.reddit.com##body:has(#blocking-modal):style(pointer-events: auto !important;)
+||redditstatic.com/shreddit/en-US/xpromo-nsfw-bypassable-modal-desktop-$script
+www.reddit.com##div.prompt:has(slot[name="view-in-app-button"])
+||redditstatic.com/shreddit/*/xpromo-untagged-content-blocking-modal-$script
+reddit.com#@#body:not(.with-listing-chooser):style(overflow: visible !important; position: static !important;)
+reddit.com#@#body:style(pointer-events: auto !important; overflow: auto !important;)
+fotor.com##._1Pece
+fotor.com##.guanggao_close_group
+techopedia.com###subscriptionModal, .modal-backdrop
+techopedia.com##.modal-open:style(overflow: auto !important; padding-top: 0 !important;)
+||uta-net.com/reverse/user/phplib/img/1pix.gif$image
+dddance.party##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+citpekalongan.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+bisablog.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||merryjane.com/static/images/ads.png^$image,1p
+fizyka.org##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||readonepiece.com/wp-content/$script,1p
+ymovies.*##.alert-danger.alert
+adnan-tech.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ahzaa.net##.post-body:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+zoom.com.br###exit-modal-signup, #overlay-modal
+myschool-eng.com##*:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ideaberita.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+orangespotlight.com##*:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+tepat.id##*::selection:style(background-color:#338FFF!important)
+isikuota.co.id##*:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+nmac.to##.alert-errors.in.fade.alert
+langitmovie.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+androidmakale.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+oceanof-games.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+download.ipeenk.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+doranobi-fansub.id##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||queer.pl^$ghide
+queer.pl#@#[class^="ad-"]
+queer.pl##.box-adv
+@@||snipboard.io^$ghide
+||smarthint.co^$3p
+@@||bigten.org^$xhr,1p
+@@||frontpage.fok.nl^$ghide
+frontpage.fok.nl###wa_web_headertofloor
+frontpage.fok.nl##div.commercial_space
+civicx.com##.adblock_detector
+suedkurier.de##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+utamap.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||mp3fy.com^$ghide
+librospreuniversitariospdf.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+quotev.com##div.storyView:style(-webkit-touch-callout: default !important; cursor: auto !important;)
+hienzo.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+tfp.is##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+nadidetarifler.com###overlay, .social-media-popup
+lectortmo.com##body *:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/wp-content/plugins/rcd-right-click-disabler/*$script,1p
+dramacute.*##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+hitcena.pl##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+photoshop-online.biz##div.aslot
+livedays.jp##p,ul,ol:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+boomlive.in###ad_blocker_detect_dialog
+boomlive.in##.advert-panel
+lewdzone.com##div.loading-links
+greatist.com###modal-host
+greatist.com##body:style(overflow: auto !important;)
+deezer.com##.abp-banner
+opportunitydesk.org##body, div, p, span, a, h1, h2, h3, h4, h5, h6:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important)
+opportunitydesk.org##*::selection:style(background-color: #338FFF !important)
+kbdfans.com##html:style(overflow: auto !important;)
+kamerabudaya.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important)
+idahopress.com##.tnc-overlay.tncms-block
+idahopress.com###blox-message-incompatible
+raccontivietati.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+therealdeal.com##.async-hide:style(opacity:1!important)
+handball-world.news##small
+healthitsecurity.com###CoverPop-cover
+healthitsecurity.com##.CoverPop-open:style(overflow: auto !important)
+simpleflying.com##.simpl-adlabel
+pornfd.com##.page-error
+riie.jp##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ef.com##.mfp-bg, .mfp-wrap
+ef.com##.no-js:style(overflow: auto !important)
+flash-firmware.blogspot.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ntvspor.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||phrasemix.com/assets/new_$image
+runmods.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+selfstudyhistory.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||litecompare.com^$ghide
+@@||fiscomania.com^$ghide
+vol.at##.blur:style(filter: none !important)
+sanspo.com##body:style(user-select: text !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; -o-user-select: text !important;)
+visaonoticias.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+servedez.com###realpop_optincontent
+music.apple.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+music.apple.com##body:style(cursor:auto!important)
+allocine.fr###overlay:not(.overlay)
+allocine.fr##html.open-modal .overlay:style(display: none !important)
+allocine.fr##html.open-modal body:style(overflow: auto !important)
+allocine.fr##html.open-modal body::after:style(display: none !important;)
+osxinfo.net##.notices
+depedlps.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||9lives.be^$ghide
+@@||holowczak.com^$ghide
+taperaki.gr##.widget_et_ads
+baby.be##.warning
+mangatoon.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||receivesmsonline.net/ads.js$script,1p
+||wetransfer.net/*/adblocker$3p,domain=wetransfer.com
+stevensducks.com###sidearm-adblock-modal
+start.me##.widget-page__banner
+||foreignaffairs.com^*/newsletter-overlay$image
+foreignaffairs.com##.newsletter-backdrop
+foreignaffairs.com##body.no-scroll:style(overflow:auto !important)
+png.is##div.rounded-0.alert-info.alert:nth-of-type(1)
+gamegame.kr##div:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+festival-cannes.com##*::selection:style(background-color:#338FFF!important)
+moving2canada.com##.ad-blocker-notice
+thegearhunt.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+jootc.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||jootc.com/wp-content/plugins/wccp-pro/
+tohkaishimpo.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+iwanichi.co.jp##body:style(user-select: auto !important; -webkit-user-select: auto !important; -moz-user-select: auto !important; -webkit-user-drag: auto !important)
+selfstudyanthro.com##.unselectable,html:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; cursor: text !important)
+novelasligera.com##:not(input):not(textarea),img:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+video.tv-tokyo.co.jp##.md-question.js-modal-window
+video.tv-tokyo.co.jp###jsiModalOverLayerShare
+video.tv-tokyo.co.jp##*:style(opacity: 1 !important;)
+audioreview.m1001.coreserver.jp##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+audioreview.m1001.coreserver.jp##.blockOverlay
+ufret.jp##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+tabstats.com##.afill
+aviationweek.com##.content-body-wrapper:style(opacity:1!important)
+community.spiceworks.com##.zd-privacy-content
+community.spiceworks.com##.join-login-wrapper.join-login-alt--six-second[data-alt-modal]
+community.spiceworks.com##.sui-u-no-scroll:style(overflow:auto !important;)
+trip.com##.J_PopupMask
+trip.com##.o-pop-box-retention
+trip.com##body:style(overflow: auto !important)
+malasngeblog.com##.post-body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+relet365.com##.unselectable,html:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; cursor: auto !important)
+thenekodark.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+poli-vsp.ru,polyvsp.ru##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+edailybuzz.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+edailybuzz.com##*::selection:style(background-color:#338FFF!important)
+betaprofiles.com##.adblock
+wikibious.com##.unselectable,html:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+imgur.com##.Footer-whitelist
+@@||thisisfutbol.com^$ghide
+thisisfutbol.com##.ad-billboard
+thisisfutbol.com##.c-header__advert
+thisisfutbol.com###snack_dex6
+odoserwis.pl##body *:style(-webkit-user-select: auto !important; -moz-user-select: auto !important; -ms-user-select: auto !important; user-select: auto !important;)
+||gomovies-online.*/addons/*.gif$image
+gomovies-online.*##[href="/user/profile/premium-membership"]
+gomovies-online.*##.ico.close
+nuggetroyale.io##.mainMenuAdBox
+tileman.io##.adbanner
+daimangajiten.com##*:style(-ms-user-select:auto !important; -moz-user-select:auto !important; -webkit-user-select:auto !important; -webkit-touch-callout:default !important; user-select:auto !important)
+witz.io###moneyMakerHolder
+scriptinghelpers.org##.shvertise-banner
+striketactics.net###unit_a_cont
+chemz.io##.menu_ad1Box
+sketchful.io###moneySquare
+download.mokeedev.com##div.center-align
+indiatimes.com##*::selection:style(background-color:#338FFF!important)
+liga.net##.modal-backdrop
+liga.net###addBlockModal
+liga.net##body:style(overflow:auto !important)
+getintopc.com##body > div[attr="[object Object]"]
+brighteon.com##body:style(overflow:auto !important)
+brighteon.com##div.overlay, .bottom-banner
+*$script,3p,domain=humanbenchmark.com
+deseneledublate.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ratebeer.com##[class^="AdBlockDetector"]
+atlasobscura.com##.js-subscription-ask-modal
+atlasobscura.com##body.modal-open:style(overflow:auto !important)
+randomlists.com##.whine
+beforeitsnews.com###top-alert
+dreamstime.com###freetrial_popup
+dreamstime.com##html.documentLocked body:style(overflow: visible !important;)
+dreamstime.com##html.documentLocked:style(margin-right: 0 !important;)
+dreamstime.com##html.documentLocked header:style(padding-right: 0 !important;)
+@@||dailyvoice.com^$ghide
+dailyvoice.com###nativo_rightrail1
+routinehub.co###ethad
+darktranslation.com##*::selection:style(background-color:#338FFF!important)
+webqc.org###toplink
+trakteer.id##article.post:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+phoronix.com#@#[data-freestar-ad]:not(:empty)
+fandomwire.com##.g1-popup
+fandomwire.com##html:style(overflow:auto !important)
+@@||samfw.com^$ghide
+samfw.com##.adsbygoogle
+||samfw.com/assets/*.gif$image
+@@||fangraphs.com/dfp.js$script,1p
+igniel.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||rogersmedia.com/utilityx.js^$script,3p
+mapgenie.io##.mt-1.mb-1.text-center
+||googlesyndication.com/pagead/js/adsbygoogle.js$script,redirect=googlesyndication_adsbygoogle.js,domain=colnect.com
+katzen-fieber.de##*:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+chan.sankakucomplex.com###sank-prestitial
+chan.sankakucomplex.com##body.no-scroll:style(overflow: visible !important;position: static !important)
+nytimes.com##body.ReactModal__Body--open:style(position: unset !important; overflow: auto !important;)
+zt-protect.*##main.py-4 > p
+jimnong.tistory.com##.adblock-on
+prepinsta.com##.mfp-ready, .mfp-wrap
+prepinsta.com##html:style(overflow:auto !important)
+loginhit.com.ng###ays_tooltip
+123movies.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+diariodaregiao.com.br##body:style(-moz-user-select:text !important;-ms-user-select:text !important;user-select:text !important;)
+taufiqhdyt.com##body,code:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+nextplatform.com###adtoniq-msgr-bar
+@@||online2pdf.com^$ghide
+online2pdf.com##.ad_box_outer_container
+ping.eu##center[style="margin-bottom: 2px;"]
+1fichier.com##.ui-dialog[aria-describedby="modal-msg"]:has(a[href$="/console/abo.pl"][style^="text-decoration:underline"])
+1fichier.com##.ui-widget-overlay
+blog.naver.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+raqmedia.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||ads.proboards.com^$script,redirect=noopjs
+||bidfilter.com^$script,redirect=noopjs
+android1pro.com##:not(input):not(textarea),img:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+world4.eu##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+world4.eu##*::selection:style(background-color:#338FFF!important)
+keybr.com##.Placeholder
+2hbn.com##.adace-popup
+musicindustryhowto.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+theepochtimes.com###modal-OVERLAPABLE
+theepochtimes.com##body:style(overflow: auto !important;)
+datadikdasmen.com##.post-body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+htmlgames.com##.banner
+pbinfo.ro##.text-warning
+||pagead2.googlesyndication.com/pagead/js/adsbygoogle.js$script,redirect=googlesyndication_adsbygoogle.js,domain=hotcleaner.com
+||gmod-servers.com/assets/js/jquery.adblock-detector.js$script,1p
+@@||freedomoutpost.com^$ghide
+hulnews.top##:not(input):not(textarea),img:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+hulnews.top##*::selection:style(background-color:#338FFF!important)
+||files.vi.zone/player/*$script,domain=hulnews.top
+hulnews.top##.jw-reset.jw-error
+quora.com##.qu-overflow--hidden[class*="qu-zIndex--modal_"]
+quora.com##.qu-overflow--hidden[style*="filter: blur"]:style(filter:none !important;overflow:auto !important)
+scrolller.com##.notification[style^="height: 189px;"]
+otakudesu.*##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+puhekupla.com#@#.googlead
+protocol.com###form_out
+protocol.com##body:style(overflow:auto !important)
+tritinia.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+fakechatapp.com##.banner
+toonytool.com##.banner
+enttechub.com##body:style(-webkit-touch-callout: default !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+geotips.net##:not(input):not(textarea),img:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+novelism.jp##.select-none:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+bemoneyaware.com##html:style(overflow: auto !important)
+||cm.g.doubleclick.net/pixel$image,redirect=1x1.gif,domain=tpc.googlesyndication.com
+||tpc.googlesyndication.com/pagead/images/x_button_blue2.svg$image,redirect=1x1.gif,domain=tpc.googlesyndication.com
+||cm.g.doubleclick.net/pixel$image,redirect=1x1.gif,domain=diep.io
+||tpc.googlesyndication.com/pagead/images/x_button_blue2.svg$image,redirect=1x1.gif,domain=diep.io
+||pagead2.googlesyndication.com/pagead/js/adsbygoogle.js$redirect=googlesyndication_adsbygoogle.js,script,domain=mifirm.net
+cssreference.io##.placeholder
+hardcoregames.ca##body * :not(input):not(textarea):style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+imagecolorpicker.com#@#div[id^="ezoic-pub-ad-"]
+spielspiele.de##.is-blocked
+/wp-content/plugins/image-watermark/*$script
+@@||dmax.de^$ghide
+flipmsg.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+sonnenverlauf.de,suncalc.org###adsGross1
+sonnenverlauf.de,suncalc.org###adsKlein
+myhtebooks.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+votetw.com##div[style="width: 100%; height: 100%; top: 0;left: 0; position:fixed; z-index: 255;"]
+bilibili.com##.adblock-tips
+sogou.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+boke112.com##*::selection:style(background-color:#338FFF!important)
+bimiacg.net##body:style(cursor: auto!important;)
+bimiacg.net##a:hover:style(cursor: auto!important;)
+/wp-content/plugins/ungrabber/js/*$script
+pixnet.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+yamibo.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+wjx.cn,wjx.top##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+zhulang.com##.idx-bg
+zhulang.com##.tap-hdl
+qidian.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+book.zongheng.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ciweimao.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+wpchen.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+peekme.cc##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+hongxiu.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+readnovel.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+wenku.baidu.com##.experience-card-dialog-wrap
+wenku.baidu.com##body:style(overflow:auto !important)
+oantagonista.com##.lightbox-push
+uslsoftware.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+qiangwaikan.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+spanishdict.com###removeAdsSidebar
+spanishdict.com##.ad-wrapper, #adTopLarge, [id^="adSide"], [id^="adMiddle"]
+dez.ro#@#.ad-placement
+windguru.net###warning-content
+hendersonville.com##.adblock-detected
+outlook.live.com##div[class][tabindex="-1"][role=region][aria-label][data-min-width][data-max-width] ~ div[class][data-max-width="2400"] + div[class]
+outlook.live.com###MainModule div[data-max-width="2400"] + div[class]
+invado.pl##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+revouninstaller.com###popupModal, .modal-backdrop
+revouninstaller.com##body.modal-open:style(overflow: auto !important; padding-right: 0 !important;)
+news24.jp##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ptable.com##.Notice
+blog.csdn.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+blog.csdn.net##.hljs-button.signin
+blogpascher.com##.CampaignFullscreen__bravoLayer
+blogpascher.com##html.om-position-popup body:style(overflow:auto !important)
+||copypoison.com^$3p
+arti-definisi-pengertian.info###ouibounce-modal
+techtobo.com##.js-notices
+_google_ads.$badfilter
+buondua.com##.noblock-modal
+buondua.com##body.tingle-enabled:style(position: static!important;overflow: auto!important;)
+uemeds.cn##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||coinpayu.com^$ghide
+||4399.com/antijs/Antiindulgence.js
+||hm.baidu.com/hm.js
+dhd24.com#@#.adunit
+||jianbiaoku.com/content/js/copyFun.js$script,1p
+otomobilgunluklerim.com##.adblockalert
+otomobilgunluklerim.com##.ad_block_detected:style(overflow: auto !important;)
+picallow.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+geektyper.com###itemz[style^="position:fixed; top:10px"]
+fotofilter.de##.banner
+social-unlock.com##form#link a.submit:style(opacity: 1 !important; pointer-events: auto !important;)
+nusantararom.org##.elementor-popup-modal
+northjersey.com,independentmail.com,usatoday.com##.gnt_mol_oy
+northjersey.com,independentmail.com,usatoday.com##html.gnt__mo:style(overflow-y:scroll !important;pointer-events: unset !important;user-select: unset !important;margin-right: unset !important;)
+*/wp-content/plugins/smio-push-notification
+||d3fkv551xkjrmm.cloudfront.net/js/detection.js$script,domain=denofgeek.com
+@@||curs-valutar-bnr.ro^$ghide
+curs-valutar-bnr.ro##.adsbygoogle:style(max-height: 1px !important;left:-9999px !important;position:absolute !important)
+funnygames.*##.is-blocked
+yhocdata.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||thresholdforum.s3.us-east-2.amazonaws.com/arn:aws:s3:::thresholdforum/javascript_adblockdetector/$script
+payskip.org##body[style^="cursor:pointer"]:style(cursor: auto!important)
+pornhub.*###js-abContainterMain
+bike-parts-sym.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+ukrainashop.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+101soundboards.com##.blocked-notice-small
+||utilapi.geeksforgeeks.org/api/geo/usergeodetails/
+androidacy.com##*::selection:style(background-color:#338FFF!important)
+koszalincity.pl##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||codehelppro.com^$ghide
+codehelppro.com##.adsbygoogle
+acupoffrench.com##:not(input):not(textarea)::selection:style(background-color:Highlight!important;color:HighlightText!important)
+novelza.com##:not(input):not(textarea)::selection:style(background-color:Highlight!important;color:HighlightText!important)
+aileen-novel.online##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||freshersnow.com^$ghide
+freshersnow.com##.adsbygoogle
+bumigemilang.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+bumigemilang.com##::selection:style(background: Highlight !important; color: HighlightText !important)
+cafe.naver.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+novelpia.com##.line:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+valid.x86.fr##.fullwidth
+valid.x86.fr##.widget-advert
+||dl.gmx.*/uim/connector/live/v2/nonfriendlyiframe.html$frame,1p
+telewebgram.com#@#ins.adsbygoogle[data-ad-slot]
+telewebgram.com#@#ins.adsbygoogle[data-ad-client]
+@@||ruyamanga.com^$ghide
+||digital.elmercurio.com/assets/js/detectPrivateMode.js$script,1p
+celtadigital.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+light.gg##.items-right-square
+light.gg##.remove-turtles
+light.gg###ad-blocker-nudge
+panda-novel.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/wp-content/themes/*/public/js/detect-adblock.js$script,1p
+turbo1.co##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+outidesigoto.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+read.amazon.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+nana-music.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+projektowanie-wnetrz-online.pl##*:style(-webkit-touch-callout:default!important; -webkit-user-select:text!important; -moz-user-select:text!important; -ms-user-select:text!important; user-select:text!important;)
+google.*##[data-lyricid]:style(user-select: text !important;)
+minimum-wage.org##.alert-dismissible
+||awebstories.com/wp-content/plugins/secure-copy-content-protection^$all
+awebstories.com##*::selection:style(background-color:#338FFF !important;)
+cataz.net##.premodal-share
+cataz.net##.modal-backdrop
+cataz.net##body:style(overflow: auto !important; padding-right: 0 !important;)
+sinau-thewe.com##*:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+clujust.ro##*:style(-webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+esologs.com,fflogs.com,swtorlogs.com,warcraftlogs.com,wildstarlogs.com##.side-rail-ads
+||hbzb111.com/api/advert/
+coub.com##body > .force-to-login-popup
+coub.com##body.disable-scroll:style(overflow: auto !important;)
+artstation.com##signup-modal-prompt-fullscreen
+artstation.com##.modal-backdrop
+artstation.com##.modal-open:style(overflow:initial!important)
+swiggy.com##a[class^="_"][href^="/restaurants"]:has(div[style="background: rgb(58, 60, 65) none repeat scroll 0% 0%; color: rgb(255, 255, 255); border-color: rgb(30, 32, 35) transparent;"])
+||georgiadogs.com/js/prebid-$xhr,1p,redirect=noop.txt
+law.com###reg-modal
+law.com##.show.fade.modal-backdrop
+law.com##body:style(overflow: auto !important;)
+modrinth.com##.info-wrapper[ethical-ads-big=""]
+modrinth.com##.content-wrapper[ethical-ads-big]
+modrinth.com##.info-wrapper[data-v-7cd21295]
+iphoneincanada.ca##.slbElement
+epitesti.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||blink.net/iframe.html$domain=dailyprincetonian.com
+@@||cdn.privacy-mgmt.com^$script,xhr,domain=anisearch.com
+||anisearch.com/*?p=1|$frame
+delicateseliterare.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+bianity.net##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||api.adinplay.com/libs/aiptag/pub/CRF/curvefever.pro/tag.min.js$script,domain=curvefever.pro
+getlatka.com##.MuiModal-root
+getlatka.com##[style^="filter: blur"]:style(filter: none !important)
+lamusica.com##.modal-open:style(overflow: auto !important;)
+lamusica.com##div[id$="___BV_modal_outer_"]
+||profreehost.com/includes/js/customBottom.js$script,1p
+||droetker.*/static/js/privacy-dialog/
+stiridinromania.ro##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+scribd.com###sidebar div[data-testid="sticky-wrapper"]
+startpage.com###main > .support-banner
+startpage.com###main > div[class^="css-"]:has(> div:first-child + div > button:first-child + [aria-label]:last-child > svg[width="12"] > path[d="M11 1 1 11M1 1l10 10"])
+startpage.com#@#.a-bg-result
+startpage.com##.a-bg-result:not(:empty)
+poipiku.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+duhoctrungquoc.vn###danger_adblock
+@@||discordbotlist.com^$ghide
+airbnb.de##body,html:style(overflow: auto !important;)
+top.gg##[class*="AdContainer"]
+top.gg##div[class^="css-feed"] > div.chakra-stack
+bolugundem.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+##[class~="mailpoet_form_popup_overlay"]
+studyflix.de##.reminder-modal
+studyflix.de##html:style(overflow: auto !important;)
+||imasdk.googleapis.com/js/sdkloader/ima3.js$script,redirect=google-ima.js,domain=studyflix.de
+*/wp-content/plugins/content-copy-protection-disable-right-click/$script
+@@||grabify.link^$ghide
+steamcollector.com##.abg-card
+||vaultcdn.electricapps.net/lib/jquery-ui-min.js$script,domain=yourgamingshop.com
+postcourier.com.pg##*::selection:style(background-color:#338FFF !important;)
+lofter.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+surreyhillsgrocer.sg###NewsletterPopup-newsletter-popup
+fflogs.com###bottom-banner, #top-banner
+fflogs.com##.ad-placement
+fflogs.com##.side-rail-ads
+magiclen.org##.show.fade.modal
+magiclen.org##.show.fade.modal-backdrop
+magiclen.org##body:style(overflow: auto !important;)
+virustotal.com##.alert-info
+@@||ads.twitcasting.tv/js/env_test/ads.js$script,1p
+||player.cnevids.com/interlude/gq*&rightRail=true$script
+m.timesofindia.com##a[href^="https://timesofindia.onelink.me"]
+pl##.atomsPartialLinkLink:style(user-select: text !important;)
+jpopsingles.eu##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+actiongame.com,brain-games.co.uk,classicgame.com,games-site.co.uk,hiddenobjectgames.com,mahjong.co.uk,mahjong.com,match3.co.uk,match3games.com,mindgames.com,neongames.co.uk,neongames.com,solitaireonline.com,timemanagementgame.com##.adBlocked,.banner
+tv2.no##:root:style(scrollbar-color: revert !important; scrollbar-width: auto !important;)
+zunda.site###ad_box:style(height: 50px !important;)
+dialectsarchive.com##.unselectable:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; cursor: auto !important;)
+dollarvr.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+newsme.gr##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+displayspecifications.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+squidboards.com##.top_block
+daily-tohoku.news##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+regex101.com##.yOGxa
+savoriurbane.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important;-moz-user-select: text !important;-ms-user-select: text !important;user-select: text !important;)
+joysound.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+/wp-content/plugins/disabled-source-disabled-right-click-and-content-protection/*$script,css,1p
+audiotools.in##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; cursor: auto !important;)
+7misr4day.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; cursor: auto !important;)
+raindropteamfan.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; cursor: auto !important;)
+ilife97.com##:root:style(user-select: unset !important;)
+@@||luckydesigner.space/adview_$xhr,1p
+||cool-etv.net/ch/suppy.js$script,1p
+regexr.com##div.hello
+.secure-copy-content-protection-public.css^$css,1p
+scarysymptoms.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+scarysymptoms.com##*::selection:style(background-color:#338FFF !important;)
+ikorektor.pl###ad-top-dsk
+ikorektor.pl##.adx1
+||static.wikia.nocookie.net/silversurfer/prod/latest/ageGateUnit-pathfinder.js^$script,3p
+personality-database.com##body:style(overflow: auto !important;)
+g37.com.br##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+nppes.cms.hhs.gov##div#unsupportedBrowser
+||pagead2.googlesyndication.com/pagead/show_ads.js$script,redirect=noopjs,domain=ageofconsent.net
+wormate.io###mm-skin-over
+xeiaso.net##.adaptive
+lapresse.ca##.brz_msg_wall_body
+lapresse.ca##body > div[style]:has(.brz_msg_wall_body)
+lapresse.ca##body:style(overflow: auto !important)
+zelka.org###description:style(user-select: initial !important;)
+warungkomik.com##body *:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+zive.cz###credential_picker_container
+hindustantimes.com,zive.cz###credential_picker_iframe
+tumblr.com##.tmblr-iframe--follow-teaser
+linkco.re##section.lyric_lyric:style(user-select: text !important; -webkit-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-drag: auto !important; -khtml-user-drag: auto !important; -webkit-touch-callout: auto !important; -moz-touch-callout: auto !important;)
+||mms.cnn.com^$1p
+tuta.com##body > div > section.default:style(cursor: revert !important;)
+venturebeat.com##div.body-container:style(cursor: revert !important;)
+guildstats.eu##.gDiv
+gdrivedescarga.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+boop.pl##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+audiologyresearch.org##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+haberiniz.com.tr##.kanews-banner
+timesnownews.com###credential_picker_container
+expquebec.com##.swal2-container
+elsalvadorsurfrealestate.com##.show.middle.modal
+elsalvadorsurfrealestate.com##.show.modal-backdrop
+elsalvadorsurfrealestate.com##.aui-modal-open,.modal-open:style(overflow:unset!important)
+talouselama.fi,uusisuomi.fi,tekniikkatalous.fi,tivi.fi,kauppalehti.fi##[class^="Dialogue__Overlay-tmcl"]
+talouselama.fi,uusisuomi.fi,tekniikkatalous.fi,tivi.fi,kauppalehti.fi##body:style(overflow: auto !important;)
+tech.hindustantimes.com###credential_picker_container
+||photopea.com/img/pp_wide.png^$image,1p
+||photopea.com/img/pp_tall.png^$image,1p
+photopea.com##.bnotify
+/js/content-protector.min.js$script
+vrcmods.com##.showfreemethod
+||dbx.molystream.org/assets/s.js$script
+2pdfconverter.com,annotation.com,changefaces.com,chartle.com,coloringonline.com,fakechatapp.com,files2zip.com,mapimage.com,maproute.com,mindclouds.com,phideo.com,photocollage.com,photoeditor.com,photoenlarger.com,photofilters.com,photoresizer.com,postermaker.com,qrapp.com,stripbackground.com,toonytool.com,wordclouds.com,youtubetrimmer.com##.banner
+sportando.basketball##.select-none:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+||9animetv.to/js/safe.ob.min.js$script
+||hackthebox.com/build/assets/just-detect-adblock-$script,1p
+amtraker.com##.terrabanner
+romprovider.com##:root:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+brokensilenze.net##*:style(cursor:unset!important;user-select:unset!important)
+||pub.network^$script,3p,redirect=noopjs,domain=concertarchives.org
+concertarchives.org#@#[data-freestar-ad]
+concertarchives.org##.freestar-placement
+groundies.com##.cms-popup
+groundies.com##.modal-backdrop
+groundies.com##.modal-open:style(overflow:unset!important)
+habuteru.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+streambuddy.net##body *:style(user-select: unset !important)
+pap.pl##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+||send.cm/static/js/engine.js$script,1p
+smartkhabrinews.com##body:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+nsfw247.biz###page:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+moovitapp.com##.init.open
+moovitapp.com##.top-banner
+@@||iphoneincanada.ca^$ghide
+iphoneincanada.ca##.adthrive-ad
+peacocktv.com##.playback-ad-blocker-notice
+@@||pagead2.googlesyndication.com/pagead/js/adsbygoogle.js$script,domain=woomy-site.glitch.me
+||videos-cloudfront.jwpsrv.com^$media,domain=app.simpleclub.com
+||cdn.jwplayer.com^$media,domain=app.simpleclub.com
+||ip.sb/assets/js/wwads_blocked.js
+zippyupload.com##[class^="advt-"]
+@@||googlesyndication.com^$script,domain=cheatnetwork.eu
+@@||cheatnetwork.eu^$script,xhr,1p
+@@||cheatnetwork.eu^$ghide
+@@||how-to-pc.info^$ghide
+with.is##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+@@||s.nitropay.com/n.svg$xhr,domain=maxroll.gg
+geeksoncoffee.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+@@||sheffieldforum.co.uk^$xhr,1p
+nsmb.com###header-banner
+@@||hbstack.dev^$script,xhr,1p
+playingfire.com##body:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+goodreads.com#@#.Overlay--floating:has(> div.Overlay__window > div.Overlay__content > div.LoginInterstitial)
+tmz.com##.canvas-video-block--aside
+op.gg##.adfree-td
+op.gg##.adfree-banner
+indeed.com##body[style*="overflow"] > div[class]:has(> #passport-modal-overlay):style(opacity: 0 !important; visibility: collapse !important;)
+indeed.com##body[style*="overflow"]:has(> div[class] > #passport-modal-overlay):style(overflow: auto !important; position: relative !important; padding-right: 0px !important; inset: unset !important;)
+helldivers.io###gwvideo
+@@||conservationmag.org^$ghide
+||jsdelivr.net/npm/ad-compass@latest/dist/ad-compass.umd.js
+@@||timeanddate.com^$ghide
+timeanddate.com###ad300
+archon.gg##[class^="ArchonLayout_containerSidebar"]:has(> [class^="Advertisements"])
+archon.gg##[class^="ArchonLayout_stickyFooterAd"]
+brooklyneagle.com##body *:not(input):not(textarea):style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+thehouseofportable.com###htp
+pronews.gr##.wrap-banner
+prompthero.com##.sign-up-modal
+prompthero.com##.modal-backdrop
+prompthero.com##body:style(overflow:initial!important)
+||a.pub.network/fancaps-net/pubfig.min.js$script,redirect=noopjs,domain=fancaps.net
+||web.archive.org/web/*/http://rpc.blogrolling.com/display.php?r=$1p,script
+swagbucks.com#@#.ad_warn
+swagbucks.com#@##topAd
+||manoramaonline.com/content/*/evlok/ev-dab/*/ev-dab.min.js$script,1p
+||manoramaonline.com/acd/api/3.0/authorize/json?$xhr,1p
+techgyd.com##body * :not(input):not(textarea):style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+crunchyroll.com##.erc-existing-profile-onboarding-modal > div[class^="modal-portal__overlay"]:style(visibility: hidden !important;)
+karsaz-law.com##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+doubledouble.top##.totally-not-an-ad
+abema.tv##.body--prevent-scroll:style(overflow: auto !important;)
+abema.tv##.com-onboarding-OnboardingModalContainerView--enter-done
+/wp-content/plugins/wpshield-content-protector/dist/app.min.js$script
+/js/devtools-detector.js^$script,3p,domain=rubystm.com|rubyvid.com
+@@||pokemonsleep.club^$script,1p
+gigazine.net##div[id^="donate"]
+||cined.com/content/plugins/abss-adblock
+@@||etools.ch^$ghide
+||jetv.xyz/assets/js/devtools-detector.js$script,1p
+html5.gamedistribution.com###gd__adblocker__overlay
+volokit2.com##html:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+###kanews-modal-adblock
+karistudio.com##div.confuse
+@@||time.is^$script,1p
+||vyvymanga.net/web/js/devtools-detector.js$script,1p
+partsnl.nl##*:style(user-select: text !important; -ms-user-select: text !important; -moz-user-select: text !important; -khtml-user-select: text !important; -webkit-user-select: text !important; -webkit-touch-callout: default !important;)
+@@||autoweek.nl^$script,1p
+coomer.su,kemono.su##[href="https://github.com/easylist/easylist/issues"]
+||thedarkblues.co.uk/applications/adsense/interface/js/adbd.js^$script,1p
+thedarkblues.co.uk##.add_slot_header
+baomidou.com##astro-island[opts^="{\"name\":\"CheckAdBlocked\""]
+||images.$frame,1p,domain=nintendolife.com|purexbox.com|pushsquare.com|timeextension.com
+nintendolife.com##.insert-blocker
+foxteller.com##.m-content#chapter .chapter-content p:style(cursor: revert !important; -webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+blog.tangwudi.com##:not(input):not(textarea)::selection:style(background-color: #338FFF !important; color: white !important;)
+/copyprevention.js^$script,1p
+@@||u.gg^$ghide
+||pokeos.com/pokeos-uploads/ads/adblock/$image
+lemon8-app.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+/akam/13/*$script,xhr,1p,domain=easyjet.com|ing.nl,important
+whoisnovel.com##*::selection:style(background-color:#338FFF!important)
+whoisnovel.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+zabawkahurtownia.pl##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+bloxd.io##.AdBanner
+torontosom.ca##:root:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+@@||kunststoffe.de/ads_tracking.js$xhr,1p
+time.is###attention
+time.is##html:style(overflow: auto !important;)
+simptown.su##.juice_ban
+ingesantoso.wordpress.com##.marketing-bar
+all4pets.com.pl##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+flightradar24.com##[data-testid="sidebar__container"]
+flightradar24.com##.right-sidebar:style(right: 0 !important)
+||carbonads.com^$script,redirect=noopjs,domain=sourceb.in
+odysee.com##body:style(cursor: revert !important)
+##body div#notificationPopup.notificationPopupBlock
+imleagues.com##.mobile-hide-ad
+imleagues.com##.hasAd
+||nichepcgamer.com/wp-content/themes/luxeritas/js/dragscroll.min.js$script
+nettv4u.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+rivestream.org##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+theintercept.com##.inline-wall
+theintercept.com##.ft-ab-test-case
+||cdn.carbonads.com^$script,domain=teknixstuff.com,redirect=noopjs
+bme.hu###floating-logo-container
+origo.hu##.oh-holder.open:style(z-index: 9999!important;)
+myonlineradio.hu##.js-appAdv:style(display: none !important;)
+myonlineradio.hu##.cover-slider-cont:style(display: block !important;)
+noizz.hu##.leavingPopupLayer:style(display: none !important;)
+noizz.hu##body:style(overflow: auto !important;)
+traffihunter.hu##.ooono_promo
+vezess.hu##.m-fbPopup
+mandiner.hu##.modal-backdrop
+mandiner.hu##.modal[role="dialog"]
+hetek.hu##[class="modal-backdrop fade show"]
+hetek.hu###nyeremenyModal
+otpportalok.hu###pop_1:has(> .suti)
+unideb.hu##.sendi-banner-block-container
+music.youtube.com##ytmusic-description-shelf-renderer[is-track-lyrics-page]:style(user-select: initial !important)
+financialpost.com,nationalpost.com##.visually-hidden
+open.spotify.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important;)
+duolingo.com##[data-test*="challenge"]:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -khtml-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; -webkit-tap-highlight-color: revert !important; cursor: revert !important;)
+geeksforgeeks.org##body:style(cursor: auto !important)
+japanesewithtomo.com##*:style(-webkit-touch-callout: default !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important;)
+doordash.com##div[class^=sc-][aria-hidden="true"] + div[class^="sc-"][style*="border: medium; margin-top: var(--usage-space-medium);"]
+doordash.com##div[class^="StyledStackChildren-"]:has(> div[data-testid="appDownload"]:first-child + button[data-testid="appDownloadButton"]:last-child)
+fontsquirrel.com###bottom_banner_ad_container
+/lib/devtools-detector
+zocbo.com###festivalPop
+zhuanlan.zhihu.com##.Modal-wrapper
+zhuanlan.zhihu.com##.Modal-backdrop
+zhuanlan.zhihu.com##.MobileModal-wrapper
+zhuanlan.zhihu.com##body.WhiteBg-body:style(overflow: auto !important; position: initial !important;)
+zhuanlan.zhihu.com##html:style(overflow: auto !important; padding-right: 0 !important;)
+civitai.com##.dark\:bg-dark-9.dark\:border-dark-4:has([aria-label="Close ad"])
+dejure.org#@##AdsDiv

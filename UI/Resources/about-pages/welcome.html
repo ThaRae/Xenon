@@ -1,0 +1,135 @@
+<!doctype html>
+<!--
+Copyright (c) 2026-present, the Ladybird developers.
+Copyright (c) 2026, the Xenon developers.
+
+SPDX-License-Identifier: BSD-2-Clause
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Welcome to Xenon</title>
+        <link rel="stylesheet" href="resource://ladybird/ladybird.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/webui.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/xenon.css" />
+        <link rel="stylesheet" href="resource://ladybird/about-pages/welcome.css" />
+        <script type="module" src="resource://ladybird/about-pages/welcome.js"></script>
+    </head>
+    <body>
+        <div class="glow" aria-hidden="true"></div>
+
+        <nav class="topbar">
+            <span class="element element-small" aria-hidden="true">
+                <span class="element-number">54</span>
+                <span class="element-symbol">Xe</span>
+            </span>
+            <span id="step-counter" class="step-counter" aria-live="polite"></span>
+        </nav>
+
+        <form id="welcome-form">
+            <section class="step" data-step="hello" aria-labelledby="hello-title">
+                <span class="element element-large" aria-hidden="true">
+                    <span class="element-number">54</span>
+                    <span class="element-symbol">Xe</span>
+                    <span class="element-name">Xenon</span>
+                    <span class="element-weight">131.293</span>
+                </span>
+                <h1 id="hello-title" tabindex="-1">Hello.</h1>
+                <p class="lede">
+                    Xenon is a quiet, fast browser built on Ladybird. Two questions and you're done, or keep our picks:
+                    DuckDuckGo for search, with ads and trackers blocked.
+                </p>
+                <div class="actions">
+                    <button type="button" class="primary-button" data-go="search" disabled>Choose for myself</button>
+                    <button type="button" id="use-defaults" class="text-button" disabled>Use Xenon's picks</button>
+                </div>
+            </section>
+
+            <section class="step" data-step="search" aria-labelledby="search-title" hidden>
+                <h1 id="search-title" tabindex="-1">Where do searches go?</h1>
+                <p class="lede">Anything you type that isn't a web address goes here.</p>
+
+                <div class="engine-columns">
+                    <fieldset class="engine-group">
+                        <legend>Private</legend>
+                        <div id="private-engines"></div>
+                    </fieldset>
+                    <fieldset class="engine-group">
+                        <legend>Mainstream</legend>
+                        <div id="mainstream-engines"></div>
+                    </fieldset>
+                </div>
+
+                <p id="search-preview" class="search-preview" aria-live="polite"></p>
+
+                <label class="check-option">
+                    <input id="search-suggestions-enabled" type="checkbox" />
+                    <span id="search-suggestions-label">Suggest searches while I type</span>
+                </label>
+
+                <p class="aside">
+                    You can always skip the search engine with a !bang. <kbd>!w ladybird</kbd> opens Wikipedia's results
+                    and <kbd>!gh</kbd> opens GitHub.
+                </p>
+
+                <div class="actions">
+                    <button type="button" class="primary-button" data-go="blocking">Continue</button>
+                    <button type="button" class="text-button" data-go="hello">Back</button>
+                </div>
+            </section>
+
+            <section class="step" data-step="blocking" aria-labelledby="blocking-title" hidden>
+                <h1 id="blocking-title" tabindex="-1">Block ads and trackers?</h1>
+                <p class="lede">
+                    Xenon has uBlock Origin's filter lists built in. They strip ads, trackers, and cookie banners from
+                    every site, and nothing is sent anywhere to do it.
+                </p>
+
+                <div class="choice-list" role="radiogroup" aria-labelledby="blocking-title">
+                    <label class="choice">
+                        <input type="radio" name="ad-blocking" value="on" checked />
+                        <span class="marker" aria-hidden="true"></span>
+                        <span class="choice-name">Block them</span>
+                        <span class="choice-note">Recommended</span>
+                    </label>
+                    <label class="choice">
+                        <input type="radio" name="ad-blocking" value="off" />
+                        <span class="marker" aria-hidden="true"></span>
+                        <span class="choice-name">Show everything</span>
+                        <span class="choice-note"></span>
+                    </label>
+                </div>
+
+                <dl id="filter-lists" class="filter-lists">
+                    <div class="filter-list">
+                        <dt>Ads</dt>
+                        <dd>uBlock filters, EasyList, AdGuard</dd>
+                    </div>
+                    <div class="filter-list">
+                        <dt>Trackers</dt>
+                        <dd>EasyPrivacy, uBlock Privacy</dd>
+                    </div>
+                    <div class="filter-list">
+                        <dt>Malware and scam sites</dt>
+                        <dd>URLhaus, uBlock Badware risks</dd>
+                    </div>
+                    <div class="filter-list">
+                        <dt>Cookie banners and pop-ups</dt>
+                        <dd>AdGuard, Fanboy, uBlock</dd>
+                    </div>
+                </dl>
+                <p id="filter-lists-note" class="aside">The lists come with Xenon and update when Xenon does.</p>
+
+                <p id="save-status" class="save-status" role="status"></p>
+                <div class="actions">
+                    <button type="submit" id="start-browsing" class="primary-button">Start browsing</button>
+                    <button type="button" class="text-button" data-go="search">Back</button>
+                </div>
+                <p class="aside after-actions">
+                    Compact and vertical tab layouts are a right-click away on the tab strip.
+                </p>
+            </section>
+        </form>
+    </body>
+</html>

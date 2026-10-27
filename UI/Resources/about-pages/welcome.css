@@ -1,0 +1,309 @@
+/*
+ * Copyright (c) 2026-present, the Ladybird developers.
+ * Copyright (c) 2026, the Xenon developers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 32px;
+}
+
+.step-counter {
+    font-family: var(--xenon-mono);
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
+form {
+    position: relative;
+    max-width: 680px;
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: 112px 32px 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.step:not([hidden]) {
+    animation: step-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes step-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+h1 {
+    margin: 0 0 14px;
+    font-size: 46px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+}
+
+h1:focus {
+    outline: none;
+}
+
+[data-step="hello"] h1 {
+    margin-top: 36px;
+    font-size: 76px;
+}
+
+.lede {
+    max-width: 34em;
+    margin: 0 0 36px;
+    font-size: 19px;
+    color: var(--xenon-muted);
+}
+
+/* The greeting shows the large mark, so the corner one waits for the questions. */
+body[data-step="hello"] .element-small {
+    visibility: hidden;
+}
+
+.engine-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+}
+
+fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+legend {
+    margin-bottom: 8px;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--xenon-muted);
+}
+
+.choice {
+    position: relative;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 10px;
+    border-top: 1px solid var(--xenon-hairline);
+    cursor: pointer;
+}
+
+.choice:last-child {
+    border-bottom: 1px solid var(--xenon-hairline);
+}
+
+.choice:hover {
+    background-color: var(--xenon-row-hover);
+}
+
+.choice:has(input:checked) {
+    background-color: var(--xenon-row-selected);
+}
+
+.choice:has(input:focus-visible) {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: -2px;
+}
+
+/* The row is the control, so the native radio button only takes keyboard focus. */
+.choice input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.marker {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--xenon-muted);
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.choice:has(input:checked) .marker {
+    border: 4px solid var(--xenon-rose);
+}
+
+.choice-name {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.choice-note {
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
+.choice-list {
+    max-width: 420px;
+}
+
+.search-preview {
+    margin: 24px 0 18px;
+    font-size: 14px;
+    color: var(--xenon-muted);
+}
+
+.preview-url {
+    font-family: var(--xenon-mono);
+    font-size: 13px;
+    color: var(--xenon-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--xenon-rose);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+}
+
+.check-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.check-option input {
+    flex-shrink: 0;
+    margin: 0;
+    accent-color: var(--xenon-rose);
+}
+
+.check-option:has(input:disabled) {
+    cursor: default;
+    color: var(--xenon-muted);
+}
+
+.aside {
+    margin: 20px 0 0;
+    font-size: 14px;
+    color: var(--xenon-muted);
+}
+
+.filter-lists {
+    max-width: 420px;
+    margin: 22px 0 0;
+}
+
+.filter-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 7px 10px;
+}
+
+.filter-list dt {
+    font-size: 14px;
+}
+
+.filter-list dd {
+    margin: 0;
+    font-size: 13px;
+    color: var(--xenon-muted);
+    text-align: right;
+}
+
+#filter-lists-note {
+    margin: 10px 10px 0;
+    font-size: 13px;
+}
+
+.hidden {
+    display: none;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-top: 40px;
+}
+
+button.primary-button {
+    padding: 13px 26px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 999px;
+}
+
+button.primary-button:disabled {
+    cursor: default;
+}
+
+.text-button {
+    padding: 13px 2px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--xenon-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.text-button:hover:not(:disabled) {
+    color: var(--xenon-ink);
+}
+
+.save-status:empty {
+    display: none;
+}
+
+.save-status {
+    margin: 24px 0 0;
+    color: var(--xenon-rose);
+}
+
+.after-actions {
+    margin-top: 32px;
+    font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .step:not([hidden]) {
+        animation: none;
+    }
+}
+
+@media (max-width: 640px) {
+    form {
+        padding: 96px 20px 48px;
+    }
+
+    .topbar {
+        padding: 18px 20px;
+    }
+
+    h1 {
+        font-size: 36px;
+    }
+
+    [data-step="hello"] h1 {
+        font-size: 56px;
+    }
+
+    .engine-columns {
+        grid-template-columns: 1fr;
+    }
+}

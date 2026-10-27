@@ -1,0 +1,9 @@
+! Title: AdGuard/uBO – URL Tracking Protection (for Ladybird)
+! Source: https://ublockorigin.github.io/uAssets/filters/privacy-removeparam.txt
+! Homepage: https://github.com/uBlockOrigin/uAssets
+! License: GPL-3.0 (https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE)
+! Converted by xenon-ublock on 2026-10-26 17:30 UTC for adblock 0.13.3, as built into Ladybird's LibWeb/ContentBlocker.
+! Kept 1 of 2713 upstream filters, as 1 filters; the rest cannot take
+! effect in Ladybird. See report.md and dropped/ next to this file for what was dropped and why.
+!
+adguard.info,adguard.com,adguard.app##.hello_from_adguard_tracking_params

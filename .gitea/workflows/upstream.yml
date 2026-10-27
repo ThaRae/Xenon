@@ -1,0 +1,69 @@
+name: Upstream
+
+# A canary for the next submodule bump: builds Xenon against Ladybird's latest master instead of the pinned commit, so
+# an engine change that breaks Xenon shows up here first, not in the middle of a bump. It also lists what changed
+# upstream in UI/Qt, which Xenon's UI/ started as a copy of, so those changes can be ported. Nothing is committed.
+#
+# Runs weekly, on demand, and on pull requests that change this workflow. Same runners and image as ci.yml.
+on:
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths: [.gitea/workflows/upstream.yml]
+
+concurrency:
+  group: upstream-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-against-master:
+    runs-on: slab-large
+    timeout-minutes: 240
+    steps:
+      - name: Check out the repository
+        uses: builtin:checkout
+
+      - name: Check out Ladybird's master
+        run: |
+          git submodule update --init --depth 1 ladybird
+          pinned=$(git -C ladybird rev-parse HEAD)
+          git -C ladybird fetch --depth 1 origin master
+          git -C ladybird checkout --quiet FETCH_HEAD
+          echo "PINNED=$pinned" >> "$GITHUB_ENV"
+          echo "pinned $pinned, master $(git -C ladybird rev-parse HEAD)"
+
+      - name: What changed upstream in UI/Qt
+        run: |
+          git -C ladybird fetch --quiet --depth 1 origin "$PINNED"
+          git -C ladybird diff --stat "$PINNED" HEAD -- UI/Qt Base/res/ladybird/about-pages | tee upstream-ui-changes.txt
+
+      - name: Meta/check.py
+        # The submodule is off its pin here on purpose, so skip that one comparison.
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q python3-venv npm shellcheck
+          Meta/check.py --unpinned
+
+      - name: Build Xenon and run its tests
+        env:
+          CCACHE_TOKEN: ${{ secrets.CCACHE_TOKEN }}
+          CACHE_READ_ONLY: "true"
+        run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/build-and-test.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          summary=${GITEA_STEP_SUMMARY:-${GITHUB_STEP_SUMMARY:-/dev/null}}
+          {
+            echo "### Xenon against Ladybird master \`$(git -C ladybird rev-parse --short HEAD)\`"
+            echo
+            echo "Pinned: \`${PINNED:0:10}\`. Upstream changes to the files Xenon copied or overrides:"
+            echo
+            echo '```'
+            cat upstream-ui-changes.txt 2>/dev/null || echo "(none recorded)"
+            echo '```'
+          } >> "$summary"

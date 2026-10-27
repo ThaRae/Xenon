@@ -46,4 +46,15 @@ constexpr inline auto SlateBlue300 = qRgb(0x5c, 0x8e, 0xcc);
 constexpr inline auto SlateBlue500 = qRgb(0x54, 0x84, 0xbf);
 constexpr inline auto SlateBlue900 = qRgb(0x48, 0x72, 0xa3);
 
+// Xenon's accent, built around #ff0050. Lower numbers are lighter tints, higher numbers are deeper shades.
+constexpr inline auto Rose10 = qRgb(0xff, 0xe0, 0xea);
+constexpr inline auto Rose20 = qRgb(0xff, 0xc2, 0xd5);
+constexpr inline auto Rose40 = qRgb(0xff, 0x85, 0xaa);
+constexpr inline auto Rose60 = qRgb(0xff, 0x4d, 0x80);
+constexpr inline auto Rose100 = qRgb(0xff, 0x00, 0x50);
+constexpr inline auto Rose300 = qRgb(0xe8, 0x00, 0x4a);
+constexpr inline auto Rose500 = qRgb(0xcc, 0x00, 0x42);
+constexpr inline auto Rose900 = qRgb(0x99, 0x00, 0x32);
+constexpr inline auto Rose950 = qRgb(0x3d, 0x0a, 0x1d);
+
 }

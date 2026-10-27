@@ -10,6 +10,8 @@ and a privacy-first, low-noise setup. Xenon keeps its own look and doesn't copy 
 | --- | --- |
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good commit. It isn't modified. |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
+| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, and the shared web UI stylesheet), with `xenon.css` for what its own pages share, and the bundled filter lists. The build ships these in place of upstream's copies, which stay untouched. |
+| `UI/Icons/` | The app icon. `xenon.svg` is the artwork and `xenon-small.svg` its version for 32px and below; `Meta/generate-app-icon.py` renders the macOS iconset and the window icon from them. |
 | `Meta/xenon.py` | Builds and runs Xenon. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 
@@ -50,6 +52,51 @@ Other commands:
 ./Meta/xenon.py clean
 ```
 
+## Tests and CI
+
+```bash
+./Meta/check.py            # formatting and Xenon's invariants, in seconds
+./Meta/check.py --fix      # apply the formatters first
+./Meta/xenon.py test       # unit tests (Tests/), plus a headless render of about:welcome
+git config core.hooksPath .githooks   # run Meta/check.py before every push
+```
+
+`Meta/check.py` formats C++ with clang-format, web pages with prettier, and Python with ruff, at the versions
+Ladybird's CI uses, read from the submodule. It installs clang-format and ruff into `Build/tools` itself; prettier
+needs `npx`. It also checks the things that break Xenon quietly:
+
+- an include that resolves to Ladybird's header instead of ours
+- a source file left out of the build
+- a page override for a page upstream no longer ships
+- a malformed or duplicate !bang
+- Ladybird's violet coming back into the chrome
+- local edits in `ladybird/`, or a pinned commit that doesn't exist upstream
+
+CI runs on Gitea Actions at git.avx512.dev, on slab's ephemeral runners:
+
+| Workflow | Runs | Does |
+| --- | --- | --- |
+| `.gitea/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online` on `slab`, then on `slab-large`, a Linux build, `Meta/xenon.py test`, and the welcome page render as an artifact |
+| `.gitea/workflows/upstream.yml` | weekly, by hand | the same build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
+
+The builds run in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
+`ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
+The `CCACHE_TOKEN` repository secret points ccache and vcpkg's package cache at slab-ccache. Without it, every build
+starts cold and takes a couple of hours.
+
+## Updating the filter lists
+
+```bash
+./Meta/update-filter-lists.py              # rebuilds them in ../xenon-ublock, then copies them in
+./Meta/update-filter-lists.py --no-build   # copies what ../xenon-ublock last built
+```
+
+It ships xenon-ublock's `helium` preset, except for Peter Lowe's list, which states no license, and Helium's own two
+lists (AGPL-3.0, and almost nothing survives conversion). `UI/Resources/filter-lists/NOTICE.txt` credits every list's
+source and license. The GPL-3.0 text ships beside them. `Meta/check.py` fails if a list ships without a cleared
+license. `./Meta/xenon.py test` checks that Xenon blocks with them, given no list arguments, by loading a local page
+with blocking on and off.
+
 ## Updating Ladybird
 
 ```bash
@@ -59,7 +106,7 @@ git -C ladybird checkout FETCH_HEAD
 ```
 
 If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon last synced with, and port the relevant
-changes into `UI/`.
+changes into `UI/`. The weekly Upstream workflow lists those changes and shows whether `master` still builds.
 
 ## Features
 
@@ -72,11 +119,25 @@ What exists now and what's planned, measured against Helium:
 - [x] **!bangs**: `!w ladybird` or `ladybird !w` goes straight to Wikipedia's results, and `!gh` alone opens GitHub.
   They resolve locally, with no request to a search engine. There's a built-in list of common bangs in
   `UI/Bangs.cpp`.
+- [x] **Welcome/setup flow**: on first run (or any time at `about:welcome`), either take Xenon's picks (DuckDuckGo, with
+  blocking on) or answer two questions: which search engine, from a private/mainstream list with a live preview of
+  where a search goes, and whether to block ads and trackers (on by default, with all three filter lists). Nothing is
+  saved until you finish.
+- [x] **New tab page**: your eight most visited sites, one per site with its favicon, ranked by Ladybird's
+  decaying visit score, plus a reminder of the !bangs. Private windows say so instead and show no history. The page is
+  static, so Xenon's UI hands it the sites once it has loaded (`UI/NewTabPage.cpp`).
 - [x] **Quick link copy**: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd> copies the current page's URL.
   (DevTools stays on <kbd>⌘</kbd><kbd>⇧</kbd><kbd>I</kbd> and <kbd>F12</kbd>.)
-- [x] **Content blocking** (from Ladybird, though it's off until you turn it on in settings).
-- [ ] Helium's privacy defaults: content blocking on from first launch, and no background requests without consent.
-  Ladybird currently defaults to the content blocker off and background networking on.
+- [x] **uBlock Origin's filter lists, built in**: the lists Helium's uBlock Origin fork turns on (uBlock filters,
+  EasyList, EasyPrivacy, AdGuard, URLhaus, and the cookie banner and annoyance lists), converted for Ladybird's content
+  blocker by [xenon-ublock](../xenon-ublock). They block ads, trackers, malware sites, and cookie banners whenever
+  content blocking is on, which the welcome flow turns on by default. They ship with Xenon in
+  `UI/Resources/filter-lists`, so nothing is downloaded. Ladybird's own downloadable catalog stays off, since it holds
+  raw copies of the same lists.
+- [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
+  surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
+  picker. See xenon-ublock's `docs/gap-analysis.md`.
+- [ ] Daily filter list updates, which need a host for xenon-ublock's converted lists.
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [ ] Split view
 - [ ] MRU tab switching (<kbd>Ctrl</kbd><kbd>Tab</kbd> in most-recently-used order)
@@ -84,7 +145,10 @@ What exists now and what's planned, measured against Helium:
 - [ ] Tab groups
 - [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed
 - [ ] A separate profile directory (LibWebView currently hardcodes `Ladybird` in profile paths)
-- [ ] Xenon's own palette and app icon (the app still uses Ladybird's icon)
+- [x] Xenon's own palette, built around **#ff0050** (`UI/BrandColors.h` for the chrome, `UI/Resources/about-pages/webui.css`
+  for the internal pages)
+- [x] Xenon's own app icon: two orbits woven around a nucleus, in white and rose
+- [ ] uBlock Origin's filter set for Ladybird's content blocker (being built in a separate repo, `xenon-ublock`)
 
 Helium features that depend on Chromium, like Chrome Web Store extensions and web app installs, are out of scope
 until Ladybird supports them.
@@ -92,4 +156,5 @@ until Ladybird supports them.
 ## License
 
 Code in `UI/` that came from Ladybird keeps its original BSD-2-Clause license and copyright headers. New Xenon files
-use BSD-2-Clause too.
+use BSD-2-Clause too. The filter lists in `UI/Resources/filter-lists` are third-party data under their own licenses
+(GPL-3.0, GPL-3.0 or CC BY-SA, and CC0), listed in its `NOTICE.txt`.

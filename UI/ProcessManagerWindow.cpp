@@ -316,7 +316,7 @@ void ProcessManagerWindow::update_style()
     auto search_surface = ChromeStyle::style_sheet_color(search_surface_color);
     auto search_border = ChromeStyle::style_sheet_color(ChromeStyle::chrome_border(palette()));
     auto accent = ChromeStyle::style_sheet_color(ChromeStyle::chrome_accent());
-    auto selection = ChromeStyle::style_sheet_color(BrandColors::SlateBlue900);
+    auto selection = ChromeStyle::style_sheet_color(BrandColors::Rose500);
     auto placeholder = ChromeStyle::style_sheet_color(ChromeStyle::mix(text, search_surface_color, 0.4));
 
     m_process_count->setStyleSheet(QStringLiteral("color: %1;").arg(secondary_foreground));

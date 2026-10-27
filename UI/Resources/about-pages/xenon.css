@@ -1,0 +1,132 @@
+/*
+ * Copyright (c) 2026, the Xenon developers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+/* What Xenon's own pages (welcome, new tab) share: its neutrals, type, and marks. */
+
+:root {
+    --xenon-page: #faf8f9;
+    --xenon-ink: #1a1517;
+    --xenon-muted: #6e6569;
+    --xenon-hairline: rgba(26, 21, 23, 0.12);
+    --xenon-row-hover: rgba(26, 21, 23, 0.04);
+    --xenon-row-selected: rgba(255, 0, 80, 0.06);
+    --xenon-glow: rgba(255, 0, 80, 0.1);
+
+    --xenon-sans: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --xenon-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --xenon-page: #110e10;
+        --xenon-ink: #f4eff1;
+        --xenon-muted: #a39a9e;
+        --xenon-hairline: rgba(244, 239, 241, 0.12);
+        --xenon-row-hover: rgba(244, 239, 241, 0.05);
+        --xenon-row-selected: rgba(255, 0, 80, 0.1);
+        --xenon-glow: rgba(255, 0, 80, 0.16);
+    }
+}
+
+html {
+    background-color: var(--xenon-page);
+}
+
+body {
+    max-width: none;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family: var(--xenon-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--xenon-ink);
+    background-color: var(--xenon-page);
+}
+
+/* A single soft light in one corner, rather than color on every surface. */
+.glow {
+    position: fixed;
+    top: -30vh;
+    right: -20vw;
+    width: 80vw;
+    height: 80vh;
+    background: radial-gradient(closest-side, var(--xenon-glow), transparent);
+    pointer-events: none;
+}
+
+/*
+ * The mark is a cell from the periodic table, the way xenon itself appears there.
+ */
+.element {
+    display: inline-grid;
+    color: var(--xenon-ink);
+    border: 2px solid var(--xenon-rose);
+    border-radius: 4px;
+}
+
+.element-large {
+    grid-template-rows: auto 1fr auto auto;
+    width: 104px;
+    height: 118px;
+    padding: 8px 10px 9px;
+}
+
+.element-large .element-number {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.element-large .element-symbol {
+    align-self: center;
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.element-large .element-name {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.element-large .element-weight {
+    font-family: var(--xenon-mono);
+    font-size: 10px;
+    color: var(--xenon-muted);
+}
+
+.element-small {
+    grid-template-rows: auto 1fr;
+    width: 30px;
+    height: 34px;
+    padding: 2px 4px 3px;
+    border-width: 1.5px;
+    border-radius: 3px;
+}
+
+.element-small .element-number {
+    font-size: 7px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.element-small .element-symbol {
+    align-self: end;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+kbd {
+    padding: 2px 7px;
+    font-family: var(--xenon-mono);
+    font-size: 13px;
+    color: var(--xenon-ink);
+    background-color: var(--xenon-row-hover);
+    border: 1px solid var(--xenon-hairline);
+    border-radius: 6px;
+}

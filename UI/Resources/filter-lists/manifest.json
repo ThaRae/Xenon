@@ -1,0 +1,682 @@
+{
+  "generated_at": "2026-10-26 17:30 UTC",
+  "engine": "adblock 0.13.3, as built into Ladybird's LibWeb/ContentBlocker",
+  "converter": {
+    "name": "xenon-ublock",
+    "commit": "419c2a3"
+  },
+  "preset": "helium",
+  "excluded": {
+    "plowe-0": "Peter Lowe's list states no license, so it needs its author's permission to redistribute",
+    "helium-annoyances": "AGPL-3.0, and almost none of it survives conversion for Ladybird",
+    "helium-unbreak": "AGPL-3.0, and almost none of it survives conversion for Ladybird"
+  },
+  "lists": [
+    {
+      "id": "ublock-filters",
+      "title": "uBlock filters \u2013 Ads",
+      "group": "default",
+      "file": "lists/ublock-filters.txt",
+      "bytes": 1338680,
+      "sha256": "8ac606f95a16274979982b6decfe5b15c62d57281dd1c3e5e620177040b85aa6",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/filters/filters.txt",
+        "includes": [
+          "https://ublockorigin.github.io/uAssets/filters/filters-general.txt",
+          "https://ublockorigin.github.io/uAssets/filters/filters-2020.txt",
+          "https://ublockorigin.github.io/uAssets/filters/filters-2021.txt",
+          "https://ublockorigin.github.io/uAssets/filters/filters-2022.txt",
+          "https://ublockorigin.github.io/uAssets/filters/filters-2023.txt",
+          "https://ublockorigin.github.io/uAssets/filters/filters-2024.txt",
+          "https://ublockorigin.github.io/uAssets/filters/filters-2025.txt",
+          "https://ublockorigin.github.io/uAssets/filters/filters-2026.txt",
+          "https://ublockorigin.github.io/uAssets/filters/ubo-link-shorteners.txt"
+        ],
+        "bytes": 471713,
+        "sha256": "8cf219062dfc14b6c2ca6a689021414b909f0f87c3f308d19ddde3d68f6679cc",
+        "license_header": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+        "homepage": "https://github.com/uBlockOrigin/uAssets"
+      },
+      "filters": {
+        "upstream": 23275,
+        "kept": 12238,
+        "output": 13732,
+        "kept_unchanged": 11740,
+        "translated": {
+          "entity-domain-expanded": 252,
+          "denyallow-to-exceptions": 243,
+          "remove-to-hide": 63,
+          "exception-negations-removed": 3,
+          "to-to-hostname-filters": 3,
+          "elemhide-to-generichide": 3,
+          "strict3p-to-3p": 2,
+          "extended-marker": 2,
+          "to-to-exceptions": 2,
+          "regex-lowercase-safe": 1,
+          "wildcard-host": 1,
+          "plain-hostname": 1
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 9492,
+          "needs-engine:procedural": 458,
+          "inert:redirect-rule": 372,
+          "needs-engine:html-filtering": 134,
+          "needs-engine:popup": 134,
+          "needs-engine:dom-actions": 79,
+          "inert:csp": 64,
+          "inert:to": 63,
+          "generic-exception-applied": 50,
+          "inert:removeparam": 45,
+          "needs-engine:url-rewrite": 31,
+          "inert:method": 27,
+          "needs-engine:response-headers": 26,
+          "regex-unsupported": 23,
+          "needs-engine:response-rewrite": 13,
+          "strict-party": 8,
+          "regex-hostname": 6,
+          "cancelled-by-generic-exception": 4,
+          "needs-engine:cname": 2,
+          "needs-engine:ip-address": 2,
+          "needs-engine:specifichide": 1,
+          "regex-domain": 1,
+          "unsupported-option": 1,
+          "needs-engine:request-headers": 1
+        },
+        "duplicates": 3
+      }
+    },
+    {
+      "id": "ublock-badware",
+      "title": "uBlock filters \u2013 Badware risks",
+      "group": "default",
+      "file": "lists/ublock-badware.txt",
+      "bytes": 134092,
+      "sha256": "406e1bc281745e9cbaa21dae94acde269435aaa5f4aa32745f41a2ff0f482f84",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/filters/badware.txt",
+        "includes": [],
+        "bytes": 277903,
+        "sha256": "35a4e811d30fba8295b71a19b7b395e17dfc1539166067d5b3b1fbaa573e4062",
+        "license_header": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+        "homepage": "https://github.com/uBlockOrigin/uAssets"
+      },
+      "filters": {
+        "upstream": 4983,
+        "kept": 4661,
+        "output": 4653,
+        "kept_unchanged": 4650,
+        "translated": {
+          "reason-stripped": 11
+        },
+        "dropped": {
+          "inert:to": 232,
+          "needs-engine:ip-address": 34,
+          "needs-engine:scriptlets": 24,
+          "needs-engine:procedural": 9,
+          "needs-engine:popup": 9,
+          "inert:method": 7,
+          "strict-party": 4,
+          "needs-engine:response-headers": 2,
+          "regex-unsupported": 1
+        },
+        "duplicates": 8
+      }
+    },
+    {
+      "id": "ublock-privacy",
+      "title": "uBlock filters \u2013 Privacy",
+      "group": "default",
+      "file": "lists/ublock-privacy.txt",
+      "bytes": 36858,
+      "sha256": "23b3f1fe60baafb50f8a7dafe3c6b9eaa88c496d544be32e1e064d268de342e1",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/filters/privacy.txt",
+        "includes": [
+          "https://ublockorigin.github.io/uAssets/filters/resource-abuse.txt"
+        ],
+        "bytes": 184404,
+        "sha256": "5a7f9c23bf7430877a8fc8330aca9d5b1e6ac25b6b7d0763c9695dce35ce1369",
+        "license_header": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+        "homepage": "https://github.com/uBlockOrigin/uAssets"
+      },
+      "filters": {
+        "upstream": 1813,
+        "kept": 980,
+        "output": 983,
+        "kept_unchanged": 969,
+        "translated": {
+          "reason-stripped": 5,
+          "strict3p-to-3p": 4,
+          "entity-domain-expanded": 1,
+          "denyallow-to-exceptions": 1
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 333,
+          "needs-engine:url-rewrite": 226,
+          "inert:removeparam": 214,
+          "inert:csp": 17,
+          "needs-engine:dom-actions": 8,
+          "inert:to": 8,
+          "inert:method": 8,
+          "needs-engine:html-filtering": 6,
+          "needs-engine:response-headers": 4,
+          "strict-party": 2,
+          "regex-unsupported": 2,
+          "needs-engine:popup": 2,
+          "inert:redirect-rule": 1,
+          "needs-engine:procedural": 1,
+          "needs-engine:response-rewrite": 1
+        },
+        "duplicates": 0
+      }
+    },
+    {
+      "id": "ublock-unbreak",
+      "title": "uBlock filters \u2013 Unbreak",
+      "group": "default",
+      "file": "lists/ublock-unbreak.txt",
+      "bytes": 141897,
+      "sha256": "6565245e7d3fb7799d62e5569887c819f0f7943f2723bc8d69a9de627a7a8b44",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/filters/unbreak.txt",
+        "includes": [],
+        "bytes": 281515,
+        "sha256": "78f4b6632741eea8472928a8f5895807dc80145e35c7df8579e6d010ff1cc1b5",
+        "license_header": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+        "homepage": "https://github.com/uBlockOrigin/uAssets"
+      },
+      "filters": {
+        "upstream": 2551,
+        "kept": 2025,
+        "output": 2025,
+        "kept_unchanged": 2003,
+        "translated": {
+          "entity-domain-expanded": 17,
+          "remove-to-hide": 4,
+          "abp-has-to-has": 1,
+          "extended-marker": 1
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 307,
+          "inert:redirect-rule": 98,
+          "needs-engine:popup": 29,
+          "needs-engine:cname": 27,
+          "needs-engine:html-filtering": 17,
+          "inert:removeparam": 10,
+          "needs-engine:procedural": 10,
+          "needs-engine:dom-actions": 9,
+          "generic-exception-applied": 7,
+          "inert:csp": 3,
+          "inert:method": 3,
+          "inert:to": 2,
+          "needs-engine:csp-injection": 1,
+          "needs-engine:permissions-policy": 1,
+          "needs-engine:response-rewrite": 1,
+          "strict-party": 1
+        },
+        "duplicates": 0
+      }
+    },
+    {
+      "id": "ublock-quick-fixes",
+      "title": "uBlock filters \u2013 Quick fixes",
+      "group": "default",
+      "file": "lists/ublock-quick-fixes.txt",
+      "bytes": 25821,
+      "sha256": "f986f236921fbfc3e2315bc3a761f5a928df15621e4b014fbafc0ea0cd2f24e3",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/filters/quick-fixes.txt",
+        "includes": [],
+        "bytes": 90384,
+        "sha256": "a3b3c899c2c461fc30ccf0146a4f592c3856da2bc6ea885320c441aa620ea711",
+        "license_header": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+        "homepage": "https://github.com/uBlockOrigin/uAssets"
+      },
+      "filters": {
+        "upstream": 461,
+        "kept": 244,
+        "output": 247,
+        "kept_unchanged": 229,
+        "translated": {
+          "entity-domain-expanded": 11,
+          "denyallow-to-exceptions": 2,
+          "remove-to-hide": 2
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 167,
+          "needs-engine:procedural": 19,
+          "needs-engine:popup": 5,
+          "inert:redirect-rule": 4,
+          "needs-engine:html-filtering": 4,
+          "needs-engine:url-rewrite": 4,
+          "needs-engine:response-rewrite": 3,
+          "regex-unsupported": 3,
+          "needs-engine:response-headers": 3,
+          "inert:method": 2,
+          "needs-engine:dom-actions": 2,
+          "inert:to": 1
+        },
+        "duplicates": 0
+      }
+    },
+    {
+      "id": "adguard-generic",
+      "title": "AdGuard \u2013 Ads",
+      "group": "ads",
+      "file": "lists/adguard-generic.txt",
+      "bytes": 4943900,
+      "sha256": "3b010ff10f3b57b83789a744d55de2c98edc9a4eb82589ee09358f33c5d5f761",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://filters.adtidy.org/extension/ublock/filters/2_without_easylist.txt",
+        "includes": [],
+        "bytes": 4321732,
+        "sha256": "d25c3d75bcae5706396eaad0f3ce22d1116775e8e582ed7c29379167a182a9c8",
+        "license_header": "https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE",
+        "homepage": "https://github.com/AdguardTeam/AdguardFilters#adguard-filters"
+      },
+      "filters": {
+        "upstream": 53755,
+        "kept": 48069,
+        "output": 48511,
+        "kept_unchanged": 47778,
+        "translated": {
+          "remove-to-hide": 138,
+          "entity-domain-expanded": 101,
+          "denyallow-to-exceptions": 20,
+          "elemhide-to-generichide": 13,
+          "regex-lowercase-safe": 10,
+          "hostname-anchor-completed": 7,
+          "noop-option": 7,
+          "regex-dollar-rewritten": 2,
+          "plain-hostname": 2
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 4359,
+          "needs-engine:procedural": 1066,
+          "needs-engine:popup": 110,
+          "inert:redirect-rule": 45,
+          "inert:csp": 24,
+          "inert:removeparam": 20,
+          "regex-unsupported": 18,
+          "needs-engine:response-headers": 15,
+          "cancelled-by-generic-exception": 9,
+          "regex-hostname": 8,
+          "generic-exception-applied": 6,
+          "engine-rejects:match-case-without-full-regex": 2,
+          "generic-style": 1,
+          "regex-domain": 1,
+          "inert:method": 1,
+          "unsupported-option": 1
+        },
+        "duplicates": 39
+      }
+    },
+    {
+      "id": "easylist",
+      "title": "EasyList",
+      "group": "ads",
+      "file": "lists/easylist.txt",
+      "bytes": 1872384,
+      "sha256": "25e5f8f4501a08dd32b4a93f24584ef6ae736911e2974cbf17723ae0d353d4de",
+      "license": "GPL-3.0-or-later OR CC-BY-SA-3.0-or-later",
+      "license_url": "https://easylist.to/pages/licence.html",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/thirdparties/easylist.txt",
+        "includes": [],
+        "bytes": 1988844,
+        "sha256": "53126b01349b5fd9059c6a95c268fa03e24495c911e54d3da950906841cc131d",
+        "license_header": "https://easylist.to/pages/licence.html",
+        "homepage": "https://easylist.to/"
+      },
+      "filters": {
+        "upstream": 74639,
+        "kept": 71319,
+        "output": 71309,
+        "kept_unchanged": 71313,
+        "translated": {
+          "remove-to-hide": 3,
+          "hostname-anchor-completed": 2,
+          "extended-marker": 1
+        },
+        "dropped": {
+          "needs-engine:popup": 2970,
+          "needs-engine:procedural": 293,
+          "cancelled-by-generic-exception": 54,
+          "inert:csp": 3
+        },
+        "duplicates": 10
+      }
+    },
+    {
+      "id": "adguard-spyware-url",
+      "title": "AdGuard/uBO \u2013 URL Tracking Protection",
+      "group": "privacy",
+      "file": "lists/adguard-spyware-url.txt",
+      "bytes": 641,
+      "sha256": "7d7511a667ed9438c4613db41b0335f1b6008bbe2267dab9408cacbfd5d903c5",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/filters/privacy-removeparam.txt",
+        "includes": [],
+        "bytes": 180636,
+        "sha256": "2f310c57ca91165b4b03f404afc97d5d2541914f5e1afd23ff553dd372bedf65",
+        "license_header": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+        "homepage": "https://github.com/uBlockOrigin/uAssets"
+      },
+      "filters": {
+        "upstream": 2713,
+        "kept": 1,
+        "output": 1,
+        "kept_unchanged": 1,
+        "translated": {},
+        "dropped": {
+          "inert:removeparam": 2710,
+          "unsupported-option": 2
+        },
+        "duplicates": 0
+      }
+    },
+    {
+      "id": "easyprivacy",
+      "title": "EasyPrivacy",
+      "group": "privacy",
+      "file": "lists/easyprivacy.txt",
+      "bytes": 1479614,
+      "sha256": "b77014d421d2871a9730945d0f69b80e5e49cae003892e60b815694bc15f0e10",
+      "license": "GPL-3.0-or-later OR CC-BY-SA-3.0-or-later",
+      "license_url": "https://easylist.to/pages/licence.html",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/thirdparties/easyprivacy.txt",
+        "includes": [],
+        "bytes": 1500145,
+        "sha256": "4641f9a2f2563c671ebacd90a80fbb68035b922d68a78fb902252ee145c53738",
+        "license_header": "https://easylist.to/pages/licence.html",
+        "homepage": "https://easylist.to/"
+      },
+      "filters": {
+        "upstream": 56384,
+        "kept": 56350,
+        "output": 56348,
+        "kept_unchanged": 56340,
+        "translated": {
+          "hostname-anchor-completed": 9,
+          "entity-domain-expanded": 1
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 29,
+          "inert:csp": 2,
+          "engine-rejects:negated-document": 1,
+          "inert:method": 1,
+          "inert:redirect-rule": 1
+        },
+        "duplicates": 2
+      }
+    },
+    {
+      "id": "urlhaus-1",
+      "title": "Online Malicious URL Blocklist",
+      "group": "malware",
+      "file": "lists/urlhaus-1.txt",
+      "bytes": 11550745,
+      "sha256": "02ef9bb55825fbb34b389f69adc0ec2b8af098da4c52293aca68c46776ed943a",
+      "license": "CC0-1.0",
+      "license_url": "https://gitlab.com/malware-filter/urlhaus-filter#license",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://malware-filter.gitlab.io/urlhaus-filter/urlhaus-filter-vivaldi-online.txt",
+        "includes": [],
+        "bytes": 11550427,
+        "sha256": "f0e4232769f9bb1ac45f952e2766649e9e2bb567c79202706c41342b4cb1fbdf",
+        "license_header": "https://gitlab.com/malware-filter/urlhaus-filter#license",
+        "homepage": "https://gitlab.com/malware-filter/urlhaus-filter#malicious-url-blocklist"
+      },
+      "filters": {
+        "upstream": 98191,
+        "kept": 98191,
+        "output": 98191,
+        "kept_unchanged": 98191,
+        "translated": {},
+        "dropped": {},
+        "duplicates": 0
+      }
+    },
+    {
+      "id": "adguard-cookies",
+      "title": "AdGuard \u2013 Cookie Notices",
+      "group": "annoyances",
+      "file": "lists/adguard-cookies.txt",
+      "bytes": 1189517,
+      "sha256": "6e8c3e6f6fba63ac95893f2b8cf89e13905b65dbb7f013f318cd7e8202403ab3",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://filters.adtidy.org/extension/ublock/filters/18.txt",
+        "includes": [],
+        "bytes": 1475888,
+        "sha256": "80f2905676cd5e9235842892ac1bb024b6cc03a0571307b2cf6182d5e0d8dd15",
+        "license_header": "https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE",
+        "homepage": "https://github.com/AdguardTeam/AdguardFilters#adguard-filters"
+      },
+      "filters": {
+        "upstream": 20558,
+        "kept": 19187,
+        "output": 19187,
+        "kept_unchanged": 19139,
+        "translated": {
+          "remove-to-hide": 35,
+          "entity-domain-expanded": 12,
+          "regex-lowercase-safe": 1
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 1285,
+          "needs-engine:procedural": 86
+        },
+        "duplicates": 0
+      }
+    },
+    {
+      "id": "fanboy-cookiemonster",
+      "title": "EasyList \u2013 Cookie Notices",
+      "group": "annoyances",
+      "file": "lists/fanboy-cookiemonster.txt",
+      "bytes": 993229,
+      "sha256": "850ec17e34e42cd9a64683f2c9a618bd8d64dca0a11f06d4126ec195ef788e33",
+      "license": "GPL-3.0-or-later OR CC-BY-SA-3.0-or-later",
+      "license_url": "https://easylist.to/pages/licence.html",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/thirdparties/easylist-cookies.txt",
+        "includes": [],
+        "bytes": 1217139,
+        "sha256": "1e5b2f8c0d295c2ea6cb474ce56bc24ed394487513f81bec1982f065eca8a7d8",
+        "license_header": "https://easylist.to/pages/licence.html",
+        "homepage": "https://github.com/easylist/easylist#fanboy-lists"
+      },
+      "filters": {
+        "upstream": 28160,
+        "kept": 25636,
+        "output": 25634,
+        "kept_unchanged": 25630,
+        "translated": {
+          "entity-domain-expanded": 4,
+          "remove-to-hide": 2
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 2465,
+          "needs-engine:procedural": 57,
+          "needs-engine:dom-actions": 2
+        },
+        "duplicates": 2
+      }
+    },
+    {
+      "id": "ublock-cookies-easylist",
+      "title": "uBlock filters \u2013 Cookie Notices",
+      "group": "annoyances",
+      "file": "lists/ublock-cookies-easylist.txt",
+      "bytes": 23543,
+      "sha256": "e4e905ff68b05a47a332ff7bae58c93639dd4c16a0f64630afefd7c49b1700da",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/filters/annoyances-cookies.txt",
+        "includes": [],
+        "bytes": 377681,
+        "sha256": "3ec381cfe2ad78d274c4b562ecb337e05facbb2abc4feb72713f9d5f97df6ec2",
+        "license_header": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+        "homepage": "https://github.com/uBlockOrigin/uAssets"
+      },
+      "filters": {
+        "upstream": 2376,
+        "kept": 214,
+        "output": 214,
+        "kept_unchanged": 210,
+        "translated": {
+          "remove-to-hide": 2,
+          "entity-domain-expanded": 2
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 2160,
+          "needs-engine:dom-actions": 1,
+          "needs-engine:procedural": 1
+        },
+        "duplicates": 0
+      }
+    },
+    {
+      "id": "easylist-newsletters",
+      "title": "EasyList \u2013 Newsletter Notices",
+      "group": "annoyances",
+      "file": "lists/easylist-newsletters.txt",
+      "bytes": 266455,
+      "sha256": "ff23ecad8fdcdd2e985ff2457d317fc60dd023bf7ebf3bdec2e39d4a1ff49d55",
+      "license": "GPL-3.0-or-later OR CC-BY-SA-3.0-or-later",
+      "license_url": "https://easylist.to/pages/licence.html",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/thirdparties/easylist-newsletters.txt",
+        "includes": [],
+        "bytes": 302034,
+        "sha256": "b35c96c2a9328bfe29410aae734590de8da2b7a017678d57a40f80fe3da061e2",
+        "license_header": "https://easylist.to/pages/licence.html",
+        "homepage": "https://easylist.to/"
+      },
+      "filters": {
+        "upstream": 6055,
+        "kept": 5724,
+        "output": 5723,
+        "kept_unchanged": 5723,
+        "translated": {
+          "plain-hostname": 1
+        },
+        "dropped": {
+          "needs-engine:procedural": 229,
+          "needs-engine:scriptlets": 102
+        },
+        "duplicates": 1
+      }
+    },
+    {
+      "id": "easylist-notifications",
+      "title": "EasyList \u2013 Notifications",
+      "group": "annoyances",
+      "file": "lists/easylist-notifications.txt",
+      "bytes": 65811,
+      "sha256": "05c95a2e601f35749059aed0beaecdc9f54e581299a97138012531d37094f7f2",
+      "license": "GPL-3.0-or-later OR CC-BY-SA-3.0-or-later",
+      "license_url": "https://easylist.to/pages/licence.html",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/thirdparties/easylist-notifications.txt",
+        "includes": [],
+        "bytes": 76518,
+        "sha256": "f0a1d1694b30048f1267d3b156fd3d4c94bf1b9242ac87a4bb49f050c7991ac3",
+        "license_header": "https://easylist.to/pages/licence.html",
+        "homepage": "https://easylist.to/"
+      },
+      "filters": {
+        "upstream": 1686,
+        "kept": 1595,
+        "output": 1591,
+        "kept_unchanged": 1592,
+        "translated": {
+          "remove-to-hide": 3
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 64,
+          "needs-engine:procedural": 26,
+          "needs-engine:dom-actions": 1
+        },
+        "duplicates": 4
+      }
+    },
+    {
+      "id": "ublock-annoyances",
+      "title": "uBlock filters \u2013 Annoyances",
+      "group": "annoyances",
+      "file": "lists/ublock-annoyances.txt",
+      "bytes": 130146,
+      "sha256": "203e14762f71aad086414398c8e2c03aabbcb53152ad400b60787a8a324f17df",
+      "license": "GPL-3.0",
+      "license_url": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+      "license_needs_review": false,
+      "upstream": {
+        "url": "https://ublockorigin.github.io/uAssets/filters/annoyances.txt",
+        "includes": [
+          "https://ublockorigin.github.io/uAssets/filters/annoyances-others.txt"
+        ],
+        "bytes": 437,
+        "sha256": "f6b99bdd54bd011d982ece7dd3774fbc33ea000d7977c5f0c3bdc06665dd1b63",
+        "license_header": "https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE",
+        "homepage": "https://github.com/uBlockOrigin/uAssets"
+      },
+      "filters": {
+        "upstream": 3540,
+        "kept": 1263,
+        "output": 1263,
+        "kept_unchanged": 1259,
+        "translated": {
+          "remove-to-hide": 3,
+          "extended-marker": 1
+        },
+        "dropped": {
+          "needs-engine:scriptlets": 2107,
+          "needs-engine:procedural": 68,
+          "needs-engine:html-filtering": 32,
+          "needs-engine:dom-actions": 25,
+          "inert:redirect-rule": 24,
+          "needs-engine:url-rewrite": 8,
+          "inert:csp": 7,
+          "needs-engine:response-rewrite": 3,
+          "inert:removeparam": 2,
+          "strict-party": 1
+        },
+        "duplicates": 0
+      }
+    }
+  ]
+}

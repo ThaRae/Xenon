@@ -145,7 +145,9 @@ Optional<BangNavigation> resolve(StringView input)
         query.join(' ', words);
 
         auto query_url = MUST(String::from_utf8(bang->query_url));
-        url = URL::Parser::basic_parse(MUST(query_url.replace("%s"sv, URL::percent_encode(query.string_view()), ReplaceMode::All)));
+        // NB: The query is one URL component, so it is encoded as one: "&" or "#" left as they are would end it early.
+        auto encoded_query = URL::percent_encode(query.string_view(), URL::PercentEncodeSet::Component);
+        url = URL::Parser::basic_parse(MUST(query_url.replace("%s"sv, encoded_query, ReplaceMode::All)));
     }
 
     if (!url.has_value())

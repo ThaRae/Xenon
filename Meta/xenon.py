@@ -6,10 +6,14 @@
 # project() call so the Xenon frontend is added once every engine library and helper process exists.
 
 import argparse
+import http.server
+import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
+import threading
 
 from pathlib import Path
 
@@ -35,6 +39,21 @@ PRESETS = {
 }
 
 APP_TARGET = "xenon"
+TESTS_TARGET = "xenon-tests"
+
+# A page rendered with nothing on it compresses to a few kilobytes; the welcome page is well over this.
+SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
+
+# Text on Xenon's welcome page that Ladybird's doesn't have.
+WELCOME_PAGE_TEXT = "Use Xenon's picks"
+
+# The headless screenshot is taken this long after the load starts, not after it finishes.
+WELCOME_SCREENSHOT_DELAY_SECONDS = 4
+
+# Requests the bundled filter lists block (EasyList: /jquery.popunder.js; EasyPrivacy: -tracking-pixel.), and ordinary
+# ones nothing should block.
+BLOCKED_REQUESTS = {"/jquery.popunder.js": "script", "/site-tracking-pixel.gif": "img"}
+ALLOWED_REQUESTS = {"/app.js": "script", "/logo.gif": "img"}
 
 
 def main():
@@ -51,6 +70,8 @@ def main():
     run_parser = subparsers.add_parser("run", help="Build and launch Xenon")
     run_parser.add_argument("--no-build", action="store_true")
     run_parser.add_argument("args", nargs=argparse.REMAINDER)
+    test_parser = subparsers.add_parser("test", help="Build and run the unit tests and the headless smoke test")
+    test_parser.add_argument("--no-build", action="store_true")
     subparsers.add_parser("clean", help="Delete the build directory for the preset")
 
     args = parser.parse_args()
@@ -69,6 +90,10 @@ def main():
         if not args.no_build:
             build_main(build_dir, args.jobs, APP_TARGET)
         run_main(platform, build_dir, args.args)
+    elif args.command == "test":
+        if not args.no_build:
+            build_main(build_dir, args.jobs, APP_TARGET, TESTS_TARGET)
+        test_main(platform, build_dir)
 
 
 def configure_build_env(preset: str, jobs: str | None) -> tuple[Path, Path]:
@@ -115,25 +140,156 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
     return build_dir
 
 
-def build_main(build_dir: Path, jobs: str | None, target: str):
+def build_main(build_dir: Path, jobs: str | None, *targets: str):
     build_args = ["ninja", "-C", build_dir]
     if jobs:
         build_args.extend(["-j", jobs])
-    build_args.append(target)
+    build_args.extend(targets)
     run_command(build_args)
 
 
-def run_main(platform: Platform, build_dir: Path, args: list[str]):
+def app_executable(platform: Platform, build_dir: Path) -> Path:
+    # On Linux, Xenon has an install prefix of its own in the build directory (see UI/Xenon.cmake).
     if platform.host_system == HostSystem.macOS:
         executable = build_dir / "bin" / "Xenon.app" / "Contents" / "MacOS" / "Xenon"
     else:
-        executable = build_dir / "bin" / "Xenon"
+        executable = build_dir / "xenon" / "bin" / "Xenon"
 
     if not executable.exists():
         print(f"Executable not found: {executable}. Build Xenon before running it.", file=sys.stderr)
         sys.exit(1)
+    return executable
 
-    run_command([executable, *args])
+
+def run_main(platform: Platform, build_dir: Path, args: list[str]):
+    run_command([app_executable(platform, build_dir), *args])
+
+
+def test_main(platform: Platform, build_dir: Path):
+    failures = []
+
+    for test in sorted((build_dir / "bin").glob("TestXenon*")):
+        if test.is_dir() or not os.access(test, os.X_OK):
+            continue
+        print(f"==> {test.name}", flush=True)
+        if subprocess.run([test]).returncode != 0:
+            failures.append(test.name)
+
+    # Rendering the welcome page without a window runs Xenon's bundled resources, the WebUI bridge, and the engine's
+    # helper processes together, which unit tests can't.
+    smoke_dir = build_dir / "smoke"
+    smoke_dir.mkdir(exist_ok=True)
+    screenshot = smoke_dir / "welcome.png"
+    screenshot.unlink(missing_ok=True)
+
+    env = dict(os.environ)
+    if platform.host_system != HostSystem.macOS and not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
+        env["QT_QPA_PLATFORM"] = "offscreen"
+
+    print("==> headless render of about:welcome", flush=True)
+    with tempfile.TemporaryDirectory() as profile:
+        # Text mode waits for the page to finish loading, so this checks the page itself whatever the machine's speed.
+        # It also gets the first launch's one-off work, like building the font cache, out of the screenshot's time.
+        loaded, output = run_headless(
+            app_executable(platform, build_dir), env, ["--headless=text", "--profile-path", profile, "about:welcome"]
+        )
+        if loaded and WELCOME_PAGE_TEXT in output:
+            print(f'    loaded, with "{WELCOME_PAGE_TEXT}"')
+        else:
+            print(output[-4000:], file=sys.stderr)
+            failures.append("loading about:welcome")
+
+        rendered, output = run_headless(
+            app_executable(platform, build_dir),
+            env,
+            [
+                "--headless=screenshot",
+                f"--screenshot-delay={WELCOME_SCREENSHOT_DELAY_SECONDS}",
+                f"--screenshot-path={screenshot}",
+                "--window-width=1100",
+                "--window-height=900",
+                "--profile-path",
+                profile,
+                "about:welcome",
+            ],
+        )
+        if rendered and screenshot.exists() and screenshot.stat().st_size >= SMOKE_TEST_MIN_SCREENSHOT_BYTES:
+            print(f"    rendered {screenshot} ({screenshot.stat().st_size} bytes)")
+        else:
+            print(output[-4000:], file=sys.stderr)
+            failures.append("headless render of about:welcome")
+
+    print("==> content blocking with the bundled filter lists", flush=True)
+    if not check_content_blocking(app_executable(platform, build_dir), env):
+        failures.append("content blocking")
+
+    if failures:
+        print(f"Failed: {', '.join(failures)}", file=sys.stderr)
+        sys.exit(1)
+    print("All tests passed.")
+
+
+# Loads a local page with blocking on and off, in a throwaway profile, and checks which of its requests reach the server.
+# Xenon is given no lists here, so this also proves it loads its bundled ones by itself.
+def check_content_blocking(executable: Path, env: dict) -> bool:
+    requested: set[str] = set()
+    tags = "".join(f'<{tag} src="{path}"></{tag}>' for path, tag in {**BLOCKED_REQUESTS, **ALLOWED_REQUESTS}.items())
+    page = f"<!doctype html><title>Xenon content blocking</title><p>loaded</p>{tags}".encode()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            requested.add(self.path)
+            body = page if self.path == "/" else b""
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html" if self.path == "/" else "application/octet-stream")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+
+    passed = True
+    try:
+        for blocking in (False, True):
+            requested.clear()
+            with tempfile.TemporaryDirectory() as profile:
+                (Path(profile) / "config").mkdir()
+                (Path(profile) / "config" / "Settings.json").write_text(
+                    json.dumps({"contentBlockers": {"enabled": blocking}})
+                )
+                command = [str(executable), "--headless=text", "--profile-path", profile, url]
+                try:
+                    subprocess.run(command, env=env, capture_output=True, timeout=120)
+                except subprocess.TimeoutExpired:
+                    print("    timed out loading the test page", file=sys.stderr)
+                    return False
+
+            expected_blocked = set(BLOCKED_REQUESTS) if blocking else set()
+            reached = {path for path in (*BLOCKED_REQUESTS, *ALLOWED_REQUESTS) if path in requested}
+            wrongly_blocked = set(ALLOWED_REQUESTS) - reached
+            wrongly_allowed = (set(BLOCKED_REQUESTS) - reached) ^ expected_blocked
+            label = "blocking on " if blocking else "blocking off"
+            if "/" not in requested or wrongly_blocked or wrongly_allowed:
+                print(f"    {label}: page loaded={'/' in requested}, reached={sorted(reached)}", file=sys.stderr)
+                passed = False
+            else:
+                print(f"    {label}: reached {sorted(reached)}")
+    finally:
+        server.shutdown()
+    return passed
+
+
+def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, str]:
+    try:
+        result = subprocess.run([str(executable), *args], env=env, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired as error:
+        return False, f"timed out after {error.timeout} s"
+    return result.returncode == 0, result.stdout + result.stderr
 
 
 def run_command(command: list):
