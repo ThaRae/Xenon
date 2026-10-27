@@ -1,0 +1,404 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 18:08:49 -0400
+Subject: [PATCH] LibWeb+LibWebCommon+LibWebView+WebContent+WebWorker: Add an
+ origin access allowlist
+
+An embedder may now let an origin of its own fetch from some others as
+if they were the same origin: with no CORS, and with the credentials of
+a same-origin request. Blink and WebKit keep the same kind of allowlist
+for browser extensions, whose pages and workers reach the hosts their
+users granted them this way.
+
+Each entry is a source origin and a destination scheme and host, on any
+port, with or without the host's subdomains; an empty host is any host.
+Main fetch treats a request whose origin and current URL match an entry
+as same-origin, so its response tainting stays "basic". A redirect to a
+destination outside the list falls back to CORS, as a same-origin
+request redirected to another origin does.
+
+The UI process keeps the list (Application::set_origin_access_allow_list)
+and gives it to every WebContent and WebWorker process as it starts, and
+again whenever it changes.
+---
+ Libraries/LibWeb/Fetch/Fetching/Fetching.cpp  |  7 +++
+ Libraries/LibWebCommon/CMakeLists.txt         |  2 +
+ .../Infrastructure/OriginAccessAllowList.cpp  | 45 +++++++++++++++++++
+ .../Infrastructure/OriginAccessAllowList.h    | 35 +++++++++++++++
+ .../Infrastructure/OriginAccessAllowList.ipc  | 11 +++++
+ Libraries/LibWebView/Application.cpp          | 13 ++++++
+ Libraries/LibWebView/Application.h            |  7 +++
+ Libraries/LibWebView/WorkerProcessManager.cpp |  8 ++++
+ Libraries/LibWebView/WorkerProcessManager.h   |  2 +
+ Services/WebContent/ConnectionFromClient.cpp  |  5 +++
+ Services/WebContent/ConnectionFromClient.h    |  1 +
+ Services/WebContent/WebContentServer.ipc      |  2 +
+ Services/WebWorker/ConnectionFromClient.cpp   |  5 +++
+ Services/WebWorker/ConnectionFromClient.h     |  1 +
+ Services/WebWorker/WebWorkerServer.ipc        |  2 +
+ 15 files changed, 146 insertions(+)
+ create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp
+ create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h
+ create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.ipc
+
+diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+index 8dfeb482af7984338720bb6de6659194673a19c0..7f429be163984f5862f443e35e6b9fd24a171386 100644
+--- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
++++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+@@ -80,6 +80,7 @@
+ #include <LibWeb/WebIDL/ExceptionOrUtils.h>
+ #include <LibWebCommon/Fetch/Infrastructure/DataURL.h>
+ #include <LibWebCommon/Fetch/Infrastructure/HTTP/Statuses.h>
++#include <LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h>
+ #include <LibWebCommon/Fetch/Infrastructure/URL.h>
+ #include <LibWebCommon/Loader/UserAgent.h>
+ #include <LibWebCommon/SecureContexts/AbstractOperations.h>
+@@ -606,8 +607,14 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+             && request->current_url().scheme() == "file"sv
+             && request->destination() == Infrastructure::Request::Destination::Font;
+ 
++        // AD-HOC: Treat a request as same-origin, too, when the embedder lets its origin reach the current URL's origin,
++        //         as Blink and WebKit let browser extensions reach the hosts they were granted.
++        auto is_allowed_by_embedder = origin && request->response_tainting() == Infrastructure::Request::ResponseTainting::Basic
++            && Infrastructure::is_allowed_by_origin_access_allow_list(*origin, request->current_url());
++
+         if (
+             (origin && request->current_url().origin().is_same_origin(*origin) && request->response_tainting() == Infrastructure::Request::ResponseTainting::Basic)
++            || is_allowed_by_embedder
+             || is_file_to_file_font_load
+             || request->current_url().scheme() == "data"sv
+             || (request->mode() == Infrastructure::Request::Mode::Navigate || request->mode() == Infrastructure::Request::Mode::WebSocket)) {
+diff --git a/Libraries/LibWebCommon/CMakeLists.txt b/Libraries/LibWebCommon/CMakeLists.txt
+index bc50496b8f8e2613ba5c440a2b2c6e17dd1d0539..2810ba400c04ec8ed40f099a4c67251748db746c 100644
+--- a/Libraries/LibWebCommon/CMakeLists.txt
++++ b/Libraries/LibWebCommon/CMakeLists.txt
+@@ -7,6 +7,7 @@ set(SOURCES
+     CSS/SystemColor.cpp
+     Fetch/Infrastructure/DataURL.cpp
+     Fetch/Infrastructure/HTTP/Statuses.cpp
++    Fetch/Infrastructure/OriginAccessAllowList.cpp
+     Fetch/Infrastructure/URL.cpp
+     FileAPI/BlobURLStore.cpp
+     FileAPI/SerializedBlobURLEntry.cpp
+@@ -108,6 +109,7 @@ invoke_py_generator(
+                  "${LADYBIRD_SOURCE_DIR}/Meta/Utils/utils.py"
+ )
+ 
++compile_ipc(Fetch/Infrastructure/OriginAccessAllowList.ipc Fetch/Infrastructure/OriginAccessAllowListCodecs.h)
+ compile_ipc(Page/InputEvent.ipc Page/InputEventCodecs.h)
+ compile_ipc(Page/TextEditingCommand.ipc Page/TextEditingCommandCodecs.h)
+ compile_ipc(PixelUnits.ipc PixelUnitsCodecs.h)
+diff --git a/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..810b7710a73b6f0b8ed39b7f5cf77807218f82ff
+--- /dev/null
++++ b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp
+@@ -0,0 +1,45 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/NeverDestroyed.h>
++#include <LibURL/URL.h>
++#include <LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h>
++
++namespace Web::Fetch::Infrastructure {
++
++static Vector<OriginAccessAllowListEntry>& origin_access_allow_list()
++{
++    static NeverDestroyed<Vector<OriginAccessAllowListEntry>> allow_list;
++    return *allow_list;
++}
++
++bool OriginAccessAllowListEntry::allows(URL::Origin const& source_origin, URL::URL const& destination) const
++{
++    if (source_origin.is_opaque() || !this->source_origin.is_same_origin(source_origin))
++        return false;
++    if (destination.scheme() != destination_scheme || !destination.host().has_value())
++        return false;
++    if (destination_host.is_empty())
++        return true;
++
++    auto host = destination.serialized_host();
++    if (host == destination_host)
++        return true;
++    return allow_destination_subdomains && host.length() > destination_host.bytes().size()
++        && host.ends_with(destination_host) && host[host.length() - destination_host.bytes().size() - 1] == '.';
++}
++
++void set_origin_access_allow_list(Vector<OriginAccessAllowListEntry> allow_list)
++{
++    origin_access_allow_list() = move(allow_list);
++}
++
++bool is_allowed_by_origin_access_allow_list(URL::Origin const& source_origin, URL::URL const& destination)
++{
++    return any_of(origin_access_allow_list(), [&](auto const& entry) { return entry.allows(source_origin, destination); });
++}
++
++}
+diff --git a/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..55b69d034aec1efac337f6ca034c5192df1f2a91
+--- /dev/null
++++ b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/String.h>
++#include <AK/Vector.h>
++#include <LibURL/Origin.h>
++#include <LibWebCommon/Export.h>
++
++namespace Web::Fetch::Infrastructure {
++
++// The embedder may let an origin fetch from some others as if they were the same origin: with no CORS, and with the
++// credentials of a same-origin request. Blink and WebKit keep such allowlists for browser extensions, which reach the
++// hosts their users granted them this way. A destination is a scheme and a host, on any port; an empty host is any
++// host.
++struct WEBCOMMON_API OriginAccessAllowListEntry {
++    URL::Origin source_origin;
++    String destination_scheme;
++    String destination_host;
++    bool allow_destination_subdomains { false };
++
++    bool allows(URL::Origin const& source_origin, URL::URL const& destination) const;
++};
++
++// Each process keeps the allowlist the embedder last gave it.
++WEBCOMMON_API void set_origin_access_allow_list(Vector<OriginAccessAllowListEntry>);
++WEBCOMMON_API bool is_allowed_by_origin_access_allow_list(URL::Origin const& source_origin, URL::URL const& destination);
++
++}
++
++#include <LibWebCommon/Fetch/Infrastructure/OriginAccessAllowListCodecs.h>
+diff --git a/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.ipc b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.ipc
+new file mode 100644
+index 0000000000000000000000000000000000000000..e2893f0ef38fed8f8e513193ffad25977f7fd68c
+--- /dev/null
++++ b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.ipc
+@@ -0,0 +1,11 @@
++// Copyright (c) 2026, the Xenon developers.
++
++#include <LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h>
++
++[ExistingCpp]
++struct Web::Fetch::Infrastructure::OriginAccessAllowListEntry {
++    URL::Origin source_origin;
++    String destination_scheme;
++    String destination_host;
++    bool allow_destination_subdomains;
++}
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 938fda09fc4befc3ef7048dafae2286e11af36a0..11d6db1c210d956ed628b1bd5b7032eb224a44f8 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -1158,6 +1158,8 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+     client->request_server_site_bindings().did_connect(request_server_connection.client_id);
+     client->async_connect_to_request_server(move(request_server_connection.handle), request_server_connection.client_id);
+     client->async_set_site_compatibility_data(m_site_compatibility_data);
++    if (!m_origin_access_allow_list.is_empty())
++        client->async_set_origin_access_allow_list(m_origin_access_allow_list);
+     connect_to_image_decoder(*client, move(image_decoder));
+ 
+     // NB: A WebDriver BiDi session gives its state to every process hosting web content when it changes.
+@@ -1184,6 +1186,17 @@ ErrorOr<void> Application::reload_site_compatibility_data()
+     return {};
+ }
+ 
++void Application::set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list)
++{
++    m_origin_access_allow_list = move(allow_list);
++
++    WebContentClient::for_each_client([&](auto& client) {
++        client.async_set_origin_access_allow_list(m_origin_access_allow_list);
++        return IterationDecision::Continue;
++    });
++    WorkerProcessManager::the().update_origin_access_allow_list(m_origin_access_allow_list);
++}
++
+ Web::PageId Application::allocate_page_id()
+ {
+     VERIFY(m_next_page_or_compositor_context_id > 0);
+diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
+index 97855467bf83bf5bf7adf998cc9e2fd61d846554..3b3abd034c5a7958ab61f51c6c80dea19a48bb61 100644
+--- a/Libraries/LibWebView/Application.h
++++ b/Libraries/LibWebView/Application.h
+@@ -35,6 +35,7 @@
+ #include <LibWebCommon/CSS/PreferredContrast.h>
+ #include <LibWebCommon/CSS/PreferredMotion.h>
+ #include <LibWebCommon/Clipboard/SystemClipboard.h>
++#include <LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h>
+ #include <LibWebCommon/HTML/ActivateTab.h>
+ #include <LibWebCommon/HTML/CrossProcessId.h>
+ #include <LibWebCommon/HTML/PreparedNavigationDescriptor.h>
+@@ -109,6 +110,11 @@ public:
+     bool blocks_pop_ups() const;
+     ErrorOr<void> reload_site_compatibility_data();
+ 
++    // Origins of the embedder's own that may fetch from others as if they were the same origin. Every process that
++    // runs web content or workers gets the list.
++    Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> const& origin_access_allow_list() const { return m_origin_access_allow_list; }
++    void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry>);
++
+     bool claim_cpu_profiler(ProcessType);
+     void set_cpu_profiler_process(Core::Process, OwnPtr<Core::File> control_socket);
+ 
+@@ -600,6 +606,7 @@ private:
+     RefPtr<FontService> m_font_service;
+     OwnPtr<FontServiceHost> m_font_service_host;
+     JsonValue m_site_compatibility_data;
++    Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> m_origin_access_allow_list;
+     Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
+     RefPtr<Core::Timer> m_content_blocker_list_update_timer;
+     struct PendingContentBlockerListUpdate {
+diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
+index 4ce9d4d4313127886d6727fc84aee75b24cd3925..36805f3a3a0d9e7a25a187135a0c62a9e6778281 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.cpp
++++ b/Libraries/LibWebView/WorkerProcessManager.cpp
+@@ -225,6 +225,8 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
+         client->request_server_site_bindings().did_connect(request_server_connection.client_id);
+         client->async_connect_to_request_server(move(request_server_connection.handle), request_server_connection.client_id);
+         client->async_set_site_compatibility_data(Application::the().site_compatibility_data());
++        if (auto const& allow_list = Application::the().origin_access_allow_list(); !allow_list.is_empty())
++            client->async_set_origin_access_allow_list(allow_list);
+         // The User-Agent string, the navigator compatibility mode, and the preferred languages live in this process.
+         // Pages get them through their view; a worker gets the same values here, so its navigator never contradicts
+         // the page's.
+@@ -329,6 +331,12 @@ void WorkerProcessManager::update_site_compatibility_data(JsonValue const& data)
+         agent.value.client->async_set_site_compatibility_data(data);
+ }
+ 
++void WorkerProcessManager::update_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> const& allow_list)
++{
++    for (auto const& agent : m_agents)
++        agent.value.client->async_set_origin_access_allow_list(allow_list);
++}
++
+ void WorkerProcessManager::update_user_agent(String const& user_agent)
+ {
+     for (auto const& agent : m_agents)
+diff --git a/Libraries/LibWebView/WorkerProcessManager.h b/Libraries/LibWebView/WorkerProcessManager.h
+index 0d1b1fd0a2fa42f89a19a617cf19ac8726c9a141..5087ff7ca41648796b35470029e722d9cf124580 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.h
++++ b/Libraries/LibWebView/WorkerProcessManager.h
+@@ -19,6 +19,7 @@
+ #include <AK/kmalloc.h>
+ #include <LibCore/Forward.h>
+ #include <LibURL/Origin.h>
++#include <LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h>
+ #include <LibWebCommon/HTML/BroadcastChannelMessage.h>
+ #include <LibWebCommon/HTML/WorkerAgentTypes.h>
+ #include <LibWebCommon/Loader/NavigatorCompatibilityMode.h>
+@@ -53,6 +54,7 @@ public:
+     Web::HTML::WorkerAgentId start_worker_agent(WebWorkerClient&, Optional<CanonicalEnvironmentSettingsObject const&> outside_settings, Web::HTML::WorkerAgentStartRequest);
+     Optional<CanonicalWorkerEnvironmentSettingsObject const&> inside_settings(Web::HTML::WorkerAgentId) const;
+     void update_site_compatibility_data(JsonValue const&);
++    void update_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> const&);
+     // A worker's navigator reports what its owner's page reports, so a changed spoofing choice or language list
+     // reaches every live worker too.
+     void update_user_agent(String const&);
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 7049a3ca628b73d78082dec00d24c8d10c47e471..91de3b4d4e851270cb8c83a719cdfd358fbb84df 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -530,6 +530,11 @@ void ConnectionFromClient::set_site_compatibility_data(JsonValue data)
+     Web::ResourceLoader::the().set_site_compatibility_data(parsed_data.release_value());
+ }
+ 
++void ConnectionFromClient::set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list)
++{
++    Web::Fetch::Infrastructure::set_origin_access_allow_list(move(allow_list));
++}
++
+ void ConnectionFromClient::update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 022bbed019c8805664daed827253223b05292d6c..4673d4e820bf7f2bd3844b7fece234f2e1bb7177 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -120,6 +120,7 @@ private:
+     virtual void connect_to_image_decoder(IPC::TransportHandle handle) override;
+     virtual void connect_to_compositor_process(IPC::TransportHandle handle, IPC::TransportHandle render_clock_handle) override;
+     virtual void set_site_compatibility_data(JsonValue data) override;
++    virtual void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) override;
+     virtual void compositor_process_reconnected() override;
+     virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
+     virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 4afae00ee9d06a8be4aebc3dd26e63324c1bd710..c7040bc4cc5e9b085cd9d69b7ca679d1ffba6eb3 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -15,6 +15,7 @@
+ #include <LibWebCommon/CSS/StyleSheetIdentifier.h>
+ #include <LibWebCommon/Clipboard/SystemClipboard.h>
+ #include <LibWebCommon/ContentSecurityPolicy/Directives/NavigationType.h>
++#include <LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h>
+ #include <LibWebCommon/Fullscreen/FullscreenRequestType.h>
+ #include <LibWebCommon/Gamepad/GamepadSnapshot.h>
+ #include <LibWebCommon/Gamepad/GamepadStateBuffer.h>
+@@ -96,6 +97,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     connect_to_compositor_process(IPC::TransportHandle handle, IPC::TransportHandle render_clock_handle) =|
+     compositor_process_reconnected() =|
+     set_site_compatibility_data(JsonValue data) =|
++    set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) =|
+ 
+     update_system_theme(Web::PageId page_id, Core::AnonymousBuffer theme_buffer) =|
+     update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen_index) =|
+diff --git a/Services/WebWorker/ConnectionFromClient.cpp b/Services/WebWorker/ConnectionFromClient.cpp
+index 53fbfbb31ebb6274787036a70d5e990ac556afea..d4fa5eea0f6fb4cd1d9f55fa52a9454ba6d151b8 100644
+--- a/Services/WebWorker/ConnectionFromClient.cpp
++++ b/Services/WebWorker/ConnectionFromClient.cpp
+@@ -85,6 +85,11 @@ void ConnectionFromClient::set_site_compatibility_data(JsonValue data)
+     Web::ResourceLoader::the().set_site_compatibility_data(parsed_data.release_value());
+ }
+ 
++void ConnectionFromClient::set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list)
++{
++    Web::Fetch::Infrastructure::set_origin_access_allow_list(move(allow_list));
++}
++
+ void ConnectionFromClient::set_user_agent(String user_agent)
+ {
+     Web::ResourceLoader::the().set_user_agent(move(user_agent));
+diff --git a/Services/WebWorker/ConnectionFromClient.h b/Services/WebWorker/ConnectionFromClient.h
+index edc9cabc189fb6c521095fadbc5a36ac8d66f7c3..93f027bd458f3adbd80c95f638c8bab438b2942f 100644
+--- a/Services/WebWorker/ConnectionFromClient.h
++++ b/Services/WebWorker/ConnectionFromClient.h
+@@ -61,6 +61,7 @@ private:
+     virtual void connect_to_image_decoder(IPC::TransportHandle handle) override;
+     virtual void connect_to_compositor(IPC::TransportHandle handle) override;
+     virtual void set_site_compatibility_data(JsonValue data) override;
++    virtual void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) override;
+     virtual void set_user_agent(String user_agent) override;
+     virtual void set_navigator_compatibility_mode(Web::NavigatorCompatibilityMode mode) override;
+     virtual void set_preferred_languages(Vector<String> preferred_languages) override;
+diff --git a/Services/WebWorker/WebWorkerServer.ipc b/Services/WebWorker/WebWorkerServer.ipc
+index a8fdcf6565c47537c44c76049c4ef0955e04076b..7e9e3355db2844de293230d94424b94702b2395e 100644
+--- a/Services/WebWorker/WebWorkerServer.ipc
++++ b/Services/WebWorker/WebWorkerServer.ipc
+@@ -3,6 +3,7 @@
+ #include <LibIPC/File.h>
+ #include <LibIPC/TransportHandle.h>
+ #include <LibURL/URL.h>
++#include <LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h>
+ #include <LibWebCommon/HTML/BroadcastChannelMessage.h>
+ #include <LibWebCommon/HTML/Scripting/SerializedEnvironmentSettingsObject.h>
+ #include <LibWebCommon/HTML/SerializationRecords.h>
+@@ -19,6 +20,7 @@ endpoint WebWorkerServer {
+     connect_to_image_decoder(IPC::TransportHandle handle) =|
+     connect_to_compositor(IPC::TransportHandle handle) =|
+     set_site_compatibility_data(JsonValue data) =|
++    set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) =|
+     set_user_agent(String user_agent) =|
+     set_navigator_compatibility_mode(Web::NavigatorCompatibilityMode mode) =|
+     set_preferred_languages(Vector<String> preferred_languages) =|

@@ -1,0 +1,71 @@
+{
+    "manifest_version": 3,
+    "name": "__MSG_name__",
+    "description": "Xenon's test extension for chrome-extension:// pages and the chrome.* APIs they use.",
+    "version": "1.0",
+    "default_locale": "en",
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "__MSG_title__",
+        "default_icon": {
+            "16": "icon16.png",
+            "32": "icon32.png"
+        }
+    },
+    "permissions": [
+        "storage",
+        "alarms",
+        "tabs",
+        "offscreen",
+        "webNavigation",
+        "scripting",
+        "webRequest",
+        "notifications",
+        "privacy"
+    ],
+    "host_permissions": [
+        "http://127.0.0.1/*"
+    ],
+    "icons": {
+        "16": "icon16.png",
+        "32": "icon32.png",
+        "48": "icon48.png",
+        "128": "icon128.png"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "web_accessible_resources": [
+        {
+            "resources": ["accessible.html", "accessible.js"],
+            "matches": ["http://127.0.0.1/*"]
+        }
+    ],
+    "content_scripts": [
+        {
+            "matches": ["http://127.0.0.1/content-scripts*"],
+            "js": ["content-start.js"],
+            "css": ["content.css"],
+            "run_at": "document_start"
+        },
+        {
+            "matches": ["http://127.0.0.1/content-scripts*"],
+            "js": ["content-main.js"],
+            "run_at": "document_start",
+            "world": "MAIN"
+        },
+        {
+            "matches": ["http://127.0.0.1/content-scripts*"],
+            "js": ["content-end.js"],
+            "run_at": "document_end"
+        },
+        {
+            "matches": ["http://127.0.0.1/content-scripts*"],
+            "exclude_globs": ["*?exclude*"],
+            "js": ["content-idle.js"]
+        }
+    ],
+    "optional_permissions": [
+        "bookmarks"
+    ]
+}

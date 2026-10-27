@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-# Xenon's fast checks: formatting, and the invariants that keep Xenon building on an unmodified Ladybird checkout.
+# Xenon's fast checks: formatting, and the invariants that keep Xenon building on upstream Ladybird plus Xenon's patch
+# series (Patches/ladybird, see Meta/patches.py).
 # The same script runs locally (by hand or from the pre-push hook in .githooks/) and as CI's first job.
 #
 #   Meta/check.py            check everything
@@ -10,6 +11,8 @@
 #
 # The formatters are the versions Ladybird's own CI uses, read from the submodule, so bumping Ladybird bumps them too.
 # clang-format and ruff are installed into Build/tools on first use; prettier runs through npx.
+
+from __future__ import annotations
 
 import argparse
 import json
@@ -21,6 +24,8 @@ import sys
 import venv
 
 from pathlib import Path
+
+import patches
 
 XENON_SOURCE_DIR = Path(__file__).resolve().parent.parent
 LADYBIRD_SOURCE_DIR = XENON_SOURCE_DIR / "ladybird"
@@ -99,16 +104,20 @@ def check_includes(checks: Checks):
 
 def check_build_lists_every_source(checks: Checks):
     build_file = (UI_DIR / "Xenon.cmake").read_text()
-    listed = set(re.findall(r"\b([A-Za-z0-9_]+\.(?:cpp|mm))\b", build_file))
+    # Sources are listed relative to UI/ (Bangs.cpp, Extensions/Manifest.cpp), or by a path ending in Tests/ or UI/.
+    # Generated sources live in the build directory.
+    source_pattern = r"(?<!GENERATED_DIR\})(?<![A-Za-z0-9_/])([A-Za-z0-9_/]+\.(?:cpp|mm))\b"
+    listed = {name.removeprefix("/") for name in re.findall(source_pattern, build_file)}
+    listed = {name.split("/UI/")[-1].removeprefix("UI/") for name in listed}
 
     for path in ui_sources(".cpp", ".mm"):
-        if path.parent != UI_DIR:
-            continue
-        if path.name not in listed and path.name not in PLATFORM_SOURCES:
+        name = str(path.relative_to(UI_DIR))
+        if name not in listed and name not in PLATFORM_SOURCES:
             checks.fail("sources", f"{relative(path)} isn't built; add it to UI/Xenon.cmake")
 
     for name in sorted(listed):
-        if not (UI_DIR / name).exists() and not (XENON_SOURCE_DIR / "Tests" / name).exists():
+        test_name = name.split("Tests/")[-1]
+        if not (UI_DIR / name).exists() and not (XENON_SOURCE_DIR / "Tests" / test_name).exists():
             checks.fail("sources", f"UI/Xenon.cmake lists {name}, which doesn't exist in UI/ or Tests/")
 
 
@@ -190,7 +199,11 @@ def check_filter_lists(checks: Checks):
 
     manifest = json.loads(manifest_path.read_text())
     listed = {entry["file"] for entry in manifest["lists"]}
-    present = {f"lists/{path.name}" for path in (directory / "lists").glob("*.txt")}
+    present = {
+        f"{subdirectory}/{path.name}"
+        for subdirectory in ("lists", "trusted-lists")
+        for path in (directory / subdirectory).glob("*.txt")
+    }
     for file in sorted(listed - present):
         checks.fail("filter lists", f"the manifest names {file}, which is missing")
     for file in sorted(present - listed):
@@ -203,6 +216,8 @@ def check_filter_lists(checks: Checks):
             checks.fail(
                 "filter lists", f"{entry['id']} ships although it's excluded: {manifest['excluded'][entry['id']]}"
             )
+    if "resources" in manifest and not (directory / manifest["resources"]["file"]).exists():
+        checks.fail("filter lists", f"{manifest['resources']['file']} is missing; run Meta/update-filter-lists.py")
     for name in ("NOTICE.txt", "LICENSE-GPL-3.0.txt"):
         if not (directory / name).exists():
             checks.fail("filter lists", f"UI/Resources/filter-lists/{name} is missing; the lists' licenses require it")
@@ -220,16 +235,24 @@ def check_submodule(checks: Checks, online: bool, unpinned: bool):
         checks.fail("submodule", "ladybird/ isn't checked out; run git submodule update --init --depth 1")
         return
 
-    # Xenon builds on an unmodified Ladybird, so local edits there would build here and nowhere else.
+    # Xenon builds on upstream Ladybird plus the patch series, so an engine change that isn't in the series would build
+    # here and nowhere else.
     status = git("-C", str(LADYBIRD_SOURCE_DIR), "status", "--porcelain", "--untracked-files=no")
     if status:
-        checks.fail("submodule", "ladybird/ has local modifications; Xenon must build on an unmodified Ladybird")
+        checks.fail("submodule", "ladybird/ has uncommitted changes; commit them there and run Meta/patches.py export")
+
+    if not unpinned and patches.state() == patches.State.OTHER:
+        checks.fail(
+            "submodule",
+            f"ladybird/ is {patches.State.OTHER.value}; Meta/patches.py export saves engine changes to the series, "
+            "and Meta/patches.py apply restores it",
+        )
+
+    for path in patches.patch_files():
+        if not path.read_text().startswith(f"From {'0' * 40} "):
+            checks.fail("patches", f"{relative(path)} wasn't written by Meta/patches.py export")
 
     pinned = git("ls-tree", "HEAD", "ladybird").split()
-    checked_out = git("-C", str(LADYBIRD_SOURCE_DIR), "rev-parse", "HEAD")
-    if pinned and pinned[2] != checked_out and not unpinned:
-        checks.fail("submodule", f"ladybird/ is at {checked_out[:10]} but the commit pins {pinned[2][:10]}")
-
     if online and pinned:
         result = subprocess.run(
             ["git", "-C", str(LADYBIRD_SOURCE_DIR), "fetch", "--quiet", "--depth=1", LADYBIRD_UPSTREAM, pinned[2]],

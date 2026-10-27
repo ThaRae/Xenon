@@ -1,0 +1,1034 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 14:21:09 -0400
+Subject: [PATCH] LibURL+LibWeb+LibWebView: Let the embedder serve URL schemes
+ of its own
+
+An embedder can now register a URL scheme that it serves from the UI
+process, as a browser serves its extension pages, with
+WebView::register_url_scheme() and a handler that answers each request
+with a file and response headers.
+
+URLs of such a scheme get tuple origins of (scheme, host, port), as
+http(s) URLs do, so that each host is an origin with storage of its own.
+They are potentially trustworthy, like a packaged application's, so
+their documents are secure contexts. They are fetch schemes, so
+navigations, subresources, fetch() and workers fetch them, and CORS
+requests to them are allowed, with the handler deciding the CORS headers.
+
+WebContent asks the UI process for each such URL, as it does for a local
+file, since its sandbox keeps it from reading anything itself. The
+handler is told whether the asking process hosts a document of the URL's
+own origin, which site isolation makes the difference between a page's
+own requests and those of pages that embed it.
+
+Renderers learn the registered schemes from --embedder-scheme arguments
+when they launch.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibURL/CMakeLists.txt               |  1 +
+ Libraries/LibURL/EmbedderSchemes.cpp          | 43 ++++++++++++++
+ Libraries/LibURL/EmbedderSchemes.h            | 23 ++++++++
+ Libraries/LibURL/Rust/src/origin.rs           |  8 +++
+ Libraries/LibWeb/Fetch/Fetching/Fetching.cpp  | 10 +++-
+ .../LibWeb/Loader/EmbedderResourceRequest.h   | 29 ++++++++++
+ Libraries/LibWeb/Loader/ResourceLoader.cpp    | 57 +++++++++++++++++++
+ Libraries/LibWeb/Loader/ResourceLoader.h      |  2 +
+ Libraries/LibWeb/Page/Page.h                  |  3 +
+ .../LibWebCommon/Fetch/Infrastructure/URL.cpp |  4 +-
+ .../SecureContexts/AbstractOperations.cpp     |  4 ++
+ Libraries/LibWebView/CMakeLists.txt           |  1 +
+ Libraries/LibWebView/HelperProcess.cpp        |  5 ++
+ Libraries/LibWebView/URLSchemeHandler.cpp     | 40 +++++++++++++
+ Libraries/LibWebView/URLSchemeHandler.h       | 50 ++++++++++++++++
+ Libraries/LibWebView/WebContentPage.cpp       | 29 ++++++++++
+ Libraries/LibWebView/WebContentPage.h         |  1 +
+ Libraries/LibWebView/WebWorkerClient.cpp      |  5 ++
+ Libraries/LibWebView/WebWorkerClient.h        |  1 +
+ Libraries/LibWebView/WorkerProcessManager.cpp | 29 ++++++++++
+ Libraries/LibWebView/WorkerProcessManager.h   |  1 +
+ Services/WebContent/ConnectionFromClient.cpp  | 22 +++++++
+ Services/WebContent/ConnectionFromClient.h    |  4 ++
+ Services/WebContent/PageClient.cpp            |  5 ++
+ Services/WebContent/PageClient.h              |  1 +
+ Services/WebContent/WebContentClient.ipc      |  1 +
+ Services/WebContent/WebContentServer.ipc      |  2 +
+ Services/WebContent/main.cpp                  |  5 ++
+ Services/WebWorker/ConnectionFromClient.cpp   | 21 +++++++
+ Services/WebWorker/ConnectionFromClient.h     |  4 ++
+ Services/WebWorker/PageHost.cpp               |  5 ++
+ Services/WebWorker/PageHost.h                 |  1 +
+ Services/WebWorker/WebWorkerClient.ipc        |  1 +
+ Services/WebWorker/WebWorkerServer.ipc        |  2 +
+ Services/WebWorker/main.cpp                   |  5 ++
+ 35 files changed, 423 insertions(+), 2 deletions(-)
+ create mode 100644 Libraries/LibURL/EmbedderSchemes.cpp
+ create mode 100644 Libraries/LibURL/EmbedderSchemes.h
+ create mode 100644 Libraries/LibWeb/Loader/EmbedderResourceRequest.h
+ create mode 100644 Libraries/LibWebView/URLSchemeHandler.cpp
+ create mode 100644 Libraries/LibWebView/URLSchemeHandler.h
+
+diff --git a/Libraries/LibURL/CMakeLists.txt b/Libraries/LibURL/CMakeLists.txt
+index e5fcff64f77b9877301a01586c76e0a23a1bc741..bc35fccba87f80b06b9deb67c8656a0a6bbfd55a 100644
+--- a/Libraries/LibURL/CMakeLists.txt
++++ b/Libraries/LibURL/CMakeLists.txt
+@@ -1,4 +1,5 @@
+ set(SOURCES
++    EmbedderSchemes.cpp
+     Host.cpp
+     Origin.cpp
+     Parser.cpp
+diff --git a/Libraries/LibURL/EmbedderSchemes.cpp b/Libraries/LibURL/EmbedderSchemes.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..b566b7423be7958e477b004547465858ca9feddc
+--- /dev/null
++++ b/Libraries/LibURL/EmbedderSchemes.cpp
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/NeverDestroyed.h>
++#include <AK/Vector.h>
++#include <LibURL/EmbedderSchemes.h>
++
++namespace URL {
++
++static Vector<String>& registered_schemes()
++{
++    static NeverDestroyed<Vector<String>> schemes;
++    return *schemes;
++}
++
++void register_embedder_scheme(String scheme)
++{
++    VERIFY(!scheme.is_empty() && scheme == scheme.to_ascii_lowercase());
++    if (!is_embedder_scheme(scheme))
++        registered_schemes().append(move(scheme));
++}
++
++bool is_embedder_scheme(StringView scheme)
++{
++    return registered_schemes().contains_slow(scheme);
++}
++
++ReadonlySpan<String> embedder_schemes()
++{
++    return registered_schemes().span();
++}
++
++extern "C" bool url_rust_is_embedder_scheme(u8 const* scheme, size_t scheme_length);
++
++extern "C" bool url_rust_is_embedder_scheme(u8 const* scheme, size_t scheme_length)
++{
++    return is_embedder_scheme({ scheme, scheme_length });
++}
++
++}
+diff --git a/Libraries/LibURL/EmbedderSchemes.h b/Libraries/LibURL/EmbedderSchemes.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..f1772eb01357ca44e431720267e6249817752f4b
+--- /dev/null
++++ b/Libraries/LibURL/EmbedderSchemes.h
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/Span.h>
++#include <AK/String.h>
++#include <AK/StringView.h>
++
++namespace URL {
++
++// Schemes that the embedder serves itself (see WebView::Application::register_url_scheme()), such as a browser's
++// extension pages. Their URLs have tuple origins of (scheme, host, port), as http(s) URLs do, are potentially
++// trustworthy, and are fetched by asking the UI process for them. Every process registers the same schemes at startup,
++// before it parses its first URL.
++void register_embedder_scheme(String scheme);
++bool is_embedder_scheme(StringView scheme);
++ReadonlySpan<String> embedder_schemes();
++
++}
+diff --git a/Libraries/LibURL/Rust/src/origin.rs b/Libraries/LibURL/Rust/src/origin.rs
+index 94e28b427fbdbcc6af7daf46ad8ae0c1cc8b3464..b83310b99bb129485da62c010197006a1e625c05 100644
+--- a/Libraries/LibURL/Rust/src/origin.rs
++++ b/Libraries/LibURL/Rust/src/origin.rs
+@@ -12,6 +12,8 @@ unsafe extern "C" {
+     // NB: LibWeb's library links its own copy of this crate, so process-wide state lives in LibURL's C++.
+     fn url_rust_file_scheme_urls_have_tuple_origins() -> bool;
+ 
++    fn url_rust_is_embedder_scheme(scheme: *const u8, scheme_length: usize) -> bool;
++
+     fn url_rust_registrable_domain(
+         domain: *const u8,
+         domain_length: usize,
+@@ -268,6 +270,12 @@ impl<Serialization: AsRef<str>> Url<Serialization> {
+ 
+                 Origin::new_opaque(OpaqueOriginKind::File)
+             }
++            // AD-HOC: A scheme the embedder serves itself, such as a browser's extension pages, has tuple origins, so
++            //         that each of its hosts is an origin of its own with storage of its own.
++            // SAFETY: LibURL defines the function, which only reads the list of registered schemes.
++            scheme if unsafe { url_rust_is_embedder_scheme(scheme.as_ptr(), scheme.len()) } => {
++                Origin::new_tuple(scheme, self.host(), self.port())
++            }
+             // -> Otherwise
+             // Return a new opaque origin.
+             _ => Origin::new_opaque(OpaqueOriginKind::Standard),
+diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+index 2a6145f089716148890df2247d73d8c27ced1077..8dfeb482af7984338720bb6de6659194673a19c0 100644
+--- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
++++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+@@ -21,6 +21,7 @@
+ #include <LibRequests/Request.h>
+ #include <LibRequests/RequestTimingInfo.h>
+ #include <LibTextCodec/Encoder.h>
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibWeb/Bindings/PrincipalHostDefined.h>
+ #include <LibWeb/ContentSecurityPolicy/BlockingAlgorithms.h>
+ #include <LibWeb/DOM/Document.h>
+@@ -641,8 +642,11 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+ 
+         // -> request’s current URL’s scheme is not an HTTP(S) scheme
+         // AD-HOC: We allow CORS requests for resource:// URLs from opaque origins to enable requesting JS modules from internal pages.
++        // AD-HOC: We also allow them for schemes the embedder serves itself, which answers them with CORS headers as an
++        //         HTTP server would.
+         if (!Infrastructure::is_http_or_https_scheme(request->current_url().scheme())
+-            && !(origin && origin->is_opaque() && request->current_url().scheme() == "resource"sv)) {
++            && !(origin && origin->is_opaque() && request->current_url().scheme() == "resource"sv)
++            && !URL::is_embedder_scheme(request->current_url().scheme())) {
+             // NOTE: At this point all other request modes have been handled. Ensure we're not lying in the error message :^)
+             VERIFY(request->mode() == Infrastructure::Request::Mode::CORS);
+ 
+@@ -1483,6 +1487,10 @@ GC::Ref<PendingResponse> scheme_fetch(JS::Realm& realm, Infrastructure::FetchPar
+ 
+         return nonstandard_resource_loader_file_or_http_network_fetch(realm, fetch_params);
+     }
++    // AD-HOC: A scheme the embedder serves itself, which the UI process answers.
++    else if (URL::is_embedder_scheme(request->current_url().scheme())) {
++        return nonstandard_resource_loader_file_or_http_network_fetch(realm, fetch_params);
++    }
+     // -> HTTP(S) scheme
+     else if (Infrastructure::is_http_or_https_scheme(request->current_url().scheme())) {
+         // Return the result of running HTTP fetch given fetchParams.
+diff --git a/Libraries/LibWeb/Loader/EmbedderResourceRequest.h b/Libraries/LibWeb/Loader/EmbedderResourceRequest.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..f0a39eb0b8b726e0fbc47842f02737a6328fffcc
+--- /dev/null
++++ b/Libraries/LibWeb/Loader/EmbedderResourceRequest.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/Error.h>
++#include <AK/Function.h>
++#include <AK/Vector.h>
++#include <LibHTTP/Header.h>
++#include <LibURL/URL.h>
++
++namespace Web {
++
++// What the UI process answers for a URL of a scheme the embedder serves itself (see URL::register_embedder_scheme()):
++// the file to read the response body from, and the response's headers.
++struct EmbedderResource {
++    int fd { -1 };
++    Vector<HTTP::Header> headers;
++};
++
++struct EmbedderResourceRequest {
++    URL::URL url;
++    Function<void(ErrorOr<EmbedderResource>)> on_complete;
++};
++
++}
+diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
+index 3367c1a87eaad239e1685ac711e82b1b053fa239..09b91b2b6c3f09ddf39159256acd62f124313a69 100644
+--- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
++++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
+@@ -16,6 +16,7 @@
+ #include <LibHTTP/HSTSPreloadData.h>
+ #include <LibRequests/Request.h>
+ #include <LibRequests/RequestClient.h>
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibURL/Parser.h>
+ #include <LibWeb/Bindings/MainThreadVM.h>
+ #include <LibWeb/DOM/Document.h>
+@@ -310,6 +311,46 @@ void ResourceLoader::handle_file_load_request(LoadRequest& request, FileHandler
+     page->client().request_file(move(file_request));
+ }
+ 
++template<typename ResourceHandler, typename ErrorHandler>
++void ResourceLoader::handle_embedder_scheme_load_request(LoadRequest& request, ResourceHandler on_resource, ErrorHandler on_error)
++{
++    auto page = request.page();
++    if (!page) {
++        on_error(ByteString("INTERNAL ERROR: No Page for embedder scheme request"sv));
++        return;
++    }
++
++    // NB: The UI process decides what the URL holds and who may read it, and answers with the file to read and the
++    //     response's headers, including its Content-Type.
++    page->client().request_embedder_resource({
++        .url = request.url().value(),
++        .on_complete = [on_resource, on_error](ErrorOr<EmbedderResource> resource_or_error) mutable {
++            if (resource_or_error.is_error()) {
++                on_error(ByteString::formatted("{}", resource_or_error.error()));
++                return;
++            }
++            auto resource = resource_or_error.release_value();
++
++            auto file = Core::File::adopt_fd(resource.fd, Core::File::OpenMode::Read);
++            if (file.is_error()) {
++                on_error(ByteString::formatted("{}", file.error()));
++                return;
++            }
++            auto data = file.value()->read_until_eof();
++            if (data.is_error()) {
++                on_error(ByteString::formatted("{}", data.error()));
++                return;
++            }
++
++            FileLoadResult load_result {
++                .data = data.value().bytes(),
++                .response_headers = HTTP::HeaderList::create(move(resource.headers)),
++            };
++            on_resource(load_result);
++        },
++    });
++}
++
+ template<typename ResourceHandler, typename ErrorHandler>
+ void ResourceLoader::handle_about_load_request(LoadRequest const& request, ResourceHandler on_resource, ErrorHandler on_error)
+ {
+@@ -432,6 +473,22 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+         return nullptr;
+     }
+ 
++    if (URL::is_embedder_scheme(url.scheme())) {
++        handle_embedder_scheme_load_request(
++            request,
++            [request, on_headers_received = move(on_headers_received), on_data_received = move(on_data_received), on_complete](FileLoadResult const& load_result) {
++                log_success(request);
++                on_headers_received->function()(nullptr, load_result.response_headers, {}, {}, {}, {}, Requests::CacheState::NotCached);
++                on_data_received->function()(Requests::ResponseData::from_bytes(load_result.data));
++                on_complete->function()(true, load_result.timing_info, {});
++            },
++            [on_complete, request](ByteString const& message) {
++                log_failure(request, message);
++                on_complete->function()(false, {}, StringView(message));
++            });
++        return nullptr;
++    }
++
+     if (url.scheme() == "file"sv) {
+         handle_file_load_request(
+             request,
+diff --git a/Libraries/LibWeb/Loader/ResourceLoader.h b/Libraries/LibWeb/Loader/ResourceLoader.h
+index 3ed2ff284cf861c9a441069e7b53fe1f5016dbd4..08f7f1d02cadde85f149057327e02422bf07009f 100644
+--- a/Libraries/LibWeb/Loader/ResourceLoader.h
++++ b/Libraries/LibWeb/Loader/ResourceLoader.h
+@@ -91,6 +91,8 @@ private:
+     void handle_about_load_request(LoadRequest const& request, ResourceHandler on_resource, ErrorHandler on_error);
+     template<typename ResourceHandler, typename ErrorHandler>
+     void handle_resource_load_request(LoadRequest const& request, ResourceHandler on_resource, ErrorHandler on_error);
++    template<typename ResourceHandler, typename ErrorHandler>
++    void handle_embedder_scheme_load_request(LoadRequest& request, ResourceHandler on_resource, ErrorHandler on_error);
+ 
+     RefPtr<Requests::Request> start_network_request(LoadRequest const&, Requests::RequestClient::TransferLease);
+     void finish_network_request(NonnullRefPtr<Requests::Request>);
+diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
+index c56fc81071fd584c21b9a59d3945e5e5b8c463a1..f695ce40fe1aed4afea908d19d8f18da66d95e68 100644
+--- a/Libraries/LibWeb/Page/Page.h
++++ b/Libraries/LibWeb/Page/Page.h
+@@ -54,6 +54,7 @@
+ #include <LibWeb/HTML/TokenizedFeatures.h>
+ #include <LibWeb/HTML/UserNavigationInvolvement.h>
+ #include <LibWeb/HTML/WebViewHints.h>
++#include <LibWeb/Loader/EmbedderResourceRequest.h>
+ #include <LibWeb/Loader/FileRequest.h>
+ #include <LibWeb/Page/PageCursor.h>
+ #include <LibWeb/Page/ScreenWakeLockHandle.h>
+@@ -865,6 +866,8 @@ public:
+     virtual void page_did_consume_user_activation([[maybe_unused]] HTML::UserActivationConsumption consumption) { }
+ 
+     virtual void request_file(FileRequest) = 0;
++    // A URL of a scheme the embedder serves itself, which only the UI process can answer.
++    virtual void request_embedder_resource(EmbedderResourceRequest request) { request.on_complete(Error::from_errno(ENOTSUP)); }
+ 
+     // https://html.spec.whatwg.org/multipage/input.html#show-the-picker,-if-applicable
+     virtual void page_did_request_color_picker([[maybe_unused]] Color current_color) { }
+diff --git a/Libraries/LibWebCommon/Fetch/Infrastructure/URL.cpp b/Libraries/LibWebCommon/Fetch/Infrastructure/URL.cpp
+index e18e88f1dff25c111bc622f14808dabc26f9b349..830015569c460f820483b7e9b07eddf49bd3dbda 100644
+--- a/Libraries/LibWebCommon/Fetch/Infrastructure/URL.cpp
++++ b/Libraries/LibWebCommon/Fetch/Infrastructure/URL.cpp
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include <AK/AnyOf.h>
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibURL/URL.h>
+ #include <LibWebCommon/Fetch/Infrastructure/URL.h>
+ 
+@@ -22,7 +23,8 @@ bool is_local_url(URL::URL const& url)
+ bool is_fetch_scheme(StringView scheme)
+ {
+     // A fetch scheme is "about", "blob", "data", "file", or an HTTP(S) scheme.
+-    return any_of(FETCH_SCHEMES, [&](auto fetch_scheme) { return scheme == fetch_scheme; });
++    // AD-HOC: So is a scheme the embedder serves itself.
++    return any_of(FETCH_SCHEMES, [&](auto fetch_scheme) { return scheme == fetch_scheme; }) || URL::is_embedder_scheme(scheme);
+ }
+ 
+ // https://fetch.spec.whatwg.org/#http-scheme
+diff --git a/Libraries/LibWebCommon/SecureContexts/AbstractOperations.cpp b/Libraries/LibWebCommon/SecureContexts/AbstractOperations.cpp
+index 706748e144b50544592796c11db98de2884f846e..01026b2292d614348d6dd2a36a0e96d85348aff6 100644
+--- a/Libraries/LibWebCommon/SecureContexts/AbstractOperations.cpp
++++ b/Libraries/LibWebCommon/SecureContexts/AbstractOperations.cpp
+@@ -4,6 +4,7 @@
+  * SPDX-License-Identifier: BSD-2-Clause
+  */
+ 
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibURL/InternalURLs.h>
+ #include <LibURL/Origin.h>
+ #include <LibURL/URL.h>
+@@ -45,6 +46,9 @@ Trustworthiness is_origin_potentially_trustworthy(URL::Origin const& origin)
+ 
+     // 7. If origin’s scheme component is one which the user agent considers to be authenticated, return "Potentially Trustworthy".
+     // Note: See § 7.1 Packaged Applications for detail here.
++    // NB: The schemes the embedder serves itself are local, like a packaged application's.
++    if (auto& scheme = origin.scheme(); scheme.has_value() && URL::is_embedder_scheme(*scheme))
++        return Trustworthiness::PotentiallyTrustworthy;
+ 
+     // 8. If origin has been configured as a trustworthy origin, return "Potentially Trustworthy".
+     // Note: See § 7.2 Development Environments for detail here.
+diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
+index 5ba0c7ca79ebdf4fc57491def6adaff416bd6587..a4708f1ad416709f297afb9aab6c07b07b85391f 100644
+--- a/Libraries/LibWebView/CMakeLists.txt
++++ b/Libraries/LibWebView/CMakeLists.txt
+@@ -68,6 +68,7 @@ set(SOURCES
+     StorageJar.cpp
+     TestSpellChecker.cpp
+     URL.cpp
++    URLSchemeHandler.cpp
+     UserAgent.cpp
+     Utilities.cpp
+     VideoDecoderServerControlClient.cpp
+diff --git a/Libraries/LibWebView/HelperProcess.cpp b/Libraries/LibWebView/HelperProcess.cpp
+index b5218376db6cf250ef65fe0f855fd377724528d9..88964715a7bbaadf3b1adf612fd63528d8d2ffb3 100644
+--- a/Libraries/LibWebView/HelperProcess.cpp
++++ b/Libraries/LibWebView/HelperProcess.cpp
+@@ -12,6 +12,7 @@
+ #include <LibCore/Process.h>
+ #include <LibCore/System.h>
+ #include <LibSandbox/ConnectBroker.h>
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibWebView/Application.h>
+ #include <LibWebView/AudioServerControlClient.h>
+ #include <LibWebView/CompositorClient.h>
+@@ -336,6 +337,8 @@ ErrorOr<NonnullRefPtr<WebView::WebContentClient>> launch_web_content_process(IsP
+         arguments.append("--disable-scrollbar-painting"sv);
+     if (web_content_options.file_scheme_urls_have_tuple_origins == FileSchemeUrlsHaveTupleOrigins::Yes)
+         arguments.append("--tuple-file-origins"sv);
++    for (auto const& scheme : URL::embedder_schemes())
++        arguments.append(ByteString::formatted("--embedder-scheme={}", scheme));
+     if (browser_options.disable_sandbox == DisableSandbox::Yes)
+         arguments.append("--disable-sandbox"sv);
+ 
+@@ -549,6 +552,8 @@ ErrorOr<NonnullRefPtr<WebWorkerClient>> launch_web_worker_process(Web::HTML::Age
+         arguments.append("--enable-http-memory-cache"sv);
+     if (web_content_options.file_scheme_urls_have_tuple_origins == FileSchemeUrlsHaveTupleOrigins::Yes)
+         arguments.append("--tuple-file-origins"sv);
++    for (auto const& scheme : URL::embedder_schemes())
++        arguments.append(ByteString::formatted("--embedder-scheme={}", scheme));
+     if (web_content_options.proxy_autoconfig_url.has_value())
+         arguments.append(ByteString::formatted("--proxy-autoconfig-url={}", *web_content_options.proxy_autoconfig_url));
+ 
+diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd107545c9fefd072f77296494bcc78c77a4bebe
+--- /dev/null
++++ b/Libraries/LibWebView/URLSchemeHandler.cpp
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/NeverDestroyed.h>
++#include <LibURL/EmbedderSchemes.h>
++#include <LibWebView/URLSchemeHandler.h>
++
++namespace WebView {
++
++struct RegisteredScheme {
++    String scheme;
++    URLSchemeHandler handler;
++};
++
++static Vector<RegisteredScheme>& registered_schemes()
++{
++    static NeverDestroyed<Vector<RegisteredScheme>> schemes;
++    return *schemes;
++}
++
++void register_url_scheme(String scheme, URLSchemeHandler handler)
++{
++    VERIFY(!url_scheme_handler(scheme));
++    URL::register_embedder_scheme(scheme);
++    registered_schemes().append({ move(scheme), move(handler) });
++}
++
++URLSchemeHandler* url_scheme_handler(StringView scheme)
++{
++    for (auto& registered : registered_schemes()) {
++        if (registered.scheme == scheme)
++            return &registered.handler;
++    }
++    return nullptr;
++}
++
++}
+diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa
+--- /dev/null
++++ b/Libraries/LibWebView/URLSchemeHandler.h
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/Error.h>
++#include <AK/Function.h>
++#include <AK/String.h>
++#include <AK/StringView.h>
++#include <AK/Vector.h>
++#include <LibHTTP/Header.h>
++#include <LibIPC/File.h>
++#include <LibURL/Origin.h>
++#include <LibURL/URL.h>
++#include <LibWebView/Export.h>
++
++namespace WebView {
++
++struct URLSchemeRequest {
++    URL::URL url;
++
++    // Whether the process asking hosts a document of the URL's own origin. Site isolation gives every origin of an
++    // embedder scheme processes of its own, so this tells a page's own requests from those of pages that embed it.
++    bool from_same_origin_process { false };
++
++    // Whether this fetches the document of a navigation. Navigations are fetched in the process of the document they
++    // start from, so the asking process says nothing about who wants the URL; the navigation's initiator does.
++    bool is_navigation { false };
++    // The origin of the document that started the navigation, or none if the user started it from the browser's UI.
++    Optional<URL::Origin> navigation_initiator;
++};
++
++struct URLSchemeResponse {
++    IPC::File file;
++    // Including the Content-Type, which the renderer doesn't guess.
++    Vector<HTTP::Header> headers;
++};
++
++using URLSchemeHandler = Function<ErrorOr<URLSchemeResponse>(URLSchemeRequest const&)>;
++
++// Serves a URL scheme from the UI process, as a browser serves its extension pages. The scheme's URLs get tuple origins
++// and are potentially trustworthy (see URL::register_embedder_scheme()). Register every scheme before the first
++// renderer starts, since renderers learn the schemes when they launch. A handler that fails makes a network error.
++WEBVIEW_API void register_url_scheme(String scheme, URLSchemeHandler);
++URLSchemeHandler* url_scheme_handler(StringView scheme);
++
++}
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 884a2fc4fd4d27f748b41cb270a57fb2bfa3338f..4a0a67384565fa986f3951279df2ca0400d128d5 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -33,6 +33,7 @@
+ #include <LibWebView/StorageAreaRegistry.h>
+ #include <LibWebView/StorageJar.h>
+ #include <LibWebView/URL.h>
++#include <LibWebView/URLSchemeHandler.h>
+ #include <LibWebView/Utilities.h>
+ #include <LibWebView/ViewImplementation.h>
+ #include <LibWebView/WebContentClient.h>
+@@ -1520,6 +1521,34 @@ void WebContentPage::did_request_file(ByteString path, i32 request_id)
+         async_handle_file_return(0, file.release_value(), request_id);
+ }
+ 
++void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
++{
++    auto* handler = url_scheme_handler(url.scheme());
++    if (!handler) {
++        client().did_misbehave("did_request_embedder_resource"sv, "not an embedder scheme"sv);
++        return;
++    }
++
++    URLSchemeRequest request { .url = url, .from_same_origin_process = client().hosts_a_document_of_origin(url.origin()), .is_navigation = false, .navigation_initiator = {} };
++    traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
++        auto navigation = navigable.uncommitted_navigation();
++        if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
++            return IterationDecision::Continue;
++
++        request.is_navigation = true;
++        if (navigation->retry.has_value() && navigation->retry->user_involvement != Web::HTML::UserNavigationInvolvement::BrowserUI)
++            request.navigation_initiator = navigation->retry->initiator_origin_snapshot;
++        return IterationDecision::Break;
++    });
++
++    auto response = (*handler)(request);
++    if (response.is_error()) {
++        async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
++        return;
++    }
++    async_handle_embedder_resource_return(0, move(response.value().file), move(response.value().headers), request_id);
++}
++
+ void WebContentPage::did_request_color_picker(Color current_color)
+ {
+     view().did_request_color_picker({}, *this, current_color);
+diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
+index c3a17df4c19f67875fce048de5a96c43048f6287..6945989cd227dff33e4ee90d20feddd398da9935 100644
+--- a/Libraries/LibWebView/WebContentPage.h
++++ b/Libraries/LibWebView/WebContentPage.h
+@@ -253,6 +253,7 @@ private:
+     virtual void did_change_picture_in_picture_video_size(Gfx::IntSize video_size) override;
+     virtual void did_change_picture_in_picture_player_controls_visibility(bool shown) override;
+     virtual void did_request_file(ByteString path, i32 request_id) override;
++    virtual void did_request_embedder_resource(URL::URL url, i32 request_id) override;
+     virtual void did_request_color_picker(Color current_color) override;
+     virtual void did_request_geolocation_position(u64 request_id) override;
+     virtual void did_cancel_geolocation_position_request(u64 request_id) override;
+diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
+index c65509a873ac5255d2430a2214f4d5c5da7e1deb..7ec86d4126a428cf9684623acddc90b2c674259e 100644
+--- a/Libraries/LibWebView/WebWorkerClient.cpp
++++ b/Libraries/LibWebView/WebWorkerClient.cpp
+@@ -152,6 +152,11 @@ void WebWorkerClient::did_request_file(ByteString path, i32 request_id)
+     WorkerProcessManager::the().worker_did_request_file(m_agent_id, move(path), request_id);
+ }
+ 
++void WebWorkerClient::did_request_embedder_resource(URL::URL url, i32 request_id)
++{
++    WorkerProcessManager::the().worker_did_request_embedder_resource(m_agent_id, move(url), request_id);
++}
++
+ Messages::WebWorkerClient::DidIsKnownHstsHostResponse WebWorkerClient::did_is_known_hsts_host(String domain)
+ {
+     auto session = m_session.strong_ref();
+diff --git a/Libraries/LibWebView/WebWorkerClient.h b/Libraries/LibWebView/WebWorkerClient.h
+index 30ae9aecd232ebcd50db1fbafa22096bd96769ca..cfe845407de3d62275214d468d4623e3fe118554 100644
+--- a/Libraries/LibWebView/WebWorkerClient.h
++++ b/Libraries/LibWebView/WebWorkerClient.h
+@@ -58,6 +58,7 @@ public:
+     virtual void did_remove_blob_url_entries(Web::HTML::EnvironmentId environment_id, Vector<Utf16String> urls) override;
+     virtual Messages::WebWorkerClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
+     virtual void did_request_file(ByteString path, i32 request_id) override;
++    virtual void did_request_embedder_resource(URL::URL url, i32 request_id) override;
+     virtual Messages::WebWorkerClient::DidIsKnownHstsHostResponse did_is_known_hsts_host(String domain) override;
+     virtual Messages::WebWorkerClient::RequestMediaServerConnectionResponse request_media_server_connection() override;
+     virtual void did_post_broadcast_channel_message(Web::HTML::PostedBroadcastChannelMessage) override;
+diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
+index aaece7f1b2f564e808fa6e0bf736f56d4bc8b076..4ce9d4d4313127886d6727fc84aee75b24cd3925 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.cpp
++++ b/Libraries/LibWebView/WorkerProcessManager.cpp
+@@ -13,6 +13,7 @@
+ #include <LibWebView/CanonicalNavigable.h>
+ #include <LibWebView/HelperProcess.h>
+ #include <LibWebView/RequestServerManager.h>
++#include <LibWebView/URLSchemeHandler.h>
+ #include <LibWebView/Utilities.h>
+ #include <LibWebView/ViewImplementation.h>
+ #include <LibWebView/WebContentClient.h>
+@@ -678,6 +679,34 @@ void WorkerProcessManager::worker_did_request_file(Web::HTML::WorkerAgentId agen
+         client->async_handle_file_return(0, file.release_value(), request_id);
+ }
+ 
++void WorkerProcessManager::worker_did_request_embedder_resource(Web::HTML::WorkerAgentId agent_id, URL::URL url, i32 request_id)
++{
++    auto maybe_agent = m_agents.find(agent_id);
++    if (maybe_agent == m_agents.end())
++        return;
++
++    auto& agent = maybe_agent->value;
++    auto* handler = url_scheme_handler(url.scheme());
++    if (!handler) {
++        agent.client->async_handle_embedder_resource_return(ENOENT, {}, {}, request_id);
++        return;
++    }
++
++    // A worker process hosts the one worker, so the worker's origin is the process's.
++    URLSchemeRequest request {
++        .url = url,
++        .from_same_origin_process = agent.inside_settings->origin().is_same_origin(url.origin()),
++        .is_navigation = false,
++        .navigation_initiator = {},
++    };
++    auto response = (*handler)(request);
++    if (response.is_error()) {
++        agent.client->async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
++        return;
++    }
++    agent.client->async_handle_embedder_resource_return(0, move(response.value().file), move(response.value().headers), request_id);
++}
++
+ void WorkerProcessManager::remove_agent(Web::HTML::WorkerAgentId agent_id, AgentRemovalCause cause)
+ {
+     auto maybe_agent = m_agents.find(agent_id);
+diff --git a/Libraries/LibWebView/WorkerProcessManager.h b/Libraries/LibWebView/WorkerProcessManager.h
+index ef9ecc8b5a786346c08e569879820d1f60f13e45..0d1b1fd0a2fa42f89a19a617cf19ac8726c9a141 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.h
++++ b/Libraries/LibWebView/WorkerProcessManager.h
+@@ -118,6 +118,7 @@ private:
+     void worker_did_die(Web::HTML::WorkerAgentId);
+     void worker_process_did_exit(WebWorkerClient&);
+     void worker_did_request_file(Web::HTML::WorkerAgentId, ByteString path, i32 request_id);
++    void worker_did_request_embedder_resource(Web::HTML::WorkerAgentId, URL::URL, i32 request_id);
+ 
+     enum class AgentRemovalCause {
+         OwnerSetEmptied,
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index e223da21fd51020201f0b02c3a5b31de32140cdf..0cf88592750d7ebbe150b74c861985eafd3acac1 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3295,6 +3295,28 @@ void ConnectionFromClient::request_file(Web::PageId page_id, Web::FileRequest fi
+     async_did_request_file(page_id, path, id);
+ }
+ 
++void ConnectionFromClient::request_embedder_resource(Web::PageId page_id, Web::EmbedderResourceRequest request)
++{
++    i32 const id = last_id++;
++
++    auto url = request.url;
++    m_requested_embedder_resources.set(id, move(request));
++
++    async_did_request_embedder_resource(page_id, move(url), id);
++}
++
++void ConnectionFromClient::handle_embedder_resource_return(Web::PageId, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id)
++{
++    auto request = m_requested_embedder_resources.take(request_id);
++    VERIFY(request.has_value());
++
++    if (error != 0 || !file.has_value()) {
++        request->on_complete(Error::from_errno(error != 0 ? error : ENOENT));
++        return;
++    }
++    request->on_complete(Web::EmbedderResource { .fd = file->take_fd(), .headers = move(headers) });
++}
++
+ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+ {
+     if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index fb0eb6d9ca9fd3986f8f059fba3db4abf5f7fe45..4e8668edc84f5fde87bc48c7d17f9b69a1b52f10 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -24,6 +24,7 @@
+ #include <LibWeb/ContentSecurityPolicy/Directives/Directive.h>
+ #include <LibWeb/Forward.h>
+ #include <LibWeb/HTML/SessionHistoryEntry.h>
++#include <LibWeb/Loader/EmbedderResourceRequest.h>
+ #include <LibWeb/Loader/FileRequest.h>
+ #include <LibWeb/Page/Page.h>
+ #include <LibWeb/Platform/Timer.h>
+@@ -65,6 +66,7 @@ public:
+     virtual void die() override;
+ 
+     void request_file(Web::PageId page_id, Web::FileRequest);
++    void request_embedder_resource(Web::PageId page_id, Web::EmbedderResourceRequest);
+ 
+     PageHost& page_host() { return *m_page_host; }
+     PageHost const& page_host() const { return *m_page_host; }
+@@ -266,6 +268,7 @@ private:
+     virtual void set_window_size(Web::PageId page_id, Web::DevicePixelSize) override;
+     virtual void did_complete_window_rect_request(Web::PageId page_id, u64 completion_id) override;
+     virtual void handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) override;
++    virtual void handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) override;
+     virtual void blob_url_entry_removed(Utf16String url) override;
+     virtual void did_delete_all_cookies(Web::PageId page_id, u64 request_id) override;
+     virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
+@@ -368,6 +371,7 @@ private:
+     bool m_did_notify_started_using_gamepads { false };
+ 
+     HashMap<int, Web::FileRequest> m_requested_files {};
++    HashMap<int, Web::EmbedderResourceRequest> m_requested_embedder_resources {};
+     int last_id { 0 };
+ 
+     void enqueue_input_event(Web::QueuedInputEvent);
+diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
+index 2fcdcdffabe118a396ceff4b4565863bd4ceb885..aa8889bccda229dc4a911d2564d592e1ecf4a868 100644
+--- a/Services/WebContent/PageClient.cpp
++++ b/Services/WebContent/PageClient.cpp
+@@ -1872,6 +1872,11 @@ void PageClient::request_file(Web::FileRequest file_request)
+     client().request_file(m_id, move(file_request));
+ }
+ 
++void PageClient::request_embedder_resource(Web::EmbedderResourceRequest request)
++{
++    client().request_embedder_resource(m_id, move(request));
++}
++
+ URL::BlobURLEntry::Token PageClient::page_did_add_blob_url_entry(Web::HTML::EnvironmentSettingsObject const& environment, Utf16String const& url, Web::FileAPI::SerializedBlobURLEntry const& entry)
+ {
+     auto response = client().send_sync_but_allow_failure<Messages::WebContentClient::DidAddBlobUrlEntry>(m_id, environment.id, url, entry);
+diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
+index 980440f1f1cd4ee0b8fad3e7cd9ebf892d5d2e85..f4c58794fe8478047a550d77b0fa7f9504f4e9b2 100644
+--- a/Services/WebContent/PageClient.h
++++ b/Services/WebContent/PageClient.h
+@@ -336,6 +336,7 @@ private:
+     virtual bool page_did_request_register_session_store_tab_for_testing() override;
+     virtual String page_did_request_session_store_tab_state_for_testing() override;
+     virtual void request_file(Web::FileRequest) override;
++    virtual void request_embedder_resource(Web::EmbedderResourceRequest) override;
+     virtual URL::BlobURLEntry::Token page_did_add_blob_url_entry(Web::HTML::EnvironmentSettingsObject const&, Utf16String const& url, Web::FileAPI::SerializedBlobURLEntry const&) override;
+     virtual void page_did_remove_blob_url_entries(Web::HTML::EnvironmentSettingsObject const&, Vector<Utf16String> const& urls) override;
+     virtual void page_did_retain_blob_url_token(Web::HTML::CrossProcessId navigable_id, URL::BlobURLEntry::Token) override;
+diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
+index 5ab4f8c082c3dbcceff6eb6ed2b7ec6f13e9b29b..4349f5d54116ad68fbf2e58d967ebfd030d5df5e 100644
+--- a/Services/WebContent/WebContentClient.ipc
++++ b/Services/WebContent/WebContentClient.ipc
+@@ -229,6 +229,7 @@ endpoint WebContentClient routed by Web::PageId page_id
+     did_change_picture_in_picture_video_size(Web::PageId page_id, Gfx::IntSize video_size) =|
+     did_change_picture_in_picture_player_controls_visibility(Web::PageId page_id, bool shown) =|
+     did_request_file(Web::PageId page_id, ByteString path, i32 request_id) =|
++    did_request_embedder_resource(Web::PageId page_id, URL::URL url, i32 request_id) =|
+     did_request_color_picker(Web::PageId page_id, Color current_color) =|
+     did_request_geolocation_position(Web::PageId page_id, u64 request_id) =|
+     did_cancel_geolocation_position_request(Web::PageId page_id, u64 request_id) =|
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 2daae2483dd04f0ea4578525c981579ef80f28fe..cabeb63a74c3621054bdc14be432a2aa767b321e 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -2,6 +2,7 @@
+ #include <LibGfx/Color.h>
+ #include <LibGfx/Rect.h>
+ #include <LibHTTP/Cookie/Cookie.h>
++#include <LibHTTP/Header.h>
+ #include <LibIPC/File.h>
+ #include <LibIPC/TransportHandle.h>
+ #include <LibURL/URL.h>
+@@ -275,6 +276,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     reset_zoom(Web::PageId page_id) =|
+ 
+     handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) =|
++    handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) =|
+     blob_url_entry_removed(Utf16String url) =|
+     did_delete_all_cookies(Web::PageId page_id, u64 request_id) =|
+ 
+diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
+index 6a19e6d25fc78495d7b9aa7921ee94fad2f74c51..bcf25ad1e7365e058a3b11333b28523996d869af 100644
+--- a/Services/WebContent/main.cpp
++++ b/Services/WebContent/main.cpp
+@@ -26,6 +26,7 @@
+ #include <LibMain/Main.h>
+ #include <LibMediaClient/Client.h>
+ #include <LibRequests/RequestClient.h>
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibURL/Parser.h>
+ #include <LibUnicode/TimeZone.h>
+ #include <LibWeb/Bindings/MainThreadVM.h>
+@@ -189,6 +190,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+     StringView https_echo_server_port_string_view {};
+     StringView default_time_zone {};
+     bool file_origins_are_tuple_origins = false;
++    Vector<ByteString> embedder_schemes;
+ 
+     StringView stats_log_directory;
+     Core::ArgsParser args_parser;
+@@ -210,6 +212,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+     args_parser.add_option(is_headless, "Report that the browser is running in headless mode", "headless");
+     args_parser.add_option(default_time_zone, "Default time zone", "default-time-zone", 0, "time-zone-id");
+     args_parser.add_option(file_origins_are_tuple_origins, "Treat file:// URLs as having tuple origins", "tuple-file-origins");
++    args_parser.add_option(embedder_schemes, "A URL scheme the UI process serves", "embedder-scheme", 0, "scheme");
+     args_parser.add_option(Core::ArgsParser::Option {
+         .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
+         .help_string = "URL of a PAC file (not supported yet, requests fail)",
+@@ -250,6 +253,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+ 
+     if (file_origins_are_tuple_origins)
+         URL::set_file_scheme_urls_have_tuple_origins();
++    for (auto const& scheme : embedder_schemes)
++        URL::register_embedder_scheme(MUST(String::from_byte_string(scheme)));
+ 
+     WebContent::PageClient::set_is_headless(is_headless);
+ 
+diff --git a/Services/WebWorker/ConnectionFromClient.cpp b/Services/WebWorker/ConnectionFromClient.cpp
+index 5f74f53c356cfd3ea463fd26c4e4b5cee4ac3cfe..53fbfbb31ebb6274787036a70d5e990ac556afea 100644
+--- a/Services/WebWorker/ConnectionFromClient.cpp
++++ b/Services/WebWorker/ConnectionFromClient.cpp
+@@ -126,6 +126,27 @@ void ConnectionFromClient::request_file(Web::FileRequest request)
+     async_did_request_file(path, request_id);
+ }
+ 
++void ConnectionFromClient::request_embedder_resource(Web::EmbedderResourceRequest request)
++{
++    auto request_id = ++last_id;
++
++    auto url = request.url;
++    m_requested_embedder_resources.set(request_id, move(request));
++    async_did_request_embedder_resource(move(url), request_id);
++}
++
++void ConnectionFromClient::handle_embedder_resource_return(i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id)
++{
++    auto request = m_requested_embedder_resources.take(request_id);
++    VERIFY(request.has_value());
++
++    if (error != 0 || !file.has_value()) {
++        request->on_complete(Error::from_errno(error != 0 ? error : ENOENT));
++        return;
++    }
++    request->on_complete(Web::EmbedderResource { .fd = file->take_fd(), .headers = move(headers) });
++}
++
+ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+ {
+     if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
+diff --git a/Services/WebWorker/ConnectionFromClient.h b/Services/WebWorker/ConnectionFromClient.h
+index 6e26758ca0a621d174fea5149ad7b6473023b918..edc9cabc189fb6c521095fadbc5a36ac8d66f7c3 100644
+--- a/Services/WebWorker/ConnectionFromClient.h
++++ b/Services/WebWorker/ConnectionFromClient.h
+@@ -12,6 +12,7 @@
+ #include <LibIPC/ConnectionFromClient.h>
+ #include <LibJS/Forward.h>
+ #include <LibWeb/Forward.h>
++#include <LibWeb/Loader/EmbedderResourceRequest.h>
+ #include <LibWeb/Loader/FileRequest.h>
+ #include <LibWebCommon/Forward.h>
+ #include <LibWebCommon/HTML/BroadcastChannelMessage.h>
+@@ -36,6 +37,7 @@ public:
+     virtual void close_worker() override;
+ 
+     void request_file(Web::FileRequest);
++    void request_embedder_resource(Web::EmbedderResourceRequest);
+ 
+     PageHost& page_host() { return *m_page_host; }
+     PageHost const& page_host() const { return *m_page_host; }
+@@ -66,6 +68,7 @@ private:
+     virtual void start_worker(URL::URL url, Web::HTML::WorkerType type, Web::HTML::RequestCredentials credentials, String name, Web::HTML::TransferDataEncoder, Web::HTML::SerializedEnvironmentSettingsObject, Web::HTML::AgentType, URL::Origin origin, Web::HTML::EnvironmentId environment_id) override;
+     virtual void connect_shared_worker(Web::HTML::TransferDataEncoder, Web::HTML::SerializedEnvironmentSettingsObject) override;
+     virtual void handle_file_return(i32 error, Optional<IPC::File> file, i32 request_id) override;
++    virtual void handle_embedder_resource_return(i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) override;
+     virtual void blob_url_entry_removed(Utf16String url) override;
+     virtual void did_worker_agent_fail_loading_script(Web::HTML::WorkerAgentOwnerToken owner_token) override;
+     virtual void did_worker_agent_report_exception(Web::HTML::WorkerAgentOwnerToken owner_token, Utf16String message, Utf16String filename, u32 lineno, u32 colno) override;
+@@ -81,6 +84,7 @@ private:
+     // FIXME: Route console messages to the Browser UI using a ConsoleClient
+ 
+     HashMap<int, Web::FileRequest> m_requested_files {};
++    HashMap<int, Web::EmbedderResourceRequest> m_requested_embedder_resources {};
+     int last_id { 0 };
+ 
+     RefPtr<WorkerHost> m_worker_host;
+diff --git a/Services/WebWorker/PageHost.cpp b/Services/WebWorker/PageHost.cpp
+index 02fd58a7ee69442beaee1cbe91e841fcf813b9e6..9621ad1cc83da33767129b7ef00f3860ea5eb11c 100644
+--- a/Services/WebWorker/PageHost.cpp
++++ b/Services/WebWorker/PageHost.cpp
+@@ -119,6 +119,11 @@ void PageHost::request_file(Web::FileRequest request)
+     m_client.request_file(move(request));
+ }
+ 
++void PageHost::request_embedder_resource(Web::EmbedderResourceRequest request)
++{
++    m_client.request_embedder_resource(move(request));
++}
++
+ URL::BlobURLEntry::Token PageHost::page_did_add_blob_url_entry(Web::HTML::EnvironmentSettingsObject const& environment, Utf16String const& url, Web::FileAPI::SerializedBlobURLEntry const& entry)
+ {
+     return m_client.did_add_blob_url_entry(environment.id, url, entry);
+diff --git a/Services/WebWorker/PageHost.h b/Services/WebWorker/PageHost.h
+index cd2aacec166b78a7172735dba385bd7cd3ed1d2f..d5da116c09110ea88678d11bb753993db1824785 100644
+--- a/Services/WebWorker/PageHost.h
++++ b/Services/WebWorker/PageHost.h
+@@ -43,6 +43,7 @@ public:
+     virtual void page_did_report_worker_exception(Utf16String const& message, Utf16String const& filename, u32 lineno, u32 colno) override;
+     virtual void page_did_post_broadcast_channel_message(Web::HTML::PostedBroadcastChannelMessage const& message) override;
+     virtual void request_file(Web::FileRequest) override;
++    virtual void request_embedder_resource(Web::EmbedderResourceRequest) override;
+     virtual URL::BlobURLEntry::Token page_did_add_blob_url_entry(Web::HTML::EnvironmentSettingsObject const&, Utf16String const& url, Web::FileAPI::SerializedBlobURLEntry const&) override;
+     virtual void page_did_remove_blob_url_entries(Web::HTML::EnvironmentSettingsObject const&, Vector<Utf16String> const& urls) override;
+     virtual Optional<Web::FileAPI::SerializedBlobURLEntry> page_did_request_blob_url_entry(Utf16String const& url, Optional<URL::BlobURLEntry::Token> token) override;
+diff --git a/Services/WebWorker/WebWorkerClient.ipc b/Services/WebWorker/WebWorkerClient.ipc
+index ceb29a9058a3475a6cfc9138c6ab34ba4bf4e7db..faaa6249c464c9972abdd50da98303bd6ed548db 100644
+--- a/Services/WebWorker/WebWorkerClient.ipc
++++ b/Services/WebWorker/WebWorkerClient.ipc
+@@ -20,6 +20,7 @@ endpoint WebWorkerClient {
+     did_report_outside_settings_content_security_policy_violation(u64 policy_index, String effective_directive, URL::URL resource) =|
+     did_request_cookie(URL::URL url, HTTP::Cookie::Source source) => (HTTP::Cookie::VersionedCookie cookie)
+     did_request_file(ByteString path, i32 request_id) =|
++    did_request_embedder_resource(URL::URL url, i32 request_id) =|
+     did_is_known_hsts_host(String domain) => (bool result)
+     request_media_server_connection() => (Optional<IPC::TransportHandle> handle)
+     did_post_broadcast_channel_message(Web::HTML::PostedBroadcastChannelMessage message) =|
+diff --git a/Services/WebWorker/WebWorkerServer.ipc b/Services/WebWorker/WebWorkerServer.ipc
+index af1e377d0a207b34999d240b1d85641d8d1c0004..a8fdcf6565c47537c44c76049c4ef0955e04076b 100644
+--- a/Services/WebWorker/WebWorkerServer.ipc
++++ b/Services/WebWorker/WebWorkerServer.ipc
+@@ -1,4 +1,5 @@
+ #include <AK/JsonValue.h>
++#include <LibHTTP/Header.h>
+ #include <LibIPC/File.h>
+ #include <LibIPC/TransportHandle.h>
+ #include <LibURL/URL.h>
+@@ -48,5 +49,6 @@ endpoint WebWorkerServer {
+     broadcast_channel_message(Web::HTML::BroadcastChannelMessage message) =|
+ 
+     handle_file_return(i32 error, Optional<IPC::File> file, i32 request_id) =|
++    handle_embedder_resource_return(i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) =|
+     blob_url_entry_removed(Utf16String url) =|
+ }
+diff --git a/Services/WebWorker/main.cpp b/Services/WebWorker/main.cpp
+index 86df525081efd26e9312419f56035a6d0abc2ddf..f3036e45fa461726c767650588a7e82455d59bfd 100644
+--- a/Services/WebWorker/main.cpp
++++ b/Services/WebWorker/main.cpp
+@@ -22,6 +22,7 @@
+ #include <LibMain/Main.h>
+ #include <LibMediaClient/Client.h>
+ #include <LibRequests/RequestClient.h>
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibURL/Parser.h>
+ #include <LibWeb/Bindings/MainThreadVM.h>
+ #include <LibWeb/Fetch/Fetching/Fetching.h>
+@@ -63,6 +64,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+     bool enable_http_memory_cache = false;
+     bool wait_for_debugger = false;
+     bool file_origins_are_tuple_origins = false;
++    Vector<ByteString> embedder_schemes;
+     bool disable_sandbox = false;
+     bool enable_test_mode = false;
+ 
+@@ -79,6 +81,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+     args_parser.add_option(worker_type_string, "Type of WebWorker to start (dedicated, shared, or service)", "type", 't', "type");
+     args_parser.add_option(mach_server_name, "Mach server name", "mach-server-name", 0, "mach_server_name");
+     args_parser.add_option(file_origins_are_tuple_origins, "Treat file:// URLs as having tuple origins", "tuple-file-origins");
++    args_parser.add_option(embedder_schemes, "A URL scheme the UI process serves", "embedder-scheme", 0, "scheme");
+     args_parser.add_option(disable_sandbox, "Disable process sandboxing", "disable-sandbox");
+     args_parser.add_option(enable_test_mode, "Enable test mode", "test-mode");
+     args_parser.add_option(Core::ArgsParser::Option {
+@@ -114,6 +117,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+ 
+     if (file_origins_are_tuple_origins)
+         URL::set_file_scheme_urls_have_tuple_origins();
++    for (auto const& scheme : embedder_schemes)
++        URL::register_embedder_scheme(MUST(String::from_byte_string(scheme)));
+ 
+     auto worker_type = TRY(agent_type_from_string(worker_type_string));
+ 

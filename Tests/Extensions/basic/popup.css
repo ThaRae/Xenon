@@ -1,0 +1,35 @@
+body {
+    width: 300px;
+    margin: 0;
+    padding: 16px;
+    font-family: system-ui, sans-serif;
+    font-size: 13px;
+    color: #1d1b1e;
+    background: #fff;
+}
+
+h1 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: #ff0050;
+}
+
+p {
+    margin: 4px 0;
+}
+
+#origin {
+    color: #6b6670;
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+button {
+    margin-top: 12px;
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 6px;
+    color: #fff;
+    background: #ff0050;
+    font: inherit;
+}

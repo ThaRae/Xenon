@@ -1,0 +1,1432 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 20:55:01 -0400
+Subject: [PATCH] LibWeb+LibWebCommon+LibWebView+WebContent: Run the embedder's
+ user scripts
+
+A browser's extensions run content scripts in web pages: at document
+start, end, or idle, in the page's own world or in an isolated world of
+their own, which shares the page's DOM but none of its JavaScript
+objects. This adds what WebKit's WKUserScript and WKContentWorld give an
+embedder.
+
+The embedder sets a WebView::UserScriptHandler. While it has one, every
+document asks the UI process for its scripts as it becomes ready for
+scripts, at the same three places the content blocker runs its
+scriptlets: navigated documents, child navigables' first about:blank
+documents, and popups' first documents. The UI process answers from its
+own records of the document's URL, origin, and navigable, never from
+what the renderer says. Each Web::HTML::UserScript names its world, its
+injection time, and whether it takes a bridge to the UI process, like
+the one the pages of an embedder's own scheme get. Only isolated worlds
+get one, and the UI process only takes messages from the worlds it gave
+a bridge.
+
+An HTML::IsolatedWorld is a realm whose global wraps the document's
+Window, in a wrapper world of its own and with a WindowProxy of its own,
+as Tests/LibWeb/TestWindowProxyWorld.cpp builds one. Its errors and
+unhandled rejections only go to the console, since the page's error and
+unhandledrejection handlers would get its objects. Its wrappers are
+detached when its document is destroyed.
+
+ScriptBridgeEndpoint now names a world, and the navigable its document
+is in, so the embedder can tell its frames apart.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWeb/Bindings/MainThreadVM.cpp    |   6 +
+ Libraries/LibWeb/CMakeLists.txt               |   1 +
+ Libraries/LibWeb/DOM/Document.cpp             |  26 +++
+ Libraries/LibWeb/DOM/Document.h               |   6 +
+ Libraries/LibWeb/Forward.h                    |   1 +
+ Libraries/LibWeb/HTML/LocalNavigable.cpp      |   4 +
+ .../LibWeb/HTML/LocalTraversableNavigable.cpp |   1 +
+ Libraries/LibWeb/HTML/Parser/HTMLParser.cpp   |   3 +
+ .../HTML/Scripting/ExceptionReporter.cpp      |   9 +
+ .../LibWeb/HTML/Scripting/IsolatedWorld.cpp   | 127 +++++++++++
+ .../LibWeb/HTML/Scripting/IsolatedWorld.h     |  57 +++++
+ Libraries/LibWeb/Page/Page.h                  |   4 +
+ Libraries/LibWebCommon/CMakeLists.txt         |   1 +
+ .../LibWebCommon/HTML/Scripting/UserScript.h  |  41 ++++
+ .../HTML/Scripting/UserScript.ipc             |  19 ++
+ Libraries/LibWebView/Application.cpp          |  15 ++
+ Libraries/LibWebView/Application.h            |   7 +
+ Libraries/LibWebView/URLSchemeHandler.cpp     |  26 ++-
+ Libraries/LibWebView/URLSchemeHandler.h       |  21 +-
+ Libraries/LibWebView/UserScriptHandler.h      |  29 +++
+ Libraries/LibWebView/WebContentClient.cpp     |   8 +
+ Libraries/LibWebView/WebContentClient.h       |   1 +
+ Libraries/LibWebView/WebContentPage.cpp       |  78 ++++++-
+ Libraries/LibWebView/WebContentPage.h         |   8 +
+ Services/WebContent/CMakeLists.txt            |   1 +
+ Services/WebContent/ConnectionFromClient.cpp  |  11 +
+ Services/WebContent/ConnectionFromClient.h    |   6 +
+ Services/WebContent/PageClient.cpp            |   5 +
+ Services/WebContent/PageClient.h              |   4 +
+ Services/WebContent/UserScripts.cpp           | 203 ++++++++++++++++++
+ Services/WebContent/UserScripts.h             |  54 +++++
+ Services/WebContent/WebContentClient.ipc      |   3 +
+ Services/WebContent/WebContentServer.ipc      |   2 +
+ 33 files changed, 773 insertions(+), 15 deletions(-)
+ create mode 100644 Libraries/LibWeb/HTML/Scripting/IsolatedWorld.cpp
+ create mode 100644 Libraries/LibWeb/HTML/Scripting/IsolatedWorld.h
+ create mode 100644 Libraries/LibWebCommon/HTML/Scripting/UserScript.h
+ create mode 100644 Libraries/LibWebCommon/HTML/Scripting/UserScript.ipc
+ create mode 100644 Libraries/LibWebView/UserScriptHandler.h
+ create mode 100644 Services/WebContent/UserScripts.cpp
+ create mode 100644 Services/WebContent/UserScripts.h
+
+diff --git a/Libraries/LibWeb/Bindings/MainThreadVM.cpp b/Libraries/LibWeb/Bindings/MainThreadVM.cpp
+index feda28f31c85fbed5610c9f0c644e97fb332cc1b..7bad49322aa3097daf54f7f319a3af05392398e8 100644
+--- a/Libraries/LibWeb/Bindings/MainThreadVM.cpp
++++ b/Libraries/LibWeb/Bindings/MainThreadVM.cpp
+@@ -52,6 +52,7 @@
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/Scripting/ExceptionReporter.h>
+ #include <LibWeb/HTML/Scripting/Fetching.h>
++#include <LibWeb/HTML/Scripting/IsolatedWorld.h>
+ #include <LibWeb/HTML/Scripting/ModuleScript.h>
+ #include <LibWeb/HTML/Scripting/Script.h>
+ #include <LibWeb/HTML/Scripting/SimilarOriginWindowAgent.h>
+@@ -184,6 +185,11 @@ void initialize_main_thread_vm(HTML::AgentType type)
+     main_thread_vm_ptr()->host_promise_rejection_tracker = [](JS::Promise& promise, JS::Promise::RejectionOperation operation) {
+         auto& vm = *main_thread_vm_ptr();
+ 
++        // AD-HOC: A promise of an embedder's isolated world stays out of the global's rejected promises lists, which
++        //         the document's own unhandledrejection handlers would get it from.
++        if (HTML::IsolatedWorld::is_isolated_world_realm(promise.shape().realm()))
++            return;
++
+         // 1. Let script be the running script.
+         //    The running script is the script in the [[HostDefined]] field in the ScriptOrModule component of the running JavaScript execution context.
+         HTML::Script* script { nullptr };
+diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
+index f6175e50284fd58a66fb11b5c926c2f4fd1c04ae..ac674b84242dcb9f8931c97e2287d76b12c809ab 100644
+--- a/Libraries/LibWeb/CMakeLists.txt
++++ b/Libraries/LibWeb/CMakeLists.txt
+@@ -628,6 +628,7 @@ set(SOURCES
+     HTML/Scripting/Fetching.cpp
+     HTML/Scripting/ImportMap.cpp
+     HTML/Scripting/ImportMapParseResult.cpp
++    HTML/Scripting/IsolatedWorld.cpp
+     HTML/Scripting/ModuleMap.cpp
+     HTML/Scripting/ModuleScript.cpp
+     HTML/Scripting/Script.cpp
+diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
+index 9038a0ab85af3040b29bee73a838463b7344f60b..2273d83ca7de93aa36f2a513cc7fce7bc3dc4ecd 100644
+--- a/Libraries/LibWeb/DOM/Document.cpp
++++ b/Libraries/LibWeb/DOM/Document.cpp
+@@ -206,6 +206,7 @@
+ #include <LibWeb/HTML/Scripting/ClassicScript.h>
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/Scripting/ExceptionReporter.h>
++#include <LibWeb/HTML/Scripting/IsolatedWorld.h>
+ #include <LibWeb/HTML/Scripting/TemporaryExecutionContext.h>
+ #include <LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.h>
+ #include <LibWeb/HTML/Scripting/WindowRealm.h>
+@@ -972,6 +973,8 @@ void Document::visit_edges(Cell::Visitor& visitor)
+         visitor.visit(grid_highlight.node);
+     visitor.visit(m_active_favicon);
+     visitor.visit(m_browsing_context);
++    for (auto& it : m_isolated_worlds)
++        visitor.visit(it.value);
+     visitor.visit(m_focused_area);
+     visitor.visit(m_sequential_focus_navigation_starting_point);
+     visitor.visit(m_active_element);
+@@ -5262,6 +5265,9 @@ void Document::completely_finish_loading()
+ 
+     navigable->page().client().page_did_change_hosted_navigable_state(navigable->id(), navigable->hosted_state());
+ 
++    // AD-HOC: The embedder's user scripts that run at document idle run by the time the document has completely loaded.
++    navigable->page().client().page_document_reached_user_script_injection_time(*this, HTML::UserScriptInjectionTime::DocumentIdle);
++
+     ScopeGuard notify_observers = [this] {
+         notify_each_document_observer([&](auto const& document_observer) {
+             return document_observer.document_completely_loaded();
+@@ -6492,6 +6498,11 @@ void Document::destroy()
+     }
+     m_resize_observers.clear();
+ 
++    // AD-HOC: The embedder's isolated worlds go with the document, and their wrappers of its objects with them.
++    for (auto& it : m_isolated_worlds)
++        it.value->detach();
++    m_isolated_worlds.clear();
++
+     // 8. Set document's browsing context to null.
+     m_browsing_context = nullptr;
+ 
+@@ -7941,6 +7952,9 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+         // AD-HOC: The content blocker's scriptlets and procedural filters run before any script of the document's own.
+         ContentBlocker::the().run_page_script(*this);
+ 
++        // AD-HOC: So do the embedder's user scripts that run at document start.
++        page().client().page_document_reached_user_script_injection_time(*this, HTML::UserScriptInjectionTime::DocumentStart);
++
+         // 4. At this point scripts may run for the newly-created document document.
+         set_ready_to_run_scripts();
+     }
+@@ -12119,6 +12133,18 @@ void Document::exit_pointer_lock()
+     dbgln("FIXME: exit_pointer_lock()");
+ }
+ 
++GC::Ptr<HTML::IsolatedWorld> Document::isolated_world(String const& name)
++{
++    if (auto world = m_isolated_worlds.get(name); world.has_value())
++        return *world;
++    if (!m_window || !browsing_context() || m_has_been_destroyed)
++        return nullptr;
++
++    auto world = HTML::IsolatedWorld::create(*this);
++    m_isolated_worlds.set(name, world);
++    return world;
++}
++
+ static bool contains_named_namespace(CSS::SelectorList const& selectors)
+ {
+     return selectors.contains([](auto const& selector) { return selector->contains_named_namespace(); });
+diff --git a/Libraries/LibWeb/DOM/Document.h b/Libraries/LibWeb/DOM/Document.h
+index 1b9561f38a256a4e795ab2bc3b0aa9e5d8376163..5708f17d5b30fd0dab50c06054f649d9b32a498f 100644
+--- a/Libraries/LibWeb/DOM/Document.h
++++ b/Libraries/LibWeb/DOM/Document.h
+@@ -1714,6 +1714,10 @@ public:
+ 
+     void exit_pointer_lock();
+ 
++    // The embedder's isolated world of the given name in this document (see HTML::IsolatedWorld), made the first time
++    // it's asked for. Null for a document without a Window or a browsing context.
++    GC::Ptr<HTML::IsolatedWorld> isolated_world(String const& name);
++
+     RefPtr<SelectorQuery const> selector_query_for(Utf16View) const;
+     QuerySelectorResultCache& query_selector_result_cache();
+ 
+@@ -2263,6 +2267,8 @@ private:
+     bool m_ready_to_run_scripts { false };
+     GC::Ptr<GC::Function<void()>> m_deferred_parser_start;
+ 
++    HashMap<String, GC::Ref<HTML::IsolatedWorld>> m_isolated_worlds;
++
+     Vector<HTML::FormAssociatedElement*> m_form_associated_elements_with_form_attribute;
+ 
+     GC::Ptr<HTML::RadioButtonGroupRegistry> m_radio_button_group_registry;
+diff --git a/Libraries/LibWeb/Forward.h b/Libraries/LibWeb/Forward.h
+index 9b84ffc5ffd1f75464daaf84c48ffb34e7c454c4..fe6da867d6702960cdd0b59c9704604bb69d2af3 100644
+--- a/Libraries/LibWeb/Forward.h
++++ b/Libraries/LibWeb/Forward.h
+@@ -745,6 +745,7 @@ class HTMLVideoElement;
+ class ImageBitmap;
+ class ImageData;
+ class ImageRequest;
++class IsolatedWorld;
+ class ListOfAvailableImages;
+ class LocalNavigable;
+ class LocalTraversableNavigable;
+diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
+index f71a7572362794a93f1fffbeded1c3388551eac0..2391e6a558fbc87f21c038896da2f0522f6f93e4 100644
+--- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
++++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
+@@ -1140,6 +1140,10 @@ void LocalNavigable::initialize_navigable(NonnullRefPtr<DocumentState> document_
+     //         procedural filters run in a child navigable's first document too, before its parent can reach it.
+     if (!is_top_level_traversable() && !is_stand_in)
+         ContentBlocker::the().run_page_script(document);
++
++    // AD-HOC: So do the embedder's user scripts that run at document start, which may run in about:blank frames too.
++    if (!is_top_level_traversable() && !is_stand_in)
++        page().client().page_document_reached_user_script_injection_time(document, UserScriptInjectionTime::DocumentStart);
+ }
+ 
+ // AD-HOC: The debug settings and the compositor tree are per page, so a child navigable starts from its parent's. A
+diff --git a/Libraries/LibWeb/HTML/LocalTraversableNavigable.cpp b/Libraries/LibWeb/HTML/LocalTraversableNavigable.cpp
+index ad5c5813c601abdd6a7b61aa8c258a3be996ebde..210850e1d5783e99f3c0763a5a19b0806a72ab34 100644
+--- a/Libraries/LibWeb/HTML/LocalTraversableNavigable.cpp
++++ b/Libraries/LibWeb/HTML/LocalTraversableNavigable.cpp
+@@ -138,6 +138,7 @@ GC::Ref<LocalTraversableNavigable> LocalTraversableNavigable::create_for_new_web
+     // AD-HOC: A popup's first document is about:blank, which its opener can write into, so the content blocker's
+     //         scriptlets and procedural filters run in it too.
+     ContentBlocker::the().run_page_script(*traversable->active_document());
++    traversable->page().client().page_document_reached_user_script_injection_time(*traversable->active_document(), UserScriptInjectionTime::DocumentStart);
+ 
+     return traversable;
+ }
+diff --git a/Libraries/LibWeb/HTML/Parser/HTMLParser.cpp b/Libraries/LibWeb/HTML/Parser/HTMLParser.cpp
+index b4993e81536f590e932717dcaa1566f1700851c5..4054a0768b171b79831f0b9fa52f134c671e384f 100644
+--- a/Libraries/LibWeb/HTML/Parser/HTMLParser.cpp
++++ b/Libraries/LibWeb/HTML/Parser/HTMLParser.cpp
+@@ -927,6 +927,9 @@ void HTMLParserEndState::advance_to_dom_content_loaded_phase()
+         // 3. Set the Document's load timing info's DOM content loaded event end time to the current high resolution time given the Document's relevant global object.
+         document->load_timing_info().dom_content_loaded_event_end_time = HighResolutionTime::current_high_resolution_time(relevant_global_object(*document));
+ 
++        // AD-HOC: The embedder's user scripts that run at document end run once DOMContentLoaded has fired.
++        document->page().client().page_document_reached_user_script_injection_time(*document, HTML::UserScriptInjectionTime::DocumentEnd);
++
+         // FIXME: 4. Enable the client message queue of the ServiceWorkerContainer object whose associated service worker client is the Document object's relevant settings object.
+ 
+         // 5. Invoke WebDriver BiDi DOM content loaded with the Document's browsing context, and a new WebDriver BiDi navigation status whose id is the Document object's during-loading navigation ID for WebDriver BiDi, status is "pending", and url is the Document object's URL.
+diff --git a/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp b/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
+index d968b4b8fea7eacc881fd411e6a2494a16bdab35..19232f0839ac0e013e27e4f5339ab83e06129e76 100644
+--- a/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
++++ b/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
+@@ -17,6 +17,7 @@
+ #include <LibWeb/HTML/Scripting/ClassicScript.h>
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/Scripting/ExceptionReporter.h>
++#include <LibWeb/HTML/Scripting/IsolatedWorld.h>
+ #include <LibWeb/HTML/WindowOrWorkerGlobalScope.h>
+ #include <LibWeb/HighResolutionTime/TimeOrigin.h>
+ #include <LibWeb/Page/Page.h>
+@@ -75,6 +76,14 @@ void report_an_exception(JS::Object& global, JS::Value exception, OmitError omit
+ 
+ void report_an_exception(JS::Object& global, JS::Value exception, Optional<ErrorInformation> precomputed_error_info, OmitError omit_error, GC::Ptr<Script> script)
+ {
++    // AD-HOC: An exception of an embedder's isolated world, as from an event listener of its own, only goes to the
++    //         console. The global's error handlers belong to the document's own scripts, and would get the world's
++    //         objects.
++    if (exception.is_object() && IsolatedWorld::is_isolated_world_realm(exception.as_object().shape().realm())) {
++        report_exception_to_console(exception, exception.as_object().shape().realm(), ErrorInPromise::No);
++        return;
++    }
++
+     auto& realm = relevant_realm(global);
+     auto& vm = realm.vm();
+ 
+diff --git a/Libraries/LibWeb/HTML/Scripting/IsolatedWorld.cpp b/Libraries/LibWeb/HTML/Scripting/IsolatedWorld.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..9f656bebde35faa99a25cd366d9637d9a0066746
+--- /dev/null
++++ b/Libraries/LibWeb/HTML/Scripting/IsolatedWorld.cpp
+@@ -0,0 +1,127 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibJS/Runtime/AbstractOperations.h>
++#include <LibJS/Runtime/Error.h>
++#include <LibJS/Script.h>
++#include <LibWeb/Bindings/HostDefined.h>
++#include <LibWeb/Bindings/Intrinsics.h>
++#include <LibWeb/Bindings/MainThreadVM.h>
++#include <LibWeb/Bindings/Wrappable.h>
++#include <LibWeb/Bindings/WrapperWorld.h>
++#include <LibWeb/DOM/Document.h>
++#include <LibWeb/HTML/BrowsingContext.h>
++#include <LibWeb/HTML/Scripting/Environments.h>
++#include <LibWeb/HTML/Scripting/ExceptionReporter.h>
++#include <LibWeb/HTML/Scripting/IsolatedWorld.h>
++#include <LibWeb/HTML/Window.h>
++#include <LibWeb/HTML/WindowProxy.h>
++
++namespace Web::HTML {
++
++GC_DEFINE_ALLOCATOR(IsolatedWorld);
++
++GC::Ref<IsolatedWorld> IsolatedWorld::create(DOM::Document& document)
++{
++    auto window = GC::Ref { *document.window() };
++    auto browsing_context = GC::Ref { *document.browsing_context() };
++    auto& vm = Bindings::main_thread_vm();
++
++    // A realm like the window's own, whose global wraps the same Window, but in a wrapper world of its own and with a
++    // WindowProxy of its own. It runs with the window's settings object, by way of the window's realm as its principal
++    // realm.
++    auto wrapper_world = vm.heap().allocate<Bindings::WrapperWorld>(Bindings::WrapperWorld::Type::Extension);
++    auto realm_execution_context = Bindings::create_a_new_javascript_realm(
++        vm,
++        document.relevant_settings_object().agent_cluster_cross_origin_isolation_mode(),
++        [&](JS::Realm& realm) -> GC::Ref<JS::Object> {
++            return Bindings::create_global_object_wrapper(realm, window);
++        },
++        [&](JS::Realm& realm) -> GC::Ref<JS::Object> {
++            return browsing_context->window_proxy_for(*wrapper_world, realm)->object();
++        });
++
++    auto& realm = *realm_execution_context->realm;
++    auto intrinsics = realm.create<Bindings::Intrinsics>(realm);
++    realm.set_host_defined(realm.heap().allocate<Bindings::HostDefined>(intrinsics, wrapper_world, window->principal_realm()));
++    Bindings::cache_global_object_wrapper(realm);
++    MUST(Bindings::initialize_window_web_interfaces(*window, realm));
++
++    return vm.heap().allocate<IsolatedWorld>(document, wrapper_world, move(realm_execution_context));
++}
++
++IsolatedWorld::IsolatedWorld(DOM::Document& document, GC::Ref<Bindings::WrapperWorld> wrapper_world, NonnullOwnPtr<JS::ExecutionContext> realm_execution_context)
++    : m_document(document)
++    , m_wrapper_world(wrapper_world)
++    , m_realm_execution_context(move(realm_execution_context))
++{
++}
++
++IsolatedWorld::~IsolatedWorld() = default;
++
++bool IsolatedWorld::is_isolated_world_realm(JS::Realm const& realm)
++{
++    return realm.host_defined() && Bindings::host_defined_wrapper_world(realm).type() == Bindings::WrapperWorld::Type::Extension;
++}
++
++JS::Realm& IsolatedWorld::realm() const
++{
++    return *m_realm_execution_context->realm;
++}
++
++JS::Completion IsolatedWorld::run_script(Utf16View source, URL::URL const& url)
++{
++    auto& realm = this->realm();
++    auto script = JS::Script::parse(source, realm, url.to_byte_string());
++    if (script.is_error()) {
++        auto error = JS::SyntaxError::create(realm, script.error().first().to_utf16_string());
++        report_exception_to_console(error, realm, ErrorInPromise::No);
++        return JS::throw_completion(error);
++    }
++
++    auto& settings = m_document->relevant_settings_object();
++    prepare_to_run_script(settings);
++    JS::Completion result = realm.vm().run(script.value());
++    if (result.is_abrupt())
++        report_exception_to_console(result.value(), realm, ErrorInPromise::No);
++    clean_up_after_running_script(settings);
++    return result;
++}
++
++JS::Completion IsolatedWorld::call(JS::Value function, JS::Value this_value, ReadonlySpan<JS::Value> arguments)
++{
++    auto& realm = this->realm();
++    auto& settings = m_document->relevant_settings_object();
++    prepare_to_run_script(settings);
++    prepare_to_run_callback(settings);
++
++    JS::Completion result = JS::js_undefined();
++    if (auto call_result = JS::call(realm.vm(), function, this_value, arguments); call_result.is_error()) {
++        report_exception_to_console(call_result.error_value(), realm, ErrorInPromise::No);
++        result = JS::throw_completion(call_result.error_value());
++    } else {
++        result = call_result.value();
++    }
++
++    clean_up_after_running_callback(settings);
++    clean_up_after_running_script(settings);
++    return result;
++}
++
++void IsolatedWorld::detach()
++{
++    m_wrapper_world->detach();
++}
++
++void IsolatedWorld::visit_edges(Cell::Visitor& visitor)
++{
++    Base::visit_edges(visitor);
++    visitor.visit(m_document);
++    visitor.visit(m_wrapper_world);
++    m_realm_execution_context->visit_edges(visitor);
++}
++
++}
+diff --git a/Libraries/LibWeb/HTML/Scripting/IsolatedWorld.h b/Libraries/LibWeb/HTML/Scripting/IsolatedWorld.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..8ab0d0ac5feee8bbdc258825722bd91f135001a4
+--- /dev/null
++++ b/Libraries/LibWeb/HTML/Scripting/IsolatedWorld.h
+@@ -0,0 +1,57 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/NonnullOwnPtr.h>
++#include <AK/Utf16View.h>
++#include <LibGC/Ptr.h>
++#include <LibJS/Forward.h>
++#include <LibJS/Heap/Cell.h>
++#include <LibJS/Runtime/Completion.h>
++#include <LibURL/URL.h>
++#include <LibWeb/Export.h>
++#include <LibWeb/Forward.h>
++
++namespace Web::HTML {
++
++// A world of the embedder's own in a document, for scripts such as browser extensions' content scripts: a realm whose
++// global wraps the document's Window, with a WindowProxy of its own. It shares the document's DOM, but every DOM object
++// has a wrapper of its own in it (see Bindings::WrapperWorld), so the world and the document's own scripts never see
++// each other's JavaScript objects, expando properties, or changes to builtins.
++class WEB_API IsolatedWorld final : public JS::Cell {
++    GC_CELL(IsolatedWorld, JS::Cell);
++    GC_DECLARE_ALLOCATOR(IsolatedWorld);
++
++public:
++    // Makes a world in a document that has a Window and a browsing context.
++    static GC::Ref<IsolatedWorld> create(DOM::Document&);
++    virtual ~IsolatedWorld() override;
++
++    static bool is_isolated_world_realm(JS::Realm const&);
++
++    JS::Realm& realm() const;
++
++    // Runs a classic script in the world. Its errors go to the console rather than to the document's error handlers,
++    // which would get the world's objects.
++    JS::Completion run_script(Utf16View source, URL::URL const&);
++    // Calls a function of the world as a callback, with its errors going where run_script() sends them.
++    JS::Completion call(JS::Value function, JS::Value this_value, ReadonlySpan<JS::Value> arguments);
++
++    // Drops the world's wrappers of the document's objects, as the document goes away.
++    void detach();
++
++private:
++    IsolatedWorld(DOM::Document&, GC::Ref<Bindings::WrapperWorld>, NonnullOwnPtr<JS::ExecutionContext>);
++
++    virtual void visit_edges(Cell::Visitor&) override;
++
++    GC::Ref<DOM::Document> m_document;
++    GC::Ref<Bindings::WrapperWorld> m_wrapper_world;
++    NonnullOwnPtr<JS::ExecutionContext> m_realm_execution_context;
++};
++
++}
+diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
+index da49a708b3021971dd1cdc617d456dae204241c6..88159f8a51fd080eef053404f844b1b11bbeba49 100644
+--- a/Libraries/LibWeb/Page/Page.h
++++ b/Libraries/LibWeb/Page/Page.h
+@@ -77,6 +77,7 @@
+ #include <LibWebCommon/HTML/PostedMessageDescriptor.h>
+ #include <LibWebCommon/HTML/ReplicatedNavigableState.h>
+ #include <LibWebCommon/HTML/Scripting/EnvironmentId.h>
++#include <LibWebCommon/HTML/Scripting/UserScript.h>
+ #include <LibWebCommon/HTML/SelectItem.h>
+ #include <LibWebCommon/HTML/UserActivationConsumption.h>
+ #include <LibWebCommon/HTML/VisibilityState.h>
+@@ -881,6 +882,9 @@ public:
+     virtual void request_file(FileRequest) = 0;
+     // Called before any script of the document's own may run, for the embedder to prepare the document's realm.
+     virtual void page_document_is_ready_to_run_scripts(DOM::Document&) { }
++    // Called as a document reaches each point at which the embedder's user scripts may run in it (see HTML::UserScript):
++    // before its own scripts may run, once DOMContentLoaded has fired, and once it has completely loaded.
++    virtual void page_document_reached_user_script_injection_time(DOM::Document&, HTML::UserScriptInjectionTime) { }
+ 
+     // A URL of a scheme the embedder serves itself, which only the UI process can answer.
+     virtual void request_embedder_resource(EmbedderResourceRequest request) { request.on_complete(Error::from_errno(ENOTSUP)); }
+diff --git a/Libraries/LibWebCommon/CMakeLists.txt b/Libraries/LibWebCommon/CMakeLists.txt
+index f9832f0fa51106a24a7af2b44c0389a85074d1be..d3665092ba3c8f96aaabbe0da86bd8ee40758665 100644
+--- a/Libraries/LibWebCommon/CMakeLists.txt
++++ b/Libraries/LibWebCommon/CMakeLists.txt
+@@ -111,6 +111,7 @@ invoke_py_generator(
+ )
+ 
+ compile_ipc(Fetch/Infrastructure/OriginAccessAllowList.ipc Fetch/Infrastructure/OriginAccessAllowListCodecs.h)
++compile_ipc(HTML/Scripting/UserScript.ipc HTML/Scripting/UserScriptCodecs.h)
+ compile_ipc(Page/InputEvent.ipc Page/InputEventCodecs.h)
+ compile_ipc(Page/TextEditingCommand.ipc Page/TextEditingCommandCodecs.h)
+ compile_ipc(PixelUnits.ipc PixelUnitsCodecs.h)
+diff --git a/Libraries/LibWebCommon/HTML/Scripting/UserScript.h b/Libraries/LibWebCommon/HTML/Scripting/UserScript.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..eab1bb95aca7bee6aed52f3c0a9e946c4446a96b
+--- /dev/null
++++ b/Libraries/LibWebCommon/HTML/Scripting/UserScript.h
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/String.h>
++#include <LibURL/URL.h>
++
++namespace Web::HTML {
++
++// When a user script runs in its document, as WebKit's WKUserScriptInjectionTime and browser extensions' run_at.
++enum class UserScriptInjectionTime : u8 {
++    // Before any script of the document's own.
++    DocumentStart,
++    // Once the document has been parsed, and DOMContentLoaded has fired.
++    DocumentEnd,
++    // Once the document has loaded, or soon after DocumentEnd if loading takes a while.
++    DocumentIdle,
++};
++
++// A script the embedder runs in a document, as WebKit's WKUserScript: in the document's own world, or in an isolated
++// world of the embedder's, which shares the document's DOM but none of its JavaScript objects (see IsolatedWorld).
++struct UserScript {
++    // The isolated world to run in, by the embedder's name for it, or the document's own world if empty.
++    String world;
++    String source;
++    // Where the script came from, for error messages and stack traces.
++    URL::URL url;
++    UserScriptInjectionTime injection_time { UserScriptInjectionTime::DocumentIdle };
++    // Whether the source is the body of a function given the world's script bridge to the UI process: an object whose
++    // postMessage(string) reaches the UI process, and whose onmessage, if set, receives the UI process's messages. Only
++    // isolated worlds get a bridge, which the document's own scripts can't reach.
++    bool takes_bridge { false };
++};
++
++}
++
++#include <LibWebCommon/HTML/Scripting/UserScriptCodecs.h>
+diff --git a/Libraries/LibWebCommon/HTML/Scripting/UserScript.ipc b/Libraries/LibWebCommon/HTML/Scripting/UserScript.ipc
+new file mode 100644
+index 0000000000000000000000000000000000000000..1e2413e8ab0f291eb44ec968b799fb5df4782ef1
+--- /dev/null
++++ b/Libraries/LibWebCommon/HTML/Scripting/UserScript.ipc
+@@ -0,0 +1,19 @@
++// Copyright (c) 2026, the Xenon developers.
++
++#include <LibWebCommon/HTML/Scripting/UserScript.h>
++
++[ExistingCpp]
++enum Web::HTML::UserScriptInjectionTime : u8 {
++    DocumentStart,
++    DocumentEnd,
++    DocumentIdle,
++}
++
++[ExistingCpp]
++struct Web::HTML::UserScript {
++    String world;
++    String source;
++    URL::URL url;
++    Web::HTML::UserScriptInjectionTime injection_time;
++    bool takes_bridge;
++}
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index b13a6ede5fb0cf65424a97baf857757feca0f741..2d7d1883b28cf5dad98d8ceb020778b443d2fc6f 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -1241,6 +1241,8 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+     client->async_set_site_compatibility_data(m_site_compatibility_data);
+     if (!m_origin_access_allow_list.is_empty())
+         client->async_set_origin_access_allow_list(m_origin_access_allow_list);
++    if (m_user_script_handler)
++        client->async_set_user_scripts_enabled(true);
+     connect_to_image_decoder(*client, move(image_decoder));
+ 
+     // NB: A WebDriver BiDi session gives its state to every process hosting web content when it changes.
+@@ -1277,6 +1279,19 @@ void Application::set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure
+     WorkerProcessManager::the().update_origin_access_allow_list(m_origin_access_allow_list);
+ }
+ 
++void Application::set_user_script_handler(OwnPtr<UserScriptHandler> handler)
++{
++    auto was_enabled = m_user_script_handler != nullptr;
++    m_user_script_handler = move(handler);
++    if (was_enabled == (m_user_script_handler != nullptr))
++        return;
++
++    WebContentClient::for_each_client([&](auto& client) {
++        client.async_set_user_scripts_enabled(m_user_script_handler != nullptr);
++        return IterationDecision::Continue;
++    });
++}
++
+ Web::PageId Application::allocate_page_id()
+ {
+     VERIFY(m_next_page_or_compositor_context_id > 0);
+diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
+index f0cd1394dd921dbf1efb2c12f52c8863a0fdd353..7b020f5c2a0e5445c015ed324932dca3b4a8b200 100644
+--- a/Libraries/LibWebView/Application.h
++++ b/Libraries/LibWebView/Application.h
+@@ -59,6 +59,7 @@
+ #include <LibWebView/Profile.h>
+ #include <LibWebView/Settings.h>
+ #include <LibWebView/StorageJar.h>
++#include <LibWebView/UserScriptHandler.h>
+ #include <LibWebView/WebDriverSessionConfig.h>
+ #include <RequestServer/SiteBinding.h>
+ 
+@@ -115,6 +116,11 @@ public:
+     Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> const& origin_access_allow_list() const { return m_origin_access_allow_list; }
+     void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry>);
+ 
++    // The embedder's user scripts. While there's a handler, every document asks it for its scripts as the document
++    // becomes ready for scripts.
++    UserScriptHandler* user_script_handler() { return m_user_script_handler.ptr(); }
++    void set_user_script_handler(OwnPtr<UserScriptHandler>);
++
+     bool claim_cpu_profiler(ProcessType);
+     void set_cpu_profiler_process(Core::Process, OwnPtr<Core::File> control_socket);
+ 
+@@ -609,6 +615,7 @@ private:
+     OwnPtr<FontServiceHost> m_font_service_host;
+     JsonValue m_site_compatibility_data;
+     Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> m_origin_access_allow_list;
++    OwnPtr<UserScriptHandler> m_user_script_handler;
+     Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
+     Optional<Core::AnonymousBuffer> m_trusted_content_blocker_list_buffer;
+     Optional<Core::AnonymousBuffer> m_content_blocker_resources_buffer;
+diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
+index 43a6678142343d70e85fa46ab3b5c1bd7e47cce8..40e44cbc811b0bcbfae2323d378412075fd75491 100644
+--- a/Libraries/LibWebView/URLSchemeHandler.cpp
++++ b/Libraries/LibWebView/URLSchemeHandler.cpp
+@@ -49,18 +49,31 @@ URLSchemeBridge* url_scheme_bridge(StringView scheme)
+     return nullptr;
+ }
+ 
+-ScriptBridgeEndpoint::ScriptBridgeEndpoint(WebContentPage& page, Web::HTML::CrossProcessId document_id, URL::URL url, URL::Origin origin)
++ScriptBridgeEndpoint::ScriptBridgeEndpoint(WebContentPage& page, Web::HTML::CrossProcessId document_id, URL::URL url, URL::Origin origin, Navigable navigable, String world)
+     : m_page(page)
+     , m_document_id(document_id)
+     , m_url(move(url))
+     , m_origin(move(origin))
++    , m_navigable(navigable)
++    , m_world(move(world))
+ {
+ }
+ 
++ScriptBridgeEndpoint ScriptBridgeEndpoint::in_world(String world) const
++{
++    auto endpoint = *this;
++    endpoint.m_world = move(world);
++    return endpoint;
++}
++
+ bool ScriptBridgeEndpoint::is_open() const
+ {
+     auto page = m_page.strong_ref();
+-    return page && page->embedder_bridge_endpoint(m_document_id).has_value();
++    if (!page)
++        return false;
++    if (m_world.is_empty())
++        return page->embedder_bridge_endpoint(m_document_id).has_value();
++    return page->user_script_endpoint(m_document_id, m_world).has_value();
+ }
+ 
+ Optional<u64> ScriptBridgeEndpoint::view_id() const
+@@ -74,13 +87,18 @@ Optional<u64> ScriptBridgeEndpoint::view_id() const
+ 
+ void ScriptBridgeEndpoint::post_message(String message) const
+ {
+-    if (auto page = m_page.strong_ref())
++    auto page = m_page.strong_ref();
++    if (!page)
++        return;
++    if (m_world.is_empty())
+         page->async_post_embedder_message(m_document_id, move(message));
++    else
++        page->async_post_user_script_message(m_document_id, m_world, move(message));
+ }
+ 
+ bool ScriptBridgeEndpoint::operator==(ScriptBridgeEndpoint const& other) const
+ {
+-    return m_page.ptr() == other.m_page.ptr() && m_document_id == other.m_document_id;
++    return m_page.ptr() == other.m_page.ptr() && m_document_id == other.m_document_id && m_world == other.m_world;
+ }
+ 
+ }
+diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
+index 7916cd15b545b7407dd048b6fe1193ec4601ac29..ed9672b54ea581b54e4022e04e107d290783bd12 100644
+--- a/Libraries/LibWebView/URLSchemeHandler.h
++++ b/Libraries/LibWebView/URLSchemeHandler.h
+@@ -44,15 +44,28 @@ struct URLSchemeResponse {
+ 
+ using URLSchemeHandler = Function<ErrorOr<URLSchemeResponse>(URLSchemeRequest const&)>;
+ 
+-// A document with a script bridge to the UI process, as the UI process knows it: its URL and origin come from the UI
+-// process's own records, never from the renderer.
++// A document with a script bridge to the UI process, as the UI process knows it: its URL, origin, and navigable come
++// from the UI process's own records, never from the renderer. The bridge is in the document's own world, for the pages
++// of a bridged scheme, or in one of the UI process's isolated worlds in the document (see UserScriptHandler).
+ class WEBVIEW_API ScriptBridgeEndpoint {
+ public:
+-    ScriptBridgeEndpoint(WebContentPage&, Web::HTML::CrossProcessId document_id, URL::URL, URL::Origin);
++    struct Navigable {
++        Web::HTML::CrossProcessId id;
++        // None for a top-level traversable.
++        Optional<Web::HTML::CrossProcessId> parent_id;
++    };
++
++    ScriptBridgeEndpoint(WebContentPage&, Web::HTML::CrossProcessId document_id, URL::URL, URL::Origin, Navigable, String world = {});
+ 
+     Web::HTML::CrossProcessId document_id() const { return m_document_id; }
+     URL::URL const& url() const { return m_url; }
+     URL::Origin const& origin() const { return m_origin; }
++    // The navigable the document is in, as the UI process last knew it.
++    Navigable const& navigable() const { return m_navigable; }
++    // The isolated world of the bridge, or empty for the document's own world.
++    String const& world() const { return m_world; }
++    // The same document's isolated world of the given name, whose bridge is open once the UI process has given it one.
++    ScriptBridgeEndpoint in_world(String world) const;
+ 
+     // Whether the document is still around. Messages to a document that's gone are dropped.
+     bool is_open() const;
+@@ -67,6 +80,8 @@ private:
+     Web::HTML::CrossProcessId m_document_id;
+     URL::URL m_url;
+     URL::Origin m_origin;
++    Navigable m_navigable;
++    String m_world;
+ };
+ 
+ // A script bridge between the UI process and the scheme's documents. Before a document's own scripts run, its bootstrap
+diff --git a/Libraries/LibWebView/UserScriptHandler.h b/Libraries/LibWebView/UserScriptHandler.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..d1c85bd4ae293da1d6626af082b898ce4dd7dfc9
+--- /dev/null
++++ b/Libraries/LibWebView/UserScriptHandler.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/Function.h>
++#include <AK/String.h>
++#include <AK/Vector.h>
++#include <AK/kmalloc.h>
++#include <LibWebCommon/HTML/Scripting/UserScript.h>
++#include <LibWebView/URLSchemeHandler.h>
++
++namespace WebView {
++
++// The embedder's user scripts, as WebKit's WKUserContentController: which scripts each document gets, in its own world
++// or in isolated worlds of the embedder's (see Web::HTML::UserScript), and the messages of those worlds' bridges.
++struct UserScriptHandler {
++    AK_ALLOC_WITH_KMALLOC;
++
++    // A document's scripts, asked for once, as it becomes ready for scripts. The endpoint is the document's own world.
++    Function<Vector<Web::HTML::UserScript>(ScriptBridgeEndpoint const& document)> scripts_for_document;
++    // A message from the bridge of an isolated world that scripts_for_document() gave one.
++    Function<void(ScriptBridgeEndpoint const& world, String message)> on_message;
++};
++
++}
+diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
+index 7e77afc33cf07791abfa1cf57994aeddc7eca931..e2ae14593ef1ea2b0a70d5175a31be52b83cc235 100644
+--- a/Libraries/LibWebView/WebContentClient.cpp
++++ b/Libraries/LibWebView/WebContentClient.cpp
+@@ -63,6 +63,14 @@ Messages::WebContentClient::DidRequestEmbedderBootstrapResponse WebContentClient
+     return Optional<String> {};
+ }
+ 
++Messages::WebContentClient::DidRequestUserScriptsResponse WebContentClient::did_request_user_scripts(Web::PageId page_id, Web::HTML::CrossProcessId document_id)
++{
++    if (auto* page = this->page(page_id))
++        return page->did_request_user_scripts(document_id);
++
++    return Vector<Web::HTML::UserScript> {};
++}
++
+ bool WebContentClient::hosts_an_environment_with_storage_key(Web::StorageAPI::StorageKey const& storage_key)
+ {
+     bool hosts_one = false;
+diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
+index e72d5f151cbf9045ed90efffa4b69976954320c8..c5d886098df6ceb2fafcf85f6eec4400e49c750a 100644
+--- a/Libraries/LibWebView/WebContentClient.h
++++ b/Libraries/LibWebView/WebContentClient.h
+@@ -85,6 +85,7 @@ public:
+ 
+     virtual Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::PageId page_id, Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry entry) override;
+     virtual Messages::WebContentClient::DidRequestEmbedderBootstrapResponse did_request_embedder_bootstrap(Web::PageId page_id, Web::HTML::CrossProcessId document_id) override;
++    virtual Messages::WebContentClient::DidRequestUserScriptsResponse did_request_user_scripts(Web::PageId page_id, Web::HTML::CrossProcessId document_id) override;
+     virtual void did_retain_blob_url_token(Web::HTML::CrossProcessId navigable_id, URL::BlobURLEntry::Token token) override;
+     virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
+ 
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 7a02c67695045fe89df3210ac6f1a91f88d10bf6..4b128db6c9124824f7a9b3367709c520b73df4d1 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -235,15 +235,22 @@ Optional<CanonicalNavigable&> WebContentPage::hosted_navigable(Web::HTML::CrossP
+ // The environments a page names are the window environments of the documents it hosts, and of those populated for it
+ // to host.
+ void WebContentPage::for_each_hosted_document(Function<IterationDecision(CanonicalDocument&)> const& callback) const
++{
++    for_each_hosted_document([&](CanonicalDocument& document, CanonicalNavigable const&) {
++        return callback(document);
++    });
++}
++
++void WebContentPage::for_each_hosted_document(Function<IterationDecision(CanonicalDocument&, CanonicalNavigable const&)> const& callback) const
+ {
+     traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
+         auto decision = IterationDecision::Continue;
+         if (traversable().hosts(navigable, *this))
+-            decision = callback(navigable.active_document());
++            decision = callback(navigable.active_document(), navigable);
+         navigable.for_each_populated_document_state([&](CanonicalDocumentState const& document_state) {
+             auto& document = *document_state.populated_document->document;
+             if (decision == IterationDecision::Continue && document.host() == this)
+-                decision = callback(document);
++                decision = callback(document, navigable);
+         });
+         return decision;
+     });
+@@ -1557,26 +1564,81 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+     async_handle_embedder_resource_return(0, move(response.value().file), move(response.value().headers), request_id);
+ }
+ 
+-// A document of this page whose scheme has a script bridge, which the page hosts or is creating.
+-Optional<ScriptBridgeEndpoint> WebContentPage::embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id)
++// A document of this page, which the page hosts or is creating.
++Optional<ScriptBridgeEndpoint> WebContentPage::hosted_document_endpoint(Web::HTML::CrossProcessId document_id, String world)
+ {
+     // NB: A page that has closed, or whose traversable has gone, hosts nothing, though it may live on a little longer.
+     if (!m_is_open || !m_traversable)
+         return {};
+ 
+     Optional<ScriptBridgeEndpoint> endpoint;
+-    for_each_hosted_document([&](CanonicalDocument& document) {
++    for_each_hosted_document([&](CanonicalDocument& document, CanonicalNavigable const& navigable) {
+         if (document.id() != document_id)
+             return IterationDecision::Continue;
+ 
+-        auto const& origin = document.origin();
+-        if (!origin.is_opaque() && origin.scheme().has_value() && url_scheme_bridge(*origin.scheme()))
+-            endpoint = ScriptBridgeEndpoint { *this, document_id, document.creation_url(), origin };
++        ScriptBridgeEndpoint::Navigable navigable_record { .id = navigable.id(), .parent_id = {} };
++        if (auto const* parent = navigable.parent())
++            navigable_record.parent_id = parent->id();
++        endpoint = ScriptBridgeEndpoint { *this, document_id, document.creation_url(), document.origin(), navigable_record, move(world) };
+         return IterationDecision::Break;
+     });
+     return endpoint;
+ }
+ 
++// A document of this page whose scheme has a script bridge, which the page hosts or is creating.
++Optional<ScriptBridgeEndpoint> WebContentPage::embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id)
++{
++    auto endpoint = hosted_document_endpoint(document_id);
++    if (!endpoint.has_value())
++        return {};
++
++    auto const& origin = endpoint->origin();
++    if (origin.is_opaque() || !origin.scheme().has_value() || !url_scheme_bridge(*origin.scheme()))
++        return {};
++    return endpoint;
++}
++
++Optional<ScriptBridgeEndpoint> WebContentPage::user_script_endpoint(Web::HTML::CrossProcessId document_id, String const& world)
++{
++    auto worlds = m_bridged_user_script_worlds.get(document_id);
++    if (!worlds.has_value() || !worlds->contains(world))
++        return {};
++    return hosted_document_endpoint(document_id, world);
++}
++
++Vector<Web::HTML::UserScript> WebContentPage::did_request_user_scripts(Web::HTML::CrossProcessId document_id)
++{
++    auto* handler = Application::the().user_script_handler();
++    if (!handler)
++        return {};
++
++    // NB: The records of documents that have gone go as other documents ask for their scripts.
++    m_bridged_user_script_worlds.remove_all_matching([&](auto const& id, auto const&) {
++        return !hosted_document_endpoint(id).has_value();
++    });
++
++    auto endpoint = hosted_document_endpoint(document_id);
++    if (!endpoint.has_value())
++        return {};
++
++    auto scripts = handler->scripts_for_document(*endpoint);
++    for (auto const& script : scripts) {
++        if (script.takes_bridge && !script.world.is_empty())
++            m_bridged_user_script_worlds.ensure(document_id).set(script.world);
++    }
++    return scripts;
++}
++
++void WebContentPage::did_post_user_script_message(Web::HTML::CrossProcessId document_id, String world, String message)
++{
++    // NB: As for an embedder page's bridge, the sender comes from the UI process's records, never from the message.
++    auto endpoint = user_script_endpoint(document_id, world);
++    if (!endpoint.has_value())
++        return;
++    if (auto* handler = Application::the().user_script_handler())
++        handler->on_message(*endpoint, move(message));
++}
++
+ Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::CrossProcessId document_id)
+ {
+     auto endpoint = embedder_bridge_endpoint(document_id);
+diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
+index 59db0ff524b10f6cfbb178b1f95ae90acec081d7..97a2d506812a562b9ad1e554a76dcc0a55cee6b3 100644
+--- a/Libraries/LibWebView/WebContentPage.h
++++ b/Libraries/LibWebView/WebContentPage.h
+@@ -160,6 +160,8 @@ public:
+ 
+     // A document of this page whose scheme has a script bridge, which the page hosts or is creating.
+     Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
++    // An isolated world of the UI process's in a document of this page, which the UI process gave a bridge.
++    Optional<ScriptBridgeEndpoint> user_script_endpoint(Web::HTML::CrossProcessId document_id, String const& world);
+ 
+ private:
+     // The caller of a WebAuthn ceremony, from this process's records of the documents a page hosts, or the error to
+@@ -170,6 +172,8 @@ private:
+     bool holds_container_of(CanonicalNavigable const& child_frame, StringView message_name);
+     bool continue_navigation_population_in_selected_process(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id);
+     void for_each_hosted_document(Function<IterationDecision(CanonicalDocument&)> const&) const;
++    void for_each_hosted_document(Function<IterationDecision(CanonicalDocument&, CanonicalNavigable const&)> const&) const;
++    Optional<ScriptBridgeEndpoint> hosted_document_endpoint(Web::HTML::CrossProcessId document_id, String world = {});
+     bool populates_a_navigation_to_local_file(ByteString const& path) const;
+     Optional<CanonicalDocument&> document_with_hosted_environment(Web::HTML::EnvironmentId const& environment_id) const;
+     StorageJar* storage_jar(Web::StorageAPI::StorageEndpointType) const;
+@@ -265,6 +269,7 @@ private:
+     virtual void did_request_file(ByteString path, i32 request_id) override;
+     virtual void did_request_embedder_resource(URL::URL url, i32 request_id) override;
+     virtual void did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message) override;
++    virtual void did_post_user_script_message(Web::HTML::CrossProcessId document_id, String world, String message) override;
+     virtual void did_request_color_picker(Color current_color) override;
+     virtual void did_request_geolocation_position(u64 request_id) override;
+     virtual void did_cancel_geolocation_position_request(u64 request_id) override;
+@@ -369,6 +374,7 @@ private:
+     Messages::WebContentClient::DidRequestAllCookiesCookiestoreResponse did_request_all_cookies_cookiestore(Web::HTML::EnvironmentId const&, URL::URL);
+     Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry);
+     Optional<String> did_request_embedder_bootstrap(Web::HTML::CrossProcessId document_id);
++    Vector<Web::HTML::UserScript> did_request_user_scripts(Web::HTML::CrossProcessId document_id);
+ 
+     // Test-only handlers, reached over the separate test transport (see WebContentTestClient).
+     virtual void did_finish_test(String text) override;
+@@ -392,6 +398,8 @@ private:
+     Web::PageId m_id;
+     WeakPtr<CanonicalTraversable> m_traversable;
+     bool m_is_open { true };
++    // The isolated worlds of each document that the UI process gave a bridge, which alone may post it messages.
++    HashMap<Web::HTML::CrossProcessId, HashTable<String>> m_bridged_user_script_worlds;
+     Optional<PresentedBackingStores> m_presented_backing_stores;
+     bool m_needs_beforeunload_check { true };
+     bool m_detached_close_pending { false };
+diff --git a/Services/WebContent/CMakeLists.txt b/Services/WebContent/CMakeLists.txt
+index 4458f1ff70ea56e2fa4ca1a587c729fe28d94149..3e061f0c4c3fadefb26930eed0a49e9599e79d1c 100644
+--- a/Services/WebContent/CMakeLists.txt
++++ b/Services/WebContent/CMakeLists.txt
+@@ -5,6 +5,7 @@ set(SOURCES
+     DevToolsDebugger.cpp
+     DevToolsIndexedDB.cpp
+     EmbedderBridge.cpp
++    UserScripts.cpp
+     PageClient.cpp
+     PageHost.cpp
+     TestConnection.cpp
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index bdbbf0b320d583bb05da78995f57a91d3bc80753..376318f805d030d73da225fea6f2d3cf9fd71be0 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -535,6 +535,11 @@ void ConnectionFromClient::set_origin_access_allow_list(Vector<Web::Fetch::Infra
+     Web::Fetch::Infrastructure::set_origin_access_allow_list(move(allow_list));
+ }
+ 
++void ConnectionFromClient::set_user_scripts_enabled(bool enabled)
++{
++    m_user_scripts_enabled = enabled;
++}
++
+ void ConnectionFromClient::update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+@@ -3348,6 +3353,12 @@ void ConnectionFromClient::post_embedder_message(Web::PageId page_id, Web::HTML:
+         page->deliver_embedder_message(document_id, move(message));
+ }
+ 
++void ConnectionFromClient::post_user_script_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String world, String message)
++{
++    if (auto page = this->page(page_id); page.has_value())
++        page->deliver_user_script_message(document_id, world, move(message));
++}
++
+ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+ {
+     if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 427e05f0ebc13cf1f67b38de4e3cc1c22ec9e7b3..ae7294116f957211335c5c6dd460786f119c109c 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -89,6 +89,9 @@ public:
+     void notify_started_using_gamepads();
+     void pump_and_dispatch_gamepad_events();
+ 
++    // Whether the UI process has user scripts for documents, which they ask it for as they become ready for scripts.
++    bool user_scripts_enabled() const { return m_user_scripts_enabled; }
++
+ private:
+     ConnectionFromClient(NonnullOwnPtr<IPC::Transport>, bool enable_test_mode);
+ 
+@@ -121,6 +124,7 @@ private:
+     virtual void connect_to_compositor_process(IPC::TransportHandle handle, IPC::TransportHandle render_clock_handle) override;
+     virtual void set_site_compatibility_data(JsonValue data) override;
+     virtual void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) override;
++    virtual void set_user_scripts_enabled(bool enabled) override;
+     virtual void compositor_process_reconnected() override;
+     virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
+     virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
+@@ -273,6 +277,7 @@ private:
+     virtual void handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) override;
+     virtual void handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) override;
+     virtual void post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) override;
++    virtual void post_user_script_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String world, String message) override;
+     virtual void blob_url_entry_removed(Utf16String url) override;
+     virtual void did_delete_all_cookies(Web::PageId page_id, u64 request_id) override;
+     virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
+@@ -383,6 +388,7 @@ private:
+ 
+     Queue<Web::QueuedInputEvent> m_input_event_queue;
+     bool m_enable_test_mode { false };
++    bool m_user_scripts_enabled { false };
+ };
+ 
+ }
+diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
+index 03136feef04c960a47eb3ecab8e5cebed39c8bb1..5078404a857c4a37318d855d61261b1fc93558a5 100644
+--- a/Services/WebContent/PageClient.cpp
++++ b/Services/WebContent/PageClient.cpp
+@@ -1904,6 +1904,11 @@ void PageClient::page_document_is_ready_to_run_scripts(Web::DOM::Document& docum
+     m_embedder_bridges.install(client(), m_id, document);
+ }
+ 
++void PageClient::page_document_reached_user_script_injection_time(Web::DOM::Document& document, Web::HTML::UserScriptInjectionTime injection_time)
++{
++    m_user_scripts.document_reached(client(), m_id, document, injection_time);
++}
++
+ URL::BlobURLEntry::Token PageClient::page_did_add_blob_url_entry(Web::HTML::EnvironmentSettingsObject const& environment, Utf16String const& url, Web::FileAPI::SerializedBlobURLEntry const& entry)
+ {
+     auto response = client().send_sync_but_allow_failure<Messages::WebContentClient::DidAddBlobUrlEntry>(m_id, environment.id, url, entry);
+diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
+index 2956d9527a025e7b4a557f01bd617e41f615d40b..7f026c4ddfec1277c152b2fe97b8dd4f2405c565 100644
+--- a/Services/WebContent/PageClient.h
++++ b/Services/WebContent/PageClient.h
+@@ -38,6 +38,7 @@
+ #include <LibWebCommon/WebView/StorageSetResult.h>
+ #include <WebContent/EmbedderBridge.h>
+ #include <WebContent/Forward.h>
++#include <WebContent/UserScripts.h>
+ 
+ namespace WebContent {
+ 
+@@ -63,6 +64,7 @@ public:
+     void run_webdriver_command(u64 command_id, Optional<Web::HTML::CrossProcessId> navigable_id, String const& name, JsonValue payload, Vector<String> arguments);
+ 
+     void deliver_embedder_message(Web::HTML::CrossProcessId document_id, String message) { m_embedder_bridges.deliver_message(document_id, move(message)); }
++    void deliver_user_script_message(Web::HTML::CrossProcessId document_id, String const& world, String message) { m_user_scripts.deliver_message(document_id, world, move(message)); }
+     void webdriver_did_set_current_browsing_context(u64 command_id, Web::HTML::CrossProcessId navigable_id);
+     void did_handle_webdriver_mouse_event(u64 request_id);
+     bool prepare_webdriver_input_command(u64, Optional<Web::HTML::CrossProcessId>, JsonValue&);
+@@ -390,6 +392,7 @@ private:
+     virtual void page_did_take_screenshot(Gfx::ShareableBitmap const& screenshot) override;
+     virtual void received_message_from_web_ui(Utf16String const& name, JS::Value data) override;
+     virtual void page_document_is_ready_to_run_scripts(Web::DOM::Document&) override;
++    virtual void page_document_reached_user_script_injection_time(Web::DOM::Document&, Web::HTML::UserScriptInjectionTime) override;
+     virtual void page_did_block_resource() override;
+     virtual void page_did_start_network_request(u64 request_id, URL::URL const&, ByteString const&, Vector<HTTP::Header> const&, ReadonlyBytes, Optional<String>, String const& referrer_policy, bool is_navigation_request, Web::Fetch::Infrastructure::Request::Priority) override;
+     virtual void page_did_receive_network_response_headers(u64 request_id, u32 status_code, Optional<String>, Vector<HTTP::Header> const&, Requests::CacheState) override;
+@@ -440,6 +443,7 @@ private:
+     u64 m_next_webdriver_mouse_event_request_id { 0 };
+     RefPtr<WebUIConnection> m_web_ui;
+     EmbedderBridges m_embedder_bridges;
++    UserScripts m_user_scripts;
+ 
+     GC::Ptr<WebContentConsoleClient> m_top_level_document_console_client;
+ 
+diff --git a/Services/WebContent/UserScripts.cpp b/Services/WebContent/UserScripts.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..73c84009f9886491b33ef2b147579300cce20960
+--- /dev/null
++++ b/Services/WebContent/UserScripts.cpp
+@@ -0,0 +1,203 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibCore/Timer.h>
++#include <LibGC/Function.h>
++#include <LibJS/Runtime/Object.h>
++#include <LibJS/Runtime/PrimitiveString.h>
++#include <LibJS/Runtime/Realm.h>
++#include <LibWeb/DOM/Document.h>
++#include <LibWeb/HTML/EventLoop/EventLoop.h>
++#include <LibWeb/HTML/Scripting/ClassicScript.h>
++#include <LibWeb/HTML/Scripting/Environments.h>
++#include <LibWeb/HTML/Scripting/IsolatedWorld.h>
++#include <LibWeb/HTML/Scripting/TemporaryExecutionContext.h>
++#include <WebContent/ConnectionFromClient.h>
++#include <WebContent/UserScripts.h>
++
++namespace WebContent {
++
++using Web::HTML::UserScriptInjectionTime;
++
++// Scripts that run at document idle wait for the document to load, but no longer than this after DOMContentLoaded, as
++// in Chromium.
++static constexpr auto DOCUMENT_IDLE_TIMEOUT = AK::Duration::from_milliseconds(200);
++
++void UserScripts::document_reached(ConnectionFromClient& client, Web::PageId page_id, Web::DOM::Document& document, UserScriptInjectionTime injection_time)
++{
++    auto document_id = document.id();
++
++    if (injection_time == UserScriptInjectionTime::DocumentStart) {
++        if (!client.user_scripts_enabled() || m_documents.contains(document_id))
++            return;
++
++        auto response = client.send_sync_but_allow_failure<Messages::WebContentClient::DidRequestUserScripts>(page_id, document_id);
++        forget_documents_that_are_gone();
++        if (!response)
++            return;
++        auto scripts = response->take_scripts();
++        if (scripts.is_empty())
++            return;
++
++        m_documents.set(document_id, { .document = document, .pending = move(scripts), .reached_document_end = false, .idle_timer = nullptr });
++        run_scripts(client, page_id, document_id, UserScriptInjectionTime::DocumentStart);
++        return;
++    }
++
++    auto scripts = m_documents.get(document_id);
++    if (!scripts.has_value())
++        return;
++
++    if (injection_time == UserScriptInjectionTime::DocumentEnd) {
++        if (scripts->reached_document_end)
++            return;
++        scripts->reached_document_end = true;
++        run_scripts(client, page_id, document_id, UserScriptInjectionTime::DocumentEnd);
++
++        // NB: The scripts that just ran may have changed what's in the map.
++        if (auto remaining_scripts = m_documents.get(document_id); remaining_scripts.has_value()) {
++            remaining_scripts->idle_timer = Core::Timer::create_single_shot(DOCUMENT_IDLE_TIMEOUT, [this, &client, page_id, document_id] {
++                auto scripts = m_documents.get(document_id);
++                if (!scripts.has_value())
++                    return;
++                if (auto document = scripts->document.ptr())
++                    document_reached(client, page_id, *document, UserScriptInjectionTime::DocumentIdle);
++            });
++            remaining_scripts->idle_timer->start();
++        }
++        return;
++    }
++
++    // A document may finish loading without a parser to fire DOMContentLoaded, and document idle never comes first.
++    if (!scripts->reached_document_end)
++        document_reached(client, page_id, document, UserScriptInjectionTime::DocumentEnd);
++    run_scripts(client, page_id, document_id, UserScriptInjectionTime::DocumentIdle);
++    m_documents.remove(document_id);
++}
++
++void UserScripts::run_scripts(ConnectionFromClient& client, Web::PageId page_id, Web::HTML::CrossProcessId document_id, UserScriptInjectionTime injection_time)
++{
++    auto scripts = m_documents.get(document_id);
++    if (!scripts.has_value())
++        return;
++
++    auto document = scripts->document.ptr();
++    if (!document || document->has_been_destroyed()) {
++        m_documents.remove(document_id);
++        return;
++    }
++
++    // NB: A script may make new documents, such as iframes, which ask for scripts of their own, so none of the map is
++    //     held on to while scripts run.
++    Vector<Web::HTML::UserScript> scripts_to_run;
++    scripts->pending.remove_all_matching([&](auto const& script) {
++        if (script.injection_time != injection_time)
++            return false;
++        scripts_to_run.append(script);
++        return true;
++    });
++
++    GC::Ref protected_document = *document;
++    for (auto const& script : scripts_to_run) {
++        if (protected_document->has_been_destroyed())
++            return;
++        run_script(client, page_id, protected_document, script);
++    }
++}
++
++void UserScripts::run_script(ConnectionFromClient& client, Web::PageId page_id, Web::DOM::Document& document, Web::HTML::UserScript const& script)
++{
++    auto source = Utf16String::from_utf8(script.source);
++
++    if (script.world.is_empty()) {
++        // NB: A bridge in the document's own world would be the document's to use as well.
++        if (script.takes_bridge) {
++            dbgln("UserScripts: Not running {}, since only isolated worlds get a bridge", script.url);
++            return;
++        }
++        auto& settings = document.relevant_settings_object();
++        auto classic_script = Web::HTML::ClassicScript::create(script.url.to_byte_string(), source.utf16_view(), settings, script.url);
++        (void)classic_script->run();
++        return;
++    }
++
++    auto world = document.isolated_world(script.world);
++    if (!world)
++        return;
++
++    if (!script.takes_bridge) {
++        (void)world->run_script(source.utf16_view(), script.url);
++        return;
++    }
++
++    // NB: The script is a function body, so that the bridge is a parameter rather than something on the world's global.
++    auto function_source = Utf16String::formatted("(function (bridge) {{\n{}\n}})", source);
++    auto function = world->run_script(function_source.utf16_view(), script.url);
++    if (function.is_abrupt())
++        return;
++
++    auto& realm = world->realm();
++    auto document_id = document.id();
++    auto bridge = JS::Object::create(realm, realm.intrinsics().object_prototype());
++    bridge->define_native_function(realm, "postMessage"_utf16_fly_string, [&client, page_id, document_id, world_name = script.world](JS::VM& vm) -> JS::ThrowCompletionOr<JS::Value> {
++        auto message = TRY(vm.argument(0).to_utf16_string(vm)).to_utf8();
++        client.async_did_post_user_script_message(page_id, document_id, world_name, move(message));
++        return JS::js_undefined(); }, 1, JS::default_attributes);
++
++    m_bridges.ensure(document_id).set(script.world, { .document = document, .world = *world, .object = *bridge });
++    (void)world->call(function.value(), JS::js_undefined(), { { JS::Value { bridge } } });
++}
++
++void UserScripts::deliver_message(Web::HTML::CrossProcessId document_id, String const& world_name, String message)
++{
++    auto bridges = m_bridges.get(document_id);
++    if (!bridges.has_value())
++        return;
++    auto bridge = bridges->get(world_name);
++    if (!bridge.has_value())
++        return;
++
++    auto document = bridge->document.ptr();
++    auto world = bridge->world.ptr();
++    auto object = bridge->object.ptr();
++    if (!document || !world || !object || document->has_been_destroyed()) {
++        bridges->remove(world_name);
++        return;
++    }
++
++    Web::HTML::queue_a_task(Web::HTML::Task::Source::PostedMessage, nullptr, document, GC::create_function(document->heap(), [document = GC::Ref { *document }, world = GC::Ref { *world }, object = GC::Ref { *object }, message = move(message)] {
++        if (document->has_been_destroyed())
++            return;
++
++        JS::Value handler;
++        {
++            Web::HTML::TemporaryExecutionContext execution_context { document->relevant_settings_object() };
++            auto result = object->get("onmessage"_utf16_fly_string);
++            if (result.is_error())
++                return;
++            handler = result.value();
++        }
++        if (!handler.is_function())
++            return;
++
++        auto& vm = world->realm().vm();
++        (void)world->call(handler, object, { { JS::PrimitiveString::create(vm, Utf16String::from_utf8(message)) } });
++    }));
++}
++
++void UserScripts::forget_documents_that_are_gone()
++{
++    auto is_gone = [](GC::Weak<Web::DOM::Document> const& document) {
++        return !document || document->has_been_destroyed();
++    };
++    m_documents.remove_all_matching([&](auto const&, auto const& scripts) { return is_gone(scripts.document); });
++    m_bridges.remove_all_matching([&](auto const&, auto& bridges) {
++        bridges.remove_all_matching([&](auto const&, auto const& bridge) { return is_gone(bridge.document); });
++        return bridges.is_empty();
++    });
++}
++
++}
+diff --git a/Services/WebContent/UserScripts.h b/Services/WebContent/UserScripts.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..8c72a24be7063922adc0de4bef494a22e4605118
+--- /dev/null
++++ b/Services/WebContent/UserScripts.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/HashMap.h>
++#include <AK/String.h>
++#include <AK/Vector.h>
++#include <LibCore/Forward.h>
++#include <LibGC/Weak.h>
++#include <LibJS/Forward.h>
++#include <LibWeb/Forward.h>
++#include <LibWebCommon/HTML/CrossProcessId.h>
++#include <LibWebCommon/HTML/Scripting/UserScript.h>
++#include <LibWebCommon/Page/PageId.h>
++#include <WebContent/Forward.h>
++
++namespace WebContent {
++
++// The UI process's user scripts in a page's documents (see Web::HTML::UserScript). A document asks the UI process for
++// its scripts once, as it becomes ready for scripts, if the UI process has any. Each runs at its injection time, in the
++// document's own world or in one of the UI process's isolated worlds, where it may be given the world's bridge to the
++// UI process.
++class UserScripts {
++public:
++    void document_reached(ConnectionFromClient&, Web::PageId, Web::DOM::Document&, Web::HTML::UserScriptInjectionTime);
++    void deliver_message(Web::HTML::CrossProcessId document_id, String const& world, String message);
++
++private:
++    struct DocumentScripts {
++        GC::Weak<Web::DOM::Document> document;
++        Vector<Web::HTML::UserScript> pending;
++        bool reached_document_end { false };
++        RefPtr<Core::Timer> idle_timer;
++    };
++
++    struct Bridge {
++        GC::Weak<Web::DOM::Document> document;
++        GC::Weak<Web::HTML::IsolatedWorld> world;
++        GC::Weak<JS::Object> object;
++    };
++
++    void run_scripts(ConnectionFromClient&, Web::PageId, Web::HTML::CrossProcessId document_id, Web::HTML::UserScriptInjectionTime);
++    void run_script(ConnectionFromClient&, Web::PageId, Web::DOM::Document&, Web::HTML::UserScript const&);
++    void forget_documents_that_are_gone();
++
++    HashMap<Web::HTML::CrossProcessId, DocumentScripts> m_documents;
++    HashMap<Web::HTML::CrossProcessId, HashMap<String, Bridge>> m_bridges;
++};
++
++}
+diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
+index e5a559088588b96d4b8f69ff76b1c7a50e620034..5aed4de7b99c304748ba51b7849a7b803ab263c9 100644
+--- a/Services/WebContent/WebContentClient.ipc
++++ b/Services/WebContent/WebContentClient.ipc
+@@ -40,6 +40,7 @@
+ #include <LibWebCommon/HTML/SameDocumentNavigationEntry.h>
+ #include <LibWebCommon/HTML/SandboxingFlagSet.h>
+ #include <LibWebCommon/HTML/Scripting/ScriptRegistryTypes.h>
++#include <LibWebCommon/HTML/Scripting/UserScript.h>
+ #include <LibWebCommon/HTML/SelectItem.h>
+ #include <LibWebCommon/HTML/SelectedFile.h>
+ #include <LibWebCommon/HTML/SerializationRecords.h>
+@@ -234,6 +235,8 @@ endpoint WebContentClient routed by Web::PageId page_id
+     did_request_embedder_resource(Web::PageId page_id, URL::URL url, i32 request_id) =|
+     [NotRouted] did_request_embedder_bootstrap(Web::PageId page_id, Web::HTML::CrossProcessId document_id) => (Optional<String> script)
+     did_post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) =|
++    [NotRouted] did_request_user_scripts(Web::PageId page_id, Web::HTML::CrossProcessId document_id) => (Vector<Web::HTML::UserScript> scripts)
++    did_post_user_script_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String world, String message) =|
+     did_request_color_picker(Web::PageId page_id, Color current_color) =|
+     did_request_geolocation_position(Web::PageId page_id, u64 request_id) =|
+     did_cancel_geolocation_position_request(Web::PageId page_id, u64 request_id) =|
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 679466293c37b450deb8e3c38a70bacf1ce76e7d..226e967047defaf91cd8ce2966e2472a0a5773a1 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -99,6 +99,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     compositor_process_reconnected() =|
+     set_site_compatibility_data(JsonValue data) =|
+     set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) =|
++    set_user_scripts_enabled(bool enabled) =|
+ 
+     update_system_theme(Web::PageId page_id, Core::AnonymousBuffer theme_buffer) =|
+     update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen_index) =|
+@@ -283,6 +284,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) =|
+     handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) =|
+     post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) =|
++    post_user_script_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String world, String message) =|
+     blob_url_entry_removed(Utf16String url) =|
+     did_delete_all_cookies(Web::PageId page_id, u64 request_id) =|
+ 

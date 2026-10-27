@@ -5,8 +5,10 @@ and the feature checklist.
 
 ## Rules
 
-- Don't edit `ladybird/`. It's a pinned, unmodified submodule. Engine-side changes need a different approach, like a
-  patch series applied at build time, so raise that before doing it.
+- `ladybird/` is a submodule pinned to an upstream commit. Xenon's engine changes are a patch series in
+  `Patches/ladybird`, applied at build time. Make them with `Meta/patches.py` (apply, commit in `ladybird/`, export),
+  never by committing the submodule at a local commit. Keep each patch generic and upstreamable, with an upstream-style
+  subject (`LibWeb: ...`), and keep the engine change as small as the feature allows.
 - Port Helium's features, not its look. Xenon has its own palette with a **#ff0050** accent: a rose scale in
   `UI/BrandColors.h` for the Qt chrome, and `--xenon-rose*` variables in `UI/Resources/about-pages/webui.css` for the
   internal pages. Use those rather than Ladybird's violet/indigo, and don't retheme anything to match Helium.
@@ -37,3 +39,4 @@ and the feature checklist.
 - `./Meta/check.py` (`--fix` to format): run before committing. CI runs it too, along with `./Meta/xenon.py test`
   (unit tests in `Tests/`, plus a headless render of about:welcome).
 - New unit tests are `Tests/Test*.cpp`, registered in `UI/Xenon.cmake` as `TestXenon*` targets under `xenon-tests`.
+- `./Meta/patches.py apply` / `export` / `pin` / `status`: the engine patch series (see the top of the script).

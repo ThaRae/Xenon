@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- Meta/xenon.py test serves this from a local web server, where the test extension's content scripts run in it. It
+     prints one line of results, theirs and its own, and closes, which ends the headless browser. -->
+<!-- Frames of the page's own only, which an extension's web accessible pages bypass, as in Chrome. -->
+<meta http-equiv="Content-Security-Policy" content="frame-src 'self'" />
+<div id="marker">marker</div>
+<iframe src="/frame"></iframe>
+<script>
+    const results = {};
+    function check(name, condition) {
+        results[name] = Boolean(condition);
+    }
+
+    check("content scripts run before the page's scripts", sessionStorage.getItem("xenonContentStart") === "ran");
+    check("MAIN world content scripts run in the page's world", window.xenonMainWorld === true);
+    check(
+        "the content scripts' globals stay out of the page",
+        window.xenonContentSecret === undefined && typeof chrome === "undefined"
+    );
+    window.xenonPageSecret = "page";
+    document.getElementById("marker").pageExpando = "page";
+
+    let errors = 0;
+    addEventListener("error", () => errors++);
+    addEventListener("unhandledrejection", () => errors++);
+    addEventListener("DOMContentLoaded", () => postMessage({ toContentScript: "ping" }, "*"));
+
+    function finish() {
+        const contentResults = document.documentElement.dataset.contentResults;
+        if (!contentResults) {
+            setTimeout(finish, 50);
+            return;
+        }
+        Object.assign(results, JSON.parse(contentResults));
+
+        const marker = document.getElementById("marker");
+        check("content scripts' stylesheets apply", getComputedStyle(marker).color === "rgb(1, 2, 3)");
+        check("window.postMessage reaches content scripts", document.documentElement.dataset.contentPostMessage === "trusted");
+        check("the content scripts' expandos stay out of the page", marker.contentExpando === undefined);
+        check("the content scripts' errors stay out of the page", errors === 0);
+
+        console.log("XENON-EXTENSION-TEST " + JSON.stringify(results));
+        window.close();
+    }
+    addEventListener("load", () => setTimeout(finish, 100));
+</script>

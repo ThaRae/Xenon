@@ -1,0 +1,100 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 22:05:27 -0400
+Subject: [PATCH] LibWeb: Let the embedder's schemes bypass Content Security
+ Policy
+
+A browser's extensions put frames of their own pages into the pages they
+work on, such as a password manager's autofill menu and its bar that
+offers to save a login. Sites with a strict policy, like frame-src
+'self', would block them. Blink lets extension resources bypass a page's
+policy (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy),
+which is why these frames work on such sites in Chrome.
+
+Requests, responses, and navigations to URLs of the embedder's own
+schemes are no longer checked against the page's policy, nor reported
+under a report-only one. The embedder still decides which pages may
+load them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../BlockingAlgorithms.cpp                    |  7 +++++++
+ .../FetchIntegration.cpp                      | 19 +++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
+index 89d9215bef4ceea10c85bf0260982e51f41d9754..153be49a66599aa4d0222d3b1e304fda0c6c2de3 100644
+--- a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
++++ b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
+@@ -7,6 +7,7 @@
+ 
+ #include <AK/AnyOf.h>
+ #include <LibGC/Heap.h>
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibWeb/ContentSecurityPolicy/BlockingAlgorithms.h>
+ #include <LibWeb/ContentSecurityPolicy/Directives/DirectiveOperations.h>
+ #include <LibWeb/ContentSecurityPolicy/Directives/HTMLIntegration.h>
+@@ -42,6 +43,12 @@ ViolationReporter violation_reporter_for_request(JS::Realm& realm, GC::Ref<Fetch
+ // https://w3c.github.io/webappsec-csp/#should-block-navigation-request
+ Directives::Directive::Result should_navigation_request_of_type_be_blocked_by_content_security_policy(GC::Ref<Fetch::Infrastructure::Request> navigation_request, Directives::Directive::NavigationType navigation_type)
+ {
++    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
++    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages
++    //         may load them.
++    if (URL::is_embedder_scheme(navigation_request->current_url().scheme()))
++        return Directives::Directive::Result::Allowed;
++
+     // 1. Let result be "Allowed".
+     auto result = Directives::Directive::Result::Allowed;
+ 
+diff --git a/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp b/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
+index f3efd21e81fb262c984be77b99bfd36c992c32b9..3532cd9cdcb5b4aca1e4e6a753b5bd615e145527 100644
+--- a/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
++++ b/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
+@@ -6,6 +6,7 @@
+  * SPDX-License-Identifier: BSD-2-Clause
+  */
+ 
++#include <LibURL/EmbedderSchemes.h>
+ #include <LibWeb/ContentSecurityPolicy/Directives/FetchIntegration.h>
+ #include <LibWeb/ContentSecurityPolicy/FetchIntegration.h>
+ #include <LibWeb/ContentSecurityPolicy/PolicyList.h>
+@@ -71,6 +72,12 @@ namespace Web::ContentSecurityPolicy {
+ // https://w3c.github.io/webappsec-csp/#report-for-request
+ void report_content_security_policy_violations_for_request(Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
+ {
++    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
++    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages
++    //         may load them.
++    if (URL::is_embedder_scheme(request.current_url().scheme()))
++        return;
++
+     // 1. Let CSP list be request’s policy container's CSP list.
+     auto const& csp_list = request.policy_container().get<NonnullRefPtr<HTML::PolicyContainer const>>()->csp_list;
+ 
+@@ -93,6 +100,12 @@ void report_content_security_policy_violations_for_request(Fetch::Infrastructure
+ // https://w3c.github.io/webappsec-csp/#should-block-request
+ Directives::Directive::Result should_request_be_blocked_by_content_security_policy(Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
+ {
++    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
++    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages
++    //         may load them.
++    if (URL::is_embedder_scheme(request.current_url().scheme()))
++        return Directives::Directive::Result::Allowed;
++
+     // 1. Let CSP list be request’s policy container's CSP list.
+     auto const& csp_list = request.policy_container().get<NonnullRefPtr<HTML::PolicyContainer const>>()->csp_list;
+ 
+@@ -126,6 +139,12 @@ Directives::Directive::Result should_request_be_blocked_by_content_security_poli
+ // https://w3c.github.io/webappsec-csp/#should-block-response
+ Directives::Directive::Result should_response_to_request_be_blocked_by_content_security_policy(Fetch::Infrastructure::Response const& response, Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
+ {
++    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
++    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages
++    //         may load them.
++    if (URL::is_embedder_scheme(request.current_url().scheme()))
++        return Directives::Directive::Result::Allowed;
++
+     // 1. Let CSP list be request’s policy container's CSP list.
+     auto const& csp_list = request.policy_container().get<NonnullRefPtr<HTML::PolicyContainer const>>()->csp_list;
+ 

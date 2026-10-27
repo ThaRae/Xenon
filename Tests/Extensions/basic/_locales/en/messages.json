@@ -1,0 +1,5 @@
+{
+    "name": { "message": "Xenon test extension" },
+    "title": { "message": "Open the test popup" },
+    "greeting": { "message": "Hello, $who$!", "placeholders": { "who": { "content": "$1" } } }
+}

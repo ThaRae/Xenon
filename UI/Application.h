@@ -127,6 +127,8 @@ private:
     void cancel_quit();
 
     virtual Core::EventLoop& create_platform_event_loop() override;
+    virtual void create_platform_arguments(Core::ArgsParser&) override;
+    virtual void create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&) override;
     virtual void create_platform_actions() override;
 
     virtual Optional<String> ui_font_family() const override;
@@ -198,6 +200,8 @@ private:
     virtual void on_recently_closed_entries_changed() const override;
 
     OwnPtr<QApplication> m_application;
+    // Unpacked extensions to load for this session (Xenon's --load-extension, as in Chrome).
+    Vector<ByteString> m_extensions_to_load;
     BrowserWindow* m_active_window { nullptr };
     OwnPtr<ProcessManagerWindow> m_process_manager_window;
     CrashReportNotifier m_crash_report_notifier;

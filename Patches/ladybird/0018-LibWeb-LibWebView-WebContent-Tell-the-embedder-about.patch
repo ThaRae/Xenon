@@ -1,0 +1,444 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 22:01:02 -0400
+Subject: [PATCH] LibWeb+LibWebView+WebContent: Tell the embedder about
+ navigations
+
+A browser's extensions follow the navigations of a tab's frames: when one
+starts, commits, fires DOMContentLoaded, loads, or fails, as Chrome's
+webNavigation API reports them. WebDriver BiDi learns of exactly these,
+but processes hosting web content only report them during a BiDi
+session.
+
+Application::set_navigation_event_handler() gives the embedder each
+navigation event as BiDi gets it, named as BiDi names it, with the
+navigable it's about: those the browser process emits itself, as a
+navigation starts or fails there, and those the processes hosting web
+content report. While the embedder has a handler, those processes report
+them outside of BiDi sessions too, through the same event sink, and
+nothing else of BiDi runs.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWeb/DOM/Document.cpp             |  7 ++--
+ Libraries/LibWeb/HTML/LocalNavigable.cpp      | 16 ++++-----
+ Libraries/LibWeb/HTML/Parser/HTMLParser.cpp   |  4 +--
+ Libraries/LibWeb/WebDriver/BiDi/BiDi.cpp      |  6 ++++
+ Libraries/LibWeb/WebDriver/BiDi/BiDi.h        |  6 ++++
+ Libraries/LibWebView/Application.cpp          | 21 ++++++++++++
+ Libraries/LibWebView/Application.h            |  9 +++++
+ Libraries/LibWebView/CanonicalNavigable.cpp   |  5 +++
+ Libraries/LibWebView/CanonicalTraversable.cpp |  1 +
+ Libraries/LibWebView/WebContentPage.cpp       |  4 +++
+ Services/WebContent/ConnectionFromClient.cpp  |  5 +++
+ Services/WebContent/ConnectionFromClient.h    |  1 +
+ Services/WebContent/WebContentServer.ipc      |  1 +
+ Services/WebContent/WebDriverBiDi.cpp         | 34 ++++++++++++-------
+ Services/WebContent/WebDriverBiDi.h           |  2 ++
+ 15 files changed, 97 insertions(+), 25 deletions(-)
+
+diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
+index 2273d83ca7de93aa36f2a513cc7fce7bc3dc4ecd..27e4ffe44e63e2650dad7d3f7f27abf7c3b19a9f 100644
+--- a/Libraries/LibWeb/DOM/Document.cpp
++++ b/Libraries/LibWeb/DOM/Document.cpp
+@@ -6689,7 +6689,7 @@ void Document::abort()
+         // 1. Invoke WebDriver BiDi navigation aborted with document's node navigable and a new WebDriver BiDi navigation
+         //    status whose id is document's during-loading navigation ID for WebDriver BiDi, status is "canceled", and
+         //    url is document's URL.
+-        if (WebDriver::BiDi::is_active()) {
++        if (WebDriver::BiDi::reports_navigation_events()) {
+             if (auto navigable = this->navigable())
+                 WebDriver::BiDi::navigation_event(*navigable, "browsingContext.navigationAborted"sv, m_navigation_id, url());
+         }
+@@ -7935,13 +7935,14 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+         // 2. Invoke WebDriver BiDi navigation committed with navigable and a new WebDriver BiDi navigation status whose
+         //    id is document's during-loading navigation ID for WebDriver BiDi, status is "committed", and url is
+         //    document's URL
+-        if (WebDriver::BiDi::is_active()) {
++        if (WebDriver::BiDi::reports_navigation_events()) {
+             if (auto navigable = this->navigable()) {
+                 WebDriver::BiDi::navigation_event(*navigable, "browsingContext.navigationCommitted"sv, m_navigation_id, url());
+ 
+                 // AD-HOC: WebDriver BiDi creates the document's realm, and runs its preload scripts, once the document is
+                 //         active in its navigable and before scripts may run for it.
+-                WebDriver::BiDi::document_is_ready_for_scripts(*this);
++                if (WebDriver::BiDi::is_active())
++                    WebDriver::BiDi::document_is_ready_for_scripts(*this);
+             }
+         }
+ 
+diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
+index 2391e6a558fbc87f21c038896da2f0522f6f93e4..0a33978bd3d175d0f68f1f8af40340c5f1304b6c 100644
+--- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
++++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
+@@ -3096,7 +3096,7 @@ void LocalNavigable::queue_navigation_and_traversal_task_for_session_history_ent
+ 
+             // INTEROP: A navigation that loads no document is reported as failed to WebDriver BiDi, which is what other
+             //          implementations do, so that the navigation's waiters learn it ended.
+-            if (!output->document && WebDriver::BiDi::is_active())
++            if (!output->document && WebDriver::BiDi::reports_navigation_events())
+                 WebDriver::BiDi::navigation_event(*this, "browsingContext.navigationFailed"sv, navigation_id, url);
+ 
+             // 2. Set saveExtraDocumentState to false.
+@@ -3150,7 +3150,7 @@ void LocalNavigable::queue_navigation_and_traversal_task_for_session_history_ent
+                     [](auto const&) { });
+ 
+                 // 2. Invoke WebDriver BiDi navigation failed with navigable and a new WebDriver BiDi navigation status whose id is navigationId, status is "canceled", and url is navigationParams's response's URL.
+-                if (WebDriver::BiDi::is_active()) {
++                if (WebDriver::BiDi::reports_navigation_events()) {
+                     auto response_url = navigation_params.visit(
+                         [&](GC::Ref<NavigationParams> const& it) { return it->response->url().value_or(url); },
+                         [&](auto const&) { return url; });
+@@ -3159,7 +3159,7 @@ void LocalNavigable::queue_navigation_and_traversal_task_for_session_history_ent
+             }
+             // INTEROP: A navigation whose fetch failed is reported as failed to WebDriver BiDi too, which is what other
+             //          implementations do.
+-            else if (WebDriver::BiDi::is_active()) {
++            else if (WebDriver::BiDi::reports_navigation_events()) {
+                 WebDriver::BiDi::navigation_event(*this, "browsingContext.navigationFailed"sv, navigation_id, error_url);
+             }
+         }
+@@ -3549,7 +3549,7 @@ void LocalNavigable::begin_navigation(PreparedNavigation navigation)
+     //    then invoke WebDriver BiDi navigation failed with navigable and a WebDriver BiDi navigation status whose id
+     //    is navigationId, status is "canceled", and url is url, and return.
+     if (active_document.unload_counter() > 0) {
+-        if (WebDriver::BiDi::is_active())
++        if (WebDriver::BiDi::reports_navigation_events())
+             WebDriver::BiDi::navigation_event(*this, "browsingContext.navigationFailed"sv, navigation_id, url);
+         return;
+     }
+@@ -3614,14 +3614,14 @@ void LocalNavigable::begin_navigation(PreparedNavigation navigation)
+ 
+     // 17. Invoke WebDriver BiDi navigation started with navigable and a new WebDriver BiDi navigation status whose id is
+     //     navigationId, status is "pending", and url is url.
+-    if (WebDriver::BiDi::is_active())
++    if (WebDriver::BiDi::reports_navigation_events())
+         WebDriver::BiDi::navigation_event(*this, "browsingContext.navigationStarted"sv, navigation_id, url);
+ 
+     // 18. If navigable's ongoing navigation is "traversal", then:
+     if (ongoing_navigation().has<Traversal>()) {
+         // 1. Invoke WebDriver BiDi navigation failed with navigable and a new WebDriver BiDi navigation status whose id
+         //    is navigationId, status is "canceled", and url is url.
+-        if (WebDriver::BiDi::is_active())
++        if (WebDriver::BiDi::reports_navigation_events())
+             WebDriver::BiDi::navigation_event(*this, "browsingContext.navigationFailed"sv, navigation_id, url);
+ 
+         // 2. Return.
+@@ -3984,7 +3984,7 @@ void LocalNavigable::navigate_to_a_fragment(URL::URL const& url, HistoryHandling
+ 
+     // Invoke WebDriver BiDi fragment navigated with navigable and a new WebDriver BiDi navigation status whose id is
+     // navigationId, url is url, and status is "complete".
+-    if (WebDriver::BiDi::is_active())
++    if (WebDriver::BiDi::reports_navigation_events())
+         WebDriver::BiDi::navigation_event(*this, "browsingContext.fragmentNavigated"sv, navigation_id, url);
+ }
+ 
+@@ -4466,7 +4466,7 @@ void perform_url_and_history_update_steps(DOM::Document& document, URL::URL new_
+ 
+     // 2. Invoke WebDriver BiDi history updated with navigable.
+     // NB: The browser process names the navigable and its URL, which is its active document's URL.
+-    if (WebDriver::BiDi::is_active())
++    if (WebDriver::BiDi::reports_navigation_events())
+         WebDriver::BiDi::navigation_event(*navigable, "browsingContext.historyUpdated"sv, {}, document.url());
+ }
+ 
+diff --git a/Libraries/LibWeb/HTML/Parser/HTMLParser.cpp b/Libraries/LibWeb/HTML/Parser/HTMLParser.cpp
+index 4054a0768b171b79831f0b9fa52f134c671e384f..f926abb3654024c6b6960f9f438641a8fd710c0e 100644
+--- a/Libraries/LibWeb/HTML/Parser/HTMLParser.cpp
++++ b/Libraries/LibWeb/HTML/Parser/HTMLParser.cpp
+@@ -935,7 +935,7 @@ void HTMLParserEndState::advance_to_dom_content_loaded_phase()
+         // 5. Invoke WebDriver BiDi DOM content loaded with the Document's browsing context, and a new WebDriver BiDi navigation status whose id is the Document object's during-loading navigation ID for WebDriver BiDi, status is "pending", and url is the Document object's URL.
+         // NB: The browsing context's active document's node navigable is the navigable the steps report on.
+         // NB: The initial about:blank document of a navigable is not loaded by a navigation.
+-        if (WebDriver::BiDi::is_active() && !document->is_initial_about_blank()) {
++        if (WebDriver::BiDi::reports_navigation_events() && !document->is_initial_about_blank()) {
+             if (auto navigable = document->navigable())
+                 WebDriver::BiDi::navigation_event(*navigable, "browsingContext.domContentLoaded"sv, document->during_loading_navigation_id_for_webdriver_bidi(), document->url());
+         }
+@@ -1057,7 +1057,7 @@ void HTMLParserEndState::complete()
+ 
+         // 6. Invoke WebDriver BiDi load complete with the Document's browsing context, and a new WebDriver BiDi navigation status whose id is the Document object's during-loading navigation ID for WebDriver BiDi, status is "complete", and url is the Document object's URL.
+         // NB: The initial about:blank document of a navigable is not loaded by a navigation.
+-        if (WebDriver::BiDi::is_active() && !document->is_initial_about_blank()) {
++        if (WebDriver::BiDi::reports_navigation_events() && !document->is_initial_about_blank()) {
+             if (auto navigable = document->navigable())
+                 WebDriver::BiDi::navigation_event(*navigable, "browsingContext.load"sv, document->during_loading_navigation_id_for_webdriver_bidi(), document->url());
+         }
+diff --git a/Libraries/LibWeb/WebDriver/BiDi/BiDi.cpp b/Libraries/LibWeb/WebDriver/BiDi/BiDi.cpp
+index f8505c9fa0a5703b8c5533706b6d2be8c2cb3196..2124fb1cf3ac9c9dfd9a3b13475a7b37f08ffd4a 100644
+--- a/Libraries/LibWeb/WebDriver/BiDi/BiDi.cpp
++++ b/Libraries/LibWeb/WebDriver/BiDi/BiDi.cpp
+@@ -26,6 +26,12 @@
+ namespace Web::WebDriver::BiDi {
+ 
+ bool g_is_active { false };
++bool g_embedder_wants_navigation_events { false };
++
++void set_embedder_wants_navigation_events(bool wants_them)
++{
++    g_embedder_wants_navigation_events = wants_them;
++}
+ 
+ static BiDiSessionState& state()
+ {
+diff --git a/Libraries/LibWeb/WebDriver/BiDi/BiDi.h b/Libraries/LibWeb/WebDriver/BiDi/BiDi.h
+index 283a3c92606f51ce494b108124486e69e75be81e..4c757b0335401fbed7728e9befa6c43a6a2374e0 100644
+--- a/Libraries/LibWeb/WebDriver/BiDi/BiDi.h
++++ b/Libraries/LibWeb/WebDriver/BiDi/BiDi.h
+@@ -25,10 +25,16 @@
+ namespace Web::WebDriver::BiDi {
+ 
+ WEB_API extern bool g_is_active;
++WEB_API extern bool g_embedder_wants_navigation_events;
+ 
+ // Whether a BiDi session is active.
+ inline bool is_active() { return g_is_active; }
+ 
++// Whether this process reports navigation events: for a BiDi session, or for the embedder, which follows navigations
++// the way a session does, as a browser does for its extensions' webNavigation API.
++inline bool reports_navigation_events() { return g_is_active || g_embedder_wants_navigation_events; }
++WEB_API void set_embedder_wants_navigation_events(bool);
++
+ WEB_API void set_session_state(BiDiSessionState);
+ WEB_API BiDiSessionState const& session_state();
+ WEB_API bool is_event_enabled(StringView event_name);
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 2d7d1883b28cf5dad98d8ceb020778b443d2fc6f..2556360a6f4e15ee5e9a107886f67c0a59e49f6c 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -1243,6 +1243,8 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+         client->async_set_origin_access_allow_list(m_origin_access_allow_list);
+     if (m_user_script_handler)
+         client->async_set_user_scripts_enabled(true);
++    if (m_navigation_event_handler)
++        client->async_set_navigation_events_enabled(true);
+     connect_to_image_decoder(*client, move(image_decoder));
+ 
+     // NB: A WebDriver BiDi session gives its state to every process hosting web content when it changes.
+@@ -1279,6 +1281,25 @@ void Application::set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure
+     WorkerProcessManager::the().update_origin_access_allow_list(m_origin_access_allow_list);
+ }
+ 
++void Application::set_navigation_event_handler(NavigationEventHandler handler)
++{
++    auto was_enabled = static_cast<bool>(m_navigation_event_handler);
++    m_navigation_event_handler = move(handler);
++    if (was_enabled == static_cast<bool>(m_navigation_event_handler))
++        return;
++
++    WebContentClient::for_each_client([&](auto& client) {
++        client.async_set_navigation_events_enabled(static_cast<bool>(m_navigation_event_handler));
++        return IterationDecision::Continue;
++    });
++}
++
++void Application::notify_navigation_event(CanonicalNavigable const& navigable, StringView event_name, URL::URL const& url) const
++{
++    if (m_navigation_event_handler)
++        m_navigation_event_handler(navigable, event_name, url);
++}
++
+ void Application::set_user_script_handler(OwnPtr<UserScriptHandler> handler)
+ {
+     auto was_enabled = m_user_script_handler != nullptr;
+diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
+index 7b020f5c2a0e5445c015ed324932dca3b4a8b200..e67d09b4d5376d9a31a3edb8d42646a77a3ebfdc 100644
+--- a/Libraries/LibWebView/Application.h
++++ b/Libraries/LibWebView/Application.h
+@@ -116,6 +116,14 @@ public:
+     Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> const& origin_access_allow_list() const { return m_origin_access_allow_list; }
+     void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry>);
+ 
++    // Navigations as WebDriver BiDi learns of them, for an embedder that follows them the way a BiDi session does, as
++    // a browser does for its extensions' webNavigation API. The event names are BiDi's ("browsingContext.load"), and
++    // the URL is the one BiDi's navigation status would have. While there's a handler, the processes hosting web
++    // content report the navigation events of their navigables, which they otherwise only do during a BiDi session.
++    using NavigationEventHandler = Function<void(CanonicalNavigable const&, StringView event_name, URL::URL const&)>;
++    void set_navigation_event_handler(NavigationEventHandler);
++    void notify_navigation_event(CanonicalNavigable const&, StringView event_name, URL::URL const&) const;
++
+     // The embedder's user scripts. While there's a handler, every document asks it for its scripts as the document
+     // becomes ready for scripts.
+     UserScriptHandler* user_script_handler() { return m_user_script_handler.ptr(); }
+@@ -616,6 +624,7 @@ private:
+     JsonValue m_site_compatibility_data;
+     Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> m_origin_access_allow_list;
+     OwnPtr<UserScriptHandler> m_user_script_handler;
++    NavigationEventHandler m_navigation_event_handler;
+     Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
+     Optional<Core::AnonymousBuffer> m_trusted_content_blocker_list_buffer;
+     Optional<Core::AnonymousBuffer> m_content_blocker_resources_buffer;
+diff --git a/Libraries/LibWebView/CanonicalNavigable.cpp b/Libraries/LibWebView/CanonicalNavigable.cpp
+index 5879748dbeaddda7f69508354b6966609c916388..e4a1c2a564dac172780bdc4f7bb5551115cebe1d 100644
+--- a/Libraries/LibWebView/CanonicalNavigable.cpp
++++ b/Libraries/LibWebView/CanonicalNavigable.cpp
+@@ -196,6 +196,7 @@ void CanonicalNavigable::begin_navigation(Web::HTML::PreparedNavigationDescripto
+     if (active_document().unload_counter() > 0) {
+         if (auto* webdriver_bidi = WebDriverBiDi::the())
+             webdriver_bidi->navigation_failed(*this, { .id = navigation_id, .status = WebDriverBiDi::NavigationStatusType::Canceled, .url = url });
++        Application::the().notify_navigation_event(*this, "browsingContext.navigationFailed"sv, url);
+         return;
+     }
+ 
+@@ -251,6 +252,7 @@ void CanonicalNavigable::begin_navigation(Web::HTML::PreparedNavigationDescripto
+     //     navigationId, status is "pending", and url is url.
+     if (auto* webdriver_bidi = WebDriverBiDi::the())
+         webdriver_bidi->navigation_started(*this, { .id = navigation_id, .status = WebDriverBiDi::NavigationStatusType::Pending, .url = url });
++    Application::the().notify_navigation_event(*this, "browsingContext.navigationStarted"sv, url);
+ 
+     // 18. If navigable's ongoing navigation is "traversal", then:
+     // AD-HOC: A navigation from the browser's UI goes on, and takes the navigable over from the traversal.
+@@ -259,6 +261,7 @@ void CanonicalNavigable::begin_navigation(Web::HTML::PreparedNavigationDescripto
+         //    is navigationId, status is "canceled", and url is url.
+         if (auto* webdriver_bidi = WebDriverBiDi::the())
+             webdriver_bidi->navigation_failed(*this, { .id = navigation_id, .status = WebDriverBiDi::NavigationStatusType::Canceled, .url = url });
++        Application::the().notify_navigation_event(*this, "browsingContext.navigationFailed"sv, url);
+ 
+         // 2. Return.
+         return;
+@@ -270,6 +273,7 @@ void CanonicalNavigable::begin_navigation(Web::HTML::PreparedNavigationDescripto
+     if (is_javascript_url && !host) {
+         if (auto* webdriver_bidi = WebDriverBiDi::the())
+             webdriver_bidi->navigation_failed(*this, { .id = navigation_id, .status = WebDriverBiDi::NavigationStatusType::Canceled, .url = url });
++        Application::the().notify_navigation_event(*this, "browsingContext.navigationFailed"sv, url);
+         return;
+     }
+ 
+@@ -306,6 +310,7 @@ void CanonicalNavigable::begin_navigation(Web::HTML::PreparedNavigationDescripto
+         clear_ongoing_navigation();
+         if (auto* webdriver_bidi = WebDriverBiDi::the())
+             webdriver_bidi->navigation_failed(*this, { .id = navigation_id, .status = WebDriverBiDi::NavigationStatusType::Canceled, .url = url });
++        Application::the().notify_navigation_event(*this, "browsingContext.navigationFailed"sv, url);
+         return;
+     }
+     auto start_request = Web::HTML::NavigationStartRequest {
+diff --git a/Libraries/LibWebView/CanonicalTraversable.cpp b/Libraries/LibWebView/CanonicalTraversable.cpp
+index 995c08ae837ae39bcff67d41b75aedaa304100a5..f9b4130b321083e2b82787c36abb5c59ed7f871e 100644
+--- a/Libraries/LibWebView/CanonicalTraversable.cpp
++++ b/Libraries/LibWebView/CanonicalTraversable.cpp
+@@ -2146,6 +2146,7 @@ void CanonicalTraversable::apply_the_reload_history_step(HistoryOperation& opera
+         if (auto* bidi = WebDriverBiDi::the())
+             bidi->navigation_started(*this, { .id = navigation_id, .status = WebDriverBiDi::NavigationStatusType::Pending, .url = active_document_url() });
+     }
++    Application::the().notify_navigation_event(*this, "browsingContext.navigationStarted"sv, active_document_url());
+ 
+     // 2. Return the result of applying the history step step to traversable given true, null, null, userInvolvement, and "reload".
+     apply_history_step(operation, step, true, {}, user_involvement, Web::Bindings::NavigationType::Reload);
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index e7aa04955d2600842988beddacde99502002b32f..9ff2c6a130ba064d858d0db9bd3c8c1a66243cac 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -1407,6 +1407,10 @@ void WebContentPage::webdriver_bidi_event(Web::HTML::CrossProcessId navigable_id
+ 
+ void WebContentPage::webdriver_bidi_navigation_event(Web::HTML::CrossProcessId navigable_id, String name, Optional<Utf16String> navigation_id, URL::URL url)
+ {
++    // NB: A process hosting web content only reports on the navigables it hosts.
++    if (auto navigable = hosted_navigable(navigable_id); navigable.has_value())
++        Application::the().notify_navigation_event(*navigable, name, url);
++
+     if (auto* webdriver_bidi = WebDriverBiDi::the())
+         webdriver_bidi->did_receive_navigation_event(*this, navigable_id, name, move(navigation_id), move(url));
+ }
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 7d9ee294c23945b9dcc4b8adf51f2b302273ecc4..dc4870490c6a7899e9f500bb789eac944c3aeed4 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -540,6 +540,11 @@ void ConnectionFromClient::set_user_scripts_enabled(bool enabled)
+     m_user_scripts_enabled = enabled;
+ }
+ 
++void ConnectionFromClient::set_navigation_events_enabled(bool enabled)
++{
++    WebContent::set_embedder_wants_navigation_events(enabled);
++}
++
+ void ConnectionFromClient::update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 3f9225970c7dff412565fd5e85dd38d426bd0368..48c0a87d1d50099fd82acb192a9c84a9194bee16 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -125,6 +125,7 @@ private:
+     virtual void set_site_compatibility_data(JsonValue data) override;
+     virtual void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) override;
+     virtual void set_user_scripts_enabled(bool enabled) override;
++    virtual void set_navigation_events_enabled(bool enabled) override;
+     virtual void compositor_process_reconnected() override;
+     virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
+     virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 2fe96fa1efd5b6f890654eeadeaeb06a6df484ea..ee5d0fcb383ed243af8117d26bb839a00b2cb2bb 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -101,6 +101,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     set_site_compatibility_data(JsonValue data) =|
+     set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) =|
+     set_user_scripts_enabled(bool enabled) =|
++    set_navigation_events_enabled(bool enabled) =|
+ 
+     update_system_theme(Web::PageId page_id, Core::AnonymousBuffer theme_buffer) =|
+     update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen_index) =|
+diff --git a/Services/WebContent/WebDriverBiDi.cpp b/Services/WebContent/WebDriverBiDi.cpp
+index 8c15883c8e86583c66be81d6838bb835f3508b1a..091bb6ec4d7a287722f271038eeae5582738f4ab 100644
+--- a/Services/WebContent/WebDriverBiDi.cpp
++++ b/Services/WebContent/WebDriverBiDi.cpp
+@@ -33,24 +33,34 @@ static PageClient* page_client_of(Web::HTML::Navigable const& navigable)
+     return as_if<PageClient>(const_cast<Web::HTML::Navigable&>(navigable).page().client());
+ }
+ 
++// NB: Events of the navigables this process hosts go to the page hosting them, which reports them to the browser process.
++static void install_event_sink()
++{
++    Web::WebDriver::BiDi::set_event_sink({
++        .on_event = [](Web::HTML::Navigable const& navigable, String const& name, JsonValue params) {
++            if (auto* page_client = page_client_of(navigable))
++                page_client->webdriver_bidi_event(navigable.id(), name, move(params)); },
++        .on_navigation_event = [](Web::HTML::Navigable const& navigable, StringView name, Optional<Utf16String> const& navigation_id, URL::URL const& url) {
++            if (auto* page_client = page_client_of(navigable))
++                page_client->webdriver_bidi_navigation_event(navigable.id(), name, navigation_id, url); },
++    });
++}
++
+ void set_webdriver_bidi_session_state(Web::WebDriver::BiDiSessionState state)
+ {
+-    // NB: Events of the navigables this process hosts go to the page hosting them, which reports them to the browser
+-    //     process.
+-    if (state.is_active && !Web::WebDriver::BiDi::is_active()) {
+-        Web::WebDriver::BiDi::set_event_sink({
+-            .on_event = [](Web::HTML::Navigable const& navigable, String const& name, JsonValue params) {
+-                if (auto* page_client = page_client_of(navigable))
+-                    page_client->webdriver_bidi_event(navigable.id(), name, move(params)); },
+-            .on_navigation_event = [](Web::HTML::Navigable const& navigable, StringView name, Optional<Utf16String> const& navigation_id, URL::URL const& url) {
+-                if (auto* page_client = page_client_of(navigable))
+-                    page_client->webdriver_bidi_navigation_event(navigable.id(), name, navigation_id, url); },
+-        });
+-    }
++    if (state.is_active && !Web::WebDriver::BiDi::is_active())
++        install_event_sink();
+ 
+     Web::WebDriver::BiDi::set_session_state(move(state));
+ }
+ 
++void set_embedder_wants_navigation_events(bool wants_them)
++{
++    if (wants_them)
++        install_event_sink();
++    Web::WebDriver::BiDi::set_embedder_wants_navigation_events(wants_them);
++}
++
+ // https://w3c.github.io/webdriver-bidi/#command-browsingContext-create
+ static Web::WebDriver::Response create_a_new_top_level_traversable(Web::HTML::Navigable& navigable)
+ {
+diff --git a/Services/WebContent/WebDriverBiDi.h b/Services/WebContent/WebDriverBiDi.h
+index 657adf3bd7947e15338e7dbc1520fcd7b1aab629..29f0a789a365c11c4446ff8c10c05c988d0c82fe 100644
+--- a/Services/WebContent/WebDriverBiDi.h
++++ b/Services/WebContent/WebDriverBiDi.h
+@@ -19,5 +19,7 @@ namespace WebContent {
+ void run_webdriver_bidi_command(PageClient&, u64 command_id, Web::HTML::CrossProcessId navigable_id, String const& method, JsonValue params);
+ 
+ void set_webdriver_bidi_session_state(Web::WebDriver::BiDiSessionState);
++// The browser process wants navigation events outside of BiDi sessions too.
++void set_embedder_wants_navigation_events(bool);
+ 
+ }

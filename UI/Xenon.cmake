@@ -39,8 +39,23 @@ set(XENON_SOURCES
     CrashReportNotifier.cpp
     CrashReportReviewWidget.cpp
     DevToolsBanner.cpp
+    ElementPicker.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
+    Extensions/Alarms.cpp
+    Extensions/Browser.cpp
+    Extensions/ContentScripts.cpp
+    Extensions/Dialog.cpp
+    Extensions/Extension.cpp
+    Extensions/Locales.cpp
+    Extensions/Manifest.cpp
+    Extensions/MatchPattern.cpp
+    Extensions/Popup.cpp
+    Extensions/Registry.cpp
+    Extensions/Router.cpp
+    Extensions/Scripting.cpp
+    Extensions/Storage.cpp
+    Extensions/Toolbar.cpp
     FilterLists.cpp
     FindInPageWidget.cpp
     Icon.cpp
@@ -63,6 +78,7 @@ set(XENON_SOURCES
     StringUtils.cpp
     Tab.cpp
     TabBar.cpp
+    WebAuthnPopover.cpp
     WebCompatReportReview.cpp
     WebContentView.cpp
     WindowCloseCoordinator.cpp
@@ -143,12 +159,20 @@ endif()
 list(TRANSFORM XENON_SOURCES PREPEND "${XENON_UI_DIR}/")
 list(TRANSFORM XENON_ARC_SOURCES PREPEND "${XENON_UI_DIR}/")
 
+# The chrome.* API that extension contexts get, and the scripts that run the background worker (see
+# UI/Extensions/Router.cpp), built into the browser.
+set(XENON_GENERATED_DIR "${CMAKE_BINARY_DIR}/Xenon")
+embed_as_string(xenon_chrome_api "${XENON_UI_DIR}/Resources/extensions/chrome-api.js" "${XENON_GENERATED_DIR}/ChromeAPI.cpp" chrome_api_source NAMESPACE "Ladybird::Extensions")
+embed_as_string(xenon_background_page "${XENON_UI_DIR}/Resources/extensions/background-page.js" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" background_page_source NAMESPACE "Ladybird::Extensions")
+embed_as_string(xenon_worker_bridge "${XENON_UI_DIR}/Resources/extensions/worker-bridge.js" "${XENON_GENERATED_DIR}/WorkerBridge.cpp" worker_bridge_source NAMESPACE "Ladybird::Extensions")
+list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" "${XENON_GENERATED_DIR}/WorkerBridge.cpp")
+
 # NB: Qt finalizes executables in a deferred call by default, and we are already running deferred, so finalize by hand.
 qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
-target_link_libraries(xenon PRIVATE AK LibCore LibFileSystem LibGfx LibIPC LibMain LibWebView LibURL LibWakeLock)
+target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibWebView LibURL LibWakeLock)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL)
 # NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
 #     tree, so Xenon's root comes first.
@@ -271,6 +295,11 @@ copy_resources_to_build("${xenon_resource_dir}" xenon)
 # UI/FilterLists.cpp hands the lists to the browser at startup; the notice and license travel with them.
 file(GLOB XENON_FILTER_LISTS CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/lists/*.txt")
 copy_resource_set(xenon/filter-lists/lists RESOURCES ${XENON_FILTER_LISTS} DESTINATION "${xenon_resource_dir}" TARGET xenon)
+# uBlock Origin's own lists, which Xenon passes as trusted, and uBlock Origin's scriptlets and redirect surrogates.
+file(GLOB XENON_TRUSTED_FILTER_LISTS CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/trusted-lists/*.txt")
+copy_resource_set(xenon/filter-lists/trusted-lists RESOURCES ${XENON_TRUSTED_FILTER_LISTS} DESTINATION "${xenon_resource_dir}" TARGET xenon)
+file(GLOB XENON_FILTER_LIST_RESOURCES CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/resources/*")
+copy_resource_set(xenon/filter-lists/resources RESOURCES ${XENON_FILTER_LIST_RESOURCES} DESTINATION "${xenon_resource_dir}" TARGET xenon)
 copy_resource_set(xenon/filter-lists
     RESOURCES
         "${XENON_UI_DIR}/Resources/filter-lists/LICENSE-GPL-3.0.txt"
@@ -287,4 +316,14 @@ ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBangs.cpp" Xenon NAME TestXenonBang
 target_sources(TestXenonBangs PRIVATE "${XENON_UI_DIR}/Bangs.cpp")
 target_include_directories(TestXenonBangs BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs)
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestExtensions.cpp" Xenon NAME TestXenonExtensions LIBS LibCrypto LibFileSystem LibURL)
+target_sources(TestXenonExtensions PRIVATE
+    "${XENON_UI_DIR}/Extensions/Extension.cpp"
+    "${XENON_UI_DIR}/Extensions/Locales.cpp"
+    "${XENON_UI_DIR}/Extensions/Manifest.cpp"
+    "${XENON_UI_DIR}/Extensions/MatchPattern.cpp"
+    "${XENON_UI_DIR}/Extensions/Storage.cpp"
+)
+target_include_directories(TestXenonExtensions BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions)

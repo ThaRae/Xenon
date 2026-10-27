@@ -1,0 +1,2818 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 19:46:25 -0400
+Subject: [PATCH] LibURL+LibWeb+LibWebView+WebContent: Run WebAuthn ceremonies
+ in the UI process
+
+WebContent now sends WebAuthn requests to the UI process, which owns the
+authenticator part of every ceremony. Before starting one, it checks the
+request against its own records of the documents a page hosts: the
+document must be the active document of its navigable and hosted by the
+asking page, have a non-opaque origin in a secure context, and be allowed
+the feature by its permissions policy, and the RP ID must be its host or
+a registrable domain suffix of it. It works out sameOriginWithAncestors
+and the top-level origin itself, and builds the client data from them,
+so a renderer can only ever ask for credentials for its own site.
+
+WebAuthnCoordinator runs one ceremony at a time, in a view that is
+visible and focused. It hands the request to every authenticator an
+AuthenticatorSource reports, follows the client's rules for user
+verification, discoverable credentials and PINs, retries with the appid
+extension's AppID, applies the attestation conveyance preference, and
+asks the user through ViewImplementation's new WebAuthn prompt hooks.
+Errors that would tell a page whether a credential exists go to the user
+rather than the page. Ceremonies end on their timeout, when the page
+aborts them, or when their document goes away or their view is hidden.
+
+The UI process also needs a little CBOR, to build attestation objects and
+read credential public keys for getPublicKey(), and the HTML check for a
+registrable domain suffix, which moves from LibWeb to URL::Host.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibURL/Host.cpp                     |  48 +
+ Libraries/LibURL/Host.h                       |   3 +
+ Libraries/LibWeb/CookieStore/CookieStore.cpp  |   2 +-
+ Libraries/LibWeb/DOM/Document.cpp             |  47 +-
+ Libraries/LibWeb/DOM/Document.h               |   1 -
+ Libraries/LibWebView/CMakeLists.txt           |   4 +
+ Libraries/LibWebView/ViewImplementation.cpp   |  21 +
+ Libraries/LibWebView/ViewImplementation.h     |  13 +
+ .../LibWebView/WebAuthn/AttestationObject.cpp | 197 ++++
+ .../LibWebView/WebAuthn/AttestationObject.h   |  75 ++
+ Libraries/LibWebView/WebAuthn/Authenticator.h | 167 ++++
+ Libraries/LibWebView/WebAuthn/CBOR.cpp        | 264 ++++++
+ Libraries/LibWebView/WebAuthn/CBOR.h          |  79 ++
+ Libraries/LibWebView/WebAuthn/ClientData.cpp  | 102 ++
+ Libraries/LibWebView/WebAuthn/ClientData.h    |  36 +
+ Libraries/LibWebView/WebAuthn/Coordinator.cpp | 897 ++++++++++++++++++
+ Libraries/LibWebView/WebAuthn/Coordinator.h   |  68 ++
+ Libraries/LibWebView/WebAuthn/Prompt.h        |  79 ++
+ Libraries/LibWebView/WebContentPage.cpp       | 100 ++
+ Libraries/LibWebView/WebContentPage.h         |   7 +
+ Services/WebContent/ConnectionFromClient.cpp  |   6 +
+ Services/WebContent/ConnectionFromClient.h    |   1 +
+ Services/WebContent/PageClient.cpp            |  22 +
+ Services/WebContent/PageClient.h              |   4 +
+ Services/WebContent/WebContentClient.ipc      |   4 +
+ Services/WebContent/WebContentServer.ipc      |   2 +
+ Tests/LibWebView/CMakeLists.txt               |   4 +
+ Tests/LibWebView/TestWebAuthn.cpp             | 167 ++++
+ 28 files changed, 2372 insertions(+), 48 deletions(-)
+ create mode 100644 Libraries/LibWebView/WebAuthn/AttestationObject.cpp
+ create mode 100644 Libraries/LibWebView/WebAuthn/AttestationObject.h
+ create mode 100644 Libraries/LibWebView/WebAuthn/Authenticator.h
+ create mode 100644 Libraries/LibWebView/WebAuthn/CBOR.cpp
+ create mode 100644 Libraries/LibWebView/WebAuthn/CBOR.h
+ create mode 100644 Libraries/LibWebView/WebAuthn/ClientData.cpp
+ create mode 100644 Libraries/LibWebView/WebAuthn/ClientData.h
+ create mode 100644 Libraries/LibWebView/WebAuthn/Coordinator.cpp
+ create mode 100644 Libraries/LibWebView/WebAuthn/Coordinator.h
+ create mode 100644 Libraries/LibWebView/WebAuthn/Prompt.h
+ create mode 100644 Tests/LibWebView/TestWebAuthn.cpp
+
+diff --git a/Libraries/LibURL/Host.cpp b/Libraries/LibURL/Host.cpp
+index 7467ab85f5dd140458d5c56de55f952156b89d5b..54ab09971273588363ea778a97c9175975620a5c 100644
+--- a/Libraries/LibURL/Host.cpp
++++ b/Libraries/LibURL/Host.cpp
+@@ -232,6 +232,54 @@ Optional<String> Host::public_suffix() const
+ }
+ 
+ // https://url.spec.whatwg.org/#host-registrable-domain
++static bool ends_with_dot_prefixed_suffix(StringView string, StringView suffix)
++{
++    if (string.length() <= suffix.length())
++        return false;
++    if (!string.ends_with(suffix))
++        return false;
++    return string[string.length() - suffix.length() - 1] == '.';
++}
++
++// https://html.spec.whatwg.org/multipage/browsers.html#is-a-registrable-domain-suffix-of-or-is-equal-to
++bool Host::is_a_registrable_domain_suffix_of_or_is_equal_to(Host const& original_host) const
++{
++    auto const& host_suffix = *this;
++
++    // 4. If hostSuffix does not equal originalHost, then:
++    if (host_suffix != original_host) {
++        // 1. If hostSuffix or originalHost is not a domain, then return false.
++        // NOTE: This excludes hosts that are IP addresses.
++        if (!host_suffix.has<String>() || !original_host.has<String>())
++            return false;
++        auto const& host_suffix_string = host_suffix.get<String>();
++        auto const& original_host_string = original_host.get<String>();
++
++        // 2. If hostSuffix, prefixed by U+002E (.), does not match the end of originalHost, then return false.
++        if (!ends_with_dot_prefixed_suffix(original_host_string, host_suffix_string))
++            return false;
++
++        // 3. If any of the following are true:
++        //     * hostSuffix equals hostSuffix's public suffix; or
++        //     * hostSuffix, prefixed by U+002E (.), matches the end of originalHost's public suffix,
++        //    then return false. [URL]
++        if (host_suffix_string == host_suffix.public_suffix())
++            return false;
++
++        auto original_host_public_suffix = original_host.public_suffix();
++        VERIFY(original_host_public_suffix.has_value());
++
++        if (ends_with_dot_prefixed_suffix(*original_host_public_suffix, host_suffix_string))
++            return false;
++
++        // 4. Assert: originalHost's public suffix, prefixed by U+002E (.), matches the end of hostSuffix.
++        VERIFY(ends_with_dot_prefixed_suffix(host_suffix_string, *original_host_public_suffix));
++    }
++
++    // 5. Return true.
++    return true;
++}
++
+ Optional<String> Host::registrable_domain() const
+ {
+     // 1. If host’s public suffix is null or host’s public suffix equals host, then return null.
+diff --git a/Libraries/LibURL/Host.h b/Libraries/LibURL/Host.h
+index 1aa3992764aa21376f3dffef1dae950655a97d67..49e59167697d31ec299d787980f02fb81655e8ab 100644
+--- a/Libraries/LibURL/Host.h
++++ b/Libraries/LibURL/Host.h
+@@ -50,6 +50,9 @@ public:
+     Optional<String> public_suffix() const;
+     Optional<String> registrable_domain() const;
+ 
++    // https://html.spec.whatwg.org/multipage/browsers.html#is-a-registrable-domain-suffix-of-or-is-equal-to
++    bool is_a_registrable_domain_suffix_of_or_is_equal_to(Host const& original_host) const;
++
+     String serialize() const;
+ 
+ private:
+diff --git a/Libraries/LibWeb/CookieStore/CookieStore.cpp b/Libraries/LibWeb/CookieStore/CookieStore.cpp
+index 69b7bd6d91be9e95a2577216ec7f0f145e3c58a0..b612518eb09a11f1fdd146bc773a01f52784c339 100644
+--- a/Libraries/LibWeb/CookieStore/CookieStore.cpp
++++ b/Libraries/LibWeb/CookieStore/CookieStore.cpp
+@@ -448,7 +448,7 @@ bool CookieStore::set_a_cookie(HTML::EnvironmentId const& environment_id, URL::U
+         auto domain_utf8 = domain->to_utf8();
+         // NB: Parse domain once so the suffix check and parsedDomain can share it.
+         auto parsed_domain = URL::Parser::parse_host(domain_utf8);
+-        if (!host.has_value() || !parsed_domain.has_value() || !DOM::is_a_registrable_domain_suffix_of_or_is_equal_to(parsed_domain.value(), host.value()))
++        if (!host.has_value() || !parsed_domain.has_value() || !parsed_domain->is_a_registrable_domain_suffix_of_or_is_equal_to(host.value()))
+             return false;
+ 
+         // 4. Let parsedDomain be the result of host parsing domain.
+diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
+index 30d86afc096398371a813e803737ff10ee6e2798..9038a0ab85af3040b29bee73a838463b7344f60b 100644
+--- a/Libraries/LibWeb/DOM/Document.cpp
++++ b/Libraries/LibWeb/DOM/Document.cpp
+@@ -6203,52 +6203,7 @@ bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_stri
+     if (!host_suffix.has_value())
+         return false;
+ 
+-    return is_a_registrable_domain_suffix_of_or_is_equal_to(host_suffix.value(), original_host);
+-}
+-
+-static bool ends_with_dot_prefixed_suffix(Utf16View string, Utf16View suffix)
+-{
+-    if (string.length_in_code_units() <= suffix.length_in_code_units())
+-        return false;
+-    if (!string.ends_with(suffix))
+-        return false;
+-    return string.code_unit_at(string.length_in_code_units() - suffix.length_in_code_units() - 1) == '.';
+-}
+-
+-bool is_a_registrable_domain_suffix_of_or_is_equal_to(URL::Host const& host_suffix, URL::Host const& original_host)
+-{
+-    // 4. If hostSuffix does not equal originalHost, then:
+-    if (host_suffix != original_host) {
+-        // 1. If hostSuffix or originalHost is not a domain, then return false.
+-        // NOTE: This excludes hosts that are IP addresses.
+-        if (!host_suffix.has<String>() || !original_host.has<String>())
+-            return false;
+-        auto const& host_suffix_string = host_suffix.get<String>();
+-        auto const& original_host_string = original_host.get<String>();
+-
+-        // 2. If hostSuffix, prefixed by U+002E (.), does not match the end of originalHost, then return false.
+-        if (!ends_with_dot_prefixed_suffix(Utf16View { original_host_string.bytes_as_string_view() }, Utf16View { host_suffix_string.bytes_as_string_view() }))
+-            return false;
+-
+-        // 3. If any of the following are true:
+-        //     * hostSuffix equals hostSuffix's public suffix; or
+-        //     * hostSuffix, prefixed by U+002E (.), matches the end of originalHost's public suffix,
+-        //    then return false. [URL]
+-        if (host_suffix_string == host_suffix.public_suffix())
+-            return false;
+-
+-        auto original_host_public_suffix = original_host.public_suffix();
+-        VERIFY(original_host_public_suffix.has_value());
+-
+-        if (ends_with_dot_prefixed_suffix(Utf16View { original_host_public_suffix->bytes_as_string_view() }, Utf16View { host_suffix_string.bytes_as_string_view() }))
+-            return false;
+-
+-        // 4. Assert: originalHost's public suffix, prefixed by U+002E (.), matches the end of hostSuffix.
+-        VERIFY(ends_with_dot_prefixed_suffix(Utf16View { host_suffix_string.bytes_as_string_view() }, Utf16View { original_host_public_suffix->bytes_as_string_view() }));
+-    }
+-
+-    // 5. Return true.
+-    return true;
++    return host_suffix->is_a_registrable_domain_suffix_of_or_is_equal_to(original_host);
+ }
+ 
+ // https://html.spec.whatwg.org/multipage/browsers.html#dom-document-domain
+diff --git a/Libraries/LibWeb/DOM/Document.h b/Libraries/LibWeb/DOM/Document.h
+index a25a036f689f9ef85eba85552a4a077e80db2ffa..1b9561f38a256a4e795ab2bc3b0aa9e5d8376163 100644
+--- a/Libraries/LibWeb/DOM/Document.h
++++ b/Libraries/LibWeb/DOM/Document.h
+@@ -2474,6 +2474,5 @@ template<>
+ inline bool Node::fast_is<Document>() const { return is_document(); }
+ 
+ bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_string, URL::Host const& original_host);
+-bool is_a_registrable_domain_suffix_of_or_is_equal_to(URL::Host const& host_suffix, URL::Host const& original_host);
+ 
+ }
+diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
+index a4708f1ad416709f297afb9aab6c07b07b85391f..8b84a1a14cf5da6bd5f5e2b3e81f385f943fc7b3 100644
+--- a/Libraries/LibWebView/CMakeLists.txt
++++ b/Libraries/LibWebView/CMakeLists.txt
+@@ -73,6 +73,10 @@ set(SOURCES
+     Utilities.cpp
+     VideoDecoderServerControlClient.cpp
+     ViewImplementation.cpp
++    WebAuthn/AttestationObject.cpp
++    WebAuthn/CBOR.cpp
++    WebAuthn/ClientData.cpp
++    WebAuthn/Coordinator.cpp
+     WebCompatReport.cpp
+     WebContentClient.cpp
+     WebContentPage.cpp
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index ae7ddb5e5dc289c77b612f4218f996fa54e43b75..c79989a08490bf6914082751e2a1c54f4ee3dcd0 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -41,6 +41,7 @@
+ #include <LibWebView/URL.h>
+ #include <LibWebView/UserAgent.h>
+ #include <LibWebView/ViewImplementation.h>
++#include <LibWebView/WebAuthn/Coordinator.h>
+ #include <LibWebView/WebContentClient.h>
+ #include <LibWebView/WebDriverBiDi.h>
+ #include <math.h>
+@@ -344,6 +345,26 @@ void ViewImplementation::set_has_system_focus(bool has_system_focus)
+     traversable().set_has_system_focus(has_system_focus, {});
+ }
+ 
++void ViewImplementation::web_authn_cancel()
++{
++    WebAuthnCoordinator::the().user_cancelled(*this);
++}
++
++void ViewImplementation::web_authn_provide_pin(String pin)
++{
++    WebAuthnCoordinator::the().user_entered_pin(*this, move(pin));
++}
++
++void ViewImplementation::web_authn_choose_account(size_t index)
++{
++    WebAuthnCoordinator::the().user_chose_account(*this, index);
++}
++
++void ViewImplementation::web_authn_allow_attestation(bool allow)
++{
++    WebAuthnCoordinator::the().user_answered_attestation_consent(*this, allow);
++}
++
+ void ViewImplementation::load(URL::URL const& url, Web::Bindings::NavigationHistoryBehavior history_handling)
+ {
+     load(traversable().prepare_navigation(url, {}, history_handling));
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index 061cdb71672c74340cda0c0a846c9a89a0f49462..07b112f6c2f6eb9ded77de8ede3fce4d9a624a54 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -78,6 +78,7 @@
+ #include <LibWebView/Settings.h>
+ #include <LibWebView/SpellChecker.h>
+ #include <LibWebView/TabPerformanceStats.h>
++#include <LibWebView/WebAuthn/Prompt.h>
+ #include <LibWebView/WebContentClient.h>
+ #include <LibWebView/WebContentPage.h>
+ #include <LibWebView/WebDriverSessionConfig.h>
+@@ -143,6 +144,12 @@ public:
+ 
+     void server_did_paint(Badge<WebContentPage>, i32 bitmap_id, Gfx::IntSize size, Gfx::IntRect damage_rect, double device_pixel_ratio);
+ 
++    // What the user does in the WebAuthn prompt.
++    void web_authn_cancel();
++    void web_authn_provide_pin(String pin);
++    void web_authn_choose_account(size_t index);
++    void web_authn_allow_attestation(bool allow);
++
+     void set_window_position(Gfx::IntPoint);
+     void set_window_size(Gfx::IntSize);
+     void set_system_visibility_state(Web::HTML::VisibilityState);
+@@ -567,6 +574,12 @@ public:
+     Function<void(WebContentPage& requesting_page, u64 request_id)> on_start_geolocation_position_watch;
+     Function<void(WebContentPage& requesting_page, u64 request_id)> on_stop_geolocation_position_watch;
+     Function<void(Utf16String const& name, URL::Origin const&, Function<void(bool granted)> on_decided)> on_request_permission;
++
++    // WebAuthn ceremonies of the view's pages. The embedder shows the prompt, and updates it on each call, until
++    // on_web_authn_prompt_closed. It answers with the web_authn_* methods. A view without a prompt has no
++    // authenticators.
++    Function<void(WebAuthnPrompt const&)> on_web_authn_prompt;
++    Function<void()> on_web_authn_prompt_closed;
+     Function<void(Web::HTML::FileFilter const& accepted_file_types, Web::HTML::AllowMultipleFiles)> on_request_file_picker;
+     Function<void(Gfx::IntPoint content_position, i32 minimum_width, Vector<Web::HTML::SelectItem> items)> on_request_select_dropdown;
+     Function<void(Web::KeyEvent const&)> on_finish_handling_key_event;
+diff --git a/Libraries/LibWebView/WebAuthn/AttestationObject.cpp b/Libraries/LibWebView/WebAuthn/AttestationObject.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..2a0f6ec78234b0483bf558279101de1be43df510
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/AttestationObject.cpp
+@@ -0,0 +1,197 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/Endian.h>
++#include <LibCrypto/ASN1/Constants.h>
++#include <LibCrypto/BigInt/UnsignedBigInteger.h>
++#include <LibCrypto/PK/PK.h>
++#include <LibCrypto/PK/RSA.h>
++#include <LibWebView/WebAuthn/AttestationObject.h>
++#include <LibWebView/WebAuthn/CBOR.h>
++
++namespace WebView {
++
++// https://datatracker.ietf.org/doc/html/rfc9053#name-key-object-parameters
++static constexpr i64 COSE_KEY_KTY = 1;
++static constexpr i64 COSE_KEY_ALG = 3;
++static constexpr i64 COSE_KEY_EC2_CRV = -1;
++static constexpr i64 COSE_KEY_EC2_X = -2;
++static constexpr i64 COSE_KEY_EC2_Y = -3;
++static constexpr i64 COSE_KEY_OKP_X = -2;
++static constexpr i64 COSE_KEY_RSA_N = -1;
++static constexpr i64 COSE_KEY_RSA_E = -2;
++
++static constexpr i64 COSE_KEY_TYPE_OKP = 1;
++static constexpr i64 COSE_KEY_TYPE_EC2 = 2;
++static constexpr i64 COSE_KEY_TYPE_RSA = 3;
++
++static constexpr i64 COSE_CURVE_P256 = 1;
++static constexpr i64 COSE_CURVE_ED25519 = 6;
++
++ErrorOr<AuthenticatorData> AuthenticatorData::parse(ReadonlyBytes bytes)
++{
++    // rpIdHash (32), flags (1), signCount (4), then attestedCredentialData and extensions, if their flags are set.
++    if (bytes.size() < 37)
++        return Error::from_string_literal("Authenticator data is too short");
++
++    AuthenticatorData data;
++    data.rp_id_hash = TRY(ByteBuffer::copy(bytes.slice(0, 32)));
++    data.flags = bytes[32];
++    data.sign_count = (static_cast<u32>(bytes[33]) << 24) | (static_cast<u32>(bytes[34]) << 16) | (static_cast<u32>(bytes[35]) << 8) | bytes[36];
++
++    if (!(data.flags & AttestedCredentialDataIncluded))
++        return data;
++
++    // aaguid (16), credentialIdLength (2), credentialId, credentialPublicKey (CBOR).
++    auto rest = bytes.slice(37);
++    if (rest.size() < 18)
++        return Error::from_string_literal("Attested credential data is too short");
++
++    AttestedCredentialData attested;
++    attested.aaguid = TRY(ByteBuffer::copy(rest.slice(0, 16)));
++    size_t credential_id_length = (static_cast<size_t>(rest[16]) << 8) | rest[17];
++    rest = rest.slice(18);
++    if (rest.size() < credential_id_length)
++        return Error::from_string_literal("Credential ID is longer than the authenticator data");
++    attested.credential_id = TRY(ByteBuffer::copy(rest.slice(0, credential_id_length)));
++    rest = rest.slice(credential_id_length);
++
++    auto public_key = TRY(CBOR::decode_prefix(rest));
++    attested.credential_public_key = TRY(ByteBuffer::copy(rest.slice(0, public_key.length)));
++    data.attested_credential_data = move(attested);
++    return data;
++}
++
++ByteBuffer AuthenticatorData::serialize() const
++{
++    ByteBuffer bytes;
++    bytes.append(rp_id_hash);
++    bytes.append(attested_credential_data.has_value() ? flags | AttestedCredentialDataIncluded : flags);
++    for (int shift = 24; shift >= 0; shift -= 8)
++        bytes.append(static_cast<u8>(sign_count >> shift));
++    if (attested_credential_data.has_value()) {
++        bytes.append(attested_credential_data->aaguid);
++        bytes.append(static_cast<u8>(attested_credential_data->credential_id.size() >> 8));
++        bytes.append(static_cast<u8>(attested_credential_data->credential_id.size()));
++        bytes.append(attested_credential_data->credential_id);
++        bytes.append(attested_credential_data->credential_public_key);
++    }
++    return bytes;
++}
++
++// https://w3c.github.io/webauthn/#sctn-generating-an-attestation-object
++ByteBuffer encode_attestation_object(StringView format, ReadonlyBytes attestation_statement, ReadonlyBytes authenticator_data)
++{
++    // attObj = { authData: bytes, $$attStmtType }, with attStmtType = ( fmt: text, attStmt: { * tstr => any } ), in
++    // CTAP2 canonical CBOR, whose map keys sort shortest first: "fmt", "attStmt", "authData".
++    CBOR::Encoder encoder;
++    encoder.begin_map(3);
++    encoder.write_text("fmt"sv);
++    encoder.write_text(format);
++    encoder.write_text("attStmt"sv);
++    encoder.write_encoded(attestation_statement);
++    encoder.write_text("authData"sv);
++    encoder.write_bytes(authenticator_data);
++    return encoder.finish();
++}
++
++// https://w3c.github.io/webauthn/#sctn-none-attestation
++ByteBuffer none_attestation_statement()
++{
++    // The attestation statement is an empty CBOR map.
++    CBOR::Encoder encoder;
++    encoder.begin_map(0);
++    return encoder.finish();
++}
++
++bool is_self_attestation(StringView format, ReadonlyBytes attestation_statement, ReadonlyBytes aaguid)
++{
++    // https://w3c.github.io/webauthn/#sctn-createCredential, constructCredentialAlg:
++    // If the aaguid in the attested credential data is 16 zero bytes, credentialCreationData.attestationObjectResult.fmt
++    // is "packed", and "x5c" is absent from credentialCreationData.attestationObjectResult, then self attestation is
++    // being used and no further action is needed.
++    if (format != "packed"sv)
++        return false;
++    if (!all_of(aaguid, [](u8 byte) { return byte == 0; }))
++        return false;
++    auto statement = CBOR::decode(attestation_statement);
++    if (statement.is_error() || !statement.value().is_map())
++        return false;
++    return !statement.value().get("x5c"sv);
++}
++
++static ErrorOr<ByteBuffer> bytes_member(CBOR::Value const& map, i64 key)
++{
++    auto const* value = map.get(key);
++    if (!value || !value->is_bytes())
++        return Error::from_string_literal("COSE key is missing a parameter");
++    return value->value.get<ByteBuffer>();
++}
++
++// https://w3c.github.io/webauthn/#sctn-public-key-easy
++ErrorOr<CredentialPublicKey> CredentialPublicKey::from_cose_key(ReadonlyBytes cose_key)
++{
++    auto key = TRY(CBOR::decode(cose_key));
++    auto const* key_type = key.get(COSE_KEY_KTY);
++    auto const* algorithm = key.get(COSE_KEY_ALG);
++    if (!key_type || !key_type->is_integer() || !algorithm || !algorithm->is_integer())
++        return Error::from_string_literal("COSE key has no key type or algorithm");
++
++    CredentialPublicKey result;
++    result.algorithm = static_cast<i32>(algorithm->value.get<i64>());
++
++    auto key_type_value = key_type->value.get<i64>();
++    // NB: EC2 and OKP keys both keep their curve under -1.
++    auto const* curve = key.get(COSE_KEY_EC2_CRV);
++    auto curve_value = curve && curve->is_integer() ? curve->value.get<i64>() : 0;
++
++    if (result.algorithm == COSE_ALGORITHM_ES256 && key_type_value == COSE_KEY_TYPE_EC2 && curve_value == COSE_CURVE_P256) {
++        auto x = TRY(bytes_member(key, COSE_KEY_EC2_X));
++        auto y = TRY(bytes_member(key, COSE_KEY_EC2_Y));
++        if (x.size() != 32 || y.size() != 32)
++            return Error::from_string_literal("Invalid P-256 point");
++        ByteBuffer point;
++        point.append(0x04);
++        point.append(x);
++        point.append(y);
++        Span<u32 const> parameters = ::Crypto::ASN1::secp256r1_oid;
++        result.subject_public_key_info = TRY(::Crypto::PK::wrap_in_subject_public_key_info(point, ::Crypto::ASN1::ec_public_key_encryption_oid, parameters));
++    } else if (result.algorithm == COSE_ALGORITHM_EDDSA && key_type_value == COSE_KEY_TYPE_OKP && curve_value == COSE_CURVE_ED25519) {
++        auto x = TRY(bytes_member(key, COSE_KEY_OKP_X));
++        if (x.size() != 32)
++            return Error::from_string_literal("Invalid Ed25519 key");
++        result.subject_public_key_info = TRY(::Crypto::PK::wrap_in_subject_public_key_info(x, ::Crypto::ASN1::ed25519_oid));
++    } else if (result.algorithm == COSE_ALGORITHM_RS256 && key_type_value == COSE_KEY_TYPE_RSA) {
++        auto n = TRY(bytes_member(key, COSE_KEY_RSA_N));
++        auto e = TRY(bytes_member(key, COSE_KEY_RSA_E));
++        ::Crypto::PK::RSAPublicKey public_key { ::Crypto::UnsignedBigInteger::import_data(n), ::Crypto::UnsignedBigInteger::import_data(e) };
++        auto der = TRY(public_key.export_as_der());
++        result.subject_public_key_info = TRY(::Crypto::PK::wrap_in_subject_public_key_info(der, ::Crypto::ASN1::rsa_encryption_oid, nullptr));
++    }
++
++    // NB: Another algorithm's key leaves getPublicKey() returning null, as the spec allows.
++    return result;
++}
++
++ByteBuffer cose_key_for_es256(ReadonlyBytes x, ReadonlyBytes y)
++{
++    // {1: 2, 3: -7, -1: 1, -2: x, -3: y}, in CTAP2 canonical order.
++    CBOR::Encoder encoder;
++    encoder.begin_map(5);
++    encoder.write_integer(COSE_KEY_KTY);
++    encoder.write_integer(COSE_KEY_TYPE_EC2);
++    encoder.write_integer(COSE_KEY_ALG);
++    encoder.write_integer(COSE_ALGORITHM_ES256);
++    encoder.write_integer(COSE_KEY_EC2_CRV);
++    encoder.write_integer(COSE_CURVE_P256);
++    encoder.write_integer(COSE_KEY_EC2_X);
++    encoder.write_bytes(x);
++    encoder.write_integer(COSE_KEY_EC2_Y);
++    encoder.write_bytes(y);
++    return encoder.finish();
++}
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/AttestationObject.h b/Libraries/LibWebView/WebAuthn/AttestationObject.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..c7c31ea181e19112a85b89c7cc93cce2d1a1fd78
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/AttestationObject.h
+@@ -0,0 +1,75 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/ByteBuffer.h>
++#include <AK/Error.h>
++#include <AK/Optional.h>
++#include <AK/StringView.h>
++#include <LibWebView/Export.h>
++
++namespace WebView {
++
++// https://w3c.github.io/webauthn/#sctn-alg-identifier
++static constexpr i32 COSE_ALGORITHM_ES256 = -7;
++static constexpr i32 COSE_ALGORITHM_EDDSA = -8;
++static constexpr i32 COSE_ALGORITHM_RS256 = -257;
++
++// https://w3c.github.io/webauthn/#sctn-authenticator-data
++struct WEBVIEW_API AuthenticatorData {
++    // https://w3c.github.io/webauthn/#authdata-flags
++    enum Flags : u8 {
++        UserPresent = 1 << 0,
++        UserVerified = 1 << 2,
++        BackupEligible = 1 << 3,
++        BackupState = 1 << 4,
++        AttestedCredentialDataIncluded = 1 << 6,
++        ExtensionDataIncluded = 1 << 7,
++    };
++
++    // https://w3c.github.io/webauthn/#sctn-attested-credential-data
++    struct AttestedCredentialData {
++        ByteBuffer aaguid;
++        ByteBuffer credential_id;
++        ByteBuffer credential_public_key;
++    };
++
++    ByteBuffer rp_id_hash;
++    u8 flags { 0 };
++    u32 sign_count { 0 };
++    Optional<AttestedCredentialData> attested_credential_data;
++
++    static ErrorOr<AuthenticatorData> parse(ReadonlyBytes);
++
++    // Serializes authenticator data with no extensions.
++    ByteBuffer serialize() const;
++};
++
++// https://w3c.github.io/webauthn/#sctn-generating-an-attestation-object
++WEBVIEW_API ByteBuffer encode_attestation_object(StringView format, ReadonlyBytes attestation_statement, ReadonlyBytes authenticator_data);
++
++// https://w3c.github.io/webauthn/#sctn-none-attestation
++WEBVIEW_API ByteBuffer none_attestation_statement();
++
++// Whether a packed attestation statement is self attestation, which WebAuthn passes on even when the RP asked for no
++// attestation, since it identifies nothing.
++WEBVIEW_API bool is_self_attestation(StringView format, ReadonlyBytes attestation_statement, ReadonlyBytes aaguid);
++
++// https://w3c.github.io/webauthn/#sctn-public-key-easy
++struct WEBVIEW_API CredentialPublicKey {
++    i32 algorithm { 0 };
++
++    // The key as a DER SubjectPublicKeyInfo, for the algorithms getPublicKey() supports: ES256, EdDSA and RS256.
++    Optional<ByteBuffer> subject_public_key_info;
++
++    static ErrorOr<CredentialPublicKey> from_cose_key(ReadonlyBytes);
++};
++
++// https://w3c.github.io/webauthn/#sctn-encoded-credPubKey-examples
++WEBVIEW_API ByteBuffer cose_key_for_es256(ReadonlyBytes x, ReadonlyBytes y);
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/Authenticator.h b/Libraries/LibWebView/WebAuthn/Authenticator.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..4226c1a85332dc4ff93b804792acd544460a5678
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/Authenticator.h
+@@ -0,0 +1,167 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/ByteBuffer.h>
++#include <AK/Function.h>
++#include <AK/NonnullOwnPtr.h>
++#include <AK/NonnullRefPtr.h>
++#include <AK/Optional.h>
++#include <AK/RefCounted.h>
++#include <AK/String.h>
++#include <AK/Variant.h>
++#include <AK/Vector.h>
++#include <LibWebCommon/WebAuthn/WebAuthn.h>
++#include <LibWebView/Export.h>
++#include <LibWebView/Forward.h>
++
++namespace WebView {
++
++// https://w3c.github.io/webauthn/#sctn-authenticator-model
++// An authenticator the browser process can reach, such as a security key on USB. Its operations are those of CTAP2,
++// one at a time, and complete on the thread that started them.
++class WEBVIEW_API Authenticator : public RefCounted<Authenticator> {
++public:
++    // What authenticatorGetInfo says about the authenticator.
++    struct Info {
++        // The COSE algorithms it supports, in its order of preference.
++        Vector<i32> algorithms;
++
++        bool supports_resident_keys { false };
++        bool supports_client_pin { false };
++        bool has_client_pin { false };
++        bool has_built_in_user_verification { false };
++
++        // CTAP 2.1's makeCredUvNotRqd: whether it makes non-discoverable credentials without user verification
++        // even when it is protected by user verification.
++        bool make_credential_without_user_verification { false };
++
++        // Whether it only speaks CTAP1/U2F.
++        bool is_u2f_only { false };
++
++        Vector<Web::WebAuthn::AuthenticatorTransport> transports;
++        Web::WebAuthn::AuthenticatorAttachment attachment { Web::WebAuthn::AuthenticatorAttachment::CrossPlatform };
++    };
++
++    // https://w3c.github.io/webauthn/#sctn-op-make-cred
++    struct MakeCredentialRequest {
++        ByteBuffer client_data_hash;
++        String rp_id;
++        String rp_name;
++        ByteBuffer user_id;
++        String user_name;
++        String user_display_name;
++        i32 algorithm { 0 };
++        Vector<Web::WebAuthn::PublicKeyCredentialDescriptor> exclude_list;
++        bool resident_key { false };
++        bool user_verification { false };
++        Optional<String> pin;
++    };
++
++    // https://w3c.github.io/webauthn/#sctn-op-get-assertion
++    struct GetAssertionRequest {
++        ByteBuffer client_data_hash;
++        String rp_id;
++        Vector<Web::WebAuthn::PublicKeyCredentialDescriptor> allow_list;
++        bool user_verification { false };
++        Optional<String> pin;
++    };
++
++    struct Registration {
++        ByteBuffer credential_id;
++        ByteBuffer authenticator_data;
++        String attestation_format;
++        // The CBOR encoding of the attestation statement.
++        ByteBuffer attestation_statement;
++        bool resident_key { false };
++    };
++
++    struct UserEntity {
++        ByteBuffer id;
++        String name;
++        String display_name;
++    };
++
++    struct Assertion {
++        ByteBuffer credential_id;
++        ByteBuffer authenticator_data;
++        ByteBuffer signature;
++        Optional<UserEntity> user;
++    };
++
++    enum class Error : u8 {
++        // No credential in the allow list is on the authenticator (CTAP2_ERR_NO_CREDENTIALS).
++        NoCredentials,
++        // A credential in the exclude list is on the authenticator (CTAP2_ERR_CREDENTIAL_EXCLUDED).
++        CredentialExcluded,
++        // The operation needs the PIN (CTAP2_ERR_PIN_REQUIRED, CTAP2_ERR_PUAT_REQUIRED).
++        PinRequired,
++        // The PIN was wrong (CTAP2_ERR_PIN_INVALID).
++        PinInvalid,
++        // Too many wrong PINs or failed verifications (CTAP2_ERR_PIN_BLOCKED, CTAP2_ERR_PIN_AUTH_BLOCKED,
++        // CTAP2_ERR_UV_BLOCKED).
++        PinBlocked,
++        // User verification is required, and no PIN is set (CTAP2_ERR_PIN_NOT_SET).
++        PinNotSet,
++        // The authenticator can't do what was asked (CTAP2_ERR_UNSUPPORTED_ALGORITHM, CTAP2_ERR_UNSUPPORTED_OPTION).
++        NotSupported,
++        // The user declined on the authenticator (CTAP2_ERR_OPERATION_DENIED).
++        OperationDenied,
++        // The user didn't respond in time (CTAP2_ERR_USER_ACTION_TIMEOUT).
++        Timeout,
++        // The operation was cancelled.
++        Cancelled,
++        // The authenticator went away.
++        Removed,
++        Other,
++    };
++
++    struct Failure {
++        Error error { Error::Other };
++        Optional<u32> pin_retries;
++    };
++
++    using MakeCredentialResult = Variant<Registration, Failure>;
++    using GetAssertionResult = Variant<Vector<Assertion>, Failure>;
++
++    virtual ~Authenticator() = default;
++
++    virtual Info const& info() const = 0;
++    virtual String const& name() const = 0;
++
++    virtual void make_credential(MakeCredentialRequest, Function<void(MakeCredentialResult)>) = 0;
++    virtual void get_assertion(GetAssertionRequest, Function<void(GetAssertionResult)>) = 0;
++
++    // Waits for the user to touch the authenticator to choose it (CTAP 2.1's authenticatorSelection).
++    virtual void wait_for_touch(Function<void(Optional<Failure>)>) = 0;
++
++    // How many PIN attempts are left before the PIN is blocked.
++    virtual void get_pin_retries(Function<void(Optional<u32>)>) = 0;
++
++    // Stops the operation in progress, which then completes with Error::Cancelled.
++    virtual void cancel() = 0;
++};
++
++// Finds authenticators for a ceremony while it waits for one.
++class WEBVIEW_API AuthenticatorSource {
++public:
++    // Reports authenticators until it is destroyed.
++    class Discovery {
++        AK_ALLOC_WITH_KMALLOC;
++
++    public:
++        virtual ~Discovery() = default;
++    };
++
++    virtual ~AuthenticatorSource() = default;
++
++    // Reports the authenticators that a ceremony in the traversable may use: those present now, and then each that
++    // appears.
++    virtual NonnullOwnPtr<Discovery> discover(CanonicalTraversable const&, Function<void(NonnullRefPtr<Authenticator>)> on_authenticator) = 0;
++};
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/CBOR.cpp b/Libraries/LibWebView/WebAuthn/CBOR.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..2593a1ee6ddfc67f8f62d89d49b33cdbaa33b439
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/CBOR.cpp
+@@ -0,0 +1,264 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/Utf8View.h>
++#include <LibWebView/WebAuthn/CBOR.h>
++
++namespace WebView::CBOR {
++
++// Authenticators nest a few levels deep at most; this keeps a hostile one from exhausting the stack.
++static constexpr size_t MAXIMUM_NESTING_DEPTH = 16;
++
++enum MajorType : u8 {
++    UnsignedInteger = 0,
++    NegativeInteger = 1,
++    ByteString = 2,
++    TextString = 3,
++    ArrayType = 4,
++    MapType = 5,
++    Tag = 6,
++    SimpleOrFloat = 7,
++};
++
++Value const* Value::get(i64 key) const
++{
++    if (!is_map())
++        return nullptr;
++    for (auto const& entry : value.get<Map>()) {
++        if (entry.key.is_integer() && entry.key.value.get<i64>() == key)
++            return &entry.value;
++    }
++    return nullptr;
++}
++
++Value const* Value::get(StringView key) const
++{
++    if (!is_map())
++        return nullptr;
++    for (auto const& entry : value.get<Map>()) {
++        if (entry.key.is_text() && entry.key.value.get<String>() == key)
++            return &entry.value;
++    }
++    return nullptr;
++}
++
++class Decoder {
++public:
++    explicit Decoder(ReadonlyBytes bytes)
++        : m_bytes(bytes)
++    {
++    }
++
++    size_t offset() const { return m_offset; }
++
++    ErrorOr<Value> read_value(size_t depth)
++    {
++        if (depth > MAXIMUM_NESTING_DEPTH)
++            return Error::from_string_literal("CBOR is nested too deeply");
++
++        auto initial_byte = TRY(read_byte());
++        auto major_type = static_cast<MajorType>(initial_byte >> 5);
++        auto additional_information = initial_byte & 0x1f;
++
++        if (major_type == SimpleOrFloat) {
++            switch (additional_information) {
++            case 20:
++                return Value { false };
++            case 21:
++                return Value { true };
++            case 22:
++                return Value { Null {} };
++            default:
++                return Error::from_string_literal("Unsupported CBOR simple value or float");
++            }
++        }
++
++        auto argument = TRY(read_argument(additional_information));
++
++        switch (major_type) {
++        case UnsignedInteger:
++            if (argument > static_cast<u64>(NumericLimits<i64>::max()))
++                return Error::from_string_literal("CBOR integer out of range");
++            return Value { static_cast<i64>(argument) };
++        case NegativeInteger:
++            if (argument > static_cast<u64>(NumericLimits<i64>::max()))
++                return Error::from_string_literal("CBOR integer out of range");
++            return Value { -1 - static_cast<i64>(argument) };
++        case ByteString:
++            return Value { TRY(ByteBuffer::copy(TRY(read_bytes(argument)))) };
++        case TextString: {
++            auto bytes = TRY(read_bytes(argument));
++            auto view = StringView { bytes };
++            if (!Utf8View { view }.validate())
++                return Error::from_string_literal("CBOR text string is not UTF-8");
++            return Value { TRY(String::from_utf8(view)) };
++        }
++        case ArrayType: {
++            if (argument > remaining())
++                return Error::from_string_literal("CBOR array is longer than its data");
++            Array array;
++            TRY(array.try_ensure_capacity(argument));
++            for (u64 i = 0; i < argument; ++i)
++                array.unchecked_append(TRY(read_value(depth + 1)));
++            return Value { move(array) };
++        }
++        case MapType: {
++            if (argument > remaining())
++                return Error::from_string_literal("CBOR map is longer than its data");
++            Map map;
++            TRY(map.try_ensure_capacity(argument));
++            for (u64 i = 0; i < argument; ++i) {
++                auto key = TRY(read_value(depth + 1));
++                auto value = TRY(read_value(depth + 1));
++                map.unchecked_append({ move(key), move(value) });
++            }
++            return Value { move(map) };
++        }
++        case Tag:
++            return Error::from_string_literal("CBOR tags are not supported");
++        case SimpleOrFloat:
++            break;
++        }
++        VERIFY_NOT_REACHED();
++    }
++
++private:
++    size_t remaining() const { return m_bytes.size() - m_offset; }
++
++    ErrorOr<u8> read_byte()
++    {
++        if (remaining() < 1)
++            return Error::from_string_literal("CBOR ended early");
++        return m_bytes[m_offset++];
++    }
++
++    ErrorOr<ReadonlyBytes> read_bytes(u64 length)
++    {
++        if (length > remaining())
++            return Error::from_string_literal("CBOR ended early");
++        auto bytes = m_bytes.slice(m_offset, length);
++        m_offset += length;
++        return bytes;
++    }
++
++    ErrorOr<u64> read_argument(u8 additional_information)
++    {
++        if (additional_information < 24)
++            return additional_information;
++
++        size_t length = 0;
++        switch (additional_information) {
++        case 24:
++            length = 1;
++            break;
++        case 25:
++            length = 2;
++            break;
++        case 26:
++            length = 4;
++            break;
++        case 27:
++            length = 8;
++            break;
++        default:
++            return Error::from_string_literal("Indefinite-length or reserved CBOR item");
++        }
++
++        auto bytes = TRY(read_bytes(length));
++        u64 argument = 0;
++        for (auto byte : bytes)
++            argument = (argument << 8) | byte;
++        return argument;
++    }
++
++    ReadonlyBytes m_bytes;
++    size_t m_offset { 0 };
++};
++
++ErrorOr<DecodedValue> decode_prefix(ReadonlyBytes bytes)
++{
++    Decoder decoder { bytes };
++    auto value = TRY(decoder.read_value(0));
++    return DecodedValue { move(value), decoder.offset() };
++}
++
++ErrorOr<Value> decode(ReadonlyBytes bytes)
++{
++    auto decoded = TRY(decode_prefix(bytes));
++    if (decoded.length != bytes.size())
++        return Error::from_string_literal("Trailing data after CBOR");
++    return move(decoded.value);
++}
++
++void Encoder::write_head(u8 major_type, u64 argument)
++{
++    auto initial_byte = static_cast<u8>(major_type << 5);
++    if (argument < 24) {
++        m_buffer.append(initial_byte | argument);
++    } else if (argument <= 0xff) {
++        m_buffer.append(initial_byte | 24);
++        m_buffer.append(argument);
++    } else if (argument <= 0xffff) {
++        m_buffer.append(initial_byte | 25);
++        for (int shift = 8; shift >= 0; shift -= 8)
++            m_buffer.append(argument >> shift);
++    } else if (argument <= 0xffffffff) {
++        m_buffer.append(initial_byte | 26);
++        for (int shift = 24; shift >= 0; shift -= 8)
++            m_buffer.append(argument >> shift);
++    } else {
++        m_buffer.append(initial_byte | 27);
++        for (int shift = 56; shift >= 0; shift -= 8)
++            m_buffer.append(argument >> shift);
++    }
++}
++
++void Encoder::write_integer(i64 value)
++{
++    if (value >= 0)
++        write_head(UnsignedInteger, value);
++    else
++        write_head(NegativeInteger, static_cast<u64>(-1 - value));
++}
++
++void Encoder::write_bytes(ReadonlyBytes bytes)
++{
++    write_head(ByteString, bytes.size());
++    m_buffer.append(bytes);
++}
++
++void Encoder::write_text(StringView text)
++{
++    write_head(TextString, text.length());
++    m_buffer.append(text.bytes());
++}
++
++void Encoder::write_bool(bool value)
++{
++    m_buffer.append(value ? 0xf5 : 0xf4);
++}
++
++void Encoder::write_null()
++{
++    m_buffer.append(0xf6);
++}
++
++void Encoder::begin_array(size_t length)
++{
++    write_head(ArrayType, length);
++}
++
++void Encoder::begin_map(size_t length)
++{
++    write_head(MapType, length);
++}
++
++void Encoder::write_encoded(ReadonlyBytes bytes)
++{
++    m_buffer.append(bytes);
++}
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/CBOR.h b/Libraries/LibWebView/WebAuthn/CBOR.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..cec299a91e2430b6dcb6015a3ff7c071dfc5ee58
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/CBOR.h
+@@ -0,0 +1,79 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/ByteBuffer.h>
++#include <AK/Error.h>
++#include <AK/NonnullOwnPtr.h>
++#include <AK/String.h>
++#include <AK/Variant.h>
++#include <AK/Vector.h>
++#include <LibWebView/Export.h>
++
++// The subset of CBOR (RFC 8949) that WebAuthn and CTAP2 use: integers, byte and text strings, arrays, maps, booleans
++// and null, all of definite length. https://w3c.github.io/webauthn/#sctn-conforming-all-classes
++namespace WebView::CBOR {
++
++struct Value;
++
++using Array = Vector<Value>;
++using Map = Vector<struct MapEntry>;
++
++struct Null { };
++
++struct WEBVIEW_API Value {
++    // Integers are kept as i64 when they fit, which covers everything WebAuthn uses.
++    Variant<i64, ByteBuffer, String, Array, Map, bool, Null> value;
++
++    bool is_integer() const { return value.has<i64>(); }
++    bool is_bytes() const { return value.has<ByteBuffer>(); }
++    bool is_text() const { return value.has<String>(); }
++    bool is_map() const { return value.has<Map>(); }
++
++    // Looks up a map entry by an integer or text key.
++    Value const* get(i64 key) const;
++    Value const* get(StringView key) const;
++};
++
++struct MapEntry {
++    Value key;
++    Value value;
++};
++
++// Decodes one data item from the start of the bytes, and says how many bytes it took.
++struct DecodedValue {
++    Value value;
++    size_t length { 0 };
++};
++WEBVIEW_API ErrorOr<DecodedValue> decode_prefix(ReadonlyBytes);
++
++// Decodes bytes that hold exactly one data item.
++WEBVIEW_API ErrorOr<Value> decode(ReadonlyBytes);
++
++// Writes CBOR. Map entries are written in the order given, so writers of CTAP2 canonical CBOR sort them themselves.
++class WEBVIEW_API Encoder {
++public:
++    void write_integer(i64);
++    void write_bytes(ReadonlyBytes);
++    void write_text(StringView);
++    void write_bool(bool);
++    void write_null();
++    void begin_array(size_t length);
++    void begin_map(size_t length);
++
++    // Writes an already encoded data item as it is.
++    void write_encoded(ReadonlyBytes);
++
++    ByteBuffer finish() { return move(m_buffer); }
++
++private:
++    void write_head(u8 major_type, u64 argument);
++
++    ByteBuffer m_buffer;
++};
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/ClientData.cpp b/Libraries/LibWebView/WebAuthn/ClientData.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..3950a6b924a62c9c0c9937ff2842cf29dec8e70a
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/ClientData.cpp
+@@ -0,0 +1,102 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/Base64.h>
++#include <AK/StringBuilder.h>
++#include <AK/Utf8View.h>
++#include <LibCrypto/Hash/SHA2.h>
++#include <LibWebView/WebAuthn/ClientData.h>
++
++namespace WebView {
++
++// https://w3c.github.io/webauthn/#ccdtostring
++static void append_ccd_to_string(StringBuilder& result, StringView string)
++{
++    // 1. Let encoded be an empty byte string.
++    // 2. Append 0x22 (") to encoded.
++    result.append('"');
++
++    // 3. Invoke ToString on the given object to convert to a string.
++    // 4. For each code point in the resulting string, if the code point:
++    for (auto code_point : Utf8View { string }) {
++        // - is in the set {U+0020, U+0021, U+0023–U+005B, U+005D–U+10FFFF}: Append the UTF-8 encoding of that code
++        //   point to encoded.
++        if (code_point == 0x20 || code_point == 0x21 || (code_point >= 0x23 && code_point <= 0x5b) || code_point >= 0x5d)
++            result.append_code_point(code_point);
++        // - is U+0022: Append 0x5c22 (\") to encoded.
++        else if (code_point == '"')
++            result.append("\\\""sv);
++        // - is U+005C: Append 0x5c5c (\\) to encoded.
++        else if (code_point == '\\')
++            result.append("\\\\"sv);
++        // - otherwise: Append 0x5c75 (\u) to encoded, followed by four, lower-case hex digits that, when interpreted
++        //   as a base-16 number, represent that code point.
++        else
++            result.appendff("\\u{:04x}", code_point);
++    }
++
++    // 5. Append 0x22 (") to encoded.
++    result.append('"');
++}
++
++// https://w3c.github.io/webauthn/#clientdatajson-serialization
++ByteBuffer CollectedClientData::serialize() const
++{
++    // 1. Let result be an empty byte string.
++    StringBuilder result;
++
++    // 2. Append 0x7b2274797065223a ({"type":) to result.
++    result.append("{\"type\":"sv);
++
++    // 3. Append CCDToString(type) to result.
++    append_ccd_to_string(result, type == Type::Create ? "webauthn.create"sv : "webauthn.get"sv);
++
++    // 4. Append 0x2c226368616c6c656e6765223a (,"challenge":) to result.
++    result.append(",\"challenge\":"sv);
++
++    // 5. Append CCDToString(challenge) to result.
++    // NB: challenge is the base64url encoding of the challenge.
++    append_ccd_to_string(result, MUST(encode_base64url(challenge, AK::OmitPadding::Yes)));
++
++    // 6. Append 0x2c226f726967696e223a (,"origin":) to result.
++    result.append(",\"origin\":"sv);
++
++    // 7. Append CCDToString(origin) to result.
++    append_ccd_to_string(result, origin.serialize());
++
++    // 8. Append 0x2c2263726f73734f726967696e223a (,"crossOrigin":) to result.
++    result.append(",\"crossOrigin\":"sv);
++
++    // 9. If crossOrigin is not present, or is false, append 0x66616c7365 (false) to result. Otherwise, append
++    //    0x74727565 (true) to result.
++    result.append(cross_origin ? "true"sv : "false"sv);
++
++    // 10. If topOrigin is present:
++    if (top_origin.has_value()) {
++        // 1. Append 0x2c22746f704f726967696e223a (,"topOrigin":) to result.
++        result.append(",\"topOrigin\":"sv);
++
++        // 2. Append CCDToString(topOrigin) to result.
++        append_ccd_to_string(result, top_origin->serialize());
++    }
++
++    // 11. Create a temporary copy of the CollectedClientData and remove the fields type, challenge, origin,
++    //     crossOrigin (if present), and topOrigin (if present).
++    // 12. If no fields remain in the temporary copy then append 0x7d (}) to result.
++    result.append('}');
++
++    return MUST(result.to_byte_buffer());
++}
++
++// https://w3c.github.io/webauthn/#collectedclientdata-hash-of-the-serialized-client-data
++ByteBuffer hash_of_the_serialized_client_data(ReadonlyBytes client_data_json)
++{
++    // This is the hash (computed using SHA-256) of the JSON-compatible serialization of client data.
++    auto digest = Crypto::Hash::SHA256::hash(client_data_json);
++    return MUST(ByteBuffer::copy(digest.bytes()));
++}
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/ClientData.h b/Libraries/LibWebView/WebAuthn/ClientData.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..4263bedc06f091e7bf41f18c033a798af92401e6
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/ClientData.h
+@@ -0,0 +1,36 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/ByteBuffer.h>
++#include <AK/Optional.h>
++#include <LibURL/Origin.h>
++#include <LibWebView/Export.h>
++
++namespace WebView {
++
++// https://w3c.github.io/webauthn/#dictdef-collectedclientdata
++struct WEBVIEW_API CollectedClientData {
++    enum class Type : u8 {
++        Create,
++        Get,
++    };
++
++    Type type { Type::Create };
++    ByteBuffer challenge;
++    URL::Origin origin { URL::Origin::create_opaque() };
++    bool cross_origin { false };
++    Optional<URL::Origin> top_origin;
++
++    // https://w3c.github.io/webauthn/#clientdatajson-serialization
++    ByteBuffer serialize() const;
++};
++
++// https://w3c.github.io/webauthn/#collectedclientdata-hash-of-the-serialized-client-data
++WEBVIEW_API ByteBuffer hash_of_the_serialized_client_data(ReadonlyBytes client_data_json);
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.cpp b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..14a098cc789c647c3ea75fec25219563d9b2d320
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
+@@ -0,0 +1,897 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/WeakPtr.h>
++#include <AK/Weakable.h>
++#include <LibCore/Timer.h>
++#include <LibWebView/CanonicalDocument.h>
++#include <LibWebView/CanonicalNavigable.h>
++#include <LibWebView/CanonicalTraversable.h>
++#include <LibWebView/ViewImplementation.h>
++#include <LibWebView/WebAuthn/AttestationObject.h>
++#include <LibWebView/WebAuthn/ClientData.h>
++#include <LibWebView/WebAuthn/Coordinator.h>
++#include <LibWebView/WebAuthn/Prompt.h>
++#include <LibWebView/WebContentPage.h>
++
++namespace WebView {
++
++using Web::WebAuthn::AttestationConveyancePreference;
++using Web::WebAuthn::AuthenticatorAttachment;
++using Web::WebAuthn::CreateRequest;
++using Web::WebAuthn::ErrorName;
++using Web::WebAuthn::GetRequest;
++using Web::WebAuthn::ResidentKeyRequirement;
++using Web::WebAuthn::UserVerificationRequirement;
++
++// How often a ceremony checks that its document is still active and its view still in front of the user.
++static constexpr auto LIVENESS_CHECK_INTERVAL = AK::Duration::from_milliseconds(500);
++
++static Web::WebAuthn::Error not_allowed(StringView message)
++{
++    return { ErrorName::NotAllowedError, MUST(String::from_utf8(message)) };
++}
++
++class WebAuthnCoordinator::Ceremony final
++    : public RefCounted<Ceremony>
++    , public Weakable<Ceremony> {
++public:
++    using Request = Variant<CreateRequest, GetRequest>;
++
++    Ceremony(WebContentPage& page, u64 request_id, CeremonyContext context, Request request)
++        : m_page(page)
++        , m_request_id(request_id)
++        , m_context(move(context))
++        , m_request(move(request))
++    {
++    }
++
++    WebContentPage* page() const { return m_page.ptr(); }
++    u64 request_id() const { return m_request_id; }
++    bool is_create() const { return m_request.has<CreateRequest>(); }
++
++    ViewImplementation* view() const
++    {
++        if (!m_page || !m_page->is_open())
++            return nullptr;
++        auto view = m_page->traversable().view();
++        return view.has_value() ? &*view : nullptr;
++    }
++
++    void start(Vector<AuthenticatorSource*> const& sources);
++
++    void authenticator_appeared(NonnullRefPtr<Authenticator>);
++
++    // Ends the ceremony, answering the renderer unless it has been answered already.
++    void end(Optional<Web::WebAuthn::Result>);
++
++    // Ends the ceremony without an answer, because the renderer gave up on it or went away.
++    void abandon();
++
++    void user_cancelled();
++    void user_entered_pin(String pin);
++    void user_chose_account(size_t index);
++    void user_answered_attestation_consent(bool allow);
++
++private:
++    enum class Phase : u8 {
++        // Waiting for the user to insert or touch an authenticator.
++        Waiting,
++        // Waiting for the PIN of the selected authenticator.
++        AwaitingPin,
++        // Waiting for the selected authenticator to finish an operation with the PIN.
++        AwaitingTouch,
++        // Waiting for the user to choose among the accounts on the selected authenticator.
++        AwaitingAccountChoice,
++        // Waiting for the user to allow or refuse the site seeing the authenticator's make and model.
++        AwaitingAttestationConsent,
++        // The renderer has its answer, and the prompt stays up only to inform the user.
++        Answered,
++        Ended,
++    };
++
++    // What an authenticator is asked to do, given what it supports.
++    struct Plan {
++        Optional<WebAuthnPrompt::State> unsuitable;
++        bool needs_pin { false };
++        bool resident_key { false };
++        bool user_verification { false };
++        i32 algorithm { 0 };
++    };
++
++    struct Candidate {
++        NonnullRefPtr<Authenticator> authenticator;
++        Plan plan;
++        bool is_busy { false };
++        bool tried_app_id { false };
++    };
++
++    Plan plan_for(Authenticator::Info const&) const;
++    Candidate* candidate_for(Authenticator const&);
++    void issue_request(Candidate&, Optional<String> pin = {});
++    void select_for_pin_entry(Candidate&);
++    void cancel_other_candidates(Authenticator const* except);
++    void handle_failure(Candidate&, Authenticator::Failure const&);
++    void handle_registration(Candidate&, Authenticator::Registration);
++    void handle_assertions(Candidate&, Vector<Authenticator::Assertion>);
++    void finish_registration(bool share_attestation);
++    void finish_assertion(Authenticator::Assertion const&);
++    void show_prompt(WebAuthnPrompt::State);
++    void close_prompt();
++    void check_liveness();
++
++    WeakPtr<WebContentPage> m_page;
++    u64 m_request_id { 0 };
++    CeremonyContext m_context;
++    Request m_request;
++
++    ByteBuffer m_client_data_json;
++    ByteBuffer m_client_data_hash;
++
++    Phase m_phase { Phase::Waiting };
++    WebAuthnPrompt m_prompt;
++    bool m_prompt_is_shown { false };
++
++    Vector<Candidate> m_candidates;
++    RefPtr<Authenticator> m_selected;
++    Optional<Authenticator::Registration> m_pending_registration;
++    Vector<Authenticator::Assertion> m_pending_assertions;
++    bool m_pending_assertions_used_app_id { false };
++
++    RefPtr<Core::Timer> m_lifetime_timer;
++    RefPtr<Core::Timer> m_liveness_timer;
++
++    Vector<NonnullOwnPtr<AuthenticatorSource::Discovery>> m_discoveries;
++};
++
++void WebAuthnCoordinator::Ceremony::start(Vector<AuthenticatorSource*> const& sources)
++{
++    // https://w3c.github.io/webauthn/#sctn-createCredential and https://w3c.github.io/webauthn/#sctn-getAssertion:
++    // Let collectedClientData be a new CollectedClientData instance whose fields are:
++    //   type: "webauthn.create" or "webauthn.get"
++    //   challenge: The base64url encoding of pkOptions.challenge.
++    //   origin: The serialization of callerOrigin.
++    //   crossOrigin: The inverse of the value of the sameOriginWithAncestors argument.
++    //   topOrigin: The serialization of callerOrigin’s top-level origin if sameOriginWithAncestors is false, else
++    //              undefined.
++    // Let clientDataJSON be the JSON-compatible serialization of client data constructed from collectedClientData.
++    // Let clientDataHash be the hash of the serialized client data represented by clientDataJSON.
++    CollectedClientData client_data;
++    client_data.type = is_create() ? CollectedClientData::Type::Create : CollectedClientData::Type::Get;
++    client_data.challenge = m_request.visit([](auto const& request) { return request.challenge; });
++    client_data.origin = m_context.origin;
++    client_data.cross_origin = m_context.cross_origin;
++    if (m_context.cross_origin)
++        client_data.top_origin = m_context.top_level_origin;
++    m_client_data_json = client_data.serialize();
++    m_client_data_hash = hash_of_the_serialized_client_data(m_client_data_json);
++
++    m_prompt.operation = is_create() ? WebAuthnPrompt::Operation::Create : WebAuthnPrompt::Operation::Get;
++    m_prompt.rp_id = m_request.visit([](auto const& request) { return request.rp_id; });
++    m_prompt.origin = m_context.origin;
++    if (m_context.cross_origin)
++        m_prompt.top_level_origin = m_context.top_level_origin;
++    if (auto const* create_request = m_request.get_pointer<CreateRequest>())
++        m_prompt.user_name = create_request->user_name;
++
++    // Start lifetimeTimer.
++    auto timeout = m_request.visit([](auto const& request) { return request.timeout; });
++    m_lifetime_timer = Core::Timer::create_single_shot(AK::Duration::from_milliseconds(timeout), [weak_self = make_weak_ptr()] {
++        // If lifetimeTimer expires, then for each authenticator in issuedRequests invoke the authenticatorCancel
++        // operation on authenticator and remove authenticator from issuedRequests. Throw a "NotAllowedError".
++        if (auto self = weak_self.strong_ref())
++            self->end(not_allowed("The operation timed out"sv));
++    });
++    m_lifetime_timer->start();
++
++    m_liveness_timer = Core::Timer::create_repeating(LIVENESS_CHECK_INTERVAL, [weak_self = make_weak_ptr()] {
++        if (auto self = weak_self.strong_ref())
++            self->check_liveness();
++    });
++    m_liveness_timer->start();
++
++    show_prompt(WebAuthnPrompt::State::InsertKey);
++
++    for (auto* source : sources) {
++        m_discoveries.append(source->discover(m_page->traversable(), [weak_self = make_weak_ptr()](NonnullRefPtr<Authenticator> authenticator) {
++            if (auto self = weak_self.strong_ref())
++                self->authenticator_appeared(move(authenticator));
++        }));
++    }
++}
++
++void WebAuthnCoordinator::Ceremony::check_liveness()
++{
++    if (m_phase == Phase::Ended)
++        return;
++
++    auto* view = this->view();
++    if (!view) {
++        abandon();
++        return;
++    }
++
++    // If the document stopped being active, nobody is waiting for the answer anymore.
++    auto navigable = m_page->traversable().find(m_context.navigable_id);
++    if (!navigable.has_value() || navigable->active_document().id() != m_context.document_id || navigable->active_document().host() != m_page.ptr()) {
++        abandon();
++        return;
++    }
++
++    if (m_phase == Phase::Answered)
++        return;
++
++    // A ceremony continues only while the user can see the view that started it. It may lose focus to its prompt.
++    if (m_page->traversable().system_visibility_state() != Web::HTML::VisibilityState::Visible)
++        end(not_allowed("The page is no longer visible"sv));
++}
++
++WebAuthnCoordinator::Ceremony::Plan WebAuthnCoordinator::Ceremony::plan_for(Authenticator::Info const& info) const
++{
++    Plan plan;
++    bool can_verify_user = info.has_built_in_user_verification || info.has_client_pin;
++
++    auto user_verification_requirement = m_request.visit([](auto const& request) { return request.user_verification; });
++    switch (user_verification_requirement) {
++    case UserVerificationRequirement::Required:
++        plan.user_verification = true;
++        break;
++    case UserVerificationRequirement::Preferred:
++        // NB: As in other browsers, verify the user when the authenticator is set up for it.
++        plan.user_verification = can_verify_user;
++        break;
++    case UserVerificationRequirement::Discouraged:
++        plan.user_verification = false;
++        break;
++    }
++
++    if (plan.user_verification && !can_verify_user) {
++        plan.unsuitable = info.supports_client_pin ? WebAuthnPrompt::State::PinNotSet : WebAuthnPrompt::State::KeyNotSupported;
++        return plan;
++    }
++
++    if (auto const* request = m_request.get_pointer<CreateRequest>()) {
++        // https://w3c.github.io/webauthn/#dom-authenticatorselectioncriteria-authenticatorattachment
++        if (request->authenticator_attachment.has_value() && *request->authenticator_attachment != info.attachment) {
++            plan.unsuitable = *request->authenticator_attachment == AuthenticatorAttachment::Platform ? WebAuthnPrompt::State::NoPlatformAuthenticator : WebAuthnPrompt::State::KeyNotSupported;
++            return plan;
++        }
++
++        // The first of the requested algorithms the authenticator supports. One that doesn't say supports ES256.
++        auto supported_algorithms = info.algorithms.is_empty() ? Vector<i32> { COSE_ALGORITHM_ES256 } : info.algorithms;
++        Optional<i32> algorithm;
++        for (auto requested : request->public_key_algorithms) {
++            if (supported_algorithms.contains_slow(requested)) {
++                algorithm = requested;
++                break;
++            }
++        }
++        if (!algorithm.has_value()) {
++            plan.unsuitable = WebAuthnPrompt::State::KeyNotSupported;
++            return plan;
++        }
++        plan.algorithm = *algorithm;
++
++        // https://w3c.github.io/webauthn/#dom-authenticatorselectioncriteria-residentkey
++        switch (request->resident_key) {
++        case ResidentKeyRequirement::Required:
++            plan.resident_key = true;
++            break;
++        case ResidentKeyRequirement::Preferred:
++            // NB: As in other browsers, make a discoverable credential when the authenticator can protect it.
++            plan.resident_key = info.supports_resident_keys && can_verify_user;
++            break;
++        case ResidentKeyRequirement::Discouraged:
++            plan.resident_key = false;
++            break;
++        }
++        if (plan.resident_key && !info.supports_resident_keys) {
++            plan.unsuitable = WebAuthnPrompt::State::KeyNotSupported;
++            return plan;
++        }
++
++        // A CTAP2 authenticator with a PIN makes a credential only with the PIN, unless it is a non-discoverable one
++        // and the authenticator offers makeCredUvNotRqd.
++        plan.needs_pin = !info.has_built_in_user_verification && info.has_client_pin && (plan.user_verification || plan.resident_key || !info.make_credential_without_user_verification);
++    } else {
++        auto const& get_request = m_request.get<GetRequest>();
++
++        // An empty allow list asks for discoverable credentials.
++        if (get_request.allow_credentials.is_empty() && !info.supports_resident_keys) {
++            plan.unsuitable = WebAuthnPrompt::State::KeyNotSupported;
++            return plan;
++        }
++
++        plan.needs_pin = plan.user_verification && !info.has_built_in_user_verification && info.has_client_pin;
++    }
++
++    if (plan.needs_pin)
++        plan.user_verification = true;
++    return plan;
++}
++
++WebAuthnCoordinator::Ceremony::Candidate* WebAuthnCoordinator::Ceremony::candidate_for(Authenticator const& authenticator)
++{
++    for (auto& candidate : m_candidates) {
++        if (candidate.authenticator.ptr() == &authenticator)
++            return &candidate;
++    }
++    return nullptr;
++}
++
++void WebAuthnCoordinator::Ceremony::authenticator_appeared(NonnullRefPtr<Authenticator> authenticator)
++{
++    if (m_phase == Phase::Ended || m_phase == Phase::Answered)
++        return;
++
++    auto plan = plan_for(authenticator->info());
++    m_candidates.append({ authenticator, plan });
++    auto& candidate = m_candidates.last();
++
++    // Once the user has chosen an authenticator, others wait.
++    if (m_phase != Phase::Waiting)
++        return;
++
++    if (plan.unsuitable.has_value()) {
++        show_prompt(*plan.unsuitable);
++        return;
++    }
++
++    if (!plan.needs_pin) {
++        issue_request(candidate);
++        return;
++    }
++
++    // An authenticator needing a PIN is chosen first, so that the PIN goes to the right one: right away if it's the
++    // only one, and otherwise when the user touches it.
++    bool another_is_present = any_of(m_candidates, [&](auto const& other) { return other.authenticator != candidate.authenticator && !other.plan.unsuitable.has_value(); });
++    if (!another_is_present) {
++        select_for_pin_entry(candidate);
++        return;
++    }
++
++    candidate.is_busy = true;
++    authenticator->wait_for_touch([this, protect = NonnullRefPtr { *this }, authenticator](Optional<Authenticator::Failure> failure) {
++        auto* candidate = candidate_for(*authenticator);
++        if (!candidate)
++            return;
++        candidate->is_busy = false;
++        if (m_phase != Phase::Waiting)
++            return;
++        if (failure.has_value()) {
++            handle_failure(*candidate, *failure);
++            return;
++        }
++        select_for_pin_entry(*candidate);
++    });
++}
++
++void WebAuthnCoordinator::Ceremony::select_for_pin_entry(Candidate& candidate)
++{
++    m_selected = candidate.authenticator;
++    cancel_other_candidates(m_selected.ptr());
++    m_phase = Phase::AwaitingPin;
++
++    candidate.authenticator->get_pin_retries([this, protect = NonnullRefPtr { *this }](Optional<u32> retries) {
++        if (m_phase != Phase::AwaitingPin)
++            return;
++        m_prompt.pin_retries = retries;
++        m_prompt.pin_was_wrong = false;
++        show_prompt(WebAuthnPrompt::State::EnterPin);
++    });
++}
++
++void WebAuthnCoordinator::Ceremony::cancel_other_candidates(Authenticator const* except)
++{
++    for (auto& candidate : m_candidates) {
++        if (candidate.authenticator.ptr() == except || !candidate.is_busy)
++            continue;
++        candidate.authenticator->cancel();
++    }
++}
++
++void WebAuthnCoordinator::Ceremony::issue_request(Candidate& candidate, Optional<String> pin)
++{
++    candidate.is_busy = true;
++    auto authenticator = candidate.authenticator;
++
++    // NB: A PIN is passed on for the one request it was entered for, and never leaves the browser process.
++    auto user_verification = candidate.plan.user_verification || pin.has_value();
++
++    if (auto const* request = m_request.get_pointer<CreateRequest>()) {
++        // https://w3c.github.io/webauthn/#sctn-op-make-cred
++        Authenticator::MakeCredentialRequest make_credential;
++        make_credential.client_data_hash = m_client_data_hash;
++        make_credential.rp_id = request->rp_id;
++        make_credential.rp_name = request->rp_name;
++        make_credential.user_id = request->user_id;
++        make_credential.user_name = request->user_name;
++        make_credential.user_display_name = request->user_display_name;
++        make_credential.algorithm = candidate.plan.algorithm;
++        make_credential.exclude_list = request->exclude_credentials;
++        make_credential.resident_key = candidate.plan.resident_key;
++        make_credential.user_verification = user_verification;
++        make_credential.pin = move(pin);
++        authenticator->make_credential(move(make_credential), [this, protect = NonnullRefPtr { *this }, authenticator](Authenticator::MakeCredentialResult result) {
++            auto* candidate = candidate_for(*authenticator);
++            if (!candidate)
++                return;
++            candidate->is_busy = false;
++            result.visit(
++                [&](Authenticator::Registration& registration) { handle_registration(*candidate, move(registration)); },
++                [&](Authenticator::Failure const& failure) { handle_failure(*candidate, failure); });
++        });
++        return;
++    }
++
++    // https://w3c.github.io/webauthn/#sctn-op-get-assertion
++    auto const& request = m_request.get<GetRequest>();
++    Authenticator::GetAssertionRequest get_assertion;
++    get_assertion.client_data_hash = m_client_data_hash;
++    get_assertion.rp_id = candidate.tried_app_id ? *request.app_id : request.rp_id;
++    get_assertion.allow_list = request.allow_credentials;
++    get_assertion.user_verification = user_verification;
++    get_assertion.pin = move(pin);
++    authenticator->get_assertion(move(get_assertion), [this, protect = NonnullRefPtr { *this }, authenticator](Authenticator::GetAssertionResult result) {
++        auto* candidate = candidate_for(*authenticator);
++        if (!candidate)
++            return;
++        candidate->is_busy = false;
++        result.visit(
++            [&](Vector<Authenticator::Assertion>& assertions) { handle_assertions(*candidate, move(assertions)); },
++            [&](Authenticator::Failure const& failure) { handle_failure(*candidate, failure); });
++    });
++}
++
++void WebAuthnCoordinator::Ceremony::user_entered_pin(String pin)
++{
++    if (m_phase != Phase::AwaitingPin || !m_selected)
++        return;
++    auto* candidate = candidate_for(*m_selected);
++    if (!candidate)
++        return;
++
++    m_phase = Phase::AwaitingTouch;
++    show_prompt(WebAuthnPrompt::State::TouchKey);
++    issue_request(*candidate, move(pin));
++}
++
++void WebAuthnCoordinator::Ceremony::handle_failure(Candidate& candidate, Authenticator::Failure const& failure)
++{
++    if (m_phase == Phase::Ended || m_phase == Phase::Answered)
++        return;
++
++    auto is_selected = m_selected == candidate.authenticator.ptr();
++
++    switch (failure.error) {
++    case Authenticator::Error::Cancelled:
++        return;
++
++    case Authenticator::Error::NoCredentials:
++        // https://w3c.github.io/webauthn/#sctn-appid-extension
++        // If a U2F authenticator indicates that a credential is not applicable, try again with the AppID as the RP ID.
++        if (auto const* request = m_request.get_pointer<GetRequest>(); request && request->app_id.has_value() && !candidate.tried_app_id) {
++            candidate.tried_app_id = true;
++            if (is_selected && m_phase == Phase::AwaitingTouch) {
++                // NB: The PIN has been used up, so the user enters it again for the second request.
++                m_phase = Phase::AwaitingPin;
++                m_prompt.pin_was_wrong = false;
++                show_prompt(WebAuthnPrompt::State::EnterPin);
++                return;
++            }
++            issue_request(candidate);
++            return;
++        }
++        // NB: The page isn't told, so that it can't learn whether the user has a credential for it. The user can try
++        //     another authenticator, or cancel.
++        break;
++
++    case Authenticator::Error::CredentialExcluded:
++        // https://w3c.github.io/webauthn/#sctn-createCredential
++        // If any authenticator returns an error status equivalent to "InvalidStateError", cancel the others, and
++        // throw an "InvalidStateError" DOMException. The authenticator only says so once the user has consented, so
++        // the RP may know.
++        cancel_other_candidates(candidate.authenticator.ptr());
++        if (m_page && m_page->is_open())
++            m_page->async_web_authn_request_completed(m_request_id, Web::WebAuthn::Error { ErrorName::InvalidStateError, "The authenticator is already registered"_string });
++        m_phase = Phase::Answered;
++        m_lifetime_timer->stop();
++        show_prompt(WebAuthnPrompt::State::KeyAlreadyRegistered);
++        return;
++
++    case Authenticator::Error::PinRequired:
++        if (m_phase == Phase::Waiting) {
++            candidate.plan.needs_pin = true;
++            candidate.plan.user_verification = true;
++            select_for_pin_entry(candidate);
++            return;
++        }
++        break;
++
++    case Authenticator::Error::PinInvalid:
++        if (is_selected) {
++            m_phase = Phase::AwaitingPin;
++            m_prompt.pin_was_wrong = true;
++            m_prompt.pin_retries = failure.pin_retries;
++            if (m_prompt.pin_retries.has_value()) {
++                show_prompt(WebAuthnPrompt::State::EnterPin);
++                return;
++            }
++            candidate.authenticator->get_pin_retries([this, protect = NonnullRefPtr { *this }](Optional<u32> retries) {
++                if (m_phase != Phase::AwaitingPin)
++                    return;
++                m_prompt.pin_retries = retries;
++                show_prompt(WebAuthnPrompt::State::EnterPin);
++            });
++            return;
++        }
++        break;
++
++    case Authenticator::Error::PinBlocked:
++        show_prompt(WebAuthnPrompt::State::PinBlocked);
++        break;
++
++    case Authenticator::Error::PinNotSet:
++        show_prompt(WebAuthnPrompt::State::PinNotSet);
++        break;
++
++    case Authenticator::Error::NotSupported:
++        show_prompt(WebAuthnPrompt::State::KeyNotSupported);
++        break;
++
++    case Authenticator::Error::OperationDenied:
++        // The user declined on the authenticator itself.
++        end(not_allowed("The user declined"sv));
++        return;
++
++    case Authenticator::Error::Removed:
++        m_candidates.remove_first_matching([&](auto const& other) { return other.authenticator == candidate.authenticator; });
++        if (is_selected) {
++            m_selected = nullptr;
++            m_phase = Phase::Waiting;
++            show_prompt(WebAuthnPrompt::State::InsertKey);
++        }
++        return;
++
++    case Authenticator::Error::Timeout:
++    case Authenticator::Error::Other:
++        break;
++    }
++
++    if (failure.error == Authenticator::Error::NoCredentials)
++        show_prompt(WebAuthnPrompt::State::KeyNotRegistered);
++
++    // The authenticator that failed is done. If the user had chosen it, they may now choose another.
++    if (is_selected) {
++        m_selected = nullptr;
++        m_phase = Phase::Waiting;
++    }
++}
++
++void WebAuthnCoordinator::Ceremony::handle_registration(Candidate& candidate, Authenticator::Registration registration)
++{
++    if (m_phase == Phase::Ended || m_phase == Phase::Answered)
++        return;
++
++    // When an authenticator succeeds, cancel the others.
++    cancel_other_candidates(candidate.authenticator.ptr());
++    m_selected = candidate.authenticator;
++    m_pending_registration = move(registration);
++
++    // https://w3c.github.io/webauthn/#dom-attestationconveyancepreference-direct
++    // The RP wants the attestation statement as the authenticator generated it. Since it identifies the
++    // authenticator's make and model, the user is asked first.
++    auto const& request = m_request.get<CreateRequest>();
++    auto wants_attestation = request.attestation == AttestationConveyancePreference::Direct || request.attestation == AttestationConveyancePreference::Enterprise;
++    auto authenticator_data = AuthenticatorData::parse(m_pending_registration->authenticator_data);
++    auto is_identifying = m_pending_registration->attestation_format != "none"sv
++        && !(authenticator_data.is_error() || !authenticator_data.value().attested_credential_data.has_value()
++            || is_self_attestation(m_pending_registration->attestation_format, m_pending_registration->attestation_statement, authenticator_data.value().attested_credential_data->aaguid));
++
++    if (wants_attestation && is_identifying) {
++        m_phase = Phase::AwaitingAttestationConsent;
++        show_prompt(WebAuthnPrompt::State::AttestationConsent);
++        return;
++    }
++
++    finish_registration(false);
++}
++
++void WebAuthnCoordinator::Ceremony::user_answered_attestation_consent(bool allow)
++{
++    if (m_phase != Phase::AwaitingAttestationConsent)
++        return;
++    finish_registration(allow);
++}
++
++void WebAuthnCoordinator::Ceremony::finish_registration(bool share_attestation)
++{
++    VERIFY(m_pending_registration.has_value());
++    auto registration = m_pending_registration.release_value();
++
++    auto authenticator_data = AuthenticatorData::parse(registration.authenticator_data);
++    if (authenticator_data.is_error() || !authenticator_data.value().attested_credential_data.has_value()) {
++        dbgln("WebAuthn: {} returned authenticator data without a credential", m_selected ? m_selected->name() : String {});
++        end(Web::WebAuthn::Error { ErrorName::UnknownError, "The authenticator returned invalid data"_string });
++        return;
++    }
++    auto const& attested_credential_data = *authenticator_data.value().attested_credential_data;
++
++    // https://w3c.github.io/webauthn/#sctn-createCredential, constructCredentialAlg:
++    // If credentialCreationData.attestationConveyancePreferenceOption’s value is "none", replace potentially uniquely
++    // identifying information with non-identifying versions of the same: unless self attestation is being used, set
++    // the attestation statement format to "none" and the attestation statement to an empty CBOR map. "indirect" may
++    // be treated the same way. "direct" and "enterprise" convey the attestation statement as it is, once the user has
++    // allowed it.
++    auto format = registration.attestation_format;
++    auto statement = registration.attestation_statement;
++    if (!share_attestation && !is_self_attestation(format, statement, attested_credential_data.aaguid)) {
++        format = "none"_string;
++        statement = none_attestation_statement();
++    }
++
++    auto const& request = m_request.get<CreateRequest>();
++    auto public_key = CredentialPublicKey::from_cose_key(attested_credential_data.credential_public_key);
++
++    Web::WebAuthn::RegistrationResponse response;
++    response.credential_id = registration.credential_id.is_empty() ? attested_credential_data.credential_id : registration.credential_id;
++    response.client_data_json = m_client_data_json;
++    response.attestation_object = encode_attestation_object(format, statement, registration.authenticator_data);
++    response.authenticator_data = registration.authenticator_data;
++    if (!public_key.is_error()) {
++        response.public_key = public_key.value().subject_public_key_info;
++        response.public_key_algorithm = public_key.value().algorithm;
++    }
++    if (m_selected) {
++        response.transports = m_selected->info().transports;
++        response.authenticator_attachment = m_selected->info().attachment;
++    }
++
++    // https://w3c.github.io/webauthn/#sctn-authenticator-credential-properties-extension
++    if (request.credential_properties)
++        response.resident_key = registration.resident_key;
++
++    end(move(response));
++}
++
++void WebAuthnCoordinator::Ceremony::handle_assertions(Candidate& candidate, Vector<Authenticator::Assertion> assertions)
++{
++    if (m_phase == Phase::Ended || m_phase == Phase::Answered)
++        return;
++
++    if (assertions.is_empty()) {
++        handle_failure(candidate, { Authenticator::Error::NoCredentials, {} });
++        return;
++    }
++
++    cancel_other_candidates(candidate.authenticator.ptr());
++    m_selected = candidate.authenticator;
++    m_pending_assertions_used_app_id = candidate.tried_app_id;
++
++    if (assertions.size() == 1) {
++        finish_assertion(assertions.first());
++        return;
++    }
++
++    // https://w3c.github.io/webauthn/#sctn-op-get-assertion
++    // With several credentials for the RP and no allow list, the user chooses one.
++    m_pending_assertions = move(assertions);
++    m_prompt.accounts.clear();
++    for (auto const& assertion : m_pending_assertions) {
++        WebAuthnPrompt::Account account;
++        if (assertion.user.has_value()) {
++            account.name = assertion.user->name;
++            account.display_name = assertion.user->display_name;
++        }
++        m_prompt.accounts.append(move(account));
++    }
++    m_phase = Phase::AwaitingAccountChoice;
++    show_prompt(WebAuthnPrompt::State::ChooseAccount);
++}
++
++void WebAuthnCoordinator::Ceremony::user_chose_account(size_t index)
++{
++    if (m_phase != Phase::AwaitingAccountChoice || index >= m_pending_assertions.size())
++        return;
++    auto assertion = m_pending_assertions[index];
++    m_pending_assertions.clear();
++    finish_assertion(assertion);
++}
++
++void WebAuthnCoordinator::Ceremony::finish_assertion(Authenticator::Assertion const& assertion)
++{
++    auto const& request = m_request.get<GetRequest>();
++
++    // https://w3c.github.io/webauthn/#sctn-getAssertion, constructAssertionAlg:
++    Web::WebAuthn::AssertionResponse response;
++
++    // If the allow list had one credential, the authenticator may leave out which one it used.
++    response.credential_id = assertion.credential_id;
++    if (response.credential_id.is_empty() && request.allow_credentials.size() == 1)
++        response.credential_id = request.allow_credentials.first().id;
++
++    response.client_data_json = m_client_data_json;
++    response.authenticator_data = assertion.authenticator_data;
++    response.signature = assertion.signature;
++    if (assertion.user.has_value() && !assertion.user->id.is_empty())
++        response.user_handle = assertion.user->id;
++    if (m_selected)
++        response.authenticator_attachment = m_selected->info().attachment;
++
++    // https://w3c.github.io/webauthn/#sctn-appid-extension
++    // When creating assertionCreationData, if the assertion was created by a U2F authenticator with the U2F
++    // application parameter set to the SHA-256 hash of appId instead of the SHA-256 hash of the RP ID, set output to
++    // true.
++    if (request.app_id.has_value())
++        response.used_app_id = m_pending_assertions_used_app_id;
++
++    end(move(response));
++}
++
++void WebAuthnCoordinator::Ceremony::user_cancelled()
++{
++    // If the user cancels the process, cancel the authenticator operations and throw a "NotAllowedError".
++    // NB: A ceremony that has answered already just closes its prompt.
++    end(not_allowed("The user cancelled"sv));
++}
++
++void WebAuthnCoordinator::Ceremony::end(Optional<Web::WebAuthn::Result> result)
++{
++    if (m_phase == Phase::Ended)
++        return;
++    auto was_answered = m_phase == Phase::Answered;
++    m_phase = Phase::Ended;
++
++    for (auto& candidate : m_candidates) {
++        if (candidate.is_busy)
++            candidate.authenticator->cancel();
++    }
++
++    if (m_lifetime_timer)
++        m_lifetime_timer->stop();
++    if (m_liveness_timer)
++        m_liveness_timer->stop();
++
++    if (!was_answered && result.has_value() && m_page && m_page->is_open())
++        m_page->async_web_authn_request_completed(m_request_id, result.release_value());
++
++    close_prompt();
++    m_candidates.clear();
++    m_selected = nullptr;
++
++    // NB: A discovery may be reporting an authenticator right now, on the stack below.
++    Core::deferred_invoke([discoveries = move(m_discoveries)] { });
++    m_pending_registration.clear();
++    m_pending_assertions.clear();
++
++    WebAuthnCoordinator::the().ceremony_ended(*this);
++}
++
++void WebAuthnCoordinator::Ceremony::abandon()
++{
++    end({});
++}
++
++void WebAuthnCoordinator::Ceremony::show_prompt(WebAuthnPrompt::State state)
++{
++    m_prompt.state = state;
++
++    auto* view = this->view();
++    if (!view || !view->on_web_authn_prompt)
++        return;
++    m_prompt_is_shown = true;
++    view->on_web_authn_prompt(m_prompt);
++}
++
++void WebAuthnCoordinator::Ceremony::close_prompt()
++{
++    if (!m_prompt_is_shown)
++        return;
++    m_prompt_is_shown = false;
++    auto* view = this->view();
++    if (view && view->on_web_authn_prompt_closed)
++        view->on_web_authn_prompt_closed();
++}
++
++WebAuthnCoordinator& WebAuthnCoordinator::the()
++{
++    static auto& coordinator = *new WebAuthnCoordinator;
++    return coordinator;
++}
++
++void WebAuthnCoordinator::add_authenticator_source(AuthenticatorSource& source)
++{
++    m_sources.append(&source);
++}
++
++void WebAuthnCoordinator::begin_create(WebContentPage& page, u64 request_id, CeremonyContext context, CreateRequest request)
++{
++    begin(page, request_id, move(context), move(request));
++}
++
++void WebAuthnCoordinator::begin_get(WebContentPage& page, u64 request_id, CeremonyContext context, GetRequest request)
++{
++    begin(page, request_id, move(context), move(request));
++}
++
++void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyContext context, Variant<CreateRequest, GetRequest> request)
++{
++    // A ceremony may only start in a view that can ask the user, and that the user is looking at: as in other browsers,
++    // a page in the background can't ask for a credential.
++    auto& traversable = page.traversable();
++    auto view = traversable.view();
++    if (!view.has_value() || !view->on_web_authn_prompt) {
++        page.async_web_authn_request_completed(request_id, not_allowed("No authenticators are available"sv));
++        return;
++    }
++    if (traversable.system_visibility_state() != Web::HTML::VisibilityState::Visible || !traversable.has_system_focus()) {
++        page.async_web_authn_request_completed(request_id, not_allowed("The page does not have focus"sv));
++        return;
++    }
++
++    if (any_of(m_ceremonies, [&](auto const& ceremony) { return ceremony->page() && &ceremony->page()->traversable() == &traversable; })) {
++        page.async_web_authn_request_completed(request_id, not_allowed("Another WebAuthn request is in progress"sv));
++        return;
++    }
++
++    auto ceremony = adopt_ref(*new Ceremony(page, request_id, move(context), move(request)));
++    m_ceremonies.append(ceremony);
++    ceremony->start(m_sources);
++}
++
++void WebAuthnCoordinator::ceremony_ended(Ceremony& ceremony)
++{
++    // NB: The ceremony may be on the stack, in one of its own callbacks.
++    auto index = m_ceremonies.find_first_index_if([&](auto const& other) { return other.ptr() == &ceremony; });
++    if (!index.has_value())
++        return;
++    Core::deferred_invoke([ceremony = m_ceremonies.take(*index)] { });
++}
++
++void WebAuthnCoordinator::cancel(WebContentPage const& page, u64 request_id)
++{
++    for (auto& ceremony : m_ceremonies) {
++        if (ceremony->page() == &page && ceremony->request_id() == request_id) {
++            ceremony->abandon();
++            return;
++        }
++    }
++}
++
++WebAuthnCoordinator::Ceremony* WebAuthnCoordinator::ceremony_in_view(ViewImplementation const& view) const
++{
++    for (auto const& ceremony : m_ceremonies) {
++        if (ceremony->view() == &view)
++            return ceremony.ptr();
++    }
++    return nullptr;
++}
++
++void WebAuthnCoordinator::user_cancelled(ViewImplementation const& view)
++{
++    if (auto* ceremony = ceremony_in_view(view))
++        ceremony->user_cancelled();
++}
++
++void WebAuthnCoordinator::user_entered_pin(ViewImplementation const& view, String pin)
++{
++    if (auto* ceremony = ceremony_in_view(view))
++        ceremony->user_entered_pin(move(pin));
++}
++
++void WebAuthnCoordinator::user_chose_account(ViewImplementation const& view, size_t index)
++{
++    if (auto* ceremony = ceremony_in_view(view))
++        ceremony->user_chose_account(index);
++}
++
++void WebAuthnCoordinator::user_answered_attestation_consent(ViewImplementation const& view, bool allow)
++{
++    if (auto* ceremony = ceremony_in_view(view))
++        ceremony->user_answered_attestation_consent(allow);
++}
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.h b/Libraries/LibWebView/WebAuthn/Coordinator.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..0d9212e1b59692fc89eeb84bfb9d3384dc3f5962
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/Coordinator.h
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/NonnullRefPtr.h>
++#include <AK/Vector.h>
++#include <LibURL/Origin.h>
++#include <LibWebCommon/HTML/CrossProcessId.h>
++#include <LibWebCommon/WebAuthn/WebAuthn.h>
++#include <LibWebView/Export.h>
++#include <LibWebView/Forward.h>
++#include <LibWebView/WebAuthn/Authenticator.h>
++
++namespace WebView {
++
++// Runs the authenticator part of WebAuthn ceremonies: it finds authenticators, issues them requests, asks the user
++// what it needs to through the requesting view's prompt, and answers the renderer.
++// https://w3c.github.io/webauthn/#sctn-createCredential
++// https://w3c.github.io/webauthn/#sctn-discover-from-external-source
++class WEBVIEW_API WebAuthnCoordinator {
++public:
++    static WebAuthnCoordinator& the();
++
++    // The caller, as the browser process's own records of documents describe it.
++    struct CeremonyContext {
++        URL::Origin origin { URL::Origin::create_opaque() };
++        bool cross_origin { false };
++        Optional<URL::Origin> top_level_origin;
++        Web::HTML::CrossProcessId navigable_id;
++        Web::HTML::CrossProcessId document_id;
++    };
++
++    // NB: A source must outlive the coordinator.
++    void add_authenticator_source(AuthenticatorSource&);
++
++    void begin_create(WebContentPage&, u64 request_id, CeremonyContext, Web::WebAuthn::CreateRequest);
++    void begin_get(WebContentPage&, u64 request_id, CeremonyContext, Web::WebAuthn::GetRequest);
++
++    // The renderer gave up on a request, because its AbortSignal was aborted.
++    void cancel(WebContentPage const&, u64 request_id);
++
++    // What the user does in the prompt of the ceremony a view shows.
++    void user_cancelled(ViewImplementation const&);
++    void user_entered_pin(ViewImplementation const&, String pin);
++    void user_chose_account(ViewImplementation const&, size_t index);
++    void user_answered_attestation_consent(ViewImplementation const&, bool allow);
++
++private:
++    class Ceremony;
++    friend class Ceremony;
++
++    WebAuthnCoordinator() = default;
++
++    void begin(WebContentPage&, u64 request_id, CeremonyContext, Variant<Web::WebAuthn::CreateRequest, Web::WebAuthn::GetRequest>);
++    void ceremony_ended(Ceremony&);
++    Ceremony* ceremony_in_view(ViewImplementation const&) const;
++
++    // NB: A tab runs one ceremony at a time.
++    Vector<NonnullRefPtr<Ceremony>> m_ceremonies;
++
++    Vector<AuthenticatorSource*> m_sources;
++};
++
++}
+diff --git a/Libraries/LibWebView/WebAuthn/Prompt.h b/Libraries/LibWebView/WebAuthn/Prompt.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..bfd39cfcfc12ae4ff3e82254ad9b5151b45680fd
+--- /dev/null
++++ b/Libraries/LibWebView/WebAuthn/Prompt.h
+@@ -0,0 +1,79 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/Optional.h>
++#include <AK/String.h>
++#include <AK/Vector.h>
++#include <LibURL/Origin.h>
++#include <LibWebView/Export.h>
++
++namespace WebView {
++
++// What a WebAuthn ceremony is waiting for, for the embedder to show the user. The embedder answers through
++// ViewImplementation's web_authn_* methods.
++struct WEBVIEW_API WebAuthnPrompt {
++    enum class Operation : u8 {
++        // navigator.credentials.create(): registering an authenticator with a site.
++        Create,
++        // navigator.credentials.get(): signing in with one.
++        Get,
++    };
++
++    enum class State : u8 {
++        // Insert a security key, and touch it.
++        InsertKey,
++        // Enter the security key's PIN. pin_retries says how many attempts are left, if the key said.
++        EnterPin,
++        // Touch the security key to finish, after entering its PIN.
++        TouchKey,
++        // The security key holds several accounts for the site: choose one of accounts.
++        ChooseAccount,
++        // The site asks to see the security key's make and model: answer with web_authn_allow_attestation().
++        AttestationConsent,
++        // This security key isn't registered with the site. Another one may be.
++        KeyNotRegistered,
++        // This security key is already registered with the site. The ceremony has ended.
++        KeyAlreadyRegistered,
++        // This security key's PIN is blocked, after too many wrong attempts.
++        PinBlocked,
++        // The site requires a PIN or other verification, and this security key has none set up.
++        PinNotSet,
++        // This security key can't do what the site asked.
++        KeyNotSupported,
++        // The site asked for an authenticator built into the device, and there is none.
++        NoPlatformAuthenticator,
++    };
++
++    struct Account {
++        String name;
++        String display_name;
++    };
++
++    Operation operation { Operation::Get };
++    State state { State::InsertKey };
++
++    // The site the credential is for.
++    String rp_id;
++
++    // The origin asking, and, when it is a frame of another site, the origin the address bar shows.
++    URL::Origin origin { URL::Origin::create_opaque() };
++    Optional<URL::Origin> top_level_origin;
++
++    // For Create: the account being registered.
++    String user_name;
++
++    Optional<u32> pin_retries;
++    bool pin_was_wrong { false };
++
++    Vector<Account> accounts;
++
++    // Whether the ceremony is over, so that the prompt only informs.
++    bool has_ended() const { return state == State::KeyAlreadyRegistered; }
++};
++
++}
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 378935f86903042c44935f24dd3df88c2dc665c3..7a02c67695045fe89df3210ac6f1a91f88d10bf6 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -11,9 +11,11 @@
+ #include <LibCore/EventLoop.h>
+ #include <LibCore/StatsLog.h>
+ #include <LibHTTP/Cookie/ParsedCookie.h>
++#include <LibURL/Parser.h>
+ #include <LibWebCommon/Geolocation/GeolocationPositionErrorCode.h>
+ #include <LibWebCommon/HTML/BrowsingContext.h>
+ #include <LibWebCommon/Page/InputEvent.h>
++#include <LibWebCommon/SecureContexts/AbstractOperations.h>
+ #include <LibWebCommon/WebDriver/Error.h>
+ #include <LibWebCommon/WebView/SiteIsolation.h>
+ #include <LibWebView/Application.h>
+@@ -1649,6 +1651,104 @@ void WebContentPage::did_request_permission(u64 request_id, Utf16String name)
+     });
+ }
+ 
++// https://w3c.github.io/webauthn/#sctn-api
++// The renderer has checked the request already, but this process decides: it knows which document asks, and
++// where, from its own records, which a renderer can't forge.
++ErrorOr<WebAuthnCoordinator::CeremonyContext, Web::WebAuthn::Error> WebContentPage::web_authn_ceremony_context(StringView message_name, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::PermissionsPolicy::PolicyControlledFeature feature, String const& rp_id)
++{
++    auto not_allowed = [](StringView message) {
++        return Web::WebAuthn::Error { Web::WebAuthn::ErrorName::NotAllowedError, MUST(String::from_utf8(message)) };
++    };
++    auto security_error = [](StringView message) {
++        return Web::WebAuthn::Error { Web::WebAuthn::ErrorName::SecurityError, MUST(String::from_utf8(message)) };
++    };
++
++    // Only the process hosting a document speaks for it. The document may have been replaced since it asked.
++    auto navigable = traversable().find(navigable_id);
++    if (!navigable.has_value())
++        return not_allowed("The document is gone"sv);
++    auto document = navigable->document_with_id(document_id);
++    if (!document)
++        return not_allowed("The document is gone"sv);
++    if (document->host() != this) {
++        client().did_misbehave(message_name, "WebAuthn request for a document the page does not host"sv);
++        return not_allowed("The document is not hosted by this page"sv);
++    }
++    if (&navigable->active_document() != document.ptr())
++        return not_allowed("The document is not active"sv);
++
++    WebAuthnCoordinator::CeremonyContext context;
++    context.origin = document->origin();
++    context.navigable_id = navigable_id;
++    context.document_id = document_id;
++
++    // Let callerOrigin be origin. If callerOrigin is an opaque origin, throw a "NotAllowedError" DOMException.
++    if (context.origin.is_opaque())
++        return not_allowed("Opaque origins can't use WebAuthn"sv);
++
++    // NB: Only secure contexts have the API.
++    auto top_level_origin = document->top_level_origin();
++    if (!top_level_origin.has_value())
++        return not_allowed("The document has no top-level browsing context"sv);
++    if (Web::SecureContexts::is_origin_potentially_trustworthy(context.origin) != Web::SecureContexts::Trustworthiness::PotentiallyTrustworthy
++        || Web::SecureContexts::is_origin_potentially_trustworthy(*top_level_origin) != Web::SecureContexts::Trustworthiness::PotentiallyTrustworthy)
++        return not_allowed("WebAuthn requires a secure context"sv);
++
++    // Let effectiveDomain be the callerOrigin’s effective domain. If effective domain is not a valid domain, then throw
++    // a "SecurityError" DOMException.
++    // NB: This process doesn't follow document.domain, which only ever shortens the host to one of its registrable
++    //     suffixes, so the host allows every RP ID that the effective domain does.
++    auto const& host = context.origin.host();
++    if (!host.is_domain() || host.is_empty_host())
++        return security_error("The caller's origin has no valid domain"sv);
++
++    // If the RP ID is not a registrable domain suffix of and is not equal to effectiveDomain, throw a "SecurityError"
++    // DOMException.
++    auto rp_id_host = URL::Parser::parse_host(rp_id);
++    if (rp_id.is_empty() || !rp_id_host.has_value() || !rp_id_host->is_a_registrable_domain_suffix_of_or_is_equal_to(host))
++        return security_error("The RP ID is not a registrable domain suffix of the caller's domain"sv);
++
++    // https://w3c.github.io/webauthn/#sctn-permissions-policy
++    if (Web::PermissionsPolicy::check_permissions_policy(document->permissions_policy(), feature, context.origin, context.origin) != Web::PermissionsPolicy::FeatureValue::Enabled)
++        return not_allowed("The permissions policy does not allow this request"sv);
++
++    // https://w3c.github.io/webappsec-credential-management/#same-origin-with-its-ancestors
++    for (auto const* ancestor = navigable->parent(); ancestor; ancestor = ancestor->parent()) {
++        if (!ancestor->active_document().origin().is_same_origin(context.origin)) {
++            context.cross_origin = true;
++            break;
++        }
++    }
++    context.top_level_origin = top_level_origin.release_value();
++
++    return context;
++}
++
++void WebContentPage::did_request_web_authn_create(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest request)
++{
++    auto context = web_authn_ceremony_context("did_request_web_authn_create"sv, navigable_id, document_id, Web::PermissionsPolicy::PolicyControlledFeature::PublicKeyCredentialsCreate, request.rp_id);
++    if (context.is_error()) {
++        async_web_authn_request_completed(request_id, context.release_error());
++        return;
++    }
++    WebAuthnCoordinator::the().begin_create(*this, request_id, context.release_value(), move(request));
++}
++
++void WebContentPage::did_request_web_authn_get(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::GetRequest request)
++{
++    auto context = web_authn_ceremony_context("did_request_web_authn_get"sv, navigable_id, document_id, Web::PermissionsPolicy::PolicyControlledFeature::PublicKeyCredentialsGet, request.rp_id);
++    if (context.is_error()) {
++        async_web_authn_request_completed(request_id, context.release_error());
++        return;
++    }
++    WebAuthnCoordinator::the().begin_get(*this, request_id, context.release_value(), move(request));
++}
++
++void WebContentPage::did_cancel_web_authn_request(u64 request_id)
++{
++    WebAuthnCoordinator::the().cancel(*this, request_id);
++}
++
+ void WebContentPage::did_cancel_geolocation_position_request(u64 request_id)
+ {
+     if (view().on_cancel_geolocation_position_request)
+diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
+index 09cd4a3ebd0f701971ade28ed36cceb4b88faef0..59db0ff524b10f6cfbb178b1f95ae90acec081d7 100644
+--- a/Libraries/LibWebView/WebContentPage.h
++++ b/Libraries/LibWebView/WebContentPage.h
+@@ -26,6 +26,7 @@
+ #include <LibWebView/Export.h>
+ #include <LibWebView/Forward.h>
+ #include <LibWebView/URLSchemeHandler.h>
++#include <LibWebView/WebAuthn/Coordinator.h>
+ #include <WebContent/WebContentClientEndpoint.h>
+ #include <WebContent/WebContentServerEndpoint.h>
+ #include <WebContent/WebContentTestClientEndpoint.h>
+@@ -161,6 +162,9 @@ public:
+     Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
+ 
+ private:
++    // The caller of a WebAuthn ceremony, from this process's records of the documents a page hosts, or the error to
++    // answer the renderer with.
++    ErrorOr<WebAuthnCoordinator::CeremonyContext, Web::WebAuthn::Error> web_authn_ceremony_context(StringView message_name, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::PermissionsPolicy::PolicyControlledFeature, String const& rp_id);
+     void relay_finished_input_event(WebContentPage const& reporting_page, u64 event_id, Web::EventResult);
+     Optional<CanonicalNavigable&> population_worker_navigable(Web::HTML::CrossProcessId navigable_id) const;
+     bool holds_container_of(CanonicalNavigable const& child_frame, StringView message_name);
+@@ -267,6 +271,9 @@ private:
+     virtual void did_start_geolocation_position_watch(u64 request_id) override;
+     virtual void did_stop_geolocation_position_watch(u64 request_id) override;
+     virtual void did_request_permission(u64 request_id, Utf16String name) override;
++    virtual void did_request_web_authn_create(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest request) override;
++    virtual void did_request_web_authn_get(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::GetRequest request) override;
++    virtual void did_cancel_web_authn_request(u64 request_id) override;
+     virtual void did_request_file_picker(Web::HTML::FileFilter accepted_file_types, Web::HTML::AllowMultipleFiles allow_multiple_files) override;
+     virtual void did_finish_handling_input_event(u64 event_id, Web::EventResult event_result) override;
+     virtual void did_update_input_method_state(Optional<Web::DevicePixelRect> caret_rect, bool is_enabled, i32 cursor_position, i32 anchor_position, Utf16String text_before_cursor, Utf16String text_after_cursor) override;
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 2e7531ba90d54e3c8863951848673102069c803f..bdbbf0b320d583bb05da78995f57a91d3bc80753 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3240,6 +3240,12 @@ void ConnectionFromClient::permission_request_completed(Web::PageId page_id, u64
+         page->permission_request_completed(request_id, granted);
+ }
+ 
++void ConnectionFromClient::web_authn_request_completed(Web::PageId page_id, u64 request_id, Web::WebAuthn::Result result)
++{
++    if (auto page = this->page(page_id); page.has_value())
++        page->web_authn_request_completed(request_id, move(result));
++}
++
+ void ConnectionFromClient::set_has_focus(Web::PageId page_id, bool has_focus)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 6cdf47cf9fb82886b6e37ec8b5237bc983d59ab3..427e05f0ebc13cf1f67b38de4e3cc1c22ec9e7b3 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -259,6 +259,7 @@ private:
+     virtual void set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData, Optional<u16> error_code) override;
+     virtual void geolocation_position_response(Web::PageId page_id, u64 request_id, WebView::GeolocationPositionData, Optional<u16> error_code) override;
+     virtual void permission_request_completed(Web::PageId page_id, u64 request_id, bool granted) override;
++    virtual void web_authn_request_completed(Web::PageId page_id, u64 request_id, Web::WebAuthn::Result result) override;
+     virtual void set_has_focus(Web::PageId page_id, bool) override;
+     virtual void set_focused_navigable(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id) override;
+     virtual void consume_user_activation(Web::PageId page_id, Web::HTML::UserActivationConsumption) override;
+diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
+index 32479bd241b3cd549c5f788d4980a45d5a482771..55c7c0f1fde041c75ceb22d3c924339e923f25e9 100644
+--- a/Services/WebContent/PageClient.cpp
++++ b/Services/WebContent/PageClient.cpp
+@@ -1298,6 +1298,28 @@ void PageClient::page_did_request_permission(u64 request_id, Utf16String const&
+     client().async_did_request_permission(m_id, request_id, name);
+ }
+ 
++bool PageClient::page_did_request_web_authn_create(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest const& request)
++{
++    client().async_did_request_web_authn_create(m_id, request_id, navigable_id, document_id, request);
++    return true;
++}
++
++bool PageClient::page_did_request_web_authn_get(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::GetRequest const& request)
++{
++    client().async_did_request_web_authn_get(m_id, request_id, navigable_id, document_id, request);
++    return true;
++}
++
++void PageClient::page_did_cancel_web_authn_request(u64 request_id)
++{
++    client().async_did_cancel_web_authn_request(m_id, request_id);
++}
++
++void PageClient::web_authn_request_completed(u64 request_id, Web::WebAuthn::Result result)
++{
++    page().web_authn_request_completed(request_id, move(result));
++}
++
+ void PageClient::permission_request_completed(u64 request_id, bool granted)
+ {
+     page().permission_request_completed(request_id, granted);
+diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
+index fb651743b76d52b8d2681e7b959e21752be009da..ffda6406aa35cd5960eacb9412b8dbef24969744 100644
+--- a/Services/WebContent/PageClient.h
++++ b/Services/WebContent/PageClient.h
+@@ -113,6 +113,7 @@ public:
+     void set_geolocation_emulated_position(WebView::GeolocationPositionData const&, Optional<u16> error_code);
+     void geolocation_position_response(u64 request_id, WebView::GeolocationPositionData const&, Optional<u16> error_code);
+     void permission_request_completed(u64 request_id, bool granted);
++    void web_authn_request_completed(u64 request_id, Web::WebAuthn::Result);
+     Optional<URL::URL> generate_text_fragment_url(u64 generation_id);
+ 
+     void alert_closed();
+@@ -352,6 +353,9 @@ private:
+     virtual void page_did_start_geolocation_position_watch(u64 request_id) override;
+     virtual void page_did_stop_geolocation_position_watch(u64 request_id) override;
+     virtual void page_did_request_permission(u64 request_id, Utf16String const& name) override;
++    virtual bool page_did_request_web_authn_create(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest const&) override;
++    virtual bool page_did_request_web_authn_get(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::GetRequest const&) override;
++    virtual void page_did_cancel_web_authn_request(u64 request_id) override;
+     virtual void page_did_finish_test(Utf16String const& text) override;
+     virtual void page_did_set_test_timeout(double milliseconds) override;
+     virtual void page_did_receive_reference_test_metadata(JsonValue) override;
+diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
+index af9748cbca47aa5b4b96dcc143903c8c7287cd55..e5a559088588b96d4b8f69ff76b1c7a50e620034 100644
+--- a/Services/WebContent/WebContentClient.ipc
++++ b/Services/WebContent/WebContentClient.ipc
+@@ -65,6 +65,7 @@
+ #include <LibWebCommon/StorageAPI/StorageAreaId.h>
+ #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
+ #include <LibWebCommon/WebDriver/Response.h>
++#include <LibWebCommon/WebAuthn/WebAuthn.h>
+ #include <LibWebCommon/WebView/AccessibilityNodeData.h>
+ #include <LibWebCommon/WebView/Attribute.h>
+ #include <LibWebCommon/WebView/ConsoleOutput.h>
+@@ -239,6 +240,9 @@ endpoint WebContentClient routed by Web::PageId page_id
+     did_start_geolocation_position_watch(Web::PageId page_id, u64 request_id) =|
+     did_stop_geolocation_position_watch(Web::PageId page_id, u64 request_id) =|
+     did_request_permission(Web::PageId page_id, u64 request_id, Utf16String name) =|
++    did_request_web_authn_create(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest request) =|
++    did_request_web_authn_get(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::GetRequest request) =|
++    did_cancel_web_authn_request(Web::PageId page_id, u64 request_id) =|
+     did_request_file_picker(Web::PageId page_id, Web::HTML::FileFilter accepted_file_types, Web::HTML::AllowMultipleFiles allow_multiple_files) =|
+     did_request_select_dropdown(Web::PageId page_id, Web::HTML::CrossProcessId local_root_id, Gfx::IntPoint content_position, i32 minimum_width, Vector<Web::HTML::SelectItem> items) =|
+     did_finish_handling_input_event(Web::PageId page_id, u64 event_id, Web::EventResult event_result) =|
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index d5b43305c2bafa750ecefa14fe586370f5a6aefe..679466293c37b450deb8e3c38a70bacf1ce76e7d 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -59,6 +59,7 @@
+ #include <LibWebCommon/WebDriver/Capabilities.h>
+ #include <LibWebCommon/WebDriver/Response.h>
+ #include <LibWebCommon/WebDriver/UserPrompt.h>
++#include <LibWebCommon/WebAuthn/WebAuthn.h>
+ #include <LibWebCommon/WebView/Attribute.h>
+ #include <LibWebCommon/WebView/BrowsingBehavior.h>
+ #include <LibWebCommon/WebView/DOMNodeProperties.h>
+@@ -265,6 +266,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData position, Optional<u16> error_code) =|
+     geolocation_position_response(Web::PageId page_id, u64 request_id, WebView::GeolocationPositionData position, Optional<u16> error_code) =|
+     permission_request_completed(Web::PageId page_id, u64 request_id, bool granted) =|
++    web_authn_request_completed(Web::PageId page_id, u64 request_id, Web::WebAuthn::Result result) =|
+     set_has_focus(Web::PageId page_id, bool has_focus) =|
+     set_focused_navigable(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id) =|
+     consume_user_activation(Web::PageId page_id, Web::HTML::UserActivationConsumption consumption) =|
+diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
+index c65d0e228da078a4727871db6a325a00864de0b5..60ebbacec459fd8581f692a3da5969220920f837 100644
+--- a/Tests/LibWebView/CMakeLists.txt
++++ b/Tests/LibWebView/CMakeLists.txt
+@@ -26,6 +26,7 @@ set(TEST_SOURCES
+     TestStorageAreaRegistry.cpp
+     TestStorageJar.cpp
+     TestTabPerformanceStats.cpp
++    TestWebAuthn.cpp
+     TestWebViewURL.cpp
+ )
+ 
+@@ -65,6 +66,9 @@ foreach(source IN LISTS TEST_SOURCES)
+     if (source STREQUAL "TestRendererFontService.cpp")
+         list(APPEND test_libraries LibCompositing LibGfx LibIPC LibThreading)
+     endif()
++    if (source STREQUAL "TestWebAuthn.cpp")
++        list(APPEND test_libraries LibCrypto)
++    endif()
+     ladybird_test("${source}" LibWebView LIBS ${test_libraries})
+ endforeach()
+ 
+diff --git a/Tests/LibWebView/TestWebAuthn.cpp b/Tests/LibWebView/TestWebAuthn.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..0aca2f5892cdf20cd7ecb71f0014b947d1b05193
+--- /dev/null
++++ b/Tests/LibWebView/TestWebAuthn.cpp
+@@ -0,0 +1,167 @@
++/*
++ * Copyright (c) 2026-present, the Ladybird developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/Base64.h>
++#include <AK/ByteBuffer.h>
++#include <LibCrypto/ASN1/Constants.h>
++#include <LibCrypto/ASN1/DER.h>
++#include <LibCrypto/Certificate/Certificate.h>
++#include <LibTest/TestCase.h>
++#include <LibURL/Parser.h>
++#include <LibWebView/WebAuthn/AttestationObject.h>
++#include <LibWebView/WebAuthn/CBOR.h>
++#include <LibWebView/WebAuthn/ClientData.h>
++
++static ByteBuffer from_hex(StringView hex)
++{
++    VERIFY(hex.length() % 2 == 0);
++    ByteBuffer bytes;
++    for (size_t i = 0; i < hex.length(); i += 2)
++        bytes.append(AK::parse_hexadecimal_number<u8>(hex.substring_view(i, 2)).value());
++    return bytes;
++}
++
++static URL::Origin origin(StringView url)
++{
++    return URL::Parser::basic_parse(url)->origin();
++}
++
++// https://w3c.github.io/webauthn/#sctn-test-vectors-none-es256-topOrigin
++static constexpr auto TOP_ORIGIN_CHALLENGE = "4e1f4c6198699e33c14f192153f49d7e0e8e3577d5ac416c5f3adc92a41f27e5"sv;
++static constexpr auto TOP_ORIGIN_CLIENT_DATA_JSON = "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a225468394d595a68706e6a504254786b68555f53646667364f4e58665672454673587a72636b7151664a2d55222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a747275652c22746f704f726967696e223a2268747470733a2f2f6578616d706c652e636f6d227d"sv;
++static constexpr auto TOP_ORIGIN_ATTESTATION_OBJECT = "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5410000000097586fd09799a76401c200455099ef2a0020b8ad59b996047ab18e2ceb57206c362da57458793481f4a8ebf101c7ca7cc0f1a5010203262001215820a1c47c1d82da4ebe82cd72207102b380670701993bc35398ae2e5726427fe01d22582086c1080d82987028c7f54ecb1b01185de243b359294a0ed210cd47480f0adc88"sv;
++
++TEST_CASE(client_data_serialization)
++{
++    WebView::CollectedClientData client_data;
++    client_data.type = WebView::CollectedClientData::Type::Create;
++    client_data.challenge = from_hex(TOP_ORIGIN_CHALLENGE);
++    client_data.origin = origin("https://example.org"sv);
++    client_data.cross_origin = true;
++    client_data.top_origin = origin("https://example.com"sv);
++    EXPECT_EQ(client_data.serialize(), from_hex(TOP_ORIGIN_CLIENT_DATA_JSON));
++
++    client_data.type = WebView::CollectedClientData::Type::Get;
++    client_data.challenge = from_hex("0102"sv);
++    client_data.cross_origin = false;
++    client_data.top_origin = {};
++    auto serialized = client_data.serialize();
++    EXPECT_EQ(StringView { serialized }, R"({"type":"webauthn.get","challenge":"AQI","origin":"https://example.org","crossOrigin":false})"sv);
++}
++
++TEST_CASE(attestation_object_round_trip)
++{
++    auto attestation_object = from_hex(TOP_ORIGIN_ATTESTATION_OBJECT);
++    auto decoded = TRY_OR_FAIL(WebView::CBOR::decode(attestation_object));
++
++    auto const* format = decoded.get("fmt"sv);
++    auto const* authenticator_data_bytes = decoded.get("authData"sv);
++    EXPECT(format && format->is_text() && format->value.get<String>() == "none"sv);
++    EXPECT(authenticator_data_bytes && authenticator_data_bytes->is_bytes());
++
++    auto authenticator_data = TRY_OR_FAIL(WebView::AuthenticatorData::parse(authenticator_data_bytes->value.get<ByteBuffer>()));
++    EXPECT(authenticator_data.attested_credential_data.has_value());
++    EXPECT_EQ(authenticator_data.attested_credential_data->credential_id, from_hex("b8ad59b996047ab18e2ceb57206c362da57458793481f4a8ebf101c7ca7cc0f1"sv));
++    EXPECT_EQ(authenticator_data.attested_credential_data->aaguid, from_hex("97586fd09799a76401c200455099ef2a"sv));
++    EXPECT_EQ(authenticator_data.serialize(), authenticator_data_bytes->value.get<ByteBuffer>());
++
++    // Building the attestation object again gives the same bytes, in CTAP2 canonical order.
++    auto none_statement = WebView::none_attestation_statement();
++    EXPECT_EQ(WebView::encode_attestation_object("none"sv, none_statement, authenticator_data_bytes->value.get<ByteBuffer>()), attestation_object);
++}
++
++TEST_CASE(credential_public_key)
++{
++    auto attestation_object_bytes = from_hex(TOP_ORIGIN_ATTESTATION_OBJECT);
++    auto attestation_object = TRY_OR_FAIL(WebView::CBOR::decode(attestation_object_bytes));
++    auto authenticator_data = TRY_OR_FAIL(WebView::AuthenticatorData::parse(attestation_object.get("authData"sv)->value.get<ByteBuffer>()));
++
++    auto public_key = TRY_OR_FAIL(WebView::CredentialPublicKey::from_cose_key(authenticator_data.attested_credential_data->credential_public_key));
++    EXPECT_EQ(public_key.algorithm, WebView::COSE_ALGORITHM_ES256);
++    EXPECT(public_key.subject_public_key_info.has_value());
++
++    // The SubjectPublicKeyInfo holds the uncompressed point.
++    Crypto::ASN1::Decoder decoder { *public_key.subject_public_key_info };
++    auto subject_public_key = TRY_OR_FAIL(Crypto::Certificate::parse_subject_public_key_info(decoder));
++    auto expected_point = from_hex("04a1c47c1d82da4ebe82cd72207102b380670701993bc35398ae2e5726427fe01d86c1080d82987028c7f54ecb1b01185de243b359294a0ed210cd47480f0adc88"sv);
++    EXPECT_EQ(subject_public_key.raw_key, expected_point);
++
++    // A key of an algorithm getPublicKey() doesn't support has no SubjectPublicKeyInfo.
++    WebView::CBOR::Encoder encoder;
++    encoder.begin_map(2);
++    encoder.write_integer(1);
++    encoder.write_integer(2);
++    encoder.write_integer(3);
++    encoder.write_integer(-35);
++    auto es384_key = encoder.finish();
++    auto es384 = TRY_OR_FAIL(WebView::CredentialPublicKey::from_cose_key(es384_key));
++    EXPECT_EQ(es384.algorithm, -35);
++    EXPECT(!es384.subject_public_key_info.has_value());
++}
++
++TEST_CASE(self_attestation)
++{
++    auto zero_aaguid = MUST(ByteBuffer::create_zeroed(16));
++    auto signature = from_hex("3006020101020101"sv);
++
++    WebView::CBOR::Encoder self;
++    self.begin_map(2);
++    self.write_text("alg"sv);
++    self.write_integer(-7);
++    self.write_text("sig"sv);
++    self.write_bytes(signature);
++    auto self_statement = self.finish();
++    EXPECT(WebView::is_self_attestation("packed"sv, self_statement, zero_aaguid));
++
++    WebView::CBOR::Encoder full;
++    full.begin_map(3);
++    full.write_text("alg"sv);
++    full.write_integer(-7);
++    full.write_text("sig"sv);
++    full.write_bytes(signature);
++    full.write_text("x5c"sv);
++    full.begin_array(0);
++    auto full_statement = full.finish();
++    EXPECT(!WebView::is_self_attestation("packed"sv, full_statement, zero_aaguid));
++    EXPECT(!WebView::is_self_attestation("fido-u2f"sv, self_statement, zero_aaguid));
++    auto aaguid = from_hex("97586fd09799a76401c200455099ef2a"sv);
++    EXPECT(!WebView::is_self_attestation("packed"sv, self_statement, aaguid));
++}
++
++static bool is_malformed(StringView hex)
++{
++    auto bytes = from_hex(hex);
++    return WebView::CBOR::decode(bytes).is_error();
++}
++
++TEST_CASE(cbor_rejects_malformed_input)
++{
++    // Truncated byte string, indefinite length, trailing data, and nesting deeper than any authenticator needs.
++    EXPECT(is_malformed("4401"sv));
++    EXPECT(is_malformed("5f4101ff"sv));
++    EXPECT(is_malformed("0000"sv));
++    ByteBuffer deep;
++    for (size_t i = 0; i < 64; ++i)
++        deep.append(0x81);
++    deep.append(0x00);
++    EXPECT(WebView::CBOR::decode(deep).is_error());
++
++    // A map claiming more entries than there are bytes.
++    EXPECT(is_malformed("bb7fffffffffffffff"sv));
++}
++
++TEST_CASE(registrable_domain_suffix)
++{
++    auto host = [](StringView string) { return URL::Parser::parse_host(string).release_value(); };
++
++    EXPECT(host("example.com"sv).is_a_registrable_domain_suffix_of_or_is_equal_to(host("login.example.com"sv)));
++    EXPECT(host("login.example.com"sv).is_a_registrable_domain_suffix_of_or_is_equal_to(host("login.example.com"sv)));
++    EXPECT(!host("com"sv).is_a_registrable_domain_suffix_of_or_is_equal_to(host("example.com"sv)));
++    EXPECT(!host("other.com"sv).is_a_registrable_domain_suffix_of_or_is_equal_to(host("example.com"sv)));
++    EXPECT(!host("github.io"sv).is_a_registrable_domain_suffix_of_or_is_equal_to(host("someone.github.io"sv)));
++    EXPECT(!host("1.2.3.4"sv).is_a_registrable_domain_suffix_of_or_is_equal_to(host("example.com"sv)));
++    EXPECT(host("localhost"sv).is_a_registrable_domain_suffix_of_or_is_equal_to(host("localhost"sv)));
++}

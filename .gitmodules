@@ -2,3 +2,4 @@
 	path = ladybird
 	url = https://github.com/LadybirdBrowser/ladybird.git
 	shallow = true
+	ignore = all

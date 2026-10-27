@@ -23,6 +23,8 @@
 #include <UI/ChromeStyle.h>
 #include <UI/ContentBlockingButton.h>
 #include <UI/ContentBlockingPopover.h>
+#include <UI/ElementPicker.h>
+#include <UI/Extensions/Toolbar.h>
 #include <UI/Icon.h>
 #include <UI/JavaScriptDialog.h>
 #if defined(AK_OS_MACOS)
@@ -32,6 +34,7 @@
 #include <UI/NewTabPage.h>
 #include <UI/Popover.h>
 #include <UI/StringUtils.h>
+#include <UI/WebAuthnPopover.h>
 #include <UI/WindowControlButton.h>
 
 #include <LibWebView/TabPerformanceMonitor.h>
@@ -848,10 +851,13 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         show_private_session_popover();
     });
 
+    m_extension_toolbar = new Extensions::ActionToolbar(m_toolbar, *this);
+
     m_content_blocking_button = new ContentBlockingButton(m_toolbar);
     m_content_blocking_button->setToolTip("Ad Block");
     QObject::connect(m_content_blocking_button, &QToolButton::clicked, this, [this] { show_content_blocking_popover(); });
     view().on_content_blocking_change = [this](auto const& snapshot) { update_content_blocking_controls(snapshot); };
+    view().on_element_picker_filter = [this](auto const& filter) { ElementPicker::confirm_filter(*this, filter); };
     update_content_blocking_controls(view().content_blocking_snapshot());
     content_blocker_count_visibility_changed();
 
@@ -941,6 +947,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     toolbar_layout->addWidget(m_performance_monitor, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_downloads_button, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_private_badge, 0, Qt::AlignVCenter);
+    toolbar_layout->addWidget(m_extension_toolbar, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_content_blocking_button, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_hamburger_button, 0, Qt::AlignVCenter);
 
@@ -1199,6 +1206,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
         dialog->open();
     };
+
+    WebAuthnPopover::attach(view());
 
     view().on_request_permission = [this](auto const& name, auto const& origin, auto on_decided) {
         auto requester = origin.is_opaque() ? "this page"_string : origin.serialize();

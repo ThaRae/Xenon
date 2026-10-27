@@ -1,0 +1,498 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Mon, 26 Oct 2026 14:44:37 -0400
+Subject: [PATCH] LibWeb+LibWebView+WebContent: Add an element picker for
+ cosmetic filters
+
+uBlock Origin's element picker lets the user click something on a page
+and hide it from then on. ViewImplementation::start_element_picker()
+does the same with the node picker DevTools uses: it highlights what is
+under the pointer, and on a click asks WebContent for a cosmetic filter
+that hides the picked element on its site. The filter uses the element's
+id, or its tag and classes, when they pick out only it, and otherwise the
+shortest path of child combinators (from the nearest ancestor with an id)
+that does. A text node stands for the element holding it.
+
+The page and image context menus get a Block Element... action that
+starts it. A frontend can show the resulting filter for the user to
+confirm or edit (on_element_picker_filter); otherwise it is saved as it
+is. Either way Settings::add_custom_content_blocker_filter() adds it to
+the custom filters, which applies it to every page at once.
+
+Internals exposes the filter generator for tests.
+---
+ Libraries/LibWeb/Internals/Internals.cpp     |  5 +
+ Libraries/LibWeb/Internals/Internals.h       |  1 +
+ Libraries/LibWeb/Internals/Internals.idl     |  1 +
+ Libraries/LibWeb/Loader/ContentBlocker.cpp   | 98 ++++++++++++++++++++
+ Libraries/LibWeb/Loader/ContentBlocker.h     |  4 +
+ Libraries/LibWebView/Menu.h                  |  1 +
+ Libraries/LibWebView/Settings.cpp            | 24 +++++
+ Libraries/LibWebView/Settings.h              |  2 +
+ Libraries/LibWebView/ViewImplementation.cpp  | 52 +++++++++++
+ Libraries/LibWebView/ViewImplementation.h    | 14 +++
+ Libraries/LibWebView/WebContentPage.cpp      |  6 ++
+ Libraries/LibWebView/WebContentPage.h        |  1 +
+ Services/WebContent/ConnectionFromClient.cpp | 14 +++
+ Services/WebContent/ConnectionFromClient.h   |  1 +
+ Services/WebContent/WebContentClient.ipc     |  1 +
+ Services/WebContent/WebContentServer.ipc     |  1 +
+ 16 files changed, 226 insertions(+)
+
+diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
+index 39cb890415e276f053daba386d2c13f0698c97b9..ae0b1e9a5ef450c6a317d5e411ff8d3141c33252 100644
+--- a/Libraries/LibWeb/Internals/Internals.cpp
++++ b/Libraries/LibWeb/Internals/Internals.cpp
+@@ -1299,6 +1299,11 @@ void Internals::set_content_blocking_enabled(bool enabled)
+     page().set_content_blocking_policy(enabled, {});
+ }
+ 
++Optional<String> Internals::cosmetic_filter_for_element(DOM::Element& element)
++{
++    return ContentBlocker::cosmetic_filter_for_element(element);
++}
++
+ WebIDL::UnsignedLongLong Internals::partial_layout_count()
+ {
+     return window().associated_document().partial_layout_count();
+diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
+index 1c8e42b1dfd3303b8b357a2f67b943b0997f467e..8448534c886d9fc56ad818ca8952a4bb2fcc8e3b 100644
+--- a/Libraries/LibWeb/Internals/Internals.h
++++ b/Libraries/LibWeb/Internals/Internals.h
+@@ -167,6 +167,7 @@ public:
+     WebIDL::ExceptionOr<void> set_content_blockers(Utf16String const& patterns);
+     WebIDL::ExceptionOr<void> set_site_compatibility_data(Utf16String const& source);
+     void set_content_blocking_enabled(bool enabled);
++    Optional<String> cosmetic_filter_for_element(DOM::Element&);
+     WebIDL::UnsignedLongLong partial_layout_count();
+     WebIDL::UnsignedLongLong full_layout_count();
+     void begin_layout_trace();
+diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
+index c68f10a60703e09f8a8f7b35b782ddef32998e52..66279cf9bc970656ca60323581f8926f0b261f3f 100644
+--- a/Libraries/LibWeb/Internals/Internals.idl
++++ b/Libraries/LibWeb/Internals/Internals.idl
+@@ -164,6 +164,7 @@ interface Internals {
+     undefined setContentBlockers(DOMString patterns);
+     undefined setSiteCompatibilityData(DOMString source);
+     undefined setContentBlockingEnabled(boolean enabled);
++    DOMString? cosmeticFilterForElement(Element element);
+     unsigned long long partialLayoutCount();
+     unsigned long long fullLayoutCount();
+     undefined beginLayoutTrace();
+diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
+index 5c3be7593acaeb49d8f60c7c1cf9f80782ead3fa..e47f89f14314d6e9bfa0377002bde8db65151e1c 100644
+--- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
++++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
+@@ -8,12 +8,17 @@
+ #include <AK/StringBuilder.h>
+ #include <AK/Vector.h>
+ #include <LibURL/Parser.h>
++#include <AK/Utf16StringBuilder.h>
++#include <LibWeb/CSS/Serialize.h>
+ #include <LibWeb/ContentBlockerRustFFI.h>
+ #include <LibWeb/DOM/Document.h>
++#include <LibWeb/DOM/Element.h>
++#include <LibWeb/DOM/NodeList.h>
+ #include <LibWeb/HTML/Scripting/ClassicScript.h>
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/Window.h>
+ #include <LibWeb/Loader/ContentBlocker.h>
++#include <LibWebCommon/Loader/ContentBlocking.h>
+ 
+ namespace Web {
+ 
+@@ -278,6 +283,99 @@ bool ContentBlocker::is_uncloaked_request_filtered(URL::URL const& url, StringVi
+     return ContentBlocking::FFI::rust_content_blocker_matches_uncloaked(m_engine, url_string.bytes(), alias_target.bytes(), source_url_string.bytes(), request_type.bytes());
+ }
+ 
++static Utf16String join_with_child_combinators(ReadonlySpan<Utf16String> parts)
++{
++    Utf16StringBuilder builder;
++    for (size_t i = 0; i < parts.size(); ++i) {
++        if (i != 0)
++            builder.append_ascii(" > "sv);
++        builder.append(parts[i].utf16_view());
++    }
++    return builder.to_string();
++}
++
++Optional<String> ContentBlocker::cosmetic_filter_for_element(DOM::Element& element)
++{
++    auto& document = element.document();
++    auto site = content_blocking_site(document.url());
++    if (!site.has_value())
++        return {};
++
++    auto selects_only_element = [&](Utf16String const& selector) {
++        auto result = document.query_selector_all(selector.utf16_view());
++        if (result.is_error())
++            return false;
++        auto const& list = *result.value();
++        return list.length() == 1 && list.item(0) == &element;
++    };
++    auto filter_for = [&](Utf16String const& selector) -> Optional<String> {
++        auto selector_utf8 = selector.utf16_view().to_utf8();
++        if (selector_utf8.is_error())
++            return {};
++        return MUST(String::formatted("{}##{}", *site, selector_utf8.value()));
++    };
++    auto id_selector = [](Utf16FlyString const& id) {
++        Utf16StringBuilder builder;
++        builder.append_ascii('#');
++        CSS::serialize_an_identifier(builder, id.view());
++        return builder.to_string();
++    };
++    auto compound_selector = [](DOM::Element const& element, bool with_classes) {
++        Utf16StringBuilder builder;
++        builder.append(element.local_name().view());
++        if (with_classes) {
++            for (auto const& class_name : element.class_names()) {
++                builder.append_ascii('.');
++                CSS::serialize_an_identifier(builder, class_name.view());
++            }
++        }
++        return builder.to_string();
++    };
++
++    if (auto const& id = element.id(); id.has_value() && !id->is_empty()) {
++        if (auto selector = id_selector(*id); selects_only_element(selector))
++            return filter_for(selector);
++    }
++    if (!element.class_names().is_empty()) {
++        if (auto selector = compound_selector(element, true); selects_only_element(selector))
++            return filter_for(selector);
++    }
++
++    // Walk up, one child combinator at a time, until the selector picks out only the element.
++    Vector<Utf16String> parts;
++    for (DOM::Element* current = &element; current; current = current->parent_element().ptr()) {
++        if (current != &element) {
++            if (auto const& id = current->id(); id.has_value() && !id->is_empty()) {
++                parts.prepend(id_selector(*id));
++                break;
++            }
++        }
++        if (current == document.document_element())
++            break;
++
++        auto part = compound_selector(*current, false);
++        size_t position = 1;
++        bool has_same_type_siblings = false;
++        for (auto* sibling = current->previous_element_sibling(); sibling; sibling = sibling->previous_element_sibling()) {
++            if (sibling->local_name() == current->local_name()) {
++                ++position;
++                has_same_type_siblings = true;
++            }
++        }
++        for (auto* sibling = current->next_element_sibling(); sibling && !has_same_type_siblings; sibling = sibling->next_element_sibling())
++            has_same_type_siblings = sibling->local_name() == current->local_name();
++        if (has_same_type_siblings)
++            part = Utf16String::formatted("{}:nth-of-type({})", part, position);
++        parts.prepend(move(part));
++
++        auto selector = join_with_child_combinators(parts);
++        if (selects_only_element(selector))
++            return filter_for(selector);
++    }
++
++    return filter_for(join_with_child_combinators(parts));
++}
++
+ void ContentBlocker::run_page_script(DOM::Document& document) const
+ {
+     // Scriptlets and procedural filters are cosmetic filters (##+js(), ##...:has-text()).
+diff --git a/Libraries/LibWeb/Loader/ContentBlocker.h b/Libraries/LibWeb/Loader/ContentBlocker.h
+index f8eb77c9d68e5336ed2da73d01fe929a59ee1c06..8ab045ece224d7e15b0c9a583fcaf9dd798fc04d 100644
+--- a/Libraries/LibWeb/Loader/ContentBlocker.h
++++ b/Libraries/LibWeb/Loader/ContentBlocker.h
+@@ -79,6 +79,10 @@ public:
+     // CNAME uncloaking).
+     bool is_uncloaked_request_filtered(URL::URL const&, StringView alias_target, URL::URL const& source_url, ResourceType) const;
+ 
++    // A filter that hides the element on its site, like `example.com###banner`, for the element picker: the element's id
++    // or tag and classes when they pick out only it, otherwise its path from the nearest ancestor with an id.
++    static Optional<String> cosmetic_filter_for_element(DOM::Element&);
++
+     // Runs the document's scriptlets and procedural cosmetic filters. Called before any of the document's own
+     // scripts can run, once per Window.
+     void run_page_script(DOM::Document&) const;
+diff --git a/Libraries/LibWebView/Menu.h b/Libraries/LibWebView/Menu.h
+index 8f31943d6030bb80ba30ad71ec2a7c6ffa630a94..740fd739b689d01f255d050784219dc0d88da252 100644
+--- a/Libraries/LibWebView/Menu.h
++++ b/Libraries/LibWebView/Menu.h
+@@ -51,6 +51,7 @@ enum class ActionID {
+     TakeVisibleScreenshot,
+     TakeFullScreenshot,
+     ReportWebsiteIssue,
++    BlockElement,
+ 
+     ToggleVerticalTabsExpanded,
+ 
+diff --git a/Libraries/LibWebView/Settings.cpp b/Libraries/LibWebView/Settings.cpp
+index ca9bdfbc635856421f1a1295bba94c70be2871ec..9ffd61b12f367460d826ec4791ab0731b7685431 100644
+--- a/Libraries/LibWebView/Settings.cpp
++++ b/Libraries/LibWebView/Settings.cpp
+@@ -1267,6 +1267,30 @@ bool Settings::remove_content_blocker_list(StringView identifier)
+     return true;
+ }
+ 
++void Settings::add_custom_content_blocker_filter(StringView filter)
++{
++    auto trimmed_filter = filter.trim_whitespace();
++    if (trimmed_filter.is_empty())
++        return;
++
++    auto existing = m_custom_content_blocker_filters.bytes_as_string_view();
++    bool already_present = false;
++    existing.for_each_split_view('\n', SplitBehavior::Nothing, [&](StringView line) {
++        if (line.trim_whitespace() == trimmed_filter)
++            already_present = true;
++    });
++    if (already_present)
++        return;
++
++    StringBuilder builder;
++    builder.append(existing);
++    if (!existing.is_empty() && !existing.ends_with('\n'))
++        builder.append('\n');
++    builder.append(trimmed_filter);
++    builder.append('\n');
++    set_custom_content_blocker_filters(MUST(builder.to_string()));
++}
++
+ void Settings::set_custom_content_blocker_filters(String filters)
+ {
+     if (m_custom_content_blocker_filters == filters)
+diff --git a/Libraries/LibWebView/Settings.h b/Libraries/LibWebView/Settings.h
+index 8bea550d0089e563c3c025c7e29d6efc3807a9fe..40c00b3960f5d0740f76911464dcdd6a2a127df4 100644
+--- a/Libraries/LibWebView/Settings.h
++++ b/Libraries/LibWebView/Settings.h
+@@ -244,6 +244,8 @@ public:
+     bool remove_content_blocker_list(StringView identifier);
+     String const& custom_content_blocker_filters() const { return m_custom_content_blocker_filters; }
+     void set_custom_content_blocker_filters(String);
++    // Adds one filter (such as one from the element picker) to the custom filters, unless it is there already.
++    void add_custom_content_blocker_filter(StringView);
+ 
+     static DNSSettings parse_dns_settings(JsonValue const&);
+     DNSSettings const& dns_settings() const { return m_dns_settings; }
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index 0886253a3c152a005b33250cbdddcfe30ea5e8de..ae7ddb5e5dc289c77b612f4218f996fa54e43b75 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -1742,6 +1742,44 @@ void ViewImplementation::request_node_picker_hit_test(NodePickerRequestType type
+     page().async_get_node_id_at_position(request_id, position);
+ }
+ 
++void ViewImplementation::start_element_picker(Function<void(Optional<String>)> on_element_picked)
++{
++    m_on_element_picked = move(on_element_picked);
++
++    start_node_picker([this](DevTools::DevToolsDelegate::NodePickerEvent event) {
++        switch (event.type) {
++        case DevTools::DevToolsDelegate::NodePickerEvent::Type::Hovered:
++            if (event.node_id.has_value())
++                highlight_dom_node(*event.node_id, {});
++            break;
++        case DevTools::DevToolsDelegate::NodePickerEvent::Type::Previewed:
++            break;
++        case DevTools::DevToolsDelegate::NodePickerEvent::Type::Picked:
++            stop_node_picker();
++            clear_highlighted_dom_node();
++            if (event.node_id.has_value())
++                page().async_request_cosmetic_filter_for_node(++m_element_picker_request_id, *event.node_id);
++            else if (auto on_element_picked = move(m_on_element_picked))
++                on_element_picked({});
++            break;
++        case DevTools::DevToolsDelegate::NodePickerEvent::Type::Canceled:
++            stop_node_picker();
++            clear_highlighted_dom_node();
++            if (auto on_element_picked = move(m_on_element_picked))
++                on_element_picked({});
++            break;
++        }
++    });
++}
++
++void ViewImplementation::did_receive_cosmetic_filter_for_node(u64 request_id, Optional<String> filter)
++{
++    if (request_id != m_element_picker_request_id)
++        return;
++    if (auto on_element_picked = move(m_on_element_picked))
++        on_element_picked(move(filter));
++}
++
+ void ViewImplementation::did_receive_node_picker_hit_test(u64 request_id, Web::UniqueNodeID node_id)
+ {
+     auto request_type = m_pending_node_picker_requests.take(request_id);
+@@ -4330,6 +4368,17 @@ void ViewImplementation::initialize_context_menus()
+     });
+     m_report_website_issue_action->set_enabled(false);
+ 
++    m_block_element_action = Action::create("Block Element..."sv, ActionID::BlockElement, [this]() {
++        start_element_picker([this](Optional<String> filter) {
++            if (!filter.has_value())
++                return;
++            if (on_element_picker_filter)
++                on_element_picker_filter(*filter);
++            else
++                Application::settings().add_custom_content_blocker_filter(*filter);
++        });
++    });
++
+     // A URL from the context menu is the page's — a link's or an image's — so it's navigated to from the page, unless
+     // the user selected it as text. Blink also starts a selected URL with no initiator (IDC_CONTENT_CONTEXT_GOTOURL).
+     m_open_in_new_tab_action = Action::create("Open in New Tab"sv, ActionID::OpenInNewTab, [this]() {
+@@ -4485,6 +4534,7 @@ void ViewImplementation::initialize_context_menus()
+     m_page_context_menu->add_separator();
+     m_page_context_menu->add_action(application.view_source_action());
+     m_page_context_menu->add_action(*m_report_website_issue_action);
++    m_page_context_menu->add_action(*m_block_element_action);
+ 
+     m_link_context_menu = Menu::create("Link Context Menu"sv);
+     add_open_url_actions(*m_link_context_menu);
+@@ -4512,6 +4562,8 @@ void ViewImplementation::initialize_context_menus()
+     m_image_context_menu->add_separator();
+     m_image_context_menu->add_action(*m_copy_image_action);
+     m_image_context_menu->add_action(*m_copy_url_action);
++    m_image_context_menu->add_separator();
++    m_image_context_menu->add_action(*m_block_element_action);
+ 
+     m_media_context_menu = Menu::create("Media Context Menu"sv);
+     m_media_context_menu->add_action(*m_media_play_action);
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index 47d92356048972f7a6a86a779a5c3d0d079fee4f..061cdb71672c74340cda0c0a846c9a89a0f49462 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -324,6 +324,15 @@ public:
+     void node_picker_preview(Web::DevicePixelPoint);
+     void node_picker_cancel();
+ 
++    // Lets the user pick an element on the page (with the node picker), then calls back with a cosmetic filter that
++    // hides it on its site, or with none if the user canceled. Add the filter with
++    // Settings::add_custom_content_blocker_filter().
++    void start_element_picker(Function<void(Optional<String> filter)>);
++
++    // Called with the filter the context menu's Block Element... action made, for the user to see and confirm. Unset,
++    // the filter is added to the custom filters as it is.
++    Function<void(String const& filter)> on_element_picker_filter;
++
+     void inspect_dom_node(Web::UniqueNodeID node_id, DOMNodeProperties::Type, Optional<Web::CSS::PseudoElement> pseudo_element, JsonValue options = {});
+     void inspect_grid_layouts(Web::UniqueNodeID root_node_id);
+     void inspect_current_grid(Web::UniqueNodeID node_id);
+@@ -845,6 +854,7 @@ protected:
+     RefPtr<Action> m_take_visible_screenshot_action;
+     RefPtr<Action> m_take_full_screenshot_action;
+     RefPtr<Action> m_report_website_issue_action;
++    RefPtr<Action> m_block_element_action;
+ 
+     RefPtr<Action> m_open_in_new_tab_action;
+     RefPtr<Action> m_open_in_new_window_action;
+@@ -1113,6 +1123,7 @@ protected:
+     };
+     void request_node_picker_hit_test(NodePickerRequestType, Web::DevicePixelPoint);
+     void did_receive_node_picker_hit_test(u64 request_id, Web::UniqueNodeID);
++    void did_receive_cosmetic_filter_for_node(u64 request_id, Optional<String> filter);
+     void did_receive_indexed_database_inspection(u64 request_id, JsonObject);
+ 
+     bool m_node_picker_active { false };
+@@ -1121,6 +1132,9 @@ protected:
+     HashMap<u64, NodePickerRequestType> m_pending_node_picker_requests;
+     DevTools::DevToolsDelegate::OnNodePickerEvent m_on_node_picker_event;
+ 
++    Function<void(Optional<String>)> m_on_element_picked;
++    u64 m_element_picker_request_id { 0 };
++
+     bool m_devtools_connected { false };
+ };
+ 
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index f2450c2d1525622510166194e9d6160de91e37b6..378935f86903042c44935f24dd3df88c2dc665c3 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -1093,6 +1093,12 @@ void WebContentPage::did_get_hovered_node_id(Web::UniqueNodeID node_id)
+     }
+ }
+ 
++void WebContentPage::did_get_cosmetic_filter_for_node(u64 request_id, Optional<String> filter)
++{
++    if (displays_tab())
++        view().did_receive_cosmetic_filter_for_node(request_id, move(filter));
++}
++
+ void WebContentPage::did_get_node_id_at_position(u64 request_id, Web::UniqueNodeID node_id)
+ {
+     if (displays_tab()) {
+diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
+index 2bb2e10f5188d494b6f87b07aa2d9e612a660331..09cd4a3ebd0f701971ade28ed36cceb4b88faef0 100644
+--- a/Libraries/LibWebView/WebContentPage.h
++++ b/Libraries/LibWebView/WebContentPage.h
+@@ -212,6 +212,7 @@ private:
+     virtual void did_accessibility_focus_change(i64 focused_node_id) override;
+     virtual void did_get_hovered_node_id(Web::UniqueNodeID node_id) override;
+     virtual void did_get_node_id_at_position(u64 request_id, Web::UniqueNodeID node_id) override;
++    virtual void did_get_cosmetic_filter_for_node(u64 request_id, Optional<String> filter) override;
+     virtual void did_list_style_sheets(Vector<Web::CSS::StyleSheetIdentifier> stylesheets) override;
+     virtual void did_get_style_sheet_source(Web::CSS::StyleSheetIdentifier identifier, URL::URL base_url, Utf16String source) override;
+     virtual void did_list_devtools_sources(u64 request_id, Vector<Web::HTML::ScriptRegistryDescription> sources) override;
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 300065dcd286ed29fcffabdb5b845088c16956c8..2e7531ba90d54e3c8863951848673102069c803f 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -2034,6 +2034,20 @@ void ConnectionFromClient::get_node_id_at_position(Web::PageId page_id, u64 requ
+     async_did_get_node_id_at_position(page_id, request_id, page->page().node_id_at_position(position));
+ }
+ 
++void ConnectionFromClient::request_cosmetic_filter_for_node(Web::PageId page_id, u64 request_id, Web::UniqueNodeID node_id)
++{
++    Optional<String> filter;
++    if (auto* node = Web::DOM::Node::from_unique_id(node_id)) {
++        // The picker can land on a text node; hide the element that holds it.
++        auto* element = as_if<Web::DOM::Element>(*node);
++        if (!element)
++            element = node->parent_element().ptr();
++        if (element)
++            filter = Web::ContentBlocker::cosmetic_filter_for_element(*element);
++    }
++    async_did_get_cosmetic_filter_for_node(page_id, request_id, move(filter));
++}
++
+ void ConnectionFromClient::list_style_sheets(Web::PageId page_id)
+ {
+     auto page = this->page(page_id);
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 0bc51aa0a8cef1f8aa74b075dff0f09aa3551ab4..6cdf47cf9fb82886b6e37ec8b5237bc983d59ab3 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -209,6 +209,7 @@ private:
+         i32 offset_end, String text) override;
+     virtual void get_hovered_node_id(Web::PageId page_id) override;
+     virtual void get_node_id_at_position(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) override;
++    virtual void request_cosmetic_filter_for_node(Web::PageId page_id, u64 request_id, Web::UniqueNodeID node_id) override;
+ 
+     virtual void list_style_sheets(Web::PageId page_id) override;
+     virtual void request_style_sheet_source(Web::PageId page_id, Web::CSS::StyleSheetIdentifier identifier) override;
+diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
+index 1a94dd33311e1d17f23f19da5ca8852acb111627..af9748cbca47aa5b4b96dcc143903c8c7287cd55 100644
+--- a/Services/WebContent/WebContentClient.ipc
++++ b/Services/WebContent/WebContentClient.ipc
+@@ -153,6 +153,7 @@ endpoint WebContentClient routed by Web::PageId page_id
+     did_accessibility_focus_change(Web::PageId page_id, i64 focused_node_id) =|
+     did_get_hovered_node_id(Web::PageId page_id, Web::UniqueNodeID node_id) =|
+     did_get_node_id_at_position(Web::PageId page_id, u64 request_id, Web::UniqueNodeID node_id) =|
++    did_get_cosmetic_filter_for_node(Web::PageId page_id, u64 request_id, Optional<String> filter) =|
+     did_finish_editing_dom_node(Web::PageId page_id, Optional<Web::UniqueNodeID> node_id) =|
+     did_mutate_dom(Web::PageId page_id, WebView::Mutation mutation) =|
+     did_get_dom_node_html(Web::PageId page_id, String html) =|
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 8d8cb3fdb7c0d51a9f47c7cc9ecdbf6cb5304993..d5b43305c2bafa750ecefa14fe586370f5a6aefe 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -188,6 +188,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     perform_accessibility_text_action(Web::PageId page_id, i64 node_id, String action, i32 offset_start, i32 offset_end, String text) =|
+     get_hovered_node_id(Web::PageId page_id) =|
+     get_node_id_at_position(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) =|
++    request_cosmetic_filter_for_node(Web::PageId page_id, u64 request_id, Web::UniqueNodeID node_id) =|
+ 
+     js_console_input(Web::PageId page_id, String js_source) =|
+     run_javascript(Web::PageId page_id, String js_source) =|
