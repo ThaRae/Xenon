@@ -41,6 +41,19 @@
 
         // The background checks chrome.scripting against this page's tab.
         Object.assign(test.results, await chrome.runtime.sendMessage({ toBackground: "scripting" }));
+
+        // A web accessible extension page loads in a frame, though the page's CSP only allows frames of its own.
+        const accessibleLoaded = new Promise(resolve => {
+            addEventListener("message", event => {
+                if (event.origin === `chrome-extension://${chrome.runtime.id}` && event.data === "accessible-loaded")
+                    resolve(true);
+            });
+            setTimeout(() => resolve(false), 5000);
+        });
+        const frame = document.createElement("iframe");
+        frame.src = chrome.runtime.getURL("accessible.html");
+        document.body.append(frame);
+        check("web accessible pages load in frames, whatever the page's CSP", await accessibleLoaded);
     }
 
     run()

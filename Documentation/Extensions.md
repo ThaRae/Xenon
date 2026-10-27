@@ -133,6 +133,11 @@ outright once upstream has the equivalent. A fork does make engine work a little
    aborted in the processes hosting web content. Those processes only reported them during a BiDi session; while the
    embedder has a handler, `WebDriver::BiDi::reports_navigation_events()` is true for them too, and nothing else of
    BiDi runs. Xenon makes `webNavigation`'s events of them.
+7. **Embedder schemes bypass Content Security Policy** (`0019`, done). Requests, responses, and navigations to URLs
+   of the embedder's own schemes aren't checked against the page's policy, as Blink lets extension resources bypass
+   it (`WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy`). Without it, a site with
+   `frame-src 'self'` blocks Bitwarden's inline menu and its bar that offers to save a login. The embedder's handler
+   still decides which pages may load which files (`web_accessible_resources`).
 
 The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
 no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
@@ -393,7 +398,7 @@ for Bitwarden in Chrome.
   another process, and can only send messages as the content scripts in its own frames.
 - **CSP:** extension pages get MV3's policy and can't loosen it beyond what MV3 allows. The page's CSP doesn't stop
   content scripts from running, since the UI process injects them, but what they insert into the page (a `<script>`,
-  an `<img>`) is still subject to it, as in Chrome.
+  an `<img>`) is still subject to it, as in Chrome, except the extension's own resources, which bypass it (patch 19).
 - **Storage** is per extension ID, in the profile, and deleted with the extension.
 - **Native messaging** (milestone 4) runs only hosts registered in Chrome's manifest locations whose
   `allowed_origins` list the extension, over stdin/stdout with Chrome's length-prefixed framing. It needs no engine
@@ -496,10 +501,11 @@ for Bitwarden in Chrome.
     `onReferenceFragmentUpdated`, and `onHistoryStateUpdated`, with the tab, frame, parent frame, document, and
     Chrome's other details. They're followed while any extension has the `webNavigation` permission.
   - In a headless browser, the page it loads stands for tab 1 of window 1, for `tabs.get`, `tabs.query`, `sender.tab`,
-    `tabs.sendMessage`, and `scripting`, so that `Meta/xenon.py test` can check them. It checks 44 things on its
+    `tabs.sendMessage`, and `scripting`, so that `Meta/xenon.py test` can check them. It checks 45 things on its
     content script page now, among them `executeScript` in each world and frame, results and promises, CSS, frames,
-    `tabs.sendMessage` to content scripts, a registered script running in a frame that reloads, and the
-    `webNavigation` events of a frame's navigation and of one that fails.
+    `tabs.sendMessage` to content scripts, a registered script running in a frame that reloads, the
+    `webNavigation` events of a frame's navigation and of one that fails, and a web accessible page in a frame of a
+    page whose CSP allows only its own frames.
   - Bitwarden's autofill scripts go in at its content script's request: on a login page, its inline menu shows on the
     focused field (seen in a headless render with a locked vault: "Unlock your account to view autofill
     suggestions"). Its frames are `web_accessible_resources` pages, which load in the page. With the vault unlocked,
@@ -509,7 +515,8 @@ for Bitwarden in Chrome.
   - Saving new logins (Bitwarden's notification bar) hasn't been checked on its own.
   - `webNavigation`'s `onCreatedNavigationTarget` and `onTabReplaced`, and real error names (Chrome's
     `net::ERR_NAME_NOT_RESOLVED` and the like) and transition types.
-  - `web_accessible_resources` as subresources of web pages (frames already load), and sandboxed pages.
+  - `web_accessible_resources` as subresources of web pages (frames load, under any CSP the page has), and sandboxed
+    pages.
   - `match_about_blank`, `match_origin_as_fallback`, and `file:` access. `activeTab`.
   - Content scripts' and `insertCSS`'s stylesheets as user stylesheets. Values the page posts arriving as copies in
     each world.

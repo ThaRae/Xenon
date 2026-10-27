@@ -35,6 +35,12 @@
     "background": {
         "service_worker": "background.js"
     },
+    "web_accessible_resources": [
+        {
+            "resources": ["accessible.html", "accessible.js"],
+            "matches": ["http://127.0.0.1/*"]
+        }
+    ],
     "content_scripts": [
         {
             "matches": ["http://127.0.0.1/content-scripts*"],
