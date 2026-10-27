@@ -389,15 +389,28 @@ for (const button of document.querySelectorAll("[data-show-location]")) {
     button.addEventListener("click", () => ladybird.sendMessage("xenon/showLocation", button.dataset.showLocation));
 }
 
-// The blocking dashboard keeps your own filters, so they're edited there rather than here, once Xenon has one.
+// The blocking dashboard, once Xenon has one, turns each list on or off and keeps your own filters, so the page links to
+// its tabs for those rather than editing them here.
 function renderBlockingDashboard() {
     const url = XENON.blockingDashboard;
     document.querySelector("#blocking-dashboard-row").hidden = !url;
     document.querySelector("#custom-filters-row").hidden = !!url;
-    if (url) document.querySelector("#blocking-dashboard").href = url;
-    document.querySelector("#element-picker-destination").textContent = url
-        ? "My filters, in the dashboard"
-        : "your own filters below";
+
+    const chooseLists = document.querySelector("#choose-filter-lists");
+    chooseLists.hidden = !url;
+
+    const destination = document.querySelector("#element-picker-destination");
+    if (!url) {
+        destination.textContent = "your own filters below";
+        return;
+    }
+
+    document.querySelector("#blocking-dashboard").href = url;
+    chooseLists.href = `${url}#lists`;
+    const myFilters = document.createElement("a");
+    myFilters.href = `${url}#filters`;
+    myFilters.textContent = "My filters";
+    destination.replaceChildren(myFilters, ", in the dashboard");
 }
 
 // The password manager, which UI/PasswordManagers.h installs from its developer's Chrome Web Store listing. Without one,

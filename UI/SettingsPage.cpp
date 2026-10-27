@@ -267,7 +267,8 @@ private:
             settings.set("filterLists"sv, move(filter_lists));
         }
 
-        // FIXME: Ask UI/BlockingDashboard.h for its URL, once it's in. Until then, the xenon: scheme is the dashboard's.
+        // FIXME: Use Blocking::dashboard_url() (UI/Blocking.h) once the dashboard is in. Until then, the xenon: scheme is
+        //        the dashboard's.
         if (URL::is_embedder_scheme("xenon"sv))
             settings.set("blockingDashboard"sv, "xenon://blocking/"sv);
 
