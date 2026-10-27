@@ -156,4 +156,38 @@ void set_bangs_enabled(bool enabled)
     notify_observers();
 }
 
+static constexpr auto DISABLED_FILTER_LISTS_KEY = "blocking/disabledFilterLists";
+static constexpr auto BLOCKED_REQUEST_TOTAL_KEY = "blocking/blockedRequestTotal";
+
+HashTable<String> disabled_filter_lists()
+{
+    HashTable<String> ids;
+    for (auto const& id : settings().value(DISABLED_FILTER_LISTS_KEY).toStringList())
+        ids.set(ak_string_from_qstring(id));
+    return ids;
+}
+
+void set_filter_list_enabled(StringView id, bool enabled)
+{
+    auto ids = settings().value(DISABLED_FILTER_LISTS_KEY).toStringList();
+    auto qid = qstring_from_ak_string(id);
+    ids.removeAll(qid);
+    if (!enabled)
+        ids.append(qid);
+    ids.sort();
+    settings().setValue(DISABLED_FILTER_LISTS_KEY, ids);
+}
+
+u64 blocked_request_total()
+{
+    return settings().value(BLOCKED_REQUEST_TOTAL_KEY, 0).toULongLong();
+}
+
+void add_to_blocked_request_total(u64 count)
+{
+    if (count == 0)
+        return;
+    settings().setValue(BLOCKED_REQUEST_TOTAL_KEY, static_cast<qulonglong>(blocked_request_total() + count));
+}
+
 }

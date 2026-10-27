@@ -26,7 +26,8 @@ namespace Ladybird::FilterLists {
 Main::Arguments with_bundled_filter_lists(Main::Arguments);
 
 // The lists and resources in a bundle's directory, in the order Ladybird gets them: lists/*.txt, trusted-lists/*.txt,
-// and resources/ublock-resources.json.
+// and resources/ublock-resources.json. Lists turned off in the blocking dashboard (XenonSettings::disabled_filter_lists)
+// are left out.
 struct ContentBlockers {
     Vector<ByteString> lists;
     Vector<ByteString> trusted_lists;

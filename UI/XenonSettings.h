@@ -7,6 +7,8 @@
 #pragma once
 
 #include <AK/ByteString.h>
+#include <AK/HashTable.h>
+#include <AK/String.h>
 #include <AK/Time.h>
 #include <AK/Types.h>
 
@@ -54,8 +56,18 @@ void set_split_view_drag_and_drop(bool);
 bool bangs_enabled();
 void set_bangs_enabled(bool);
 
+// The ids of the bundled filter lists (UI/Resources/filter-lists/manifest.json) turned off in the blocking dashboard,
+// which UI/FilterLists.cpp leaves out of what it gives the content blocker. Every list is on until it's turned off.
+HashTable<String> disabled_filter_lists();
+void set_filter_list_enabled(StringView id, bool);
+
+// How many requests content blocking has blocked since Xenon was first run, as uBlock Origin counts "since install".
+u64 blocked_request_total();
+void add_to_blocked_request_total(u64);
+
 // Told whenever one of these settings changes, wherever it was changed from, as WebView::SettingsObserver is for
-// Ladybird's settings. The features follow about:settings through it, and about:settings follows the menus.
+// Ladybird's settings. The features follow about:settings through it, and about:settings follows the menus and the
+// blocking dashboard. The blocked request total, which changes with nearly every page, isn't told.
 class Observer {
 public:
     Observer();
