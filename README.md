@@ -157,7 +157,7 @@ What exists now and what's planned, measured against Helium:
   background service worker. They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`,
   `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for. Their content scripts run
   in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and stylesheets on request.
-  Bitwarden logs in (with a security key too), and its inline autofill menu shows on login fields.
+  Bitwarden logs in (with a security key too) and autofills logins.
 - [ ] uBlock Origin features that need engine work: scriptlets (YouTube ads, anti-adblock walls), `$redirect`
   surrogates, `$removeparam`, popup blocking, procedural hiding (`:has-text()`), CNAME uncloaking, and the element
   picker. See xenon-ublock's `docs/gap-analysis.md`.

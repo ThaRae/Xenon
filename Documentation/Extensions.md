@@ -491,11 +491,11 @@ for Bitwarden in Chrome.
     `tabs.sendMessage` to content scripts, and a registered script running in a frame that reloads.
   - Bitwarden's autofill scripts go in at its content script's request: on a login page, its inline menu shows on the
     focused field (seen in a headless render with a locked vault: "Unlock your account to view autofill
-    suggestions"). Its frames are `web_accessible_resources` pages, which load in the page.
+    suggestions"). Its frames are `web_accessible_resources` pages, which load in the page. With the vault unlocked,
+    autofill works (tried by hand).
 
   Left:
-  - Filling in a login from the popup or the inline menu, and saving new logins, need trying by hand with an unlocked
-    vault.
+  - Saving new logins (Bitwarden's notification bar) hasn't been checked on its own.
   - `webNavigation` events, which Bitwarden's autofill and badge listen for.
   - `web_accessible_resources` as subresources of web pages (frames already load), and sandboxed pages.
   - `match_about_blank`, `match_origin_as_fallback`, and `file:` access. `activeTab`.
