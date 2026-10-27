@@ -85,6 +85,8 @@ struct DeferredTab {
     URL::URL url;
     QString title;
     QIcon favicon;
+    // A tab that hibernated keeps its history here rather than in the session store, which a private window has none of.
+    Optional<WebView::SessionHistorySnapshot> history {};
 };
 
 class Tab final
@@ -114,6 +116,11 @@ public:
     bool is_loaded() const { return m_view != nullptr; }
     // Builds the tab's view and toolbar, and restores its history, if it hasn't loaded yet.
     void ensure_loaded();
+    // Whether the tab holds nothing that hibernating would lose, like a dialog the page opened (TabHibernation.cpp).
+    bool can_hibernate() const;
+    // Gives up the tab's view and toolbar, and with them its WebContent process, which leaves the tab as a restored tab
+    // is until it's selected and loads again (TabHibernation.cpp).
+    void hibernate();
 
     URL::URL url() const;
 
@@ -328,6 +335,8 @@ private:
     bool m_toolbar_window_controls_visible { false };
     Optional<WebView::SessionTabId> m_session_tab_id;
     Optional<DeferredTab> m_deferred_tab;
+    // What create_tab_shell() made, which a tab keeps when it hibernates.
+    QObjectList m_tab_shell_children;
 };
 
 }

@@ -78,6 +78,7 @@ set(XENON_SOURCES
     StringUtils.cpp
     Tab.cpp
     TabBar.cpp
+    TabHibernation.cpp
     WebAuthnPopover.cpp
     WebCompatReportReview.cpp
     WebContentView.cpp

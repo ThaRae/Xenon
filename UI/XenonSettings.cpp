@@ -52,4 +52,34 @@ void set_chrome_layout(ChromeLayout layout)
     }
 }
 
+static constexpr auto TAB_HIBERNATION_KEY = "tabs/hibernation";
+// In seconds.
+static constexpr auto TAB_HIBERNATION_TIMEOUT_KEY = "tabs/hibernationTimeout";
+
+// Chromium's Memory Saver discards a tab after 2 hours at its most aggressive. Xenon goes by time alone, without Memory
+// Saver's other trigger, memory pressure, so it takes that timing.
+static constexpr auto DEFAULT_TAB_HIBERNATION_TIMEOUT = AK::Duration::from_seconds(2 * 60 * 60);
+static constexpr auto MINIMUM_TAB_HIBERNATION_TIMEOUT = AK::Duration::from_seconds(5);
+
+bool tab_hibernation_enabled()
+{
+    return settings().value(TAB_HIBERNATION_KEY, true).toBool();
+}
+
+void set_tab_hibernation_enabled(bool enabled)
+{
+    settings().setValue(TAB_HIBERNATION_KEY, enabled);
+}
+
+AK::Duration tab_hibernation_timeout()
+{
+    auto seconds = settings().value(TAB_HIBERNATION_TIMEOUT_KEY, static_cast<qlonglong>(DEFAULT_TAB_HIBERNATION_TIMEOUT.to_seconds())).toLongLong();
+    return max(AK::Duration::from_seconds(seconds), MINIMUM_TAB_HIBERNATION_TIMEOUT);
+}
+
+void set_tab_hibernation_timeout(AK::Duration timeout)
+{
+    settings().setValue(TAB_HIBERNATION_TIMEOUT_KEY, static_cast<qlonglong>(timeout.to_seconds()));
+}
+
 }

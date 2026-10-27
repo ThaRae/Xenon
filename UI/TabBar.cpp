@@ -2529,22 +2529,20 @@ static void size_page_like(Tab& page, Tab const& current)
 
 void TabWidget::insert_tab(int index, Tab* widget, QString const& label)
 {
+    auto install_event_filters = [this, widget] {
+        widget->view().installEventFilter(this);
+        widget->bookmarks_bar().installEventFilter(this);
+    };
     if (widget->is_loaded()) {
         // A page inserted behind the current one stays at Qt's default geometry until it's selected, and a load can
         // start into it long before that. Size its view like the current page's view first, so the page's first layout
         // sees the real viewport.
         if (auto* current = as_if<Tab>(m_stacked_widget->currentWidget()); current && current != widget && current->is_loaded())
             size_page_like(*widget, *current);
-        widget->view().installEventFilter(this);
-        widget->bookmarks_bar().installEventFilter(this);
-    } else {
-        // A tab that hasn't loaded gets the filters for its view and bookmarks bar once it has them.
-        auto install_event_filters = [this, widget] {
-            widget->view().installEventFilter(this);
-            widget->bookmarks_bar().installEventFilter(this);
-        };
-        connect(widget, &Tab::loaded, this, install_event_filters, Qt::SingleShotConnection);
+        install_event_filters();
     }
+    // A tab that hasn't loaded, or that hibernated, gets the filters for its view and bookmarks bar once it has them.
+    connect(widget, &Tab::loaded, this, install_event_filters);
 
     m_stacked_widget->insertWidget(index, widget);
     m_tab_bar->insertTab(index, label);

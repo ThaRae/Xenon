@@ -15,6 +15,7 @@
 #include <UI/BrowserWindow.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterLists.h>
+#include <UI/TabHibernation.h>
 #if defined(LADYBIRD_QT_HAVE_POSITIONING)
 #    include <UI/GeolocationProviderQt.h>
 #endif
@@ -151,6 +152,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
     }
 
     Ladybird::Extensions::Registry::the().start_background_pages();
+    Ladybird::TabHibernation::start();
 
     return app->execute();
 }

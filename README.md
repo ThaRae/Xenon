@@ -169,7 +169,13 @@ What exists now and what's planned, measured against Helium:
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
 - [ ] Split view
 - [ ] MRU tab switching (<kbd>Ctrl</kbd><kbd>Tab</kbd> in most-recently-used order)
-- [ ] Tab hibernation
+- [x] **Tab hibernation**, Xenon's take on the Memory Saver that Helium has from Chromium: a background tab left unused
+  for two hours gives up its WebContent process, and its favicon turns grey. It keeps its title, favicon, URL, back/forward
+  history, and scroll position, and reloads when you select it. A window's current tab never hibernates, and neither do
+  pinned tabs, tabs playing audio (or that were a minute ago), with picture-in-picture or DevTools open, waiting on a
+  dialog, or holding text typed into a form and not sent. Right-click the tab strip for **Tab Hibernation → Off** or a
+  timeout from 15 minutes to 6 hours, or a background tab for **Hibernate Tab** (`UI/TabHibernation.cpp`, engine patch
+  `0020`, which saves the scroll position first).
 - [ ] Tab groups
 - [ ] The full DuckDuckGo bang list (13,000+), plus a keyword chip in the address bar while a bang is typed
 - [ ] A separate profile directory (LibWebView currently hardcodes `Ladybird` in profile paths)

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <AK/Time.h>
 #include <AK/Types.h>
 
 // Settings for Xenon's own features. Settings that Ladybird already has, like vertical tabs, stay in its settings store.
@@ -26,5 +27,12 @@ void set_chrome_layout(ChromeLayout);
 // Whether horizontal tabs share their row with the toolbar. Vertical tabs leave this setting as it was, so switching
 // back to horizontal tabs returns to the layout used before.
 bool compact_toolbar();
+
+// Whether background tabs left unused for the hibernation timeout give up their WebContent process, as Chromium's Memory
+// Saver discards them (UI/TabHibernation.cpp). A hibernated tab loads again when it's selected.
+bool tab_hibernation_enabled();
+void set_tab_hibernation_enabled(bool);
+AK::Duration tab_hibernation_timeout();
+void set_tab_hibernation_timeout(AK::Duration);
 
 }
