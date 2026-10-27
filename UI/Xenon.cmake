@@ -172,6 +172,16 @@ embed_as_string(xenon_externally_connectable_relay "${XENON_UI_DIR}/Resources/ex
 list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" "${XENON_GENERATED_DIR}/WorkerBridge.cpp")
 list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ExternallyConnectable.cpp" "${XENON_GENERATED_DIR}/ExternallyConnectableRelay.cpp")
 
+# The !bangs (Meta/update-bangs.py refreshes the list), built into the browser as a table that UI/Bangs.cpp searches.
+set(XENON_BANG_TABLE "${XENON_GENERATED_DIR}/UI/BangTable.h")
+add_custom_command(
+    OUTPUT "${XENON_BANG_TABLE}"
+    COMMAND "${Python3_EXECUTABLE}" "${XENON_SOURCE_DIR}/Meta/generate-bang-table.py" "${XENON_UI_DIR}/Resources/bangs/bangs.json" -o "${XENON_BANG_TABLE}"
+    DEPENDS "${XENON_SOURCE_DIR}/Meta/generate-bang-table.py" "${XENON_UI_DIR}/Resources/bangs/bangs.json"
+    VERBATIM
+)
+add_custom_target(xenon_generate_bang_table DEPENDS "${XENON_BANG_TABLE}")
+
 # NB: Qt finalizes executables in a deferred call by default, and we are already running deferred, so finalize by hand.
 qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
@@ -182,7 +192,8 @@ target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL)
 # NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
 #     tree, so Xenon's root comes first.
 target_include_directories(xenon BEFORE PRIVATE ${XENON_SOURCE_DIR})
-target_include_directories(xenon PRIVATE ${LADYBIRD_SOURCE_DIR} ${LADYBIRD_SOURCE_DIR}/Services/)
+target_include_directories(xenon PRIVATE ${LADYBIRD_SOURCE_DIR} ${LADYBIRD_SOURCE_DIR}/Services/ ${XENON_GENERATED_DIR})
+add_dependencies(xenon xenon_generate_bang_table)
 
 if (Qt6Positioning_FOUND)
     target_link_libraries(xenon PRIVATE Qt::Positioning)
@@ -320,6 +331,8 @@ qt_finalize_target(xenon)
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBangs.cpp" Xenon NAME TestXenonBangs LIBS LibURL)
 target_sources(TestXenonBangs PRIVATE "${XENON_UI_DIR}/Bangs.cpp")
 target_include_directories(TestXenonBangs BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_include_directories(TestXenonBangs PRIVATE ${XENON_GENERATED_DIR})
+add_dependencies(TestXenonBangs xenon_generate_bang_table)
 
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestFilterLists.cpp" Xenon NAME TestXenonFilterLists LIBS LibCrypto)
 target_sources(TestXenonFilterLists PRIVATE "${XENON_UI_DIR}/FilterListBundle.cpp")

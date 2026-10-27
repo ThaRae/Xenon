@@ -19,6 +19,7 @@
 class QAction;
 class QEvent;
 class QGraphicsDropShadowEffect;
+class QLabel;
 class QMouseEvent;
 class QResizeEvent;
 class QToolButton;
@@ -78,6 +79,7 @@ private:
     void update_chrome_style();
     void update_location_icon();
     void update_zoom_indicator();
+    void update_bang_chip();
     void update_focus_glow(int alpha);
     void set_field_hovered(bool);
     void schedule_chrome_style_update();
@@ -94,6 +96,7 @@ private:
     QToolButton* m_leading_icon_button { nullptr };
     QToolButton* m_trailing_action_button { nullptr };
     QToolButton* m_zoom_indicator_button { nullptr };
+    QLabel* m_bang_chip { nullptr };
     QVariantAnimation* m_focus_glow_animation { nullptr };
     QGraphicsDropShadowEffect* m_focus_glow_effect { nullptr };
     QAction* m_zoom_action { nullptr };
@@ -113,6 +116,11 @@ private:
     bool m_has_pending_chrome_style_update { false };
     bool m_should_show_full_url_on_mouse_release { false };
     int m_text_leading_margin { 0 };
+    bool m_has_bang_chip { false };
+    // Backspace at the start of the text took the chip away, so the bang is plain text until the user edits it.
+    bool m_is_bang_chip_dismissed { false };
+    int m_bang_chip_prefix_length { 0 };
+    int m_bang_chip_text_margin { 0 };
     int m_focus_glow_alpha { 0 };
 };
 
