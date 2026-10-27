@@ -80,6 +80,7 @@ set(XENON_SOURCES
     StringUtils.cpp
     Tab.cpp
     TabBar.cpp
+    TabCycler.cpp
     TabHibernation.cpp
     WebAuthnPopover.cpp
     WebCompatReportReview.cpp
@@ -337,4 +338,7 @@ target_sources(TestXenonExtensions PRIVATE
 )
 target_include_directories(TestXenonExtensions BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions TestXenonFilterLists)
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestRecentTabOrder.cpp" Xenon NAME TestXenonRecentTabOrder)
+target_include_directories(TestXenonRecentTabOrder BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions TestXenonFilterLists TestXenonRecentTabOrder)

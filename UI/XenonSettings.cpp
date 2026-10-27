@@ -15,6 +15,7 @@
 namespace Ladybird::XenonSettings {
 
 static constexpr auto COMPACT_TOOLBAR_KEY = "layout/compactToolbar";
+static constexpr auto RECENTLY_USED_TAB_ORDER_KEY = "tabs/cycleInRecentlyUsedOrder";
 
 static QSettings& settings()
 {
@@ -80,6 +81,16 @@ AK::Duration tab_hibernation_timeout()
 void set_tab_hibernation_timeout(AK::Duration timeout)
 {
     settings().setValue(TAB_HIBERNATION_TIMEOUT_KEY, static_cast<qlonglong>(timeout.to_seconds()));
+}
+
+bool cycle_tabs_in_recently_used_order()
+{
+    return settings().value(RECENTLY_USED_TAB_ORDER_KEY, true).toBool();
+}
+
+void set_cycle_tabs_in_recently_used_order(bool enabled)
+{
+    settings().setValue(RECENTLY_USED_TAB_ORDER_KEY, enabled);
 }
 
 }

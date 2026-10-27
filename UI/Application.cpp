@@ -336,12 +336,11 @@ public:
             tab->request_close();
         });
 
+        // Ctrl+Tab and Ctrl+Shift+Tab go through the window's tabs in the order they were last used (UI/TabCycler.cpp).
         m_open_next_tab_action = make_action("Open &Next Tab");
         m_open_next_tab_action->setShortcuts({
             QKeySequence(Qt::CTRL | Qt::Key_PageDown),
-            QKeySequence(Qt::CTRL | Qt::Key_Tab),
 #if defined(AK_OS_MACOS)
-            QKeySequence(Qt::META | Qt::Key_Tab),
             QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketRight),
 #endif
         });
@@ -353,9 +352,7 @@ public:
         m_open_previous_tab_action = make_action("Open &Previous Tab");
         m_open_previous_tab_action->setShortcuts({
             QKeySequence(Qt::CTRL | Qt::Key_PageUp),
-            QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab),
 #if defined(AK_OS_MACOS)
-            QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_Tab),
             QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketLeft),
 #endif
         });
