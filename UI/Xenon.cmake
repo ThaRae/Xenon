@@ -56,6 +56,8 @@ set(XENON_SOURCES
     Extensions/Scripting.cpp
     Extensions/Storage.cpp
     Extensions/Toolbar.cpp
+    FilterListBundle.cpp
+    FilterListUpdates.cpp
     FilterLists.cpp
     FindInPageWidget.cpp
     Icon.cpp
@@ -175,7 +177,7 @@ qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
-target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibWebView LibURL LibWakeLock)
+target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibRequests LibWebView LibURL LibWakeLock)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL)
 # NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
 #     tree, so Xenon's root comes first.
@@ -319,6 +321,11 @@ ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBangs.cpp" Xenon NAME TestXenonBang
 target_sources(TestXenonBangs PRIVATE "${XENON_UI_DIR}/Bangs.cpp")
 target_include_directories(TestXenonBangs BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestFilterLists.cpp" Xenon NAME TestXenonFilterLists LIBS LibCrypto)
+target_sources(TestXenonFilterLists PRIVATE "${XENON_UI_DIR}/FilterListBundle.cpp")
+target_include_directories(TestXenonFilterLists BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_compile_definitions(TestXenonFilterLists PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestExtensions.cpp" Xenon NAME TestXenonExtensions LIBS LibCrypto LibFileSystem LibURL)
 target_sources(TestXenonExtensions PRIVATE
     "${XENON_UI_DIR}/Extensions/Extension.cpp"
@@ -329,4 +336,4 @@ target_sources(TestXenonExtensions PRIVATE
 )
 target_include_directories(TestXenonExtensions BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions)
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonExtensions TestXenonFilterLists)

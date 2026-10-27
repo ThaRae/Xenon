@@ -225,6 +225,10 @@ legend {
     text-align: right;
 }
 
+#filter-list-updates {
+    margin: 14px 10px 0;
+}
+
 #filter-lists-note {
     margin: 10px 10px 0;
     font-size: 13px;
