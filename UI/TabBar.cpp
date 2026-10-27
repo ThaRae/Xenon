@@ -190,6 +190,11 @@ static bool window_has_chrome_in_titlebar(QWidget& widget)
     return !top_level_window || top_level_window->has_chrome_in_titlebar();
 }
 
+Tab* tab_being_dragged()
+{
+    return s_active_tab_dragged_tab;
+}
+
 static bool target_can_accept_tab_drop(QWidget& target, QDropEvent& event)
 {
     if (!s_active_tab_drag_source)
@@ -985,6 +990,14 @@ void TabBar::paintEvent(QPaintEvent*)
     // The tab groups' headers and lines go below the tabs, so the selected tab covers a group's line.
     paint_tab_groups(painter, unpinned_clip);
 
+    auto tab_shape_rect = [&](int index, QRect const& tab_rect) {
+        if (is_collapsed_vertical)
+            return collapsed_vertical_tab_shape_rect(QRectF(tab_rect));
+        if (!is_vertical)
+            return horizontal_tab_card_shape_rect(QRectF(tab_rect), horizontal_tab_edges(index));
+        return tab_card_shape_rect(QRectF(tab_rect));
+    };
+
     for (int index = 0; index < count(); ++index) {
         // The tab being dragged follows the cursor as the drag's image, leaving a gap where it would be dropped.
         if (index == dragged_index)
@@ -1013,13 +1026,17 @@ void TabBar::paintEvent(QPaintEvent*)
         // A pinned tab is a tile that shows only its favicon, except where the pinned tabs keep their rows.
         auto is_pinned_tile = index < pinned_count && pinned_tabs_are_tiles();
 
-        QRectF shape_rect;
-        if (is_collapsed_vertical)
-            shape_rect = collapsed_vertical_tab_shape_rect(QRectF(tab_rect));
-        else if (!is_vertical)
-            shape_rect = horizontal_tab_card_shape_rect(QRectF(tab_rect), horizontal_tab_edges(index));
-        else
-            shape_rect = tab_card_shape_rect(QRectF(tab_rect));
+        auto shape_rect = tab_shape_rect(index, tab_rect);
+
+        // Xenon: A split view's two tabs share a frame, under them.
+        if (auto* tab = m_tab_widget ? m_tab_widget->tab(index) : nullptr; tab && index + 1 < count() && index + 1 != dragged_index) {
+            auto& stack = m_tab_widget->tab_stack();
+            if (stack.split_side(*tab) == SplitViewSide::Left && stack.split_partner(*tab) == m_tab_widget->tab(index + 1)) {
+                auto frame = shape_rect.united(tab_shape_rect(index + 1, shifted_tab_rect(index + 1)));
+                SplitView::paint_tab_frame(painter, palette(), frame, stack.is_shown(*tab));
+            }
+        }
+
         QPainterPath tab_path;
         if (!is_vertical && is_selected && !m_floating_selected_tab)
             tab_path = horizontal_selected_tab_path(QRectF(shape_rect.left(), shape_rect.top(), shape_rect.width(), tab_rect.bottom() + 1 - shape_rect.top()));
@@ -1854,10 +1871,14 @@ void TabBar::start_tab_drag(int index)
     auto drop_target = s_pending_tab_drop_target;
     // The tab joins the tab group its drop showed it in.
     QPointer<TabGroup> drop_group = drop_target ? drop_target->tab_bar()->m_drop_group.data() : nullptr;
+    // Xenon: A tab dropped on the edge of a page opens beside it, in a split view.
+    auto split_view_drop = SplitView::take_pending_drop();
 
     if (auto* source_window = qobject_cast<BrowserWindow*>(window()); source_window && dragged_tab) {
         if (auto current_index = source_window->tab_index(dragged_tab); current_index >= 0) {
-            if (action == Qt::MoveAction && drop_target) {
+            if (split_view_drop.has_value()) {
+                SplitView::complete_drop(*split_view_drop, *dragged_tab);
+            } else if (action == Qt::MoveAction && drop_target) {
                 if (auto* target_window = qobject_cast<BrowserWindow*>(drop_target->window()))
                     source_window->move_tab_to_window(current_index, *target_window, s_pending_tab_drop_index);
                 if (drop_target && dragged_tab)
@@ -2979,7 +3000,7 @@ TabWidget::TabWidget(QWidget* parent)
     m_toolbar_container = new QStackedWidget(this);
     m_toolbar_container->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     m_toolbar_container->installEventFilter(this);
-    m_stacked_widget = new QStackedWidget(this);
+    m_stacked_widget = new TabStack(*this);
     m_page_column = new QWidget(this);
     m_page_column_layout = new QVBoxLayout(m_page_column);
     m_page_column_layout->setSpacing(0);
@@ -3226,6 +3247,11 @@ Tab* TabWidget::take_tab(int index)
         return nullptr;
 
     m_tab_groups->will_remove_tab(index);
+
+    // Xenon: A tab leaving its split view hands its place to the other side.
+    if (auto* partner = m_stacked_widget->separate(*as<Tab>(widget)); partner && index == current_index())
+        set_current_tab(partner);
+
     m_stacked_widget->removeWidget(widget);
     if (as<Tab>(widget)->is_loaded()) {
         as<Tab>(widget)->view().removeEventFilter(this);
@@ -4168,6 +4194,11 @@ void TabWidget::update_tab_chrome_visibility()
     for (int index = 0; index < m_stacked_widget->count(); ++index)
         update_web_view_frame(*tab(index));
 #endif
+    // Xenon: A split view frames its pages like the web view frames a page alone.
+    Optional<WebView::VerticalTabsPosition> sidebar_position;
+    if (m_tab_bar_visible && !is_horizontal)
+        sidebar_position = m_vertical_tabs_position;
+    m_stacked_widget->set_frame(m_tab_bar_visible, sidebar_position);
 
     auto show_window_controls = m_window_controls_visible
         && m_tab_bar_visible

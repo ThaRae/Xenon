@@ -213,7 +213,16 @@ What exists now and what's planned, measured against Helium:
   manifest, and switches to them without a restart. It falls back to the bundled lists if anything fails. The welcome
   flow and Settings → Services turn updates off. See [Documentation/FilterListUpdates.md](Documentation/FilterListUpdates.md).
 - [ ] Frameless mode (hide all chrome, so the page fills the window)
-- [ ] Split view
+- [x] **Split view**: two tabs side by side in one window, each with its own page and history (`UI/SplitView.cpp`).
+  - Open one from a tab's context menu (**New Split View with Current Tab**, or **Add Tab to New Split View** on the
+    current tab), with <kbd>⌘</kbd><kbd>⌥</kbd><kbd>N</kbd> (<kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>N</kbd> elsewhere), with
+    **Open Link in Split View**, or by holding a dragged tab on the left or right edge of a page for half a second.
+  - The two tabs sit together in the tab strip. The active page has a rose ring and the toolbar; click the other page to
+    switch. The inactive page's corner names it and has the split view's menu.
+  - Drag the divider to resize (it snaps to the middle), or double-click it to swap the pages. **Reverse Views**,
+    **Close Left/Right View** and **Separate Views** are in the split button left of the address bar and in the tab's
+    context menu. Closing either tab leaves the other as a normal tab.
+  - Not yet: restoring split views after a restart.
 - [x] **MRU tab switching**: hold <kbd>Ctrl</kbd> and press <kbd>Tab</kbd> to walk back through a window's tabs in the
   order you last used them, and let go to stay on one. One quick press flips between the last two tabs, and
   <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>Tab</kbd> walks the other way, from the least recently used tab. On macOS it's the

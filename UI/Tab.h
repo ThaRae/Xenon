@@ -167,6 +167,9 @@ public:
     void update_web_view_frame(bool chrome_visible, Optional<WebView::VerticalTabsPosition> sidebar_position);
 #endif
     void set_window(BrowserWindow&);
+    // Xenon: In a split view, the split view frames the page itself, and only the active page has a bookmarks bar at
+    //        its top.
+    void set_in_split_view(bool in_split_view, bool is_active_side = true);
     void set_toolbar_container_in_tab_layout(bool);
     void set_toolbar_window_controls_visible(bool);
     static int toolbar_height(bool window_controls_visible);
@@ -287,6 +290,8 @@ private:
     bool m_is_updating_chrome_style { false };
     bool m_vertical_tabs_enabled { false };
     bool m_compact_toolbar { false };
+    bool m_in_split_view { false };
+    bool m_hides_page_bookmarks_bar { false };
 #ifdef AK_OS_MACOS
     QHBoxLayout* m_view_layout { nullptr };
     // The web view's frame as TabWidget last asked for it, which a tab that hasn't loaded gets once it loads.

@@ -13,6 +13,7 @@
 #include <AK/Vector.h>
 #include <AK/kmalloc.h>
 #include <LibWebView/Settings.h>
+#include <UI/SplitView.h>
 #include <UI/Tab.h>
 #include <UI/TabGroups.h>
 
@@ -51,6 +52,9 @@ class TabWidget;
 enum class TabBarEdge : u8;
 
 static constexpr int TAB_ICON_SIZE = 16;
+
+// The tab a tab drag is moving, while one is under way.
+Tab* tab_being_dragged();
 
 enum class TabLayout : u8 {
     Horizontal,
@@ -273,6 +277,7 @@ public:
     explicit TabWidget(QWidget* parent = nullptr);
 
     TabBar* tab_bar() const { return m_tab_bar; }
+    TabStack& tab_stack() const { return *m_stacked_widget; }
     QWidget* tab_bar_row() const { return m_tab_bar_row; }
     TabGroups& tab_groups() const { return *m_tab_groups; }
 
@@ -377,7 +382,7 @@ private:
     TabGroups* m_tab_groups { nullptr };
     void size_hidden_pages_like_the_current_one();
 
-    QStackedWidget* m_stacked_widget { nullptr };
+    TabStack* m_stacked_widget { nullptr };
     QToolButton* m_new_tab_button { nullptr };
     QToolButton* m_vertical_tabs_toggle_button { nullptr };
     QToolButton* m_minimize_window_button { nullptr };

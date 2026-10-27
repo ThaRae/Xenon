@@ -33,6 +33,7 @@
 #include <UI/Menu.h>
 #include <UI/NewTabPage.h>
 #include <UI/Popover.h>
+#include <UI/SplitView.h>
 #include <UI/StringUtils.h>
 #include <UI/TabHibernation.h>
 #include <UI/WebAuthnPopover.h>
@@ -908,6 +909,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     m_page_context_menu = create_context_menu(*this, view(), view().page_context_menu());
     m_link_context_menu = create_context_menu(*this, view(), view().link_context_menu());
+    SplitView::add_link_context_menu_action(*this, *m_link_context_menu);
     m_selected_text_link_context_menu = create_context_menu(*this, view(), view().selected_text_link_context_menu());
     m_image_context_menu = create_context_menu(*this, view(), view().image_context_menu());
     m_media_context_menu = create_context_menu(*this, view(), view().media_context_menu());
@@ -945,6 +947,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         toolbar_layout->addWidget(m_toolbar_window_controls, 0, Qt::AlignVCenter);
 
     toolbar_layout->addWidget(navigation_button_cluster, 0, Qt::AlignVCenter);
+    toolbar_layout->addWidget(SplitView::create_toolbar_button(*this, *m_toolbar, TOOLBAR_BUTTON_SIZE), 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(location_edit_container, 1);
     toolbar_layout->addWidget(m_performance_monitor, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_downloads_button, 0, Qt::AlignVCenter);
@@ -1465,6 +1468,7 @@ void Tab::create_tab_context_menu()
     m_context_menu->addAction(m_pin_tab_action);
     m_context_menu->addAction(TabHibernation::create_hibernate_tab_action(*this, *m_context_menu));
     add_tab_group_actions(*m_context_menu, *this);
+    SplitView::add_tab_context_menu_actions(*this, *m_context_menu);
     m_context_menu->addSeparator();
     auto* move_tab_menu = m_context_menu->addMenu("Mo&ve Tab");
     move_tab_menu->addAction(move_to_start_action);
@@ -1615,10 +1619,10 @@ void Tab::update_web_view_frame(bool chrome_visible, Optional<WebView::VerticalT
     if (!is_loaded())
         return;
 
-    // With the browser chrome hidden, the page fills the window edge to edge.
-    if (!chrome_visible) {
+    // With the browser chrome hidden, the page fills the window edge to edge. In a split view, the split view frames it.
+    if (!chrome_visible || m_in_split_view) {
         m_view_layout->setContentsMargins(0, 0, 0, 0);
-        m_view->set_has_rounded_corners(false);
+        m_view->set_has_rounded_corners(m_in_split_view);
         return;
     }
 
@@ -1629,6 +1633,20 @@ void Tab::update_web_view_frame(bool chrome_visible, Optional<WebView::VerticalT
     m_view->set_has_rounded_corners(true);
 }
 #endif
+
+void Tab::set_in_split_view(bool in_split_view, bool is_active_side)
+{
+    auto hides_page_bookmarks_bar = in_split_view && !is_active_side;
+    if (m_in_split_view == in_split_view && m_hides_page_bookmarks_bar == hides_page_bookmarks_bar)
+        return;
+    m_in_split_view = in_split_view;
+    m_hides_page_bookmarks_bar = hides_page_bookmarks_bar;
+#ifdef AK_OS_MACOS
+    update_web_view_frame(m_web_view_chrome_visible, m_web_view_sidebar_position);
+#endif
+    if (is_loaded())
+        update_bookmarks_bar_geometry();
+}
 
 void Tab::set_toolbar_container_in_tab_layout(bool in_tab_layout)
 {
@@ -1891,7 +1909,7 @@ void Tab::paintEvent(QPaintEvent*)
     auto const& palette = window()->palette();
     painter.fillRect(rect(), ChromeStyle::chrome_background(palette));
 
-    if (!m_web_view_chrome_visible || !m_web_view_sidebar_position.has_value() || !is_loaded())
+    if (!m_web_view_chrome_visible || !m_web_view_sidebar_position.has_value() || !is_loaded() || m_in_split_view)
         return;
 
     // At the bottom of the window, the sidebar's color reaches around the web view's rounded corner beside it, so the
@@ -2401,6 +2419,7 @@ void Tab::update_bookmarks_bar_geometry()
     auto show_bookmarks_bar = Application::settings().appearance().show_bookmarks_bar;
     auto on_hover = show_bookmarks_bar == WebView::ShowBookmarksBar::OnHover;
     auto visible = !m_window->isFullScreen()
+        && !(m_hides_page_bookmarks_bar && m_bookmarks_bar_container->parentWidget() == this)
         && (show_bookmarks_bar == WebView::ShowBookmarksBar::Always
             || (show_bookmarks_bar == WebView::ShowBookmarksBar::OnHover && m_bookmarks_bar_hover_expanded));
 

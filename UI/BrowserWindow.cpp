@@ -25,6 +25,7 @@
 #include <UI/Extensions/Dialog.h>
 #include <UI/Icon.h>
 #include <UI/Menu.h>
+#include <UI/SplitView.h>
 #include <UI/StringUtils.h>
 #if defined(AK_OS_MACOS)
 #    include <UI/MacWindow.h>
@@ -405,6 +406,7 @@ void BrowserWindow::initialize_hamburger_menu()
     QObject::connect(m_hamburger_menu, &QMenu::aboutToShow, this, &BrowserWindow::update_hamburger_zoom_label);
 
     m_hamburger_menu->addAction(application.new_tab_action());
+    m_hamburger_menu->addAction(SplitView::create_new_split_view_action(*this));
     m_hamburger_menu->addAction(application.new_window_action());
     m_hamburger_menu->addAction(application.new_private_window_action());
     m_hamburger_menu->addAction(application.reopen_recently_closed_tab_action());
@@ -917,7 +919,8 @@ void BrowserWindow::set_current_tab(Tab* tab)
     if (tab)
         tab->ensure_loaded();
 
-    if (m_current_tab)
+    // Xenon: The other side of a split view stays in view.
+    if (m_current_tab && m_current_tab->isHidden())
         m_current_tab->view().set_system_visibility_state(Web::HTML::VisibilityState::Hidden);
 
     m_current_tab = tab;
@@ -992,6 +995,8 @@ void BrowserWindow::move_tab(int old_index, int new_index)
         new_index = clamp(new_index, pinned_count, m_tabs_container->count() - 1);
     if (new_index != old_index)
         m_tabs_container->tab_bar()->moveTab(old_index, new_index);
+    // Xenon: A split view's tabs move together.
+    SplitView::keep_split_views_together(*this, *tab);
 }
 
 int BrowserWindow::pinned_tab_count() const
