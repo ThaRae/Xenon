@@ -44,11 +44,21 @@ Registry& Registry::the()
     return *registry;
 }
 
+// As in Chrome, an extension's pages may copy and paste from script, with no user gesture, if it has the clipboard
+// permissions. Proton Pass clears what it copied from its offscreen document this way.
+static bool page_has_permission(WebView::ScriptBridgeEndpoint const& endpoint, StringView permission)
+{
+    auto extension = Registry::the().extension_for_url(endpoint.url());
+    return extension && extension->has_permission(permission);
+}
+
 void Registry::register_url_scheme()
 {
     WebView::URLSchemeBridge bridge {
         .bootstrap_script = [](WebView::ScriptBridgeEndpoint const& endpoint) { return Router::the().bootstrap_script(endpoint); },
         .on_message = [](WebView::ScriptBridgeEndpoint const& endpoint, String message) { Router::the().on_message(endpoint, message); },
+        .may_read_clipboard = [](WebView::ScriptBridgeEndpoint const& endpoint) { return page_has_permission(endpoint, "clipboardRead"sv); },
+        .may_write_clipboard = [](WebView::ScriptBridgeEndpoint const& endpoint) { return page_has_permission(endpoint, "clipboardWrite"sv); },
     };
 
     auto handler = [this](WebView::URLSchemeRequest const& request) { return respond(request); };

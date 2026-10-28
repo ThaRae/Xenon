@@ -198,6 +198,14 @@ They block ads, trackers, malware sites, and cookie banners whenever content blo
 turns on by default. They ship with Xenon in `UI/Resources/filter-lists`, and update daily (below). Ladybird's own
 downloadable catalog stays off, since it holds raw copies of the same lists.
 
+Every WebContent process builds its own engine from the lists. That means every tab, every cross-site frame, and the
+spare process kept ready for the next tab. Three engine patches keep each engine small:
+
+- `0027` keeps the malware lists' 100,000 `||host/path^$document` filters as 8-byte hashes, not as engine filters of
+  over 100 bytes each;
+- `0029` gives back the memory used to build the engine, several times what the engine keeps;
+- `0028` sends no lists to any process while blocking is off.
+
 ### uBlock Origin's engine features
 
 Scriptlets (YouTube ads, anti-adblock walls), `$redirect` surrogates, `$removeparam`, popup blocking, procedural
@@ -257,7 +265,8 @@ remove it.
 
 - **Bitwarden** logs in (with a security key too) and autofills logins.
 - **Proton Pass** signs in through Proton's account page, unlocks with its extra password, autofills logins, and saves
-  new ones.
+  new ones. Once allowed to use the clipboard, it clears a copied password when its timer runs out (engine patch
+  `0027`; see [Extensions.md](Extensions.md)).
 
 ### Security keys (WebAuthn)
 

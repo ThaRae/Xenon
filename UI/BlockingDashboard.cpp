@@ -287,6 +287,9 @@ void register_url_scheme()
             return MUST(String::formatted("const initialState = {};\n{}", dashboard_state(), BOOTSTRAP_SCRIPT));
         },
         .on_message = [](WebView::ScriptBridgeEndpoint const& endpoint, String message) { handle_message(endpoint, message); },
+        // The dashboard uses the clipboard only as any page does.
+        .may_read_clipboard = {},
+        .may_write_clipboard = {},
     };
     WebView::register_url_scheme(MUST(String::from_utf8(SCHEME)), respond, move(bridge));
 }

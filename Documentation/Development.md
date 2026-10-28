@@ -90,7 +90,7 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
 - a page override for a page upstream no longer ships
 - a malformed or duplicate !bang
 - Ladybird's violet coming back into the chrome
-- a format string that would crash on non-ASCII text
+- a format string that would crash on non-ASCII text (escapes such as `\u201C` included), or one it can't read
 - a workflow step whose shell script doesn't parse
 - engine changes in `ladybird/` that aren't exported to `Patches/ladybird`, or a pinned commit that doesn't exist
   upstream
@@ -166,6 +166,11 @@ lists (AGPL-3.0, and almost nothing survives conversion). The content blocker pa
 `0004`–`0009`) let the lists keep scriptlets, procedural filters, and `$redirect`, `$removeparam`, `$popup` and CNAME
 filters. uBlock Origin's own lists go in `trusted-lists/`, and its scriptlets and redirect surrogates in
 `resources/`.
+
+A list costs memory in every WebContent process, since each builds its own engine from all of them: roughly 5 to 12 MiB
+per process for a large list like EasyList or AdGuard's. `||host^$document` and `||host/path^$document` filters are the
+exception: engine patch `0027` keeps those as hashes (8 bytes each), so a list made of them, like URLhaus, costs almost
+nothing.
 
 `UI/Resources/filter-lists/NOTICE.txt` credits every list's source and license, and the GPL-3.0 text ships beside
 them. `Meta/check.py` fails if a list ships without a cleared license. `Meta/xenon.py test` checks that Xenon applies
