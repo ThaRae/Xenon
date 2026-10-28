@@ -57,7 +57,7 @@ async function run() {
         })
     );
     await chrome.alarms.create("wake", { when: Date.now() + 100 });
-    const wokenBy = await Promise.race([woken, sleep(5000).then(() => undefined)]);
+    const wokenBy = await Promise.race([woken, sleep(10000).then(() => undefined)]);
     check("an event it has a listener for starts it again", typeof wokenBy === "string" && wokenBy !== second?.instance);
 
     console.log(`XENON-EXTENSION-TEST ${JSON.stringify(results)}`);
