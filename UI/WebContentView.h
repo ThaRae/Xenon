@@ -99,6 +99,7 @@ struct WebCompatReportCapture {
 
 struct WebContentViewInitialState {
     WebView::IsPrivate is_private { WebView::IsPrivate::No };
+    WebView::EnableContentBlocker enable_content_blocker { WebView::EnableContentBlocker::Yes };
     double maximum_frames_per_second { 60.0 };
     Optional<u64> display_id;
     WebView::ViewImplementation const* owner_view { nullptr };

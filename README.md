@@ -32,6 +32,7 @@ It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 
 - Pick Bitwarden or Proton Pass when you first start Xenon, and it installs and updates it for you
 - Sign in with a USB security key (WebAuthn, on macOS)
+- Extensions stop running in the background when idle, as in Chrome, and start again when needed
 
 **Setup**
 
