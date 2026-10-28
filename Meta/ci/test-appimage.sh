@@ -51,16 +51,27 @@ source /etc/os-release
 echo "system: $PRETTY_NAME, $(ldd --version | head -n 1)"
 
 # Should the container not let the AppImage mount itself, it runs from a copy it extracts instead, which tests all the
-# same but how it's mounted. --appimage-mount stays up for as long as the image is mounted.
+# same but how it's mounted. --appimage-mount prints where it mounted the image, and stays up while it's mounted.
 appimage=Build/distribution/Xenon-$(tr -d '[:space:]' < VERSION.txt)-x86_64.AppImage
 chmod +x "$appimage"
-"$appimage" --appimage-mount </dev/null >/dev/null 2>&1 &
+mount_output=$(mktemp)
+"$appimage" --appimage-mount </dev/null >"$mount_output" 2>&1 &
 mount_pid=$!
-sleep 5
-if kill -0 "$mount_pid" 2>/dev/null; then
-  kill "$mount_pid"
-  wait "$mount_pid" 2>/dev/null || true
+mounted=false
+for _ in $(seq 1 20); do
+  mount_point=$(head -n 1 "$mount_output")
+  if [[ -n $mount_point ]] && timeout 5 test -x "$mount_point/AppRun"; then
+    mounted=true
+    break
+  fi
+  sleep 0.5
+done
+kill "$mount_pid" 2>/dev/null || true
+wait "$mount_pid" 2>/dev/null || true
+if [[ $mounted == true ]]; then
+  echo "The AppImage mounts itself, at $mount_point"
 else
+  cat "$mount_output"
   echo "::warning::The AppImage couldn't mount itself on $PRETTY_NAME, so it runs extracted"
   export APPIMAGE_EXTRACT_AND_RUN=1
 fi

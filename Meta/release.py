@@ -744,6 +744,19 @@ def make_app_dir(app_dir: Path):
     (app_dir.parent / "linuxdeploy.log").write_text(log)
     print(f"    linuxdeploy copied {len(list((usr / 'lib').glob('*.so*')))} libraries into usr/lib", flush=True)
 
+    # linuxdeploy copies one library of each name. Where the build or vcpkg has one of the same name as the system's
+    # (ICU, libpng, zstd...), the build's binaries load their own and the system's Qt the system's, and linuxdeploy
+    # copies in the system's. The build is made and tested with its own, which can have more in it: vcpkg's libpng has
+    # APNG's functions, which Ubuntu's lacks. So those take the system's place, in the libraries Qt loads too.
+    sources: dict[str, set[Path]] = {}
+    for path in re.findall(r"^Deploying shared library (\S+)", log, re.MULTILINE):
+        sources.setdefault(Path(path).name, set()).add(Path(path))
+    for name, paths in sorted(sources.items()):
+        own = [path for path in paths if path.resolve().is_relative_to(XENON_SOURCE_DIR)]
+        if own and len(paths) > 1:
+            shutil.copy2(own[0], usr / "lib" / name)
+            print(f"    {name} is the build's, not the system's", flush=True)
+
 
 def check_app_dir(app_dir: Path) -> list[str]:
     """What's wrong with an AppDir, if anything: an rpath that isn't relative to the binary, or a library the linker
@@ -825,26 +838,49 @@ def package_linux_main(args):
     print("Check it with Meta/release.py test, then publish it with the macOS release.")
 
 
-def check_https(appimage: Path) -> bool:
-    output = ""
-    # The site is on the internet, so it gets a few tries.
-    for _ in range(3):
-        with tempfile.TemporaryDirectory() as profile:
-            try:
-                result = subprocess.run(
-                    [appimage, "--headless=text", "--profile-path", profile, HTTPS_TEST_URL],
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                )
-                output = result.stdout + result.stderr
-            except subprocess.TimeoutExpired:
-                output = "timed out"
-        if HTTPS_TEST_TEXT in output:
-            print(f'    loaded {HTTPS_TEST_URL}, with "{HTTPS_TEST_TEXT}"')
-            return True
-        time.sleep(10)
-    print(output[-4000:], file=sys.stderr)
+def check_system_libraries(appimage: Path) -> bool:
+    """Whether this system has every library the AppImage leaves to systems (linuxdeploy's excludelist)."""
+    missing: dict[str, Path] = {}
+    with tempfile.TemporaryDirectory() as directory:
+        run(appimage, "--appimage-extract", cwd=directory)
+        root = Path(directory) / "squashfs-root"
+        for binary in elf_files(root / "usr"):
+            for library, location in linked_libraries(binary).items():
+                if location == "not found":
+                    missing.setdefault(library, binary.relative_to(root))
+    for library, binary in sorted(missing.items()):
+        print(f"    missing {library}, which {binary} links", file=sys.stderr)
+    if not missing:
+        print("    all there")
+    return not missing
+
+
+def check_https(appimage: Path, xenon) -> bool:
+    env = dict(os.environ)
+    with tempfile.TemporaryDirectory() as profile:
+
+        def loads(url: str) -> tuple[bool, str]:
+            _, output = xenon.run_headless(appimage, env, ["--headless=text", "--profile-path", profile, url])
+            return HTTPS_TEST_TEXT in output, output
+
+        # The site is on the internet, so it gets a few tries.
+        for _ in range(3):
+            loaded, output = loads(HTTPS_TEST_URL)
+            if loaded:
+                print(f'    loaded {HTTPS_TEST_URL}, with "{HTTPS_TEST_TEXT}"')
+                return True
+            time.sleep(10)
+        print(output[-4000:], file=sys.stderr)
+
+        # Whether it's the certificates, Xenon's network, or the system's.
+        plain_url = HTTPS_TEST_URL.replace("https://", "http://")
+        verb = "loads" if loads(plain_url)[0] else "doesn't load"
+        print(f"    Xenon {verb} {plain_url}", file=sys.stderr)
+        try:
+            urllib.request.urlopen(HTTPS_TEST_URL, timeout=30).read()
+            print(f"    Python loads {HTTPS_TEST_URL}", file=sys.stderr)
+        except OSError as error:
+            print(f"    Python doesn't load {HTTPS_TEST_URL} either: {error}", file=sys.stderr)
     return False
 
 
@@ -860,10 +896,15 @@ def test_linux_main(args):
 
     xenon = load_module("xenon", XENON_SOURCE_DIR / "Meta" / "xenon.py")
     print(f"==> Testing {appimage.name}", flush=True)
-    failures = xenon.check_app(xenon.Platform(), appimage, DISTRIBUTION_DIR / "smoke")
+    failures = []
+    print("==> the system has every library the AppImage leaves to it", flush=True)
+    if not check_system_libraries(appimage):
+        failures.append("system libraries")
+
+    failures += xenon.check_app(xenon.Platform(), appimage, DISTRIBUTION_DIR / "smoke")
 
     print("==> a page over HTTPS, with the system's certificates", flush=True)
-    if not check_https(appimage):
+    if not check_https(appimage, xenon):
         failures.append("HTTPS")
 
     if failures:

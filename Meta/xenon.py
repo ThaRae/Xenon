@@ -1274,7 +1274,10 @@ def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, st
     try:
         result = subprocess.run([str(executable), *args], env=env, capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired as error:
-        return False, f"timed out after {error.timeout} s"
+        # What it printed before it was stopped, which can be bytes even in text mode.
+        parts = (error.stdout, error.stderr)
+        output = "".join(part.decode(errors="replace") if isinstance(part, bytes) else part for part in parts if part)
+        return False, f"{output}\ntimed out after {error.timeout} s"
     return result.returncode == 0, result.stdout + result.stderr
 
 

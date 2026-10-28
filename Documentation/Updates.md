@@ -160,10 +160,12 @@ doesn't check for updates itself on Linux (`UI/Updater.cpp`), and the AppImage i
 ### Where it runs
 
 An AppImage brings its own libraries, but not glibc or libstdc++, so it runs on systems whose glibc and libstdc++ are
-at least as new as the newest symbol versions it uses: those of Ubuntu 26.04, which Ladybird's CI image is, unless the
-binaries happen to use none of the newest. That means Ubuntu 26.04 and later, Fedora 44 and later, Arch Linux and
-openSUSE Tumbleweed, but not Debian 13 or Ubuntu 24.04. The system also needs FUSE, as for any AppImage (`fuse3`,
-which desktop installs have), or `--appimage-extract-and-run`.
+at least as new as the newest symbol versions it uses. Built in Ladybird's CI image, which is Ubuntu 26.04, that's
+`GLIBC_2.43`, `GLIBCXX_3.4.32` and `CXXABI_1.3.15` (Xenon 0.1.0; `package` reports them for each release): glibc 2.43
+and the libstdc++ of GCC 13.2 or later. That means Ubuntu 26.04 and later, Fedora 44 and later, and Arch Linux, which
+the release workflow tests it on, and other distributions as new; not Fedora 43 (glibc 2.42), Debian 13 (2.41) or
+Ubuntu 24.04 (2.39). The system also needs FUSE, as for any AppImage (`fuse3`, which desktop installs have), or
+`--appimage-extract-and-run`.
 
 Building in an older image would widen that, but Xenon needs Qt 6.10, a compiler and a C++ library new enough for
 Ladybird, and Ladybird's Rust toolchain, and only Ladybird's image is tested with all of them; older distributions
