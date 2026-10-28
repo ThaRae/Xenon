@@ -54,7 +54,7 @@ jobs:
           git -C ladybird diff --stat "$PINNED" "$MASTER" -- UI/Qt Base/res/ladybird/about-pages | tee upstream-ui-changes.txt
 
       - name: Apply Xenon's patches to master
-        # The pinned commit was fetched above, which lets git am fall back to a three-way merge.
+        # The pinned commit was fetched above, which lets git am fall back to a three-way merge for any patch.
         run: Meta/patches.py apply --base "$MASTER"
 
       - name: Meta/check.py

@@ -25,6 +25,7 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 
 from enum import Enum
 from pathlib import Path
@@ -141,8 +142,33 @@ def is_ancestor(ancestor: str, commit: str) -> bool:
         return False
 
 
+def has_commit(commit: str) -> bool:
+    try:
+        git("cat-file", "-e", f"{commit}^{{commit}}")
+        return True
+    except RuntimeError:
+        return False
+
+
 def has_local_changes() -> bool:
     return bool(git("status", "--porcelain", "--untracked-files=no"))
+
+
+def write_series_blobs(series_base: str, patches: list[Path]):
+    # When a patch doesn't apply as is, git am --3way merges it from the blobs it was made from, which are the series
+    # base's files as the patches before it left them. A shallow ladybird/ has the base's own blobs but none of those,
+    # so every patch after the first would fail with "lacks necessary blobs". Applying the series to its base in a
+    # scratch index writes them to the object store, and touches nothing else: apply makes the same commits either way.
+    with tempfile.TemporaryDirectory() as directory:
+        env = {"GIT_INDEX_FILE": str(Path(directory) / "index")}
+        git("read-tree", series_base, env=env)
+        for path in patches:
+            try:
+                git("apply", "--cached", str(path), env=env)
+            except RuntimeError:
+                # The series isn't based on series_base after all (exported but not yet pinned), so there's nothing
+                # more to write.
+                return
 
 
 def apply_series(base: str, force: bool = False):
@@ -161,11 +187,21 @@ def apply_series(base: str, force: bool = False):
         print(f"No patches in {relative(PATCHES_DIR)}; ladybird/ is at {base[:10]}")
         return
 
+    pinned = pinned_commit()
+    if base != pinned and has_commit(pinned):
+        write_series_blobs(pinned, patches)
+
     for path in patches:
         try:
             git("am", "--quiet", "--3way", "--keep-cr", "--committer-date-is-author-date", str(path), env=COMMITTER_ENV)
         except RuntimeError as error:
             print(f"{relative(path)} doesn't apply to {base[:10]}:\n{error}", file=sys.stderr)
+            if "lacks necessary blobs" in str(error) and not has_commit(pinned):
+                print(
+                    "git am can't fall back to a merge without the pinned commit. Run `git am --abort` and "
+                    f"`git fetch --depth 1 origin {pinned}` in ladybird/, then apply again.",
+                    file=sys.stderr,
+                )
             print(
                 "Resolve it in ladybird/ and run `git am --continue` there, then Meta/patches.py export; or run "
                 "`git am --abort` there to give up.",
