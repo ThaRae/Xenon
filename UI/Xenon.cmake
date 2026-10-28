@@ -91,6 +91,7 @@ set(XENON_SOURCES
     ScreenshotSelectionOverlay.cpp
     ScreenshotViewer.cpp
     SelectDropdown.cpp
+    SessionSaving.cpp
     SettingsPage.cpp
     SplitView.cpp
     StringUtils.cpp

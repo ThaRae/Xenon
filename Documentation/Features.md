@@ -4,7 +4,8 @@ What each feature does, how to reach it, and where it lives in the code. The [RE
 version. Xenon brings over [Helium](https://helium.computer)'s feature set, measured against Helium, in its own look.
 
 - [Setup and internal pages](#setup-and-internal-pages): welcome flow, new tab page, settings
-- [Tabs and windows](#tabs-and-windows): layouts, split view, tab groups, recently used order, hibernation, memory use
+- [Tabs and windows](#tabs-and-windows): layouts, split view, tab groups, recently used order, hibernation, memory use,
+  restoring tabs
 - [Search and the address bar](#search-and-the-address-bar): !bangs, quick link copy
 - [Ads and trackers](#ads-and-trackers): uBlock Origin's filters and engine features, its popup and dashboard, daily
   updates
@@ -147,6 +148,21 @@ As in Chromium's tab hover cards: hovering a tab, the current one included, show
 
 It's measured as the card shows, at most once a second (`UI/TabMemory.cpp`, with engine patch `0024`, which lets the UI
 see which tab a worker belongs to).
+
+### Restoring tabs
+
+With **Settings → Startup and pages → Restore the last session's windows and tabs** on, Xenon opens the windows it had
+open when it last quit or crashed. With it off, only pinned tabs come back, and **Reopen Recently Closed Tab**
+(<kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>T</kbd>, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>T</kbd> on macOS) brings back the rest of a
+window.
+
+- Each tab comes back with its page and its back/forward history, in its place, with the window's active tab and pinned
+  tabs. At launch, tab groups come back too. Tabs other than a window's current one load when they're selected.
+- After two crashes in a row, nothing comes back by itself, in case a page is what crashes Xenon. Reopen Recently Closed
+  Tab still brings the windows back.
+- Ladybird's session store (`LibWebView/SessionStore`, the profile's `Sessions.db`) writes the session every 30 seconds
+  and when Xenon quits. Xenon has it write a tab's new page, the active tab, and the tab order within a second of a
+  change (`UI/SessionSaving.cpp`), so that tabs opened, reopened, or duplicated just before a crash don't come back blank.
 
 ## Search and the address bar
 
