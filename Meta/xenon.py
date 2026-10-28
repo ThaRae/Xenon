@@ -239,6 +239,8 @@ def test_main(platform: Platform, build_dir: Path):
     screenshot = smoke_dir / "welcome.png"
     screenshot.unlink(missing_ok=True)
 
+    # The session restore check opens Xenon's windows. CI gives Linux a real X server for them
+    # (Meta/ci/build-and-test.sh); without a display, they go to Qt's offscreen platform.
     env = dict(os.environ)
     if platform.host_system != HostSystem.macOS and not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
         env["QT_QPA_PLATFORM"] = "offscreen"
