@@ -2,8 +2,7 @@
 
 Xenon is a web browser built on the [Ladybird](https://ladybird.org) engine. It brings over the features of
 [Helium](https://helium.computer): uBlock Origin's ad blocking built in, !bangs in the address bar, a choice of layouts,
-and a private, low-noise setup. It has its own look, built around a rose accent (**#ff0050**), and doesn't copy
-Helium's.
+and a private, low-noise setup.
 
 It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 
