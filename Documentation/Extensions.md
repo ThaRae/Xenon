@@ -310,6 +310,13 @@ also opens ports to the worker as it starts.
 device-trust keys. It picks those code paths by `manifest_version`, not by checking that `chrome.offscreen` exists, so
 the API has to be there with the background.
 
+**The clipboard.** As in Chrome, an extension's pages with `clipboardWrite` copy and cut with `document.execCommand()`,
+and those with `clipboardRead` paste with `execCommand("paste")`, with no user gesture (patch 27). The paste is
+synchronous, so the text is in the field when `execCommand()` returns. The engine asks the UI process, which answers
+from the extension's permissions (`URLSchemeBridge::may_read_clipboard` and `may_write_clipboard`). Proton Pass clears
+what it copied this way: once its timer runs out, its offscreen document pastes to see whether the clipboard still holds
+what it copied, and if so, copies a space over it. `navigator.clipboard` still needs a gesture in every page.
+
 ### Content scripts and isolation
 
 As each document becomes ready for scripts, the engine asks the UI process for its user scripts (patch 16), and
@@ -616,8 +623,11 @@ for Bitwarden in Chrome.
     that fail; the save prompt after a plain form post doesn't need them.
   - Signing in from the onboarding tab Pass opens on install led to Proton's Pass web app, which doesn't sign the
     extension in; the popup's button does. Not compared with Chrome.
-  - Not tried yet: passkeys, credit cards and identities, one-time codes, aliases, the settings page, importing and
-    exporting, and copying to the clipboard (through its offscreen document).
+  - Not tried yet: passkeys, credit cards and identities, one-time codes, aliases, the settings page, and importing and
+    exporting.
+  - Copying from the popup asks for `clipboardRead` and `clipboardWrite` the first time the clipboard is set to clear
+    itself. Once allowed, the offscreen document clears it when the time runs out (patch 27); `Meta/xenon.py test`
+    clears the clipboard the same way from the test extension's offscreen document. Not yet tried by hand.
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] **Milestone 5: installing from the store** (under way). Done: CRX3 installs, updates once a day, and removal,
   for the password managers the welcome page offers, Bitwarden and Proton Pass. Left: installing any extension from

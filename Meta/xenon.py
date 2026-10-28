@@ -931,6 +931,15 @@ def check_extensions(executable: Path, env: dict) -> bool:
     # A web page, and JSON with no CORS headers, from two local servers: two origins.
     page = f"""<!doctype html><script>
         const results = {{ "no chrome.runtime": typeof chrome === "undefined" || !chrome.runtime }};
+        // Only an extension's pages copy and paste from script without a user gesture.
+        const text = document.createElement("textarea");
+        document.documentElement.append(text);
+        text.focus();
+        text.value = "web page";
+        text.select();
+        results["no copy without a user gesture"] = !document.execCommand("copy");
+        text.value = "";
+        results["no paste"] = !document.execCommand("paste") && text.value === "";
         const base = "chrome-extension://{extension_id}/";
         const image = new Promise(resolve => {{
             const img = new Image();

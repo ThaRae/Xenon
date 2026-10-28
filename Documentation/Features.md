@@ -240,7 +240,8 @@ remove it.
 
 - **Bitwarden** logs in (with a security key too) and autofills logins.
 - **Proton Pass** signs in through Proton's account page, unlocks with its extra password, autofills logins, and saves
-  new ones.
+  new ones. Once allowed to use the clipboard, it clears a copied password when its timer runs out (engine patch
+  `0027`; see [Extensions.md](Extensions.md)).
 
 ### Security keys (WebAuthn)
 
