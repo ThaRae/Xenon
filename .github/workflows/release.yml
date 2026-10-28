@@ -1,7 +1,7 @@
 name: Release
 
-# Packages a macOS release on GitHub's runners, as Meta/release.py package does on a Mac, and keeps the archive and the
-# appcast it writes as the run's artifact. It doesn't publish: that stays Meta/release.py publish, on the Mac
+# Packages a macOS release on GitHub's runners, as Meta/release.py package does on a Mac, and keeps the installer disk
+# image, the archive, and the appcast it writes as the run's artifact. It doesn't publish: that stays Meta/release.py publish, on the Mac
 # (Documentation/Updates.md).
 #
 # It builds as ci.yml's macos job does, from the build caches main's builds saved, and doesn't save its own. A cold
@@ -154,11 +154,12 @@ jobs:
           ./Meta/release.py package --no-build --update-key "$RUNNER_TEMP/update-key.txt"
 
       # The archive's and the appcast's signatures, against the key the app was given, which must be the one installed
-      # Xenons know; and the app's code signature, with the release certificate.
+      # Xenons know; and the app's and the installer's code signatures, with the release certificate.
       - name: Verify the release
         run: |
           app=Build/distribution/Xenon.app
           archive=Build/distribution/Xenon-$VERSION.tar.xz
+          installer=Build/distribution/Xenon-$VERSION.dmg
           appcast=Build/distribution/appcast.xml
           public_key=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$app/Contents/Info.plist")
           if [ "$public_key" != "$UPDATE_PUBLIC_KEY" ]; then
@@ -174,13 +175,19 @@ jobs:
             echo "::error::The app isn't signed with the Xenon Release certificate"
             exit 1
           fi
-          echo "The archive's and the appcast's signatures, and the app's code signature, check out."
+          codesign --verify --strict "$installer"
+          if ! grep -qx "Authority=Xenon Release" <<< "$(codesign -dvv "$installer" 2>&1)"; then
+            echo "::error::The installer isn't signed with the Xenon Release certificate"
+            exit 1
+          fi
+          echo "The archive's and the appcast's signatures, and the app's and the installer's code signatures, check out."
 
       - name: Upload the release
         uses: actions/upload-artifact@v7
         with:
           name: Xenon-${{ env.VERSION }}
           path: |
+            Build/distribution/Xenon-${{ env.VERSION }}.dmg
             Build/distribution/Xenon-${{ env.VERSION }}.tar.xz
             Build/distribution/appcast.xml
           if-no-files-found: error
@@ -198,13 +205,14 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          archive=Build/distribution/Xenon-$VERSION.tar.xz
           {
             echo "### Xenon $VERSION"
             echo
             echo "Built from \`$(git rev-parse --short HEAD)\`, with Ladybird \`$(git -C ladybird rev-parse --short HEAD)\` and $XCODE_VERSION"
-            if [ -f "$archive" ]; then
-              echo
-              echo "\`$(basename "$archive")\`: $(stat -f '%z' "$archive") bytes, SHA-256 \`$(shasum -a 256 "$archive" | cut -d ' ' -f 1)\`"
-            fi
+            for file in Build/distribution/Xenon-$VERSION.dmg Build/distribution/Xenon-$VERSION.tar.xz; do
+              if [ -f "$file" ]; then
+                echo
+                echo "\`$(basename "$file")\`: $(stat -f '%z' "$file") bytes, SHA-256 \`$(shasum -a 256 "$file" | cut -d ' ' -f 1)\`"
+              fi
+            done
           } >> "$GITHUB_STEP_SUMMARY"

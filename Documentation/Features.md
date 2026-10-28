@@ -10,7 +10,7 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
   updates
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden and Proton Pass,
   security keys
-- [Updates](#updates): Xenon updating itself
+- [Installing and updates](#installing-and-updates): the installer, and Xenon updating itself
 - [Look](#look): palette and icon
 - [Not done yet](#not-done-yet)
 
@@ -238,9 +238,12 @@ On macOS, sites and password managers can register a USB security key and sign i
 (`navigator.credentials.create()` and `get()`), PINs included, and in cross-origin frames that are allowed to. A prompt
 over the page says what the key needs. It comes from engine patches `0010`–`0015`; see [WebAuthn.md](WebAuthn.md).
 
-## Updates
+## Installing and updates
 
-On macOS, Xenon checks for a new version when it starts and once a day, downloads it in the background, and installs it
+On macOS, Xenon installs from a disk image, `Xenon-<version>.dmg`: open it and drag Xenon into Applications, as the
+window shows. Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases/releases) has one.
+
+Xenon then checks for a new version when it starts and once a day, downloads it in the background, and installs it
 when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch
 to update**, and turns automatic updates off. **Check for Updates…** in the Xenon menu checks at once.
 
