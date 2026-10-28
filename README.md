@@ -46,6 +46,13 @@ cases, and where it lives in the code.
 **Not done yet**: frameless mode, restoring split views after a restart, passkeys beyond USB security keys, and Linux
 support for security keys.
 
+## Installing it
+
+Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases/releases) has a
+`Xenon-<version>.dmg`. Open it and drag Xenon into Applications. Releases aren't notarized yet, so the first time,
+macOS asks you to allow it in **System Settings → Privacy & Security → Open Anyway**. After that, Xenon updates
+itself.
+
 ## Building it
 
 On macOS, with Xcode, CMake 3.30+, and Rust (via rustup) installed:

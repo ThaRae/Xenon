@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 # Renders Xenon's app icon from its sources in UI/Icons into the PNGs the build uses: the macOS iconset that
-# UI/Xenon.cmake turns into app_icon.icns, the window icon (UI/Icons/xenon.png) that xenon.qrc embeds, and Xenon's
-# versions of Ladybird's logo (UI/Resources/icons), which the build ships in place of Ladybird's.
+# UI/Xenon.cmake turns into app_icon.icns, the window icon (UI/Icons/xenon.png) that xenon.qrc embeds, Xenon's
+# versions of Ladybird's logo (UI/Resources/icons), which the build ships in place of Ladybird's, and the background of
+# the installer disk image's window (UI/Icons/macos/installer-background.png, from installer-background.svg), which
+# Meta/release.py makes.
 #
 #   Meta/generate-app-icon.py
 #
@@ -39,6 +41,11 @@ WINDOW_ICON_SIZE = 256
 # Xenon's icon brings its own dark square, so it's the same picture.
 LADYBIRD_ICONS_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "icons"
 LADYBIRD_ICONS = {"48x48/app-browser.png": 48, "128x128/app-browser.png": 128, "128x128/app-browser-dark.png": 128}
+
+# The installer's background, at the window's size and at twice it, for Retina screens. dmgbuild finds the @2x one by its
+# name.
+INSTALLER_BACKGROUND = ICONS_DIR / "macos" / "installer-background.svg"
+INSTALLER_BACKGROUND_WIDTH = 640
 
 
 def rounded_square(size: float, offset: float) -> str:
@@ -98,9 +105,17 @@ def main():
             output.parent.mkdir(parents=True, exist_ok=True)
             render(small if path.startswith("48x48/") else large, size, output)
 
+    for scale, suffix in ((1, ""), (2, "@2x")):
+        output = INSTALLER_BACKGROUND.with_name(f"{INSTALLER_BACKGROUND.stem}{suffix}.png")
+        subprocess.run(
+            ["rsvg-convert", "--width", str(INSTALLER_BACKGROUND_WIDTH * scale), "--keep-aspect-ratio", "--output",
+             str(output), str(INSTALLER_BACKGROUND)],
+            check=True,
+        )  # fmt: skip
+
     print(
-        f"Rendered {len(ICONSET)} iconset sizes, the {WINDOW_ICON_SIZE}px window icon, and {len(LADYBIRD_ICONS)} of"
-        " Ladybird's logo icons."
+        f"Rendered {len(ICONSET)} iconset sizes, the {WINDOW_ICON_SIZE}px window icon, {len(LADYBIRD_ICONS)} of"
+        " Ladybird's logo icons, and the installer's background."
     )
 
 

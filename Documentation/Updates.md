@@ -13,8 +13,16 @@ Mac with `Meta/release.py` and published as GitHub releases of
 
 ## The published releases
 
-Each version is a GitHub release of ThaRae/xenon-releases, tagged `v<version>`, with one file:
-`Xenon-<version>.tar.xz`, which holds `Xenon.app`. The repository's `main` holds `appcast.xml`, Sparkle's feed, which lists the newest release:
+Each version is a GitHub release of ThaRae/xenon-releases, tagged `v<version>`, with two files:
+
+- `Xenon-<version>.dmg`, the installer people download. It opens a window with `Xenon.app` beside a link to
+  Applications, over a background that says to drag one onto the other (`UI/Icons/macos/installer-background.svg`,
+  rendered by `Meta/generate-app-icon.py`), and has Xenon's icon on its volume. `Meta/release.py` makes it with
+  [dmgbuild](https://github.com/dmgbuild/dmgbuild), which lays the window out without scripting Finder, so it works the
+  same on GitHub's runners as on a Mac. It's signed with the release certificate, like the app.
+- `Xenon-<version>.tar.xz`, which holds `Xenon.app`, for Sparkle to update from.
+
+The repository's `main` holds `appcast.xml`, Sparkle's feed, which lists the newest release:
 
 | In the appcast | What it is |
 | --- | --- |
@@ -44,10 +52,13 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
      and strips the binaries. It uses the functions of Ladybird's `Meta/package-macos-test-bundle.py`, which does the
      same for Ladybird. Its `Info.plist` gets the version, the appcast's URL, and the update key's public half;
    - signed with the release certificate, from the inside out;
+   - `Xenon-<version>.dmg`, the installer, signed with the release certificate too. `package` mounts it and checks it
+     holds the app, the link to Applications, and its window's layout;
    - `Xenon-<version>.tar.xz`, signed with the update key;
    - `appcast.xml`, which lists it, signed too.
-3. Try `Build/distribution/Xenon.app`.
-4. `./Meta/release.py publish` asks, then creates the GitHub release with the archive (`gh release create`), commits
+3. Try `Build/distribution/Xenon.app`, and open the installer to see its window.
+4. `./Meta/release.py publish` asks, then creates the GitHub release with the installer and the archive
+   (`gh release create`), commits
    the appcast to ThaRae/xenon-releases' `main`, and tags the commit `v<version>` in ThaRae/Xenon. It publishes the
    appcast only once the archive it names is up. It refuses a tree with uncommitted changes, and a commit that isn't
    on ThaRae/Xenon's `main`. It pushes over HTTPS with `gh`'s credentials, whatever Xenon's `origin` is.
@@ -66,10 +77,11 @@ update key's public half must be the ones [below](#setting-up-a-mac-to-release-f
 stops the run at once. It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A
 cold build doesn't fit in one run, so with no caches to start from, it stops there. It runs `Meta/release.py test` with
 the release certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote: the
-archive's and the appcast's signatures, with `sign_update --verify`, the app's `SUPublicEDKey`, and its code signature.
+archive's and the appcast's signatures, with `sign_update --verify`, the app's `SUPublicEDKey`, and the app's and the
+installer's code signatures.
 
-`Xenon-<version>.tar.xz` and `appcast.xml` are the run's artifact, `Xenon-<version>`, for 30 days, with the archive's
-SHA-256 in the run's summary. The workflow doesn't publish: that's still `Meta/release.py publish`, from the Mac's
+`Xenon-<version>.dmg`, `Xenon-<version>.tar.xz` and `appcast.xml` are the run's artifact, `Xenon-<version>`, for 30
+days, with the installer's and the archive's SHA-256 in the run's summary. The workflow doesn't publish: that's still `Meta/release.py publish`, from the Mac's
 `Build/distribution`. The certificate and the update key are the repository's secrets
 ([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The run imports the certificate into a keychain
 of its own, and deletes the keychain and the key's file when it's done.
@@ -98,7 +110,8 @@ release, so macOS would ask again after each update.
 Sparkle doesn't hold an update to the certificate: once the update key's signature checks out, it only checks that the
 new app's code signature is intact. A new certificate costs one round of those questions, not the updates.
 
-Without notarization, macOS's Gatekeeper still stops the first launch of a downloaded Xenon. Open it once from
+Without notarization, macOS's Gatekeeper still stops the first launch of a Xenon installed from a downloaded
+installer. Open it once from
 **System Settings → Privacy & Security → Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Xenon.app`.
 Updates that Xenon installs itself aren't quarantined, so they open without asking.
 
@@ -146,10 +159,12 @@ It packages three test releases of the current build, signed with a throwaway ke
 out like GitHub's: the appcast at a fixed path, and each archive at `releases/download/v<version>/`, which redirects to
 another host name, as github.com does. It runs Xenon with a profile of its own:
 
-1. 0.0.1 finds 0.0.2, downloads it through the redirect, checks it, and installs it when it quits. The installed app's
+1. 0.0.1's installer holds the app, a link to Applications, and its window's layout. The test installs 0.0.1 from it,
+   copying the app out as dragging it to Applications does;
+2. 0.0.1 finds 0.0.2, downloads it through the redirect, checks it, and installs it when it quits. The installed app's
    signature checks out;
-2. 0.0.2 turns down 0.0.3 with a byte changed after it was signed;
-3. and 0.0.3 signed with another key.
+3. 0.0.2 turns down 0.0.3 with a byte changed after it was signed;
+4. and 0.0.3 signed with another key.
 
 It opens Xenon's windows while it runs, and needs **Update Xenon automatically** on, since Xenon's own settings aren't
 the profile's. CI's builds don't run it; the release workflow does, before it packages. Run it before a release.

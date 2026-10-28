@@ -3,7 +3,8 @@
 # Packages Xenon for release on macOS, publishes the release, and tests that one release updates itself to the next.
 #
 #   Meta/release.py package    build Xenon, then write Build/distribution: a Xenon.app that runs on any Mac, signed;
-#                              Xenon-<version>.tar.xz, signed with Xenon's update key; and appcast.xml, which lists it
+#                              Xenon-<version>.dmg, the disk image people install it from; Xenon-<version>.tar.xz,
+#                              signed with Xenon's update key; and appcast.xml, which lists it
 #   Meta/release.py publish    publish what package wrote, as a release of ThaRae/xenon-releases on GitHub
 #   Meta/release.py test       check that a release finds, checks and installs the next one from a local server, and
 #                              turns down ones that were tampered with
@@ -20,6 +21,7 @@ import email.utils
 import functools
 import http.server
 import importlib.util
+import json
 import os
 import plistlib
 import queue
@@ -56,6 +58,15 @@ UPDATE_KEY_ACCOUNT = "xenon"
 
 APP_NAME = "Xenon.app"
 BUNDLE_IDENTIFIER = "org.xenon.Xenon"
+
+# The installer: a disk image whose window shows Xenon.app beside a link to /Applications, over a background that says to
+# drag one onto the other (UI/Icons/macos/installer-background.svg, which Meta/generate-app-icon.py renders, at 1x and
+# 2x). dmgbuild writes the window's layout itself, without scripting Finder, so it works the same on GitHub's runners.
+DMGBUILD_VERSION = "1.6.7"
+INSTALLER_BACKGROUND = XENON_SOURCE_DIR / "UI" / "Icons" / "macos" / "installer-background.png"
+INSTALLER_WINDOW_SIZE = (640, 400)
+INSTALLER_ICON_SIZE = 128
+INSTALLER_ICON_LOCATIONS = {APP_NAME: (170, 190), "Applications": (470, 190)}
 
 # The Qt plugins Xenon loads: the platform and the style at startup, and the image formats when Qt reads one.
 QT_PLUGINS = (
@@ -335,6 +346,96 @@ def sign_bundle(app: Path, identity: str):
     run("codesign", "--verify", "--deep", "--strict", app)
 
 
+def dmgbuild_python() -> Path:
+    """The Python of a virtual environment of dmgbuild's own, under Build/tools."""
+    environment = XENON_SOURCE_DIR / "Build" / "tools" / f"dmgbuild-{DMGBUILD_VERSION}"
+    python = environment / "bin" / "python"
+    if not (environment / "bin" / "dmgbuild").is_file():
+        print(f"Installing dmgbuild {DMGBUILD_VERSION} into {environment.relative_to(XENON_SOURCE_DIR)}", flush=True)
+        shutil.rmtree(environment, ignore_errors=True)
+        run(sys.executable, "-m", "venv", environment)
+        run(python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", f"dmgbuild=={DMGBUILD_VERSION}")
+    return python
+
+
+def make_installer(app: Path, dmg: Path, identity: str):
+    """The disk image people install Xenon from: the app, a link to /Applications, the window laid out to drag one onto
+    the other, and Xenon's icon on the volume. Signed with the app's identity, unless that's ad hoc."""
+    settings = {
+        "filename": str(dmg),
+        "volume_name": "Xenon",
+        "format": "ULFO",
+        "files": [str(app)],
+        "symlinks": {"Applications": "/Applications"},
+        "icon": str(app / "Contents" / "Resources" / "app_icon.icns"),
+        "background": str(INSTALLER_BACKGROUND),
+        "window_rect": ((200, 120), INSTALLER_WINDOW_SIZE),
+        "default_view": "icon-view",
+        "show_status_bar": False,
+        "show_tab_view": False,
+        "show_toolbar": False,
+        "show_pathbar": False,
+        "show_sidebar": False,
+        "show_icon_preview": False,
+        "icon_size": INSTALLER_ICON_SIZE,
+        "text_size": 13,
+        "icon_locations": INSTALLER_ICON_LOCATIONS,
+    }
+    program = (
+        "import json, sys, dmgbuild\n"
+        "settings = json.load(sys.stdin)\n"
+        "dmgbuild.build_dmg(settings.pop('filename'), settings.pop('volume_name'), settings=settings)\n"
+    )
+    dmg.unlink(missing_ok=True)
+    result = subprocess.run(
+        [str(dmgbuild_python()), "-c", program], input=json.dumps(settings), capture_output=True, text=True
+    )
+    if result.returncode != 0 or not dmg.is_file():
+        sys.exit(f"dmgbuild failed:\n{result.stdout}{result.stderr}")
+
+    if identity != "-":
+        timestamp = "--timestamp" if identity.startswith("Developer ID Application:") else "--timestamp=none"
+        run("codesign", "--force", "--sign", identity, timestamp, dmg)
+        run("codesign", "--verify", "--strict", dmg)
+    run("hdiutil", "verify", "-quiet", dmg)
+
+
+class MountedImage:
+    """A disk image attached read-only, out of sight of Finder, for as long as the with block lasts."""
+
+    def __init__(self, dmg: Path):
+        self.dmg = dmg
+
+    def __enter__(self) -> Path:
+        output = run("hdiutil", "attach", "-nobrowse", "-noautoopen", "-readonly", "-plist", self.dmg)
+        entities = plistlib.loads(output.encode())["system-entities"]
+        self.mount_point = Path(next(entity["mount-point"] for entity in entities if "mount-point" in entity))
+        return self.mount_point
+
+    def __exit__(self, *exception):
+        subprocess.run(["hdiutil", "detach", "-force", str(self.mount_point)], capture_output=True)
+
+
+def check_installer(dmg: Path) -> list[str]:
+    """What's wrong with an installer disk image, if anything."""
+    problems = []
+    with MountedImage(dmg) as volume:
+        app = volume / APP_NAME
+        applications = volume / "Applications"
+        if not app.is_dir():
+            problems.append(f"it has no {APP_NAME}")
+        elif subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], capture_output=True).returncode:
+            problems.append(f"its {APP_NAME}'s signature doesn't check out")
+        if not applications.is_symlink() or os.readlink(applications) != "/Applications":
+            problems.append("it has no link to /Applications")
+        # dmgbuild combines the background's 1x and 2x into .background.tiff.
+        if not (volume / ".DS_Store").is_file() or not (volume / ".background.tiff").is_file():
+            problems.append("its window has no layout or background")
+        if not (volume / ".VolumeIcon.icns").is_file():
+            problems.append("its volume has no icon")
+    return problems
+
+
 def make_archive(app: Path, archive: Path):
     """Archives the bundle as Sparkle expects: symlinks kept, extended attributes left out."""
     compression = "-cJf" if archive.name.endswith(".tar.xz") else "-czf"
@@ -396,6 +497,10 @@ def archive_name(version: str) -> str:
     return f"Xenon-{version}.tar.xz"
 
 
+def installer_name(version: str) -> str:
+    return f"Xenon-{version}.dmg"
+
+
 def package_main(args):
     version = args.version or read_version()
     check_signing_identity(args.sign)
@@ -416,6 +521,12 @@ def package_main(args):
     print(f"==> Signing it as {'ad hoc' if args.sign == '-' else args.sign}", flush=True)
     sign_bundle(app, args.sign)
 
+    print("==> Making the installer", flush=True)
+    installer = DISTRIBUTION_DIR / installer_name(version)
+    make_installer(app, installer, args.sign)
+    if problems := check_installer(installer):
+        sys.exit(f"The installer isn't right: {'; '.join(problems)}")
+
     print("==> Archiving it, and signing the archive and the appcast", flush=True)
     archive = DISTRIBUTION_DIR / archive_name(version)
     make_archive(app, archive)
@@ -427,6 +538,7 @@ def package_main(args):
     if notes:
         (DISTRIBUTION_DIR / "notes.txt").write_text(notes + "\n")
 
+    print(f"    {installer} ({installer.stat().st_size / (1024 * 1024):.0f} MiB)")
     print(f"    {archive} ({archive.stat().st_size / (1024 * 1024):.0f} MiB)")
     print(f"    {appcast}")
     print("Check the app, then publish it with Meta/release.py publish.")
@@ -440,8 +552,11 @@ def publish_main(args):
     info = plistlib.loads((app / "Contents" / "Info.plist").read_bytes())
     version = info["CFBundleShortVersionString"]
     archive = DISTRIBUTION_DIR / archive_name(version)
+    installer = DISTRIBUTION_DIR / installer_name(version)
     if info["SUFeedURL"] != FEED_URL or not archive.is_file() or archive.name not in appcast.read_text():
         sys.exit(f"Build/distribution isn't a release for {RELEASES_REPOSITORY}. Package it again.")
+    if not installer.is_file():
+        sys.exit(f"Build/distribution has no {installer.name}. Package it again.")
     if subprocess.run(["gh", "auth", "status"], capture_output=True).returncode != 0:
         sys.exit("gh isn't logged in to GitHub: gh auth login")
 
@@ -469,9 +584,9 @@ def publish_main(args):
     notes = notes_file.read_text().strip() if notes_file.is_file() else f"Xenon {version}"
     notes += f"\n\nBuilt from https://github.com/{XENON_REPOSITORY}/commit/{commit}."
 
-    print(f"==> Creating the {tag} release, with {archive.name}", flush=True)
+    print(f"==> Creating the {tag} release, with {installer.name} and {archive.name}", flush=True)
     run(
-        "gh", "release", "create", tag, archive, "--repo", RELEASES_REPOSITORY, "--target", "main",
+        "gh", "release", "create", tag, installer, archive, "--repo", RELEASES_REPOSITORY, "--target", "main",
         "--title", f"Xenon {version}", "--notes", notes,
     )  # fmt: skip
 
@@ -636,10 +751,17 @@ def test_main(args):
             archives = {version: package(version) for version in TEST_VERSIONS}
             first, second, third = TEST_VERSIONS
 
-            # Installed as a user would: unpacked into a folder of applications.
+            # Installed as a user would: from the installer, copied into a folder of applications.
+            print(f"==> {first}'s installer", flush=True)
+            installer = root / "releases" / first / installer_name(first)
+            make_installer(root / "releases" / first / APP_NAME, installer, args.sign)
+            problems = check_installer(installer)
+            expect("the installer has the app, a link to Applications, and its window's layout", not problems,
+                   "; ".join(problems))  # fmt: skip
             applications = root / "Applications"
             applications.mkdir()
-            run("tar", "-xzf", archives[first], "-C", applications)
+            with MountedImage(installer) as volume:
+                run("ditto", volume / APP_NAME, applications / APP_NAME)
             installed = applications / APP_NAME
             profile = root / "profile"
 

@@ -204,7 +204,7 @@ Xenon updates itself on macOS with Sparkle, from releases published to
 
 ```bash
 ./Meta/release.py test       # a release updates itself to the next, and turns down tampered ones
-./Meta/release.py package    # builds Xenon, and writes a signed Xenon.app, its archive and the appcast to Build/distribution
+./Meta/release.py package    # builds Xenon, and writes a signed Xenon.app, its installer (a .dmg), its archive and the appcast to Build/distribution
 ./Meta/release.py publish    # publishes them, and tags the commit
 ```
 
