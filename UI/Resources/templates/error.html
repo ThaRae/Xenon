@@ -8,14 +8,23 @@
         <script>
             // Xenon: a tab whose page failed because the site's certificate didn't verify shows Xenon's certificate
             // warning instead, which says why and lets the user proceed anyway (UI/CertificateErrors.h). A frame keeps
-            // this page, as in Chrome. This page is parsed before it's the tab's active document, which only then has
-            // a navigable to navigate, so it goes once it's shown.
-            requestAnimationFrame(() => {
-                const message = document.querySelector('meta[name="xenon-error-message"]').content;
-                if (window.top !== window || !message.includes("SSL verification failed")) return;
-                const url = document.querySelector('meta[name="xenon-failed-url"]').content;
-                location.replace("xenon://certificate-error/?url=" + encodeURIComponent(url));
-            });
+            // this page, as in Chrome. This page is parsed before it's the tab's active document, and only then has a
+            // navigable to navigate (and a window.top), so it waits for that. It may not be rendered, as in a
+            // background tab, so it waits with a timer rather than for a frame.
+            if (
+                document.querySelector('meta[name="xenon-error-message"]').content.includes("SSL verification failed")
+            ) {
+                const showCertificateWarning = () => {
+                    if (window.top === null) {
+                        setTimeout(showCertificateWarning, 50);
+                        return;
+                    }
+                    if (window.top !== window) return;
+                    const url = document.querySelector('meta[name="xenon-failed-url"]').content;
+                    location.replace("xenon://certificate-error/?url=" + encodeURIComponent(url));
+                };
+                showCertificateWarning();
+            }
         </script>
         <style>
             :root {
