@@ -34,7 +34,7 @@ jobs:
           df -h /
 
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check out Ladybird's master
         run: |
@@ -65,7 +65,7 @@ jobs:
           Meta/check.py --unpinned
 
       - name: Restore main's build caches
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             Build/caches

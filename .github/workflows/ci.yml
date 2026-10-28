@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check out Ladybird (the pinned submodule)
         run: git submodule update --init --depth 1 ladybird
@@ -56,7 +56,7 @@ jobs:
           df -h /
 
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check out Ladybird (the pinned submodule)
         run: |
@@ -65,7 +65,7 @@ jobs:
 
       - name: Restore the build caches
         id: restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             Build/caches
@@ -79,7 +79,7 @@ jobs:
 
       - name: Save the build caches
         if: always() && (github.event_name != 'pull_request' || steps.restore.outputs.cache-matched-key == '')
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             Build/caches
@@ -107,7 +107,7 @@ jobs:
 
       - name: Upload the dependency build logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vcpkg-build-logs-linux
           path: Build/vcpkg-release/buildtrees/*/*.log
@@ -116,7 +116,7 @@ jobs:
 
       - name: Upload the welcome page render
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: welcome-render-linux
           path: Build/release/smoke/welcome.png
@@ -133,7 +133,7 @@ jobs:
       CCACHE_MAXSIZE: 3G
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check out Ladybird (the pinned submodule)
         run: git submodule update --init --depth 1 ladybird
@@ -160,7 +160,7 @@ jobs:
 
       - name: Restore the build caches
         id: restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             Build/caches
@@ -180,7 +180,7 @@ jobs:
 
       - name: Save the build caches
         if: always() && (github.event_name != 'pull_request' || steps.restore.outputs.cache-matched-key == '')
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             Build/caches
@@ -208,7 +208,7 @@ jobs:
 
       - name: Upload the dependency build logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vcpkg-build-logs-macos
           path: Build/vcpkg-release/buildtrees/*/*.log
@@ -217,7 +217,7 @@ jobs:
 
       - name: Upload the welcome page render
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: welcome-render-macos
           path: Build/release/smoke/welcome.png
