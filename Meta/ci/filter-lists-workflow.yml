@@ -29,10 +29,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out the published lists
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check out Xenon
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ThaRae/Xenon
           ref: ${{ inputs.xenon_ref || 'main' }}
@@ -40,7 +40,7 @@ jobs:
           persist-credentials: false
 
       - name: Check out xenon-ublock
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ThaRae/xenon-ublock
           path: .build/xenon-ublock
