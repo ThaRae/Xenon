@@ -146,9 +146,25 @@ async function run() {
     check("tabs.connect disconnects without content scripts", tabPortError?.includes("Receiving end does not exist"));
     check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
 
-    // Optional permissions need the user, so the test can only check what doesn't ask.
+    // clipboardWrite and clipboardRead let an extension's pages copy and paste from script, with no user gesture.
+    const clipboardText = "Xenon clipboard test";
+    const textarea = document.createElement("textarea");
+    document.body.append(textarea);
+    textarea.focus();
+    textarea.value = clipboardText;
+    textarea.select();
+    check("execCommand copy without a user gesture", document.execCommand("copy"));
+    textarea.value = "";
+    check("execCommand paste", document.execCommand("paste") && textarea.value === clipboardText);
+    textarea.remove();
+
+    // Optional permissions need the user. Meta/xenon.py exposes internals, which stands in for the user's gesture, but a
+    // headless browser has no one to ask, so it denies.
     check("permissions.contains an optional one", (await chrome.permissions.contains({ permissions: ["bookmarks"] })) === false);
     check("permissions.request needs a user gesture", await chrome.permissions.request({ permissions: ["bookmarks"] }).then(() => false, error => /user gesture/.test(error.message)));
+    internals.grantTransientActivation();
+    check("permissions.request asks", (await chrome.permissions.request({ permissions: ["bookmarks"] })) === false);
+    check("permissions.request denied", (await chrome.permissions.contains({ permissions: ["bookmarks"] })) === false);
     check("permissions.remove of a required one", await chrome.permissions.remove({ permissions: ["storage"] }).then(() => false, () => true));
     check("permissions.getAll", (await chrome.permissions.getAll()).permissions.includes("privacy"));
 
@@ -190,13 +206,14 @@ async function run() {
     await chrome.offscreen.createDocument({ url: "offscreen.html", reasons: ["CLIPBOARD"], justification: "test" });
     let offscreen;
     for (let attempt = 0; attempt < 50 && !offscreen; ++attempt) {
-        offscreen = await chrome.runtime.sendMessage({ toOffscreen: "ping" }).catch(() => undefined);
+        offscreen = await chrome.runtime.sendMessage({ toOffscreen: "ping", copied: clipboardText }).catch(() => undefined);
         if (!offscreen) await new Promise(resolve => setTimeout(resolve, 100));
     }
     check(
         "offscreen document",
         offscreen?.offscreen && offscreen.hasDOM && offscreen.localStorage && offscreen.onlyRuntime
     );
+    check("offscreen document clears the clipboard", offscreen?.clearedClipboard);
     check(
         "offscreen in getContexts",
         (await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] })).length === 1

@@ -1031,11 +1031,19 @@ private:
 void prompt_for_permissions(Extension const& extension, Optional<u64> caller_view_id, Vector<String> const& warnings, Function<void(bool granted)> on_answer)
 {
     auto answer = adopt_ref(*new PromptAnswer(move(on_answer)));
-    auto question = qformatted("Allow \u201C{}\u201D to:", extension.manifest().name);
+    // NB: Not qformatted(), whose format string has to be ASCII.
+    auto question = QObject::tr("Allow \u201C%1\u201D to:").arg(qstring_from_ak_string(extension.manifest().name));
     QStringList lines;
     for (auto const& warning : warnings)
         lines.append(QString::fromUtf8("\u2022 ") + qstring_from_ak_string(warning));
     auto details = lines.join('\n');
+
+    // A headless browser, as Meta/xenon.py test runs, has no one to ask. It says what it would have asked, and denies.
+    if (Application::browser_options().headless_mode.has_value()) {
+        warnln("{}\n{}", ak_string_from_qstring(question), ak_string_from_qstring(details));
+        answer->answer(false);
+        return;
+    }
 
     // A popup asking stays open for the answer: the prompt is a popover of its own, over the popup.
     QPointer<QWidget> popup;

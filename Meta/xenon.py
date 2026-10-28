@@ -900,19 +900,24 @@ def unpacked_extension_id(directory: Path) -> str:
 
 
 # Runs a page in a headless browser until the page closes itself, and returns the results it printed after
-# EXTENSION_TEST_MARKER. The profile is a throwaway one, unless one is given.
+# EXTENSION_TEST_MARKER. The profile is a throwaway one, unless one is given. The page gets Ladybird's internals object,
+# whose grantTransientActivation() stands in for the user's gesture that some APIs need.
 def run_extension_test_page(executable: Path, env: dict, url: str, profile: str | None = None) -> dict | None:
     with tempfile.TemporaryDirectory() as temporary_profile:
         command = [
             str(executable),
             "--headless=manual",
+            "--expose-internals-object",
             "--profile-path",
             profile or temporary_profile,
             f"--load-extension={TEST_EXTENSION_DIR}",
             url,
         ]
         try:
-            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)
+            # The browser prints what it would have asked the user, which isn't ASCII.
+            result = subprocess.run(
+                command, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
+            )
         except subprocess.TimeoutExpired:
             print(f"    timed out on {url}", file=sys.stderr)
             return None
@@ -938,6 +943,15 @@ def check_extensions(executable: Path, env: dict) -> bool:
     # A web page, and JSON with no CORS headers, from two local servers: two origins.
     page = f"""<!doctype html><script>
         const results = {{ "no chrome.runtime": typeof chrome === "undefined" || !chrome.runtime }};
+        // Only an extension's pages copy and paste from script without a user gesture.
+        const text = document.createElement("textarea");
+        document.documentElement.append(text);
+        text.focus();
+        text.value = "web page";
+        text.select();
+        results["no copy without a user gesture"] = !document.execCommand("copy");
+        text.value = "";
+        results["no paste"] = !document.execCommand("paste") && text.value === "";
         const base = "chrome-extension://{extension_id}/";
         const image = new Promise(resolve => {{
             const img = new Image();
