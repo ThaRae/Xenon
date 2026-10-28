@@ -112,7 +112,9 @@ CI runs on GitHub Actions, on GitHub's own runners:
 - **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
   (`ladybird/.github/actions/setup`).
 - **Caches**: ccache's objects (`Build/caches`) and vcpkg's prebuilt packages (`ladybird/Build/caches`) are kept in
-  GitHub's cache, one entry per platform. Builds on `main` save them, and a pull request starts from `main`'s. A cold
+  GitHub's cache, one entry per platform. Builds on `main` save them, and a pull request starts from `main`'s. A pull
+  request whose build misses ccache more than 500 times (a Ladybird bump, say) saves its own too, so its next push
+  starts from there instead of recompiling the same files; smaller ones don't, to leave room in GitHub's 10 GB. A cold
   build takes a few hours, so the build step stops itself in time to save the caches, and the next run carries on from
   there.
 
