@@ -280,6 +280,92 @@ fn measure_deserialize(path: &Path) {
     std::hint::black_box(engine);
 }
 
+// Checks that the engine WebContent builds blocks the same pages as a plain adblock engine holding every filter, for
+// URLs made from the lists' `||host/path^$document` filters, which Xenon's patch keeps out of the engine.
+fn verify(scenario: &Scenario) {
+    let rules = joined(&scenario.lists, true);
+    let trusted_rules = joined(&scenario.trusted_lists, false);
+    let engine = libweb_content_blocker_rust::rust_content_blocker_create(
+        ak::Span::new(&rules),
+        ak::Span::new(&trusted_rules),
+        ak::Span::new(&[]),
+    );
+    let engine = unsafe { engine.as_ref() };
+    assert!(engine.is_some());
+
+    let rules = String::from_utf8(rules).unwrap();
+    let trusted_rules = String::from_utf8(trusted_rules).unwrap();
+    let mut filter_set = adblock::lists::FilterSet::new(false);
+    filter_set.add_filter_list(rules.clone(), adblock::lists::ParseOptions::default());
+    filter_set.add_filter_list(
+        trusted_rules.clone(),
+        adblock::lists::ParseOptions {
+            permissions: adblock::resources::PermissionMask::from_bits(0x01),
+            ..Default::default()
+        },
+    );
+    let reference = adblock::engine::Engine::new_with_filter_set(filter_set);
+
+    let mut urls = Vec::new();
+    for line in rules.lines().chain(trusted_rules.lines()) {
+        let Some(pattern) = line
+            .strip_prefix("||")
+            .and_then(|rest| rest.strip_suffix("^$document").or_else(|| rest.strip_suffix("^$doc")))
+        else {
+            continue;
+        };
+        if pattern.contains(['*', '^', '|', '$']) {
+            continue;
+        }
+        urls.push(format!("https://{pattern}"));
+        urls.push(format!("https://{pattern}?x=1"));
+        urls.push(format!("http://www.{pattern}"));
+        urls.push(format!("https://{pattern}x"));
+        urls.push(format!("HTTPS://{}", pattern.to_ascii_uppercase()));
+    }
+    urls.extend(
+        [
+            "https://github.com/LadybirdBrowser/ladybird",
+            "https://www.youtube.com/watch?v=x",
+            "https://x.com/home",
+            "https://example.com/",
+        ]
+        .map(String::from),
+    );
+
+    let source = "https://example.org/";
+    let mut checked = 0;
+    let mut blocked = 0;
+    let mut mismatches = Vec::new();
+    for url in &urls {
+        for request_type in ["document", "subdocument", "image"] {
+            let Ok(request) = adblock::request::Request::new(url, source, request_type, "GET") else {
+                continue;
+            };
+            let expected = reference.check_network_request(&request).should_block();
+            let actual = libweb_content_blocker_rust::rust_content_blocker_matches(
+                engine,
+                ak::Span::new(url.as_bytes()),
+                ak::Span::new(source.as_bytes()),
+                ak::Span::new(request_type.as_bytes()),
+            );
+            checked += 1;
+            blocked += usize::from(actual);
+            if expected != actual {
+                mismatches.push(format!("{request_type} {url}: expected {expected}, got {actual}"));
+            }
+        }
+    }
+    println!(
+        "Verified {checked} requests to {} URLs ({blocked} blocked): {} mismatches",
+        urls.len(),
+        mismatches.len()
+    );
+    for mismatch in mismatches.iter().take(20) {
+        println!("    {mismatch}");
+    }
+}
+
 fn main() {
     let arguments: Vec<String> = std::env::args().collect();
     let directory = PathBuf::from(&arguments[1]);
@@ -293,6 +379,7 @@ fn main() {
                 arguments.get(4).map(Path::new),
             ),
             "deserialize" => measure_deserialize(Path::new(&arguments[3])),
+            "verify" => verify(&scenarios[0]),
             mode => panic!("unknown mode {mode}"),
         }
         return;
@@ -324,4 +411,6 @@ fn main() {
         }
     }
     run(&["deserialize", serialized.to_str().unwrap()]);
+    println!();
+    run(&["verify"]);
 }
