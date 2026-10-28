@@ -200,7 +200,7 @@ index 7d145052c90f1316572dcc6363abf0089a8a19c7..ecbd43e640ad30a5338695178cdbb065
  
      // A load the browser's UI started, whose URL the address bar shows while it is the ongoing navigation.
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index 1548e691b38e152de33c76d6abd08466f2f0d474..bc6925c6e9d672ca81c00641aa2968e46c78fcd8 100644
+index ff1ba33a72573567167d31b42dadcea89e76a288..556b4539705039c59910350607f60fb49b7e4532 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
 @@ -58,6 +58,7 @@
@@ -211,7 +211,7 @@ index 1548e691b38e152de33c76d6abd08466f2f0d474..bc6925c6e9d672ca81c00641aa2968e4
  #include <LibWebView/RequestServerSiteBindings.h>
  #include <LibWebView/StorageAreaRegistry.h>
  #include <LibWebView/WebContentPage.h>
-@@ -127,6 +128,9 @@ public:
+@@ -129,6 +130,9 @@ public:
      // documents processes of their own, which host nothing else.
      Optional<String> const& hosted_web_ui() const { return m_hosted_web_ui; }
      void set_hosted_web_ui(String host) { m_hosted_web_ui = move(host); }
@@ -221,7 +221,7 @@ index 1548e691b38e152de33c76d6abd08466f2f0d474..bc6925c6e9d672ca81c00641aa2968e4
      void register_embedded_page(Web::PageId page_id, CanonicalTraversable&);
      void unregister_embedded_page(Web::PageId page_id);
      Optional<Web::PageId> page_id_for_traversable(CanonicalTraversable const&) const;
-@@ -227,6 +231,7 @@ private:
+@@ -229,6 +233,7 @@ private:
      bool m_rejected_ipc { false };
      bool m_has_hosted_local_file_content { false };
      Optional<String> m_hosted_web_ui;
