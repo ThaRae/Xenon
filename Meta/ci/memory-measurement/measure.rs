@@ -375,6 +375,51 @@ fn verify(scenario: &Scenario) {
     }
 }
 
+// What the lists put in a page at each URL: hiding selectors, procedural filters, and scriptlets.
+fn cosmetics(scenario: &Scenario) {
+    let rules = String::from_utf8(joined(&scenario.lists, true)).unwrap();
+    let trusted_rules = String::from_utf8(joined(&scenario.trusted_lists, false)).unwrap();
+    let mut filter_set = adblock::lists::FilterSet::new(false);
+    filter_set.add_filter_list(rules, adblock::lists::ParseOptions::default());
+    filter_set.add_filter_list(
+        trusted_rules,
+        adblock::lists::ParseOptions {
+            permissions: adblock::resources::PermissionMask::from_bits(0x01),
+            ..Default::default()
+        },
+    );
+    let mut engine = adblock::engine::Engine::new_with_filter_set(filter_set);
+    if let Some(path) = &scenario.resources {
+        let resources: Vec<adblock::resources::Resource> =
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        engine.use_resources(resources);
+    }
+    for url in [
+        "https://www.youtube.com/",
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://github.com/LadybirdBrowser/ladybird",
+        "https://x.com/",
+        "https://example.com/",
+    ] {
+        let resources = engine.url_cosmetic_resources(url);
+        let selector_bytes: usize = resources.hide_selectors.iter().map(String::len).sum();
+        let procedural_bytes: usize = resources.procedural_actions.iter().map(String::len).sum();
+        println!(
+            "{url}: {} hiding selectors ({selector_bytes} bytes), {} procedural filters ({procedural_bytes} bytes), \
+             scriptlets {} bytes, generichide {}",
+            resources.hide_selectors.len(),
+            resources.procedural_actions.len(),
+            resources.injected_script.len(),
+            resources.generichide
+        );
+        let mut procedural: Vec<_> = resources.procedural_actions.iter().collect();
+        procedural.sort();
+        for action in procedural.iter().take(8) {
+            println!("    procedural: {}", action.chars().take(160).collect::<String>());
+        }
+    }
+}
+
 fn main() {
     let arguments: Vec<String> = std::env::args().collect();
     let directory = PathBuf::from(&arguments[1]);
@@ -389,6 +434,7 @@ fn main() {
             ),
             "deserialize" => measure_deserialize(Path::new(&arguments[3])),
             "verify" => verify(&scenarios[0]),
+            "cosmetics" => cosmetics(&scenarios[0]),
             mode => panic!("unknown mode {mode}"),
         }
         return;
@@ -420,6 +466,8 @@ fn main() {
         }
     }
     run(&["deserialize", serialized.to_str().unwrap()]);
+    println!();
+    run(&["cosmetics"]);
     println!();
     run(&["verify"]);
 }
