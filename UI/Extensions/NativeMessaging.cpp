@@ -31,6 +31,11 @@ static constexpr size_t MAX_HOST_MESSAGE_SIZE = 1024 * 1024;
 static constexpr size_t MAX_BROWSER_MESSAGE_SIZE = 1024 * 1024 * 1024;
 static constexpr auto HOSTS_VARIABLE = "XENON_NATIVE_MESSAGING_HOSTS"sv;
 
+static String host_error(StringView message)
+{
+    return MUST(String::from_utf8(message));
+}
+
 bool is_valid_native_host_name(StringView name)
 {
     if (name.is_empty() || name.starts_with('.') || name.ends_with('.'))
@@ -45,7 +50,7 @@ bool is_valid_native_host_name(StringView name)
             continue;
         }
         previous_was_dot = false;
-        if (!is_ascii_lowercase(character) && !is_ascii_digit(character) && character != '_')
+        if (!is_ascii_lower_alpha(character) && !is_ascii_digit(character) && character != '_')
             return false;
     }
     return true;
@@ -96,15 +101,15 @@ static ErrorOr<NativeHost, String> parse_native_host_manifest(ByteString const& 
 {
     auto file = Core::File::open(path, Core::File::OpenMode::Read);
     if (file.is_error())
-        return String { NATIVE_HOST_NOT_FOUND };
+        return host_error(NATIVE_HOST_NOT_FOUND);
 
     auto contents = file.value()->read_until_eof();
     if (contents.is_error())
-        return String { NATIVE_HOST_NOT_FOUND };
+        return host_error(NATIVE_HOST_NOT_FOUND);
 
     auto json = JsonValue::from_string(StringView { contents.value() });
     if (json.is_error() || !json.value().is_object())
-        return String { NATIVE_HOST_NOT_FOUND };
+        return host_error(NATIVE_HOST_NOT_FOUND);
 
     auto const& object = json.value().as_object();
     auto name = object.get_string("name"sv);
@@ -112,11 +117,11 @@ static ErrorOr<NativeHost, String> parse_native_host_manifest(ByteString const& 
     auto type = object.get_string("type"sv);
     auto origins = object.get_array("allowed_origins"sv);
     if (!name.has_value() || *name != expected_name)
-        return String { NATIVE_HOST_NOT_FOUND };
+        return host_error(NATIVE_HOST_NOT_FOUND);
     if (!host_path.has_value() || !type.has_value() || *type != "stdio"sv || !origins.has_value())
-        return String { NATIVE_HOST_NOT_FOUND };
+        return host_error(NATIVE_HOST_NOT_FOUND);
     if (!LexicalPath { host_path->to_byte_string() }.is_absolute())
-        return String { NATIVE_HOST_NOT_FOUND };
+        return host_error(NATIVE_HOST_NOT_FOUND);
 
     NativeHost host;
     host.name = *name;
@@ -131,7 +136,7 @@ static ErrorOr<NativeHost, String> parse_native_host_manifest(ByteString const& 
 ErrorOr<NativeHost, String> find_native_host(StringView name, StringView extension_id)
 {
     if (!is_valid_native_host_name(name))
-        return String { NATIVE_HOST_NOT_FOUND };
+        return host_error(NATIVE_HOST_NOT_FOUND);
 
     auto filename = ByteString::formatted("{}.json", name);
     Optional<NativeHost> found;
@@ -144,9 +149,9 @@ ErrorOr<NativeHost, String> find_native_host(StringView name, StringView extensi
         break;
     }
     if (!found.has_value())
-        return String { NATIVE_HOST_NOT_FOUND };
+        return host_error(NATIVE_HOST_NOT_FOUND);
     if (!origin_is_allowed(found->allowed_origins, extension_id))
-        return String { NATIVE_HOST_FORBIDDEN };
+        return host_error(NATIVE_HOST_FORBIDDEN);
     return found.release_value();
 }
 
@@ -169,7 +174,7 @@ ErrorOr<Optional<JsonValue>, String> take_native_message(ByteBuffer& buffer)
     u32 size = 0;
     memcpy(&size, buffer.data(), sizeof(size));
     if (size > MAX_HOST_MESSAGE_SIZE)
-        return String { NATIVE_HOST_COMMUNICATION_ERROR };
+        return host_error(NATIVE_HOST_COMMUNICATION_ERROR);
     if (buffer.size() < sizeof(u32) + size)
         return Optional<JsonValue> {};
 
@@ -177,7 +182,7 @@ ErrorOr<Optional<JsonValue>, String> take_native_message(ByteBuffer& buffer)
     auto json = JsonValue::from_string(payload);
     buffer = MUST(buffer.slice(sizeof(u32) + size, buffer.size() - sizeof(u32) - size));
     if (json.is_error())
-        return String { NATIVE_HOST_COMMUNICATION_ERROR };
+        return host_error(NATIVE_HOST_COMMUNICATION_ERROR);
     return json.release_value();
 }
 
@@ -220,11 +225,11 @@ ErrorOr<NonnullRefPtr<NativeHostProcess>, String> NativeHostProcess::start(
     int stdin_pipe[2];
     int stdout_pipe[2];
     if (pipe(stdin_pipe) < 0)
-        return String { NATIVE_HOST_FAILED_TO_START };
+        return host_error(NATIVE_HOST_FAILED_TO_START);
     if (pipe(stdout_pipe) < 0) {
         ::close(stdin_pipe[0]);
         ::close(stdin_pipe[1]);
-        return String { NATIVE_HOST_FAILED_TO_START };
+        return host_error(NATIVE_HOST_FAILED_TO_START);
     }
 
     auto fail_pipes = [&] {
@@ -232,7 +237,7 @@ ErrorOr<NonnullRefPtr<NativeHostProcess>, String> NativeHostProcess::start(
         ::close(stdin_pipe[1]);
         ::close(stdout_pipe[0]);
         ::close(stdout_pipe[1]);
-        return String { NATIVE_HOST_FAILED_TO_START };
+        return host_error(NATIVE_HOST_FAILED_TO_START);
     };
 
     if (set_cloexec(stdin_pipe[0]).is_error() || set_cloexec(stdin_pipe[1]).is_error()
@@ -245,7 +250,7 @@ ErrorOr<NonnullRefPtr<NativeHostProcess>, String> NativeHostProcess::start(
 
     auto host_path = host.path.to_byte_string();
     auto origin = MUST(String::formatted("chrome-extension://{}/", extension_id)).to_byte_string();
-    auto working_directory = LexicalPath { host_path }.dirname();
+    auto working_directory = LexicalPath::dirname(host_path);
 
     posix_spawn_file_actions_adddup2(&actions, stdin_pipe[0], STDIN_FILENO);
     posix_spawn_file_actions_adddup2(&actions, stdout_pipe[1], STDOUT_FILENO);
@@ -267,14 +272,14 @@ ErrorOr<NonnullRefPtr<NativeHostProcess>, String> NativeHostProcess::start(
     if (spawned != 0) {
         ::close(stdin_pipe[1]);
         ::close(stdout_pipe[0]);
-        return String { NATIVE_HOST_FAILED_TO_START };
+        return host_error(NATIVE_HOST_FAILED_TO_START);
     }
 
     if (set_nonblocking(stdin_pipe[1]).is_error() || set_nonblocking(stdout_pipe[0]).is_error()) {
         ::close(stdin_pipe[1]);
         ::close(stdout_pipe[0]);
         ::kill(pid, SIGTERM);
-        return String { NATIVE_HOST_FAILED_TO_START };
+        return host_error(NATIVE_HOST_FAILED_TO_START);
     }
 
     auto process = adopt_ref(*new NativeHostProcess);
@@ -310,7 +315,7 @@ void NativeHostProcess::post_message(JsonValue const& message)
         return;
     auto encoded = encode_native_message(message);
     if (encoded.size() - sizeof(u32) > MAX_BROWSER_MESSAGE_SIZE) {
-        closed_by_host(String { NATIVE_HOST_COMMUNICATION_ERROR });
+        closed_by_host(host_error(NATIVE_HOST_COMMUNICATION_ERROR));
         return;
     }
     MUST(m_outgoing.try_append(encoded.bytes()));
@@ -332,7 +337,7 @@ void NativeHostProcess::flush_outgoing()
         if (written < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
                 break;
-            closed_by_host(String { NATIVE_HOST_COMMUNICATION_ERROR });
+            closed_by_host(host_error(NATIVE_HOST_COMMUNICATION_ERROR));
             return;
         }
         if (written == 0)
@@ -355,11 +360,11 @@ void NativeHostProcess::read_from_host()
         if (nread < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
                 break;
-            closed_by_host(String { NATIVE_HOST_COMMUNICATION_ERROR });
+            closed_by_host(host_error(NATIVE_HOST_COMMUNICATION_ERROR));
             return;
         }
         if (nread == 0) {
-            closed_by_host(String { NATIVE_HOST_EXITED });
+            closed_by_host(host_error(NATIVE_HOST_EXITED));
             return;
         }
         MUST(m_incoming.try_append(ReadonlyBytes { chunk, static_cast<size_t>(nread) }));
