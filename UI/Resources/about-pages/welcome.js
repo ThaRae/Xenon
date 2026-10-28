@@ -44,6 +44,7 @@ const engineInfo = {
 const passwordManagerInfo = {
     bitwarden: { note: "Open source, can be self-hosted", developer: "Bitwarden" },
     "proton-pass": { note: "Open source, with email aliases", developer: "Proton" },
+    "icloud-passwords": { note: "Your iCloud Keychain, on this Mac", developer: "Apple" },
 };
 
 let settings;
@@ -205,6 +206,12 @@ function updatePasswordManagerDetails() {
             `Xenon downloads ${name} from the Chrome Web Store, checks that ${developer} signed it, and looks for ` +
                 "updates once a day. To fill in your logins, it can read and change the sites you visit."
         );
+        if (id === "icloud-passwords") {
+            notes.push(
+                "It talks to Apple's Password Manager on this Mac, the same helper Chrome uses. macOS Sonoma or later, " +
+                    "and iCloud Keychain, are required."
+            );
+        }
     }
     if (id && id === current) notes.push(`${passwordManagerName(id)} is installed, and Xenon keeps it up to date.`);
     if (current && id !== current) notes.push(`${passwordManagerName(current)} is removed, with its data in Xenon.`);

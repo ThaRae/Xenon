@@ -10,6 +10,7 @@
 #include <LibWebView/Application.h>
 #include <UI/Extensions/Browser.h>
 #include <UI/Extensions/MatchPattern.h>
+#include <UI/Extensions/NativeMessaging.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
 
@@ -350,6 +351,8 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
             else
                 open();
         }
+    } else if (*type == "connect-native"sv && port_id.has_value()) {
+        open_native_port(*context, *port_id, message.get_string("application"sv).value_or({}));
     } else if (*type == "connected"sv && port_id.has_value()) {
         handle_port_accepted(*context, *port_id, message.get_bool("accepted"sv).value_or(false));
     } else if (*type == "port-message"sv && port_id.has_value()) {
@@ -1174,6 +1177,11 @@ bool Router::background_is_busy(String const& extension_id) const
         if (is_background(pending.sender) || any_of(pending.awaiting, is_background))
             return true;
     }
+    // An open native messaging port keeps the background running, as Chrome keeps a service worker with one.
+    for (auto const& [id, port] : m_ports) {
+        if (port.native && is_background(port.opener))
+            return true;
+    }
     return false;
 }
 
@@ -1363,11 +1371,82 @@ void Router::handle_port_accepted(Context& receiver, String const& port_id, bool
     }
 }
 
+void Router::open_native_port(Context& opener, String const& port_id, String const& application)
+{
+    prune_closed_contexts();
+    if (m_ports.contains(port_id))
+        return;
+
+    auto disconnect = [&](StringView error) {
+        JsonObject message;
+        message.set("type"sv, "port-disconnect"sv);
+        message.set("port"sv, port_id);
+        message.set("error"sv, error);
+        post(opener.endpoint, message.serialized());
+    };
+
+    if (opener.kind == ContextKind::ContentScript || opener.kind == ContextKind::ExternalPage) {
+        disconnect(NATIVE_HOST_FORBIDDEN);
+        return;
+    }
+    if (!opener.extension->has_permission("nativeMessaging"sv)) {
+        disconnect(NATIVE_HOST_FORBIDDEN);
+        return;
+    }
+
+    auto native = NativeHostProcess::start(
+        application,
+        opener.extension->id(),
+        [this, port_id](JsonValue message) {
+            auto port = m_ports.get(port_id);
+            if (!port.has_value())
+                return;
+            JsonObject delivery;
+            delivery.set("type"sv, "port-message"sv);
+            delivery.set("port"sv, port_id);
+            delivery.set("message"sv, move(message));
+            post(port->opener, delivery.serialized());
+        },
+        [this, port_id](Optional<String> error) {
+            auto port = m_ports.get(port_id);
+            if (!port.has_value())
+                return;
+            auto opener_endpoint = port->opener;
+            port->native = nullptr;
+            m_ports.remove(port_id);
+            JsonObject disconnect;
+            disconnect.set("type"sv, "port-disconnect"sv);
+            disconnect.set("port"sv, port_id);
+            if (error.has_value())
+                disconnect.set("error"sv, *error);
+            post(opener_endpoint, disconnect.serialized());
+        });
+    if (native.is_error()) {
+        disconnect(native.error());
+        return;
+    }
+
+    m_ports.set(port_id, Port {
+                             .extension_id = opener.extension->id(),
+                             .opener = opener.endpoint,
+                             .awaiting = {},
+                             .receivers = {},
+                             .early_messages = {},
+                             .native = native.release_value(),
+                         });
+}
+
 void Router::handle_port_message(Context& sender, String const& port_id, JsonValue message)
 {
     auto port = m_ports.get(port_id);
     if (!port.has_value())
         return;
+
+    if (port->native) {
+        if (sender.endpoint == port->opener)
+            port->native->post_message(message);
+        return;
+    }
 
     JsonObject delivery;
     delivery.set("type"sv, "port-message"sv);
@@ -1408,6 +1487,8 @@ void Router::close_port_end(WebView::ScriptBridgeEndpoint const& endpoint, Strin
     };
 
     if (endpoint == port->opener) {
+        if (port->native)
+            port->native->disconnect();
         for (auto const& receiver : port->receivers)
             disconnect(receiver);
         m_ports.remove(port_id);

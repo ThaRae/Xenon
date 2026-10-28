@@ -99,6 +99,7 @@ FILTER_LIST_UPDATES_MARKER = "XENON-FILTER-LIST-UPDATES-TEST "
 # A test extension whose pages check the chrome.* APIs and print what they found on a line starting with this.
 TEST_EXTENSION_DIR = XENON_SOURCE_DIR / "Tests" / "Extensions" / "basic"
 EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
+NATIVE_MESSAGING_ECHO_HOST = XENON_SOURCE_DIR / "Tests" / "NativeMessaging" / "echo_host.py"
 
 # A local HTTPS server's self-signed certificate (Tests/CertificateErrors). Xenon's certificate warning and the server's
 # page each print what they found on a line starting with the marker.
@@ -899,6 +900,15 @@ def check_password_managers(executable: Path, env: dict) -> bool:
             expect(
                 "removes it when none is chosen", found is None and installed() == {}, output, f"{found}, {installed()}"
             )
+
+            if sys.platform != "darwin":
+                found, output = run(profile, "--password-manager=icloud-passwords")
+                expect(
+                    "does not offer iCloud Passwords off macOS",
+                    "available on macOS" in output and found is None and installed() == {},
+                    output,
+                    f"{found}, {installed()}",
+                )
     finally:
         server.shutdown()
     return passed
@@ -956,9 +966,33 @@ def turn_on_content_blocking(profile: str):
     (Path(profile) / "config" / "Settings.json").write_text(json.dumps({"contentBlockers": {"enabled": True}}))
 
 
+def write_native_messaging_host(directory: Path, name: str, allowed_origin: str, executable: Path) -> None:
+    (directory / f"{name}.json").write_text(
+        json.dumps(
+            {
+                "name": name,
+                "description": "Xenon native messaging test host",
+                "path": str(executable),
+                "type": "stdio",
+                "allowed_origins": [allowed_origin],
+            }
+        )
+        + "\n"
+    )
+
+
 def check_extensions(executable: Path, env: dict) -> bool:
     extension_id = unpacked_extension_id(TEST_EXTENSION_DIR)
     passed = True
+    hosts_directory = Path(tempfile.mkdtemp(prefix="xenon-native-messaging-"))
+    echo_host = NATIVE_MESSAGING_ECHO_HOST.resolve()
+    echo_host.chmod(echo_host.stat().st_mode | 0o111)
+    origin = f"chrome-extension://{extension_id}/"
+    write_native_messaging_host(hosts_directory, "com.xenon.test", origin, echo_host)
+    write_native_messaging_host(
+        hosts_directory, "com.xenon.forbidden", "chrome-extension://notthisextension/", echo_host
+    )
+    env = {**env, "XENON_NATIVE_MESSAGING_HOSTS": str(hosts_directory)}
 
     # A web page, and JSON with no CORS headers, from two local servers: two origins.
     page = f"""<!doctype html><script>
@@ -1071,6 +1105,7 @@ def check_extensions(executable: Path, env: dict) -> bool:
     finally:
         for server in (page_server, data_server):
             server.shutdown()
+        shutil.rmtree(hosts_directory, ignore_errors=True)
 
     for name, page_results in (
         ("web page", results),

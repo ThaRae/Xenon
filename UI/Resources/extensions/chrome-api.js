@@ -814,15 +814,36 @@ const privacy = {
 
 // --- Native messaging --------------------------------------------------------------------------------------------------
 
-// FIXME: Native messaging hosts (milestone 4). Until then, every host is one that isn't installed.
-const nativeHostNotFound = "Specified native messaging host not found.";
 function connectNative(application) {
-    const port = new Port(crypto.randomUUID(), String(application ?? ""));
-    queueMicrotask(() => port.closeFromUIProcess(nativeHostNotFound));
+    const id = crypto.randomUUID();
+    const port = new Port(id, String(application ?? ""));
+    post({ type: "connect-native", port: id, application: String(application ?? "") });
     return port;
 }
-const sendNativeMessage = api(() => {
-    throw new ExtensionError(nativeHostNotFound);
+const sendNativeMessage = api((application, message) => {
+    return new Promise((resolve, reject) => {
+        const port = connectNative(application);
+        let settled = false;
+        port.onMessage.addListener(response => {
+            if (settled) return;
+            settled = true;
+            resolve(response);
+            port.disconnect();
+        });
+        port.onDisconnect.addListener(() => {
+            if (settled) return;
+            settled = true;
+            reject(new ExtensionError(chrome.runtime.lastError?.message ?? "Native host has exited."));
+        });
+        try {
+            port.postMessage(message);
+        } catch (error) {
+            if (!settled) {
+                settled = true;
+                reject(error);
+            }
+        }
+    });
 });
 
 // --- chrome ------------------------------------------------------------------------------------------------------------
