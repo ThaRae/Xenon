@@ -532,7 +532,9 @@ for Bitwarden in Chrome.
   Left from milestones 1 and 2:
   - `webRequest` events never fire, and notifications are never shown (milestone 4).
   - Optional host permissions (`origins` in `permissions.request`). `idle` always reports `active`.
-  - The permission prompt has only been built, not clicked: headless tests have no user gestures.
+  - The permission prompt hasn't been clicked. `Meta/xenon.py test` reaches it with a gesture from Ladybird's
+    `internals` (`--expose-internals-object`), and a headless browser, with no one to ask, prints the prompt and
+    denies.
   - `tabs.captureVisibleTab` and `action.setIcon` with `imageData` fail. `tabs.onDetached`, `onMoved`, `onReplaced`,
     and `onHighlighted`, and `permissions.onAdded` and `onRemoved`, exist but never fire.
   - A background page whose process crashes isn't restarted until the extension is reloaded.

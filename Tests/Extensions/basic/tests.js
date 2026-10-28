@@ -146,9 +146,13 @@ async function run() {
     check("tabs.connect disconnects without content scripts", tabPortError?.includes("Receiving end does not exist"));
     check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
 
-    // Optional permissions need the user, so the test can only check what doesn't ask.
+    // Optional permissions need the user. Meta/xenon.py exposes internals, which stands in for the user's gesture, but a
+    // headless browser has no one to ask, so it denies.
     check("permissions.contains an optional one", (await chrome.permissions.contains({ permissions: ["bookmarks"] })) === false);
     check("permissions.request needs a user gesture", await chrome.permissions.request({ permissions: ["bookmarks"] }).then(() => false, error => /user gesture/.test(error.message)));
+    internals.grantTransientActivation();
+    check("permissions.request asks", (await chrome.permissions.request({ permissions: ["bookmarks"] })) === false);
+    check("permissions.request denied", (await chrome.permissions.contains({ permissions: ["bookmarks"] })) === false);
     check("permissions.remove of a required one", await chrome.permissions.remove({ permissions: ["storage"] }).then(() => false, () => true));
     check("permissions.getAll", (await chrome.permissions.getAll()).permissions.includes("privacy"));
 

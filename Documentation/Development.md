@@ -90,7 +90,7 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
 - a page override for a page upstream no longer ships
 - a malformed or duplicate !bang
 - Ladybird's violet coming back into the chrome
-- a format string that would crash on non-ASCII text
+- a format string that would crash on non-ASCII text (escapes such as `\u201C` included), or one it can't read
 - a workflow step whose shell script doesn't parse
 - engine changes in `ladybird/` that aren't exported to `Patches/ladybird`, or a pinned commit that doesn't exist
   upstream
