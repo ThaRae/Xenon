@@ -93,7 +93,8 @@ def python_sources() -> list[Path]:
 
 
 def shell_sources() -> list[Path]:
-    scripts = sorted((XENON_SOURCE_DIR / "Meta").rglob("*.sh"))
+    # The AppImage's entry point is a script too (Meta/release.py).
+    scripts = sorted((XENON_SOURCE_DIR / "Meta").rglob("*.sh")) + [XENON_SOURCE_DIR / "UI" / "Linux" / "AppRun"]
     hooks = XENON_SOURCE_DIR / ".githooks"
     return scripts + (sorted(path for path in hooks.iterdir() if path.is_file()) if hooks.exists() else [])
 

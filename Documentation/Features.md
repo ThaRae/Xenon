@@ -278,6 +278,12 @@ over the page says what the key needs. It comes from engine patches `0010`–`00
 On macOS, Xenon installs from a disk image, `Xenon-<version>.dmg`: open it and drag Xenon into Applications, as the
 window shows. Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases/releases) has one.
 
+On Linux, each release has an AppImage, `Xenon-<version>-x86_64.AppImage`, which runs as it is once it's executable,
+on distributions at least as new as Ubuntu 26.04. It carries update information, so
+[AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate) and the AppImage managers that use it update it
+from the next release, downloading only what changed. `Meta/release.py` packages it with linuxdeploy and appimagetool;
+see [Updates.md](Updates.md#the-appimage).
+
 Xenon then checks for a new version when it starts and once a day, downloads it in the background, and installs it
 when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch
 to update**, and turns automatic updates off. **Check for Updates…** in the Xenon menu checks at once.

@@ -4,7 +4,7 @@ Xenon is a web browser built on the [Ladybird](https://ladybird.org) engine. It 
 [Helium](https://helium.computer): uBlock Origin's ad blocking built in, !bangs in the address bar, a choice of layouts,
 and a private, low-noise setup.
 
-It's early. macOS is the main platform; Linux builds and passes its tests in CI.
+It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 
 ## What it does
 
@@ -52,6 +52,17 @@ Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases
 `Xenon-<version>.dmg`. Open it and drag Xenon into Applications. Releases aren't notarized yet, so the first time,
 macOS asks you to allow it in **System Settings → Privacy & Security → Open Anyway**. After that, Xenon updates
 itself.
+
+On Linux, download `Xenon-<version>-x86_64.AppImage`, make it executable, and run it:
+
+```bash
+chmod +x Xenon-*-x86_64.AppImage
+./Xenon-*-x86_64.AppImage
+```
+
+It needs a recent distribution: Ubuntu 26.04 or later, Fedora 44 or later, or Arch Linux. It doesn't update itself;
+[AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate), or an AppImage manager like Gear Lever, updates
+it from the next release.
 
 ## Building it
 
