@@ -36,7 +36,8 @@ windows say so instead and show no history. The page is static, so Xenon's UI ha
 (`UI/NewTabPage.cpp`).
 
 Ladybird opens new tabs blank, so Xenon makes `about:newtab` the new tab page of a profile until its first run is
-complete (`UI/main.cpp`). **Settings → Startup** can change it, and its reset button goes back to `about:newtab`.
+complete (`UI/main.cpp`). **Settings → Startup and pages** can change it, and its reset button goes back to
+`about:newtab`.
 
 ### Settings
 
@@ -44,11 +45,13 @@ complete (`UI/main.cpp`). **Settings → Startup** can change it, and its reset 
 below them. Every change applies at once, and the page follows changes made from the menus.
 
 - Xenon's sections:
-  - **Look and layout**: the three layouts, the sidebar's side, the bookmarks bar, zoom, dark pages.
+  - **Look and layout**: the three layouts, the sidebar's side, the bookmarks bar, zoom, whether sites are asked for
+    light or dark, dark pages.
   - **Tabs**: recently used order, hibernation and its timeout, dragging a tab to a page's edge to split, groups.
   - **Search and bangs**: the engine, suggestions, bangs on or off, and a lookup of all 13,000.
-  - **Ads and trackers**: blocking, which lists are in use and when they were last checked, daily updates with
-    **Check now**, subscriptions and local lists, and links into the blocking dashboard.
+  - **Ads and trackers**: blocking, the count on the shield, which lists are in use and when they were last checked,
+    daily updates with **Check now**, the sites let through (each with **Turn back on**), subscriptions and local
+    lists, and links into the blocking dashboard.
   - **Password manager** and **Extensions**.
   - **Updates**: the version, whether a new one is ready, automatic updates, and **Check now** or **Relaunch to
     update**.
@@ -200,8 +203,8 @@ Its dashboard, `xenon://blocking/`, has the filter lists (each can be turned off
 **Settings → Ads and trackers** links to each.
 
 **Settings → Ads and trackers → Count what's blocked on the shield** puts the page's count on the shield, as uBlock
-Origin's badge does. It's a Xenon setting (`UI/XenonSettings`), off by default. The engine lists what was blocked by host
-and kind, once each; engine patch `0026` adds the count of every blocked request that the popup and the badge show.
+Origin's badge does. It's a Xenon setting (`UI/XenonSettings`), off by default. The engine lists what was blocked by
+host and kind, once each; engine patch `0026` adds the count of every blocked request that the popup and the badge show.
 
 uBlock Origin's switches for large media, cosmetic filtering and JavaScript, and which domains had requests blocked,
 need engine work.

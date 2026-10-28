@@ -304,6 +304,7 @@ include("${LADYBIRD_SOURCE_DIR}/UI/cmake/ResourceFiles.cmake")
 set(XENON_ABOUT_PAGE_OVERRIDES
     newtab.html
     settings.html
+    version.html
     webui.css
     welcome.css
     welcome.html

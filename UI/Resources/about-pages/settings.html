@@ -172,6 +172,40 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                 </label>
                                 <input id="enable-force-dark" type="checkbox" switch />
                             </div>
+                            <div class="row" data-keywords="dark mode light theme color scheme">
+                                <div class="label">
+                                    <span id="website-color-scheme-title">Light or dark sites</span>
+                                    <p class="description">
+                                        Which design sites are asked to show. System follows your computer.
+                                    </p>
+                                </div>
+                                <div
+                                    id="website-color-scheme"
+                                    class="segmented"
+                                    role="radiogroup"
+                                    aria-labelledby="website-color-scheme-title"
+                                >
+                                    <label>
+                                        <input type="radio" name="website-color-scheme" value="system" />
+                                        System
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="website-color-scheme" value="light" />
+                                        Light
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="website-color-scheme" value="dark" />
+                                        Dark
+                                    </label>
+                                </div>
+                            </div>
+                            <!-- Ladybird's theme for its own interface, which appearance.js sets. Xenon's chrome
+                                 doesn't follow it, so it isn't offered. -->
+                            <div id="interface-theme" class="segmented hidden" role="radiogroup" aria-label="Theme">
+                                <label><input type="radio" name="interface-theme" value="system" />System</label>
+                                <label><input type="radio" name="interface-theme" value="light" />Light</label>
+                                <label><input type="radio" name="interface-theme" value="dark" />Dark</label>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -256,15 +290,17 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                     <div class="group">
                         <h2 class="group-title">Search engine</h2>
                         <div class="rows">
-                            <div class="row">
-                                <label for="search-engine">Search with</label>
-                                <div class="control-pair">
-                                    <select id="search-engine">
-                                        <option value="">Don't search from the address bar</option>
-                                        <hr />
-                                    </select>
-                                    <button id="search-settings" class="secondary-button">Edit…</button>
+                            <div class="row stacked" data-keywords="default">
+                                <div class="row-heading">
+                                    <span id="search-engine-title">Search with</span>
+                                    <button id="search-settings" class="secondary-button">Your own engines…</button>
                                 </div>
+                                <div
+                                    id="search-engine"
+                                    class="engine-choices"
+                                    role="radiogroup"
+                                    aria-labelledby="search-engine-title"
+                                ></div>
                             </div>
                             <div class="row">
                                 <label for="search-suggestions-enabled">
@@ -325,9 +361,9 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                 </label>
                                 <input id="enable-content-blocking" type="checkbox" switch />
                             </div>
-                            <div class="row hidden" id="show-content-blocker-count-setting">
+                            <div class="row" id="show-content-blocker-count-setting" data-keywords="badge number">
                                 <label for="show-content-blocker-count">Count what's blocked on the shield</label>
-                                <input id="show-content-blocker-count" type="checkbox" switch />
+                                <input id="show-content-blocker-count" type="checkbox" switch disabled />
                             </div>
                             <div class="row" id="blocking-dashboard-row" hidden>
                                 <div class="label">
@@ -339,6 +375,11 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                 <a id="blocking-dashboard" class="pill-link" href="#blocking">Open</a>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="group" id="content-blocker-disabled-sites-section" hidden>
+                        <h2 class="group-title">Sites let through</h2>
+                        <div id="content-blocker-disabled-sites" class="rows site-rows"></div>
                     </div>
 
                     <div class="group">
@@ -379,7 +420,7 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                     </div>
 
                     <details class="group disclosure">
-                        <summary class="group-title">Subscriptions and local lists</summary>
+                        <summary class="group-title">Other lists, and your own filters</summary>
                         <div class="rows">
                             <div class="row stacked" id="custom-filters-row">
                                 <label for="custom-content-blocker-filters">
@@ -398,65 +439,70 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                     </button>
                                 </div>
                             </div>
-                            <div class="row stacked">
-                                <label for="custom-content-blocker-subscription-url">
-                                    Subscribe to a list
-                                    <p class="description">
-                                        From a source you trust. Its updates tell that source your IP address.
-                                    </p>
-                                </label>
-                                <div class="control-pair">
-                                    <input
-                                        id="custom-content-blocker-subscription-url"
-                                        type="url"
-                                        placeholder="https://example.com/filters.txt"
-                                    />
-                                    <button id="add-content-blocker-subscription" class="secondary-button">Add</button>
-                                </div>
-                                <p
-                                    id="custom-content-blocker-subscription-status"
-                                    class="description"
-                                    role="status"
-                                ></p>
-                                <div id="custom-content-blocker-subscriptions" class="list-rows"></div>
-                            </div>
-                            <div class="row stacked">
+                            <div class="row stacked" data-keywords="subscribe subscription import local catalog">
                                 <div class="row-heading">
-                                    <label>
-                                        Lists on this computer
-                                        <p class="description">Adblock-compatible lists saved as text files.</p>
+                                    <div class="label">
+                                        Ladybird's catalog, and lists you add
+                                        <p class="description">
+                                            The catalog is Ladybird's own downloads of the original lists. Xenon's lists
+                                            above already have them, converted for Xenon, so turning these on only adds
+                                            duplicates.
+                                        </p>
+                                    </div>
+                                    <div class="control-pair">
+                                        <button id="update-content-blocker-lists" class="secondary-button">
+                                            Update enabled lists
+                                        </button>
+                                        <button
+                                            id="add-filter-list"
+                                            class="secondary-button"
+                                            aria-expanded="false"
+                                            aria-controls="add-filter-list-form"
+                                        >
+                                            Add a list…
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="content-blocker-lists" class="list-rows"></div>
+                                <div id="add-filter-list-form" class="add-filter-list" hidden>
+                                    <label for="custom-content-blocker-subscription-url">
+                                        Subscribe to a list
+                                        <p class="description">
+                                            From a source you trust. Its updates tell that source your IP address.
+                                        </p>
                                     </label>
-                                    <input
-                                        id="local-content-blocker-list-picker"
-                                        type="file"
-                                        accept=".txt,text/plain"
-                                        hidden
-                                    />
-                                    <button id="import-local-content-blocker-list" class="secondary-button">
-                                        Import…
-                                    </button>
+                                    <div class="control-pair">
+                                        <input
+                                            id="custom-content-blocker-subscription-url"
+                                            type="url"
+                                            placeholder="https://example.com/filters.txt"
+                                        />
+                                        <button id="add-content-blocker-subscription" class="secondary-button">
+                                            Add
+                                        </button>
+                                    </div>
+                                    <p
+                                        id="custom-content-blocker-subscription-status"
+                                        class="description"
+                                        role="status"
+                                    ></p>
+                                    <div class="row-heading">
+                                        <div class="label">
+                                            Or import one from this computer
+                                            <p class="description">An Adblock-compatible list saved as a text file.</p>
+                                        </div>
+                                        <input
+                                            id="local-content-blocker-list-picker"
+                                            type="file"
+                                            accept=".txt,text/plain"
+                                            hidden
+                                        />
+                                        <button id="import-local-content-blocker-list" class="secondary-button">
+                                            Import…
+                                        </button>
+                                    </div>
+                                    <p id="local-content-blocker-list-status" class="description" role="status"></p>
                                 </div>
-                                <p id="local-content-blocker-list-status" class="description" role="status"></p>
-                                <div id="local-content-blocker-lists" class="list-rows"></div>
-                            </div>
-                        </div>
-                    </details>
-
-                    <details class="group disclosure">
-                        <summary class="group-title">Ladybird's list catalog</summary>
-                        <p class="group-note">
-                            Ladybird's own downloads of the original lists. Xenon's lists above already have them,
-                            converted for Xenon, so turning these on only adds duplicates.
-                        </p>
-                        <div class="rows">
-                            <div class="row stacked">
-                                <div class="row-heading">
-                                    <span>Catalog lists</span>
-                                    <button id="update-content-blocker-lists" class="secondary-button">
-                                        Update enabled lists
-                                    </button>
-                                </div>
-                                <div id="built-in-content-blocker-lists" class="list-rows"></div>
                                 <details class="nested-disclosure">
                                     <summary>Lists for other languages</summary>
                                     <div id="language-content-blocker-lists" class="list-rows"></div>
@@ -472,7 +518,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                     <span class="label"></span>
                                     <p class="description"></p>
                                 </label>
-                                <p class="description filter-list-metadata"></p>
                             </div>
                             <div class="list-row-controls">
                                 <input type="checkbox" switch />
