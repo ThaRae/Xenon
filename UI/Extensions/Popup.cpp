@@ -57,7 +57,9 @@ QFrame#XenonExtensionPopup {{
     layout->setSpacing(0);
 
     // NB: The popup is the extension's own page, which goes without the content blocker as its background does.
-    m_view = new WebContentView(&card(), {}, { .enable_content_blocker = WebView::EnableContentBlocker::No });
+    WebContentViewInitialState initial_state;
+    initial_state.enable_content_blocker = WebView::EnableContentBlocker::No;
+    m_view = new WebContentView(&card(), {}, initial_state);
     layout->addWidget(m_view);
     // NB: Before the page loads, so that its chrome.* knows it's a popup.
     Browser::did_open_popup(m_view->view_id(), tab, *this);
