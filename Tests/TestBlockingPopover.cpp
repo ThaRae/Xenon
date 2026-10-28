@@ -36,7 +36,7 @@ static QApplication& application()
 
 static WebView::ContentBlockingSnapshot snapshot(WebView::ContentBlockingState state, u64 blocked)
 {
-    return { .site = "news.example.com"_string, .state = state, .blocked_request_count = blocked };
+    return { .site = "news.example.com"_string, .state = state, .blocked_resources = {}, .blocked_request_count = blocked };
 }
 
 static Vector<BlockingDomain> domains()
