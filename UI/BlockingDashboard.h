@@ -15,7 +15,8 @@
 // dashboard gets it again when the blocking settings change elsewhere.
 namespace Ladybird::BlockingDashboard {
 
-// Registers the xenon: scheme. Call it before the first renderer starts.
+// Registers the xenon: scheme, which also serves the certificate warning (UI/CertificateErrors.h). Call it before the first
+// renderer starts.
 void register_url_scheme();
 
 }

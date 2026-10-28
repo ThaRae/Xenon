@@ -43,6 +43,8 @@ set(XENON_SOURCES
     BookmarkDialog.cpp
     BookmarksBar.cpp
     BrowserWindow.cpp
+    CertificateDetails.cpp
+    CertificateErrors.cpp
     ChromeStyle.cpp
     ContentBlockingButton.cpp
     ContentBlockingPopover.cpp
@@ -329,6 +331,20 @@ foreach (page IN LISTS XENON_ABOUT_PAGE_ADDITIONS)
     list(APPEND ABOUT_PAGES "${XENON_UI_DIR}/Resources/about-pages/${page}")
 endforeach()
 
+# The engine's error page, whose Xenon version sends a tab whose site's certificate didn't verify to Xenon's certificate
+# warning (UI/CertificateErrors.h).
+set(XENON_TEMPLATE_OVERRIDES
+    error.html
+)
+foreach (page IN LISTS XENON_TEMPLATE_OVERRIDES)
+    list(FIND WEB_TEMPLATES "${LADYBIRD_SOURCE_DIR}/Base/res/ladybird/templates/${page}" index)
+    if (index EQUAL -1)
+        message(FATAL_ERROR "Xenon overrides templates/${page}, which Ladybird no longer ships. Check upstream's changes.")
+    endif()
+    list(REMOVE_AT WEB_TEMPLATES ${index})
+    list(INSERT WEB_TEMPLATES ${index} "${XENON_UI_DIR}/Resources/templates/${page}")
+endforeach()
+
 # Ladybird's internal pages show its logo as their favicon and on an empty history or bookmarks page, and so does the
 # task manager. Xenon's versions (rendered by Meta/generate-app-icon.py) take their place.
 set(XENON_ICON_OVERRIDES
@@ -404,6 +420,16 @@ copy_resource_set(xenon/blocking
     TARGET xenon
 )
 
+# The certificate warning's page (UI/CertificateErrors.cpp serves it at xenon://certificate-error/).
+copy_resource_set(xenon/certificate-error
+    RESOURCES
+        "${XENON_UI_DIR}/Resources/certificate-error/certificate-error.css"
+        "${XENON_UI_DIR}/Resources/certificate-error/certificate-error.html"
+        "${XENON_UI_DIR}/Resources/certificate-error/certificate-error.js"
+    DESTINATION "${xenon_resource_dir}"
+    TARGET xenon
+)
+
 qt_finalize_target(xenon)
 
 # Xenon's unit tests, which Meta/xenon.py test builds and runs. Each is named TestXenon* to stay clear of Ladybird's.
@@ -427,6 +453,12 @@ target_sources(TestXenonExtensions PRIVATE
     "${XENON_UI_DIR}/Extensions/Storage.cpp"
 )
 target_include_directories(TestXenonExtensions BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestCertificateDetails.cpp" Xenon NAME TestXenonCertificateDetails LIBS LibCore LibURL)
+target_sources(TestXenonCertificateDetails PRIVATE "${XENON_UI_DIR}/CertificateDetails.cpp")
+target_include_directories(TestXenonCertificateDetails BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_link_libraries(TestXenonCertificateDetails PRIVATE OpenSSL::Crypto)
+target_compile_definitions(TestXenonCertificateDetails PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
 
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestCRX.cpp" Xenon NAME TestXenonCRX LIBS LibCrypto LibFileSystem LibHTTP LibRequests LibURL LibWebView LibXML)
 target_sources(TestXenonCRX PRIVATE
@@ -456,4 +488,4 @@ target_sources(TestXenonBlockingPopover PRIVATE
 target_include_directories(TestXenonBlockingPopover BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonBlockingPopover PRIVATE Qt::Core Qt::Gui Qt::Widgets)
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonBlockingPopover TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonRecentTabOrder)
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonRecentTabOrder)

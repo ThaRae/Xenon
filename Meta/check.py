@@ -170,6 +170,25 @@ def check_about_page_overrides(checks: Checks):
         checks.fail("overrides", f"UI/Resources/about-pages/{name} isn't listed in UI/Xenon.cmake, so it never ships")
 
 
+def check_template_overrides(checks: Checks):
+    build_file = (UI_DIR / "Xenon.cmake").read_text()
+    match = re.search(r"set\(XENON_TEMPLATE_OVERRIDES\s+([^)]*)\)", build_file)
+    if not match:
+        checks.fail("overrides", "UI/Xenon.cmake needs an XENON_TEMPLATE_OVERRIDES list")
+        return
+
+    overrides = match.group(1).split()
+    shipped = {path.name for path in (UI_DIR / "Resources" / "templates").iterdir()}
+    upstream = LADYBIRD_SOURCE_DIR / "Base" / "res" / "ladybird" / "templates"
+    for name in overrides:
+        if name not in shipped:
+            checks.fail("overrides", f"{name} is listed as an override but UI/Resources/templates/{name} is missing")
+        if not (upstream / name).exists():
+            checks.fail("overrides", f"{name} overrides a template Ladybird no longer ships; check upstream's changes")
+    for name in sorted(shipped - set(overrides)):
+        checks.fail("overrides", f"UI/Resources/templates/{name} isn't listed in UI/Xenon.cmake, so it never ships")
+
+
 def check_bangs(checks: Checks):
     # The bangs Xenon ships (Meta/update-bangs.py writes them), which the build turns into UI/Bangs.cpp's lookup table.
     directory = UI_DIR / "Resources" / "bangs"
@@ -454,6 +473,7 @@ def main():
     check_format_strings(checks)
     check_build_lists_every_source(checks)
     check_about_page_overrides(checks)
+    check_template_overrides(checks)
     check_bangs(checks)
     check_palette(checks)
     check_filter_lists(checks)

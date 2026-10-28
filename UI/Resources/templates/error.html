@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Can’t reach %failed_host%</title>
+        <meta name="xenon-error-message" content="%error_message%" />
+        <meta name="xenon-failed-url" content="%failed_url%" />
+        <script>
+            // Xenon: a tab whose page failed because the site's certificate didn't verify shows Xenon's certificate
+            // warning instead, which says why and lets the user proceed anyway (UI/CertificateErrors.h). A frame keeps
+            // this page, as in Chrome. This page is parsed before it's the tab's active document, which only then has
+            // a navigable to navigate, so it goes once it's shown.
+            requestAnimationFrame(() => {
+                const message = document.querySelector('meta[name="xenon-error-message"]').content;
+                if (window.top !== window || !message.includes("SSL verification failed")) return;
+                const url = document.querySelector('meta[name="xenon-failed-url"]').content;
+                location.replace("xenon://certificate-error/?url=" + encodeURIComponent(url));
+            });
+        </script>
+        <style>
+            :root {
+                color-scheme: light dark;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+                font-size: 13px;
+
+                --page: #ffffff;
+                --text: #1d1d1f;
+                --body: #3a3a40;
+                --muted: #5d5d64;
+                --control: rgba(0, 0, 0, 0.06);
+                --control-hover: rgba(0, 0, 0, 0.09);
+                --primary: #ff0050;
+                --primary-hover: #e8004a;
+                --focus-edge: #ff0050;
+                --focus-ring: rgba(255, 0, 80, 0.16);
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --page: #1c1c1e;
+                    --text: #f2f2f5;
+                    --body: #dcdce1;
+                    --muted: #acacb4;
+                    --control: rgba(255, 255, 255, 0.1);
+                    --control-hover: rgba(255, 255, 255, 0.14);
+                    --focus-edge: rgba(255, 133, 170, 0.75);
+                    --focus-ring: rgba(255, 0, 80, 0.2);
+                }
+            }
+            body {
+                margin: 0;
+                padding: 132px 24px 48px;
+                color: var(--text);
+                background: var(--page);
+            }
+            main {
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                /* The content lines up with the left edge of a centered column. */
+                max-width: 800px;
+                margin: 0 auto;
+            }
+            main > * {
+                max-width: 560px;
+            }
+            svg {
+                width: 40px;
+                height: 40px;
+                color: var(--muted);
+            }
+            h1 {
+                margin: 0;
+                font-size: 22px;
+                font-weight: 600;
+                overflow-wrap: anywhere;
+            }
+            p {
+                margin: 0;
+                line-height: 1.55;
+                color: var(--body);
+            }
+            .actions {
+                display: flex;
+                gap: 8px;
+                margin-top: 10px;
+            }
+            button,
+            summary {
+                font: inherit;
+                font-size: 13px;
+                height: 28px;
+                padding: 0 16px;
+                border: 0;
+                border-radius: 7px;
+                cursor: pointer;
+            }
+            button {
+                color: #ffffff;
+                background: var(--primary);
+                font-weight: 500;
+            }
+            button:hover {
+                background: var(--primary-hover);
+            }
+            details {
+                display: contents;
+            }
+            summary {
+                display: inline-flex;
+                align-items: center;
+                color: var(--text);
+                background: var(--control);
+                list-style: none;
+            }
+            summary::-webkit-details-marker {
+                display: none;
+            }
+            summary:hover {
+                background: var(--control-hover);
+            }
+            .details {
+                margin-top: 4px;
+                font-size: 12px;
+                color: var(--muted);
+                overflow-wrap: anywhere;
+            }
+            :focus-visible {
+                outline: none;
+                box-shadow:
+                    0 0 0 1px var(--focus-edge),
+                    0 0 0 3px var(--focus-ring);
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <path d="M2.5 8a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0M4.2 4.2l7.6 7.6" />
+            </svg>
+            <h1>Can’t reach %failed_host%</h1>
+            <p>%error_message%</p>
+            <div class="actions">
+                <details>
+                    <summary>Show details</summary>
+                    <div class="details">%failed_url%</div>
+                </details>
+                <button type="button" data-url="%failed_url%" onclick="location.href = this.dataset.url" autofocus>
+                    Try again
+                </button>
+            </div>
+        </main>
+    </body>
+</html>

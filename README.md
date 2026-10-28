@@ -33,6 +33,10 @@ It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 - Pick Bitwarden or Proton Pass when you first start Xenon, and it installs and updates it for you
 - Sign in with a USB security key (WebAuthn, on macOS)
 
+**Security**
+
+- A warning for sites whose certificate can't be verified that says why, with a way past it for your own servers
+
 **Setup**
 
 - A welcome flow that asks three questions (search engine, blocking, password manager) or takes Xenon's picks

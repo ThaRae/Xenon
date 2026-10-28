@@ -15,6 +15,7 @@
 #include <UI/Application.h>
 #include <UI/BlockingDashboard.h>
 #include <UI/BrowserWindow.h>
+#include <UI/CertificateErrors.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
@@ -103,6 +104,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
     //     first starts once the event loop runs, and the profile they live in is only known once the application has
     //     been created.
     app->initialize_extensions();
+
+    Ladybird::CertificateErrors::initialize();
 
     // Ladybird opens new tabs blank. Xenon has a new tab page of its own (UI/NewTabPage.cpp), which a new profile opens
     // new tabs to until the user picks another page.
