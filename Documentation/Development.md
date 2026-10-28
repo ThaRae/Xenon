@@ -164,6 +164,11 @@ lists (AGPL-3.0, and almost nothing survives conversion). The content blocker pa
 filters. uBlock Origin's own lists go in `trusted-lists/`, and its scriptlets and redirect surrogates in
 `resources/`.
 
+A list costs memory in every WebContent process, since each builds its own engine from all of them: roughly 5 to 12 MiB
+per process for a large list like EasyList or AdGuard's. `||host^$document` and `||host/path^$document` filters are the
+exception: engine patch `0027` keeps those as hashes (8 bytes each), so a list made of them, like URLhaus, costs almost
+nothing.
+
 `UI/Resources/filter-lists/NOTICE.txt` credits every list's source and license, and the GPL-3.0 text ships beside
 them. `Meta/check.py` fails if a list ships without a cleared license. `Meta/xenon.py test` checks that Xenon applies
 the lists without being given any, with blocking on and off: requests that EasyList and EasyPrivacy block, and a
