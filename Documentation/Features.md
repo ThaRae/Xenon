@@ -9,8 +9,8 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
 - [Search and the address bar](#search-and-the-address-bar): !bangs, quick link copy
 - [Ads and trackers](#ads-and-trackers): uBlock Origin's filters and engine features, its popup and dashboard, daily
   updates
-- [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden and Proton Pass,
-  security keys
+- [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden, Proton Pass,
+  1Password, security keys
 - [Security](#security): certificate warnings
 - [Installing and updates](#installing-and-updates): the installer, and Xenon updating itself
 - [Look](#look): palette and icon
@@ -27,7 +27,7 @@ questions:
 
 - which search engine, from a private/mainstream list with a live preview of where a search goes;
 - whether to block ads and trackers (on by default, with all the filter lists);
-- which password manager, if any: Bitwarden or Proton Pass, as Helium's setup offers.
+- which password manager, if any: Bitwarden, Proton Pass, or 1Password, as Helium's setup offers.
 
 Nothing is saved until you finish.
 
@@ -262,16 +262,19 @@ still in progress; [Extensions.md](Extensions.md) has the details.
 - Their content scripts run in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and
   stylesheets on request.
 
-### Bitwarden and Proton Pass
+### Bitwarden, Proton Pass, and 1Password
 
-The welcome flow offers both, as Helium's setup does. Xenon installs the one picked from the Chrome Web Store, after
-checking its signatures, and keeps it up to date. **Settings → Password manager** and the Extensions window switch or
-remove it.
+The welcome flow offers all three, as Helium's setup does. Xenon installs the one picked from the Chrome Web Store,
+after checking its signatures, and keeps it up to date. **Settings → Password manager** and the Extensions window
+switch or remove it.
 
 - **Bitwarden** logs in (with a security key too) and autofills logins.
 - **Proton Pass** signs in through Proton's account page, unlocks with its extra password, autofills logins, and saves
   new ones. Once allowed to use the clipboard, it clears a copied password when its timer runs out (engine patch
   `0028`; see [Extensions.md](Extensions.md)).
+- **1Password** installs from its Chrome Web Store listing (`aeblfdkhhhdcdjpifhhbdiojplfjncoa`) the same way. Unlocking
+  through the 1Password desktop app needs native messaging, which Xenon doesn't have yet. How far the extension works
+  on its own hasn't been tried by hand; see [Extensions.md](Extensions.md).
 
 ### Security keys (WebAuthn)
 
