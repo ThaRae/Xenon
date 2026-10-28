@@ -5,12 +5,14 @@
  */
 
 #include <AK/HashMap.h>
+#include <AK/QuickSort.h>
 #include <AK/Time.h>
 #include <AK/TypeCasts.h>
 #include <AK/Vector.h>
 #include <LibWebView/ViewImplementation.h>
 #include <UI/BrowserWindow.h>
 #include <UI/JavaScriptDialog.h>
+#include <UI/MemoryPressure.h>
 #include <UI/Tab.h>
 #include <UI/TabHibernation.h>
 #include <UI/TabMemory.h>
@@ -61,9 +63,13 @@ public:
             return;
         }
 
-        // Often enough that a tab hibernates close to its time, and no more than twice a minute.
+        // Often enough that a tab hibernates close to its time, and no more than twice a minute. Memory pressure
+        // needs a quicker look, so that a machine that's swapping doesn't wait the timeout's quarter.
         auto timeout = XenonSettings::tab_hibernation_timeout().to_milliseconds();
-        m_timer.start(static_cast<int>(clamp<i64>(timeout / 4, 1000, 30 * 1000)));
+        auto interval = clamp<i64>(timeout / 4, 1000, 30 * 1000);
+        if (XenonSettings::hibernate_on_memory_pressure())
+            interval = min(interval, static_cast<i64>(5000));
+        m_timer.start(static_cast<int>(interval));
     }
 
     bool may_hibernate(Tab& tab)
@@ -92,13 +98,19 @@ public:
         return {};
     }
 
-    void hibernate_when_ready(Tab& tab, bool requested_by_user)
+    enum class Request {
+        Timeout,
+        MemoryPressure,
+        User,
+    };
+
+    void hibernate_when_ready(Tab& tab, Request request)
     {
         auto& state = state_for(tab);
         if (state.is_preparing)
             return;
         state.is_preparing = true;
-        state.requested_by_user = requested_by_user;
+        state.request = request;
 
         // The page saves its scroll position to its session history entry first, and says whether it holds input that
         // hibernating would lose.
@@ -128,7 +140,7 @@ private:
         MonotonicTime last_used;
         Optional<MonotonicTime> last_audible {};
         bool is_preparing { false };
-        bool requested_by_user { false };
+        Request request { Request::Timeout };
         // What the tab's processes used when it last hibernated.
         Optional<u64> memory_freed {};
     };
@@ -193,9 +205,40 @@ private:
                     state.last_audible = now;
 
                 if (now - state.last_used >= timeout && may_hibernate(tab))
-                    hibernate_when_ready(tab, false);
+                    hibernate_when_ready(tab, Request::Timeout);
             }
         }
+
+        hibernate_under_memory_pressure();
+    }
+
+    void hibernate_under_memory_pressure()
+    {
+        if (!XenonSettings::hibernate_on_memory_pressure())
+            return;
+
+        struct Candidate {
+            Tab* tab { nullptr };
+            MonotonicTime last_used;
+        };
+        Vector<Candidate> eligible;
+        for (auto* widget : QApplication::topLevelWidgets()) {
+            auto* window = as_if<BrowserWindow>(widget);
+            if (!window)
+                continue;
+            for (int i = 0; i < window->tab_count(); ++i) {
+                auto& tab = *window->tab_at(i);
+                auto& state = state_for(tab);
+                if (state.is_preparing || !may_hibernate(tab))
+                    continue;
+                eligible.append({ &tab, state.last_used });
+            }
+        }
+        quick_sort(eligible, [](Candidate const& a, Candidate const& b) { return a.last_used < b.last_used; });
+
+        auto wanted = MemoryPressure::tabs_to_hibernate(MemoryPressure::level_for(MemoryPressure::sample()), eligible.size());
+        for (size_t i = 0; i < wanted; ++i)
+            hibernate_when_ready(*eligible[i].tab, Request::MemoryPressure);
     }
 
     void finish_hibernating(Tab& tab, bool has_unsubmitted_input)
@@ -211,9 +254,13 @@ private:
             return;
         }
 
-        // The tab may have been used while its page answered.
-        if (!state->requested_by_user) {
+        // The tab may have been used while its page answered. A timeout only hibernates if the tab has still been
+        // unused for the whole timeout; memory pressure and an explicit Hibernate Tab don't wait.
+        if (state->request == Request::Timeout) {
             if (!XenonSettings::tab_hibernation_enabled() || MonotonicTime::now() - state->last_used < XenonSettings::tab_hibernation_timeout())
+                return;
+        } else if (state->request == Request::MemoryPressure) {
+            if (!XenonSettings::tab_hibernation_enabled() || !XenonSettings::hibernate_on_memory_pressure())
                 return;
         }
         if (!may_hibernate(tab))
@@ -312,7 +359,7 @@ QAction* create_hibernate_tab_action(Tab& tab, QMenu& context_menu)
     action->setToolTip("Free this tab's memory until it's selected again");
     QObject::connect(action, &QAction::triggered, &tab, [&tab] {
         if (Hibernator::the().may_hibernate(tab))
-            Hibernator::the().hibernate_when_ready(tab, true);
+            Hibernator::the().hibernate_when_ready(tab, Hibernator::Request::User);
     });
     QObject::connect(&context_menu, &QMenu::aboutToShow, action, [action, &tab] {
         action->setEnabled(Hibernator::the().may_hibernate(tab));

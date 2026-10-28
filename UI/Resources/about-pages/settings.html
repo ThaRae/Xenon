@@ -249,6 +249,16 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                 <label for="tab-hibernation-timeout">Hibernate a tab after</label>
                                 <select id="tab-hibernation-timeout" disabled></select>
                             </div>
+                            <div class="row" data-keywords="memory saver sleep discard pressure ram">
+                                <label for="tab-hibernation-on-memory-pressure">
+                                    Also when the system is low on memory
+                                    <p class="description">
+                                        Background tabs hibernate right away if the machine is short of memory, the way
+                                        Chromium's Memory Saver does, instead of waiting for the time above.
+                                    </p>
+                                </label>
+                                <input id="tab-hibernation-on-memory-pressure" type="checkbox" switch disabled />
+                            </div>
                         </div>
                     </div>
 
