@@ -39,3 +39,60 @@ jobs:
             Meta/ci/memory-measurement/target/release/measure UI/Resources/filter-lists
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  browsers:
+    runs-on: macos-26
+    timeout-minutes: 360
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/Build/caches/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 3G
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: git submodule update --init --depth 1 ladybird
+
+      - name: Select Xcode
+        run: |
+          version=$(sed -n "s/.*xcode-version: *'\{0,1\}\([0-9.]*\)'\{0,1\}.*/\1/p" ladybird/.github/actions/setup/action.yml)
+          xcode=/Applications/Xcode_$version.app
+          if [ ! -d "$xcode" ]; then
+            xcode=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          fi
+          sudo xcode-select --switch "$xcode"
+          echo "XCODE_VERSION=$(xcodebuild -version | head -n 1)" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: |
+          brew update --quiet
+          brew unlink openssl@3 || true
+          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool llvm@22 nasm ninja pkg-config unzip
+
+      - name: Restore the build caches
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: macos-${{ env.XCODE_VERSION }}-${{ github.sha }}
+          restore-keys: macos-${{ env.XCODE_VERSION }}-
+
+      - name: Build Xenon
+        timeout-minutes: 320
+        run: ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" build
+
+      - name: Measure Xenon and Chrome
+        run: |
+          chrome=()
+          if [ -d "/Applications/Google Chrome.app" ]; then
+            chrome=(--chrome "/Applications/Google Chrome.app")
+          fi
+          {
+            echo "### Headless browsers on macOS (physical footprint, MiB)"
+            echo
+            echo '```'
+            python3 Meta/ci/memory-measurement/browsers.py --xenon Build/release/bin/Xenon.app "${chrome[@]}"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
