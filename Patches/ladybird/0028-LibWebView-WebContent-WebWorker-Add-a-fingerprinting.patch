@@ -1,0 +1,422 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan E <76752281+ThaRae@users.noreply.github.com>
+Date: Wed, 28 Oct 2026 16:46:41 -0400
+Subject: [PATCH] LibWebView+WebContent+WebWorker: Add a fingerprinting
+ protection setting
+
+The setting is on by default and lives next to Global Privacy Control:
+about:settings has a toggle for it, pages are told through their view
+as they are about GPC, and workers are told by the worker process
+manager when they start and whenever it changes. In test mode it is
+always reported as off.
+---
+ Base/res/ladybird/about-pages/settings.html       |  7 +++++++
+ Base/res/ladybird/about-pages/settings/privacy.js |  9 +++++++++
+ Libraries/LibWebView/Application.cpp              | 15 +++++++++++++++
+ Libraries/LibWebView/Application.h                |  4 ++++
+ Libraries/LibWebView/Settings.cpp                 | 14 ++++++++++++++
+ Libraries/LibWebView/Settings.h                   |  5 +++++
+ Libraries/LibWebView/ViewImplementation.cpp       | 11 +++++++++++
+ Libraries/LibWebView/ViewImplementation.h         |  1 +
+ Libraries/LibWebView/WebUI/SettingsUI.cpp         | 11 +++++++++++
+ Libraries/LibWebView/WebUI/SettingsUI.h           |  2 ++
+ Libraries/LibWebView/WorkerProcessManager.cpp     |  7 +++++++
+ Libraries/LibWebView/WorkerProcessManager.h       |  1 +
+ Services/WebContent/ConnectionFromClient.cpp      |  5 +++++
+ Services/WebContent/ConnectionFromClient.h        |  1 +
+ Services/WebContent/WebContentServer.ipc          |  1 +
+ Services/WebWorker/ConnectionFromClient.cpp       |  5 +++++
+ Services/WebWorker/ConnectionFromClient.h         |  1 +
+ Services/WebWorker/WebWorkerServer.ipc            |  1 +
+ 18 files changed, 101 insertions(+)
+
+diff --git a/Base/res/ladybird/about-pages/settings.html b/Base/res/ladybird/about-pages/settings.html
+index 5c28fdb17fac91b23141198a72d9dd75f21f69af..b9a6a818825793b93cb76b9a3031ad1ebd669e6f 100644
+--- a/Base/res/ladybird/about-pages/settings.html
++++ b/Base/res/ladybird/about-pages/settings.html
+@@ -1032,6 +1032,13 @@
+                                 </label>
+                                 <input id="global-privacy-control-toggle" type="checkbox" switch />
+                             </div>
++                            <div class="inline-container">
++                                <label for="fingerprinting-protection-toggle">
++                                    Fingerprinting protection
++                                    <p class="description">Randomize canvas, audio and hardware details per site and session.</p>
++                                </label>
++                                <input id="fingerprinting-protection-toggle" type="checkbox" switch />
++                            </div>
+                         </div>
+                     </div>
+                 </div>
+diff --git a/Base/res/ladybird/about-pages/settings/privacy.js b/Base/res/ladybird/about-pages/settings/privacy.js
+index e48c473c78b703b496e4161af704fa807c083705..0ec02462a54189f1b4e969ad901243509a6ade4b 100644
+--- a/Base/res/ladybird/about-pages/settings/privacy.js
++++ b/Base/res/ladybird/about-pages/settings/privacy.js
+@@ -25,6 +25,7 @@ const clearBrowsingDataSiteDataSize = document.querySelector("#clear-browsing-da
+ const clearBrowsingDataTimeRange = document.querySelector("#clear-browsing-data-time-range");
+ 
+ const globalPrivacyControlToggle = document.querySelector("#global-privacy-control-toggle");
++const fingerprintingProtectionToggle = document.querySelector("#fingerprinting-protection-toggle");
+ 
+ const MiB = 1024 * 1024;
+ const GiB = MiB * 1024;
+@@ -36,6 +37,10 @@ function loadSettings(settings) {
+         globalPrivacyControlToggle.checked = settings.globalPrivacyControl;
+     }
+ 
++    if (Object.hasOwn(settings, "fingerprintingProtection")) {
++        fingerprintingProtectionToggle.checked = settings.fingerprintingProtection;
++    }
++
+     if (Object.hasOwn(settings, "browsingData")) {
+         BROWSING_DATA = settings.browsingData;
+         showBrowsingDataSettings();
+@@ -177,6 +182,10 @@ globalPrivacyControlToggle.addEventListener("change", () => {
+     ladybird.sendMessage("setGlobalPrivacyControl", globalPrivacyControlToggle.checked);
+ });
+ 
++fingerprintingProtectionToggle.addEventListener("change", () => {
++    ladybird.sendMessage("setFingerprintingProtection", fingerprintingProtectionToggle.checked);
++});
++
+ document.addEventListener("WebUIMessage", event => {
+     if (event.detail.name === "loadSettings") {
+         loadSettings(event.detail.data);
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 8f310ec7639cc829a9eacda1ae11513b2ff0d323..e6b2512dab16e7cd9eebf5c4b5a9c1f2b8c37e6e 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -136,6 +136,11 @@ struct ApplicationSettingsObserver final : public SettingsObserver {
+         Application::the().languages_changed({});
+     }
+ 
++    virtual void fingerprinting_protection_changed() override
++    {
++        Application::the().fingerprinting_protection_changed({});
++    }
++
+     virtual void browsing_data_settings_changed() override
+     {
+         Application::request_server_manager().disk_cache_settings_changed();
+@@ -3069,6 +3074,16 @@ void Application::languages_changed(Badge<ApplicationSettingsObserver>)
+     WorkerProcessManager::the().update_preferred_languages(m_settings->languages());
+ }
+ 
++void Application::fingerprinting_protection_changed(Badge<ApplicationSettingsObserver>)
++{
++    WorkerProcessManager::the().update_fingerprinting_protection(fingerprinting_protection_enabled());
++}
++
++bool Application::fingerprinting_protection_enabled() const
++{
++    return m_web_content_options.is_test_mode != IsTestMode::Yes && m_settings->fingerprinting_protection();
++}
++
+ String Application::user_agent_string() const
+ {
+     return MUST(String::from_utf8(m_user_agent_string));
+diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
+index d3a73370adde6f99893ab871edde3662a4beb6c4..84e7c22fd25edca628e091f9b7b50ead75467d92 100644
+--- a/Libraries/LibWebView/Application.h
++++ b/Libraries/LibWebView/Application.h
+@@ -172,6 +172,10 @@ public:
+     void appearance_changed(Badge<ApplicationSettingsObserver>);
+     void tab_settings_changed(Badge<ApplicationSettingsObserver>);
+     void languages_changed(Badge<ApplicationSettingsObserver>);
++    void fingerprinting_protection_changed(Badge<ApplicationSettingsObserver>);
++
++    // The fingerprinting protection setting, forced off in test mode so that test output stays deterministic.
++    bool fingerprinting_protection_enabled() const;
+ 
+     // The spoofing choices in effect: what every page and worker reports from its navigator.
+     String user_agent_string() const;
+diff --git a/Libraries/LibWebView/Settings.cpp b/Libraries/LibWebView/Settings.cpp
+index 9701d1b366cd8c52a68d4501c79ad444fab90971..0c03c3650e4f84f8462951406e03f0a69009107c 100644
+--- a/Libraries/LibWebView/Settings.cpp
++++ b/Libraries/LibWebView/Settings.cpp
+@@ -81,6 +81,7 @@ static constexpr auto DISK_CACHE_KEY = "diskCache"sv;
+ static constexpr auto DISK_CACHE_MAXIMUM_SIZE_KEY = "maxSize"sv;
+ 
+ static constexpr auto GLOBAL_PRIVACY_CONTROL_KEY = "globalPrivacyControl"sv;
++static constexpr auto FINGERPRINTING_PROTECTION_KEY = "fingerprintingProtection"sv;
+ 
+ static constexpr auto BACKGROUND_NETWORKING_KEY = "backgroundNetworking"sv;
+ static constexpr auto BACKGROUND_NETWORKING_ENABLED_KEY = "enabled"sv;
+@@ -432,6 +433,9 @@ Settings Settings::create(ByteString settings_path, Vector<String> platform_lang
+     if (auto global_privacy_control = settings_json.value().get_bool(GLOBAL_PRIVACY_CONTROL_KEY); global_privacy_control.has_value())
+         settings.m_global_privacy_control = *global_privacy_control ? GlobalPrivacyControl::Yes : GlobalPrivacyControl::No;
+ 
++    if (auto fingerprinting_protection = settings_json.value().get_bool(FINGERPRINTING_PROTECTION_KEY); fingerprinting_protection.has_value())
++        settings.m_fingerprinting_protection = *fingerprinting_protection;
++
+     if (auto background_networking = settings_json.value().get_object(BACKGROUND_NETWORKING_KEY); background_networking.has_value()) {
+         if (auto enabled = background_networking->get_bool(BACKGROUND_NETWORKING_ENABLED_KEY); enabled.has_value())
+             settings.m_background_networking_enabled = *enabled;
+@@ -653,6 +657,7 @@ JsonValue Settings::serialize_json() const
+     settings.set(BROWSING_DATA_KEY, move(browsing_data));
+ 
+     settings.set(GLOBAL_PRIVACY_CONTROL_KEY, m_global_privacy_control == GlobalPrivacyControl::Yes);
++    settings.set(FINGERPRINTING_PROTECTION_KEY, m_fingerprinting_protection);
+ 
+     JsonObject background_network_features;
+     background_network_features.set(CONTENT_BLOCKER_SUBSCRIPTION_UPDATES_KEY, m_filter_list_updates_enabled);
+@@ -1153,6 +1158,15 @@ void Settings::set_global_privacy_control(GlobalPrivacyControl global_privacy_co
+         observer.global_privacy_control_changed();
+ }
+ 
++void Settings::set_fingerprinting_protection(bool enabled)
++{
++    m_fingerprinting_protection = enabled;
++    persist_settings();
++
++    for (auto& observer : m_observers)
++        observer.fingerprinting_protection_changed();
++}
++
+ DNSSettings Settings::parse_dns_settings(JsonValue const& dns_settings)
+ {
+     if (!dns_settings.is_object())
+diff --git a/Libraries/LibWebView/Settings.h b/Libraries/LibWebView/Settings.h
+index c1ec73fe9b51258fcfa25bc78aaec4a206497e63..96dac2334b8a04839e3b40f098dc1a65b10a1911 100644
+--- a/Libraries/LibWebView/Settings.h
++++ b/Libraries/LibWebView/Settings.h
+@@ -149,6 +149,7 @@ public:
+     virtual void autoplay_settings_changed() { }
+     virtual void browsing_data_settings_changed() { }
+     virtual void global_privacy_control_changed() { }
++    virtual void fingerprinting_protection_changed() { }
+     virtual void dns_settings_changed() { }
+     virtual void config_variable_changed(ConfigVariableID) { }
+     virtual void geolocation_settings_changed() { }
+@@ -229,6 +230,9 @@ public:
+     GlobalPrivacyControl global_privacy_control() const { return m_global_privacy_control; }
+     void set_global_privacy_control(GlobalPrivacyControl);
+ 
++    bool fingerprinting_protection() const { return m_fingerprinting_protection; }
++    void set_fingerprinting_protection(bool);
++
+     bool background_networking_enabled() const { return m_background_networking_enabled; }
+     void set_background_networking_enabled(bool);
+     bool filter_list_updates_enabled() const { return m_filter_list_updates_enabled; }
+@@ -301,6 +305,7 @@ private:
+ 
+     BrowsingDataSettings m_browsing_data_settings;
+     GlobalPrivacyControl m_global_privacy_control { GlobalPrivacyControl::No };
++    bool m_fingerprinting_protection { true };
+ 
+     bool m_background_networking_enabled { true };
+     bool m_filter_list_updates_enabled { false };
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index c465cdae5e56b5bac18fa8f5a56a565b020b3c3a..b962c5d4dc063cd21f447f7b6f1da8e30d3b106e 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -1400,6 +1400,11 @@ static void send_global_privacy_control(WebContentPage const& page)
+     page.async_set_enable_global_privacy_control(Application::settings().global_privacy_control() == GlobalPrivacyControl::Yes);
+ }
+ 
++static void send_fingerprinting_protection(WebContentPage const& page)
++{
++    page.async_set_enable_fingerprinting_protection(Application::the().fingerprinting_protection_enabled());
++}
++
+ // Only a page hosting the tab's traversable takes this request: It applies to the page's local traversable, which a page
+ // embedding an out-of-process iframe doesn't have.
+ static void send_force_dark(WebContentPage const& page)
+@@ -1419,6 +1424,7 @@ void ViewImplementation::send_preferences_to_page(WebContentPage& page)
+     send_browsing_behavior(page);
+     send_autoplay_settings(page);
+     send_global_privacy_control(page);
++    send_fingerprinting_protection(page);
+     auto* spell_checker = Application::the().spell_checker();
+     page.async_set_spell_checking_available(spell_checker != nullptr);
+     page.async_set_writing_suggestions_available(spell_checker && spell_checker->can_suggest());
+@@ -4221,6 +4227,11 @@ void ViewImplementation::global_privacy_control_changed()
+     traversable().for_each_hosting_page(send_global_privacy_control);
+ }
+ 
++void ViewImplementation::fingerprinting_protection_changed()
++{
++    traversable().for_each_hosting_page(send_fingerprinting_protection);
++}
++
+ void ViewImplementation::geolocation_settings_changed()
+ {
+     using ErrorCode = Web::Geolocation::GeolocationPositionErrorCode;
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index 7d145052c90f1316572dcc6363abf0089a8a19c7..9190aa56a63f0f3a5a176a28afd68aee92b9dd8c 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -776,6 +776,7 @@ protected:
+     virtual void autoplay_settings_changed() override;
+     virtual void geolocation_settings_changed() override;
+     virtual void global_privacy_control_changed() override;
++    virtual void fingerprinting_protection_changed() override;
+ 
+     virtual void bookmarks_changed() override;
+     void update_bookmark_action();
+diff --git a/Libraries/LibWebView/WebUI/SettingsUI.cpp b/Libraries/LibWebView/WebUI/SettingsUI.cpp
+index 2b20d1cd5fd4565c1472c6e61b5500d86029b6b0..885c9cb5700522721a42402cb1196cd86760d796 100644
+--- a/Libraries/LibWebView/WebUI/SettingsUI.cpp
++++ b/Libraries/LibWebView/WebUI/SettingsUI.cpp
+@@ -159,6 +159,9 @@ void SettingsUI::register_interfaces()
+     register_interface("setGlobalPrivacyControl"sv, [this](auto const& data) {
+         set_global_privacy_control(data);
+     });
++    register_interface("setFingerprintingProtection"sv, [this](auto const& data) {
++        set_fingerprinting_protection(data);
++    });
+ 
+     register_interface("setServicesNetworkAccessEnabled"sv, [this](auto const& data) {
+         set_services_network_access_enabled(data);
+@@ -607,6 +610,14 @@ void SettingsUI::set_global_privacy_control(JsonValue const& global_privacy_cont
+     Application::settings().set_global_privacy_control(global_privacy_control.as_bool() ? GlobalPrivacyControl::Yes : GlobalPrivacyControl::No);
+ }
+ 
++void SettingsUI::set_fingerprinting_protection(JsonValue const& fingerprinting_protection)
++{
++    if (!fingerprinting_protection.is_bool())
++        return;
++
++    Application::settings().set_fingerprinting_protection(fingerprinting_protection.as_bool());
++}
++
+ void SettingsUI::set_services_network_access_enabled(JsonValue const& enabled)
+ {
+     if (!enabled.is_bool())
+diff --git a/Libraries/LibWebView/WebUI/SettingsUI.h b/Libraries/LibWebView/WebUI/SettingsUI.h
+index f8a84fbfb1ba2e6bcb2ec7132ec9cecf00d41b38..d1d5ee3277ab4dca9bfb36feebd514e5e36c31d6 100644
+--- a/Libraries/LibWebView/WebUI/SettingsUI.h
++++ b/Libraries/LibWebView/WebUI/SettingsUI.h
+@@ -32,6 +32,7 @@ private:
+     virtual void autoplay_settings_changed() override { broadcast_settings_change(); }
+     virtual void browsing_data_settings_changed() override { broadcast_settings_change(); }
+     virtual void global_privacy_control_changed() override { broadcast_settings_change(); }
++    virtual void fingerprinting_protection_changed() override { broadcast_settings_change(); }
+     virtual void dns_settings_changed() override { broadcast_settings_change(); }
+     virtual void config_variable_changed(ConfigVariableID) override { broadcast_settings_change(); }
+     virtual void geolocation_settings_changed() override { broadcast_settings_change(); }
+@@ -71,6 +72,7 @@ private:
+     void set_browsing_data_settings(JsonValue const&);
+     void clear_browsing_data(JsonValue const&);
+     void set_global_privacy_control(JsonValue const&);
++    void set_fingerprinting_protection(JsonValue const&);
+ 
+     void set_services_network_access_enabled(JsonValue const&);
+     void set_filter_list_updates_enabled(JsonValue const&);
+diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
+index 1337e8b871b55edc284a161d881e43644120d1db..20e48f736e546160d5b18befd9fcafa346896f73 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.cpp
++++ b/Libraries/LibWebView/WorkerProcessManager.cpp
+@@ -220,6 +220,7 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
+         client->async_set_user_agent(Application::the().user_agent_string());
+         client->async_set_navigator_compatibility_mode(Application::the().navigator_compatibility_mode());
+         client->async_set_preferred_languages(Application::settings().languages());
++        client->async_set_enable_fingerprinting_protection(Application::the().fingerprinting_protection_enabled());
+         connect_to_image_decoder(*client, move(image_decoder));
+ 
+         if (auto compositor_handle = Application::the().connect_new_compositor_canvas_client(); !compositor_handle.is_error())
+@@ -357,6 +358,12 @@ void WorkerProcessManager::update_preferred_languages(Vector<String> const& pref
+         agent.value.client->async_set_preferred_languages(preferred_languages);
+ }
+ 
++void WorkerProcessManager::update_fingerprinting_protection(bool enable)
++{
++    for (auto const& agent : m_agents)
++        agent.value.client->async_set_enable_fingerprinting_protection(enable);
++}
++
+ void WorkerProcessManager::close_worker_agent(WebContentClient& client, Web::HTML::WorkerAgentId agent_id, Web::HTML::WorkerAgentOwnerToken owner_token)
+ {
+     Owner identity {
+diff --git a/Libraries/LibWebView/WorkerProcessManager.h b/Libraries/LibWebView/WorkerProcessManager.h
+index 71dfdfcc620e1b8c961ecca636db51da8bd96f3f..b4e1cf03ae6d08babc4d47a6dd9967b403a9d9d0 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.h
++++ b/Libraries/LibWebView/WorkerProcessManager.h
+@@ -61,6 +61,7 @@ public:
+     void update_user_agent(String const&);
+     void update_navigator_compatibility_mode(Web::NavigatorCompatibilityMode);
+     void update_preferred_languages(Vector<String> const&);
++    void update_fingerprinting_protection(bool);
+ 
+     void close_worker_agent(WebContentClient&, Web::HTML::WorkerAgentId, Web::HTML::WorkerAgentOwnerToken);
+     void close_worker_agent(WebWorkerClient&, Web::HTML::WorkerAgentId, Web::HTML::WorkerAgentOwnerToken);
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 97c28c1a959095d15c85e860a304c060aee12918..5b1bae51662fe673803db8d7d1010307eaacc6db 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3287,6 +3287,11 @@ void ConnectionFromClient::set_enable_global_privacy_control(Web::PageId, bool e
+     Web::update_loader_config([&](auto& config) { config.enable_global_privacy_control = enable; });
+ }
+ 
++void ConnectionFromClient::set_enable_fingerprinting_protection(Web::PageId, bool enable)
++{
++    Web::update_loader_config([&](auto& config) { config.enable_fingerprinting_protection = enable; });
++}
++
+ void ConnectionFromClient::set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData position, Optional<u16> error_code)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 8891b5b1749470ccaeea882cd9e459d0bb10dd4a..f947a3e2f654881672383d9626cb0771df8ae5d6 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -260,6 +260,7 @@ private:
+     virtual void set_preferred_languages(Web::PageId page_id, Vector<String>) override;
+     virtual void set_browsing_behavior(Web::PageId page_id, WebView::BrowsingBehavior) override;
+     virtual void set_enable_global_privacy_control(Web::PageId page_id, bool) override;
++    virtual void set_enable_fingerprinting_protection(Web::PageId page_id, bool) override;
+     virtual void set_spell_checking_available(Web::PageId page_id, bool available) override;
+     virtual void set_writing_suggestions_available(Web::PageId page_id, bool available) override;
+     virtual void set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData, Optional<u16> error_code) override;
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 0a782f27a78e9670b1e4ee6d8dcdbf03efccf9ca..592ea6fba1b8e5a2002d5cd652319329046c156b 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -265,6 +265,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     set_preferred_languages(Web::PageId page_id, Vector<String> preferred_languages) =|
+     set_browsing_behavior(Web::PageId page_id, WebView::BrowsingBehavior browsing_behavior) =|
+     set_enable_global_privacy_control(Web::PageId page_id, bool enable) =|
++    set_enable_fingerprinting_protection(Web::PageId page_id, bool enable) =|
+     set_spell_checking_available(Web::PageId page_id, bool available) =|
+     set_writing_suggestions_available(Web::PageId page_id, bool available) =|
+     set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData position, Optional<u16> error_code) =|
+diff --git a/Services/WebWorker/ConnectionFromClient.cpp b/Services/WebWorker/ConnectionFromClient.cpp
+index 8de2e2e20b1629c7d2cda72971061fabc6b26564..8a6bdb3887b620d1a86e06336b456ea7bbd20b1a 100644
+--- a/Services/WebWorker/ConnectionFromClient.cpp
++++ b/Services/WebWorker/ConnectionFromClient.cpp
+@@ -106,6 +106,11 @@ void ConnectionFromClient::set_preferred_languages(Vector<String> preferred_lang
+     Web::update_loader_config([&](auto& config) { config.preferred_languages = move(preferred_languages); });
+ }
+ 
++void ConnectionFromClient::set_enable_fingerprinting_protection(bool enable)
++{
++    Web::update_loader_config([&](auto& config) { config.enable_fingerprinting_protection = enable; });
++}
++
+ void ConnectionFromClient::close_worker()
+ {
+     async_did_close_worker();
+diff --git a/Services/WebWorker/ConnectionFromClient.h b/Services/WebWorker/ConnectionFromClient.h
+index 2d429a57877c285982c41e152fcf3a9d8a0b0839..081e895f713c603ed5615c75a70371d05b32be39 100644
+--- a/Services/WebWorker/ConnectionFromClient.h
++++ b/Services/WebWorker/ConnectionFromClient.h
+@@ -65,6 +65,7 @@ private:
+     virtual void set_user_agent(String user_agent) override;
+     virtual void set_navigator_compatibility_mode(Web::NavigatorCompatibilityMode mode) override;
+     virtual void set_preferred_languages(Vector<String> preferred_languages) override;
++    virtual void set_enable_fingerprinting_protection(bool) override;
+     virtual void set_system_font_family(String family) override;
+     virtual void start_worker(URL::URL url, Web::HTML::WorkerType type, Web::HTML::RequestCredentials credentials, String name, Web::HTML::TransferDataEncoder, Web::HTML::SerializedEnvironmentSettingsObject, Web::HTML::AgentType, URL::Origin origin, Web::HTML::EnvironmentId environment_id) override;
+     virtual void connect_shared_worker(Web::HTML::TransferDataEncoder, Web::HTML::SerializedEnvironmentSettingsObject) override;
+diff --git a/Services/WebWorker/WebWorkerServer.ipc b/Services/WebWorker/WebWorkerServer.ipc
+index 78909d234ade10689d9461de89c697a9efdc6b4a..5296b4c30052f6c1f2ad7f2591b7f6d6dbd3a2eb 100644
+--- a/Services/WebWorker/WebWorkerServer.ipc
++++ b/Services/WebWorker/WebWorkerServer.ipc
+@@ -24,6 +24,7 @@ endpoint WebWorkerServer {
+     set_user_agent(String user_agent) =|
+     set_navigator_compatibility_mode(Web::NavigatorCompatibilityMode mode) =|
+     set_preferred_languages(Vector<String> preferred_languages) =|
++    set_enable_fingerprinting_protection(bool enable) =|
+ 
+     set_system_font_family(String family) =|
+ 
