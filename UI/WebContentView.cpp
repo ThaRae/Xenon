@@ -101,7 +101,7 @@ static QWidget* initial_web_content_view_parent([[maybe_unused]] QWidget* window
 
 WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTraversable&> traversable, WebContentViewInitialState initial_state)
     : WebContentViewBase(initial_web_content_view_parent(window))
-    , WebView::ViewImplementation(initial_state.is_private)
+    , WebView::ViewImplementation(initial_state.is_private, initial_state.enable_content_blocker)
 {
 #ifdef LADYBIRD_QT_USE_RHI_WIDGET
     // Keep the QRhiWidget out of the top-level QWidget backing store. If it is

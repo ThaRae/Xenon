@@ -295,9 +295,20 @@ Xenon runs the background script the way Chrome ran MV2 background pages, with a
 - The worker gets no `fetch` events for the extension's own URLs, which a service worker gets. Proton Pass serves the
   item icons in its popup that way (`/api-proxy/...`), so they don't load. The scheme handler would have to wait for
   the worker's answer, which patch 1's synchronous `URLSchemeHandler` can't.
-- It stays running, as an MV2 background page did. Chrome stops idle service workers after 30 seconds and restarts them
-  on an event; an extension that survives being stopped also survives not being stopped. Stopping idle workers is a
-  memory optimization for later.
+- It stops once it has been idle for 30 seconds, as Chrome stops a service worker, and starts again for the next event
+  it has a listener for. Each event, runtime message, port message, and call to or from the background keeps it running
+  another 30 seconds, and so does a runtime message it owes a response to or waits for one on. Stopping closes the
+  background page, which takes its four processes with it (WebContent, WebWorker, and an ImageDecoder for each); its
+  ports close, and its offscreen document stays open. `--extension-idle-timeout=<seconds>` changes the 30 seconds.
+- To know what to start it for, the worker's `chrome-api.js` tells the router when one of its events gets its first
+  listener or loses its last (`listening` messages); the router keeps that list while the background is stopped, as
+  Chrome keeps a stopped worker's listeners. Runtime messages and ports count as `runtime.onMessage` and
+  `runtime.onConnect` (or their `External` versions). An event for a background that is starting waits for its script
+  to run, like runtime messages do. Starting again is no new session: there's no `runtime.onStartup`.
+- Its hidden view goes without the content blocker (engine patch `0031`), as do offscreen documents and popups. Each
+  opens in a WebContent process of its own, rather than the spare one, and that process never gets the filter lists, so
+  it doesn't build the content blocker's engine (about 13 MiB, and over 100 MiB while it builds). In Chrome, uBlock
+  Origin doesn't see other extensions' requests either. Their cross-site frames are in other processes, which do.
 - `chrome.extension.getBackgroundPage()` is left out, which is how Bitwarden tells MV3 from MV2.
 - Once Ladybird runs real service workers, the background script can move to one; `chrome-api.js` stays as it is.
 
@@ -311,7 +322,7 @@ device-trust keys. It picks those code paths by `manifest_version`, not by check
 the API has to be there with the background.
 
 **The clipboard.** As in Chrome, an extension's pages with `clipboardWrite` copy and cut with `document.execCommand()`,
-and those with `clipboardRead` paste with `execCommand("paste")`, with no user gesture (patch 27). The paste is
+and those with `clipboardRead` paste with `execCommand("paste")`, with no user gesture (patch 28). The paste is
 synchronous, so the text is in the field when `execCommand()` returns. The engine asks the UI process, which answers
 from the extension's permissions (`URLSchemeBridge::may_read_clipboard` and `may_write_clipboard`). Proton Pass clears
 what it copied this way: once its timer runs out, its offscreen document pastes to see whether the clipboard still holds
@@ -427,7 +438,7 @@ for Bitwarden in Chrome.
 | Web pages messaging an extension (`externally_connectable`) | | `UI/Extensions/ContentScripts` (the page's `chrome.runtime` and a relay world per extension), `Router` (their `ExternalPage` contexts), `UI/Resources/extensions/externally-connectable.js` and `externally-connectable-relay.js` |
 | Web accessible resources as web pages' subresources | 0022 | `UI/Extensions/Registry` |
 | `chrome.scripting`, `webNavigation` frames | 0017 | `UI/Extensions/Scripting.cpp` (the `Router`'s injections, registered content scripts, and Chrome's frame IDs), `Registry` (registered scripts that persist) |
-| Background worker, offscreen documents | 0001 (workers' loads) | `UI/Extensions/Registry` (their hidden views and generated files), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
+| Background worker, offscreen documents | 0001 (workers' loads), 0031 (no content blocker) | `UI/Extensions/Registry` (their hidden views and generated files), `Router` (stopping the background when idle, and starting it for events), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
 | Managing extensions | | `UI/Extensions/Dialog` (Qt), and `--load-extension`. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
@@ -532,7 +543,10 @@ for Bitwarden in Chrome.
   - `Meta/xenon.py test` runs the test page twice in one profile. It checks that the background answers messages and
     ports from a worker global, gets `onInstalled` and then `onStartup`, and that alarms, tabs, windows, and an
     offscreen document work, and that the page and the background fetch from a permitted host without CORS while a web
-    page can't.
+    page can't. With content blocking on, the offscreen document loads an image the lists block on a web page.
+  - The background stops when idle and starts again for events it listens to. `Meta/xenon.py test` runs
+    `Tests/Extensions/basic/idle.html` with a 2-second timeout: the background stops and closes its ports, starts again
+    for a message without `onStartup`, stays stopped for an event it has no listener for, and starts for an alarm.
   - Bitwarden 2026.10.0's Chrome build loads. Its background runs its state migrations and fetches its server's
     config, and its popup page shows the welcome screen (seen in a headless render at popup size).
 
@@ -626,7 +640,7 @@ for Bitwarden in Chrome.
   - Not tried yet: passkeys, credit cards and identities, one-time codes, aliases, the settings page, and importing and
     exporting.
   - Copying from the popup asks for `clipboardRead` and `clipboardWrite` the first time the clipboard is set to clear
-    itself. Once allowed, the offscreen document clears it when the time runs out (patch 27); `Meta/xenon.py test`
+    itself. Once allowed, the offscreen document clears it when the time runs out (patch 28); `Meta/xenon.py test`
     clears the clipboard the same way from the test extension's offscreen document. Not yet tried by hand.
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] **Milestone 5: installing from the store** (under way). Done: CRX3 installs, updates once a day, and removal,

@@ -17,6 +17,7 @@
 #include <UI/EventLoopImplementationQt.h>
 #include <UI/Extensions/Browser.h>
 #include <UI/Extensions/Registry.h>
+#include <UI/Extensions/Router.h>
 #include <UI/ExternalURLHandler.h>
 #include <UI/Menu.h>
 #include <UI/PictureInPictureWindow.h>
@@ -565,6 +566,21 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
         .accept_value = [this](StringView paths) -> ErrorOr<bool> {
             for (auto path : paths.split_view(','))
                 m_extensions_to_load.append(path);
+            return true;
+        },
+        .hide_mode = Core::ArgsParser::OptionHideMode::None,
+    });
+    args_parser.add_option(Core::ArgsParser::Option {
+        .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
+        .help_string = "Stop an extension's background once it has been idle this many seconds (30 by default, as in Chrome)",
+        .long_name = "extension-idle-timeout",
+        .short_name = 0,
+        .value_name = "seconds",
+        .accept_value = [](StringView seconds) -> ErrorOr<bool> {
+            auto value = seconds.to_number<u32>();
+            if (!value.has_value() || *value == 0)
+                return false;
+            Extensions::Router::the().set_background_idle_timeout(AK::Duration::from_seconds(*value));
             return true;
         },
         .hide_mode = Core::ArgsParser::OptionHideMode::None,

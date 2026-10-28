@@ -910,10 +910,14 @@ def unpacked_extension_id(directory: Path) -> str:
 
 
 # Runs a page in a headless browser until the page closes itself, and returns the results it printed after
-# EXTENSION_TEST_MARKER. The profile is a throwaway one, unless one is given. The page gets Ladybird's internals object,
-# whose grantTransientActivation() stands in for the user's gesture that some APIs need.
-def run_extension_test_page(executable: Path, env: dict, url: str, profile: str | None = None) -> dict | None:
+# EXTENSION_TEST_MARKER. The profile is a throwaway one with content blocking on, unless one is given. The page gets
+# Ladybird's internals object, whose grantTransientActivation() stands in for the user's gesture that some APIs need.
+def run_extension_test_page(
+    executable: Path, env: dict, url: str, profile: str | None = None, arguments: tuple[str, ...] = ()
+) -> dict | None:
     with tempfile.TemporaryDirectory() as temporary_profile:
+        if not profile:
+            turn_on_content_blocking(temporary_profile)
         command = [
             str(executable),
             "--headless=manual",
@@ -921,6 +925,7 @@ def run_extension_test_page(executable: Path, env: dict, url: str, profile: str 
             "--profile-path",
             profile or temporary_profile,
             f"--load-extension={TEST_EXTENSION_DIR}",
+            *arguments,
             url,
         ]
         try:
@@ -946,6 +951,11 @@ def run_extension_test_page(executable: Path, env: dict, url: str, profile: str 
     return None
 
 
+def turn_on_content_blocking(profile: str):
+    (Path(profile) / "config").mkdir(exist_ok=True)
+    (Path(profile) / "config" / "Settings.json").write_text(json.dumps({"contentBlockers": {"enabled": True}}))
+
+
 def check_extensions(executable: Path, env: dict) -> bool:
     extension_id = unpacked_extension_id(TEST_EXTENSION_DIR)
     passed = True
@@ -963,25 +973,29 @@ def check_extensions(executable: Path, env: dict) -> bool:
         text.value = "";
         results["no paste"] = !document.execCommand("paste") && text.value === "";
         const base = "chrome-extension://{extension_id}/";
-        const image = new Promise(resolve => {{
+        const image_fails = src => new Promise(resolve => {{
             const img = new Image();
             img.onload = () => resolve(false);
             img.onerror = () => resolve(true);
-            img.src = base + "popup.css";
+            img.src = src;
         }});
         Promise.all([
             fetch(base + "manifest.json").then(() => false, () => true),
-            image,
+            image_fails(base + "popup.css"),
             fetch(new URLSearchParams(location.search).get("data")).then(() => false, () => true),
-        ]).then(([fetch_failed, image_failed, data_fetch_failed]) => {{
+            image_fails("/site-tracking-pixel.gif"),
+        ]).then(([fetch_failed, image_failed, data_fetch_failed, tracker_failed]) => {{
             results["fetch blocked"] = fetch_failed;
             results["subresource blocked"] = image_failed;
             results["CORS still applies to web pages"] = data_fetch_failed;
+            results["the content blocker still applies to web pages"] = tracker_failed;
             console.log("{EXTENSION_TEST_MARKER}" + JSON.stringify(results));
             window.close();
         }});
     </script>""".encode()
     data = b'{"ok": true}'
+    # A 1x1 GIF, at a path the bundled lists block (BLOCKED_REQUESTS).
+    gif = bytes.fromhex("47494638396101000100800000000000ffffff21f90401000000002c00000000010001000002024401003b")
     content_script_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "content-scripts.html").read_bytes()
     connectable_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "externally-connectable.html").read_bytes()
 
@@ -989,6 +1003,8 @@ def check_extensions(executable: Path, env: dict) -> bool:
         def do_GET(self):
             if self.path == "/data.json":
                 body, content_type = data, "application/json"
+            elif self.path == "/site-tracking-pixel.gif":
+                body, content_type = gif, "image/gif"
             elif self.path.startswith("/content-scripts"):
                 body, content_type = content_script_page, "text/html"
             elif self.path.startswith("/connectable"):
@@ -1016,6 +1032,7 @@ def check_extensions(executable: Path, env: dict) -> bool:
         # An extension page gets chrome.* and its extension's origin, and its background worker runs. The page runs
         # twice in one profile: the first time, the extension is installed; the second, the browser starts up with it.
         with tempfile.TemporaryDirectory() as profile:
+            turn_on_content_blocking(profile)
             for run, expected_event in enumerate(("installed:install", "startup"), 1):
                 url = f"chrome-extension://{extension_id}/tests.html?data={urllib.parse.quote(data_url, safe='')}"
                 results = run_extension_test_page(executable, env, url, profile)
@@ -1047,6 +1064,10 @@ def check_extensions(executable: Path, env: dict) -> bool:
         # A web page that the extension's externally_connectable matches messages it with chrome.runtime.
         connectable_url = f"http://127.0.0.1:{page_server.server_address[1]}/connectable?id={extension_id}"
         connectable_results = run_extension_test_page(executable, env, connectable_url)
+
+        # The background worker stops once it's idle, and starts again for what it listens to.
+        idle_url = f"chrome-extension://{extension_id}/idle.html"
+        idle_results = run_extension_test_page(executable, env, idle_url, arguments=("--extension-idle-timeout=2",))
     finally:
         for server in (page_server, data_server):
             server.shutdown()
@@ -1055,6 +1076,7 @@ def check_extensions(executable: Path, env: dict) -> bool:
         ("web page", results),
         ("content scripts", content_script_results),
         ("externally connectable page", connectable_results),
+        ("idle background", idle_results),
     ):
         if page_results is None:
             return False

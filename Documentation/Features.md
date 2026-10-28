@@ -203,8 +203,12 @@ spare process kept ready for the next tab. Three engine patches keep each engine
 
 - `0027` keeps the malware lists' 100,000 `||host/path^$document` filters as 8-byte hashes, not as engine filters of
   over 100 bytes each;
-- `0029` gives back the memory used to build the engine, several times what the engine keeps;
-- `0028` sends no lists to any process while blocking is off.
+- `0030` gives back the memory used to build the engine, several times what the engine keeps;
+- `0029` sends no lists to any process while blocking is off.
+
+Extensions' own pages get no lists at all: their background pages, offscreen documents, and popups each open in a
+process of their own that never builds the engine (`0031`). uBlock Origin doesn't filter other extensions' requests in
+Chrome either. Frames from other sites in those pages still get the lists, in their own processes.
 
 ### uBlock Origin's engine features
 
@@ -251,7 +255,8 @@ Manifest V3 extensions, for password managers first, as Helium offers Bitwarden,
 still in progress; [Extensions.md](Extensions.md) has the details.
 
 - Unpacked extensions load from the Extensions dialog or with `--load-extension=<dir>`, get a toolbar button and
-  popup, and run their background service worker.
+  popup, and run their background service worker. As in Chrome, the worker stops after 30 seconds without events or
+  calls, and its four processes with it, and starts again for the next event it listens to (`UI/Extensions/Router`).
 - They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`, `action`, `commands`, and
   `offscreen`, and fetch from the hosts they have permission for.
 - Their content scripts run in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and
@@ -266,7 +271,7 @@ remove it.
 - **Bitwarden** logs in (with a security key too) and autofills logins.
 - **Proton Pass** signs in through Proton's account page, unlocks with its extra password, autofills logins, and saves
   new ones. Once allowed to use the clipboard, it clears a copied password when its timer runs out (engine patch
-  `0027`; see [Extensions.md](Extensions.md)).
+  `0028`; see [Extensions.md](Extensions.md)).
 
 ### Security keys (WebAuthn)
 

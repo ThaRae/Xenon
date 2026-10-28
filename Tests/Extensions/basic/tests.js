@@ -218,6 +218,15 @@ async function run() {
         "offscreen in getContexts",
         (await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] })).length === 1
     );
+    // Meta/xenon.py turns content blocking on, and serves an image the bundled lists block on web pages. Extensions'
+    // hidden pages go without the content blocker, as uBlock Origin doesn't see other extensions' requests in Chrome.
+    if (dataURL) {
+        const image = await chrome.runtime.sendMessage({
+            toOffscreen: "image",
+            url: new URL("/site-tracking-pixel.gif", dataURL).href,
+        });
+        check("the content blocker leaves offscreen documents alone", image?.loaded === true);
+    }
     await chrome.offscreen.closeDocument();
     check("offscreen.hasDocument after", (await chrome.offscreen.hasDocument()) === false);
 

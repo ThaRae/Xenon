@@ -25,6 +25,8 @@ static constexpr auto NO_RECEIVER = "Could not establish connection. Receiving e
 static constexpr auto PRUNE_INTERVAL = AK::Duration::from_seconds(5);
 // How long messages wait for a background that has started to run its script, in case it never does.
 static constexpr auto BACKGROUND_START_TIMEOUT = AK::Duration::from_seconds(10);
+// How long a background with nothing to do keeps running, as in Chrome.
+static constexpr auto BACKGROUND_IDLE_TIMEOUT = AK::Duration::from_seconds(30);
 
 StringView context_kind_name(ContextKind kind)
 {
@@ -52,6 +54,7 @@ Router& Router::the()
 }
 
 Router::Router()
+    : m_background_idle_timeout(BACKGROUND_IDLE_TIMEOUT)
 {
     m_prune_timer = Core::Timer::create_repeating(PRUNE_INTERVAL, [this] { prune_closed_contexts(); });
 }
@@ -291,6 +294,9 @@ void Router::forget_extension(Extension const& extension)
     m_popup_size_listeners.remove(extension.id());
     if (auto starting = m_starting_backgrounds.take(extension.id()); starting.has_value())
         starting->timeout->stop();
+    if (auto running = m_running_backgrounds.take(extension.id()); running.has_value())
+        (*running)->stop();
+    m_background_listeners.remove(extension.id());
 }
 
 void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String const& text)
@@ -298,6 +304,9 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
     auto context = context_for(endpoint);
     if (!context.has_value())
         return;
+
+    if (context->kind == ContextKind::Background)
+        background_was_active(context->extension->id());
 
     auto json = JsonValue::from_string(text);
     if (json.is_error() || !json.value().is_object())
@@ -331,6 +340,7 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
             auto receivers = content_script_receivers(*context->extension, *tab_id, message.get_integer<i64>("frameId"sv), message.get_string("documentId"sv));
             open_port(*context, *port_id, name, move(receivers));
         } else {
+            wake_background(*context->extension, context->kind == ContextKind::ExternalPage ? "runtime.onConnectExternal"sv : "runtime.onConnect"sv);
             Function<void()> open = [this, endpoint, port_id = *port_id, name] {
                 if (auto opener = context_for(endpoint); opener.has_value())
                     open_port(*opener, port_id, name, extension_receivers(*opener));
@@ -346,6 +356,15 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
         handle_port_message(*context, *port_id, message.get("message"sv).value_or(JsonValue {}));
     } else if (*type == "port-disconnect"sv && port_id.has_value()) {
         handle_port_disconnect(*context, *port_id);
+    } else if (*type == "listening"sv && context->kind == ContextKind::Background) {
+        auto name = message.get_string("name"sv);
+        if (!name.has_value())
+            return;
+        auto& listeners = m_background_listeners.ensure(context->extension->id());
+        if (message.get_bool("listening"sv).value_or(false))
+            listeners.set(*name);
+        else
+            listeners.remove(*name);
     } else if (*type == "closing"sv) {
         // NB: The page is still there for a moment, so it's forgotten once it has gone.
         Core::deferred_invoke([this] { prune_closed_contexts(); });
@@ -363,7 +382,7 @@ void Router::reply(WebView::ScriptBridgeEndpoint const& endpoint, u64 id, JsonVa
     message.set("type"sv, "reply"sv);
     message.set("id"sv, id);
     message.set("result"sv, move(result));
-    endpoint.post_message(message.serialized());
+    the().post(endpoint, message.serialized());
 }
 
 void Router::reply_with_error(WebView::ScriptBridgeEndpoint const& endpoint, u64 id, StringView error)
@@ -372,7 +391,7 @@ void Router::reply_with_error(WebView::ScriptBridgeEndpoint const& endpoint, u64
     message.set("type"sv, "reply"sv);
     message.set("id"sv, id);
     message.set("error"sv, error);
-    endpoint.post_message(message.serialized());
+    the().post(endpoint, message.serialized());
 }
 
 // What Chrome gives content scripts of chrome.*, besides i18n, which needs no calls.
@@ -395,6 +414,7 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
     }
 
     if (name == "runtime.sendMessage"sv) {
+        wake_background(*context.extension, context.kind == ContextKind::ExternalPage ? "runtime.onMessageExternal"sv : "runtime.onMessage"sv);
         auto message = args.is_empty() ? JsonValue {} : args.at(0);
         Function<void()> send = [this, endpoint = context.endpoint, id, message] {
             if (auto sender = context_for(endpoint); sender.has_value())
@@ -849,8 +869,12 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
     if (name == "runtime.backgroundReady"sv) {
         if (context.kind != ContextKind::Background)
             return JsonValue {};
+        auto starting = m_starting_backgrounds.get(extension->id());
+        auto is_restart = starting.has_value() && starting->is_restart;
         Core::deferred_invoke([this, id = extension->id()] { background_did_run(id); });
 
+        // NB: These come before what waited for the background to run its script. A background that started again for
+        //     an event is in the same session, and gets no runtime.onStartup.
         JsonObject details;
         if (auto reason = Registry::the().take_install_reason(extension->id()); reason.has_value()) {
             details.set("reason"sv, reason->reason);
@@ -858,9 +882,9 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
                 details.set("previousVersion"sv, *reason->previous_version);
             JsonArray event_args;
             event_args.must_append(move(details));
-            dispatch_event(*extension, "runtime.onInstalled"sv, move(event_args), ContextKind::Background);
-        } else {
-            dispatch_event(*extension, "runtime.onStartup"sv, {}, ContextKind::Background);
+            post(context.endpoint, event_message("runtime.onInstalled"sv, move(event_args)));
+        } else if (!is_restart) {
+            post(context.endpoint, event_message("runtime.onStartup"sv, {}));
         }
         return JsonValue {};
     }
@@ -982,27 +1006,46 @@ void Router::set_popup_size_listener(String const& extension_id, Function<void(i
         m_popup_size_listeners.remove(extension_id);
 }
 
-void Router::dispatch_event(Extension const& extension, StringView name, JsonArray args, Optional<ContextKind> kind)
+String Router::event_message(StringView name, JsonArray args)
 {
-    prune_closed_contexts();
-
     JsonObject message;
     message.set("type"sv, "event"sv);
     message.set("name"sv, name);
     message.set("args"sv, move(args));
-    auto serialized = message.serialized();
+    return message.serialized();
+}
+
+void Router::dispatch_event(Extension const& extension, StringView name, JsonArray args, Optional<ContextKind> kind)
+{
+    prune_closed_contexts();
+
+    auto serialized = event_message(name, move(args));
+
+    // The background gets the event once it has run its script, starting again for it if it stopped when idle.
+    if (!kind.has_value() || *kind == ContextKind::Background) {
+        wake_background(extension, name);
+        if (auto starting = m_starting_backgrounds.get(extension.id()); starting.has_value()) {
+            starting->waiting.append([this, id = extension.id(), serialized] {
+                for (auto const& context : m_contexts) {
+                    if (context.extension->id() == id && context.kind == ContextKind::Background)
+                        post(context.endpoint, serialized);
+                }
+            });
+        }
+    }
+    auto background_is_starting = m_starting_backgrounds.contains(extension.id());
 
     for (auto const& context : m_contexts) {
         if (context.extension->id() != extension.id())
             continue;
         if (kind.has_value() && context.kind != *kind)
             continue;
-        if (context.kind == ContextKind::ExternalPage)
+        if (context.kind == ContextKind::ExternalPage || (context.kind == ContextKind::Background && background_is_starting))
             continue;
         // Content scripts have chrome.storage's events alone, and learn of changed permissions for chrome.storage's sake.
         if (context.kind == ContextKind::ContentScript && !name.starts_with("storage."sv) && !name.starts_with("permissions."sv))
             continue;
-        context.endpoint.post_message(serialized);
+        post(context.endpoint, serialized);
     }
 }
 
@@ -1054,9 +1097,19 @@ Vector<WebView::ScriptBridgeEndpoint> Router::content_script_receivers(Extension
 
 void Router::background_will_start(Extension const& extension)
 {
+    // NB: Its script registers its listeners again as it runs.
+    m_background_listeners.remove(extension.id());
+    start_background(extension, false);
+}
+
+void Router::start_background(Extension const& extension, bool is_restart)
+{
+    if (auto running = m_running_backgrounds.take(extension.id()); running.has_value())
+        (*running)->stop();
+
     auto timeout = Core::Timer::create_single_shot(BACKGROUND_START_TIMEOUT, [this, id = extension.id()] { background_did_run(id); });
     timeout->start();
-    m_starting_backgrounds.set(extension.id(), { .waiting = {}, .timeout = move(timeout) });
+    m_starting_backgrounds.set(extension.id(), { .waiting = {}, .timeout = move(timeout), .is_restart = is_restart });
 }
 
 Optional<Vector<Function<void()>>&> Router::waiting_for_background(Context const& sender)
@@ -1075,8 +1128,91 @@ void Router::background_did_run(String const& extension_id)
     if (!starting.has_value())
         return;
     starting->timeout->stop();
+
+    auto idle = Core::Timer::create_single_shot(m_background_idle_timeout, [this, extension_id] { stop_idle_background(extension_id); });
+    idle->start();
+    m_running_backgrounds.set(extension_id, move(idle));
+
     for (auto& action : starting->waiting)
         action();
+}
+
+// https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle#idle-shutdown
+// Chrome starts a stopped service worker for the events it registered listeners for, and runtime messages and ports
+// are events too.
+void Router::wake_background(Extension const& extension, StringView event_name)
+{
+    if (m_starting_backgrounds.contains(extension.id()) || m_running_backgrounds.contains(extension.id()))
+        return;
+    auto listeners = m_background_listeners.get(extension.id());
+    if (!listeners.has_value() || !listeners->contains(event_name))
+        return;
+
+    start_background(extension, true);
+    if (!Registry::the().restart_background_page(extension)) {
+        if (auto starting = m_starting_backgrounds.take(extension.id()); starting.has_value())
+            starting->timeout->stop();
+    }
+}
+
+// Each event, message, and call of a background's keeps it running for another while.
+void Router::background_was_active(String const& extension_id)
+{
+    if (auto idle = m_running_backgrounds.get(extension_id); idle.has_value())
+        (*idle)->restart();
+}
+
+// A background that owes a runtime message its response, or waits for one, isn't idle.
+bool Router::background_is_busy(String const& extension_id) const
+{
+    auto is_background = [&](WebView::ScriptBridgeEndpoint const& endpoint) {
+        return any_of(m_contexts, [&](Context const& context) {
+            return context.kind == ContextKind::Background && context.endpoint == endpoint && context.extension->id() == extension_id;
+        });
+    };
+    for (auto const& [id, pending] : m_pending_messages) {
+        if (is_background(pending.sender) || any_of(pending.awaiting, is_background))
+            return true;
+    }
+    return false;
+}
+
+// A background that stopped takes its page's processes with it. Its ports close, as they do when Chrome stops a service
+// worker, and its offscreen document stays open.
+void Router::stop_idle_background(String const& extension_id)
+{
+    auto idle = m_running_backgrounds.get(extension_id);
+    if (!idle.has_value())
+        return;
+    if (background_is_busy(extension_id)) {
+        (*idle)->restart();
+        return;
+    }
+    m_running_backgrounds.remove(extension_id);
+
+    Vector<WebView::ScriptBridgeEndpoint> endpoints;
+    m_contexts.remove_all_matching([&](Context const& context) {
+        if (context.kind != ContextKind::Background || context.extension->id() != extension_id)
+            return false;
+        endpoints.append(context.endpoint);
+        return true;
+    });
+    for (auto const& endpoint : endpoints)
+        forget_endpoint(endpoint);
+
+    if (auto extension = Registry::the().extension(extension_id))
+        Registry::the().stop_idle_background_page(*extension);
+}
+
+void Router::post(WebView::ScriptBridgeEndpoint const& endpoint, String const& message)
+{
+    endpoint.post_message(message);
+    for (auto const& context : m_contexts) {
+        if (context.kind == ContextKind::Background && context.endpoint == endpoint) {
+            background_was_active(context.extension->id());
+            return;
+        }
+    }
 }
 
 // https://developer.chrome.com/docs/extensions/reference/api/runtime#method-sendMessage
@@ -1101,7 +1237,7 @@ void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue messag
         if (!receiver.is_open())
             continue;
         pending.awaiting.append(receiver);
-        receiver.post_message(serialized);
+        post(receiver, serialized);
     }
 
     if (pending.awaiting.is_empty()) {
@@ -1186,7 +1322,7 @@ void Router::open_port(Context& opener, String const& port_id, String const& nam
         if (!receiver.is_open())
             continue;
         port.awaiting.append(receiver);
-        receiver.post_message(serialized);
+        post(receiver, serialized);
     }
 
     if (port.awaiting.is_empty()) {
@@ -1194,7 +1330,7 @@ void Router::open_port(Context& opener, String const& port_id, String const& nam
         disconnect.set("type"sv, "port-disconnect"sv);
         disconnect.set("port"sv, port_id);
         disconnect.set("error"sv, NO_RECEIVER);
-        opener.endpoint.post_message(disconnect.serialized());
+        post(opener.endpoint, disconnect.serialized());
         return;
     }
     m_ports.set(port_id, move(port));
@@ -1209,7 +1345,7 @@ void Router::handle_port_accepted(Context& receiver, String const& port_id, bool
     if (accepted) {
         port->receivers.append(receiver.endpoint);
         for (auto const& message : port->early_messages)
-            receiver.endpoint.post_message(message);
+            post(receiver.endpoint, message);
     }
     if (port->awaiting.is_empty())
         port->early_messages.clear();
@@ -1223,7 +1359,7 @@ void Router::handle_port_accepted(Context& receiver, String const& port_id, bool
         disconnect.set("type"sv, "port-disconnect"sv);
         disconnect.set("port"sv, port_id);
         disconnect.set("error"sv, NO_RECEIVER);
-        opener.post_message(disconnect.serialized());
+        post(opener, disconnect.serialized());
     }
 }
 
@@ -1241,11 +1377,11 @@ void Router::handle_port_message(Context& sender, String const& port_id, JsonVal
 
     if (sender.endpoint == port->opener) {
         for (auto const& receiver : port->receivers)
-            receiver.post_message(serialized);
+            post(receiver, serialized);
         if (!port->awaiting.is_empty())
             port->early_messages.append(serialized);
     } else if (port->receivers.contains_slow(sender.endpoint)) {
-        port->opener.post_message(serialized);
+        post(port->opener, serialized);
     }
 }
 
@@ -1268,7 +1404,7 @@ void Router::close_port_end(WebView::ScriptBridgeEndpoint const& endpoint, Strin
         message.set("port"sv, port_id);
         if (error.has_value())
             message.set("error"sv, *error);
-        other.post_message(message.serialized());
+        post(other, message.serialized());
     };
 
     if (endpoint == port->opener) {
