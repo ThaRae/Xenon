@@ -583,9 +583,8 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
     });
 }
 
-void Application::create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&)
+void Application::initialize_extensions()
 {
-    // NB: Extensions are served from the UI process, which renderers have to know before the first of them starts.
     auto languages = platform_preferred_languages();
     auto ui_language = languages.is_empty() ? "en-US"_string : languages.first();
     Extensions::Registry::the().initialize(profile().paths().data, m_extensions_to_load, move(ui_language));

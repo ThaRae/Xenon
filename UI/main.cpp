@@ -99,6 +99,11 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
         return 0;
     }
 
+    // NB: Extensions are served from the UI process, which renderers have to know before the first of them starts. The
+    //     first starts once the event loop runs, and the profile they live in is only known once the application has
+    //     been created.
+    app->initialize_extensions();
+
     // Ladybird opens new tabs blank. Xenon has a new tab page of its own (UI/NewTabPage.cpp), which a new profile opens
     // new tabs to until the user picks another page.
     if (!Ladybird::Application::settings().first_run_complete())
