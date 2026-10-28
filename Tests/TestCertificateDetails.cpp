@@ -25,7 +25,8 @@ static ByteBuffer certificate(StringView name)
 
 static JsonObject describe(StringView name, StringView url)
 {
-    return describe_rejected_certificate(certificate(name), URL::Parser::basic_parse(url).release_value());
+    auto der_certificate = certificate(name);
+    return describe_rejected_certificate(der_certificate, URL::Parser::basic_parse(url).release_value());
 }
 
 static Vector<ByteString> strings(JsonObject const& description, StringView key)

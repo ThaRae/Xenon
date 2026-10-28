@@ -208,7 +208,7 @@ index c206faca3e5e25e6ed1a815fadc4e45f39b7de93..202b3fd36808f40dcf2bf35aa3c28d48
      CURL.cpp
 diff --git a/Services/RequestServer/CertificateExceptions.cpp b/Services/RequestServer/CertificateExceptions.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..0b7784a2a554e6ed639a63f3456c20d4fc5bfa56
+index 0000000000000000000000000000000000000000..c18e49e788a410d8890daeca99d5dcc17943c8a1
 --- /dev/null
 +++ b/Services/RequestServer/CertificateExceptions.cpp
 @@ -0,0 +1,100 @@
@@ -262,7 +262,7 @@ index 0000000000000000000000000000000000000000..0b7784a2a554e6ed639a63f3456c20d4
 +    if (EVP_Digest(public_key, static_cast<size_t>(public_key_size), digest, &digest_size, EVP_sha256(), nullptr) != 1)
 +        return;
 +
-+    auto encoded_digest = encode_base64({ digest, digest_size });
++    auto encoded_digest = encode_base64(ReadonlyBytes { digest, digest_size });
 +    if (encoded_digest.is_error())
 +        return;
 +    public_key_pins().set(host_and_port(host, port), ByteString::formatted("sha256//{}", encoded_digest.value()));
@@ -384,7 +384,7 @@ index f56316405830e2b7c61db7d39cd878415047c221..a9b941df418e3083a77f389bbe4fb7b6
      virtual void remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) override;
      virtual void retrieve_cache_access_profile(u64 access_profile_request_id, AK::Duration granularity) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..65a9e8bffe68486ccede7833ca84c12908a28cab 100644
+index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..f83b57ebf08282efc48cf628d27f40376f92db24 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -21,6 +21,7 @@
@@ -442,7 +442,7 @@ index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..65a9e8bffe68486ccede7833ca84c129
 +        return;
 +
 +    if (auto connection = ControlConnectionFromClient::the(); connection.has_value())
-+        connection->async_server_certificate_rejected(m_url, certificate.release_value());
++        connection->async_server_certificate_rejected(m_url, *certificate);
 +}
 +
  void Request::transition_to_state(State state)
