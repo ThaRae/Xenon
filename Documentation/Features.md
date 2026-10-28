@@ -262,7 +262,8 @@ the whole session, and new ones the next time Xenon starts.
 - The User-Agent and client hints are exactly those of Chrome on the same platform, without a Ladybird token.
 
 It's on by default. **Settings → Privacy and data → Fingerprinting protection** turns it off, for pages and workers
-alike. The code is in `ladybird/Libraries/LibWeb/Fingerprinting/`, carried as a Xenon patch. See
+alike. `navigator.webdriver` is false unless WebDriver is driving the browser. The code is in
+`ladybird/Libraries/LibWeb/Fingerprinting/`, carried as engine patches `0030`–`0033`. See
 [Fingerprinting.md](Fingerprinting.md).
 
 ## Password managers and extensions
