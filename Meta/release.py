@@ -682,6 +682,42 @@ def linked_libraries(binary: Path) -> dict[str, str]:
     return libraries
 
 
+def needed_libraries(binary: Path) -> set[str]:
+    """The libraries a binary names as its own dependencies."""
+    return set(re.findall(r"\(NEEDED\)\s+Shared library: \[(.+)\]", run("readelf", "--dynamic", "--wide", binary)))
+
+
+def dynamic_symbols(binary: Path, kind: str) -> set[str]:
+    """A binary's dynamic symbols, without their versions: "defined" ones, or "undefined" ones, which it imports."""
+    output = run("nm", "--dynamic", f"--{kind}-only", "--format=just-symbols", binary)
+    return {symbol.split("@")[0] for symbol in output.split()}
+
+
+def choose_shared_libraries(app_dir: Path, log: str):
+    """linuxdeploy copies in one library of each name. Where the build or vcpkg has one of the same name as the system's
+    (ICU, libpng, zstd...), it takes the system's, which the system's Qt is built against, and the build's code runs
+    with that too. It's kept, unless it lacks something the binaries in the AppDir use from it: vcpkg's libpng has APNG's
+    functions, which Ubuntu's lacks. Then the build's takes its place, if it has all that the system's Qt uses."""
+    sources: dict[str, set[Path]] = {}
+    for path in re.findall(r"^Deploying shared library (\S+)", log, re.MULTILINE):
+        sources.setdefault(Path(path).name, set()).add(Path(path))
+    needs = {binary: needed_libraries(binary) for binary in elf_files(app_dir / "usr")}
+    for name, paths in sorted(sources.items()):
+        own = sorted(path for path in paths if path.resolve().is_relative_to(XENON_SOURCE_DIR))
+        system = sorted(path for path in paths if not path.resolve().is_relative_to(XENON_SOURCE_DIR))
+        if not own or not system:
+            continue
+        used = set().union(*(dynamic_symbols(binary, "undefined") for binary, names in needs.items() if name in names))
+        own_symbols, system_symbols = dynamic_symbols(own[0], "defined"), dynamic_symbols(system[0], "defined")
+        if not (used & (own_symbols - system_symbols)):
+            continue
+        if missing := sorted(used & (system_symbols - own_symbols)):
+            sys.exit(f"Neither {own[0]} nor {system[0]} has all that the AppImage uses from it: {', '.join(missing)}")
+        shutil.copy2(own[0], app_dir / "usr" / "lib" / name)
+        print(f"    {name} is the build's, not the system's, which lacks {len(used & (own_symbols - system_symbols))}"
+              " functions the build uses")  # fmt: skip
+
+
 def qt_plugins_directory(executable: Path) -> Path:
     """The plugin directory of the Qt that Xenon links: the system's, laid out as Debian does, or one laid out as Qt's
     own installer does."""
@@ -743,19 +779,7 @@ def make_app_dir(app_dir: Path):
     log = run_appimage_tool("linuxdeploy", *arguments, NO_STRIP="1")
     (app_dir.parent / "linuxdeploy.log").write_text(log)
     print(f"    linuxdeploy copied {len(list((usr / 'lib').glob('*.so*')))} libraries into usr/lib", flush=True)
-
-    # linuxdeploy copies one library of each name. Where the build or vcpkg has one of the same name as the system's
-    # (ICU, libpng, zstd...), the build's binaries load their own and the system's Qt the system's, and linuxdeploy
-    # copies in the system's. The build is made and tested with its own, which can have more in it: vcpkg's libpng has
-    # APNG's functions, which Ubuntu's lacks. So those take the system's place, in the libraries Qt loads too.
-    sources: dict[str, set[Path]] = {}
-    for path in re.findall(r"^Deploying shared library (\S+)", log, re.MULTILINE):
-        sources.setdefault(Path(path).name, set()).add(Path(path))
-    for name, paths in sorted(sources.items()):
-        own = [path for path in paths if path.resolve().is_relative_to(XENON_SOURCE_DIR)]
-        if own and len(paths) > 1:
-            shutil.copy2(own[0], usr / "lib" / name)
-            print(f"    {name} is the build's, not the system's", flush=True)
+    choose_shared_libraries(app_dir, log)
 
 
 def check_app_dir(app_dir: Path) -> list[str]:

@@ -578,9 +578,10 @@ def check_filter_list_updates(executable: Path, env: dict) -> bool:
                 files = list(Path(profile).rglob("ContentBlocking/Xenon/state.json"))
                 return json.loads(files[0].read_text()) if files else {}
 
+            # NB: A Xenon that didn't start wrote no state, which the steps report on.
             def a_day_passes():
-                file = next(Path(profile).rglob("ContentBlocking/Xenon/state.json"))
-                file.write_text(json.dumps({**state(), "checkedAt": 0}))
+                for file in Path(profile).rglob("ContentBlocking/Xenon/state.json"):
+                    file.write_text(json.dumps({**state(), "checkedAt": 0}))
 
             results, output = run(profile, "/poll", "/xenon-update-test.js")
             expect(
@@ -818,8 +819,8 @@ def check_password_managers(executable: Path, env: dict) -> bool:
                 }
 
             def a_day_passes():
-                file = next(Path(profile).rglob("Extensions/password-manager-updates.json"))
-                file.write_text(json.dumps({"checkedAt": 0}))
+                for file in Path(profile).rglob("Extensions/password-manager-updates.json"):
+                    file.write_text(json.dumps({"checkedAt": 0}))
 
             def downloads() -> list[str]:
                 return [path for path in requested if path.startswith("/crx/")]
@@ -1422,7 +1423,16 @@ def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, st
         parts = (error.stdout, error.stderr)
         output = "".join(part.decode(errors="replace") if isinstance(part, bytes) else part for part in parts if part)
         return False, f"{output}\ntimed out after {error.timeout} s"
-    return result.returncode == 0, result.stdout + result.stderr
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        # A crash can print nothing, so say how it ended.
+        how = (
+            f"was killed by signal {-result.returncode}"
+            if result.returncode < 0
+            else f"exited with {result.returncode}"
+        )
+        output += f"\nXenon {how}"
+    return result.returncode == 0, output
 
 
 def run_command(command: list):
