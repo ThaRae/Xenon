@@ -15,6 +15,7 @@ import json
 import os
 import shutil
 import signal
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -98,6 +99,11 @@ FILTER_LIST_UPDATES_MARKER = "XENON-FILTER-LIST-UPDATES-TEST "
 # A test extension whose pages check the chrome.* APIs and print what they found on a line starting with this.
 TEST_EXTENSION_DIR = XENON_SOURCE_DIR / "Tests" / "Extensions" / "basic"
 EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
+
+# A local HTTPS server's self-signed certificate (Tests/CertificateErrors). Xenon's certificate warning and the server's
+# page each print what they found on a line starting with the marker.
+CERTIFICATE_ERRORS_DIR = XENON_SOURCE_DIR / "Tests" / "CertificateErrors"
+CERTIFICATE_ERROR_TEST_MARKER = "XENON-CERTIFICATE-ERROR-TEST "
 
 # A page that tries WebAuthn and prints what it found on a line starting with this.
 WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
@@ -293,6 +299,10 @@ def test_main(platform: Platform, build_dir: Path):
     print("==> the blocking dashboard", flush=True)
     if not check_blocking_dashboard(app_executable(platform, build_dir), env):
         failures.append("blocking dashboard")
+
+    print("==> the certificate warning, for a local HTTPS server with a self-signed certificate", flush=True)
+    if not check_certificate_errors(app_executable(platform, build_dir), env):
+        failures.append("certificate warning")
 
     print("==> extension pages and their chrome.* APIs", flush=True)
     if not check_extensions(app_executable(platform, build_dir), env):
@@ -1261,6 +1271,118 @@ def check_session_restore(executable: Path, env: dict) -> bool:
             if process and process.poll() is None:
                 stop(signal.SIGKILL)
             server.shutdown()
+
+
+# Opens a page on a local HTTPS server whose certificate is self-signed. Xenon refuses the certificate, and shows its
+# warning in place of the page, saying why (UI/CertificateErrors.h). Nothing can click in a headless browser, so XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS
+# has the warning print what it shows and then proceed, as the user would. The page then loads, and closes the browser.
+def check_certificate_errors(executable: Path, env: dict) -> bool:
+    page = f"""<!doctype html><title>Xenon certificate test</title><script>
+        console.log("{CERTIFICATE_ERROR_TEST_MARKER}" + JSON.stringify({{ loaded: location.href }}));
+        window.close();
+    </script>""".encode()
+    requested: list[str] = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            requested.append(self.path)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(page)))
+            self.end_headers()
+            self.wfile.write(page)
+
+        def log_message(self, *args):
+            pass
+
+    class Server(http.server.ThreadingHTTPServer):
+        # Xenon hangs up as soon as it has seen the certificate, until it's told to accept it.
+        def handle_error(self, request, client_address):
+            pass
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(CERTIFICATE_ERRORS_DIR / "self-signed.pem", CERTIFICATE_ERRORS_DIR / "self-signed-key.pem")
+    server = Server(("127.0.0.1", 0), Handler)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"https://127.0.0.1:{server.server_address[1]}/"
+    try:
+        with tempfile.TemporaryDirectory() as profile:
+            command = [str(executable), "--headless=manual", "--profile-path", profile, url]
+            test_env = {**env, "XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS": "1"}
+            try:
+                result = subprocess.run(
+                    command, env=test_env, capture_output=True, encoding="utf-8", errors="replace", timeout=60
+                )
+                output = result.stdout + result.stderr
+            except subprocess.TimeoutExpired as error:
+                output = "".join(
+                    part.decode(errors="replace") if isinstance(part, bytes) else part
+                    for part in (error.stdout, error.stderr)
+                    if part
+                )
+                output += f"\ntimed out after {error.timeout} s"
+    finally:
+        server.shutdown()
+
+    reports = certificate_error_reports(output)
+    warning = next((report for report in reports if "problems" in report), None)
+    loaded = next((report for report in reports if "loaded" in report), None)
+
+    passed = True
+
+    def expect(step: str, ok: bool, details: str):
+        nonlocal passed
+        if ok:
+            print(f"    {step}")
+            return
+        print(f"    FAIL: {step} ({details})", file=sys.stderr)
+        passed = False
+
+    expect(
+        "shows the warning, saying the certificate is self-signed",
+        warning is not None and warning["problems"] == ["selfSigned"] and warning["canProceed"] is True,
+        f"the warning reported {warning}",
+    )
+    expect(
+        "proceeds to the site, which loads",
+        loaded is not None and loaded["loaded"] == url and "/" in requested,
+        f"the page reported {loaded}, and the server was asked for {requested}",
+    )
+    # The warning on its own, opened at its address, knows of no certificate to accept for the site.
+    with tempfile.TemporaryDirectory() as profile:
+        warning_url = "xenon://certificate-error/?url=" + urllib.parse.quote(url, safe="")
+        command = [str(executable), "--headless=manual", "--profile-path", profile, warning_url]
+        try:
+            result = subprocess.run(
+                command, env=test_env, capture_output=True, encoding="utf-8", errors="replace", timeout=60
+            )
+            direct_output = result.stdout + result.stderr
+        except subprocess.TimeoutExpired:
+            direct_output = "timed out"
+    direct = next((report for report in certificate_error_reports(direct_output) if "problems" in report), None)
+    expect(
+        "opened at its address, the warning has nothing to proceed past",
+        direct is not None and direct["canProceed"] is False,
+        f"the warning reported {direct}: {direct_output[-2000:]}",
+    )
+
+    if not passed:
+        # A crash's stack trace would push what the pages printed out of the output's tail.
+        for line in output.splitlines():
+            if CERTIFICATE_ERROR_TEST_MARKER in line or "VERIFICATION FAILED" in line or "Failed load" in line:
+                print(line, file=sys.stderr)
+        print(output[-4000:], file=sys.stderr)
+    return passed
+
+
+def certificate_error_reports(output: str) -> list[dict]:
+    # The console prints the logged string in quotes.
+    return [
+        json.loads(line.split(CERTIFICATE_ERROR_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
+        for line in output.splitlines()
+        if CERTIFICATE_ERROR_TEST_MARKER in line
+    ]
 
 
 def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, str]:

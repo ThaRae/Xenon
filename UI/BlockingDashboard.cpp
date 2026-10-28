@@ -18,6 +18,7 @@
 #include <LibWebView/URLSchemeHandler.h>
 #include <LibWebView/Utilities.h>
 #include <UI/BlockingDashboard.h>
+#include <UI/CertificateErrors.h>
 #include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
 #include <UI/XenonSettings.h>
@@ -74,6 +75,8 @@ static StringView mime_type_for(StringView uri)
 
 static ErrorOr<WebView::URLSchemeResponse> respond(WebView::URLSchemeRequest const& request)
 {
+    if (request.url.serialized_host() == CertificateErrors::PAGE_HOST)
+        return CertificateErrors::respond(request);
     if (request.url.serialized_host() != DASHBOARD_HOST)
         return Error::from_errno(ENOENT);
 
@@ -226,6 +229,10 @@ static bool is_dashboard(WebView::ScriptBridgeEndpoint const& endpoint)
 
 static void handle_message(WebView::ScriptBridgeEndpoint const& endpoint, String const& message)
 {
+    if (CertificateErrors::is_page(endpoint)) {
+        CertificateErrors::handle_message(endpoint, message);
+        return;
+    }
     if (!is_dashboard(endpoint))
         return;
 
@@ -272,6 +279,8 @@ void register_url_scheme()
 {
     WebView::URLSchemeBridge bridge {
         .bootstrap_script = [](WebView::ScriptBridgeEndpoint const& endpoint) -> Optional<String> {
+            if (CertificateErrors::is_page(endpoint))
+                return CertificateErrors::bootstrap_script(endpoint);
             if (!is_dashboard(endpoint))
                 return {};
             // NB: The state is JSON, which is also a JavaScript expression.
