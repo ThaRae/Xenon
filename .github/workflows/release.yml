@@ -60,7 +60,7 @@ jobs:
           exit $missing
 
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check out Ladybird (the pinned submodule)
         run: |
@@ -126,7 +126,7 @@ jobs:
           brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool llvm@22 nasm ninja pkg-config unzip
 
       - name: Restore the build caches
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             Build/caches
@@ -177,7 +177,7 @@ jobs:
           echo "The archive's and the appcast's signatures, and the app's code signature, check out."
 
       - name: Upload the release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Xenon-${{ env.VERSION }}
           path: |
