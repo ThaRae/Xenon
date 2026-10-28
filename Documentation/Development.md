@@ -105,6 +105,7 @@ CI runs on GitHub Actions, on GitHub's own runners:
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test`, with the welcome page render as an artifact |
 | `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
+| `.github/workflows/release.yml` | by hand, pull requests that change it | `Meta/release.py test` and `package` on macOS, from `main`'s build caches, with the release's archive and appcast as an artifact. It doesn't publish |
 
 - **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
   `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
@@ -210,3 +211,7 @@ Xenon updates itself on macOS with Sparkle, from releases published to
 Bump `VERSION.txt` first. Releases are signed with a self-signed certificate and an update key, both in the login
 keychain of the Mac they're made on. [Updates.md](Updates.md) covers setting those up, what Xenon checks, and the test.
 The build fetches Sparkle's release (`UI/Xenon.cmake`) by itself, on macOS.
+
+`.github/workflows/release.yml` runs `test` and `package` on GitHub's macOS runner instead, by hand, with the
+certificate and the update key as the repository's secrets, and keeps the archive and the appcast as the run's
+artifact. It doesn't publish.
