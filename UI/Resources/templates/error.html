@@ -11,17 +11,26 @@
             // this page, as in Chrome. This page is parsed before it's the tab's active document, and only then has a
             // navigable to navigate (and a window.top), so it waits for that. It may not be rendered, as in a
             // background tab, so it waits with a timer rather than for a frame.
+            console.log("XENON-CERTIFICATE-ERROR-PROBE script runs");
             if (
                 document.querySelector('meta[name="xenon-error-message"]').content.includes("SSL verification failed")
             ) {
+                let checks = 0;
                 const showCertificateWarning = () => {
                     if (window.top === null) {
+                        if (++checks % 20 === 1) console.log("XENON-CERTIFICATE-ERROR-PROBE no top yet");
                         setTimeout(showCertificateWarning, 50);
                         return;
                     }
+                    console.log("XENON-CERTIFICATE-ERROR-PROBE top is window: " + (window.top === window));
                     if (window.top !== window) return;
                     const url = document.querySelector('meta[name="xenon-failed-url"]').content;
-                    location.replace("xenon://certificate-error/?url=" + encodeURIComponent(url));
+                    try {
+                        location.replace("xenon://certificate-error/?url=" + encodeURIComponent(url));
+                        console.log("XENON-CERTIFICATE-ERROR-PROBE navigating to the warning");
+                    } catch (error) {
+                        console.log("XENON-CERTIFICATE-ERROR-PROBE navigation threw " + error);
+                    }
                 };
                 showCertificateWarning();
             }

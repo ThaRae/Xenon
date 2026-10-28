@@ -1298,7 +1298,7 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
             test_env = {**env, "XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS": "1"}
             try:
                 result = subprocess.run(
-                    command, env=test_env, capture_output=True, encoding="utf-8", errors="replace", timeout=120
+                    command, env=test_env, capture_output=True, encoding="utf-8", errors="replace", timeout=60
                 )
                 output = result.stdout + result.stderr
             except subprocess.TimeoutExpired as error:
@@ -1311,12 +1311,7 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
     finally:
         server.shutdown()
 
-    reports = [
-        # The console prints the logged string in quotes.
-        json.loads(line.split(CERTIFICATE_ERROR_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
-        for line in output.splitlines()
-        if CERTIFICATE_ERROR_TEST_MARKER in line
-    ]
+    reports = certificate_error_reports(output)
     warning = next((report for report in reports if "problems" in report), None)
     loaded = next((report for report in reports if "loaded" in report), None)
 
@@ -1340,9 +1335,38 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
         loaded is not None and loaded["loaded"] == url and "/" in requested,
         f"the page reported {loaded}, and the server was asked for {requested}",
     )
+    # The warning on its own, opened at its address, knows of no certificate to accept for the site.
+    with tempfile.TemporaryDirectory() as profile:
+        warning_url = "xenon://certificate-error/?url=" + urllib.parse.quote(url, safe="")
+        command = [str(executable), "--headless=manual", "--profile-path", profile, warning_url]
+        try:
+            result = subprocess.run(
+                command, env=test_env, capture_output=True, encoding="utf-8", errors="replace", timeout=60
+            )
+            direct_output = result.stdout + result.stderr
+        except subprocess.TimeoutExpired:
+            direct_output = "timed out"
+    direct = next((report for report in certificate_error_reports(direct_output) if "problems" in report), None)
+    expect(
+        "opened at its address, the warning has nothing to proceed past",
+        direct is not None and direct["canProceed"] is False,
+        f"the warning reported {direct}: {direct_output[-2000:]}",
+    )
+
     if not passed:
         print(output[-4000:], file=sys.stderr)
+        for template in sorted(executable.parents[2].rglob("templates/error.html")):
+            print(f"    {template} is Xenon's: {'xenon-error-message' in template.read_text()}", file=sys.stderr)
     return passed
+
+
+def certificate_error_reports(output: str) -> list[dict]:
+    # The console prints the logged string in quotes.
+    return [
+        json.loads(line.split(CERTIFICATE_ERROR_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
+        for line in output.splitlines()
+        if CERTIFICATE_ERROR_TEST_MARKER in line
+    ]
 
 
 def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, str]:

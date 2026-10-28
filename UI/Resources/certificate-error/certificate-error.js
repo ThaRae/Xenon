@@ -173,5 +173,7 @@ if (state.proceedsByItself) {
     if (state.canProceed) {
         advanced.click();
         proceed.click();
+    } else {
+        window.close();
     }
 }
