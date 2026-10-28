@@ -1,0 +1,98 @@
+name: Extension memory measurement (temporary, issue #28)
+
+# Builds Xenon before and after the pull request that keeps the content blocker out of extensions' pages and stops idle
+# backgrounds, on one runner, and measures what the test extension costs in each.
+on:
+  push:
+    branches: [claude/extension-memory-measure]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # main, with #34.
+  BEFORE: 4d3e0a1fbddd17ea3285a69403fc63c444c8beb6
+  AFTER_BRANCH: claude/objective-ardinghelli-cc8d75
+
+jobs:
+  extension:
+    runs-on: macos-26
+    timeout-minutes: 360
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/Build/caches/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 3G
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Keep the measurement and the test extension
+        run: |
+          cp Meta/ci/extension-memory/measure.py "$RUNNER_TEMP/measure.py"
+          cp -R Tests/Extensions/basic "$RUNNER_TEMP/extension"
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: git submodule update --init --depth 1 ladybird
+
+      - name: Select Xcode
+        run: |
+          version=$(sed -n "s/.*xcode-version: *'\{0,1\}\([0-9.]*\)'\{0,1\}.*/\1/p" ladybird/.github/actions/setup/action.yml)
+          xcode=/Applications/Xcode_$version.app
+          if [ ! -d "$xcode" ]; then
+            xcode=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          fi
+          sudo xcode-select --switch "$xcode"
+          echo "XCODE_VERSION=$(xcodebuild -version | head -n 1)" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: |
+          brew update --quiet
+          brew unlink openssl@3 || true
+          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool llvm@22 nasm ninja pkg-config unzip
+
+      - name: Restore the build caches
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: macos-${{ env.XCODE_VERSION }}-${{ github.sha }}
+          restore-keys: macos-${{ env.XCODE_VERSION }}-
+
+      - name: Build before
+        timeout-minutes: 300
+        run: |
+          git checkout --detach "$BEFORE"
+          git submodule update --init --depth 1 ladybird
+          ./Meta/patches.py apply --force
+          ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" build
+
+      - name: Measure before
+        run: |
+          {
+            echo '```'
+            python3 "$RUNNER_TEMP/measure.py" --xenon Build/release/bin/Xenon.app --extension "$RUNNER_TEMP/extension" \
+              --label "Before: main ($(git rev-parse --short HEAD))"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Build after
+        timeout-minutes: 120
+        run: |
+          git fetch origin "$AFTER_BRANCH"
+          git checkout --detach FETCH_HEAD
+          git submodule update --init --depth 1 ladybird
+          ./Meta/patches.py apply --force
+          ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" build
+
+      - name: Measure after
+        run: |
+          {
+            echo '```'
+            python3 "$RUNNER_TEMP/measure.py" --xenon Build/release/bin/Xenon.app --extension "$RUNNER_TEMP/extension" \
+              --label "After: $AFTER_BRANCH ($(git rev-parse --short HEAD))"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
