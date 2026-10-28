@@ -1,0 +1,41 @@
+name: Memory measurement (temporary, issue #28)
+
+on:
+  push:
+    branches: [claude/memory-measure]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  content-blocker:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Check out Ladybird with Xenon's patches
+        run: |
+          git submodule update --init --depth 1 ladybird
+          ./Meta/patches.py apply
+
+      - name: Build the measurement
+        run: |
+          rustc --version
+          cargo build --release --manifest-path Meta/ci/memory-measurement/Cargo.toml
+
+      - name: Measure
+        run: |
+          {
+            echo "### ${{ matrix.os }}"
+            echo
+            echo '```'
+            Meta/ci/memory-measurement/target/release/measure UI/Resources/filter-lists
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

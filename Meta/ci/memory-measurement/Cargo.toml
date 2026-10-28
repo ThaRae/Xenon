@@ -1,0 +1,26 @@
+# Temporary: measures the memory each WebContent process spends on the content blocker (issue #28). Builds Ladybird's
+# content blocker crate, as Xenon's patches leave it, against the same allocator, and loads Xenon's lists into it.
+[package]
+name = "content-blocker-memory"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "libweb_content_blocker_rust"
+path = "../../../ladybird/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "measure"
+path = "measure.rs"
+
+[dependencies]
+ak = { path = "../../../ladybird/AK/Rust" }
+adblock = { version = "=0.13.3", features = ["css-validation"] }
+libc = "0.2"
+mimalloc = { version = "0.1", features = ["secure"] }
+rustc-demangle = "0.1"
+serde_json = "1.0"
+
+[profile.release]
+debug = false
