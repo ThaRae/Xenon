@@ -3,3 +3,5 @@
 compile_commands.json
 .cache/
 __pycache__/
+Meta/ci/memory-measurement/target/
+Meta/measure-results/*.json
