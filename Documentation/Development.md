@@ -20,7 +20,7 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good upstream commit. |
 | `Patches/ladybird/` | Xenon's changes to the engine, as a patch series applied to the pinned commit at build time. |
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
-| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, the error page, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
+| `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon's artwork. |
 | `Tests/` | Unit tests, built as `TestXenon*` targets. |
 | `Meta/xenon.py` | Builds, runs, and tests Xenon. |

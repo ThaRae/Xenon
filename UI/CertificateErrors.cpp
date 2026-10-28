@@ -10,12 +10,15 @@
 #include <AK/Vector.h>
 #include <AK/WeakPtr.h>
 #include <LibCore/Environment.h>
+#include <LibCore/EventLoop.h>
 #include <LibCore/Resource.h>
 #include <LibHTTP/Header.h>
 #include <LibURL/Parser.h>
 #include <LibURL/URL.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/BrowsingSession.h>
+#include <LibWebView/CanonicalNavigation.h>
+#include <LibWebView/CanonicalTraversable.h>
 #include <LibWebView/HSTSStore.h>
 #include <LibWebView/RequestServerManager.h>
 #include <LibWebView/Utilities.h>
@@ -87,10 +90,40 @@ static RejectedCertificate const* rejected_certificate(WebView::BrowsingSession 
     return nullptr;
 }
 
+static URL::URL warning_url(URL::URL const& site)
+{
+    auto url = MUST(String::formatted("{}://{}/?url={}", SCHEME, PAGE_HOST, URL::percent_encode(site.serialize(), URL::PercentEncodeSet::Component)));
+    return URL::Parser::basic_parse(url).release_value();
+}
+
+// A tab whose own page the site is gets the warning in place of the engine's error page. RequestServer reports the
+// certificate before the navigation that failed on it ends, so the warning supersedes that navigation, and the tab's
+// history goes on from the page it was on. A frame keeps the engine's error page, as in Chrome.
+static void show_warning_in_place_of_navigations_to(WebView::BrowsingSession& session, URL::URL const& url)
+{
+    Vector<u64> view_ids;
+    WebView::ViewImplementation::for_each_view([&](WebView::ViewImplementation& view) {
+        if (&view.session() != &session || !view.has_traversable())
+            return IterationDecision::Continue;
+        auto navigation = view.traversable().uncommitted_navigation();
+        if (navigation && navigation->url.equals(url, URL::ExcludeFragment::Yes))
+            view_ids.append(view.view_id());
+        return IterationDecision::Continue;
+    });
+
+    for (auto view_id : view_ids) {
+        Core::deferred_invoke([view_id, url = warning_url(url)] {
+            if (auto view = WebView::ViewImplementation::find_view_by_id(view_id); view.has_value())
+                view->load(url);
+        });
+    }
+}
+
 void initialize()
 {
     WebView::RequestServerManager::the().on_server_certificate_rejected = [](WebView::BrowsingSession& session, URL::URL const& url, ByteBuffer const& certificate) {
         did_reject_certificate(session, url, certificate);
+        show_warning_in_place_of_navigations_to(session, url);
     };
 }
 

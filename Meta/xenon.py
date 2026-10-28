@@ -1273,8 +1273,8 @@ def check_session_restore(executable: Path, env: dict) -> bool:
             server.shutdown()
 
 
-# Opens a page on a local HTTPS server whose certificate is self-signed. Xenon refuses the certificate, and its warning
-# says why (UI/CertificateErrors.h). Nothing can click in a headless browser, so XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS
+# Opens a page on a local HTTPS server whose certificate is self-signed. Xenon refuses the certificate, and shows its
+# warning in place of the page, saying why (UI/CertificateErrors.h). Nothing can click in a headless browser, so XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS
 # has the warning print what it shows and then proceed, as the user would. The page then loads, and closes the browser.
 def check_certificate_errors(executable: Path, env: dict) -> bool:
     page = f"""<!doctype html><title>Xenon certificate test</title><script>
@@ -1368,9 +1368,11 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
     )
 
     if not passed:
+        # A crash's stack trace would push what the pages printed out of the output's tail.
+        for line in output.splitlines():
+            if CERTIFICATE_ERROR_TEST_MARKER in line or "VERIFICATION FAILED" in line or "Failed load" in line:
+                print(line, file=sys.stderr)
         print(output[-4000:], file=sys.stderr)
-        for template in sorted(executable.parents[2].rglob("templates/error.html")):
-            print(f"    {template} is Xenon's: {'xenon-error-message' in template.read_text()}", file=sys.stderr)
     return passed
 
 

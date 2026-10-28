@@ -298,14 +298,15 @@ self-signed certificate.
   one that way.
 - **Frames**: a frame whose certificate fails shows the plain error page, with no way past it.
 - **The address bar** shows `xenon://certificate-error/?url=…` while the warning is up.
+- **Redirects**: a page that redirects to a site whose certificate fails shows the plain error page.
 
 RequestServer reports each certificate it refuses to the UI process, and takes the ones the user accepts, which curl
-then pins by their public key (engine patch `0027`, `RequestServer+LibWebView: Let the user accept a certificate that
+then pins by their public key (engine patch `0030`, `RequestServer+LibWebView: Let the user accept a certificate that
 fails verification`). It learns which certificate it refused by making the request once more with curl's
 `CURLOPT_CERTINFO`, which costs every connection otherwise; the handshake failed before anything was sent.
 `UI/CertificateErrors.cpp` keeps the certificates and serves the warning, `UI/CertificateDetails.cpp` works out what's
-wrong with one, and the page is in `UI/Resources/certificate-error`. Xenon's version of the engine's error page
-(`UI/Resources/templates/error.html`) sends a tab whose page failed that way to the warning.
+wrong with one, and the page is in `UI/Resources/certificate-error`. RequestServer reports a certificate before the
+navigation that failed on it ends, so the UI process sends a tab whose page it was to the warning in its place.
 
 ## Installing and updates
 

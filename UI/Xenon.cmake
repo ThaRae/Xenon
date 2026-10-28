@@ -332,20 +332,6 @@ foreach (page IN LISTS XENON_ABOUT_PAGE_ADDITIONS)
     list(APPEND ABOUT_PAGES "${XENON_UI_DIR}/Resources/about-pages/${page}")
 endforeach()
 
-# The engine's error page, whose Xenon version sends a tab whose site's certificate didn't verify to Xenon's certificate
-# warning (UI/CertificateErrors.h).
-set(XENON_TEMPLATE_OVERRIDES
-    error.html
-)
-foreach (page IN LISTS XENON_TEMPLATE_OVERRIDES)
-    list(FIND WEB_TEMPLATES "${LADYBIRD_SOURCE_DIR}/Base/res/ladybird/templates/${page}" index)
-    if (index EQUAL -1)
-        message(FATAL_ERROR "Xenon overrides templates/${page}, which Ladybird no longer ships. Check upstream's changes.")
-    endif()
-    list(REMOVE_AT WEB_TEMPLATES ${index})
-    list(INSERT WEB_TEMPLATES ${index} "${XENON_UI_DIR}/Resources/templates/${page}")
-endforeach()
-
 # Ladybird's internal pages show its logo as their favicon and on an empty history or bookmarks page, and so does the
 # task manager. Xenon's versions (rendered by Meta/generate-app-icon.py) take their place.
 set(XENON_ICON_OVERRIDES
