@@ -1,0 +1,336 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Wed, 28 Oct 2026 14:53:11 -0400
+Subject: [PATCH] LibWeb: Keep plain $document URL filters out of the content
+ blocker
+
+Malware lists are made of filters that block pages at one URL or under
+one host, and nothing else: `||host^$document` and
+`||host/path^$document`. The Online Malicious URL Blocklist, which
+uBlock Origin enables by default, has about 98,000 of them. In the
+adblock engine each takes over 100 bytes, so that one list costs about
+17 MiB in every WebContent process, which builds its own engine, and
+about 45 MiB more while the engine is being built.
+
+Keep those filters as sorted 64-bit hashes of their patterns instead,
+8 bytes each, and check a page against them as the engine would match
+the filters: the filter's host is whole labels of the page's host (for
+`||host^`, a suffix), and its path follows that host up to a separator
+or the end of the URL. A hit is then handed to the engine as a match it
+already found, so that exceptions still let the page through, and a
+`$badfilter` for one of these filters drops its hash.
+
+While here, stop copying every list twice more than needed when
+building the engine, and skip the lines without a `#` when looking for
+generic cosmetic selector lists, since those are all network filters.
+---
+ .../LibWeb/ContentBlocker/Rust/src/lib.rs     | 192 ++++++++++++++++--
+ 1 file changed, 171 insertions(+), 21 deletions(-)
+
+diff --git a/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs b/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
+index f2ae52c1215e0ced5babdcb5bf694cd680b9dde3..eacda5b0d36fc663f89c49af6abf7096dad23f1d 100644
+--- a/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
++++ b/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
+@@ -16,6 +16,7 @@ mod rust_panic;
+ use crate::rust_panic::abort_on_panic;
+ use std::collections::HashMap;
+ use std::collections::HashSet;
++use std::hash::Hasher;
+ 
+ #[repr(C)]
+ pub struct ContentBlockerString {
+@@ -42,6 +43,7 @@ pub struct ContentBlockerRequestResult {
+ 
+ pub struct ContentBlockerEngine {
+     engine: adblock::engine::Engine,
++    document_url_filters: DocumentUrlFilters,
+     generic_selector_list_rules: GenericSelectorListRules,
+     /// Filters with `$popup`, without that option: they decide whether a page may open a new window to a URL.
+     popup_engine: Option<adblock::engine::Engine>,
+@@ -56,12 +58,128 @@ const TRUSTED_LIST_PERMISSION: u8 = 0x01;
+ /// Applies procedural and action cosmetic filters in the page (see `page_script_for_url`).
+ const PROCEDURAL_FILTERING_SCRIPT: &str = include_str!("procedural.js");
+ 
+-/// The filter lines that need their own engine, split out of a list.
++/// The filter lines that need their own engine, or none, split out of a list.
+ #[derive(Default)]
+ struct SplitRules {
+     rules: String,
+     popup_rules: String,
+     cname_exception_rules: String,
++    document_url_filters: Vec<u64>,
++    document_url_badfilters: Vec<u64>,
++}
++
++/// The pattern of a filter that blocks pages at one URL, or under one host, and nothing else: `||host^$document` or
++/// `||host/path^$document`, as malware lists hold them by the hundred thousand. In the engine, each would take over 100
++/// bytes in every process; as a hash, it takes 8. Also whether the filter is the `$badfilter` that cancels one.
++fn document_url_filter_pattern(line: &str) -> Option<(&str, bool)> {
++    let (pattern, options) = line.strip_prefix("||")?.rsplit_once('$')?;
++    let mut is_document = false;
++    let mut is_badfilter = false;
++    for option in options.split(',') {
++        match option {
++            "document" | "doc" => is_document = true,
++            "badfilter" => is_badfilter = true,
++            _ => return None,
++        }
++    }
++    let pattern = pattern.strip_suffix('^')?;
++    let (host, path) = pattern.split_at(pattern.find('/').unwrap_or(pattern.len()));
++    let is_plain_host = !host.is_empty()
++        && !host.starts_with('.')
++        && !host.ends_with('.')
++        && host
++            .bytes()
++            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_'));
++    let is_plain_path = path
++        .bytes()
++        .all(|byte| byte.is_ascii_graphic() && !matches!(byte, b'*' | b'^' | b'|' | b'$'));
++    (is_document && is_plain_host && is_plain_path).then_some((pattern, is_badfilter))
++}
++
++fn document_url_filter_hash(pattern: &[u8]) -> u64 {
++    let mut hasher = std::collections::hash_map::DefaultHasher::new();
++    for byte in pattern {
++        hasher.write_u8(byte.to_ascii_lowercase());
++    }
++    hasher.finish()
++}
++
++/// A URL separator, which `^` in a filter matches.
++fn is_url_separator(byte: u8) -> bool {
++    byte.is_ascii() && !byte.is_ascii_alphanumeric() && !matches!(byte, b'_' | b'.' | b'%' | b'-')
++}
++
++/// The hashes of the patterns of the filters `document_url_filter_pattern` takes out of the lists.
++#[derive(Default)]
++struct DocumentUrlFilters {
++    hashes: Vec<u64>,
++}
++
++impl DocumentUrlFilters {
++    fn new(mut hashes: Vec<u64>, badfilters: &[u64]) -> Self {
++        let badfilters: HashSet<u64> = badfilters.iter().copied().collect();
++        hashes.retain(|hash| !badfilters.contains(hash));
++        hashes.sort_unstable();
++        hashes.dedup();
++        hashes.shrink_to_fit();
++        Self { hashes }
++    }
++
++    fn contains(&self, pattern: &[u8]) -> bool {
++        self.hashes.binary_search(&document_url_filter_hash(pattern)).is_ok()
++    }
++
++    /// Whether a filter matches a page at `url`, whose host is `hostname`, as the engine would match it.
++    fn matches(&self, url: &str, hostname: &str) -> bool {
++        if self.hashes.is_empty() || hostname.is_empty() {
++            return false;
++        }
++        let url = url.to_ascii_lowercase();
++        let hostname = hostname.to_ascii_lowercase();
++
++        // `||host^` matches the host and the hosts under it.
++        let bare_hostname = hostname.strip_suffix('.').unwrap_or(&hostname);
++        let label_starts: Vec<usize> = std::iter::once(0)
++            .chain(bare_hostname.match_indices('.').map(|(index, _)| index + 1))
++            .collect();
++        if label_starts
++            .iter()
++            .any(|&start| self.contains(&bare_hostname.as_bytes()[start..]))
++        {
++            return true;
++        }
++
++        // `||host/path^` matches where the filter's host is whole labels of the URL's host, the first time it appears
++        // there, and its path follows that host where it first appears in the URL, up to a separator or the end.
++        let label_ends: Vec<usize> = hostname
++            .match_indices('.')
++            .map(|(index, _)| index)
++            .chain(std::iter::once(hostname.len()))
++            .collect();
++        for &start in &label_starts {
++            for &end in label_ends.iter().filter(|&&end| end > start) {
++                let filter_host = &hostname[start..end];
++                if hostname.find(filter_host) != Some(start) {
++                    continue;
++                }
++                let Some(host_start) = url.find(filter_host) else {
++                    continue;
++                };
++                let path_start = host_start + filter_host.len();
++                let path = &url.as_bytes()[path_start..];
++                if !path.starts_with(b"/") {
++                    continue;
++                }
++                let matches_up_to = |length: usize| self.contains(&url.as_bytes()[host_start..path_start + length]);
++                if (1..path.len()).any(|length| is_url_separator(path[length]) && matches_up_to(length))
++                    || matches_up_to(path.len())
++                {
++                    return true;
++                }
++            }
++        }
++        false
++    }
+ }
+ 
+ /// The option part of a network filter, as the engine finds it (after the last `$`), or none for cosmetic filters.
+@@ -79,6 +197,15 @@ impl SplitRules {
+         let mut split = Self::default();
+         for line in text.lines() {
+             let trimmed = line.trim();
++            if let Some((pattern, is_badfilter)) = document_url_filter_pattern(trimmed) {
++                let hash = document_url_filter_hash(pattern.as_bytes());
++                if is_badfilter {
++                    split.document_url_badfilters.push(hash);
++                } else {
++                    split.document_url_filters.push(hash);
++                }
++                continue;
++            }
+             let Some((pattern, options)) = network_filter_options(trimmed) else {
+                 split.rules.push_str(line);
+                 split.rules.push('\n');
+@@ -121,22 +248,22 @@ impl SplitRules {
+ }
+ 
+ /// An engine for the given lists, or none when both are empty.
+-fn engine_from_lists(untrusted: &str, trusted: &str) -> Option<adblock::engine::Engine> {
++fn engine_from_lists(untrusted: String, trusted: String) -> Option<adblock::engine::Engine> {
+     if untrusted.trim().is_empty() && trusted.trim().is_empty() {
+         return None;
+     }
+     Some(main_engine_from_lists(untrusted, trusted))
+ }
+ 
+-fn main_engine_from_lists(untrusted: &str, trusted: &str) -> adblock::engine::Engine {
++fn main_engine_from_lists(untrusted: String, trusted: String) -> adblock::engine::Engine {
+     let mut filter_set = adblock::lists::FilterSet::new(false);
+-    filter_set.add_filter_list(untrusted.to_string(), adblock::lists::ParseOptions::default());
++    filter_set.add_filter_list(untrusted, adblock::lists::ParseOptions::default());
+     if !trusted.is_empty() {
+         let options = adblock::lists::ParseOptions {
+             permissions: adblock::resources::PermissionMask::from_bits(TRUSTED_LIST_PERMISSION),
+             ..Default::default()
+         };
+-        filter_set.add_filter_list(trusted.to_string(), options);
++        filter_set.add_filter_list(trusted, options);
+     }
+     adblock::engine::Engine::new_with_filter_set(filter_set)
+ }
+@@ -246,12 +373,13 @@ fn selector_key_from_start(selector: &str) -> Option<SelectorKey> {
+ }
+ 
+ impl GenericSelectorListRules {
+-    fn from_rules(rules: &str) -> Self {
++    fn from_rules(lists: &[&str]) -> Self {
+         let mut selector_list_rules = Self::default();
+ 
+-        for line in rules.lines() {
++        for line in lists.iter().flat_map(|rules| rules.lines()) {
+             let trimmed_line = line.trim();
+-            if trimmed_line.is_empty() || trimmed_line.starts_with('!') || trimmed_line.starts_with('[') {
++            // Every cosmetic filter has a `#`, and most lines are network filters, which have none.
++            if trimmed_line.starts_with('!') || trimmed_line.starts_with('[') || !trimmed_line.contains('#') {
+                 continue;
+             }
+ 
+@@ -382,6 +510,26 @@ impl GenericSelectorListRules {
+     }
+ }
+ 
++impl ContentBlockerEngine {
++    /// The engine's verdict on a request, with the document URL filters it doesn't hold applied as it would apply them.
++    fn check_network_request(
++        &self,
++        request: &adblock::request::Request,
++        request_type: &str,
++    ) -> adblock::blocker::BlockerResult {
++        let result = self.engine.check_network_request(request);
++        if result.filter.is_none()
++            && request.is_supported
++            && request_type == "document"
++            && self.document_url_filters.matches(&request.url, &request.hostname)
++        {
++            // As if the engine held the filter that matched: only an exception lets the page through.
++            return self.engine.check_network_request_subset(request, true, false);
++        }
++        result
++    }
++}
++
+ fn cosmetic_css_for_url(engine: &ContentBlockerEngine, url: &str, classes: &[&str], ids: &[&str]) -> String {
+     let resources = engine.engine.url_cosmetic_resources(url);
+     let mut selectors = resources.hide_selectors;
+@@ -475,22 +623,24 @@ pub extern "C" fn rust_content_blocker_create(
+         let untrusted = SplitRules::from_text(rules);
+         let trusted = SplitRules::from_text(trusted_rules);
+ 
+-        let mut engine = main_engine_from_lists(&untrusted.rules, &trusted.rules);
++        let generic_selector_list_rules =
++            GenericSelectorListRules::from_rules(&[untrusted.rules.as_str(), trusted.rules.as_str()]);
++        let mut document_url_filters = untrusted.document_url_filters;
++        document_url_filters.extend(trusted.document_url_filters);
++        let mut document_url_badfilters = untrusted.document_url_badfilters;
++        document_url_badfilters.extend(trusted.document_url_badfilters);
++
++        let mut engine = main_engine_from_lists(untrusted.rules, trusted.rules);
+         if let Ok(resources) = serde_json::from_slice::<Vec<adblock::resources::Resource>>(resources.as_slice()) {
+             engine.use_resources(resources);
+         }
+ 
+-        let mut all_rules = untrusted.rules;
+-        all_rules.push_str(&trusted.rules);
+-        let generic_selector_list_rules = GenericSelectorListRules::from_rules(&all_rules);
+         let engine = ContentBlockerEngine {
+             engine,
++            document_url_filters: DocumentUrlFilters::new(document_url_filters, &document_url_badfilters),
+             generic_selector_list_rules,
+-            popup_engine: engine_from_lists(&untrusted.popup_rules, &trusted.popup_rules),
+-            cname_exception_engine: engine_from_lists(
+-                &untrusted.cname_exception_rules,
+-                &trusted.cname_exception_rules,
+-            ),
++            popup_engine: engine_from_lists(untrusted.popup_rules, trusted.popup_rules),
++            cname_exception_engine: engine_from_lists(untrusted.cname_exception_rules, trusted.cname_exception_rules),
+         };
+         Box::into_raw(Box::new(engine))
+     })
+@@ -533,7 +683,7 @@ pub extern "C" fn rust_content_blocker_matches(
+             return false;
+         };
+ 
+-        engine.engine.check_network_request(&request).should_block()
++        engine.check_network_request(&request, request_type).should_block()
+     })
+ }
+ 
+@@ -568,7 +718,7 @@ pub extern "C" fn rust_content_blocker_check_request(
+             return allow();
+         };
+ 
+-        let result = engine.engine.check_network_request(&request);
++        let result = engine.check_network_request(&request, request_type);
+         if result.should_block() {
+             // A redirect only applies to a blocked request: `$redirect-rule` alone never blocks.
+             return match result.redirect {
+@@ -664,7 +814,7 @@ pub extern "C" fn rust_content_blocker_matches_uncloaked(
+         let Ok(original) = adblock::request::Request::new(url, source_url, request_type, "") else {
+             return false;
+         };
+-        let original_result = engine.engine.check_network_request(&original);
++        let original_result = engine.check_network_request(&original, request_type);
+         if original_result.filter.is_some() || original_result.exception.is_some() {
+             return false;
+         }
+@@ -675,7 +825,7 @@ pub extern "C" fn rust_content_blocker_matches_uncloaked(
+         let Ok(request) = adblock::request::Request::new(&uncloaked, source_url, request_type, "") else {
+             return false;
+         };
+-        if !engine.engine.check_network_request(&request).should_block() {
++        if !engine.check_network_request(&request, request_type).should_block() {
+             return false;
+         }
+         if let Some(cname_exception_engine) = &engine.cname_exception_engine
