@@ -201,7 +201,7 @@ need engine work.
 
 ### Daily filter list updates
 
-[xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds the lists every day and signs them. Once
+[xenon-filter-lists](https://github.com/ThaRae/xenon-filter-lists) rebuilds the lists every day and signs them. Once
 a day Xenon downloads the lists that changed, checks them against the signed manifest, and switches to them without a
 restart. It falls back to the bundled lists if anything fails.
 

@@ -163,8 +163,8 @@ the lists without being given any, with blocking on and off: requests that EasyL
 scriptlet and a hiding rule for a listed site, on a page served locally at that site's address.
 
 Between releases, Xenon fetches the lists daily from
-[tharae/xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists). That public repository's workflow (kept
-here as `Meta/ci/filter-lists-workflow.yml`) runs the same script every day with `--output`, through
+[ThaRae/xenon-filter-lists](https://github.com/ThaRae/xenon-filter-lists). That public repository's GitHub Actions
+workflow (kept here as `Meta/ci/filter-lists-workflow.yml`) runs the same script every day with `--output`, through
 `Meta/ci/publish-filter-lists.sh`, and signs the manifest. See [FilterListUpdates.md](FilterListUpdates.md).
 
 ## Updating the !bangs

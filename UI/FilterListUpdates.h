@@ -17,8 +17,8 @@
 
 namespace Ladybird::FilterLists {
 
-// Keeps the filter lists up to date between releases. xenon-filter-lists, a public repository on git.avx512.dev,
-// rebuilds the bundle every day with Meta/update-filter-lists.py and signs its manifest (Documentation/FilterListUpdates.md).
+// Keeps the filter lists up to date between releases. xenon-filter-lists, a public repository on GitHub, rebuilds
+// the bundle every day with Meta/update-filter-lists.py and signs its manifest (Documentation/FilterListUpdates.md).
 //
 // Once a day, while content blocking and filter list updates (Settings, Services) are on, Xenon fetches that manifest,
 // checks its signature, and downloads the files whose hash changed, checking each against it. The newest bundle that

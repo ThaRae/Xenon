@@ -28,7 +28,7 @@
 namespace Ladybird::FilterLists {
 
 // Where xenon-filter-lists publishes the bundle, and the public half of the key it signs manifest.json with.
-static constexpr auto UPDATES_URL = "https://git.avx512.dev/tharae/xenon-filter-lists/raw/branch/main/"sv;
+static constexpr auto UPDATES_URL = "https://raw.githubusercontent.com/ThaRae/xenon-filter-lists/main/"sv;
 static constexpr auto PUBLIC_KEY = "n1G8auYT7+ppTD19FMr7o3oWbSaioHm38CWCr7FCuZ4="sv;
 
 // For tests, which publish bundles of their own from a local server, signed with a key of their own.
