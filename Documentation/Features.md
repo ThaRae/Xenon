@@ -11,6 +11,7 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
   updates
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden and Proton Pass,
   security keys
+- [Security](#security): certificate warnings
 - [Installing and updates](#installing-and-updates): the installer, and Xenon updating itself
 - [Look](#look): palette and icon
 - [Not done yet](#not-done-yet)
@@ -202,8 +203,12 @@ spare process kept ready for the next tab. Three engine patches keep each engine
 
 - `0027` keeps the malware lists' 100,000 `||host/path^$document` filters as 8-byte hashes, not as engine filters of
   over 100 bytes each;
-- `0029` gives back the memory used to build the engine, several times what the engine keeps;
-- `0028` sends no lists to any process while blocking is off.
+- `0030` gives back the memory used to build the engine, several times what the engine keeps;
+- `0029` sends no lists to any process while blocking is off.
+
+Extensions' own pages get no lists at all: their background pages, offscreen documents, and popups each open in a
+process of their own that never builds the engine (`0031`). uBlock Origin doesn't filter other extensions' requests in
+Chrome either. Frames from other sites in those pages still get the lists, in their own processes.
 
 ### uBlock Origin's engine features
 
@@ -250,7 +255,8 @@ Manifest V3 extensions, for password managers first, as Helium offers Bitwarden,
 still in progress; [Extensions.md](Extensions.md) has the details.
 
 - Unpacked extensions load from the Extensions dialog or with `--load-extension=<dir>`, get a toolbar button and
-  popup, and run their background service worker.
+  popup, and run their background service worker. As in Chrome, the worker stops after 30 seconds without events or
+  calls, and its four processes with it, and starts again for the next event it listens to (`UI/Extensions/Router`).
 - They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`, `action`, `commands`, and
   `offscreen`, and fetch from the hosts they have permission for.
 - Their content scripts run in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and
@@ -265,13 +271,47 @@ remove it.
 - **Bitwarden** logs in (with a security key too) and autofills logins.
 - **Proton Pass** signs in through Proton's account page, unlocks with its extra password, autofills logins, and saves
   new ones. Once allowed to use the clipboard, it clears a copied password when its timer runs out (engine patch
-  `0027`; see [Extensions.md](Extensions.md)).
+  `0028`; see [Extensions.md](Extensions.md)).
 
 ### Security keys (WebAuthn)
 
 On macOS, sites and password managers can register a USB security key and sign in with it
 (`navigator.credentials.create()` and `get()`), PINs included, and in cross-origin frames that are allowed to. A prompt
 over the page says what the key needs. It comes from engine patches `0010`–`0015`; see [WebAuthn.md](WebAuthn.md).
+
+## Security
+
+### Certificate warnings
+
+A site whose certificate can't be verified gets a warning in place of the page, as in Chrome and Helium: **Your
+connection isn't private**, and why, first of all:
+
+- the certificate is self-signed;
+- it's for other names than the site's (it lists them);
+- it expired, or isn't valid yet (with the date);
+- or no authority the computer trusts issued it.
+
+**Go back** leaves. **Advanced** shows the certificate (who it's issued to and by, when it's valid, the names it's for,
+and its SHA-256 fingerprint) and **Proceed to *host* (unsafe)**, for a site you know, like a homelab server with a
+self-signed certificate.
+
+- **What proceeding accepts**: that certificate, and only it, for the site's host and port, WebSockets included. Another
+  port, or another certificate on the same one, gets the warning again. Xenon forgets it when it quits, or a private
+  window's when the private windows close.
+- **Sites that can't be proceeded to**: a site that told Xenon to reach it securely only (HSTS), whose certificate
+  errors are fatal (RFC 6797 §12.1), as in Chrome. A site reached over a certificate the user accepted can't become
+  one that way.
+- **Frames**: a frame whose certificate fails shows the plain error page, with no way past it.
+- **The address bar** shows `xenon://certificate-error/?url=…` while the warning is up.
+- **Redirects**: a page that redirects to a site whose certificate fails shows the plain error page.
+
+RequestServer reports each certificate it refuses to the UI process, and takes the ones the user accepts, which curl
+then pins by their public key (engine patch `0030`, `RequestServer+LibWebView: Let the user accept a certificate that
+fails verification`). It learns which certificate it refused by making the request once more with curl's
+`CURLOPT_CERTINFO`, which costs every connection otherwise; the handshake failed before anything was sent.
+`UI/CertificateErrors.cpp` keeps the certificates and serves the warning, `UI/CertificateDetails.cpp` works out what's
+wrong with one, and the page is in `UI/Resources/certificate-error`. RequestServer reports a certificate before the
+navigation that failed on it ends, so the UI process sends a tab whose page it was to the warning in its place.
 
 ## Installing and updates
 

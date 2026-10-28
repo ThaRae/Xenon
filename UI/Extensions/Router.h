@@ -65,9 +65,14 @@ public:
     // The open popup of an extension follows the size its page reports.
     void set_popup_size_listener(String const& extension_id, Function<void(int width, int height)>);
 
-    // The extension's background page is about to start. Runtime messages and ports for the extension wait until its
-    // background script has run, as Chrome holds them while it starts a service worker, so that its listeners get them.
+    // The extension's background page is about to start, with the extension. Runtime messages, ports, and events for the
+    // extension's background wait until its script has run, as Chrome holds them while it starts a service worker, so
+    // that its listeners get them.
     void background_will_start(Extension const&);
+
+    // A background stops once it has had nothing to do for this long, as Chrome stops an extension's service worker
+    // after 30 seconds without events or calls, and starts again for the next event it has a listener for.
+    void set_background_idle_timeout(AK::Duration timeout) { m_background_idle_timeout = timeout; }
 
     // Closes the extension's contexts' ports and pending messages, and cancels its alarms, as it goes away.
     void forget_extension(Extension const&);
@@ -147,6 +152,15 @@ private:
     // What waits for the background of the sender's extension to run its script, if it hasn't yet.
     Optional<Vector<Function<void()>>&> waiting_for_background(Context const& sender);
     void background_did_run(String const& extension_id);
+    void start_background(Extension const&, bool is_restart);
+    // Starts the extension's background again if it stopped when idle, and listens to the event, which then waits for
+    // it to run its script.
+    void wake_background(Extension const&, StringView event_name);
+    void background_was_active(String const& extension_id);
+    bool background_is_busy(String const& extension_id) const;
+    void stop_idle_background(String const& extension_id);
+    // Posts to a context, which keeps the extension's background running if that's where it goes.
+    void post(WebView::ScriptBridgeEndpoint const&, String const& message);
 
     void send_runtime_message(Context&, u64 call_id, JsonValue message, Vector<WebView::ScriptBridgeEndpoint> receivers);
     void send_tab_message(Context&, u64 call_id, JsonArray const& args);
@@ -160,6 +174,7 @@ private:
     void close_port_end(WebView::ScriptBridgeEndpoint const&, String const& port_id, Optional<StringView> error = {});
     void forget_endpoint(WebView::ScriptBridgeEndpoint const&);
 
+    static String event_message(StringView name, JsonArray args);
     static void reply(WebView::ScriptBridgeEndpoint const&, u64 id, JsonValue result);
     static void reply_with_error(WebView::ScriptBridgeEndpoint const&, u64 id, StringView error);
 
@@ -179,8 +194,16 @@ private:
     struct StartingBackground {
         Vector<Function<void()>> waiting;
         NonnullRefPtr<Core::Timer> timeout;
+        // Whether it started for an event after it stopped when idle, rather than with the extension.
+        bool is_restart { false };
     };
     HashMap<String, StartingBackground> m_starting_backgrounds;
+    // The backgrounds that have run their script, and the timers that stop them once they're idle.
+    HashMap<String, NonnullRefPtr<Core::Timer>> m_running_backgrounds;
+    // The events each background has listeners for, by name, which start it again once it has stopped. They're kept
+    // while it's stopped, as Chrome keeps a stopped service worker's.
+    HashMap<String, HashTable<String>> m_background_listeners;
+    AK::Duration m_background_idle_timeout;
 };
 
 StringView context_kind_name(ContextKind);

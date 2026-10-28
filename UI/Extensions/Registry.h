@@ -51,6 +51,10 @@ public:
 
     // Starts every extension's background, once the browser can create views.
     void start_background_pages();
+    // Opens the page of a background that stopped when idle again, for an event (see Router). Its offscreen document
+    // stays open while it's stopped.
+    bool restart_background_page(Extension const&);
+    void stop_idle_background_page(Extension const&);
 
     enum class Persist : u8 {
         No,
@@ -129,6 +133,7 @@ private:
 
     void add(NonnullRefPtr<Extension>);
     void start_background_page(Extension const&);
+    void open_background_page(Extension const&);
     void stop_background_page(StringView id);
     OwnPtr<WebView::HeadlessWebView> create_hidden_view(URL::URL const&);
     static void close_hidden_view(NonnullOwnPtr<WebView::HeadlessWebView>);

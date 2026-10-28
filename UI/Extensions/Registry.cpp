@@ -432,7 +432,9 @@ void Registry::notify_extensions_changed()
 // --- Background pages --------------------------------------------------------------------------------------------------
 
 // A view no one sees, for background pages and offscreen documents. A headless view reports itself visible, so its
-// page's timers, and its workers, run at full speed.
+// page's timers, and its workers, run at full speed. Its pages are the extension's own, which the content blocker
+// leaves alone, as uBlock Origin doesn't see other extensions' requests in Chrome, so it goes without the content
+// blocker, whose engine would otherwise take tens of MiB in its process.
 OwnPtr<WebView::HeadlessWebView> Registry::create_hidden_view(URL::URL const& url)
 {
     if (!m_theme.has_value()) {
@@ -445,7 +447,7 @@ OwnPtr<WebView::HeadlessWebView> Registry::create_hidden_view(URL::URL const& ur
         m_theme = theme.release_value();
     }
 
-    auto view = WebView::HeadlessWebView::create(*m_theme, BACKGROUND_PAGE_SIZE);
+    auto view = WebView::HeadlessWebView::create(*m_theme, BACKGROUND_PAGE_SIZE, WebView::IsPrivate::No, WebView::EnableContentBlocker::No);
     view->load(url);
     return view;
 }
@@ -463,8 +465,27 @@ void Registry::start_background_page(Extension const& extension)
     if (!m_can_start_background_pages || !extension.manifest().background_service_worker.has_value())
         return;
     Router::the().background_will_start(extension);
+    open_background_page(extension);
+}
+
+bool Registry::restart_background_page(Extension const& extension)
+{
+    if (!m_can_start_background_pages || !extension.manifest().background_service_worker.has_value() || m_background_pages.contains(extension.id()))
+        return false;
+    open_background_page(extension);
+    return m_background_pages.contains(extension.id());
+}
+
+void Registry::open_background_page(Extension const& extension)
+{
     if (auto view = create_hidden_view(extension.url_for(BACKGROUND_PAGE_PATH)))
         m_background_pages.set(extension.id(), view.release_nonnull());
+}
+
+void Registry::stop_idle_background_page(Extension const& extension)
+{
+    if (auto view = m_background_pages.take(extension.id()); view.has_value())
+        close_hidden_view(view.release_value());
 }
 
 void Registry::stop_background_page(StringView id)
