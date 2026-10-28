@@ -311,7 +311,7 @@ def check_app(platform: Platform, executable: Path, smoke_dir: Path) -> list[str
         failures.append("blocking dashboard")
 
     print("==> the certificate warning, for a local HTTPS server with a self-signed certificate", flush=True)
-    if not check_certificate_errors(app_executable(platform, build_dir), env):
+    if not check_certificate_errors(executable, env):
         failures.append("certificate warning")
 
     print("==> extension pages and their chrome.* APIs", flush=True)
