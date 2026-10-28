@@ -61,6 +61,12 @@ void set_bangs_enabled(bool);
 bool automatic_updates_enabled();
 void set_automatic_updates_enabled(bool);
 
+// Whether fingerprinting protection farbles canvas, audio, hardware concurrency and device memory per site and session
+// (ladybird/Libraries/LibWeb/Fingerprinting/Farbling.h). On by default. It is Ladybird's setting underneath, which pages
+// and workers are told about, so about:settings and the Xenon menus agree on it.
+bool fingerprinting_protection();
+void set_fingerprinting_protection(bool);
+
 // The ids of the bundled filter lists (UI/Resources/filter-lists/manifest.json) turned off in the blocking dashboard,
 // which UI/FilterLists.cpp leaves out of what it gives the content blocker. Every list is on until it's turned off.
 HashTable<String> disabled_filter_lists();

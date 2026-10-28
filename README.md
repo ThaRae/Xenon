@@ -27,6 +27,7 @@ It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 - uBlock Origin's filter lists and features built in, scriptlets for YouTube ads and anti-adblock walls included
 - A popup and dashboard laid out like uBlock Origin's, with an element picker
 - The lists update daily, from a signed source
+- Fingerprinting protection inspired by Brave: canvas, audio, and hardware details differ slightly per site and session, and Xenon identifies itself as Chrome
 
 **Password managers**
 
@@ -81,6 +82,7 @@ incremental. The app ends up at `Build/release/bin/Xenon.app`.
 | [Extensions.md](Documentation/Extensions.md) | How Chrome extensions run in Xenon, and how far each password manager gets |
 | [WebAuthn.md](Documentation/WebAuthn.md) | Security key support |
 | [FilterListUpdates.md](Documentation/FilterListUpdates.md) | How the daily filter list updates are built, signed, and checked |
+| [Fingerprinting.md](Documentation/Fingerprinting.md) | How fingerprinting protection works, and how it relates to Brave's |
 | [Updates.md](Documentation/Updates.md) | How releases are made and signed, and how Xenon updates itself |
 | [CLAUDE.md](CLAUDE.md) | The rules for changing Xenon |
 
