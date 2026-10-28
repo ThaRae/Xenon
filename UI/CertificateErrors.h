@@ -16,7 +16,7 @@
 // Chrome and Helium do: why the certificate was refused (self-signed, expired, for another host, or from an authority
 // the computer doesn't trust), and behind Advanced, the certificate and a way to proceed to the site anyway.
 //
-// RequestServer tells Xenon about each certificate it refuses (engine patch 0030), and a tab whose page failed that way
+// RequestServer tells Xenon about each certificate it refuses (engine patch 0031), and a tab whose page failed that way
 // comes here in place of the engine's error page. Proceeding accepts that certificate, and only that one, for the
 // site's host and port until Xenon quits, or the private windows close. A site that asked to be reached securely only
 // (HSTS) can't be proceeded to, as in Chrome.

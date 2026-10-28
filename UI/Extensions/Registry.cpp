@@ -18,9 +18,11 @@
 #include <LibCore/System.h>
 #include <LibFileSystem/FileSystem.h>
 #include <LibGfx/SystemTheme.h>
+#include <LibURL/Site.h>
 #include <LibWebCommon/WebView/Utilities.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/HeadlessWebView.h>
+#include <LibWebView/RequestServerManager.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Extensions/CRX.h>
 #include <UI/Extensions/ContentScripts.h>
@@ -454,6 +456,11 @@ OwnPtr<WebView::HeadlessWebView> Registry::create_hidden_view(URL::URL const& ur
 
 void Registry::close_hidden_view(NonnullOwnPtr<WebView::HeadlessWebView> view)
 {
+    // The extension's RequestServer has nothing more to do once its pages are gone, so it goes with their processes
+    // rather than a minute later, as a site's RequestServer otherwise does in case the site is visited again.
+    if (auto site = URL::Site::serialize_for_partitioning(view->url().origin()); site.has_value())
+        WebView::RequestServerManager::the().retire_when_idle(view->session(), *site);
+
     auto request_close = view->prepare_for_immediate_close();
     request_close();
     // NB: The view goes once its page has had the chance to close.
