@@ -317,11 +317,15 @@ fn verify(scenario: &Scenario) {
         if pattern.contains(['*', '^', '|', '$']) {
             continue;
         }
-        urls.push(format!("https://{pattern}"));
-        urls.push(format!("https://{pattern}?x=1"));
-        urls.push(format!("http://www.{pattern}"));
-        urls.push(format!("https://{pattern}x"));
-        urls.push(format!("HTTPS://{}", pattern.to_ascii_uppercase()));
+        // Ladybird serializes URLs with lowercase hosts, and the engine doesn't lowercase them itself, so only the path
+        // gets another case.
+        let (host, path) = pattern.split_at(pattern.find('/').unwrap_or(pattern.len()));
+        urls.push(("exact", format!("https://{pattern}")));
+        urls.push(("query", format!("https://{pattern}?x=1")));
+        urls.push(("subdomain", format!("http://www.{pattern}")));
+        urls.push(("longer", format!("https://{pattern}x")));
+        urls.push(("path case", format!("https://{host}{}", path.to_ascii_uppercase())));
+        urls.push(("port", format!("https://{host}:8443{path}")));
     }
     urls.extend(
         [
@@ -330,14 +334,15 @@ fn verify(scenario: &Scenario) {
             "https://x.com/home",
             "https://example.com/",
         ]
-        .map(String::from),
+        .map(|url| ("other", url.to_string())),
     );
 
     let source = "https://example.org/";
     let mut checked = 0;
     let mut blocked = 0;
     let mut mismatches = Vec::new();
-    for url in &urls {
+    let mut mismatches_by_kind: std::collections::BTreeMap<String, usize> = Default::default();
+    for (kind, url) in &urls {
         for request_type in ["document", "subdocument", "image"] {
             let Ok(request) = adblock::request::Request::new(url, source, request_type, "GET") else {
                 continue;
@@ -352,7 +357,8 @@ fn verify(scenario: &Scenario) {
             checked += 1;
             blocked += usize::from(actual);
             if expected != actual {
-                mismatches.push(format!("{request_type} {url}: expected {expected}, got {actual}"));
+                *mismatches_by_kind.entry(format!("{kind} {request_type} expected {expected}")).or_default() += 1;
+                mismatches.push(format!("{kind} {request_type} {url}: expected {expected}, got {actual}"));
             }
         }
     }
@@ -361,6 +367,9 @@ fn verify(scenario: &Scenario) {
         urls.len(),
         mismatches.len()
     );
+    for (kind, count) in &mismatches_by_kind {
+        println!("    {count} x {kind}");
+    }
     for mismatch in mismatches.iter().take(20) {
         println!("    {mismatch}");
     }

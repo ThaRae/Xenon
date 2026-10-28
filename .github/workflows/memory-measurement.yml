@@ -41,6 +41,7 @@ jobs:
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
   browsers:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[browsers]')
     runs-on: macos-26
     timeout-minutes: 360
     env:
