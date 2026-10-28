@@ -1,8 +1,12 @@
 name: Release
 
 # Packages a macOS release on GitHub's runners, as Meta/release.py package does on a Mac, and keeps the installer disk
-# image, the archive, and the appcast it writes as the run's artifact. It doesn't publish: that stays Meta/release.py publish, on the Mac
-# (Documentation/Updates.md).
+# image, the archive, and the appcast it writes as the run's artifact (Documentation/Updates.md).
+#
+# Run by hand with publish ticked, it then publishes the release as Meta/release.py publish does: the GitHub release on
+# ThaRae/xenon-releases with the installer and the archive, the appcast there that installed Xenons update from, and
+# the v<version> tag here. Only from main, and once per version. git and gh push with the XENON_RELEASES_TOKEN secret,
+# a token that can write to both repositories; the run's own token stays read-only.
 #
 # It builds as ci.yml's macos job does, from the build caches main's builds saved, and doesn't save its own. A cold
 # build doesn't fit in one run, so with no caches to start from, it stops at once.
@@ -20,6 +24,10 @@ on:
         description: Run Meta/release.py test first, which opens Xenon's windows
         type: boolean
         default: true
+      publish:
+        description: Publish it to ThaRae/xenon-releases, where installed Xenons update from (main only)
+        type: boolean
+        default: false
   pull_request:
     paths: [.github/workflows/release.yml]
 
@@ -49,23 +57,49 @@ jobs:
           XENON_RELEASE_P12: ${{ secrets.XENON_RELEASE_P12 }}
           XENON_RELEASE_P12_PASSWORD: ${{ secrets.XENON_RELEASE_P12_PASSWORD }}
           XENON_UPDATE_KEY: ${{ secrets.XENON_UPDATE_KEY }}
+          XENON_RELEASES_TOKEN: ${{ secrets.XENON_RELEASES_TOKEN }}
+          PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         run: |
-          missing=0
-          for secret in XENON_RELEASE_P12 XENON_RELEASE_P12_PASSWORD XENON_UPDATE_KEY; do
+          status=0
+          secrets=(XENON_RELEASE_P12 XENON_RELEASE_P12_PASSWORD XENON_UPDATE_KEY)
+          [ "$PUBLISH" = true ] && secrets+=(XENON_RELEASES_TOKEN)
+          for secret in "${secrets[@]}"; do
             if [ -z "${!secret}" ]; then
               echo "::error::The $secret secret isn't set (Documentation/Updates.md)"
-              missing=1
+              status=1
             fi
           done
-          exit $missing
+          if [ "$PUBLISH" = true ] && [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::Releases are published from main, and this run is on $GITHUB_REF"
+            status=1
+          fi
+          exit $status
 
+      # Nothing in the run needs the checkout's own credentials, and publishing pushes with XENON_RELEASES_TOKEN instead.
       - name: Check out the repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Check out Ladybird (the pinned submodule)
         run: |
           git submodule update --init --depth 1 ladybird
           echo "VERSION=$(cat VERSION.txt)" >> "$GITHUB_ENV"
+
+      # Before the build too: each version is published once, so releasing again means bumping VERSION.txt. This also
+      # finds out whether the token can read ThaRae/xenon-releases.
+      - name: Check that the version isn't published yet
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.XENON_RELEASES_TOKEN }}
+        run: |
+          if gh api "repos/ThaRae/xenon-releases/releases/tags/v$VERSION" --silent 2> "$RUNNER_TEMP/release-check.txt"; then
+            echo "::error::ThaRae/xenon-releases already has v$VERSION. Bump VERSION.txt to publish another release."
+            exit 1
+          elif ! grep -q "HTTP 404" "$RUNNER_TEMP/release-check.txt"; then
+            echo "::error::XENON_RELEASES_TOKEN couldn't read ThaRae/xenon-releases: $(cat "$RUNNER_TEMP/release-check.txt")"
+            exit 1
+          fi
 
       # A keychain of the run's own, on the search list, where codesign finds the certificate. The partition list lets
       # Apple's tools use its key without asking.
@@ -194,6 +228,20 @@ jobs:
           compression-level: 0
           retention-days: 30
 
+      # After the upload, so a release that doesn't publish is still the run's artifact. publish checks that the commit
+      # is on main and the tree has no changes, then puts up the release, then the appcast, then the tag. The appcast's
+      # commit on ThaRae/xenon-releases is the Actions bot's.
+      - name: Meta/release.py publish
+        id: publish
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.XENON_RELEASES_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: ./Meta/release.py publish --yes
+
       - name: Delete the keychain and the update key
         if: always()
         run: |
@@ -204,6 +252,8 @@ jobs:
 
       - name: Summary
         if: always()
+        env:
+          PUBLISHED: ${{ steps.publish.outcome }}
         run: |
           {
             echo "### Xenon $VERSION"
@@ -215,4 +265,8 @@ jobs:
                 echo "\`$(basename "$file")\`: $(stat -f '%z' "$file") bytes, SHA-256 \`$(shasum -a 256 "$file" | cut -d ' ' -f 1)\`"
               fi
             done
+            if [ "$PUBLISHED" = success ]; then
+              echo
+              echo "Published: https://github.com/ThaRae/xenon-releases/releases/tag/v$VERSION"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

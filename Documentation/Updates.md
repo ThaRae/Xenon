@@ -63,13 +63,21 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
    appcast only once the archive it names is up. It refuses a tree with uncommitted changes, and a commit that isn't
    on ThaRae/Xenon's `main`. It pushes over HTTPS with `gh`'s credentials, whatever Xenon's `origin` is.
 
+The release workflow can do steps 2 and 4 instead, without a Mac ([On GitHub's runners](#on-githubs-runners)).
+
 ### On GitHub's runners
 
-`.github/workflows/release.yml` does step 2 on one of GitHub's `macos-26` runners, when it's run by hand, from
-**Actions → Release → Run workflow** or with:
+`.github/workflows/release.yml` does step 2 on one of GitHub's `macos-26` runners, and step 4 too with **publish**
+ticked, when it's run by hand, from **Actions → Release → Run workflow** or with:
 
 ```bash
 gh workflow run release.yml --repo ThaRae/Xenon --ref main
+```
+
+or, to publish what it builds:
+
+```bash
+gh workflow run release.yml --repo ThaRae/Xenon --ref main -f publish=true
 ```
 
 It also runs on pull requests that change it. Before it builds, it checks the secrets: the certificate's SHA-1 and the
@@ -81,10 +89,15 @@ archive's and the appcast's signatures, with `sign_update --verify`, the app's `
 installer's code signatures.
 
 `Xenon-<version>.dmg`, `Xenon-<version>.tar.xz` and `appcast.xml` are the run's artifact, `Xenon-<version>`, for 30
-days, with the installer's and the archive's SHA-256 in the run's summary. The workflow doesn't publish: that's still `Meta/release.py publish`, from the Mac's
-`Build/distribution`. The certificate and the update key are the repository's secrets
-([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The run imports the certificate into a keychain
-of its own, and deletes the keychain and the key's file when it's done.
+days, with the installer's and the archive's SHA-256 in the run's summary. The certificate and the update key are the
+repository's secrets ([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The run imports the
+certificate into a keychain of its own, and deletes the keychain and the key's file when it's done.
+
+With **publish** ticked, it then runs `Meta/release.py publish --yes`, which puts up the release, the appcast, and the
+tag as it does on a Mac, and the run's summary links the release. That needs the `XENON_RELEASES_TOKEN` secret, and
+the run has to be on `main`. Before it builds, it checks both, and that ThaRae/xenon-releases has no release of
+`VERSION.txt`'s version yet, so a run that couldn't publish stops at once rather than after the build. If publishing
+fails anyway, the release is still the run's artifact.
 
 ## Signing
 
@@ -199,6 +212,19 @@ base64 -i "Xenon Release.p12" | gh secret set XENON_RELEASE_P12 --repo ThaRae/Xe
 gh secret set XENON_RELEASE_P12_PASSWORD --repo ThaRae/Xenon    # asks for it
 gh secret set XENON_UPDATE_KEY --repo ThaRae/Xenon < xenon-update-key.txt
 ```
+
+Publishing from the workflow also needs `XENON_RELEASES_TOKEN`, since the run's own token can't write to
+ThaRae/xenon-releases. Make a fine-grained personal access token at **GitHub → Settings → Developer settings →
+Personal access tokens → Fine-grained tokens**, for the repositories ThaRae/Xenon (for the tag) and
+ThaRae/xenon-releases (for the release and the appcast), with the **Contents** permission set to **Read and write**.
+Then:
+
+```bash
+gh secret set XENON_RELEASES_TOKEN --repo ThaRae/Xenon    # asks for it
+```
+
+When the token expires, make a new one and set the secret again. Only publishing needs it: the workflow builds without
+it.
 
 After making a new key or certificate, set its secret again, and change `UPDATE_PUBLIC_KEY` or `CERTIFICATE_SHA1` in
 the workflow to match.
