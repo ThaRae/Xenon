@@ -34,6 +34,7 @@
 #include <UI/Menu.h>
 #include <UI/NewTabPage.h>
 #include <UI/Popover.h>
+#include <UI/SessionSaving.h>
 #include <UI/SplitView.h>
 #include <UI/StringUtils.h>
 #include <UI/TabHibernation.h>
@@ -1046,6 +1047,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
             }
         }
         m_suppress_javascript_dialogs_until_navigation = false;
+        // Xenon: The session saves the tab's new page within a second, rather than in up to 30.
+        SessionSaving::save_soon();
     };
 
     view().on_browser_history_traversal_complete = [this] {
@@ -1054,6 +1057,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     view().on_url_change = [this](auto const& url) {
         m_location_edit->set_url(url);
+        // Xenon: As do a navigation within the page, and a restored tab's page.
+        SessionSaving::save_soon();
     };
 
     m_location_edit->on_navigation = [this](auto input, auto fallback_url, auto destination_kind) {

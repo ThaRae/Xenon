@@ -14,10 +14,12 @@ import http.server
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.parse
 
 from pathlib import Path
@@ -99,6 +101,10 @@ EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
 
 # A page that tries WebAuthn and prints what it found on a line starting with this.
 WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
+
+# Xenon saves the session a second after a change (UI/SessionSaving.cpp). The session restore check waits this long after
+# its changes before it kills Xenon.
+SESSION_SAVE_WAIT_SECONDS = 3
 
 # Stand-ins for the password managers, served from a stand-in for the Chrome Web Store and signed with keys of their own
 # (Tests/ExtensionStore/make-crxs.py). The page that looks for them prints what it found on a line starting with this.
@@ -289,6 +295,10 @@ def test_main(platform: Platform, build_dir: Path):
     print("==> extension pages and their chrome.* APIs", flush=True)
     if not check_extensions(app_executable(platform, build_dir), env):
         failures.append("extensions")
+
+    print("==> tabs come back with their pages after a crash and after a quit", flush=True)
+    if not check_session_restore(app_executable(platform, build_dir), env):
+        failures.append("session restore")
 
     print("==> WebAuthn requests reach the UI process", flush=True)
     if not check_web_authn(app_executable(platform, build_dir), env):
@@ -1046,6 +1056,195 @@ def check_blocking_dashboard(executable: Path, env: dict) -> bool:
         return False
     print(f"    shows all {len(titles)} bundled lists")
     return True
+
+
+# A test extension's background worker sends the test's server the tabs every half second, and makes the calls to
+# chrome.tabs that the server answers with, each on the tab at an index or on none.
+SESSION_RESTORE_EXTENSION_MANIFEST = {
+    "manifest_version": 3,
+    "name": "Xenon session restore test",
+    "version": "1.0",
+    "permissions": ["tabs"],
+    "host_permissions": ["http://127.0.0.1/*"],
+    "background": {"service_worker": "background.js"},
+}
+SESSION_RESTORE_EXTENSION_BACKGROUND = """
+    async function report() {
+        const tabs = (await chrome.tabs.query({})).sort((a, b) => a.windowId - b.windowId || a.index - b.index);
+        const summary = tabs.map(tab => ({ url: tab.url, active: tab.active, status: tab.status, discarded: tab.discarded }));
+        const response = await fetch("REPORT_URL?tabs=" + encodeURIComponent(JSON.stringify(summary)));
+        for (const { call, tab, args } of await response.json())
+            await chrome.tabs[call](...(tab === undefined ? [] : [tabs[tab].id]), ...args);
+    }
+    (async () => {
+        for (;;) {
+            await report().catch(error => console.log(`Session restore test: ${error}`));
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    })();
+"""
+
+
+# Session restore runs Xenon with its windows, since a headless run's session is never saved. Xenon is started three
+# times on one profile with the setting to restore the last session on: it's killed right after it opens and duplicates
+# tabs (a duplicate restores its source's history, as a reopened tab does), then quits normally after changes made to
+# the restored session, and each time its tabs have to come back with their pages.
+def check_session_restore(executable: Path, env: dict) -> bool:
+    state = {"tabs": None, "commands": [], "requests": []}
+    changed = threading.Condition()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            path, _, query = self.path.partition("?")
+            with changed:
+                if path == "/report":
+                    state["tabs"] = json.loads(urllib.parse.parse_qs(query)["tabs"][0])
+                    body, content_type = json.dumps(state["commands"]).encode(), "application/json"
+                    state["commands"] = []
+                else:
+                    state["requests"].append(path)
+                    body, content_type = f"<!doctype html><title>{path}</title><p>{path}".encode(), "text/html"
+                changed.notify_all()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    origin = f"http://127.0.0.1:{server.server_address[1]}"
+    pages = [f"{origin}/page-{number}" for number in (1, 2, 3)]
+
+    def urls(tabs) -> list[str | None]:
+        return [tab.get("url") for tab in tabs or []]
+
+    def active_index(tabs) -> int | None:
+        return next((index for index, tab in enumerate(tabs or []) if tab["active"]), None)
+
+    def loaded(tabs) -> bool:
+        return all(tab["status"] == "complete" for tab in tabs or [])
+
+    with tempfile.TemporaryDirectory() as directory:
+        profile = Path(directory) / "profile"
+        (profile / "config").mkdir(parents=True)
+        (profile / "config" / "Settings.json").write_text(
+            json.dumps({"restorePreviousSession": True, "firstRunComplete": True})
+        )
+        extension = Path(directory) / "extension"
+        extension.mkdir()
+        (extension / "manifest.json").write_text(json.dumps(SESSION_RESTORE_EXTENSION_MANIFEST))
+        (extension / "background.js").write_text(
+            SESSION_RESTORE_EXTENSION_BACKGROUND.replace("REPORT_URL", f"{origin}/report")
+        )
+        log_path = Path(directory) / "xenon.log"
+        process = None
+
+        def start(*args: str):
+            nonlocal process
+            with changed:
+                state["tabs"] = None
+                state["requests"] = []
+            with open(log_path, "w") as log:
+                process = subprocess.Popen(
+                    [str(executable), "--profile-path", str(profile), f"--load-extension={extension}", *args],
+                    env=env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+
+        def stop(how: signal.Signals) -> int | None:
+            if how == signal.SIGTERM:
+                process.terminate()
+            try:
+                returncode = process.wait(timeout=60) if how == signal.SIGTERM else None
+            except subprocess.TimeoutExpired:
+                returncode = None
+            # A crash takes Xenon's helper processes with it, and so does a quit.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+            return returncode
+
+        def wait_for(step: str, condition, commands: list | None = None) -> bool:
+            deadline = time.monotonic() + 120
+            with changed:
+                state["commands"] = commands or []
+                while not condition(state["tabs"]):
+                    if time.monotonic() > deadline or process.poll() is not None:
+                        print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+                        print(f"    {step}: no, the tabs were {state['tabs']}", file=sys.stderr)
+                        return False
+                    changed.wait(1)
+            print(f"    {step}")
+            return True
+
+        try:
+            # A tab the session store hasn't written since it opened comes back as about:blank. The store writes every
+            # 30 seconds by itself, and Xenon has it write a change within a second, so a crash a few seconds after
+            # tabs open has to keep them.
+            start(pages[0])
+            if not wait_for("the first page loads", lambda tabs: urls(tabs) == pages[:1] and loaded(tabs)):
+                return False
+            commands = [
+                {"call": "create", "args": [{"url": pages[1], "active": False}]},
+                {"call": "duplicate", "tab": 0, "args": []},
+            ]
+            expected = [pages[0], pages[0], pages[1]]
+            if not wait_for(
+                "a page opens and one is duplicated", lambda tabs: urls(tabs) == expected and loaded(tabs), commands
+            ):
+                return False
+            time.sleep(SESSION_SAVE_WAIT_SECONDS)
+            stop(signal.SIGKILL)
+
+            # The tabs come back, the duplicate active, as when Xenon was killed. The others wait to be selected, and
+            # then load their pages.
+            start()
+            if not wait_for(
+                "after a crash, the tabs come back with their pages",
+                lambda tabs: urls(tabs) == expected and active_index(tabs) == 1,
+            ):
+                return False
+            commands = [{"call": "update", "tab": 2, "args": [{"active": True}]}]
+            if not wait_for(
+                "a restored tab loads its page when it's selected",
+                lambda tabs: (
+                    urls(tabs) == expected
+                    and active_index(tabs) == 2
+                    and not tabs[2]["discarded"]
+                    and loaded(tabs)
+                    and "/page-2" in state["requests"]
+                ),
+                commands,
+            ):
+                return False
+            commands = [{"call": "create", "args": [{"url": pages[2]}]}]
+            expected = [pages[0], pages[0], pages[1], pages[2]]
+            if not wait_for("another page opens", lambda tabs: urls(tabs) == expected and loaded(tabs), commands):
+                return False
+            if (returncode := stop(signal.SIGTERM)) != 0:
+                print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+                print(f"    Xenon exited with {returncode} when it was asked to quit", file=sys.stderr)
+                return False
+
+            start()
+            passed = wait_for(
+                "after a quit, the tabs come back with their pages",
+                lambda tabs: urls(tabs) == expected and active_index(tabs) == 3,
+            )
+            stop(signal.SIGTERM)
+            return passed
+        finally:
+            if process and process.poll() is None:
+                stop(signal.SIGKILL)
+            server.shutdown()
 
 
 def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, str]:
