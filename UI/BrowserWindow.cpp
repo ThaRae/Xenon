@@ -25,6 +25,7 @@
 #include <UI/Extensions/Dialog.h>
 #include <UI/Icon.h>
 #include <UI/Menu.h>
+#include <UI/SessionSaving.h>
 #include <UI/SplitView.h>
 #include <UI/StringUtils.h>
 #if defined(AK_OS_MACOS)
@@ -928,8 +929,11 @@ void BrowserWindow::set_current_tab(Tab* tab)
     if (m_current_tab) {
         m_current_tab->view().set_system_visibility_state(Web::HTML::VisibilityState::Visible);
 
-        if (auto session_tab_id = m_current_tab->session_tab_id(); session_tab_id.has_value())
+        if (auto session_tab_id = m_current_tab->session_tab_id(); session_tab_id.has_value()) {
             m_session->session_store->active_tab_changed(*session_tab_id);
+            // Xenon: The session saves the window's active tab within a second, rather than in up to 30.
+            SessionSaving::save_soon();
+        }
 
         Extensions::Browser::did_activate_tab(*this, *m_current_tab);
     }
@@ -1082,6 +1086,8 @@ void BrowserWindow::sync_session_tab_order()
         .ordered_tabs = AK::move(tab_order),
     };
     m_session->session_store->tab_order_changed(AK::move(changed));
+    // Xenon: As it does the order of its tabs.
+    SessionSaving::save_soon();
 }
 
 void BrowserWindow::open_file()

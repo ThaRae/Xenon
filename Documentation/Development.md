@@ -77,7 +77,7 @@ ninja -C Build/release xenon     # an incremental rebuild once configured
 ```bash
 ./Meta/check.py            # formatting and Xenon's invariants, in seconds
 ./Meta/check.py --fix      # apply the formatters first
-./Meta/xenon.py test       # unit tests, and Xenon run headless against local test pages
+./Meta/xenon.py test       # unit tests, and Xenon run against local test pages
 git config core.hooksPath .githooks   # run Meta/check.py before every push
 ```
 
@@ -98,7 +98,9 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
 `Meta/xenon.py test` runs the unit tests in `Tests/`, then runs Xenon headless: it renders `about:welcome`, checks that
 a fresh start writes only to Xenon's directories, and checks content blocking, daily filter list updates, the blocking
 dashboard, the certificate warning, extensions, WebAuthn, and password manager installs against pages and servers it
-starts locally.
+starts locally. Session restore needs Xenon's windows, since a headless run never saves its session, so that check opens
+them: it kills Xenon, and then quits it, and checks that the tabs come back with their pages. Linux CI runs the tests
+under Xvfb, so the windows are real X11 ones; without a display, they go to Qt's offscreen platform.
 
 CI runs on GitHub Actions, on GitHub's own runners:
 
