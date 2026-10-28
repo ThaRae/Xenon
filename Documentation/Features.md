@@ -122,8 +122,9 @@ walks the other way, from the least recently used tab. On macOS it's the Control
 ### Tab hibernation
 
 Xenon's take on the Memory Saver that Helium has from Chromium. A background tab left unused for two hours gives up its
-WebContent process, and its favicon turns grey. It keeps its title, favicon, URL, back/forward history, and scroll
-position, and reloads when you select it.
+WebContent process, and its favicon turns grey. It also hibernates when the machine is short of memory (Linux PSI /
+MemAvailable, macOS `host_statistics64`), without waiting for that timeout, the way Chromium's Memory Saver does.
+It keeps its title, favicon, URL, back/forward history, and scroll position, and reloads when you select it.
 
 A tab never hibernates while it's:
 
@@ -134,8 +135,9 @@ A tab never hibernates while it's:
 - holding text typed into a form and not sent.
 
 Right-click the tab strip (or open **Settings → Tabs**) for **Tab Hibernation → Off** or a timeout from 15 minutes to 6
-hours, or right-click a background tab for **Hibernate Tab**. The code is `UI/TabHibernation.cpp`, with engine patch
-`0023`, which saves the scroll position first.
+hours, or right-click a background tab for **Hibernate Tab**. **Settings → Tabs** also has **Also when the system is low
+on memory**, on by default. The code is `UI/TabHibernation.cpp` and `UI/MemoryPressure.cpp`, with engine patch `0023`,
+which saves the scroll position first. Engine patch `0033` also collects the page's JS heap when the tab is hidden.
 
 ### Memory use on hover
 
@@ -198,16 +200,17 @@ They block ads, trackers, malware sites, and cookie banners whenever content blo
 turns on by default. They ship with Xenon in `UI/Resources/filter-lists`, and update daily (below). Ladybird's own
 downloadable catalog stays off, since it holds raw copies of the same lists.
 
-Every WebContent process builds its own engine from the lists. That means every tab, every cross-site frame, and the
-spare process kept ready for the next tab. Three engine patches keep each engine small:
+Every WebContent process that holds a page builds its own engine from the lists: each tab and each cross-site frame.
+The spare process kept ready for the next tab does not, until a tab takes it. Engine patches keep each engine small:
 
 - `0027` keeps the malware lists' 100,000 `||host/path^$document` filters as 8-byte hashes, not as engine filters of
   over 100 bytes each;
 - `0030` gives back the memory used to build the engine, several times what the engine keeps;
-- `0029` sends no lists to any process while blocking is off.
+- `0029` sends no lists to any process while blocking is off;
+- `0034` leaves the spare process without the lists until a tab takes it.
 
 Extensions' own pages get no lists at all: their background pages, offscreen documents, and popups each open in a
-process of their own that never builds the engine (`0031`). uBlock Origin doesn't filter other extensions' requests in
+process of their own that never builds the engine (`0032`). uBlock Origin doesn't filter other extensions' requests in
 Chrome either. Frames from other sites in those pages still get the lists, in their own processes.
 
 ### uBlock Origin's engine features
@@ -306,7 +309,7 @@ self-signed certificate.
 - **Redirects**: a page that redirects to a site whose certificate fails shows the plain error page.
 
 RequestServer reports each certificate it refuses to the UI process, and takes the ones the user accepts, which curl
-then pins by their public key (engine patch `0030`, `RequestServer+LibWebView: Let the user accept a certificate that
+then pins by their public key (engine patch `0031`, `RequestServer+LibWebView: Let the user accept a certificate that
 fails verification`). It learns which certificate it refused by making the request once more with curl's
 `CURLOPT_CERTINFO`, which costs every connection otherwise; the handshake failed before anything was sent.
 `UI/CertificateErrors.cpp` keeps the certificates and serves the warning, `UI/CertificateDetails.cpp` works out what's
