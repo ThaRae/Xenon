@@ -1,8 +1,8 @@
 # Updates and releases
 
 Xenon updates itself on macOS with [Sparkle 2](https://sparkle-project.org), as Helium does. Releases are built on a
-Mac with `Meta/release.py` and published to [tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases), a
-public repository on git.avx512.dev, so that Xenon can fetch them without an account. Xenon itself stays private.
+Mac with `Meta/release.py` and published as GitHub releases of
+[ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases), a repository of their own.
 
 - [The published releases](#the-published-releases)
 - [Making a release](#making-a-release)
@@ -13,8 +13,8 @@ public repository on git.avx512.dev, so that Xenon can fetch them without an acc
 
 ## The published releases
 
-Each version is a release of tharae/xenon-releases, tagged `v<version>`, with one file: `Xenon-<version>.tar.xz`,
-which holds `Xenon.app`. The repository's `main` holds `appcast.xml`, Sparkle's feed, which lists the newest release:
+Each version is a GitHub release of ThaRae/xenon-releases, tagged `v<version>`, with one file:
+`Xenon-<version>.tar.xz`, which holds `Xenon.app`. The repository's `main` holds `appcast.xml`, Sparkle's feed, which lists the newest release:
 
 | In the appcast | What it is |
 | --- | --- |
@@ -23,8 +23,13 @@ which holds `Xenon.app`. The repository's `main` holds `appcast.xml`, Sparkle's 
 | `enclosure` | The archive's URL, size, and `sparkle:edSignature`, its Ed25519 signature |
 | The comment at the end | The appcast's own Ed25519 signature, from Sparkle's `sign_update` |
 
-Xenon reads `https://git.avx512.dev/tharae/xenon-releases/raw/branch/main/appcast.xml`, and downloads the archive from
-the release. Gitea takes attachments up to 100 MB, and the archive is about 57 MiB.
+Xenon reads the appcast from `https://raw.githubusercontent.com/ThaRae/xenon-releases/main/appcast.xml`, a URL that
+stays the same from release to release. It downloads the archive from
+`https://github.com/ThaRae/xenon-releases/releases/download/v<version>/Xenon-<version>.tar.xz`, which GitHub redirects
+to its storage, `release-assets.githubusercontent.com`. Sparkle follows the redirect, takes any status below 400, and
+doesn't mind that GitHub serves the appcast as `text/plain`. raw.githubusercontent.com caches a file for up to five
+minutes, so a new release can take that long to show up. GitHub takes release files up to 2 GiB, and the archive is
+about 54 MiB.
 
 The version is in `VERSION.txt`, as `major.minor.patch`. It can't be called `VERSION`: the repository's root is on the
 include path, and on macOS's case-insensitive disks `#include <version>` would find it.
@@ -42,10 +47,10 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
    - `Xenon-<version>.tar.xz`, signed with the update key;
    - `appcast.xml`, which lists it, signed too.
 3. Try `Build/distribution/Xenon.app`.
-4. `./Meta/release.py publish` asks, then creates the release with the archive (through `tea`, logged in as `avx512`),
-   commits the appcast to tharae/xenon-releases (over the same SSH host as Xenon's `origin`), and tags the commit
-   `v<version>` in Xenon. It publishes the appcast only once the archive it names is up, and refuses a tree with
-   uncommitted changes.
+4. `./Meta/release.py publish` asks, then creates the GitHub release with the archive (`gh release create`), commits
+   the appcast to ThaRae/xenon-releases' `main`, and tags the commit `v<version>` in ThaRae/Xenon. It publishes the
+   appcast only once the archive it names is up. It refuses a tree with uncommitted changes, and a commit that isn't
+   on ThaRae/Xenon's `main`. It pushes over HTTPS with `gh`'s credentials, whatever Xenon's `origin` is.
 
 ### On GitHub's runners
 
@@ -137,11 +142,12 @@ Xenon's preferences, `~/Library/Preferences/org.xenon.Xenon.plist`, and the upda
 ```
 
 It packages three test releases of the current build, signed with a throwaway key, with an identifier of their own
-(`org.xenon.Xenon.UpdateTest`) so that Sparkle's state stays apart from Xenon's. It serves them from a local server,
-and runs Xenon with a profile of its own:
+(`org.xenon.Xenon.UpdateTest`) so that Sparkle's state stays apart from Xenon's. It serves them from a local server laid
+out like GitHub's: the appcast at a fixed path, and each archive at `releases/download/v<version>/`, which redirects to
+another host name, as github.com does. It runs Xenon with a profile of its own:
 
-1. 0.0.1 finds 0.0.2, downloads and checks it, and installs it when it quits. The installed app's signature checks
-   out;
+1. 0.0.1 finds 0.0.2, downloads it through the redirect, checks it, and installs it when it quits. The installed app's
+   signature checks out;
 2. 0.0.2 turns down 0.0.3 with a byte changed after it was signed;
 3. and 0.0.3 signed with another key.
 
@@ -166,8 +172,8 @@ security import "Xenon Release.p12" -k ~/Library/Keychains/login.keychain-db -T 
 ```
 
 `security find-identity -p codesigning` then lists **Xenon Release** as `CSSMERR_TP_NOT_TRUSTED`, as a self-signed
-certificate is, and `codesign` signs with it all the same. `tea` needs a login named `avx512` that can create releases
-on tharae/xenon-releases.
+certificate is, and `codesign` signs with it all the same. `gh` needs to be logged in (`gh auth login`) as an account
+that can create releases on ThaRae/xenon-releases and push to it and to ThaRae/Xenon.
 
 ### Releasing from GitHub's runners
 

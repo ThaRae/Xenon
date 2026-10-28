@@ -4,7 +4,7 @@
 #
 #   Meta/release.py package    build Xenon, then write Build/distribution: a Xenon.app that runs on any Mac, signed;
 #                              Xenon-<version>.tar.xz, signed with Xenon's update key; and appcast.xml, which lists it
-#   Meta/release.py publish    publish what package wrote, as a release of tharae/xenon-releases on git.avx512.dev
+#   Meta/release.py publish    publish what package wrote, as a release of ThaRae/xenon-releases on GitHub
 #   Meta/release.py test       check that a release finds, checks and installs the next one from a local server, and
 #                              turns down ones that were tampered with
 #
@@ -40,10 +40,14 @@ LADYBIRD_SOURCE_DIR = XENON_SOURCE_DIR / "ladybird"
 BUILD_DIR = XENON_SOURCE_DIR / "Build" / "release"
 DISTRIBUTION_DIR = XENON_SOURCE_DIR / "Build" / "distribution"
 
-RELEASES_REPOSITORY = "tharae/xenon-releases"
-RELEASES_URL = f"https://git.avx512.dev/{RELEASES_REPOSITORY}"
-FEED_URL = f"{RELEASES_URL}/raw/branch/main/appcast.xml"
-GITEA_LOGIN = "avx512"
+# Releases are GitHub releases of their own repository, whose main holds the appcast. Xenon reads the appcast from
+# raw.githubusercontent.com, and downloads each archive from github.com, which redirects to GitHub's storage.
+XENON_REPOSITORY = "ThaRae/Xenon"
+RELEASES_REPOSITORY = "ThaRae/xenon-releases"
+RELEASES_URL = f"https://github.com/{RELEASES_REPOSITORY}"
+FEED_URL = f"https://raw.githubusercontent.com/{RELEASES_REPOSITORY}/main/appcast.xml"
+# Pushes to GitHub go over HTTPS with gh's credentials, whatever Xenon's origin is.
+GIT_WITH_GITHUB_CREDENTIALS = ("git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential")
 
 # The certificate releases are signed with, and the login keychain account that holds the key their updates are signed
 # with, as Sparkle's generate_keys made it (Documentation/Updates.md).
@@ -96,7 +100,7 @@ def main():
     package_parser.add_argument("--feed-url", default=FEED_URL, help="where the release looks for updates")
     package_parser.add_argument("--notes", type=Path, help="a file with the release notes, in plain text")
 
-    publish_parser = subparsers.add_parser("publish", help="publish Build/distribution to tharae/xenon-releases")
+    publish_parser = subparsers.add_parser("publish", help="publish Build/distribution to ThaRae/xenon-releases")
     publish_parser.add_argument("--yes", action="store_true", help="don't ask before publishing")
 
     test_parser = subparsers.add_parser("test", help="test that a release updates itself to the next")
@@ -437,12 +441,20 @@ def publish_main(args):
     version = info["CFBundleShortVersionString"]
     archive = DISTRIBUTION_DIR / archive_name(version)
     if info["SUFeedURL"] != FEED_URL or not archive.is_file() or archive.name not in appcast.read_text():
-        sys.exit("Build/distribution isn't a release for tharae/xenon-releases. Package it again.")
+        sys.exit(f"Build/distribution isn't a release for {RELEASES_REPOSITORY}. Package it again.")
+    if subprocess.run(["gh", "auth", "status"], capture_output=True).returncode != 0:
+        sys.exit("gh isn't logged in to GitHub: gh auth login")
 
     tag = f"v{version}"
     commit = run("git", "-C", XENON_SOURCE_DIR, "rev-parse", "HEAD").strip()
     if run("git", "-C", XENON_SOURCE_DIR, "status", "--porcelain", "--untracked-files=no").strip():
         sys.exit("Xenon has uncommitted changes, so the release wouldn't match any commit.")
+    # A release is made from a commit everyone can see, on main.
+    xenon_url = f"https://github.com/{XENON_REPOSITORY}.git"
+    run(*GIT_WITH_GITHUB_CREDENTIALS, "-C", XENON_SOURCE_DIR, "fetch", "--quiet", xenon_url, "main")
+    on_main = subprocess.run(["git", "-C", XENON_SOURCE_DIR, "merge-base", "--is-ancestor", commit, "FETCH_HEAD"])
+    if on_main.returncode != 0:
+        sys.exit(f"{commit[:10]} isn't on {XENON_REPOSITORY}'s main. Release from a commit that is.")
 
     signing = subprocess.run(["codesign", "-dvv", app], capture_output=True, text=True).stderr
     authority = re.search(r"^Authority=(.+)$", signing, re.MULTILINE)
@@ -455,44 +467,59 @@ def publish_main(args):
 
     notes_file = DISTRIBUTION_DIR / "notes.txt"
     notes = notes_file.read_text().strip() if notes_file.is_file() else f"Xenon {version}"
-    notes += f"\n\nBuilt from tharae/Xenon at {commit}."
+    notes += f"\n\nBuilt from https://github.com/{XENON_REPOSITORY}/commit/{commit}."
 
     print(f"==> Creating the {tag} release, with {archive.name}", flush=True)
     run(
-        "tea", "releases", "create", "--login", GITEA_LOGIN, "--repo", RELEASES_REPOSITORY, "--tag", tag,
-        "--target", "main", "--title", f"Xenon {version}", "--note", notes, "--asset", archive,
+        "gh", "release", "create", tag, archive, "--repo", RELEASES_REPOSITORY, "--target", "main",
+        "--title", f"Xenon {version}", "--notes", notes,
     )  # fmt: skip
 
     # The appcast goes up only once the archive it names is there.
     print("==> Publishing the appcast", flush=True)
-    remote = run("git", "-C", XENON_SOURCE_DIR, "remote", "get-url", "origin").strip()
-    releases_remote = re.sub(r"/[^/]+?(\.git)?$", "/xenon-releases.git", remote)
     with tempfile.TemporaryDirectory() as checkout:
-        run("git", "clone", "--depth", "1", releases_remote, checkout)
+        run(*GIT_WITH_GITHUB_CREDENTIALS, "clone", "--depth", "1", f"{RELEASES_URL}.git", checkout)
         shutil.copy2(appcast, Path(checkout) / "appcast.xml")
         run("git", "-C", checkout, "add", "appcast.xml")
         run("git", "-C", checkout, "commit", "-m", f"Xenon {version}")
-        run("git", "-C", checkout, "push", "origin", "HEAD:main")
+        run(*GIT_WITH_GITHUB_CREDENTIALS, "-C", checkout, "push", "origin", "HEAD:main")
 
     print(f"==> Tagging {commit[:10]} as {tag}", flush=True)
     run("git", "-C", XENON_SOURCE_DIR, "tag", tag, commit)
-    run("git", "-C", XENON_SOURCE_DIR, "push", "origin", tag)
+    run(*GIT_WITH_GITHUB_CREDENTIALS, "-C", XENON_SOURCE_DIR, "push", xenon_url, f"refs/tags/{tag}")
 
     print(f"Published {release_link(version)}")
 
 
 class FeedServer:
-    """Serves a directory over HTTP on 127.0.0.1, as the test's tharae/xenon-releases."""
+    """Serves a directory over HTTP on 127.0.0.1, as the test's ThaRae/xenon-releases: the appcast as
+    raw.githubusercontent.com does, and archives as GitHub's release downloads do, which redirect from github.com to
+    another host (release-assets.githubusercontent.com). Here, that's localhost."""
 
     class Handler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            self.server.requested.append(self.path)
+            download = re.fullmatch(r"/releases/download/[^/]+/([^/]+)", self.path)
+            if download:
+                self.send_response(302)
+                self.send_header("Location", f"http://localhost:{self.server.server_address[1]}/assets/{download[1]}")
+                self.end_headers()
+                return
+            super().do_GET()
+
         def log_message(self, *args):
             pass
 
     def __init__(self, directory: Path):
         handler = functools.partial(FeedServer.Handler, directory=str(directory))
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        self.server.requested = []
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}/"
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def downloaded(self, name: str) -> bool:
+        """Whether an archive was fetched through the redirect."""
+        return f"/assets/{name}" in self.server.requested
 
     def close(self):
         self.server.shutdown()
@@ -576,7 +603,7 @@ def test_main(args):
     with tempfile.TemporaryDirectory(prefix="xenon-update-test-") as temporary:
         root = Path(temporary).resolve()
         site = root / "site"
-        site.mkdir()
+        (site / "assets").mkdir(parents=True)
         server = FeedServer(site)
         key = UpdateKey.generate(root / "update-key")
         other_key = UpdateKey.generate(root / "other-key")
@@ -598,12 +625,12 @@ def test_main(args):
                 return archive
 
             def publish(version: str, archive: Path, signature: str):
-                shutil.copy2(archive, site / archive.name)
+                shutil.copy2(archive, site / "assets" / archive.name)
                 app = root / "releases" / version / APP_NAME
+                archive_url = f"{server.url}releases/download/v{version}/{archive.name}"
                 write_appcast(
-                    site / "appcast.xml", app, site / archive.name, f"{server.url}{archive.name}", signature,
-                    server.url, None,
-                )  # fmt: skip
+                    site / "appcast.xml", app, site / "assets" / archive.name, archive_url, signature, server.url, None
+                )
                 key.sign(site / "appcast.xml")
 
             archives = {version: package(version) for version in TEST_VERSIONS}
@@ -631,6 +658,7 @@ def test_main(args):
             deadline = time.monotonic() + TEST_TIMEOUT_SECONDS
             while bundle_version(installed) != second and time.monotonic() < deadline:
                 time.sleep(1)
+            expect(f"{second} downloaded through a redirect, as from GitHub", server.downloaded(archives[second].name))
             expect(f"{second} installed in place of {first}", bundle_version(installed) == second)
             signature_check = subprocess.run(
                 ["codesign", "--verify", "--deep", "--strict", installed], capture_output=True, text=True

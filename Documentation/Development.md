@@ -200,7 +200,7 @@ the build ships in place of Ladybird's (internal pages use them as their favicon
 ## Releases
 
 Xenon updates itself on macOS with Sparkle, from releases published to
-[tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases). They're made on a Mac:
+[ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases) on GitHub. They're made on a Mac:
 
 ```bash
 ./Meta/release.py test       # a release updates itself to the next, and turns down tampered ones
