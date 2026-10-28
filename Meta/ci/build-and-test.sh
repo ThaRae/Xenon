@@ -7,6 +7,8 @@
 #
 # ccache keeps its objects in Build/caches/ccache, and Ladybird's build keeps vcpkg's prebuilt packages in
 # ladybird/Build/caches. Both are in the checkout, so CI carries them from one run to the next (.github/workflows/ci.yml).
+# ccache's counters for the run go in Build/release/ccache-stats.txt, for people, and ccache-stats.tsv, which CI reads
+# to decide whether a pull request saves its own caches.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -32,6 +34,7 @@ status=0
 ./Meta/xenon.py --jobs "$JOBS" test || status=$?
 
 ccache --show-stats > Build/release/ccache-stats.txt 2>&1 || true
+ccache --print-stats > Build/release/ccache-stats.tsv 2>/dev/null || true
 
 # vcpkg keeps a failed dependency's build output in its buildtrees, which the CI log otherwise never shows. Print the
 # logs of the ports it says failed, and only those.

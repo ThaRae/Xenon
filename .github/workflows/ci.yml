@@ -9,8 +9,10 @@ name: CI
 #
 # ccache's objects (Build/caches) and vcpkg's prebuilt packages (ladybird/Build/caches) are kept in GitHub's cache, one
 # entry per platform. main saves them; a pull request starts from main's, and only saves its own when there were none to
-# start from. A cold build takes a few hours, so the build step stops itself in time for the caches to be saved, and the
-# next run carries on from there.
+# start from, or when its build missed ccache more than 500 times. That's a pull request that changes much of what's
+# compiled (a Ladybird bump, say), and its next push then starts from its own caches rather than recompiling the same
+# files from main's. A cold build takes a few hours, so the build step stops itself in time for the caches to be saved,
+# and the next run carries on from there.
 on:
   push:
     branches: [main]
@@ -77,8 +79,13 @@ jobs:
         timeout-minutes: 320
         run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/build-and-test.sh
 
+      - name: Count ccache's misses
+        id: ccache
+        if: always()
+        run: echo "misses=$(awk -F '\t' '$1 == "cache_miss" { print $2 }' Build/release/ccache-stats.tsv 2> /dev/null)" >> "$GITHUB_OUTPUT"
+
       - name: Save the build caches
-        if: always() && (github.event_name != 'pull_request' || steps.restore.outputs.cache-matched-key == '')
+        if: always() && (github.event_name != 'pull_request' || steps.restore.outputs.cache-matched-key == '' || fromJSON(steps.ccache.outputs.misses || '0') > 500)
         uses: actions/cache/save@v6
         with:
           path: |
@@ -176,10 +183,16 @@ jobs:
           status=0
           time ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" test || status=$?
           ccache --show-stats > Build/release/ccache-stats.txt 2>&1 || true
+          ccache --print-stats > Build/release/ccache-stats.tsv 2> /dev/null || true
           exit $status
 
+      - name: Count ccache's misses
+        id: ccache
+        if: always()
+        run: echo "misses=$(awk -F '\t' '$1 == "cache_miss" { print $2 }' Build/release/ccache-stats.tsv 2> /dev/null)" >> "$GITHUB_OUTPUT"
+
       - name: Save the build caches
-        if: always() && (github.event_name != 'pull_request' || steps.restore.outputs.cache-matched-key == '')
+        if: always() && (github.event_name != 'pull_request' || steps.restore.outputs.cache-matched-key == '' || fromJSON(steps.ccache.outputs.misses || '0') > 500)
         uses: actions/cache/save@v6
         with:
           path: |
