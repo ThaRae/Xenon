@@ -66,7 +66,7 @@ until it's updated.
    size and hash, in `ContentBlocking/Xenon/staging` in the profile's data directory;
 4. renames the staging directory after the lists' time (`ContentBlocking/Xenon/202610270517`), records it in
    `ContentBlocking/Xenon/state.json`, and hands the new paths to Ladybird. Ladybird reapplies them to every page
-   (engine patch `0020`, `Application::set_explicit_content_blockers()`). Then it removes the older lists.
+   (engine patch `0021`, `Application::set_explicit_content_blockers()`). Then it removes the older lists.
 
 At startup, Xenon takes the bundled lists first, as before. Once the profile is known, it switches to the downloaded
 ones if their signature still checks out, every file is there at its size, and they're newer than the bundled ones. A

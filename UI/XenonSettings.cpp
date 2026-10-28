@@ -170,6 +170,7 @@ void set_automatic_updates_enabled(bool enabled)
 }
 
 static constexpr auto DISABLED_FILTER_LISTS_KEY = "blocking/disabledFilterLists";
+static constexpr auto SHOW_BLOCKED_REQUEST_COUNT_KEY = "blocking/showBlockedRequestCount";
 static constexpr auto BLOCKED_REQUEST_TOTAL_KEY = "blocking/blockedRequestTotal";
 
 HashTable<String> disabled_filter_lists()
@@ -189,6 +190,17 @@ void set_filter_list_enabled(StringView id, bool enabled)
         ids.append(qid);
     ids.sort();
     settings().setValue(DISABLED_FILTER_LISTS_KEY, ids);
+    notify_observers();
+}
+
+bool show_blocked_request_count()
+{
+    return settings().value(SHOW_BLOCKED_REQUEST_COUNT_KEY, false).toBool();
+}
+
+void set_show_blocked_request_count(bool show)
+{
+    settings().setValue(SHOW_BLOCKED_REQUEST_COUNT_KEY, show);
     notify_observers();
 }
 

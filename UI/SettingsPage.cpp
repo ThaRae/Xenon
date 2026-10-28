@@ -294,6 +294,8 @@ private:
         bangs.set("count"sv, Bangs::bang_count());
         settings.set("bangs"sv, move(bangs));
 
+        settings.set("showContentBlockerCount"sv, XenonSettings::show_blocked_request_count());
+
         if (auto status = FilterLists::Updater::status(); status.has_value()) {
             JsonObject filter_lists;
             filter_lists.set("generatedAt"sv, status->generated_at.view());
@@ -366,6 +368,11 @@ void register_interfaces(WebView::WebUI& web_ui)
     web_ui.register_interface("xenon/setBangsEnabled"sv, [](auto const& data) {
         if (data.is_bool())
             XenonSettings::set_bangs_enabled(data.as_bool());
+    });
+
+    web_ui.register_interface("xenon/setShowContentBlockerCount"sv, [](auto const& data) {
+        if (data.is_bool())
+            XenonSettings::set_show_blocked_request_count(data.as_bool());
     });
 
     web_ui.register_interface("xenon/searchBangs"sv, [bridge](auto const& data) {

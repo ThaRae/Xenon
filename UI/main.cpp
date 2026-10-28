@@ -6,6 +6,7 @@
 
 #include <LibCore/GeolocationProvider.h>
 #include <LibMain/Main.h>
+#include <LibURL/InternalURLs.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/BrowserProcess.h>
 #include <LibWebView/CrashReportStore.h>
@@ -97,6 +98,11 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
         outln("Opening in existing process");
         return 0;
     }
+
+    // Ladybird opens new tabs blank. Xenon has a new tab page of its own (UI/NewTabPage.cpp), which a new profile opens
+    // new tabs to until the user picks another page.
+    if (!Ladybird::Application::settings().first_run_complete())
+        Ladybird::Application::settings().set_new_tab_page_url(URL::about_newtab());
 
     Ladybird::FilterLists::Updater::initialize();
     Ladybird::PasswordManagers::the().initialize(app->password_manager_choice());

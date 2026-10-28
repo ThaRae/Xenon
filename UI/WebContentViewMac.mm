@@ -24,10 +24,10 @@ static CALayer* as_layer(void* layer)
     return static_cast<CALayer*>(layer);
 }
 
-// The page layer and WebContent share one corner radius, which stays zero until a tab rounds its view.
+// The page layer's corner radius stays zero until a tab rounds its view.
 void WebContentView::set_has_rounded_corners(bool has_rounded_corners)
 {
-    set_viewport_corner_radius(has_rounded_corners ? WEB_VIEW_CORNER_RADIUS : 0);
+    m_viewport_corner_radius = has_rounded_corners ? WEB_VIEW_CORNER_RADIUS : 0;
     if (m_iosurface_layer)
         as_layer(m_iosurface_layer).cornerRadius = viewport_corner_radius();
     update_iosurface_layer_border();
@@ -52,7 +52,6 @@ bool WebContentView::ensure_iosurface_layer_attached_to_native_view()
         layer.opaque = NO;
         layer.masksToBounds = YES;
         layer.cornerRadius = viewport_corner_radius();
-        // NB: The compositor clips the viewport's scrollbars to arcs concentric with circular corners.
         layer.cornerCurve = kCACornerCurveCircular;
         // Without this every new frame would cross-fade in and geometry changes would slide.
         layer.actions = @ {

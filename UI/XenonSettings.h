@@ -66,6 +66,11 @@ void set_automatic_updates_enabled(bool);
 HashTable<String> disabled_filter_lists();
 void set_filter_list_enabled(StringView id, bool);
 
+// Whether the toolbar's ad block button shows how many requests were blocked on the page, as uBlock Origin's icon badge
+// does. Off by default.
+bool show_blocked_request_count();
+void set_show_blocked_request_count(bool);
+
 // How many requests content blocking has blocked since Xenon was first run, as uBlock Origin counts "since install".
 u64 blocked_request_total();
 void add_to_blocked_request_total(u64);

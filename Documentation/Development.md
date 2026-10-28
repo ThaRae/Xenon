@@ -138,6 +138,11 @@ git -C ladybird fetch --depth 1 origin master
 ./Meta/xenon.py build
 ```
 
+`git am --3way` falls back to a merge with the blobs a patch was made from, which a shallow `ladybird/` has only for the
+first patch. If a later one fails with "Repository lacks necessary blobs", apply the series to the old pin once, in a
+throwaway worktree (`git -C ladybird worktree add --detach /tmp/old-series <old pin>`, then `git am` the patches there),
+and retry; the blobs are then in the shared object store.
+
 If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon last synced with, and port the relevant
 changes into `UI/`. The weekly Upstream workflow applies the series to `master`, names any patch that no longer
 applies, builds, and lists those UI changes, so a bump holds no surprises.
