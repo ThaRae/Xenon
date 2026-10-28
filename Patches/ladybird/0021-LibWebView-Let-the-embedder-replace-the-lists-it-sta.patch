@@ -16,24 +16,20 @@ a settings change does. Pages get the new rules only if they changed.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibWebView/Application.cpp | 12 ++++++++++++
- Libraries/LibWebView/Application.h   |  4 ++++
- 2 files changed, 16 insertions(+)
+ Libraries/LibWebView/Application.cpp | 8 ++++++++
+ Libraries/LibWebView/Application.h   | 4 ++++
+ 2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 2556360a6f4e15ee5e9a107886f67c0a59e49f6c..b18b93fdecb98e0f6b3c03bfe2ccdb260f138f3c 100644
+index 768f933d089daf882a2a2d6c1bdf68a394e6fa3e..8f310ec7639cc829a9eacda1ae11513b2ff0d323 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -811,6 +811,18 @@ Optional<UnixDateTime> Application::content_blocker_list_last_updated_at(StringV
+@@ -829,6 +829,14 @@ Optional<UnixDateTime> Application::content_blocker_list_last_updated_at(StringV
      return {};
  }
  
 +void Application::set_explicit_content_blockers(Vector<ByteString> list_paths, Vector<ByteString> trusted_list_paths, Optional<ByteString> resources_path)
 +{
-+    // Test mode runs without the lists it was given, so it has nothing to replace.
-+    if (m_web_content_options.is_test_mode == IsTestMode::Yes)
-+        return;
-+
 +    m_explicit_content_blocker_list_paths = move(list_paths);
 +    m_trusted_content_blocker_list_paths = move(trusted_list_paths);
 +    m_content_blocker_resources_path = move(resources_path);
@@ -44,10 +40,10 @@ index 2556360a6f4e15ee5e9a107886f67c0a59e49f6c..b18b93fdecb98e0f6b3c03bfe2ccdb26
  {
      m_browser_options.content_blocker_list_paths = m_explicit_content_blocker_list_paths;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index e67d09b4d5376d9a31a3edb8d42646a77a3ebfdc..d58cf3c9548f8915db309f6f0e0e10aea139d3e0 100644
+index 67c655fa5bdc003c6303bd996a721695dc3da75f..d3a73370adde6f99893ab871edde3662a4beb6c4 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -194,6 +194,10 @@ public:
+@@ -196,6 +196,10 @@ public:
      void remove_content_blocker_list(Badge<SettingsUI>, StringView identifier);
      Optional<UnixDateTime> content_blocker_list_last_updated_at(StringView identifier) const;
  

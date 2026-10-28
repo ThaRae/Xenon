@@ -24,6 +24,7 @@
 #include <UI/FindInPageWidget.h>
 #include <UI/LocationEdit.h>
 #include <UI/WebContentView.h>
+#include <UI/XenonSettings.h>
 
 #include <QBoxLayout>
 #include <QLabel>
@@ -92,7 +93,8 @@ struct DeferredTab {
 class Tab final
     : public QWidget
     , public WebView::FileDownloaderObserver
-    , public WebView::SettingsObserver {
+    , public WebView::SettingsObserver
+    , public XenonSettings::Observer {
     Q_OBJECT
 
 public:
@@ -215,7 +217,9 @@ private:
 
     virtual void tab_settings_changed() override;
     virtual void config_variable_changed(WebView::ConfigVariableID) override;
-    virtual void content_blocker_count_visibility_changed() override;
+
+    // XenonSettings::Observer
+    virtual void xenon_settings_changed() override;
 
     void recreate_toolbar_icons();
     void connect_hamburger_menu();

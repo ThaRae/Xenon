@@ -142,10 +142,10 @@ index 31181bccc5f53bdd24aa3b94ac2db3560e8311b5..2a8b8c92fc2475f75058a9324ba1e818
  {
      if (address.type() == SocketAddress::Type::IPv6) {
 diff --git a/Libraries/LibDNS/Resolver.h b/Libraries/LibDNS/Resolver.h
-index f1c7e55a26fd0d38c4263d1044a7d8bbed05aff1..059d1cf7556647a2496c1eca6622db49a8c4ff8a 100644
+index 54bdf6f4937456985133bef8c26a0fab6028e5ba..7614c1eca86931bf7d23db62dc0385b1b5167658 100644
 --- a/Libraries/LibDNS/Resolver.h
 +++ b/Libraries/LibDNS/Resolver.h
-@@ -484,7 +484,7 @@ public:
+@@ -490,7 +490,7 @@ public:
                      [this, name, state = our_state, family,
                          &main_thread_event_loop]() mutable {
                          auto worker_started_at = MonotonicTime::now();
@@ -154,7 +154,7 @@ index f1c7e55a26fd0d38c4263d1044a7d8bbed05aff1..059d1cf7556647a2496c1eca6622db49
                          auto worker_finished_at = MonotonicTime::now();
                          PendingSystemResolution::SideTiming timing {
                              .queue_ms = (worker_started_at - state->dispatched_at).to_milliseconds(),
-@@ -871,7 +871,7 @@ private:
+@@ -877,7 +877,7 @@ private:
          ByteString const& name,
          PendingSystemResolution& state,
          Core::Socket::AddressFamily family,
@@ -163,7 +163,7 @@ index f1c7e55a26fd0d38c4263d1044a7d8bbed05aff1..059d1cf7556647a2496c1eca6622db49
          PendingSystemResolution::SideTiming timing)
      {
          (family == Core::Socket::AddressFamily::IPv4Only ? state.a : state.aaaa) = timing;
-@@ -881,7 +881,15 @@ private:
+@@ -887,7 +887,15 @@ private:
          bool got_records_this_side = false;
          if (!record_or_error.is_error()) {
              constexpr u32 SYSTEM_RESOLVER_SYNTHETIC_TTL_SECONDS = 60;
@@ -202,7 +202,7 @@ index ddeb9b60bef425613e4c653f970bb3d7cbe0d0f7..e9e3ca3d1cbcd3a3cb91f7f1ec3dd8bf
          return "An unexpected network error occurred"sv;
      }
 diff --git a/Libraries/LibRequests/Request.cpp b/Libraries/LibRequests/Request.cpp
-index 9178d280fff700cbd6966f9ee2dd8b0c4f6e7cef..54ca4cc7f901cf727400b4d19d90acbdd882665a 100644
+index 7ee16b363e45d1a1f1eba0a703672741ee7da3e5..bb4913b1896117c48abe43fbadc1cf82baee68c7 100644
 --- a/Libraries/LibRequests/Request.cpp
 +++ b/Libraries/LibRequests/Request.cpp
 @@ -67,6 +67,12 @@ int Request::request_server_client_id() const
@@ -219,10 +219,10 @@ index 9178d280fff700cbd6966f9ee2dd8b0c4f6e7cef..54ca4cc7f901cf727400b4d19d90acbd
  {
      RefPtr keep_alive = *this;
 diff --git a/Libraries/LibRequests/Request.h b/Libraries/LibRequests/Request.h
-index 18a059165e91b6b6f4d94e11b4a1055d717650a8..88dc47ae155c380b23592539db6729167b9cd8cc 100644
+index 478ea3c368e88231b7b661b32c5e3c3bfb67587d..a63d122e16da58fb646d5aa81feb14ebf4736523 100644
 --- a/Libraries/LibRequests/Request.h
 +++ b/Libraries/LibRequests/Request.h
-@@ -124,6 +124,10 @@ public:
+@@ -125,6 +125,10 @@ public:
  
      Function<void()> on_requires_network;
  
@@ -234,7 +234,7 @@ index 18a059165e91b6b6f4d94e11b4a1055d717650a8..88dc47ae155c380b23592539db672916
      Function<void()> on_teardown;
  
 diff --git a/Libraries/LibRequests/RequestClient.cpp b/Libraries/LibRequests/RequestClient.cpp
-index d117eb55dbd7cb9ca18e47babca9b6acfe63bcb4..0b0581809efc13fb756fd8cf005d2ecdd68f2d30 100644
+index 338247d43d60c500a3f01986c825652b684c91be..34bf14aecde21743cccfd1f38ca9c377d5954b25 100644
 --- a/Libraries/LibRequests/RequestClient.cpp
 +++ b/Libraries/LibRequests/RequestClient.cpp
 @@ -79,7 +79,7 @@ void RequestClient::die()
@@ -277,7 +277,7 @@ index d117eb55dbd7cb9ca18e47babca9b6acfe63bcb4..0b0581809efc13fb756fd8cf005d2ecd
  {
      if (auto request = m_requests.get(request_id); request.has_value()) {
 diff --git a/Libraries/LibRequests/RequestClient.h b/Libraries/LibRequests/RequestClient.h
-index 3946c33fa586429ed00994089258a716db74ed7a..10a71e4c395d0789af17915ebd6385896ae5886d 100644
+index 3c8217040df8066515288ba945f07ea6d523c843..ff025eaf220b97cb5363154b4148c2de58a24c66 100644
 --- a/Libraries/LibRequests/RequestClient.h
 +++ b/Libraries/LibRequests/RequestClient.h
 @@ -51,7 +51,14 @@ public:
@@ -350,10 +350,10 @@ index 4ea71815c02582f91e20cb52b19bcb2bb43b811a..f8eb77c9d68e5336ed2da73d01fe929a
      // scripts can run, once per Window.
      void run_page_script(DOM::Document&) const;
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index b7fe074afee5d1b172961970d3b809ffc2188f5e..b7cd0883e491ac76a27443dbd980f9b80846f36e 100644
+index 5a961abfed86dc17ff931d9614aceb24929ffde9..a8e92e848039602efc82434901b79032f1837f1f 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-@@ -578,8 +578,11 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+@@ -662,8 +662,11 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
      auto protocol_complete = [this, on_complete = move(on_complete), request, &protocol_request = *protocol_request](u64 total_size, Requests::RequestTimingInfo const& timing_info, Optional<Requests::NetworkError> const& network_error) {
          finish_network_request(protocol_request);
  
@@ -361,23 +361,23 @@ index b7fe074afee5d1b172961970d3b809ffc2188f5e..b7cd0883e491ac76a27443dbd980f9b8
 +        if (auto page = request.page()) {
              page->client().page_did_finish_network_request(protocol_request.id(), total_size, timing_info, network_error);
 +            if (network_error == Requests::NetworkError::BlockedByContentBlocker)
-+                page->client().page_did_block_resource();
++                page->client().page_did_block_resource(request.url().value(), blocked_resource_kind(request));
 +        }
  
          if (!network_error.has_value()) {
              log_success(request);
-@@ -630,12 +633,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
+@@ -715,12 +718,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
      //     requests are attributed through the worker process's browser-level owners.
      auto originating_page_id = request.page() && request.page()->has_top_level_traversable() ? request.page()->client().id().value() : 0;
      auto headers = headers_with_normalized_values(request.headers());
--    auto protocol_request = m_request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key());
+-    auto protocol_request = request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key());
 +
 +    // Content blocking uncloaks CNAMEs: if DNS shows the host to be an alias, the filters also see where it leads.
 +    auto check_resolved_alias = Requests::RequestClient::CheckResolvedAlias::No;
 +    if (ContentBlocker::the().has_rules() && (!request.page() || request.page()->content_blocking_enabled_for_url(request.top_level_creation_url())))
 +        check_resolved_alias = Requests::RequestClient::CheckResolvedAlias::Yes;
 +
-+    auto protocol_request = m_request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key(), check_resolved_alias);
++    auto protocol_request = request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key(), check_resolved_alias);
      if (!protocol_request) {
          log_failure(request, "Failed to initiate load"sv);
          return nullptr;
@@ -398,10 +398,10 @@ index b7fe074afee5d1b172961970d3b809ffc2188f5e..b7cd0883e491ac76a27443dbd980f9b8
          Optional<String> initiator_type_string;
          if (request.initiator_type().has_value())
 diff --git a/Services/RequestServer/ConnectionFromClient.cpp b/Services/RequestServer/ConnectionFromClient.cpp
-index b2ac2ddcf223bc6bba9141ed2eefe7fee4d7f414..fb1dc30c7774035f3a56501836cad28a27b85378 100644
+index 5b5d1fce24cda14c871516029e6fa3a0e9499f0c..65208daa0c0d402417fc9b485b7abba23c42fef3 100644
 --- a/Services/RequestServer/ConnectionFromClient.cpp
 +++ b/Services/RequestServer/ConnectionFromClient.cpp
-@@ -293,7 +293,7 @@ bool ConnectionFromClient::is_live_request_id(u64 request_id) const
+@@ -297,7 +297,7 @@ bool ConnectionFromClient::is_live_request_id(u64 request_id) const
      return m_active_requests.contains(request_id) || m_request_transfer_leases.contains({ client_id(), request_id });
  }
  
@@ -410,7 +410,7 @@ index b2ac2ddcf223bc6bba9141ed2eefe7fee4d7f414..fb1dc30c7774035f3a56501836cad28a
  {
      note_event_tick("ipc-start-request"sv);
      dbgln_if(REQUESTSERVER_DEBUG, "RequestServer: start_request({}, {})", request_id, url);
-@@ -345,7 +345,7 @@ void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL:
+@@ -349,7 +349,7 @@ void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL:
      auto transfer_lease = create_transfer_lease
          ? Optional<Requests::RequestTransferLeaseKey> { lease_key }
          : Optional<Requests::RequestTransferLeaseKey> {};
@@ -419,7 +419,7 @@ index b2ac2ddcf223bc6bba9141ed2eefe7fee4d7f414..fb1dc30c7774035f3a56501836cad28a
      request->set_performance_origin(originating_process_id, originating_page_id);
      m_active_requests.set(request_id, move(request));
  
-@@ -729,6 +729,12 @@ void ConnectionFromClient::fail_websocket(u64 websocket_id, Requests::WebSocket:
+@@ -733,6 +733,12 @@ void ConnectionFromClient::fail_websocket(u64 websocket_id, Requests::WebSocket:
      async_websocket_closed(websocket_id, to_underlying(WebSocket::CloseStatusCode::AbnormalClosure), {}, false);
  }
  
@@ -447,7 +447,7 @@ index 675be55f1a3d74b84ca9d6e412fa9768662e7163..fde1688c4baed69c89157c02f44fb338
      virtual void release_request_transfer_lease(int source_client_id, u64 source_request_id) override;
      virtual Messages::RequestServer::StopRequestResponse stop_request(u64 request_id) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index b8053954b5248b2d34d8ce5b4250c1abfccd35da..9d9a905c8c2da10e54fbf03362d1181570ad5a51 100644
+index 652ab84078962a68a2e19d1f4e0de0ca74b855c0..316fe74ae7bed7b4b4a60ca1e60b05d389209565 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -464,11 +464,13 @@ NonnullOwnPtr<Request> Request::fetch(
@@ -526,7 +526,7 @@ index b8053954b5248b2d34d8ce5b4250c1abfccd35da..9d9a905c8c2da10e54fbf03362d11815
  {
      if (m_alternative_service.has_value() && !m_alternative_service->host.is_empty())
 diff --git a/Services/RequestServer/Request.h b/Services/RequestServer/Request.h
-index 63fd505c1f48ca06e5a3fe5e8109b833c285314c..0b97b1ae89b024fe016b36f97de63b55d46b8bc1 100644
+index b6bedba0d3654ce589a4d22b9a500667e14c7032..f88a4b08123ded49b3f5fcfc5a0a515ab484c315 100644
 --- a/Services/RequestServer/Request.h
 +++ b/Services/RequestServer/Request.h
 @@ -64,7 +64,11 @@ public:
@@ -542,7 +542,7 @@ index 63fd505c1f48ca06e5a3fe5e8109b833c285314c..0b97b1ae89b024fe016b36f97de63b55
  
      static NonnullOwnPtr<Request> connect(
          u64 request_id,
-@@ -370,6 +374,10 @@ private:
+@@ -371,6 +375,10 @@ private:
  
      Optional<u32> m_address_selection_hint;
  
@@ -554,7 +554,7 @@ index 63fd505c1f48ca06e5a3fe5e8109b833c285314c..0b97b1ae89b024fe016b36f97de63b55
      RefPtr<ConnectionFromClient> m_network_connection_keep_alive;
  
 diff --git a/Services/RequestServer/RequestClient.ipc b/Services/RequestServer/RequestClient.ipc
-index 59231ebbeaa80520aec6bc9f05d33560f7603eca..88826f0d40ba436c0a233710561d30d0f753ff2f 100644
+index 088004dcd2e175b43f5fdaf70557ae0c16162482..b1f5033b99347f10bee0edea7eb959df2e3fce89 100644
 --- a/Services/RequestServer/RequestClient.ipc
 +++ b/Services/RequestServer/RequestClient.ipc
 @@ -9,6 +9,9 @@

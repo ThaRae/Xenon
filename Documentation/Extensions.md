@@ -138,12 +138,12 @@ outright once upstream has the equivalent. A fork does make engine work a little
    it (`WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy`). Without it, a site with
    `frame-src 'self'` blocks Bitwarden's inline menu and its bar that offers to save a login. The embedder's handler
    still decides which pages may load which files (`web_accessible_resources`).
-8. **Who may ask for a subresource** (`0020`, done). For a subresource, the scheme handler's `URLSchemeRequest` names
+8. **Who may ask for a subresource** (`0022`, done). For a subresource, the scheme handler's `URLSchemeRequest` names
    the origins that may be asking: a worker's, or those of the documents the asking process hosts for its page. The
    UI process knows those documents from its own records but not which one asks, and site isolation keeps them to one
    site. Proton Pass draws its icon in login fields with a web accessible image as the field's background, which a
    web page could only load in a frame before.
-9. **The embedder's own WebUI messages** (`0022`, done). `WebUI::set_embedder_interfaces()` lets the embedder give
+9. **The embedder's own WebUI messages** (`0025`, done). `WebUI::set_embedder_interfaces()` lets the embedder give
    WebUI pages (`about:settings`, `about:welcome`) interfaces of its own, beside the engine's, as each page is created.
    It isn't about extensions: Xenon's welcome page uses it to offer password managers, which it installs from the
    Chrome Web Store (see [CRX files](#loading-extensions)).
@@ -418,14 +418,14 @@ for Bitwarden in Chrome.
 | Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
 | Content scripts in isolated worlds | 0016 | `UI/Extensions/ContentScripts` (which scripts a document gets), `Manifest` (matching a document's URL), `Router` (their contexts, calls, and messages) |
 | Web pages messaging an extension (`externally_connectable`) | | `UI/Extensions/ContentScripts` (the page's `chrome.runtime` and a relay world per extension), `Router` (their `ExternalPage` contexts), `UI/Resources/extensions/externally-connectable.js` and `externally-connectable-relay.js` |
-| Web accessible resources as web pages' subresources | 0020 | `UI/Extensions/Registry` |
+| Web accessible resources as web pages' subresources | 0022 | `UI/Extensions/Registry` |
 | `chrome.scripting`, `webNavigation` frames | 0017 | `UI/Extensions/Scripting.cpp` (the `Router`'s injections, registered content scripts, and Chrome's frame IDs), `Registry` (registered scripts that persist) |
 | Background worker, offscreen documents | 0001 (workers' loads) | `UI/Extensions/Registry` (their hidden views and generated files), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
 | Managing extensions | | `UI/Extensions/Dialog` (Qt), and `--load-extension`. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
 | Installing from the Chrome Web Store | | `UI/Extensions/WebStore` (update checks and downloads), `CRX` (verifying CRX3 files and unpacking their zip), `Registry` (installed extensions, under `<profile data>/Extensions/Installed/`) |
-| Choosing a password manager | 0022 | `UI/PasswordManagers` (installs, switches, removes, and updates them daily; the `loadPasswordManagers` and `setPasswordManager` WebUI messages), `UI/WebUIInterfaces`, the welcome page's last step, the Extensions dialog's picker, and `--password-manager` |
+| Choosing a password manager | 0025 | `UI/PasswordManagers` (installs, switches, removes, and updates them daily; the `loadPasswordManagers` and `setPasswordManager` WebUI messages), `UI/WebUIInterfaces`, the welcome page's last step, the Extensions dialog's picker, and `--password-manager` |
 
 ### The toolbar and the popup
 

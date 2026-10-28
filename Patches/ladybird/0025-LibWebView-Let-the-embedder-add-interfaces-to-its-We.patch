@@ -14,7 +14,7 @@ engine's interfaces.
  2 files changed, 22 insertions(+), 3 deletions(-)
 
 diff --git a/Libraries/LibWebView/WebUI.cpp b/Libraries/LibWebView/WebUI.cpp
-index b781558f03c683f33d4ec8ee08fe3c49d0e73919..95d24c5a3125221043d111e77fede9358963a69d 100644
+index 1aa3d88ec2dd29b73b253efa87642587314a5d80..0c35f5e5865de89287bbf2d926ad6d56da287b6b 100644
 --- a/Libraries/LibWebView/WebUI.cpp
 +++ b/Libraries/LibWebView/WebUI.cpp
 @@ -4,6 +4,7 @@
@@ -25,7 +25,7 @@ index b781558f03c683f33d4ec8ee08fe3c49d0e73919..95d24c5a3125221043d111e77fede935
  #include <LibIPC/Transport.h>
  #include <LibIPC/TransportHandle.h>
  #include <LibWebView/WebContentClient.h>
-@@ -29,6 +30,17 @@ static constexpr auto s_pages = to_array<WebUI::Page>({
+@@ -30,6 +31,17 @@ static constexpr auto s_pages = to_array<WebUI::Page>({
      { "welcome"sv, "Welcome"sv, WebUI::PageType::Dynamic },
  });
  
@@ -43,7 +43,7 @@ index b781558f03c683f33d4ec8ee08fe3c49d0e73919..95d24c5a3125221043d111e77fede935
  ReadonlySpan<WebUI::Page> WebUI::pages()
  {
      return s_pages;
-@@ -78,6 +90,8 @@ ErrorOr<RefPtr<WebUI>> WebUI::create(WebContentClient& client, Web::PageId page_
+@@ -79,6 +91,8 @@ ErrorOr<RefPtr<WebUI>> WebUI::create(WebContentClient& client, Web::PageId page_
  
      VERIFY(web_ui);
      web_ui->register_interfaces();

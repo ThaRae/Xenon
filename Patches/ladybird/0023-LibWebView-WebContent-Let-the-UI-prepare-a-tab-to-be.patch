@@ -30,10 +30,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  9 files changed, 92 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/CanonicalTraversable.h b/Libraries/LibWebView/CanonicalTraversable.h
-index 65dda1f9ea39eb111c8bb63f81db6d1a9cb250b3..6a25dec18fb147de351293a0cd9782d72ed45306 100644
+index 8f6cb69c2a9f3d8c14eb135a168f53c017bf8c52..63b9397dfed855ae193b23eacd9b70cac3336f98 100644
 --- a/Libraries/LibWebView/CanonicalTraversable.h
 +++ b/Libraries/LibWebView/CanonicalTraversable.h
-@@ -181,6 +181,7 @@ public:
+@@ -182,6 +182,7 @@ public:
      void reconstruct_the_history_to_step(i32 step);
      ErrorOr<URL::URL> restore_session_history_from_ui_snapshot(SessionHistorySnapshot);
      void recover_from_web_content_process_crash();
@@ -41,7 +41,7 @@ index 65dda1f9ea39eb111c8bb63f81db6d1a9cb250b3..6a25dec18fb147de351293a0cd9782d7
      void reset_session_history_for_testing(Web::HTML::SessionHistoryEntryDescriptor);
      bool initialize_session_history_for_testing(Vector<Web::HTML::SessionHistoryEntryDescriptor>, Vector<i32> used_steps, size_t current_used_step_index);
  
-@@ -198,7 +199,6 @@ private:
+@@ -199,7 +200,6 @@ private:
      HistoryOperation* find_history_operation(Web::HTML::CrossProcessId operation_id);
      ApplyHistoryStep* find_history_step_run(Web::HTML::CrossProcessId operation_id);
      RefPtr<CanonicalNavigation> finalized_navigation(HistoryOperation const&) const;
@@ -50,10 +50,10 @@ index 65dda1f9ea39eb111c8bb63f81db6d1a9cb250b3..6a25dec18fb147de351293a0cd9782d7
      void did_fail_history_navigation_population(HistoryOperation&, ChangingNavigable&);
      void continue_history_navigation_population(HistoryOperation&, ChangingNavigable&);
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index f9aec74259c5b92f738d2214ac25ee5ecfb2c92a..d870362b6643d7d0ddde868f3b5f8fd377457cea 100644
+index de23ab70e546ccad4f49bd58be97b7b15d8de5df..c5600f4f5630e1c6331423af91d92b745f42ad4a 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -3767,6 +3767,26 @@ ErrorOr<void> ViewImplementation::restore_session_history_from_snapshot(SessionH
+@@ -3839,6 +3839,26 @@ ErrorOr<void> ViewImplementation::restore_session_history_from_snapshot(SessionH
      return {};
  }
  
@@ -80,7 +80,7 @@ index f9aec74259c5b92f738d2214ac25ee5ecfb2c92a..d870362b6643d7d0ddde868f3b5f8fd3
  bool ViewImplementation::capture_session_history_snapshot_for_testing(Badge<WebContentPage>)
  {
      m_captured_session_history_snapshot_for_testing = session_history_snapshot();
-@@ -4792,6 +4812,10 @@ void ViewImplementation::reject_pending_selection_requests()
+@@ -4869,6 +4889,10 @@ void ViewImplementation::reject_pending_selection_requests()
      reject_requests(m_pending_selected_text_for_lookup_requests);
      reject_requests(m_pending_select_word_for_dictionary_lookup_requests);
      reject_requests(m_pending_cut_selected_text_requests);
@@ -92,10 +92,10 @@ index f9aec74259c5b92f738d2214ac25ee5ecfb2c92a..d870362b6643d7d0ddde868f3b5f8fd3
  
  SpellChecker::DocumentTag ViewImplementation::spell_document_tag()
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 59b948224559b91b6057e4d0a91555b545033b70..c4f9724245865d58848b8da83283148984e098b9 100644
+index 9e9f11ab1dec051c90b0c154c5a8bac86a63a8bb..7aa4246f7ef6b1c5015dd5ca1f9e9417f0edd005 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -203,6 +203,15 @@ public:
+@@ -201,6 +201,15 @@ public:
      [[nodiscard]] SessionHistorySnapshot session_history_snapshot() const;
      [[nodiscard]] ErrorOr<void> restore_session_history_from_snapshot(SessionHistorySnapshot);
  
@@ -111,7 +111,7 @@ index 59b948224559b91b6057e4d0a91555b545033b70..c4f9724245865d58848b8da832831489
      Optional<SessionTabId> session_tab_id() const { return m_session_tab_id; }
      void set_session_tab_id(SessionTabId session_tab_id) { m_session_tab_id = session_tab_id; }
      void clear_session_tab_id() { m_session_tab_id = {}; }
-@@ -376,6 +385,7 @@ public:
+@@ -375,6 +384,7 @@ public:
      void set_listen_for_dom_mutations(bool);
      void did_connect_devtools_client();
      void did_disconnect_devtools_client();
@@ -119,21 +119,21 @@ index 59b948224559b91b6057e4d0a91555b545033b70..c4f9724245865d58848b8da832831489
      void get_dom_node_inner_html(Web::UniqueNodeID node_id);
      void get_dom_node_outer_html(Web::UniqueNodeID node_id);
      void set_dom_node_outer_html(Web::UniqueNodeID node_id, String const& html);
-@@ -866,6 +876,9 @@ protected:
+@@ -871,6 +881,9 @@ protected:
      HashMap<u64, NonnullRefPtr<Core::Promise<bool>>> m_pending_select_word_for_dictionary_lookup_requests;
      HashMap<u64, NonnullRefPtr<Core::Promise<ByteString>>> m_pending_cut_selected_text_requests;
  
 +    u64 m_next_discard_preparation_request_id { 1 };
 +    HashMap<u64, NonnullRefPtr<Core::Promise<DiscardPreparation>>> m_pending_discard_preparations;
 +
-     RefPtr<Action> m_take_visible_screenshot_action;
-     RefPtr<Action> m_take_full_screenshot_action;
-     RefPtr<Action> m_report_website_issue_action;
+     RefPtr<Action> m_take_screenshot_action;
+     RefPtr<Action> m_block_element_action;
+ 
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 9ff2c6a130ba064d858d0db9bd3c8c1a66243cac..3a2b87d83626fd53dc8c9713f8d3c33be3a00acb 100644
+index b4fcaf755def0bd7b60e4c4b856b23433adcab1f..64bdd91b788ee9a0f2659668cc9fa2bf5b569199 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1189,6 +1189,12 @@ void WebContentPage::did_take_screenshot(Gfx::ShareableBitmap screenshot)
+@@ -1206,6 +1206,12 @@ void WebContentPage::did_take_screenshot(Gfx::ShareableBitmap screenshot)
          view().did_receive_screenshot({}, screenshot);
  }
  
@@ -147,10 +147,10 @@ index 9ff2c6a130ba064d858d0db9bd3c8c1a66243cac..3a2b87d83626fd53dc8c9713f8d3c33b
  {
      if (displays_tab())
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index d01b051b62295eb5dc7146e592d089fac766d85f..4b8de00e8cd3b218cb43589d1f237e67d4916048 100644
+index 2e31e1d48d2245a5026224b0504102a6628ceb94..efc74c7bdab09cbca8ed83b4605b26102fc49ad8 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -234,6 +234,7 @@ private:
+@@ -240,6 +240,7 @@ private:
      virtual void did_resume_debugger() override;
      virtual void did_complete_debugger_breakpoint_operation(u64 request_id, Optional<String> error) override;
      virtual void did_take_screenshot(Gfx::ShareableBitmap screenshot) override;
@@ -159,7 +159,7 @@ index d01b051b62295eb5dc7146e592d089fac766d85f..4b8de00e8cd3b218cb43589d1f237e67
      virtual void did_get_selected_text(u64 request_id, ByteString selection) override;
      virtual void did_get_selected_text_for_lookup(u64 request_id, Optional<DictionaryLookup> lookup) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index dc4870490c6a7899e9f500bb789eac944c3aeed4..605c8dabc9520aa04254f11095533e4322b96968 100644
+index 61c4114171040b8d6d4b593ce06ae5328bcd20b8..97c28c1a959095d15c85e860a304c060aee12918 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -74,6 +74,7 @@
@@ -170,7 +170,7 @@ index dc4870490c6a7899e9f500bb789eac944c3aeed4..605c8dabc9520aa04254f11095533e43
  #include <LibWeb/HTML/Storage.h>
  #include <LibWeb/HTML/Window.h>
  #include <LibWeb/HTML/WorkerAgentParent.h>
-@@ -568,6 +569,48 @@ void ConnectionFromClient::stop_loading(Web::PageId page_id)
+@@ -572,6 +573,48 @@ void ConnectionFromClient::stop_loading(Web::PageId page_id)
          page->page().local_traversable()->stop_loading();
  }
  
@@ -220,7 +220,7 @@ index dc4870490c6a7899e9f500bb789eac944c3aeed4..605c8dabc9520aa04254f11095533e43
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 48c0a87d1d50099fd82acb192a9c84a9194bee16..a7d2da39cb28951fc286f31fdbda7712d4a639f5 100644
+index cbd69743713fd67a2978873312edee8e2d68f7d3..8891b5b1749470ccaeea882cd9e459d0bb10dd4a 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -131,6 +131,7 @@ private:
@@ -232,7 +232,7 @@ index 48c0a87d1d50099fd82acb192a9c84a9194bee16..a7d2da39cb28951fc286f31fdbda7712
      virtual void set_ongoing_navigation(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id) override;
      virtual void navigate_to_a_fragment(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, URL::URL url, Web::HTML::HistoryHandlingBehavior, Web::HTML::UserNavigationInvolvement, Utf16String navigation_id) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index fa3ad0089fee063939175a34d1e9c67d92e6a549..d152770f387fafe3211af288418371576a61b04b 100644
+index 808fa0cd8becff43664c26bda7c36fbe2262145b..3723169f8f5a8d35c32c67b12a9ea71c9ba55fe0 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
 @@ -176,6 +176,8 @@ endpoint WebContentClient routed by Web::PageId page_id
@@ -245,7 +245,7 @@ index fa3ad0089fee063939175a34d1e9c67d92e6a549..d152770f387fafe3211af28841837157
  
      did_get_selected_text(Web::PageId page_id, u64 request_id, ByteString selection) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index ee5d0fcb383ed243af8117d26bb839a00b2cb2bb..520557a169de22c356e208f7b3579c12e134a2b8 100644
+index e55ba0c3594c75f8be0a104d3bf3584607a873cb..0a782f27a78e9670b1e4ee6d8dcdbf03efccf9ca 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -108,6 +108,7 @@ endpoint WebContentServer routed by Web::PageId page_id

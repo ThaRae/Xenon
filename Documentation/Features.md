@@ -35,17 +35,23 @@ Your eight most visited sites, one per site with its favicon, ranked by Ladybird
 windows say so instead and show no history. The page is static, so Xenon's UI hands it the sites once it has loaded
 (`UI/NewTabPage.cpp`).
 
+Ladybird opens new tabs blank, so Xenon makes `about:newtab` the new tab page of a profile until its first run is
+complete (`UI/main.cpp`). **Settings → Startup and pages** can change it, and its reset button goes back to
+`about:newtab`.
+
 ### Settings
 
 `about:settings` (**Settings** in the menu) puts Xenon's own settings first, as Helium's does, and keeps Ladybird's
 below them. Every change applies at once, and the page follows changes made from the menus.
 
 - Xenon's sections:
-  - **Look and layout**: the three layouts, the sidebar's side, the bookmarks bar, zoom, dark pages.
+  - **Look and layout**: the three layouts, the sidebar's side, the bookmarks bar, zoom, whether sites are asked for
+    light or dark, dark pages.
   - **Tabs**: recently used order, hibernation and its timeout, dragging a tab to a page's edge to split, groups.
   - **Search and bangs**: the engine, suggestions, bangs on or off, and a lookup of all 13,000.
-  - **Ads and trackers**: blocking, which lists are in use and when they were last checked, daily updates with
-    **Check now**, subscriptions and local lists, and links into the blocking dashboard.
+  - **Ads and trackers**: blocking, the count on the shield, which lists are in use and when they were last checked,
+    daily updates with **Check now**, the sites let through (each with **Turn back on**), subscriptions and local
+    lists, and links into the blocking dashboard.
   - **Password manager** and **Extensions**.
   - **Updates**: the version, whether a new one is ready, automatic updates, and **Check now** or **Relaunch to
     update**.
@@ -55,7 +61,7 @@ below them. Every change applies at once, and the page follows changes made from
 
 The page is Xenon's `UI/Resources/about-pages/settings.*`. It runs Ladybird's own settings scripts, by their element
 ids, for Ladybird's settings. `UI/SettingsPage.cpp` answers it about Xenon's (`UI/XenonSettings`), through engine patch
-`0022` (`LibWebView: Let the embedder add interfaces to its WebUI pages`), which lets the browser give WebUI pages
+`0025` (`LibWebView: Let the embedder add interfaces to its WebUI pages`), which lets the browser give WebUI pages
 interfaces of its own (`UI/WebUIInterfaces.cpp`).
 
 ## Tabs and windows
@@ -127,7 +133,7 @@ A tab never hibernates while it's:
 
 Right-click the tab strip (or open **Settings → Tabs**) for **Tab Hibernation → Off** or a timeout from 15 minutes to 6
 hours, or right-click a background tab for **Hibernate Tab**. The code is `UI/TabHibernation.cpp`, with engine patch
-`0021`, which saves the scroll position first.
+`0023`, which saves the scroll position first.
 
 ### Memory use on hover
 
@@ -139,7 +145,7 @@ As in Chromium's tab hover cards: hovering a tab, the current one included, show
   "about".
 - A hibernated tab uses none, and its card says how much hibernating it freed.
 
-It's measured as the card shows, at most once a second (`UI/TabMemory.cpp`, with engine patch `0022`, which lets the UI
+It's measured as the card shows, at most once a second (`UI/TabMemory.cpp`, with engine patch `0024`, which lets the UI
 see which tab a worker belongs to).
 
 ## Search and the address bar
@@ -195,6 +201,10 @@ The toolbar shield opens a popup laid out like uBlock Origin's:
 
 Its dashboard, `xenon://blocking/`, has the filter lists (each can be turned off), My filters, and trusted sites.
 **Settings → Ads and trackers** links to each.
+
+**Settings → Ads and trackers → Count what's blocked on the shield** puts the page's count on the shield, as uBlock
+Origin's badge does. It's a Xenon setting (`UI/XenonSettings`), off by default. The engine lists what was blocked by
+host and kind, once each; engine patch `0026` adds the count of every blocked request that the popup and the badge show.
 
 uBlock Origin's switches for large media, cosmetic filtering and JavaScript, and which domains had requests blocked,
 need engine work.

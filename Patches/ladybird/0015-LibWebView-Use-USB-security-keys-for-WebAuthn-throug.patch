@@ -32,7 +32,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Libraries/LibWebView/WebAuthn/HIDAuthenticator.h
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 7998fb70219984f5ad5d0e1a383b5b9f8822fe13..b13a6ede5fb0cf65424a97baf857757feca0f741 100644
+index 334a46f452f91f1a0cafc0342a72b9cef6c470fb..7776be6cad4cb4abbe55d1ffc834ed94c87b5232 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
 @@ -73,6 +73,9 @@
@@ -45,7 +45,7 @@ index 7998fb70219984f5ad5d0e1a383b5b9f8822fe13..b13a6ede5fb0cf65424a97baf857757f
  #include <LibWebView/WebAuthn/VirtualAuthenticator.h>
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
-@@ -1762,6 +1765,9 @@ ErrorOr<void> Application::launch_services()
+@@ -1777,6 +1780,9 @@ ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
      WebAuthnCoordinator::the().add_authenticator_source(VirtualAuthenticators::the());
@@ -56,10 +56,10 @@ index 7998fb70219984f5ad5d0e1a383b5b9f8822fe13..b13a6ede5fb0cf65424a97baf857757f
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index bf1f33edfc44e375966d35c02cadc519c63f9403..dd9335303c6834a45598963b293ad861844c6c37 100644
+index d1f721766c410c70008a096e847dc54e91622c3f..81a87e4cdba59878a2f7e83035afd6ade81ba4b7 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -101,6 +101,9 @@ if (APPLE)
+@@ -102,6 +102,9 @@ if (APPLE)
          PlatformColorsMacOS.cpp
          ProcessReaper.cpp
      )
@@ -69,7 +69,7 @@ index bf1f33edfc44e375966d35c02cadc519c63f9403..dd9335303c6834a45598963b293ad861
  elseif (LINUX)
      list(APPEND SOURCES AudioDaemonSocket.cpp CrashReportPOSIX.cpp)
  endif()
-@@ -167,6 +170,13 @@ if (APPLE)
+@@ -168,6 +171,13 @@ if (APPLE)
      target_link_libraries(LibWebView PRIVATE "-framework Carbon")
  endif()
  

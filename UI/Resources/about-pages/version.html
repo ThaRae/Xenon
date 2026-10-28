@@ -1,0 +1,188 @@
+<!doctype html>
+<!--
+Copyright (c) 2026-present, the Ladybird developers.
+Copyright (c) 2026, the Xenon developers.
+
+SPDX-License-Identifier: BSD-2-Clause
+
+Ladybird's About page, with Xenon's app icon in place of Ladybird's logomark, and webui.css for Xenon's rose.
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="color-scheme" content="light dark" />
+        <title>About Ladybird</title>
+        <link rel="icon" type="image/png" href="resource://icons/48x48/app-browser.png" />
+        <link rel="stylesheet" type="text/css" href="resource://ladybird/ladybird.css" />
+        <link rel="stylesheet" type="text/css" href="resource://ladybird/about-pages/webui.css" />
+        <style>
+            body {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+                box-sizing: border-box;
+                padding: 100px 24px 26px;
+            }
+
+            .logomark {
+                width: 128px;
+                height: 128px;
+            }
+
+            .name {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-top: 26px;
+            }
+
+            h1 {
+                font-size: 40px;
+                font-weight: 600;
+                letter-spacing: -0.025em;
+                line-height: 1;
+            }
+
+            .badge {
+                font-size: 12px;
+                font-weight: 600;
+                padding: 3px 8px;
+                border-radius: 6px;
+                color: var(--badge-text);
+                background: var(--badge-background);
+            }
+
+            .tagline {
+                margin-top: 10px;
+                font-size: 15px;
+                color: var(--muted);
+            }
+
+            .details {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                width: 100%;
+                max-width: 460px;
+                margin-top: 30px;
+                padding: 14px 16px 14px 18px;
+                box-sizing: border-box;
+                border-radius: 8px;
+                background: var(--page);
+                box-shadow: inset 0 0 0 1px var(--separator);
+            }
+
+            .details dl {
+                flex: 1;
+                display: grid;
+                grid-template-columns: 96px minmax(0, 1fr);
+                row-gap: 8px;
+                font-size: 13px;
+                line-height: 1.4;
+            }
+
+            .details dt {
+                color: var(--muted);
+            }
+
+            .details dd {
+                overflow-wrap: anywhere;
+            }
+
+            .copy {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                height: 28px;
+                padding: 0 10px;
+                border: none;
+                border-radius: 7px;
+                font: inherit;
+                font-size: 13px;
+                color: var(--text);
+                background: var(--control);
+                cursor: pointer;
+            }
+
+            .copy:hover {
+                background: var(--control-hover);
+            }
+
+            .copy:active {
+                background: var(--control-pressed);
+            }
+
+            .copy svg {
+                width: 12px;
+                height: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <img class="logomark" src="resource://icons/128x128/app-browser-dark.png" alt="" />
+        <div class="name">
+            <h1 id="browser-name">Ladybird</h1>
+            <span class="badge">Pre-Alpha</span>
+        </div>
+        <p class="tagline">A truly independent web browser.</p>
+        <div class="details">
+            <dl>
+                <dt>Version</dt>
+                <dd id="browser-version"></dd>
+                <dt>Built</dt>
+                <dd id="browser-commit"></dd>
+                <dt>Platform</dt>
+                <dd id="platform"></dd>
+            </dl>
+            <button class="copy" id="copy" type="button">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                >
+                    <path d="M5.5 5.5h7v8h-7zM3.5 10.5v-8h7" />
+                </svg>
+                Copy
+            </button>
+        </div>
+        <script type="module">
+            const copyButton = document.querySelector("#copy");
+            let detailsText = "";
+
+            function renderVersionInfo(versionInfo) {
+                document.title = `About ${versionInfo.browserName}`;
+                document.querySelector("#browser-name").innerText = versionInfo.browserName;
+                document.querySelector("#browser-version").innerText = versionInfo.browserVersion;
+                document.querySelector("#browser-commit").innerText = `from ${versionInfo.browserCommit.slice(0, 10)}`;
+                document.querySelector("#platform").innerText = `${versionInfo.platformName}, ${versionInfo.arch}`;
+
+                // What is copied includes the details a bug report needs beyond what the page shows.
+                detailsText = [
+                    `${versionInfo.browserName} ${versionInfo.browserVersion} (${versionInfo.browserCommit})`,
+                    `Platform: ${versionInfo.platformName}, ${versionInfo.arch}`,
+                    `User agent: ${navigator.userAgent}`,
+                    `Command line: ${versionInfo.commandLine}`,
+                    `Executable path: ${versionInfo.executablePath}`,
+                ].join("\n");
+            }
+
+            copyButton.addEventListener("click", () => {
+                navigator.clipboard.writeText(detailsText);
+            });
+
+            document.addEventListener("WebUILoaded", () => {
+                ladybird.sendMessage("loadVersionInfo");
+            });
+
+            document.addEventListener("WebUIMessage", event => {
+                if (event.detail.name === "renderVersionInfo") {
+                    renderVersionInfo(event.detail.data);
+                }
+            });
+        </script>
+    </body>
+</html>

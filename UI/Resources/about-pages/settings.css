@@ -156,6 +156,7 @@ nav a.current {
 nav a:focus-visible {
     outline: 2px solid var(--xenon-rose);
     outline-offset: -2px;
+    box-shadow: none;
 }
 
 /* Sections */
@@ -276,6 +277,11 @@ p.note-row {
     font-weight: 500;
 }
 
+.row-heading > .label {
+    flex: 1;
+    min-width: 0;
+}
+
 .row-actions {
     display: flex;
     align-items: center;
@@ -303,6 +309,7 @@ input[type="url"],
 select,
 textarea {
     min-width: 0;
+    height: auto;
     padding: 7px 10px;
     font-size: 14px;
     color: var(--xenon-ink);
@@ -331,11 +338,16 @@ textarea {
     max-width: 260px;
 }
 
-input:focus,
+/* As specific as ladybird.css's focus rings, which the rose border takes the place of. */
+input[type="number"]:focus,
+input[type="search"]:focus,
+input[type="text"]:focus,
+input[type="url"]:focus,
 select:focus,
 textarea:focus {
     border-color: var(--xenon-rose);
     outline: none;
+    box-shadow: none;
 }
 
 input.success {
@@ -360,9 +372,20 @@ input[type="checkbox"][switch] {
     height: 24px;
 }
 
-input[type="checkbox"]:focus-visible {
+/* ladybird.css sizes the knob for its smaller switch. */
+input[type="checkbox"][switch]::before {
+    border-width: 9px;
+    left: 3px;
+}
+
+input[type="checkbox"][switch]:checked::before {
+    left: calc(100% - 21px);
+}
+
+input[type="checkbox"][switch]:focus-visible {
     outline: 2px solid var(--xenon-rose);
     outline-offset: 2px;
+    box-shadow: none;
 }
 
 .row:has(> input[switch]:disabled) > label {
@@ -396,10 +419,18 @@ input[type="checkbox"]:focus-visible {
     color: var(--xenon-ink);
 }
 
+/* Ladybird's scripts make some of their buttons link buttons, which look like the rest here. */
+button.link-button {
+    font: inherit;
+    cursor: pointer;
+}
+
 button.primary-button,
 button.secondary-button,
+button.link-button,
 .pill-link {
     flex-shrink: 0;
+    height: auto;
     padding: 7px 16px;
     font-size: 13px;
     font-weight: 500;
@@ -408,6 +439,7 @@ button.secondary-button,
 }
 
 button.secondary-button,
+button.link-button,
 .pill-link {
     color: var(--xenon-ink);
     background-color: transparent;
@@ -416,6 +448,7 @@ button.secondary-button,
 }
 
 button.secondary-button:hover:not(:disabled),
+button.link-button:hover,
 .pill-link:hover {
     background-color: var(--xenon-row-hover);
     border-color: var(--xenon-muted);
@@ -428,6 +461,40 @@ button.secondary-button:disabled {
 
 button.primary-button {
     font-weight: 600;
+}
+
+/* A few choices side by side, like the light or dark sites that Ladybird's appearance.js sets. */
+.segmented {
+    flex-shrink: 0;
+    gap: 2px;
+    padding: 3px;
+    background-color: var(--xenon-row-hover);
+    border: 1px solid var(--xenon-hairline);
+    border-radius: 999px;
+}
+
+.segmented label {
+    height: 28px;
+    padding: 0 14px;
+    font-weight: 500;
+    color: var(--xenon-muted);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.segmented label:hover {
+    color: var(--xenon-ink);
+}
+
+.segmented label:has(input:checked) {
+    color: var(--xenon-ink);
+    background-color: var(--xenon-row-selected);
+    box-shadow: inset 0 0 0 1px var(--xenon-rose);
+}
+
+.segmented label:has(input:focus-visible) {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: 2px;
 }
 
 /* Layouts */
@@ -575,6 +642,97 @@ button.primary-button {
     color: var(--xenon-muted);
 }
 
+/* Search engines, as Ladybird's search.js lists them: a box of choices, each with its initial on a tile. */
+
+.engine-choices {
+    overflow: hidden;
+    border: 1px solid var(--xenon-hairline);
+    border-radius: 12px;
+}
+
+.engine-choice {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 8px 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.engine-choice + .engine-choice {
+    border-top: 1px solid var(--xenon-hairline);
+}
+
+.engine-choice:hover {
+    background-color: var(--xenon-row-hover);
+}
+
+.engine-choice:has(input:checked) {
+    background-color: var(--xenon-row-selected);
+}
+
+.engine-choice:has(input:focus-visible) {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: -2px;
+}
+
+/* The row is the control, so the native radio button only takes keyboard focus. */
+.engine-choice input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.engine-name {
+    flex: 1;
+    min-width: 0;
+}
+
+.engine-check {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: var(--xenon-rose);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    visibility: hidden;
+}
+
+.engine-choice:has(input:checked) .engine-check {
+    visibility: visible;
+}
+
+/* A search engine or a site, pictured by its initial, as the new tab page pictures a site without an icon. */
+.letter-tile,
+.empty-tile {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 22.5%;
+}
+
+.letter-tile {
+    font-family: var(--xenon-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--xenon-muted);
+    background-color: var(--xenon-row-hover);
+    border: 1px solid var(--xenon-hairline);
+}
+
+.empty-tile {
+    border: 1px dashed var(--xenon-hairline);
+}
+
+.engine-choice:has(input:checked) .letter-tile {
+    color: var(--xenon-rose);
+    border-color: var(--xenon-rose);
+}
+
 /* Bangs */
 
 .bang-results {
@@ -643,12 +801,33 @@ button.primary-button {
     gap: 10px;
 }
 
-.filter-list-metadata {
-    font-size: 12px;
+.add-filter-list:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 0 4px;
+    border-top: 1px solid var(--xenon-hairline);
 }
 
-.list-rows > .description {
-    padding: 4px 0;
+.add-filter-list > label {
+    font-weight: 500;
+}
+
+/* The sites blocking is turned off on, each with a button to turn it back on. */
+.site-rows > div {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 10px;
+    border-top: 1px solid var(--xenon-hairline);
+}
+
+.site-rows .item-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 500;
+    overflow-wrap: anywhere;
 }
 
 details.disclosure > summary {
@@ -755,15 +934,6 @@ details.disclosure > summary:hover {
 .config-row textarea {
     flex-shrink: 0;
     width: 220px;
-}
-
-.config-name {
-    margin-top: 2px;
-    font-family: var(--xenon-mono);
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--xenon-muted);
-    overflow-wrap: anywhere;
 }
 
 footer {
