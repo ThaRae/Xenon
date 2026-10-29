@@ -112,14 +112,15 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
   upstream
 
 `Meta/xenon.py test` runs the unit tests in `Tests/`, then runs Xenon headless: it renders `about:welcome`, checks that
-a fresh start writes only to Xenon's directories, and checks content blocking, daily filter list updates, the blocking
-dashboard, the certificate warning, extensions, WebAuthn, and password manager installs against pages and servers it
-starts locally. Session restore needs Xenon's windows, since a headless run never saves its session, so that check opens
-them: it kills Xenon, and then quits it, and checks that the tabs come back with their pages. So does the Update
-button's, which runs Xenon with `XENON_TEST_UPDATE_READY` standing in for an update ([Updates.md](Updates.md#testing)).
-Linux CI runs the tests under Xvfb, so the windows are real X11 ones; without a display, they go to Qt's offscreen
-platform. The unit tests that draw Xenon's popovers and buttons save how they look in `Build/release/smoke`, beside the
-welcome page's render (`XENON_SCREENSHOT_DIR`, which `Meta/xenon.py test` sets).
+a fresh start writes only to Xenon's directories, and checks content blocking, daily filter list updates, when the
+ImageDecoder and media servers start and stop, the blocking dashboard, the certificate warning, extensions, WebAuthn,
+and password manager installs against pages and servers it starts locally. Session restore needs Xenon's windows, since
+a headless run never saves its session, so that check opens them: it kills Xenon, and then quits it, and checks that the
+tabs come back with their pages. So does the Update button's, which runs Xenon with `XENON_TEST_UPDATE_READY` standing
+in for an update ([Updates.md](Updates.md#testing)). Linux CI runs the tests under Xvfb, so the windows are real X11
+ones; without a display, they go to Qt's offscreen platform. The unit tests that draw Xenon's popovers and buttons save
+how they look in `Build/release/smoke`, beside the welcome page's render (`XENON_SCREENSHOT_DIR`, which `Meta/xenon.py
+test` sets).
 
 `Meta/xenon.py ladybird-test` builds Ladybird's own tests and runs them with ctest, as Ladybird's CI does: AK's and
 the libraries' unit tests, `test-js`, `test-web`'s web tests (text, layout, ref, screenshot, and crash tests), and the

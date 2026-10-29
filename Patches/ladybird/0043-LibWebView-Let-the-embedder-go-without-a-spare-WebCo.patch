@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Thu, 29 Oct 2026 09:36:18 -0400
+Subject: [PATCH] LibWebView: Let the embedder go without a spare WebContent
+ process
+
+A spare WebContent process lets the next tab open a little sooner, but
+it costs tens of MiB for as long as the browser runs, whether or not
+another tab is ever opened. Add a BrowserOptions setting with which an
+embedder that would rather have the memory can open each tab with a new
+process instead.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/Application.cpp | 4 ++++
+ Libraries/LibWebView/Options.h       | 8 ++++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 75c2ea530cde6fd62f57339fa7ca4b5814f7fc3b..550c576aa9819e8a0f9ef359389570991f00c83c 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -1754,6 +1754,10 @@ ErrorOr<Application::ChildFrameWebContentProcess> Application::launch_child_fram
+ 
+ void Application::launch_spare_web_content_process()
+ {
++    // An embedder that prefers a smaller idle footprint opens each tab with a fresh process instead.
++    if (browser_options().prewarm_spare_web_content_process == PrewarmSpareWebContentProcess::No)
++        return;
++
+     // Spare WebContent processes inherit the active WebDriver endpoint, but they are not part of the
+     // session and can race browser shutdown while bootstrapping.
+     if (browser_options().webdriver_browser_endpoint.has_value())
+diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
+index c5ac486082e9426a7649dff35c8dca36938c3fd7..2afb8ed0fd1912667cbb00d49c2897f32def19a0 100644
+--- a/Libraries/LibWebView/Options.h
++++ b/Libraries/LibWebView/Options.h
+@@ -79,6 +79,13 @@ enum class DeferContentBlockerRules {
+     Yes,
+ };
+ 
++// A pre-warmed WebContent process makes the next tab open sooner, but an idle one costs tens of MiB for as long as the
++// window is open, so an embedder that would rather have the memory can turn it off.
++enum class PrewarmSpareWebContentProcess {
++    No,
++    Yes,
++};
++
+ enum class DisableSandbox {
+     No,
+     Yes,
+@@ -115,6 +122,7 @@ struct BrowserOptions {
+     Optional<DNSSettings> dns_settings {};
+     Optional<u16> devtools_port;
+     EnableContentBlocker enable_content_blocker { EnableContentBlocker::Yes };
++    PrewarmSpareWebContentProcess prewarm_spare_web_content_process { PrewarmSpareWebContentProcess::Yes };
+     DisableSandbox disable_sandbox { DisableSandbox::No };
+     ForceVideoDecoderServer force_video_decoder_server { ForceVideoDecoderServer::No };
+     Vector<ByteString> content_blocker_list_paths {};

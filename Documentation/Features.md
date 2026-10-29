@@ -161,6 +161,22 @@ As in Chromium's tab hover cards: hovering a tab, the current one included, show
 It's measured as the card shows, at most once a second (`UI/TabMemory.cpp`, with engine patch `0024`, which lets the UI
 see which tab a worker belongs to).
 
+### Idle helper processes
+
+Besides hibernating whole tabs, Xenon doesn't keep processes that nothing is using:
+
+- There's no spare WebContent process waiting for the next tab, as Ladybird keeps: a tab's process starts when the tab
+  opens (`UI/Application.cpp`, engine patch `0043`). A new tab waits for that launch, a fraction of a second.
+- A page's image decoder starts with its first image rather than with the page, and stops once it has had nothing to
+  decode for 15 seconds; the next image starts a new one, as does an image after a decoder crash (`0046`). Images used
+  as one frame, such as an animated favicon, let the decoder go (`0045`).
+- The media server starts when a page first needs one, and stops 15 seconds after the page last used it; the audio
+  server it plays through stops 15 seconds after that. A paused video or song keeps both (`0047`).
+- Four seconds after a page loads, its process collects garbage and gives the freed memory back to the system (`0044`),
+  and does again whenever its tab is hidden (`0038`).
+
+[Memory.md](Memory.md) has the measurements.
+
 ### Restoring tabs
 
 With **Settings → Startup and pages → Restore the last session's windows and tabs** on, Xenon opens the windows it had
@@ -210,13 +226,14 @@ turns on by default. They ship with Xenon in `UI/Resources/filter-lists`, and up
 downloadable catalog stays off, since it holds raw copies of the same lists.
 
 Every WebContent process that holds a page builds its own engine from the lists: each tab and each cross-site frame.
-The spare process kept ready for the next tab does not, until a tab takes it. Engine patches keep each engine small:
+Engine patches keep each engine small:
 
 - `0027` keeps the malware lists' 100,000 `||host/path^$document` filters as 8-byte hashes, not as engine filters of
   over 100 bytes each;
-- `0030` gives back the memory used to build the engine, several times what the engine keeps;
+- `0030` gives back the memory used to build the engine, several times what the engine keeps, and `0042` makes sure it
+  leaves the process's RSS on Linux too;
 - `0029` sends no lists to any process while blocking is off;
-- `0039` leaves the spare process without the lists until a tab takes it.
+- `0039` leaves a spare process without the lists until a tab takes it, though Xenon keeps none (below).
 
 Extensions' own pages get no lists at all: their background pages, offscreen documents, and popups each open in a
 process of their own that never builds the engine (`0032`). uBlock Origin doesn't filter other extensions' requests in

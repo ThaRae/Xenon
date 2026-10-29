@@ -15,10 +15,10 @@ without the rules until a tab takes it, and send them then.
  4 files changed, 20 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 15495dfe44e68c3e5e4eb72fd675b63eb245be4d..c61b91fb7af0d376c47899bc736a7025a0823974 100644
+index cfd6ded3b17942be7af81d54694166ce72882d69..7125e06b82ffc334cb6a7ef38f7ffdcc2855907b 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -900,8 +900,8 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -906,8 +906,8 @@ void Application::send_content_blockers(WebContentClient& client) const
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
      // Each process builds an engine from the rules, which can take tens of MiB, so while blocking is off it gets none,
@@ -29,7 +29,7 @@ index 15495dfe44e68c3e5e4eb72fd675b63eb245be4d..c61b91fb7af0d376c47899bc736a7025
          client.async_set_content_blockers(Core::AnonymousBuffer {}, Core::AnonymousBuffer {}, Core::AnonymousBuffer {});
          return;
      }
-@@ -1234,7 +1234,7 @@ void Application::open_bookmark_in_new_window(String const& bookmark_id, IsPriva
+@@ -1240,7 +1240,7 @@ void Application::open_bookmark_in_new_window(String const& bookmark_id, IsPriva
          open_url_in_new_window(bookmark->bookmark().url, is_private);
  }
  
@@ -38,7 +38,7 @@ index 15495dfe44e68c3e5e4eb72fd675b63eb245be4d..c61b91fb7af0d376c47899bc736a7025
  {
      // The client's WebContentClient picks up this same session when it is created.
      auto session = session_for_new_view(is_private);
-@@ -1280,6 +1280,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1286,6 +1286,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
          webdriver_bidi->push_session_state_for_client(*client);
  
      client->set_enable_content_blocker(enable_content_blocker);
@@ -46,7 +46,7 @@ index 15495dfe44e68c3e5e4eb72fd675b63eb245be4d..c61b91fb7af0d376c47899bc736a7025
      send_content_blockers(*client);
  
      m_web_content_clients.set(client);
-@@ -1717,13 +1718,15 @@ void Application::crash_compositor_process()
+@@ -1723,13 +1724,15 @@ void Application::crash_compositor_process()
  ErrorOr<NonnullRefPtr<WebContentPage>> Application::open_page_for_new_tab(IsPrivate is_private, EnableContentBlocker enable_content_blocker)
  {
      RefPtr<WebContentClient> web_content_client;
@@ -63,7 +63,7 @@ index 15495dfe44e68c3e5e4eb72fd675b63eb245be4d..c61b91fb7af0d376c47899bc736a7025
          launch_spare_web_content_process();
      } else {
          launch_spare_web_content_process();
-@@ -1764,7 +1767,7 @@ void Application::launch_spare_web_content_process()
+@@ -1770,7 +1773,7 @@ void Application::launch_spare_web_content_process()
      Core::deferred_invoke([this]() {
          m_has_queued_task_to_launch_spare_web_content_process = false;
  
@@ -73,10 +73,10 @@ index 15495dfe44e68c3e5e4eb72fd675b63eb245be4d..c61b91fb7af0d376c47899bc736a7025
              dbgln("Unable to create spare web content client: {}", web_content_client.error());
              return;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 2fd9493ee2768862864cb3644dea51b78a352cf6..c1f6cbb2074396120244a740600529f804fbf6b4 100644
+index 5db96fdc28a4afef7d9adc21b3c38779aa9c6e26..cc2a9737d92de08a3485e448ed4456683fefeddd 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -473,7 +473,7 @@ private:
+@@ -480,7 +480,7 @@ private:
      ErrorOr<void> create_profile(Optional<StringView> profile_name, Optional<StringView> profile_path, bool force_new_process, bool temporary_profile);
      void create_mach_port_server(ByteString const& profile_identity);
      void update_website_color_scheme();

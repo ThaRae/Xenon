@@ -1,0 +1,88 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Thu, 29 Oct 2026 09:36:34 -0400
+Subject: [PATCH] WebContent: Give the memory a page freed while loading back
+ to the OS
+
+A page allocates the most around its load event, and by then the
+parser, style and scripts have freed much of it, but nothing collects
+until the tab is hidden or the heap grows again. Four seconds after a
+top-level page finishes loading, collect garbage once and decommit the
+allocator's free pages, so that what the page no longer uses leaves the
+process's RSS.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Services/WebContent/ConnectionFromClient.cpp | 14 ++++++++++++++
+ Services/WebContent/ConnectionFromClient.h   |  6 ++++++
+ Services/WebContent/PageClient.cpp           |  1 +
+ 3 files changed, 21 insertions(+)
+
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 81f158c098973edb58f37f43496a443897d301bb..0ee2771b9bc78aa654e7ce385b0daa1627efa9f9 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3442,6 +3442,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+         Web::FileAPI::remove_entry_from_blob_url_store(*url_record);
+ }
+ 
++void ConnectionFromClient::schedule_memory_release_after_load()
++{
++    // A page allocates most around its load event: by then the parser, style and scripts have freed as much as they
++    // keep, and nothing has collected since. Wait for the page to settle, then collect once and decommit, so the freed
++    // pages leave the process's RSS rather than sitting in the allocator until the tab is hidden.
++    if (!m_memory_release_timer) {
++        m_memory_release_timer = Core::Timer::create_single_shot(AK::Duration::from_seconds(4), [] {
++            Web::Bindings::main_thread_vm().heap().collect_garbage(GC::Heap::CollectionType::CollectGarbage, false);
++            ak_kmalloc_decommit_free_pages();
++        });
++    }
++    m_memory_release_timer->start();
++}
++
+ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState system_visibility_state)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 9196d2f63d87c1861f03d519756949452e797d74..b7b7d4df17c318b8e59b39628f5ab3768cea631f 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -16,6 +16,7 @@
+ #include <AK/SourceLocation.h>
+ #include <LibCompositing/Types.h>
+ #include <LibCore/AnonymousBuffer.h>
++#include <LibCore/Timer.h>
+ #include <LibGC/Root.h>
+ #include <LibIPC/ConnectionFromClient.h>
+ #include <LibJS/Forward.h>
+@@ -89,6 +90,10 @@ public:
+     void notify_started_using_gamepads();
+     void pump_and_dispatch_gamepad_events();
+ 
++    // Called when a page in this process finishes loading: collects once the page has settled, and gives the freed
++    // allocator pages back to the OS.
++    void schedule_memory_release_after_load();
++
+     // Whether the UI process has user scripts for documents, which they ask it for as they become ready for scripts.
+     bool user_scripts_enabled() const { return m_user_scripts_enabled; }
+ 
+@@ -378,6 +383,7 @@ private:
+ 
+     RefPtr<TestConnection> m_test_connection;
+     RefPtr<Web::Compositor::CompositorConnection> m_compositor_connection;
++    RefPtr<Core::Timer> m_memory_release_timer;
+     NonnullOwnPtr<PageHost> m_page_host;
+     OwnPtr<DevToolsDebugger> m_devtools_debugger;
+ 
+diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
+index cd7fd31a31e28b6ca74bfb0245c6d33b22d3ca4a..39cb9584ef4d9cad4a9c51b925559766c9c6f262 100644
+--- a/Services/WebContent/PageClient.cpp
++++ b/Services/WebContent/PageClient.cpp
+@@ -1031,6 +1031,7 @@ void PageClient::page_did_change_active_document_in_top_level_browsing_context(W
+ void PageClient::page_did_finish_loading(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id)
+ {
+     client().async_did_finish_loading(m_id, navigable_id, document_id);
++    client().schedule_memory_release_after_load();
+ }
+ 
+ Optional<u64> PageClient::page_did_start_download(Web::HTML::CrossProcessId navigable_id, Optional<Utf16String> const& navigation_id, URL::URL const& url, ByteString const& suggested_filename, Optional<u64> total_size, int request_server_client_id, u64 request_server_request_id, ByteBuffer initial_data, JsonValue network_response)

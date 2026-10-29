@@ -506,8 +506,14 @@ ladybird_test("${XENON_SOURCE_DIR}/Tests/TestMemoryPressure.cpp" Xenon NAME Test
 target_sources(TestXenonMemoryPressure PRIVATE "${XENON_UI_DIR}/MemoryPressure.cpp")
 target_include_directories(TestXenonMemoryPressure BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestAllocatorRelease.cpp" Xenon NAME TestXenonAllocatorRelease)
+target_include_directories(TestXenonAllocatorRelease BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestUserAgent.cpp" Xenon NAME TestXenonUserAgent LIBS LibWebView)
 target_include_directories(TestXenonUserAgent BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestContentBlockerMemory.cpp" Xenon NAME TestXenonContentBlockerMemory LIBS LibWebView LibWeb LibURL)
+target_include_directories(TestXenonContentBlockerMemory BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
 # The blocking popover, drawn without a window. With XENON_SCREENSHOT_DIR set, it saves how it looks there.
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBlockingPopover.cpp" Xenon NAME TestXenonBlockingPopover LIBS LibCore LibURL)
@@ -532,4 +538,4 @@ target_sources(TestXenonUpdateButton PRIVATE
 target_include_directories(TestXenonUpdateButton BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonUpdateButton PRIVATE Qt::Core Qt::Gui Qt::Widgets)
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUpdateButton TestXenonUserAgent)
+add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUpdateButton TestXenonUserAgent)
