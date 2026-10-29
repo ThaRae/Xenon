@@ -96,7 +96,8 @@ Its jobs:
 - **macos**, on a `macos-26` runner. Before it builds, it checks the secrets: the certificate's SHA-1 and the update
   key's public half must be the ones [below](#setting-up-a-mac-to-release-from), so a secret holding another one stops
   the run at once. It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A cold
-  build doesn't fit in one run, so with no caches to start from, it stops there. It runs `Meta/release.py test` with
+  build doesn't fit in one run, so with no caches to start from, it stops there. After a change to the compiler flags,
+  `main`'s caches miss until CI's build of `main` saves new ones, so wait for that. It runs `Meta/release.py test` with
   the release certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote:
   the archive's and the appcast's signatures, with `sign_update --verify`, the app's `SUPublicEDKey`, and the app's
   and the installer's code signatures. `Xenon-<version>.dmg`, `Xenon-<version>.tar.xz` and `appcast.xml` are the
@@ -166,6 +167,10 @@ and the libstdc++ of GCC 13.2 or later. That means Ubuntu 26.04 and later, Fedor
 the release workflow tests it on, and other distributions as new; not Fedora 43 (glibc 2.42), Debian 13 (2.41) or
 Ubuntu 24.04 (2.39). The system also needs FUSE, as for any AppImage (`fuse3`, which desktop installs have), or
 `--appimage-extract-and-run`.
+
+The CPU has to be x86-64-v2 (SSE4.2 and POPCNT): Intel since Nehalem (2008), AMD since Bulldozer (2011). Xenon is
+built for that baseline, not for the runner that builds it ([Development.md](Development.md#building)), so it doesn't
+need AVX. The macOS release is built for the M1, and runs on any Apple silicon Mac.
 
 Building in an older image would widen that, but Xenon needs Qt 6.10, a compiler and a C++ library new enough for
 Ladybird, and Ladybird's Rust toolchain, and only Ladybird's image is tested with all of them; older distributions
