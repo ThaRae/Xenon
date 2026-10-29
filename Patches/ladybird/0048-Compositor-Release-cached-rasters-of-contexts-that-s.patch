@@ -1,0 +1,463 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 21:45:00 +0000
+Subject: [PATCH] Compositor: Release cached rasters of contexts that stop
+ painting
+
+A context keeps the rasters of its nested display lists and repeated
+tiles, and its text blobs, to make its next frame cheap. A context that
+has stopped painting may not make one for a long time, so release them
+once it has painted nothing for a while: 4 seconds for a hidden context,
+which paints nothing until it is shown again, and 30 seconds for a
+visible one, which keeps its text blobs, since it may be read for a
+while and then scrolled. Each context is timed on its own, so an
+animation or a blinking caret in one does not keep the rasters of the
+others.
+
+Dropping a GPU raster only hands its texture back to Skia's resource
+cache, which is trimmed after a flush, and a context that paints nothing
+does not flush. So after a release, purge the cache's unlocked scratch
+resources and give the allocators' free pages back: mimalloc's on the
+main thread, glibc's on a thread of its own, since its trim walks every
+arena, and the malloc zones' on macOS.
+
+LADYBIRD_COMPOSITOR_IDLE_RELEASE=0 turns the release off.
+LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG=1 logs each release and how long
+it took, and how long each frame took to prepare.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Services/Compositor/CMakeLists.txt            |   2 +-
+ Services/Compositor/CompositorState.cpp       | 168 ++++++++++++++++++
+ Services/Compositor/CompositorState.h         |  10 ++
+ Services/Compositor/ContextState.h            |   1 +
+ Services/Compositor/DisplayListPlayerSkia.cpp |   1 +
+ .../Compositor/DisplayListRasterCache.cpp     |  33 ++++
+ Services/Compositor/DisplayListRasterCache.h  |  24 +++
+ Services/Compositor/SkiaBackendContext.cpp    |   8 +
+ Services/Compositor/SkiaBackendContext.h      |   1 +
+ 9 files changed, 247 insertions(+), 1 deletion(-)
+
+diff --git a/Services/Compositor/CMakeLists.txt b/Services/Compositor/CMakeLists.txt
+index 5eaf310ad9e330b21473f210a8011e0b23a84268..8d46089c601d873a58564140559f94d90cccec42 100644
+--- a/Services/Compositor/CMakeLists.txt
++++ b/Services/Compositor/CMakeLists.txt
+@@ -82,7 +82,7 @@ target_include_directories(compositorservice PRIVATE ${LADYBIRD_SOURCE_DIR}/Serv
+ target_link_libraries(Compositor PRIVATE compositorservice LibCore LibMain LibSandbox)
+ # ANGLE must precede Skia so macOS GLES symbols bind to ANGLE rather than the
+ # OpenGL framework pulled in by Skia.
+-target_link_libraries(compositorservice PRIVATE LibCore LibGfx LibIPC LibMedia LibCompositing ${ANGLE_TARGETS} skia)
++target_link_libraries(compositorservice PRIVATE LibCore LibGfx LibIPC LibMedia LibCompositing LibThreading ${ANGLE_TARGETS} skia)
+ 
+ if (HAS_VULKAN)
+     target_sources(compositorservice PRIVATE SkiaVulkanMemoryAllocator.cpp)
+diff --git a/Services/Compositor/CompositorState.cpp b/Services/Compositor/CompositorState.cpp
+index 6acec986ed036cd08e5b00bfde2eec65793cc44c..15766002a467199ca8dd739aea94a286793b5b61 100644
+--- a/Services/Compositor/CompositorState.cpp
++++ b/Services/Compositor/CompositorState.cpp
+@@ -7,17 +7,51 @@
+ #include <AK/Math.h>
+ #include <AK/Random.h>
+ #include <AK/StdLibExtras.h>
++#include <AK/kmalloc.h>
+ #include <Compositor/CanvasHost.h>
+ #include <Compositor/CompositorState.h>
++#include <LibCore/Environment.h>
+ #include <LibCore/EventLoop.h>
+ #include <LibCore/StatsLog.h>
+ #include <LibCore/Timer.h>
+ #include <LibMedia/Sinks/DisplayingVideoSink.h>
++#include <LibThreading/Thread.h>
++
++#if defined(__GLIBC__)
++#    include <malloc.h>
++#elif defined(AK_OS_MACOS)
++#    include <malloc/malloc.h>
++#endif
+ 
+ namespace Compositor {
+ 
+ static constexpr int gpu_completion_check_interval_ms = 1;
+ 
++// A context's cached rasters only save work while it paints. A hidden context paints nothing until it is shown again,
++// so its rasters go soon after. A visible one may be read for a while and then scrolled, so it keeps them for longer,
++// and keeps its text blobs, which are small and which every scroll uses.
++static constexpr auto hidden_context_raster_release_delay = AK::Duration::from_seconds(4);
++static constexpr auto visible_context_raster_release_delay = AK::Duration::from_seconds(30);
++// Giving free pages back walks the heaps, so it is done at most this often.
++static constexpr auto free_page_release_interval = AK::Duration::from_seconds(4);
++// Skia can only purge a texture once the GPU work that reads it is done.
++static constexpr auto gpu_work_retry_delay = AK::Duration::from_milliseconds(100);
++
++static bool idle_memory_release_is_enabled()
++{
++    static auto const enabled = Core::Environment::get("LADYBIRD_COMPOSITOR_IDLE_RELEASE"sv).value_or("1"sv) != "0"sv;
++    return enabled;
++}
++
++static bool idle_memory_release_is_logged()
++{
++    static bool const logged = [] {
++        auto value = Core::Environment::get("LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG"sv);
++        return value.has_value() && !value->is_empty() && *value != "0"sv;
++    }();
++    return logged;
++}
++
+ NonnullRefPtr<CompositorState> CompositorState::create(RefPtr<Gfx::SkiaBackendContext> skia_backend_context)
+ {
+     return adopt_ref(*new CompositorState(move(skia_backend_context)));
+@@ -31,12 +65,134 @@ CompositorState::CompositorState(RefPtr<Gfx::SkiaBackendContext> skia_backend_co
+ 
+ CompositorState::~CompositorState()
+ {
++    if (m_heap_trim_thread && m_heap_trim_thread->needs_to_be_joined())
++        (void)m_heap_trim_thread->join();
+     if (!m_gpu_completion_timer)
+         return;
+     m_gpu_completion_timer->on_timeout = {};
+     m_gpu_completion_timer->stop();
+ }
+ 
++void CompositorState::schedule_idle_memory_release(MonotonicTime release_time)
++{
++    if (!idle_memory_release_is_enabled())
++        return;
++    if (!m_idle_memory_release_timer)
++        m_idle_memory_release_timer = Core::Timer::create_single_shot(AK::Duration::zero(), [this] { release_idle_memory(); });
++    // Only an earlier time moves the timer, so a context that paints every frame does not re-arm it every frame.
++    if (m_idle_memory_release_timer->is_active() && m_idle_memory_release_time <= release_time)
++        return;
++    m_idle_memory_release_time = release_time;
++    auto delay = release_time - MonotonicTime::now();
++    m_idle_memory_release_timer->restart(delay.is_negative() ? AK::Duration::zero() : delay);
++}
++
++void CompositorState::schedule_idle_memory_release_for(ContextState const& context)
++{
++    auto release_delay = context_is_effectively_visible(context) ? visible_context_raster_release_delay : hidden_context_raster_release_delay;
++    schedule_idle_memory_release(MonotonicTime::now() + release_delay);
++}
++
++// Each context's rasters go once that context has painted nothing for a while, whatever the others paint.
++void CompositorState::release_idle_memory()
++{
++    auto now = MonotonicTime::now();
++    if (!m_pending_async_presents.is_empty()) {
++        schedule_idle_memory_release(now + gpu_work_retry_delay);
++        return;
++    }
++
++    auto logged = idle_memory_release_is_logged();
++    Optional<MonotonicTime> next_release_time;
++    auto release_no_later_than = [&](MonotonicTime release_time) {
++        if (!next_release_time.has_value() || release_time < *next_release_time)
++            next_release_time = release_time;
++    };
++
++    for (auto& context_entry : m_contexts) {
++        auto& context = *context_entry.value;
++        auto is_visible = context_is_effectively_visible(context);
++        auto keep_text_blobs = is_visible ? DisplayListRasterCache::KeepTextBlobs::Yes : DisplayListRasterCache::KeepTextBlobs::No;
++        auto& raster_cache = context.raster_cache();
++        if (!raster_cache.has_cached_rasters(keep_text_blobs))
++            continue;
++
++        auto idle_time = now - raster_cache.last_painted();
++        auto release_delay = is_visible ? visible_context_raster_release_delay : hidden_context_raster_release_delay;
++        if (idle_time < release_delay) {
++            release_no_later_than(raster_cache.last_painted() + release_delay);
++            if (logged)
++                dbgln("COMPOSITOR-IDLE-KEEP context={} nested={} visible={} idle_ms={}", context_entry.key, context.parent_context_id().has_value(), is_visible, idle_time.to_milliseconds());
++            continue;
++        }
++
++        auto released_bytes = raster_cache.release_cached_rasters(keep_text_blobs);
++        m_free_page_release_is_pending = true;
++        if (logged) {
++            dbgln("COMPOSITOR-IDLE-RELEASE context={} nested={} visible={} idle_ms={} tiles={} nested_lists={} text={}",
++                context_entry.key, context.parent_context_id().has_value(), is_visible, idle_time.to_milliseconds(),
++                released_bytes.repeated_tiles, released_bytes.nested_display_lists, released_bytes.text_blobs);
++        }
++    }
++
++    if (m_free_page_release_is_pending) {
++        if (!m_last_free_page_release_time.has_value() || now - *m_last_free_page_release_time >= free_page_release_interval)
++            release_free_pages();
++        else
++            release_no_later_than(*m_last_free_page_release_time + free_page_release_interval);
++    }
++
++    if (next_release_time.has_value())
++        schedule_idle_memory_release(*next_release_time);
++}
++
++void CompositorState::release_free_pages()
++{
++    m_free_page_release_is_pending = false;
++    m_last_free_page_release_time = MonotonicTime::now();
++    auto logged = idle_memory_release_is_logged();
++
++    // Skia keeps the textures of dropped GPU rasters for reuse until a flush trims its cache, which a context that paints
++    // nothing never does.
++    auto start_time = MonotonicTime::now();
++    if (m_skia_backend_context)
++        m_skia_backend_context->purge_unlocked_scratch_resources();
++    auto skia_purge_end_time = MonotonicTime::now();
++
++    // AK allocates through mimalloc, whose purge on Linux only resets freed pages, which keeps them in the process.
++    ak_kmalloc_decommit_free_pages();
++    auto mimalloc_end_time = MonotonicTime::now();
++
++#if defined(AK_OS_MACOS)
++    // Skia and the GPU driver allocate through the C library.
++    (void)malloc_zone_pressure_relief(nullptr, 0);
++#endif
++
++    if (logged) {
++        dbgln("COMPOSITOR-IDLE-RELEASE free pages: skia_purge_us={} mimalloc_us={} libc_us={}",
++            (skia_purge_end_time - start_time).to_microseconds(), (mimalloc_end_time - skia_purge_end_time).to_microseconds(),
++            (MonotonicTime::now() - mimalloc_end_time).to_microseconds());
++    }
++
++#if defined(__GLIBC__)
++    // Skia and the GPU driver allocate through the C library. glibc's trim walks every arena, which can take a while on a
++    // large heap, so it runs beside the main thread, which may have frames to paint and input to route.
++    if (m_heap_trim_thread) {
++        if (!m_heap_trim_thread->has_exited())
++            return;
++        (void)m_heap_trim_thread->join();
++    }
++    m_heap_trim_thread = Threading::Thread::construct("HeapTrim"sv, [logged] {
++        auto start_time = MonotonicTime::now();
++        malloc_trim(0);
++        if (logged)
++            dbgln("COMPOSITOR-IDLE-RELEASE malloc_trim_us={}", (MonotonicTime::now() - start_time).to_microseconds());
++        return static_cast<intptr_t>(0);
++    });
++    m_heap_trim_thread->start();
++#endif
++}
++
+ void CompositorState::register_presentation(CompositorStateClient& presentation, PresentationCapabilities capabilities)
+ {
+     m_presentations.set(&presentation, capabilities);
+@@ -1001,6 +1157,8 @@ void CompositorState::set_context_visibility(Web::CompositorContextId context_id
+ 
+     if (visibility == Compositing::ContextVisibility::Visible)
+         resume_presentation_after_becoming_visible(context_id, *context);
++    else
++        schedule_idle_memory_release_for(*context);
+ }
+ 
+ void CompositorState::resume_presentation_after_becoming_visible(Web::CompositorContextId root_context_id, ContextState& root_context)
+@@ -1078,7 +1236,10 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Gfx::In
+ void CompositorState::present_frame(Web::CompositorContextId context_id, ContextState& context, PendingFrame pending_frame)
+ {
+     auto composited_context_resolver = resolver_for(context_id);
++    auto repaints_released_rasters = context.raster_cache().was_released_since_last_paint();
++    auto preparation_start_time = MonotonicTime::now();
+     auto prepared_frame = context.prepare_frame(*m_display_list_player, pending_frame, &composited_context_resolver);
++    auto preparation_time = MonotonicTime::now() - preparation_start_time;
+     if (!prepared_frame.has_value())
+         return;
+ 
+@@ -1094,6 +1255,9 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Context
+         });
+     });
+     context.presenter().did_submit_prepared_frame(pending_frame.viewport_rect);
++    if (idle_memory_release_is_logged())
++        dbgln("COMPOSITOR-FRAME context={} prepare_us={} after_release={}", context_id, preparation_time.to_microseconds(), repaints_released_rasters);
++    schedule_idle_memory_release_for(context);
+ #ifdef AK_OS_MACOS
+     // The window server's reads of an IOSurface wait for GPU work that is already scheduled to write it. Handing the
+     // frame to the client before that work finishes keeps it ahead of the window server's deadline for the next refresh.
+@@ -1295,8 +1459,12 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
+         return false;
+ 
+     auto composited_context_resolver = resolver_for(context_id);
++    auto repaints_released_rasters = context->raster_cache().was_released_since_last_paint();
+     if (auto scrollbar_fade_frame = context->paint_screenshot(*m_display_list_player, target_bitmap, &composited_context_resolver); scrollbar_fade_frame.has_value())
+         schedule_present_frame(context_id, *context, *scrollbar_fade_frame);
++    if (idle_memory_release_is_logged())
++        dbgln("COMPOSITOR-SCREENSHOT context={} after_release={}", context_id, repaints_released_rasters);
++    schedule_idle_memory_release_for(*context);
+     return true;
+ }
+ 
+diff --git a/Services/Compositor/CompositorState.h b/Services/Compositor/CompositorState.h
+index 838cdf5ca86eb0cdb54c5dfeba59b58f4d795929..475c1b9278c9a892c61c39afcbb323af78f81313 100644
+--- a/Services/Compositor/CompositorState.h
++++ b/Services/Compositor/CompositorState.h
+@@ -33,6 +33,7 @@
+ #include <LibMedia/Sinks/DisplayingVideoSink.h>
+ #include <LibMedia/VideoSinkHandle.h>
+ #include <LibMediaCodecs/VideoFramePool.h>
++#include <LibThreading/Forward.h>
+ 
+ namespace Compositor {
+ 
+@@ -279,6 +280,10 @@ private:
+     void cancel_pending_async_presents_for_context(Web::CompositorContextId);
+     void schedule_gpu_completion_check();
+     void check_gpu_completions();
++    void schedule_idle_memory_release(MonotonicTime);
++    void schedule_idle_memory_release_for(ContextState const&);
++    void release_idle_memory();
++    void release_free_pages();
+ 
+     HashMap<Web::CompositorContextId, OwnPtr<ContextState>> m_contexts;
+ 
+@@ -288,6 +293,11 @@ private:
+     OwnPtr<DisplayListPlayerSkia> m_display_list_player;
+     HashMap<Optional<u64>, OwnPtr<VSyncScheduler>> m_vsync_schedulers_by_display;
+     RefPtr<Core::Timer> m_gpu_completion_timer;
++    RefPtr<Core::Timer> m_idle_memory_release_timer;
++    MonotonicTime m_idle_memory_release_time;
++    Optional<MonotonicTime> m_last_free_page_release_time;
++    bool m_free_page_release_is_pending { false };
++    RefPtr<Threading::Thread> m_heap_trim_thread;
+ 
+     HashMap<CompositorStateClient*, PresentationCapabilities> m_presentations;
+     HashMap<Web::CompositorContextId, CompositorStateClient*> m_context_presentations;
+diff --git a/Services/Compositor/ContextState.h b/Services/Compositor/ContextState.h
+index ce65b46ea8808a23481ef567d6b6532d7e7290c1..fab518be6a62121ba08aebbfb224446feb90820e 100644
+--- a/Services/Compositor/ContextState.h
++++ b/Services/Compositor/ContextState.h
+@@ -145,6 +145,7 @@ public:
+     Optional<Web::CompositorContextId> parent_context_id() const { return m_parent_context_id; }
+     ContextPresenter& presenter() { return m_presenter; }
+     ContextPresenter const& presenter() const { return m_presenter; }
++    DisplayListRasterCache& raster_cache() { return m_scene.raster_cache(); }
+ 
+     void apply_display_list_resource_transaction(Compositing::DisplayListResourceTransaction&&);
+     void install_display_list_update(
+diff --git a/Services/Compositor/DisplayListPlayerSkia.cpp b/Services/Compositor/DisplayListPlayerSkia.cpp
+index f36dc7a8901e662b30cf99d4db594ea3fb3fc10a..c32410784afd9a6f602a506664e2b6d67970f0da 100644
+--- a/Services/Compositor/DisplayListPlayerSkia.cpp
++++ b/Services/Compositor/DisplayListPlayerSkia.cpp
+@@ -75,6 +75,7 @@ void DisplayListPlayerSkia::execute(
+     TemporaryChange composited_context_resolver_change { m_composited_context_resolver, composited_context_resolver };
+     TemporaryChange scrollbar_controller_change { m_scrollbar_controller, scrollbar_controller };
+     raster_cache.drop_clip_paths_not_used_since_last_frame();
++    raster_cache.did_paint();
+     TemporaryChange raster_cache_change { m_raster_cache, &raster_cache };
+     DisplayListPlayer::execute(
+         display_list,
+diff --git a/Services/Compositor/DisplayListRasterCache.cpp b/Services/Compositor/DisplayListRasterCache.cpp
+index f7413350983bf1c68ff0adb4d8f9f5e2d608a05b..7746e61f8f4efe45c3764c62d83491e8f7b77ecd 100644
+--- a/Services/Compositor/DisplayListRasterCache.cpp
++++ b/Services/Compositor/DisplayListRasterCache.cpp
+@@ -165,6 +165,39 @@ struct DisplayListRasterCache::ClipPath {
+ DisplayListRasterCache::DisplayListRasterCache() = default;
+ DisplayListRasterCache::~DisplayListRasterCache() = default;
+ 
++bool DisplayListRasterCache::has_cached_rasters(KeepTextBlobs keep_text_blobs) const
++{
++    if (!m_repeated_tile_rasters.is_empty() || !m_nested_display_list_rasters.is_empty())
++        return true;
++    return keep_text_blobs == KeepTextBlobs::No && (!m_text_blobs.is_empty() || !m_clip_paths.is_empty() || !m_clip_paths_from_last_frame.is_empty());
++}
++
++DisplayListRasterCache::ReleasedBytes DisplayListRasterCache::release_cached_rasters(KeepTextBlobs keep_text_blobs)
++{
++    ReleasedBytes released_bytes;
++    released_bytes.repeated_tiles = m_repeated_tile_raster_bytes;
++    m_repeated_tile_rasters.clear();
++    m_repeated_tile_raster_bytes = 0;
++    for (auto const& it : m_nested_display_list_rasters)
++        released_bytes.nested_display_lists += it.value->total_byte_size();
++    m_nested_display_list_rasters.clear();
++    if (keep_text_blobs == KeepTextBlobs::No) {
++        released_bytes.text_blobs = m_text_blob_cache_bytes;
++        m_text_blobs.clear();
++        m_text_blob_cache_bytes = 0;
++        m_clip_paths.clear();
++        m_clip_paths_from_last_frame.clear();
++    }
++    m_was_released_since_last_paint = true;
++    return released_bytes;
++}
++
++void DisplayListRasterCache::did_paint()
++{
++    m_last_painted = MonotonicTime::now();
++    m_was_released_since_last_paint = false;
++}
++
+ void DisplayListRasterCache::evict(DisplayListResourceSet const& removed_resources)
+ {
+     // Filters retain images resolved from this storage, including resources whose IDs were replaced.
+diff --git a/Services/Compositor/DisplayListRasterCache.h b/Services/Compositor/DisplayListRasterCache.h
+index 9a3d7984ddde357f36eba2b449534639b09a143d..c2e14b5c96c6b25e5fed953a218ed8c64c7082f3 100644
+--- a/Services/Compositor/DisplayListRasterCache.h
++++ b/Services/Compositor/DisplayListRasterCache.h
+@@ -75,6 +75,28 @@ public:
+     // Drops everything made from these resources, which the storage removed or replaced.
+     void evict(Compositing::DisplayListResourceSet const& removed_resources);
+ 
++    enum class KeepTextBlobs : u8 {
++        No,
++        Yes,
++    };
++    struct ReleasedBytes {
++        size_t repeated_tiles { 0 };
++        size_t nested_display_lists { 0 };
++        size_t text_blobs { 0 };
++
++        size_t total() const { return repeated_tiles + nested_display_lists + text_blobs; }
++    };
++    // Whether there are rasters for release_cached_rasters() to drop.
++    bool has_cached_rasters(KeepTextBlobs) const;
++    // Drops the rasters, and the text blobs unless asked to keep them, that a later frame can make again from the
++    // display list and its resources.
++    ReleasedBytes release_cached_rasters(KeepTextBlobs);
++
++    // Called whenever a frame or a screenshot is painted with this cache.
++    void did_paint();
++    MonotonicTime last_painted() const { return m_last_painted; }
++    bool was_released_since_last_paint() const { return m_was_released_since_last_paint; }
++
+     sk_sp<SkImage> image_for_image_frame(Compositing::DisplayListResourceStorage const&, Compositing::ImageFrameResourceId, RefPtr<Gfx::SkiaBackendContext> const&);
+     // The image can be larger than the frame, whose visible size is the part of it to draw.
+     sk_sp<SkImage> image_for_video_sink(Compositing::DisplayListResourceStorage const&, Compositing::VideoSinkResourceId, RefPtr<Gfx::SkiaBackendContext> const&, Gfx::IntSize& visible_size);
+@@ -117,6 +139,8 @@ private:
+     MonotonicTime m_text_blob_cache_sweep_time { MonotonicTime::now() };
+     HashMap<u64, NonnullOwnPtr<ClipPath>> m_clip_paths;
+     HashMap<u64, NonnullOwnPtr<ClipPath>> m_clip_paths_from_last_frame;
++    MonotonicTime m_last_painted { MonotonicTime::now() };
++    bool m_was_released_since_last_paint { false };
+ };
+ 
+ }
+diff --git a/Services/Compositor/SkiaBackendContext.cpp b/Services/Compositor/SkiaBackendContext.cpp
+index 428973bdd8b197c622d9455f32db5f00a23edfcb..d00edbc0397905ea333bd659504b4b59f1b2729c 100644
+--- a/Services/Compositor/SkiaBackendContext.cpp
++++ b/Services/Compositor/SkiaBackendContext.cpp
+@@ -139,6 +139,14 @@ size_t SkiaBackendContext::resource_cache_bytes() const
+     return bytes;
+ }
+ 
++void SkiaBackendContext::purge_unlocked_scratch_resources()
++{
++    // A texture that nothing refers to any more stays in the resource cache for reuse, and only a flush trims the
++    // cache, so a context with nothing to draw would keep it until its next frame.
++    if (auto* context = sk_context())
++        context->purgeUnlockedResources(GrPurgeResourceOptions::kScratchResourcesOnly);
++}
++
+ void SkiaBackendContext::initialize_gpu_backend()
+ {
+     VERIFY(!main_thread_context());
+diff --git a/Services/Compositor/SkiaBackendContext.h b/Services/Compositor/SkiaBackendContext.h
+index 806529ba1dadf8357234820f1a999c56739fc45a..95814ffb162ae4efe6db837f3d88b40f1fd5f95c 100644
+--- a/Services/Compositor/SkiaBackendContext.h
++++ b/Services/Compositor/SkiaBackendContext.h
+@@ -60,6 +60,7 @@ public:
+     void flush_and_submit_async(PaintingSurface&, Function<void()>&&);
+     void check_async_work_completion();
+     size_t resource_cache_bytes() const;
++    void purge_unlocked_scratch_resources();
+     virtual GrDirectContext* sk_context() const = 0;
+ 
+     virtual MetalContext& metal_context() = 0;
