@@ -481,6 +481,9 @@ target_include_directories(TestXenonAllocatorRelease BEFORE PRIVATE ${XENON_SOUR
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestUserAgent.cpp" Xenon NAME TestXenonUserAgent LIBS LibWebView)
 target_include_directories(TestXenonUserAgent BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestContentBlockerMemory.cpp" Xenon NAME TestXenonContentBlockerMemory LIBS LibWebView LibWeb LibURL)
+target_include_directories(TestXenonContentBlockerMemory BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
 # The blocking popover, drawn without a window. With XENON_SCREENSHOT_DIR set, it saves how it looks there.
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBlockingPopover.cpp" Xenon NAME TestXenonBlockingPopover LIBS LibCore LibURL)
 target_sources(TestXenonBlockingPopover PRIVATE
