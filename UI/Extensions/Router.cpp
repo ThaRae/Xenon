@@ -1315,7 +1315,7 @@ void Router::open_port(Context& opener, String const& port_id, String const& nam
     if (m_ports.contains(port_id))
         return;
 
-    Port port { .extension_id = opener.extension->id(), .opener = opener.endpoint, .awaiting = {}, .receivers = {}, .early_messages = {} };
+    Port port { .extension_id = opener.extension->id(), .opener = opener.endpoint, .awaiting = {}, .receivers = {}, .early_messages = {}, .native = {} };
 
     JsonObject connect;
     connect.set("type"sv, "connect"sv);
