@@ -237,7 +237,7 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
 def enable_ladybird_tests(build_dir: Path):
     if cmake_cache_value(build_dir, "BUILD_TESTING") == "ON":
         return
-    run_command(["cmake", "-B", build_dir, "-DBUILD_TESTING=ON"])
+    run_command(["cmake", "-S", LADYBIRD_SOURCE_DIR, "-B", build_dir, "-DBUILD_TESTING=ON"])
 
 
 def cmake_cache_value(build_dir: Path, name: str) -> str | None:
