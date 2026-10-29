@@ -1,0 +1,123 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 08:53:46 -0400
+Subject: [PATCH] LibMediaClient+AudioServer: Retire idle media servers on
+ their own
+
+A renderer gave its MediaServer up 30 s after it last held a media stream,
+playback session, or decode request, which is longer than the 25 s a page
+sits idle in the memory measurement; 15 s covers a pause between two
+playback requests just as well.
+
+The AudioServer only ever exited when the Browser dropped its control
+connection, which the Browser held for the whole renderer's life, so a
+page that had finished with audio kept one forever. It now exits 15 s
+after its last client connection goes, and the Browser launches a new
+one when a renderer next asks for a client.
+
+Neither helper starts for a page without media, and a playing or paused
+media element keeps its session, so nothing a page is using is retired.
+---
+ Libraries/LibMediaClient/Client.cpp |  4 +++-
+ Services/AudioServer/Tabs.cpp       | 21 +++++++++++++++++++++
+ Services/AudioServer/Tabs.h         |  5 +++++
+ 3 files changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/Libraries/LibMediaClient/Client.cpp b/Libraries/LibMediaClient/Client.cpp
+index e57a7113283fed6a2ddcc292671031f7f854772e..47d69519229e8741c89b7d969e53d2a608dcf84b 100644
+--- a/Libraries/LibMediaClient/Client.cpp
++++ b/Libraries/LibMediaClient/Client.cpp
+@@ -13,7 +13,9 @@
+ 
+ namespace MediaClient {
+ 
+-static constexpr int IDLE_EXIT_DELAY_MS = 30'000;
++// A renderer with no media session, stream, or decode request for this long gives up its MediaServer, which
++// exits with it; the next use launches a new one.
++static constexpr int IDLE_EXIT_DELAY_MS = 15'000;
+ 
+ static NeverDestroyed<Client::TransportFactory> s_transport_factory;
+ static NeverDestroyed<RefPtr<Client>> s_client;
+diff --git a/Services/AudioServer/Tabs.cpp b/Services/AudioServer/Tabs.cpp
+index 97b05ff0bc14059e384bcdf5d12f59e476889d14..8051f401b3f985ccc05516820e366472177e74d5 100644
+--- a/Services/AudioServer/Tabs.cpp
++++ b/Services/AudioServer/Tabs.cpp
+@@ -13,6 +13,8 @@
+ #include <LibAudio/PlaybackStream.h>
+ #include <LibAudio/RecordStream.h>
+ #include <LibCore/EventLoop.h>
++#include <LibCore/Process.h>
++#include <LibCore/Timer.h>
+ #include <LibIPC/Transport.h>
+ 
+ namespace AudioServer {
+@@ -20,6 +22,8 @@ namespace AudioServer {
+ // The device never underruns, since the mix is silence where no client has frames, so its own buffer can stay well
+ // below the lookahead the clients keep in their rings.
+ static constexpr u32 DEVICE_TARGET_LATENCY_MS = 40;
++// No client for this long after the last one went: the renderer is not playing anything.
++static constexpr int IDLE_EXIT_DELAY_MS = 15'000;
+ 
+ Tabs& Tabs::the()
+ {
+@@ -93,6 +97,9 @@ Audio::CaptureDevices& Tabs::capture_devices()
+ 
+ ErrorOr<IPC::TransportHandle> Tabs::connect_client(u64 tab_id)
+ {
++    if (m_idle_exit_timer)
++        m_idle_exit_timer->stop();
++
+     auto paired_transports = TRY(IPC::Transport::create_paired());
+     auto handle = move(paired_transports.remote_handle);
+ 
+@@ -151,6 +158,20 @@ void Tabs::connection_died(u64 tab_id, int client_id)
+     tab->connections.remove(client_id);
+     if (tab->connections.is_empty())
+         m_tabs.remove(tab_id);
++    if (m_tabs.is_empty())
++        schedule_idle_exit();
++}
++
++void Tabs::schedule_idle_exit()
++{
++    if (!m_idle_exit_timer) {
++        m_idle_exit_timer = Core::Timer::create_single_shot(AK::Duration::from_milliseconds(IDLE_EXIT_DELAY_MS), [] {
++            if (!Tabs::the().m_tabs.is_empty())
++                return;
++            Core::Process::terminate_immediately(0);
++        });
++    }
++    m_idle_exit_timer->restart();
+ }
+ 
+ }
+diff --git a/Services/AudioServer/Tabs.h b/Services/AudioServer/Tabs.h
+index 6b6b45370b5b482eb33ac70e5cfdbe26b3e85fa3..7a935a73c1016ceea5fd15138f1b3b219c0a1c7d 100644
+--- a/Services/AudioServer/Tabs.h
++++ b/Services/AudioServer/Tabs.h
+@@ -17,6 +17,7 @@
+ #include <AudioServer/PlaybackStreamMixer.h>
+ #include <AudioServer/ServerConnection.h>
+ #include <LibAudio/AudioOutput.h>
++#include <LibCore/Forward.h>
+ #include <LibIPC/TransportHandle.h>
+ 
+ namespace AudioServer {
+@@ -48,6 +49,9 @@ private:
+     };
+ 
+     Tab& tab_for(u64 tab_id);
++    // The server exists for the renderers it serves, so with no client left for a while it exits by itself and
++    // the Browser launches a new one when a renderer next asks for a client.
++    void schedule_idle_exit();
+     Audio::CaptureDevices& capture_devices();
+     void connection_died(u64 tab_id, int client_id);
+     void request_capture_permission(u64 tab_id, ByteString const& device_id, Function<void(bool)> on_decided);
+@@ -58,6 +62,7 @@ private:
+     int m_next_client_id { 1 };
+     Audio::AudioOutput m_audio_output { Audio::AudioOutput::Platform };
+ 
++    RefPtr<Core::Timer> m_idle_exit_timer;
+     WeakPtr<ControlConnection> m_control_connection;
+     HashMap<u64, Function<void(bool)>> m_pending_capture_decisions;
+     u64 m_next_capture_request_id { 1 };

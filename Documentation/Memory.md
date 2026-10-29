@@ -20,10 +20,13 @@ From a Xenon checkout with the `ladybird` submodule initialized:
 ./Meta/measure.py browsers --xenon Build/release/bin/Xenon.app
 ./Meta/measure.py browsers --xenon Build/release/xenon/bin/Xenon --chrome /usr/bin/google-chrome --no-remote
 
-# Speedometer 3.1 / JetStream 2.2 / MotionMark 1.3.1. URLs pass startAutomatically; headless text
-# dumps after --seconds (default 900) via --screenshot-delay so the JSON includes a numeric suite score.
+# Speedometer 3.1 / JetStream 2.2 / MotionMark 1.3.1. Speedometer starts from its URL and JetStream from
+# ?report=true; MotionMark has no URL-driven start, so bench serves Meta/motionmark-autostart.html in place of the
+# suite's document through --resource-map and forces CPU painting. Headless text dumps after --seconds (default
+# 900) so the JSON includes a numeric suite score; --suite narrows the run and --dump-dir keeps the full text.
 ./Meta/measure.py bench --xenon Build/release/bin/Xenon.app
 ./Meta/measure.py bench --xenon Build/release/xenon/bin/Xenon --seconds 900
+./Meta/measure.py bench --xenon Build/release/xenon/bin/Xenon --suite motionmark --seconds 600
 
 # Linux smaps parsing, no Xenon needed:
 ./Meta/measure.py self-test
@@ -92,6 +95,10 @@ on this box scored 7.24.
 | 4 | Skip spare WebContent | Xenon does not pre-warm an idle WebContent process | Linux PSS: local 644→439, github 1212→1161, youtube 2496→2152, x.com 1413→1290 (WC count −1) | keep | `UI/Application.cpp` + `LibWebView` option (`0041`) |
 | 5 | Decommit after load | GC + `ak_kmalloc_decommit_free_pages` 4s after load finish | Folded into the PSS numbers above; `TestXenonAllocatorRelease` drives the shipped decommit | keep | `WebContent` + `AK` in `0041` |
 | 6 | Blocker verdict cache | Cache 1024 request checks; skip data:/blob:/about: | Crate: 0 mismatches on 1,818,984 requests | keep | ContentBlocker Rust in `0041` |
+| 7 | Idle media servers | A MediaServer is given up 15 s after the renderer last used it (it was 30 s, which the 25 s sample never reached), and an AudioServer exits 15 s after its last client; the Browser relaunches either on demand | x.com keeps no MediaServer at the 25 s sample, where it cost 24 MiB PSS in both baseline arms, and the AudioServer a playback session used goes with it; no page starts one without media (`check_media_server_lifecycle`). youtube still holds one while its player keeps a session, and its ±300 MiB run-to-run spread hides its 20–100 MiB media stack | keep | `LibMediaClient` + `AudioServer` only, no new IPC; needs the Browser to keep launching helpers on demand |
+| 7 | Lazy ImageDecoder | A WebContent process starts an ImageDecoder on the first decode and drops it after 15 s idle | github −66 MiB PSS (decoder heap), x.com −22 MiB, local RSS −46 with two processes gone; youtube variance-limited. `check_image_decoder_lifecycle` | keep | `RemoteImageCodecPlugin` + `HelperProcess` (`0043`) |
+| 8 | screenshot-delay dump type | Capture `PageInfoType` by value in the delayed headless-text timer | 22 MiB mixed dumps became ~700 B inner text; BrowserBench scores parse again | keep | `LibWebView` `Application.cpp` (`0042`) |
+| 9 | Idle media servers | A MediaServer is given up 15 s after the renderer last used it, and an AudioServer exits 15 s after its last client; the Browser relaunches either on demand | x.com keeps no MediaServer at the 25 s sample, where it cost 24 MiB PSS in both baseline arms; no page starts one without media (`check_media_server_lifecycle`) | keep | `LibMediaClient` + `AudioServer` (`0044`) |
 
 Reverted: none. LTO/PGO, a process cap, a shared mmap'd engine, and dropping YouTube scriptlets were considered and
 left alone: the first two need a full build and a BrowserBench score to judge, sharing the engine needs an adblock-rust
