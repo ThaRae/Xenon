@@ -45,6 +45,10 @@ bool tab_hibernation_enabled();
 void set_tab_hibernation_enabled(bool);
 AK::Duration tab_hibernation_timeout();
 void set_tab_hibernation_timeout(AK::Duration);
+// Chromium's Memory Saver also discards background tabs when the machine is short of memory. On by default whenever
+// hibernation itself is on.
+bool hibernate_on_memory_pressure();
+void set_hibernate_on_memory_pressure(bool);
 
 // Whether holding a tab dragged over the left or right edge of a page opens it in a split view beside the page, like
 // Helium's "Allow split view drag and drop". On by default.

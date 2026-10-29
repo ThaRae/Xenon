@@ -166,6 +166,7 @@ verticalTabsExpandOnHover.addEventListener("change", () =>
 const cycleTabs = document.querySelector("#cycle-tabs-in-recently-used-order");
 const hibernationEnabled = document.querySelector("#tab-hibernation-enabled");
 const hibernationTimeout = document.querySelector("#tab-hibernation-timeout");
+const hibernationOnMemoryPressure = document.querySelector("#tab-hibernation-on-memory-pressure");
 const splitViewDragAndDrop = document.querySelector("#split-view-drag-and-drop");
 
 function describeTimeout(seconds) {
@@ -178,8 +179,9 @@ function renderTabs() {
     cycleTabs.checked = XENON.cycleTabsInRecentlyUsedOrder;
     splitViewDragAndDrop.checked = XENON.splitViewDragAndDrop;
 
-    const { enabled, timeoutSeconds, timeoutChoices } = XENON.tabHibernation;
+    const { enabled, timeoutSeconds, timeoutChoices, onMemoryPressure } = XENON.tabHibernation;
     hibernationEnabled.checked = enabled;
+    hibernationOnMemoryPressure.checked = onMemoryPressure;
 
     // A timeout set some other way, like a short one for testing, shows as a choice of its own.
     const choices = timeoutChoices.includes(timeoutSeconds) ? timeoutChoices : [...timeoutChoices, timeoutSeconds];
@@ -195,6 +197,7 @@ function renderTabs() {
     );
     hibernationTimeout.value = timeoutSeconds;
     hibernationTimeout.disabled = !enabled;
+    hibernationOnMemoryPressure.disabled = !enabled;
 
     for (const control of [cycleTabs, hibernationEnabled, splitViewDragAndDrop]) control.disabled = false;
 }
@@ -204,10 +207,14 @@ cycleTabs.addEventListener("change", () =>
 );
 hibernationEnabled.addEventListener("change", () => {
     hibernationTimeout.disabled = !hibernationEnabled.checked;
+    hibernationOnMemoryPressure.disabled = !hibernationEnabled.checked;
     ladybird.sendMessage("xenon/setTabHibernation", { enabled: hibernationEnabled.checked });
 });
 hibernationTimeout.addEventListener("change", () =>
     ladybird.sendMessage("xenon/setTabHibernation", { timeoutSeconds: Number(hibernationTimeout.value) })
+);
+hibernationOnMemoryPressure.addEventListener("change", () =>
+    ladybird.sendMessage("xenon/setTabHibernation", { onMemoryPressure: hibernationOnMemoryPressure.checked })
 );
 splitViewDragAndDrop.addEventListener("change", () =>
     ladybird.sendMessage("xenon/setSplitViewDragAndDrop", splitViewDragAndDrop.checked)

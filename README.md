@@ -14,7 +14,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 - Split view: two tabs side by side in one window
 - Tab groups, with names and colors, that collapse
 - <kbd>Ctrl</kbd><kbd>Tab</kbd> switches tabs in the order you last used them
-- Tabs you haven't used in a while hibernate to free memory, and come back when you select them
+- Tabs you haven't used in a while hibernate to free memory, including when the machine is short of memory, and come back when you select them
 - Hover a tab to see how much memory it uses
 
 **Search**

@@ -287,6 +287,7 @@ private:
         tab_hibernation.set("enabled"sv, XenonSettings::tab_hibernation_enabled());
         tab_hibernation.set("timeoutSeconds"sv, XenonSettings::tab_hibernation_timeout().to_seconds());
         tab_hibernation.set("timeoutChoices"sv, move(timeout_choices));
+        tab_hibernation.set("onMemoryPressure"sv, XenonSettings::hibernate_on_memory_pressure());
         settings.set("tabHibernation"sv, move(tab_hibernation));
 
         JsonObject bangs;
@@ -358,6 +359,8 @@ void register_interfaces(WebView::WebUI& web_ui)
             XenonSettings::set_tab_hibernation_timeout(AK::Duration::from_seconds(*timeout));
         if (auto enabled = object.get_bool("enabled"sv); enabled.has_value())
             XenonSettings::set_tab_hibernation_enabled(*enabled);
+        if (auto on_memory_pressure = object.get_bool("onMemoryPressure"sv); on_memory_pressure.has_value())
+            XenonSettings::set_hibernate_on_memory_pressure(*on_memory_pressure);
     });
 
     web_ui.register_interface("xenon/setSplitViewDragAndDrop"sv, [](auto const& data) {

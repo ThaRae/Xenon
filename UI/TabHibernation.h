@@ -22,8 +22,9 @@ class Tab;
 }
 
 // Tab hibernation, Xenon's take on Chromium's Memory Saver: a background tab left unused for the timeout in XenonSettings
-// gives up its view, and with it its WebContent process. It keeps its title, favicon, URL, and session history, its
-// scroll position included, and loads again when it's selected.
+// gives up its view, and with it its WebContent process. It also hibernates when the machine is short of memory
+// (UI/MemoryPressure.cpp), the way Memory Saver does, unless that is turned off. It keeps its title, favicon, URL, and
+// session history, its scroll position included, and loads again when it's selected.
 namespace Ladybird::TabHibernation {
 
 // Starts checking every window's tabs, as XenonSettings says to.

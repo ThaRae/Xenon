@@ -1,0 +1,36 @@
+# content-blocker crate, Linux cloud agent, 2026-10-28
+# ./Meta/ci/memory-measurement/target/release/measure UI/Resources/filter-lists
+# RSS, mimalloc. Process baseline 5.6 MiB. "kept" is RSS after building minus baseline.
+
+Process baseline: 5.6 MiB (current), 5.6 MiB (peak)
+
+scenario	mode	text (MiB)	build (ms)	peak while building (MiB)	kept after building (MiB)	serialized (MiB)
+Xenon: all bundled lists and resources	webcontent	26.1	501	116.3	35.3	
+Xenon: all bundled lists and resources	adblock only		350	104.5	42.7	30.4
+Xenon without urlhaus-1	webcontent	15.1	388	122.5	33.7	
+Xenon without urlhaus-1	adblock only		241	94.6	27.5	17.0
+EasyList + EasyPrivacy only	webcontent	3.3	101	58.6	16.0	
+EasyList + EasyPrivacy only	adblock only		68	58.2	12.8	5.6
+lists/adguard-cookies.txt	webcontent	1.2	39	32.4	11.4	
+lists/adguard-generic.txt	webcontent	5.3	122	64.4	16.1	
+lists/adguard-spyware-url.txt	webcontent	0.1	4	20.2	8.2	
+lists/easylist-newsletters.txt	webcontent	0.3	10	30.4	8.1	
+lists/easylist-notifications.txt	webcontent	0.1	4	16.7	9.8	
+lists/easylist.txt	webcontent	1.9	64	48.3	14.3	
+lists/easyprivacy.txt	webcontent	1.4	38	44.3	9.8	
+lists/fanboy-cookiemonster.txt	webcontent	1.1	33	36.4	8.3	
+lists/urlhaus-1.txt	webcontent	11.0	34	8.8	4.4	
+trusted-lists/ublock-annoyances.txt	webcontent	0.7	8	26.7	9.8	
+trusted-lists/ublock-badware.txt	webcontent	0.6	5	16.5	10.8	
+trusted-lists/ublock-cookies-easylist.txt	webcontent	0.7	5	14.8	11.6	
+trusted-lists/ublock-filters.txt	webcontent	2.7	54	50.4	11.3	
+trusted-lists/ublock-privacy.txt	webcontent	0.6	4	16.6	10.1	
+trusted-lists/ublock-quick-fixes.txt	webcontent	0.5	2	10.5	6.9	
+trusted-lists/ublock-unbreak.txt	webcontent	0.6	6	18.6	11.2	
+Xenon: all bundled lists	deserialized	30.4	65	43.5	33.3	
+
+https://www.youtube.com/: 30 hiding selectors, 2 procedural filters, scriptlets 97086 bytes
+https://github.com/LadybirdBrowser/ladybird: 5 hiding selectors, scriptlets 10658 bytes
+https://x.com/: 38 hiding selectors, 9 procedural filters, scriptlets 47093 bytes
+
+Verified 1818984 requests to 606328 URLs (413969 blocked): 0 mismatches

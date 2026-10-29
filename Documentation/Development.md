@@ -80,7 +80,13 @@ ninja -C Build/release xenon     # an incremental rebuild once configured
 ./Meta/check.py --fix      # apply the formatters first
 ./Meta/xenon.py test       # unit tests, and Xenon run against local test pages
 git config core.hooksPath .githooks   # run Meta/check.py before every push
+./Meta/measure.py self-test            # RSS/PSS sampling, no Xenon build
+./Meta/measure.py content-blocker      # filter-list engine memory, after Patches/ladybird
 ```
+
+Memory and BrowserBench measurements for issue #28 live in `Meta/measure.py`, with the filter-list crate in
+`Meta/ci/memory-measurement/`. [Memory.md](Memory.md) has the commands, the Xenon-versus-upstream finding, and the
+experiment table.
 
 `Meta/check.py` formats C++ with clang-format, web pages with prettier, and Python with ruff, at the versions
 Ladybird's CI uses, read from the submodule. It installs clang-format, ruff, and PyYAML into `Build/tools` itself;

@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Wed, 28 Oct 2026 23:41:44 +0000
+Subject: [PATCH] WebContent: Collect the JS heap when a page is hidden
+
+A background tab's heap and mimalloc pages otherwise sit until the next
+opportunistic GC. Collect once when the UI hides the page, and give unused
+allocator pages back, the way we already do after building the content
+blocker.
+---
+ Services/WebContent/ConnectionFromClient.cpp | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 97c28c1a959095d15c85e860a304c060aee12918..f0140a523314ccd8115d065fe7fbd775946a352d 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -13,6 +13,7 @@
+ #include <AK/JsonArray.h>
+ #include <AK/JsonObject.h>
+ #include <AK/Math.h>
++#include <AK/kmalloc.h>
+ #include <AK/OwnPtr.h>
+ #include <AK/QuickSort.h>
+ #include <AK/Utf16FlyString.h>
+@@ -3437,6 +3438,16 @@ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web:
+ {
+     if (auto page = this->page(page_id); page.has_value())
+         page->page().set_system_visibility_state(system_visibility_state);
++
++    // A background tab's JS heap and mimalloc pages otherwise sit until the next opportunistic GC. Collect once when
++    // the UI hides the page, and give the allocator's unused pages back, the way we do after building the content
++    // blocker.
++    if (system_visibility_state == Web::HTML::VisibilityState::Hidden) {
++        Core::deferred_invoke([] {
++            Web::Bindings::main_thread_vm().heap().collect_garbage(GC::Heap::CollectionType::CollectGarbage, false);
++            ak_kmalloc_collect();
++        });
++    }
+ }
+ 
+ void ConnectionFromClient::set_browsing_context_group(Web::PageId page_id, u64 browsing_context_group_id)

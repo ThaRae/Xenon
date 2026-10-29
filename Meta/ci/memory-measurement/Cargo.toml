@@ -1,0 +1,35 @@
+# Measures the memory each WebContent process spends on the content blocker (issue #28). Builds Ladybird's
+# content blocker crate, as Xenon's patches leave it, against mimalloc, and loads Xenon's lists into it.
+#
+#   cargo build --release --manifest-path Meta/ci/memory-measurement/Cargo.toml
+#   Meta/ci/memory-measurement/target/release/measure UI/Resources/filter-lists
+#
+# Meta/measure.py content-blocker applies the patches and runs this.
+[package]
+name = "content-blocker-memory"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "libweb_content_blocker_rust"
+path = "../../../ladybird/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "measure"
+path = "measure.rs"
+
+[dependencies]
+ak = { path = "../../../ladybird/AK/Rust" }
+adblock = { version = "=0.13.3", features = ["css-validation"] }
+libc = "0.2"
+mimalloc = { version = "0.1", features = ["secure"] }
+rustc-demangle = "0.1"
+serde_json = "1.0"
+
+[features]
+# The crate's lib.rs is cfg'd on this when Ladybird links it; the measurement binary uses mimalloc instead.
+allocator = []
+
+[profile.release]
+debug = false

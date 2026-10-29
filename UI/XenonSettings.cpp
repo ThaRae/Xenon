@@ -119,6 +119,19 @@ void set_tab_hibernation_timeout(AK::Duration timeout)
     notify_observers();
 }
 
+static constexpr auto TAB_HIBERNATION_ON_MEMORY_PRESSURE_KEY = "tabs/hibernateOnMemoryPressure";
+
+bool hibernate_on_memory_pressure()
+{
+    return settings().value(TAB_HIBERNATION_ON_MEMORY_PRESSURE_KEY, true).toBool();
+}
+
+void set_hibernate_on_memory_pressure(bool enabled)
+{
+    settings().setValue(TAB_HIBERNATION_ON_MEMORY_PRESSURE_KEY, enabled);
+    notify_observers();
+}
+
 bool cycle_tabs_in_recently_used_order()
 {
     return settings().value(RECENTLY_USED_TAB_ORDER_KEY, true).toBool();
