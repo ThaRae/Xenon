@@ -303,6 +303,30 @@ else()
 endif()
 add_dependencies(xenon ${ladybird_helper_processes})
 
+# Ladybird's own browser and tests, which Meta/xenon.py ladybird-test builds, look for the helper processes where
+# Ladybird's build puts them: in its bundle on macOS, in the build directory's libexec elsewhere. With tests on, they get
+# copies there too, before the bundle is signed for the last time.
+if (BUILD_TESTING)
+    if (APPLE OR WIN32)
+        set(ladybird_helper_process_dir "$<TARGET_FILE_DIR:ladybird>")
+    else()
+        set(ladybird_helper_process_dir "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBEXECDIR}")
+    endif()
+    set(ladybird_helper_process_files)
+    foreach (helper IN LISTS ladybird_helper_processes)
+        list(APPEND ladybird_helper_process_files "$<TARGET_FILE:${helper}>")
+    endforeach()
+    add_custom_target(ladybird-helper-processes ALL
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${ladybird_helper_process_dir}"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${ladybird_helper_process_files} "${ladybird_helper_process_dir}"
+        VERBATIM
+    )
+    add_dependencies(ladybird-helper-processes ladybird ${ladybird_helper_processes})
+    if (TARGET sign_ladybird_bundle)
+        add_dependencies(sign_ladybird_bundle ladybird-helper-processes)
+    endif()
+endif()
+
 # NB: Ladybird's resource lists are variables of its UI directory, which don't reach this one.
 include("${LADYBIRD_SOURCE_DIR}/UI/cmake/ResourceFiles.cmake")
 

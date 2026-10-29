@@ -391,6 +391,14 @@ def parse_browserbench_score(suite: str, text: str) -> float | None:
             # summary leaf has no suite total; the fallbacks below would return the first row's number.
             return None
     lines = visible_page_lines(text)
+    # MotionMark's results table has its own "Score" header, and the row directly under it is Multiply, not the
+    # suite total; the total is the "<n> @ 60fps" line the page prints above the table.
+    for line in lines:
+        match = re.match(r'^"?([0-9]+(?:\.[0-9]+)?)\s*@\s*60fps', line.strip())
+        if match is not None:
+            value = float(match.group(1))
+            if value > 0:
+                return value
     quoted_header_index = None
     if 'text leaf name="' not in text:
         # Layout-tree dumps quote their text fragments, so the <h1>Score</h1> fragment is a bare
@@ -1015,6 +1023,33 @@ def self_test() -> int:
     parsed = parse_browserbench_score("MotionMark 1.3.1", motion_dump)
     if parsed != 203.5:
         print(f"self-test: MotionMark parser got {parsed!r}, want 203.5", file=sys.stderr)
+        return 1
+    # The real 600 s MotionMark dump (scratch/measure-after/A4-mm-dump-2/motionmark-600s.txt): the suite total
+    # is the "<n> @ 60fps" line, while the first row under the results table's Score heading is Multiply. The
+    # parser must return the total, not 423.17.
+    motionmark_text_dump = (
+        "version 1.3.1\n"
+        "414.16 @ 60fps\n"
+        "±9.94%\n"
+        "on a medium screen (laptop, tablet)\n"
+        "Score\n"
+        "423.17\n"
+        "1394.70\n"
+        "248.52\n"
+        "Test Name\n"
+        "Multiply\n"
+        "Canvas Arcs\n"
+    )
+    parsed = parse_browserbench_score("MotionMark 1.3.1", motionmark_text_dump)
+    if parsed != 414.16:
+        print(
+            f"self-test: MotionMark text dump parser got {parsed!r}, want the 414.16 total, not a table row",
+            file=sys.stderr,
+        )
+        return 1
+    swapped_motionmark = motionmark_text_dump.replace("414.16", "410.10")
+    if parse_browserbench_score("MotionMark 1.3.1", swapped_motionmark) != 410.10:
+        print("self-test: MotionMark text parser ignored its fixture total", file=sys.stderr)
         return 1
     jetstream_summary = "JetStream 2.2\n142.7\nScore\n"
     parsed = parse_browserbench_score("JetStream 2.2", jetstream_summary)

@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Thu, 29 Oct 2026 14:11:57 -0400
+Subject: [PATCH] Tests/LibWeb: Don't expect 4 or more processors in WebKit
+ mode
+
+In WebKit mode, navigator.hardwareConcurrency is 8 on a machine with
+eight or more logical processors and 4 on the rest, but never more than
+the real count. On a machine with fewer than four, such as GitHub's
+3-core macOS runners, it is the real count, which the test took for a
+failure. Expect the exact value instead.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../Text/input/navigator-compatibility-mode-exposure.html       | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Tests/LibWeb/Text/input/navigator-compatibility-mode-exposure.html b/Tests/LibWeb/Text/input/navigator-compatibility-mode-exposure.html
+index f9c6457020a0b077c7c7522d8d0483c0a6d80c38..7275d265f38cf7406f1cdd012dae9c59fea65c1b 100644
+--- a/Tests/LibWeb/Text/input/navigator-compatibility-mode-exposure.html
++++ b/Tests/LibWeb/Text/input/navigator-compatibility-mode-exposure.html
+@@ -17,7 +17,7 @@
+                 + `buildID ${"buildID" in navigator ? navigator.buildID : "absent"}, oscpu ${"oscpu" in navigator ? `${navigator.userAgent.includes(navigator.oscpu) ? "within" : "outside"} the User-Agent` : "absent"}, `
+                 + `taintEnabled ${typeof navigator.taintEnabled}, vendor ${JSON.stringify(navigator.vendor)}, `
+                 + `hardwareConcurrency ${mode === "webkit"
+-                    ? `capped ${[4, 8].includes(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= logicalProcessors}`
++                    ? `capped ${navigator.hardwareConcurrency === Math.min(logicalProcessors, logicalProcessors < 8 ? 4 : 8)}`
+                     : `real ${navigator.hardwareConcurrency === logicalProcessors}`}`);
+             iframe.remove();
+         };
