@@ -248,6 +248,25 @@ restart. It falls back to the bundled lists if anything fails.
 The welcome flow and **Settings → Ads and trackers** turn updates off. Settings also says when the lists in use were
 made and last checked, and has **Check now**. See [FilterListUpdates.md](FilterListUpdates.md).
 
+### Fingerprinting protection
+
+Sites that fingerprint read values that differ between machines and combine them into an ID that survives clearing
+cookies. Xenon "farbles" those values the way Brave does: each site gets slightly different values, the same ones for
+the whole session, and new ones the next time Xenon starts.
+
+- Canvas: `toDataURL()`, `toBlob()`, `OffscreenCanvas.convertToBlob()`, and `getImageData()` return a copy whose
+  lowest color bit is flipped on a scattering of pixels. What's drawn on screen is untouched.
+- Web Audio: `AudioBuffer.getChannelData()`, `copyFromChannel()`, and the `AnalyserNode` getters scale samples by a
+  factor between 0.99 and 1.
+- `navigator.hardwareConcurrency` is between 4 and 8 (never above the real count), and `navigator.deviceMemory` is
+  1, 2, or 4 (never above the real amount).
+- The User-Agent and client hints are exactly those of Chrome on the same platform, without a Ladybird token.
+
+It's on by default. **Settings → Privacy and data → Fingerprinting protection** turns it off, for pages and workers
+alike. `navigator.webdriver` is false unless WebDriver is driving the browser. The code is in
+`ladybird/Libraries/LibWeb/Fingerprinting/`, carried as engine patches `0034`–`0037`. See
+[Fingerprinting.md](Fingerprinting.md).
+
 ## Password managers and extensions
 
 ### Chrome extensions

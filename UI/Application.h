@@ -133,6 +133,7 @@ private:
 
     virtual Core::EventLoop& create_platform_event_loop() override;
     virtual void create_platform_arguments(Core::ArgsParser&) override;
+    virtual void create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&) override;
     virtual void create_platform_actions() override;
 
     virtual Optional<String> ui_font_family() const override;

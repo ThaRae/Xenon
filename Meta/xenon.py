@@ -1351,10 +1351,11 @@ def check_session_restore(executable: Path, env: dict) -> bool:
                 returncode = process.wait(timeout=60) if how == signal.SIGTERM else None
             except subprocess.TimeoutExpired:
                 returncode = None
-            # A crash takes Xenon's helper processes with it, and so does a quit.
+            # A crash takes Xenon's helper processes with it, and so does a quit. macOS refuses with EPERM rather than
+            # ESRCH when all that's left of the group is zombies waiting to be reaped, which is just as gone.
             try:
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):
                 pass
             process.wait()
             return returncode
