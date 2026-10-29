@@ -21,6 +21,7 @@
 #include <UI/Extensions/Dialog.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
+#include <UI/RelaunchToUpdate.h>
 #include <UI/SettingsPage.h>
 #include <UI/StringUtils.h>
 #include <UI/TabHibernation.h>
@@ -402,7 +403,7 @@ void register_interfaces(WebView::WebUI& web_ui)
     });
 
     web_ui.register_interface("xenon/installUpdate"sv, [](auto const&) {
-        Updater::install_and_relaunch();
+        RelaunchToUpdate::relaunch(nullptr);
     });
 
     web_ui.register_interface("xenon/showExtensions"sv, [](auto const&) {

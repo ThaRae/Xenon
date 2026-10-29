@@ -91,6 +91,7 @@ set(XENON_SOURCES
     PerformanceMonitorWidget.cpp
     PictureInPictureWindow.cpp
     Popover.cpp
+    RelaunchToUpdate.cpp
     ReportReview.cpp
     ScreenshotSelectionOverlay.cpp
     ScreenshotViewer.cpp
@@ -106,6 +107,7 @@ set(XENON_SOURCES
     TabGroups.cpp
     TabHibernation.cpp
     TabMemory.cpp
+    UpdateButton.cpp
     WebAuthnPopover.cpp
     WebCompatReportReview.cpp
     WebContentView.cpp
@@ -494,4 +496,16 @@ target_sources(TestXenonBlockingPopover PRIVATE
 target_include_directories(TestXenonBlockingPopover BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonBlockingPopover PRIVATE Qt::Core Qt::Gui Qt::Widgets)
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUserAgent)
+# The toolbar's Update button and its popover, with a stand-in for the updater. With XENON_SCREENSHOT_DIR set, it saves
+# how they look there.
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestUpdateButton.cpp" Xenon NAME TestXenonUpdateButton LIBS LibCore LibURL)
+target_sources(TestXenonUpdateButton PRIVATE
+    "${XENON_UI_DIR}/ChromeStyle.cpp"
+    "${XENON_UI_DIR}/Popover.cpp"
+    "${XENON_UI_DIR}/StringUtils.cpp"
+    "${XENON_UI_DIR}/UpdateButton.cpp"
+)
+target_include_directories(TestXenonUpdateButton BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_link_libraries(TestXenonUpdateButton PRIVATE Qt::Core Qt::Gui Qt::Widgets)
+
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUpdateButton TestXenonUserAgent)
