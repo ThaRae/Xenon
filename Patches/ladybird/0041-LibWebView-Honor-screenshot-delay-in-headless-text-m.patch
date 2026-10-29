@@ -1,0 +1,125 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Thu, 29 Oct 2026 09:34:10 -0400
+Subject: [PATCH] LibWebView: Honor --screenshot-delay in headless text mode
+
+Headless text mode dumps the page's text as soon as it finishes loading,
+which is too early for a page that only has the text that's wanted well
+after its load event, such as a benchmark that starts on load and shows
+its score minutes later. When --screenshot-delay is given, wait that
+long after navigation starts and dump the text then, as headless
+screenshot mode already does.
+
+The option's default only applies to screenshot mode now, so that text
+mode can tell an explicit delay from none.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/Application.cpp | 51 +++++++++++++++++++++-------
+ Libraries/LibWebView/Options.h       |  2 +-
+ 2 files changed, 39 insertions(+), 14 deletions(-)
+
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 7125e06b82ffc334cb6a7ef38f7ffdcc2855907b..75c2ea530cde6fd62f57339fa7ca4b5814f7fc3b 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -404,7 +404,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+         },
+     });
+ 
+-    args_parser.add_option(screenshot_delay, "Set the number of seconds to wait before taking a screenshot (only supported for headless screenshot mode)", "screenshot-delay", 0, "seconds");
++    args_parser.add_option(screenshot_delay, "Set the number of seconds to wait before taking a screenshot or dumping page text (headless screenshot and text modes)", "screenshot-delay", 0, "seconds");
+     args_parser.add_option(screenshot_path, "Save screenshots to the given location (only supported for headless screenshot mode)", "screenshot-path", 0, "path");
+     args_parser.add_option(window_width, "Set viewport width in pixels (default: 800) (currently only supported for headless mode)", "window-width", 0, "pixels");
+     args_parser.add_option(window_height, "Set viewport height in pixels (default: 600) (currently only supported for headless mode)", "window-height", 0, "pixels");
+@@ -2324,26 +2324,48 @@ static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventL
+     return timer;
+ }
+ 
++static void request_page_info_and_quit(Core::EventLoop& event_loop, HeadlessWebView& view, WebView::PageInfoType type)
++{
++    view.request_internal_page_info(type)
++        ->when_resolved([&event_loop](auto const& text) {
++            outln("{}", text);
++            event_loop.quit(0);
++        })
++        .when_rejected([&event_loop](auto const& error) {
++            warnln("Unable to get page info: {}", error);
++            event_loop.quit(1);
++        });
++}
++
+ static void load_page_for_info_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, WebView::PageInfoType type)
+ {
+     view.on_load_finish = [&view, &event_loop, url, type](auto const& loaded_url) {
+         if (!url.equals(loaded_url, URL::ExcludeFragment::Yes))
+             return;
+-
+-        view.request_internal_page_info(type)
+-            ->when_resolved([&event_loop](auto const& text) {
+-                outln("{}", text);
+-                event_loop.quit(0);
+-            })
+-            .when_rejected([&event_loop](auto const& error) {
+-                warnln("Unable to get page info: {}", error);
+-                event_loop.quit(1);
+-            });
++        request_page_info_and_quit(event_loop, view, type);
+     };
+ 
+     view.load(url);
+ }
+ 
++// With --screenshot-delay, the page info is taken that many seconds after navigation starts rather than when the page
++// finishes loading, for pages that only have what is wanted long after their load event (e.g. benchmark scores).
++static NonnullRefPtr<Core::Timer> load_page_for_info_after_delay_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, WebView::PageInfoType type, u32 delay_seconds)
++{
++    // NB: The page info goes to stdout, so this goes to stderr.
++    warnln("Dumping page text after {} seconds", delay_seconds);
++
++    auto timer = Core::Timer::create_single_shot(
++        AK::Duration::from_seconds(delay_seconds),
++        [&event_loop, &view, type]() {
++            request_page_info_and_quit(event_loop, view, type);
++        });
++
++    view.load(url);
++    timer->start();
++    return timer;
++}
++
+ static void load_page_and_exit_on_close(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url)
+ {
+     view.on_close = [&event_loop]() {
+@@ -2370,13 +2392,16 @@ ErrorOr<int> Application::execute()
+ 
+             switch (*m_browser_options.headless_mode) {
+             case HeadlessMode::Screenshot:
+-                screenshot_timer = load_page_for_screenshot_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), m_browser_options.screenshot_delay);
++                screenshot_timer = load_page_for_screenshot_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), m_browser_options.screenshot_delay.value_or(1));
+                 break;
+             case HeadlessMode::LayoutTree:
+                 load_page_for_info_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::LayoutTree);
+                 break;
+             case HeadlessMode::Text:
+-                load_page_for_info_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::Text);
++                if (m_browser_options.screenshot_delay.has_value())
++                    screenshot_timer = load_page_for_info_after_delay_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::Text, *m_browser_options.screenshot_delay);
++                else
++                    load_page_for_info_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::Text);
+                 break;
+             case HeadlessMode::Manual:
+                 load_page_and_exit_on_close(*m_event_loop, *view, m_browser_options.urls.first());
+diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
+index 5951a003c89fa2e6e4cd58fbd78ea46b3909fd88..c5ac486082e9426a7649dff35c8dca36938c3fd7 100644
+--- a/Libraries/LibWebView/Options.h
++++ b/Libraries/LibWebView/Options.h
+@@ -100,7 +100,7 @@ struct BrowserOptions {
+     Vector<ByteString> raw_urls;
+     Optional<HeadlessMode> headless_mode;
+     Optional<ByteString> screenshot_path {};
+-    u32 screenshot_delay { 1 };
++    Optional<u32> screenshot_delay {};
+     int window_width { 800 };
+     int window_height { 600 };
+     NewWindow new_window { NewWindow::No };
