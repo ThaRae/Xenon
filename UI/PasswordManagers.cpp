@@ -8,6 +8,7 @@
 #include <AK/JsonObject.h>
 #include <AK/JsonValue.h>
 #include <AK/LexicalPath.h>
+#include <AK/StringBuilder.h>
 #include <LibCore/Directory.h>
 #include <LibCore/Environment.h>
 #include <LibCore/File.h>
@@ -25,8 +26,9 @@ namespace Ladybird {
 // The Chrome Web Store IDs of the extensions, which their developers' keys give them.
 static constexpr auto BITWARDEN_ID = "nngceckbapebfimnlniiiahkandclblb"sv;
 static constexpr auto PROTON_PASS_ID = "ghmbeldphafepmbegfdlkpapadhbakde"sv;
+static constexpr auto ONE_PASSWORD_ID = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"sv;
 
-// For tests, whose extensions are signed with keys of their own: "bitwarden=<id>,proton-pass=<id>".
+// For tests, whose extensions are signed with keys of their own: "bitwarden=<id>,proton-pass=<id>,1password=<id>".
 static constexpr auto EXTENSION_IDS_VARIABLE = "XENON_PASSWORD_MANAGER_IDS"sv;
 
 static constexpr auto STATE_NAME = "password-manager-updates.json"sv;
@@ -39,6 +41,21 @@ static constexpr auto TICK_INTERVAL = AK::Duration::from_seconds(10 * 60);
 // The first check waits a moment, so that its downloads don't compete with the pages the browser opens with.
 static constexpr auto FIRST_CHECK_DELAY = AK::Duration::from_seconds(5);
 
+static String offered_ids(Vector<PasswordManagers::Choice> const& choices)
+{
+    StringBuilder builder;
+    bool first = true;
+    for (auto const& choice : choices) {
+        if (!choice.available)
+            continue;
+        if (!first)
+            builder.append(", "sv);
+        first = false;
+        builder.append(choice.id);
+    }
+    return MUST(builder.to_string());
+}
+
 PasswordManagers& PasswordManagers::the()
 {
     static NeverDestroyed<PasswordManagers> password_managers;
@@ -49,6 +66,7 @@ PasswordManagers::PasswordManagers()
 {
     m_choices.append({ .id = "bitwarden"sv, .name = "Bitwarden"sv, .extension_id = MUST(String::from_utf8(BITWARDEN_ID)) });
     m_choices.append({ .id = "proton-pass"sv, .name = "Proton Pass"sv, .extension_id = MUST(String::from_utf8(PROTON_PASS_ID)) });
+    m_choices.append({ .id = "1password"sv, .name = "1Password"sv, .extension_id = MUST(String::from_utf8(ONE_PASSWORD_ID)) });
 
     if (auto ids = Core::Environment::get(EXTENSION_IDS_VARIABLE); ids.has_value()) {
         ids->for_each_split_view(',', SplitBehavior::Nothing, [&](auto pair) {
@@ -79,7 +97,7 @@ void PasswordManagers::initialize(Optional<ByteString> const& command_line_choic
         else if (choice(*command_line_choice).has_value())
             choose(command_line_choice->view());
         else
-            warnln("There's no password manager called {}; Xenon offers bitwarden and proton-pass", *command_line_choice);
+            warnln("There's no password manager called {}; Xenon offers {}", *command_line_choice, offered_ids(m_choices));
     }
 
     // The chosen password manager stays installed: one whose files are gone is installed again.
@@ -203,7 +221,10 @@ void PasswordManagers::register_web_ui_interfaces(WebView::WebUI& web_ui)
 void PasswordManagers::send_status(WebView::WebUI& web_ui) const
 {
     JsonArray choices;
+    auto current = this->current();
     for (auto const& choice : m_choices) {
+        if (!choice.available && (!current.has_value() || current->id != choice.id))
+            continue;
         JsonObject json;
         json.set("id"sv, choice.id);
         json.set("name"sv, choice.name);
@@ -218,7 +239,7 @@ void PasswordManagers::send_status(WebView::WebUI& web_ui) const
 
     JsonObject status;
     status.set("choices"sv, move(choices));
-    status.set("current"sv, id_or_null(current()));
+    status.set("current"sv, id_or_null(current));
     status.set("installing"sv, id_or_null(installing()));
     status.set("error"sv, m_error.has_value() ? JsonValue { *m_error } : JsonValue {});
     web_ui.async_send_message("passwordManagers"sv, move(status));

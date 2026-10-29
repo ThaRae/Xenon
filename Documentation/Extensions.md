@@ -229,11 +229,11 @@ for now (`UI/PasswordManagers`):
    until it's removed, which deletes its files with its storage. A new version of an extension that's running waits for
    the next start, as Chrome waits for an extension to be idle; the start after removes the old version's files.
 
-Xenon bundles neither password manager. Bitwarden's extension is GPL-3.0, with parts under the Bitwarden License,
-and Bitwarden grants no rights to its marks; Proton Pass is GPL-3.0. Fetching the developers' own store builds, at the
-user's choice, means Xenon redistributes nothing, and the page names them in plain text, with no logos. Helium
-installs them from the store too, through a proxy of its own that keeps Google from seeing which extensions a user
-installs; Xenon asks the store directly, and the welcome page says so.
+Xenon bundles none of the password managers. Bitwarden's extension is GPL-3.0, with parts under the Bitwarden License,
+and Bitwarden grants no rights to its marks; Proton Pass is GPL-3.0; 1Password is proprietary. Fetching the developers'
+own store builds, at the user's choice, means Xenon redistributes nothing, and the page names them in plain text, with
+no logos. Helium installs them from the store too, through a proxy of its own that keeps Google from seeing which
+extensions a user installs; Xenon asks the store directly, and the welcome page says so.
 
 ### Serving `chrome-extension://`
 
@@ -299,7 +299,9 @@ Xenon runs the background script the way Chrome ran MV2 background pages, with a
   it has a listener for. Each event, runtime message, port message, and call to or from the background keeps it running
   another 30 seconds, and so does a runtime message it owes a response to or waits for one on. Stopping closes the
   background page, which takes its four processes with it (WebContent, WebWorker, and an ImageDecoder for each); its
-  ports close, and its offscreen document stays open. `--extension-idle-timeout=<seconds>` changes the 30 seconds.
+  ports close, and its offscreen document stays open. The extension's RequestServer goes as soon as none of its pages
+  is left, rather than a minute later as a site's otherwise does (engine patch `0033`).
+  `--extension-idle-timeout=<seconds>` changes the 30 seconds.
 - To know what to start it for, the worker's `chrome-api.js` tells the router when one of its events gets its first
   listener or loses its last (`listening` messages); the router keeps that list while the background is stopped, as
   Chrome keeps a stopped worker's listeners. Runtime messages and ports count as `runtime.onMessage` and
@@ -438,7 +440,8 @@ for Bitwarden in Chrome.
 | Web pages messaging an extension (`externally_connectable`) | | `UI/Extensions/ContentScripts` (the page's `chrome.runtime` and a relay world per extension), `Router` (their `ExternalPage` contexts), `UI/Resources/extensions/externally-connectable.js` and `externally-connectable-relay.js` |
 | Web accessible resources as web pages' subresources | 0022 | `UI/Extensions/Registry` |
 | `chrome.scripting`, `webNavigation` frames | 0017 | `UI/Extensions/Scripting.cpp` (the `Router`'s injections, registered content scripts, and Chrome's frame IDs), `Registry` (registered scripts that persist) |
-| Background worker, offscreen documents | 0001 (workers' loads), 0032 (no content blocker) | `UI/Extensions/Registry` (their hidden views and generated files), `Router` (stopping the background when idle, and starting it for events), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
+
+| Background worker, offscreen documents | 0001 (workers' loads), 0032 (no content blocker), 0033 (no lingering RequestServer) | `UI/Extensions/Registry` (their hidden views and generated files), `Router` (stopping the background when idle, and starting it for events), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
 | Managing extensions | | `UI/Extensions/Dialog` (Qt), and `--load-extension`. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
@@ -501,9 +504,10 @@ for Bitwarden in Chrome.
   signs with test keys: a valid one, one for another extension, one changed after it was signed, one the store didn't
   sign, and one whose zip has an entry named `../escape.txt`. It checks the store's update check answers and version
   comparisons too. `Meta/xenon.py test` serves the same files from a stand-in for the store, and, with
-  `--password-manager`, installs a stand-in for Bitwarden, finds it running at once and at the next start, installs it
-  again once its files are deleted, updates it a day later from the next start, turns down a tampered update and one
-  the store didn't sign, switches to a stand-in for Proton Pass, and removes it.
+  `--password-manager`, names the offered managers (1Password among them) when asked for one it doesn't have, installs
+  a stand-in for Bitwarden, finds it running at once and at the next start, installs it again once its files are
+  deleted, updates it a day later from the next start, turns down a tampered update and one the store didn't sign,
+  switches to a stand-in for Proton Pass, and removes it.
 - The real store, by hand: Bitwarden 2026.10.0 and Proton Pass 1.43.0 install from it with their store IDs, which
   checks Google's publisher key and the store's real files.
 - Real extensions: Bitwarden's unpacked Chrome MV3 build (`npm run build:chrome` in `bitwarden/clients/apps/browser`)
@@ -644,5 +648,7 @@ for Bitwarden in Chrome.
     clears the clipboard the same way from the test extension's offscreen document. Not yet tried by hand.
 - [ ] Milestone 4: the rest of Bitwarden
 - [ ] **Milestone 5: installing from the store** (under way). Done: CRX3 installs, updates once a day, and removal,
-  for the password managers the welcome page offers, Bitwarden and Proton Pass. Left: installing any extension from
-  the store (from its page or ID), and 1Password.
+  for the password managers the welcome page offers: Bitwarden, Proton Pass, and 1Password
+  (`aeblfdkhhhdcdjpifhhbdiojplfjncoa`). Left: installing any extension from the store (from its page or ID). 1Password
+  hasn't been tried by hand; unlocking through its desktop app needs `nativeMessaging` (milestone 4), and whatever else
+  it uses beyond Bitwarden and Proton Pass hasn't been catalogued yet.

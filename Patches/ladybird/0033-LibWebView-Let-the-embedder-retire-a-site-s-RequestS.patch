@@ -1,0 +1,83 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Wed, 28 Oct 2026 19:39:01 -0400
+Subject: [PATCH] LibWebView: Let the embedder retire a site's RequestServer
+ once it's idle
+
+A site's RequestServer stays for a minute after its last client goes, in
+case the site is visited again. An embedder that closes a view of a site
+it doesn't expect back soon, such as a browser stopping an idle extension
+background page, has no use for that minute: the process just lingers.
+
+RequestServerManager::retire_when_idle() lets the session's RequestServer
+of a site go as soon as it has no clients. A client that connects before
+then keeps it the usual while.
+---
+ Libraries/LibWebView/RequestServerManager.cpp | 15 ++++++++++++++-
+ Libraries/LibWebView/RequestServerManager.h   |  6 ++++++
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
+index 609545933cce6ee4b6f73bb9cb74a3081b6a2151..a220f48dcfb3bb73a043b5a501d494a67ad4c8dc 100644
+--- a/Libraries/LibWebView/RequestServerManager.cpp
++++ b/Libraries/LibWebView/RequestServerManager.cpp
+@@ -175,6 +175,7 @@ ErrorOr<RequestServerClientConnection> RequestServerManager::connect_new_client(
+         if (site_binding == RequestServer::SiteBinding::Bound) {
+             instance.m_client_ids.set(client_id);
+             instance.m_idle_timer = nullptr;
++            instance.m_retire_when_idle = false;
+         }
+         return RequestServerClientConnection { .handle = response->take_handle(), .client_id = client_id };
+     }
+@@ -190,7 +191,8 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
+         return;
+ 
+     auto weak_instance = instance.make_weak_ptr();
+-    instance.m_idle_timer = Core::Timer::create_single_shot(AK::Duration::from_milliseconds(idle_request_server_timeout_ms), [weak_instance] {
++    auto timeout_ms = instance.m_retire_when_idle ? 0 : idle_request_server_timeout_ms;
++    instance.m_idle_timer = Core::Timer::create_single_shot(AK::Duration::from_milliseconds(timeout_ms), [weak_instance] {
+         auto instance = weak_instance.strong_ref();
+         if (instance && instance->m_client_ids.is_empty())
+             the().retire(*instance);
+@@ -198,6 +200,17 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
+     instance.m_idle_timer->start();
+ }
+ 
++void RequestServerManager::retire_when_idle(BrowsingSession& session, Utf16String const& top_level_site)
++{
++    for (auto& instance : Vector { m_instances }) {
++        if (instance->m_session.ptr() != &session || instance->site() != top_level_site)
++            continue;
++        instance->m_retire_when_idle = true;
++        if (instance->m_client_ids.is_empty())
++            retire(*instance);
++    }
++}
++
+ void RequestServerManager::did_lose_process(RequestServerInstance& instance)
+ {
+     if (Core::EventLoop::current().was_exit_requested())
+diff --git a/Libraries/LibWebView/RequestServerManager.h b/Libraries/LibWebView/RequestServerManager.h
+index 6d253ef5daf16bfd4080dbbcbebccd911f098753..e0dc02102abd28693e3d16d30857684e28115126 100644
+--- a/Libraries/LibWebView/RequestServerManager.h
++++ b/Libraries/LibWebView/RequestServerManager.h
+@@ -63,6 +63,7 @@ private:
+     RefPtr<Requests::RequestClient> m_ui_client;
+     HashTable<int> m_client_ids;
+     RefPtr<Core::Timer> m_idle_timer;
++    bool m_retire_when_idle { false };
+     bool m_retired { false };
+ 
+     // As last reported by the RequestServer.
+@@ -95,6 +96,11 @@ public:
+ 
+     ErrorOr<RequestServerClientConnection> connect_new_client(RequestServerInstance&, BrowsingSession&, RequestServer::SiteBinding);
+ 
++    // A site's RequestServer is kept for a while after its last client goes, in case the site is visited again. This
++    // lets the session's RequestServer of a site go as soon as it has no clients instead, as for a view the embedder
++    // closes of a site it doesn't expect back soon. A client that connects before then keeps it the usual while.
++    void retire_when_idle(BrowsingSession&, Utf16String const& top_level_site);
++
+     void disk_cache_settings_changed();
+     void dns_settings_changed();
+ 
