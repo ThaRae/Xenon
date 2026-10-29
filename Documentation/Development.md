@@ -73,6 +73,14 @@ Other commands:
 ninja -C Build/release xenon     # an incremental rebuild once configured
 ```
 
+Xenon is built for a baseline CPU, not the machine that builds it. `Meta/xenon.py` configures Ladybird with
+`-DENABLE_CI_BASELINE_CPU=ON`, so C++ and Rust code targets x86-64-v2 (SSE4.2 and POPCNT, no AVX) on x86-64 and the M1
+on Apple silicon, as Ladybird's own packages do. Without it, Ladybird compiles with `-march=native`, and a build can use
+instructions that older machines don't have: an AppImage built on one of GitHub's runners crashed with SIGILL on another
+([#45](https://github.com/ThaRae/Xenon/issues/45)). Every build uses the baseline, local ones too, so a release
+packaged on any Mac or runner runs on the oldest machine Xenon supports, and the build that's tested is the one that
+ships. `Meta/xenon.py` reconfigures a build directory made before this, which then recompiles everything once.
+
 ## Tests and CI
 
 ```bash
@@ -134,7 +142,9 @@ CI runs on GitHub Actions, on GitHub's own runners:
   request whose build misses ccache more than 500 times (a Ladybird bump, say) saves its own too, so its next push
   starts from there instead of recompiling the same files; smaller ones don't, to leave room in GitHub's 10 GB. A cold
   build takes a few hours, so the build step stops itself in time to save the caches, and the next run carries on from
-  there.
+  there. A change to the flags every file compiles with (the baseline CPU, say) misses all of ccache, though not
+  vcpkg's packages. Land it on `main`, and let CI's build of `main` finish and save new caches, before running the
+  release workflow, which builds from `main`'s caches and can't do a cold build in one run.
 
 ## Changing the engine
 
