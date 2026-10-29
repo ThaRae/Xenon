@@ -109,6 +109,11 @@ starts locally. Session restore needs Xenon's windows, since a headless run neve
 them: it kills Xenon, and then quits it, and checks that the tabs come back with their pages. Linux CI runs the tests
 under Xvfb, so the windows are real X11 ones; without a display, they go to Qt's offscreen platform.
 
+Should Xenon not finish loading `about:welcome` at all, the checks after it, which all load pages, are skipped rather
+than each waiting out its timeouts, which would add up to more than CI gives the job. A helper process that crashes on a
+signal only says so in its crash report, in Xenon's data directory rather than the profile, so when a check fails, the
+test prints the reports saved while it ran.
+
 CI runs on GitHub Actions, on GitHub's own runners:
 
 | Workflow | Runs on | Does |
