@@ -10,6 +10,7 @@
 #include <AK/JsonObject.h>
 #include <AK/QuickSort.h>
 #include <LibURL/Parser.h>
+#include <LibWebView/Application.h>
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/HistoryStore.h>
 #include <LibWebView/ViewImplementation.h>
@@ -23,6 +24,18 @@ static constexpr size_t HISTORY_ENTRIES_CONSIDERED = 500;
 bool is_new_tab_page(URL::URL const& url)
 {
     return url == URL::URL::about("newtab"sv);
+}
+
+bool should_hide_url(URL::URL const& url)
+{
+    return should_hide_url(url, WebView::Application::settings().new_tab_page_url());
+}
+
+bool should_hide_url(URL::URL const& url, URL::URL const& new_tab_page_url)
+{
+    if (is_new_tab_page(url))
+        return true;
+    return url.scheme() == "about"sv && url == new_tab_page_url;
 }
 
 // The sites visited most, by the history's decaying visit score, one per host so a single busy site can't fill the page.

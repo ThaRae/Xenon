@@ -107,8 +107,11 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
 a fresh start writes only to Xenon's directories, and checks content blocking, daily filter list updates, the blocking
 dashboard, the certificate warning, extensions, WebAuthn, and password manager installs against pages and servers it
 starts locally. Session restore needs Xenon's windows, since a headless run never saves its session, so that check opens
-them: it kills Xenon, and then quits it, and checks that the tabs come back with their pages. Linux CI runs the tests
-under Xvfb, so the windows are real X11 ones; without a display, they go to Qt's offscreen platform.
+them: it kills Xenon, and then quits it, and checks that the tabs come back with their pages. So does the Update
+button's, which runs Xenon with `XENON_TEST_UPDATE_READY` standing in for an update ([Updates.md](Updates.md#testing)).
+Linux CI runs the tests under Xvfb, so the windows are real X11 ones; without a display, they go to Qt's offscreen
+platform. The unit tests that draw Xenon's popovers and buttons save how they look in `Build/release/smoke`, beside the
+welcome page's render (`XENON_SCREENSHOT_DIR`, which `Meta/xenon.py test` sets).
 
 `Meta/xenon.py ladybird-test` builds Ladybird's own tests and runs them with ctest, as Ladybird's CI does: AK's and
 the libraries' unit tests, `test-js`, `test-web`'s web tests (text, layout, ref, screenshot, and crash tests), and the
@@ -129,7 +132,7 @@ CI runs on GitHub Actions, on GitHub's own runners:
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test`, with the welcome page render as an artifact |
+| `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test`, with the welcome page's render and the unit tests' renders as an artifact |
 | `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
 | `.github/workflows/release.yml` | by hand, pull requests that change it or how releases are packaged | `Meta/release.py test` and `package` on macOS, and `package` on Linux in Ladybird's CI image, from `main`'s build caches, with the installer, archive and appcast, and the AppImage, as artifacts; `Meta/release.py test` against the AppImage on Ubuntu 26.04, Fedora 44 and Arch Linux; and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases once all of that passed |
 

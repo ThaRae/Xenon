@@ -38,6 +38,7 @@
 #include <UI/SplitView.h>
 #include <UI/StringUtils.h>
 #include <UI/TabHibernation.h>
+#include <UI/UpdateButton.h>
 #include <UI/WebAuthnPopover.h>
 #include <UI/WindowControlButton.h>
 
@@ -959,6 +960,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     toolbar_layout->addWidget(m_private_badge, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_extension_toolbar, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_content_blocking_button, 0, Qt::AlignVCenter);
+    toolbar_layout->addWidget(new UpdateButton(*m_toolbar, TOOLBAR_BUTTON_SIZE), 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_hamburger_button, 0, Qt::AlignVCenter);
 
     if constexpr (!use_native_macos_window_controls()) {
@@ -1070,6 +1072,9 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     view().on_title_change = [this](auto const& title) {
         m_title = qstring_from_utf16_string(title);
+        // Xenon: Nor does a new tab page's title show its URL, which is a page's title until it has one of its own.
+        if (auto url = view().url(); NewTabPage::should_hide_url(url) && m_title == qstring_from_ak_string(url.serialize()))
+            m_title = "New Tab";
         update_tab_title();
     };
 
@@ -1529,6 +1534,9 @@ void Tab::ensure_loaded()
     auto toolbar_window_controls_visible = m_toolbar_window_controls_visible;
     initialize({});
     m_deferred_tab.clear();
+    // Xenon: A new tab page's address bar is empty from the start, and takes focus as the tab is selected.
+    if (NewTabPage::should_hide_url(deferred_url))
+        set_url_is_hidden(true);
 
     // TabWidget pushed these while the tab had no toolbar to apply them to.
     set_vertical_tabs_enabled(m_vertical_tabs_enabled);
