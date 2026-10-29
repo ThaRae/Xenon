@@ -24,6 +24,9 @@ namespace Ladybird {
 // loads every session, and is checked for updates once a day, until it's removed or another is chosen. Xenon bundles
 // none of them, so it redistributes none: each is fetched from its developer's own store listing, signed by them.
 //
+// iCloud Passwords is offered only on macOS. Its extension talks to Apple's Password Manager through native messaging
+// (UI/Extensions/NativeMessaging.h), using the helper macOS registers for Chrome. Linux has no such helper.
+//
 // Which one is chosen isn't a setting of its own: it's whichever of them is installed in the profile. Removing it from
 // the Extensions window chooses none.
 //
@@ -41,7 +44,7 @@ public:
         StringView id;
         StringView name;
         String extension_id;
-        // False when this platform can't run it.
+        // False when this platform can't run it: iCloud Passwords needs Apple's helper, which exists on macOS.
         bool available { true };
     };
 

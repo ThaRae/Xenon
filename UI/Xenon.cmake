@@ -64,6 +64,7 @@ set(XENON_SOURCES
     Extensions/Locales.cpp
     Extensions/Manifest.cpp
     Extensions/MatchPattern.cpp
+    Extensions/NativeMessaging.cpp
     Extensions/Popup.cpp
     Extensions/Registry.cpp
     Extensions/Router.cpp
@@ -461,6 +462,11 @@ target_include_directories(TestXenonCRX BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonCRX PRIVATE OpenSSL::Crypto ZLIB::ZLIB)
 target_compile_definitions(TestXenonCRX PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestNativeMessaging.cpp" Xenon NAME TestXenonNativeMessaging LIBS LibCore LibFileSystem)
+target_sources(TestXenonNativeMessaging PRIVATE "${XENON_UI_DIR}/Extensions/NativeMessaging.cpp")
+target_include_directories(TestXenonNativeMessaging BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_compile_definitions(TestXenonNativeMessaging PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestRecentTabOrder.cpp" Xenon NAME TestXenonRecentTabOrder)
 target_include_directories(TestXenonRecentTabOrder BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
@@ -475,4 +481,4 @@ target_sources(TestXenonBlockingPopover PRIVATE
 target_include_directories(TestXenonBlockingPopover BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonBlockingPopover PRIVATE Qt::Core Qt::Gui Qt::Widgets)
 
-add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonRecentTabOrder)
+add_custom_target(xenon-tests DEPENDS TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonNativeMessaging TestXenonRecentTabOrder)
