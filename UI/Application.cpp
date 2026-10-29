@@ -610,7 +610,7 @@ void Application::create_platform_options(WebView::BrowserOptions& browser_optio
     // XENON_PREWARM_SPARE_PROCESS is temporary, for comparing both policies with one binary; remove it before landing.
     auto prewarm_spare_process = Core::Environment::get("XENON_PREWARM_SPARE_PROCESS"sv).has_value();
     browser_options.prewarm_spare_web_content_process = prewarm_spare_process ? WebView::PrewarmSpareWebContentProcess::Yes
-                                                                             : WebView::PrewarmSpareWebContentProcess::No;
+                                                                              : WebView::PrewarmSpareWebContentProcess::No;
 
     if (web_content_options.user_agent_preset.has_value() || web_content_options.is_test_mode == WebView::IsTestMode::Yes)
         return;

@@ -295,7 +295,9 @@ def measure_bench(xenon_path: Path, seconds: float) -> dict:
             try:
                 output, _ = process.communicate(timeout=seconds + 30)
             except subprocess.TimeoutExpired:
-                sample = sample_tree(process.pid) if process.poll() is None else {"error": f"exited {process.returncode}"}
+                sample = (
+                    sample_tree(process.pid) if process.poll() is None else {"error": f"exited {process.returncode}"}
+                )
                 try:
                     process.send_signal(signal.SIGTERM)
                 except ProcessLookupError:
