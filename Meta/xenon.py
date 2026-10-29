@@ -213,6 +213,9 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
     build_vcpkg(vcpkg_dir)
 
     if build_dir.joinpath("build.ninja").exists():
+        # A build directory configured before Xenon used the baseline CPU (below) would go on building for this one.
+        if cmake_cache_value(build_dir, "ENABLE_CI_BASELINE_CPU") != "ON":
+            run_command(["cmake", "-S", LADYBIRD_SOURCE_DIR, "-B", build_dir, "-DENABLE_CI_BASELINE_CPU=ON"])
         return build_dir
 
     cc, cxx = pick_host_compiler(platform, cc, cxx)
@@ -232,6 +235,9 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
             # Xenon only needs the engine and helper processes. Ladybird's tests are built by ladybird-test, which turns them
             # on (enable_ladybird_tests).
             "-DBUILD_TESTING=OFF",
+            # Build C++ and Rust for a CPU every machine Xenon runs on has (x86-64-v2, or the M1 on Apple silicon), as
+            # Ladybird's own packages are, rather than with -march=native for whichever Mac or runner builds it.
+            "-DENABLE_CI_BASELINE_CPU=ON",
         ]
     )
 
