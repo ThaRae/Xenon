@@ -247,6 +247,17 @@ background, and installs it when it quits. Settings then says which version is r
 **Check for Updates…** in the Xenon menu, or **Check now** in Settings, checks at once in Sparkle's own window, with
 either switch off.
 
+An update that's ready also puts an **Update** button at the end of every window's toolbar (`UI/UpdateButton.cpp`,
+[Features.md](Features.md#the-update-button)), and turns **Check for Updates…** into **Relaunch to Update to
+<version>**. The button's popover, the menu item and Settings all relaunch through Sparkle's immediate installation
+(`Updater::install_and_relaunch()`): Sparkle starts its installer and asks Xenon to quit, which asks every page and any
+download that can't resume first, as any quit does, and the installer swaps the app and opens it again. A page that
+keeps Xenon open leaves the update to install at the next quit. Before it relaunches, Xenon notes the version it's
+installing in its preferences (`XenonRelaunchToUpdateVersion`); the Xenon that starts with that version reopens every
+window and tab, whatever the startup setting says, and forgets the note. Private windows don't reopen, so the
+popover says so when any are open, and the menu item and Settings ask first (`UI/RelaunchToUpdate.cpp`). **Later**
+hides the button until Xenon starts again or a newer version is ready.
+
 Before Sparkle replaces anything, it checks:
 
 1. the appcast's signature (`SURequireSignedFeed`). An appcast whose signature fails is used in Sparkle's safe mode,
@@ -280,8 +291,28 @@ another host name, as github.com does. It runs Xenon with a profile of its own:
 3. 0.0.2 turns down 0.0.3 with a byte changed after it was signed;
 4. and 0.0.3 signed with another key.
 
-It opens Xenon's windows while it runs, and needs **Update Xenon automatically** on, since Xenon's own settings aren't
-the profile's. CI's builds don't run it; the release workflow does, before it packages. Run it before a release.
+Step 2 also checks that the toolbar's Update button shows for 0.0.2, with `XENON_TEST_UPDATE_READY` set: a release
+ignores it (below). It opens Xenon's windows while it runs, and needs **Update Xenon automatically** on, since Xenon's own
+settings aren't the profile's. CI's builds don't run it; the release workflow does, before it packages. Run it before a
+release.
+
+### Without a release
+
+Builds that don't update themselves, development builds and Xenon on Linux, take `XENON_TEST_UPDATE_READY=<version>`
+as an update of that version that's ready (`UI/Updater.h`): Settings, the Update button and the Xenon menu offer it, and
+relaunching only quits, through the same questions as a real relaunch. A release, whose `Info.plist` names an appcast,
+ignores it. To see the button in a development build:
+
+```bash
+XENON_TEST_UPDATE_READY=9.9.9 ./Meta/xenon.py run
+```
+
+`Meta/xenon.py test` runs Xenon in a window that way, and checks that its toolbar shows the button.
+`TestXenonUpdateButton` (`Tests/TestUpdateButton.cpp`) puts a stand-in for the updater under the button itself, and
+checks that it shows and hides with the update, that its tooltip and popover name the version, that **Relaunch to
+Update** installs, that **Later** hides it in every window until a newer version, that the popover warns about private
+windows, and that a narrow toolbar gets the arrow alone. With `XENON_SCREENSHOT_DIR` set, it saves how the button and
+popover look there.
 
 ## Setting up a Mac to release from
 

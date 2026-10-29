@@ -302,7 +302,7 @@ def scan_quoted_score(lines: list[str], header_index: int) -> list[float]:
 def visible_page_lines(text: str) -> list[str]:
     """Split a suite dump into the strings a user could read.
 
-    Xenon's text mode prints the page's inner text. Builds from before engine patch 0040 captured the dump's type
+    Xenon's text mode prints the page's inner text. Builds from before engine patch 0041 captured the dump's type
     by reference, so their delayed dumps could print the layout tree and the GC graph after the text, or the
     accessibility tree instead. The first two can be tens of megabytes and never hold a score, so cut them off; in an
     accessibility tree the visible strings are the name="..." attributes of text leaves and headings/links/buttons.

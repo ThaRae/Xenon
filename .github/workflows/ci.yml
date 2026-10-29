@@ -102,7 +102,7 @@ jobs:
             echo "Ladybird \`$(git -C ladybird rev-parse --short HEAD)\`, CI image \`$IMAGE_VERSION\`"
             if [ -f Build/release/smoke/welcome.png ]; then
               echo
-              echo "Headless render of about:welcome: $(stat -c '%s bytes' Build/release/smoke/welcome.png) (artifact \`welcome-render-linux\`)"
+              echo "Headless render of about:welcome: $(stat -c '%s bytes' Build/release/smoke/welcome.png) (artifact \`renders-linux\`, with the unit tests' renders of Xenon's popovers and buttons)"
             fi
             if [ -f Build/release/ccache-stats.txt ]; then
               echo
@@ -121,12 +121,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload the welcome page render
+      - name: Upload the renders
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: welcome-render-linux
-          path: Build/release/smoke/welcome.png
+          name: renders-linux
+          path: Build/release/smoke/*.png
           if-no-files-found: ignore
           retention-days: 14
 
@@ -209,7 +209,7 @@ jobs:
             echo "Ladybird \`$(git -C ladybird rev-parse --short HEAD)\`, $XCODE_VERSION"
             if [ -f Build/release/smoke/welcome.png ]; then
               echo
-              echo "Headless render of about:welcome: $(stat -f '%z bytes' Build/release/smoke/welcome.png) (artifact \`welcome-render-macos\`)"
+              echo "Headless render of about:welcome: $(stat -f '%z bytes' Build/release/smoke/welcome.png) (artifact \`renders-macos\`, with the unit tests' renders of Xenon's popovers and buttons)"
             fi
             if [ -f Build/release/ccache-stats.txt ]; then
               echo
@@ -228,11 +228,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload the welcome page render
+      - name: Upload the renders
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: welcome-render-macos
-          path: Build/release/smoke/welcome.png
+          name: renders-macos
+          path: Build/release/smoke/*.png
           if-no-files-found: ignore
           retention-days: 14

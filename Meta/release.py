@@ -89,6 +89,8 @@ QT_PLUGINS = (
 TEST_BUNDLE_IDENTIFIER = "org.xenon.Xenon.UpdateTest"
 TEST_VERSIONS = ("0.0.1", "0.0.2", "0.0.3")
 TEST_TIMEOUT_SECONDS = 180
+# Development builds take XENON_TEST_UPDATE_READY as an update that's ready (UI/Updater.h); a release has to ignore it.
+TEST_STAND_IN_VERSION = "99.0.0"
 
 # On Linux, a release is an AppImage: one file that runs on any distribution whose glibc and libstdc++ are at least as
 # new as the ones it was built with. It holds an AppDir laid out as the build's prefix is (UI/Xenon.cmake), where Xenon
@@ -1054,12 +1056,13 @@ class FeedServer:
 class RunningXenon:
     """A test release, run with a profile of the test's own, whose output the test reads line by line."""
 
-    def __init__(self, app: Path, profile: Path):
+    def __init__(self, app: Path, profile: Path, env: dict | None = None):
         self.process = subprocess.Popen(
             [app / "Contents" / "MacOS" / "Xenon", "--profile-path", profile, "about:blank"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            env=env,
         )
         self.lines = queue.Queue()
         self.output = []
@@ -1176,16 +1179,22 @@ def test_main(args):
             installed = applications / APP_NAME
             profile = root / "profile"
 
-            print(f"==> {first} finds {second}, and installs it when it quits", flush=True)
+            print(f"==> {first} finds {second}, offers it in the toolbar, and installs it when it quits", flush=True)
             publish(second, archives[second], key.sign(archives[second]))
-            xenon = RunningXenon(installed, profile)
+            xenon = RunningXenon(installed, profile, {**os.environ, "XENON_TEST_UPDATE_READY": TEST_STAND_IN_VERSION})
             ready = xenon.wait_for(rf"Xenon {re.escape(second)} is ready", r"Unable to update Xenon")
+            downloaded = ready is not None and "is ready" in ready
+            # The toolbar's Update button shows once the update is ready (UI/UpdateButton.h).
+            offered = xenon.wait_for(r"The toolbar offers to relaunch to update to Xenon") if downloaded else None
             xenon.quit()
+            expect(f"{second} downloaded and checked", downloaded, "".join(xenon.output), ready)
             expect(
-                f"{second} downloaded and checked",
-                ready is not None and "is ready" in ready,
+                f"the toolbar offers {second}, and not XENON_TEST_UPDATE_READY's stand-in",
+                offered is not None
+                and f"to Xenon {second}" in offered
+                and TEST_STAND_IN_VERSION not in "".join(xenon.output),
                 "".join(xenon.output),
-                ready,
+                offered,
             )
 
             deadline = time.monotonic() + TEST_TIMEOUT_SECONDS
