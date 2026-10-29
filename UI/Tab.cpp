@@ -1070,6 +1070,9 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     view().on_title_change = [this](auto const& title) {
         m_title = qstring_from_utf16_string(title);
+        // Xenon: Nor does a new tab page's title show its URL, which is a page's title until it has one of its own.
+        if (auto url = view().url(); NewTabPage::should_hide_url(url) && m_title == qstring_from_ak_string(url.serialize()))
+            m_title = "New Tab";
         update_tab_title();
     };
 
@@ -1529,6 +1532,9 @@ void Tab::ensure_loaded()
     auto toolbar_window_controls_visible = m_toolbar_window_controls_visible;
     initialize({});
     m_deferred_tab.clear();
+    // Xenon: A new tab page's address bar is empty from the start, and takes focus as the tab is selected.
+    if (NewTabPage::should_hide_url(deferred_url))
+        set_url_is_hidden(true);
 
     // TabWidget pushed these while the tab had no toolbar to apply them to.
     set_vertical_tabs_enabled(m_vertical_tabs_enabled);
