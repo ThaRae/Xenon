@@ -22,11 +22,12 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 | `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
 | `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon's artwork. |
+| `UI/Linux/` | The Linux AppImage's desktop file and entry point. |
 | `Tests/` | Unit tests, built as `TestXenon*` targets. |
 | `Meta/xenon.py` | Builds, runs, and tests Xenon. |
 | `Meta/check.py` | Fast checks: formatting, and the mistakes that break Xenon quietly. |
 | `Meta/patches.py` | Applies and exports the engine patch series. |
-| `Meta/release.py` | Packages, publishes and tests releases, on macOS. |
+| `Meta/release.py` | Packages, publishes and tests releases: the macOS app on a Mac, the AppImage on Linux. |
 | `VERSION.txt` | Xenon's version. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 | `Documentation/` | This file, the [feature notes](Features.md), and the deeper write-ups on extensions, WebAuthn, filter list updates, and releases. |
@@ -114,7 +115,7 @@ CI runs on GitHub Actions, on GitHub's own runners:
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test`, with the welcome page render as an artifact |
 | `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
-| `.github/workflows/release.yml` | by hand, pull requests that change it | `Meta/release.py test` and `package` on macOS, from `main`'s build caches, with the release's installer, archive and appcast as an artifact, and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases |
+| `.github/workflows/release.yml` | by hand, pull requests that change it or how releases are packaged | `Meta/release.py test` and `package` on macOS, and `package` on Linux in Ladybird's CI image, from `main`'s build caches, with the installer, archive and appcast, and the AppImage, as artifacts; `Meta/release.py test` against the AppImage on Ubuntu 26.04, Fedora 44 and Arch Linux; and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases once all of that passed |
 
 - **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
   `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
@@ -214,25 +215,38 @@ rerun:
 ./Meta/generate-app-icon.py
 ```
 
-It renders the macOS iconset, the window icon, and Xenon's versions of Ladybird's logo in `UI/Resources/icons`, which
-the build ships in place of Ladybird's (internal pages use them as their favicon). It needs `rsvg-convert`
+It renders the macOS iconset, the window icon, the Linux AppImage's icon sizes (`UI/Icons/linux`), and Xenon's
+versions of Ladybird's logo in `UI/Resources/icons`, which the build ships in place of Ladybird's (internal pages use
+them as their favicon). It needs `rsvg-convert`
 (`brew install librsvg`).
 
 ## Releases
 
 Xenon updates itself on macOS with Sparkle, from releases published to
-[ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases) on GitHub. They're made on a Mac:
+[ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases) on GitHub. On Linux, each release has an AppImage.
+The macOS release is made on a Mac:
 
 ```bash
 ./Meta/release.py test       # a release updates itself to the next, and turns down tampered ones
 ./Meta/release.py package    # builds Xenon, and writes a signed Xenon.app, its installer (a .dmg), its archive and the appcast to Build/distribution
-./Meta/release.py publish    # publishes them, and tags the commit
+./Meta/release.py publish    # publishes them, with the AppImage if Build/distribution has it, and tags the commit
 ```
 
-Bump `VERSION.txt` first. Releases are signed with a self-signed certificate and an update key, both in the login
-keychain of the Mac they're made on. [Updates.md](Updates.md) covers setting those up, what Xenon checks, and the test.
-The build fetches Sparkle's release (`UI/Xenon.cmake`) by itself, on macOS.
+and the AppImage on Linux, where `package` writes `Xenon-<version>-x86_64.AppImage` and `test` runs
+`Meta/xenon.py test`'s checks against it:
 
-`.github/workflows/release.yml` runs `test` and `package` on GitHub's macOS runner instead, by hand, with the
-certificate and the update key as the repository's secrets, and keeps the installer, the archive and the appcast as the
-run's artifact. With **publish** ticked, on `main`, it runs `publish` too, with a token for ThaRae/xenon-releases.
+```bash
+./Meta/release.py package
+./Meta/release.py test
+```
+
+Bump `VERSION.txt` first. macOS releases are signed with a self-signed certificate and an update key, both in the login
+keychain of the Mac they're made on. [Updates.md](Updates.md) covers setting those up, what Xenon checks, the tests,
+and how the AppImage is put together and where it runs. The build fetches Sparkle's release (`UI/Xenon.cmake`) by
+itself, on macOS, and `package` fetches the AppImage tools, on Linux, each pinned by its SHA-256.
+
+`.github/workflows/release.yml` does all of it on GitHub's runners instead, by hand: `test` and `package` on macOS, with
+the certificate and the update key as the repository's secrets, and `package` on Linux in Ladybird's CI image, then
+`test` against the AppImage in clean Ubuntu, Fedora and Arch Linux containers. It keeps each platform's files as an
+artifact of the run. With **publish** ticked, on `main`, it runs `publish` once both platforms passed, with a token for
+ThaRae/xenon-releases.

@@ -138,7 +138,7 @@ A tab never hibernates while it's:
 Right-click the tab strip (or open **Settings → Tabs**) for **Tab Hibernation → Off** or a timeout from 15 minutes to 6
 hours, or right-click a background tab for **Hibernate Tab**. **Settings → Tabs** also has **Also when the system is low
 on memory**, on by default. The code is `UI/TabHibernation.cpp` and `UI/MemoryPressure.cpp`, with engine patch `0023`,
-which saves the scroll position first. Engine patch `0034` also collects the page's JS heap when the tab is hidden.
+which saves the scroll position first. Engine patch `0038` also collects the page's JS heap when the tab is hidden.
 
 ### Memory use on hover
 
@@ -208,7 +208,7 @@ The spare process kept ready for the next tab does not, until a tab takes it. En
   over 100 bytes each;
 - `0030` gives back the memory used to build the engine, several times what the engine keeps;
 - `0029` sends no lists to any process while blocking is off;
-- `0035` leaves the spare process without the lists until a tab takes it.
+- `0039` leaves the spare process without the lists until a tab takes it.
 
 Extensions' own pages get no lists at all: their background pages, offscreen documents, and popups each open in a
 process of their own that never builds the engine (`0032`). uBlock Origin doesn't filter other extensions' requests in
@@ -250,6 +250,25 @@ restart. It falls back to the bundled lists if anything fails.
 
 The welcome flow and **Settings → Ads and trackers** turn updates off. Settings also says when the lists in use were
 made and last checked, and has **Check now**. See [FilterListUpdates.md](FilterListUpdates.md).
+
+### Fingerprinting protection
+
+Sites that fingerprint read values that differ between machines and combine them into an ID that survives clearing
+cookies. Xenon "farbles" those values the way Brave does: each site gets slightly different values, the same ones for
+the whole session, and new ones the next time Xenon starts.
+
+- Canvas: `toDataURL()`, `toBlob()`, `OffscreenCanvas.convertToBlob()`, and `getImageData()` return a copy whose
+  lowest color bit is flipped on a scattering of pixels. What's drawn on screen is untouched.
+- Web Audio: `AudioBuffer.getChannelData()`, `copyFromChannel()`, and the `AnalyserNode` getters scale samples by a
+  factor between 0.99 and 1.
+- `navigator.hardwareConcurrency` is between 4 and 8 (never above the real count), and `navigator.deviceMemory` is
+  1, 2, or 4 (never above the real amount).
+- The User-Agent and client hints are exactly those of Chrome on the same platform, without a Ladybird token.
+
+It's on by default. **Settings → Privacy and data → Fingerprinting protection** turns it off, for pages and workers
+alike. `navigator.webdriver` is false unless WebDriver is driving the browser. The code is in
+`ladybird/Libraries/LibWeb/Fingerprinting/`, carried as engine patches `0034`–`0037`. See
+[Fingerprinting.md](Fingerprinting.md).
 
 ## Password managers and extensions
 
@@ -330,6 +349,12 @@ navigation that failed on it ends, so the UI process sends a tab whose page it w
 
 On macOS, Xenon installs from a disk image, `Xenon-<version>.dmg`: open it and drag Xenon into Applications, as the
 window shows. Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases/releases) has one.
+
+On Linux, each release has an AppImage, `Xenon-<version>-x86_64.AppImage`, which runs as it is once it's executable,
+on distributions at least as new as Ubuntu 26.04. It carries update information, so
+[AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate) and the AppImage managers that use it update it
+from the next release, downloading only what changed. `Meta/release.py` packages it with linuxdeploy and appimagetool;
+see [Updates.md](Updates.md#the-appimage).
 
 Xenon then checks for a new version when it starts and once a day, downloads it in the background, and installs it
 when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch

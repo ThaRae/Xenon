@@ -169,6 +169,17 @@ void set_bangs_enabled(bool enabled)
     notify_observers();
 }
 
+bool fingerprinting_protection()
+{
+    return WebView::Application::settings().fingerprinting_protection();
+}
+
+void set_fingerprinting_protection(bool enabled)
+{
+    WebView::Application::settings().set_fingerprinting_protection(enabled);
+    notify_observers();
+}
+
 static constexpr auto AUTOMATIC_UPDATES_KEY = "updates/automatic";
 
 bool automatic_updates_enabled()

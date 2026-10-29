@@ -1,0 +1,243 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Wed, 28 Oct 2026 23:13:08 +0000
+Subject: [PATCH] LibWeb: Farble samples written to an already farbled
+ AudioBuffer
+
+copyToChannel after getChannelData wrote unfarbled samples into the
+live view script already had, so the view mixed scaled and unscaled
+samples. Samples written to a channel that's already farbled are now
+scaled too.
+
+Playing a buffer acquires its content, and the next getChannelData
+attaches a copy of it. That copy was taken from samples that were
+already scaled, so the channel stays marked as farbled, and a test
+checks that it isn't scaled a second time.
+
+internals.setFingerprintingProtection() lets tests turn protection on
+despite test mode. A text test covers canvas, audio, hardwareConcurrency,
+deviceMemory, the Chrome User-Agent, and navigator.webdriver.
+---
+ .../LibWeb/Bindings/RustBindingsServices.cpp  |   2 +-
+ Libraries/LibWeb/Internals/Internals.cpp      |   6 +
+ Libraries/LibWeb/Internals/Internals.h        |   1 +
+ Libraries/LibWeb/Internals/Internals.idl      |   1 +
+ Libraries/LibWeb/WebAudio/AudioBuffer.cpp     |   7 ++
+ .../expected/Fingerprinting/protection.txt    |  15 +++
+ .../Text/input/Fingerprinting/protection.html | 106 ++++++++++++++++++
+ 7 files changed, 137 insertions(+), 1 deletion(-)
+ create mode 100644 Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
+ create mode 100644 Tests/LibWeb/Text/input/Fingerprinting/protection.html
+
+diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
+index b09a5542851ba0b1a8f68ca596a90f34ea2a897d..d598a816c36be6e4316687e8c5c7bdfcb98ea82a 100644
+--- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
++++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
+@@ -13,6 +13,7 @@
+ #include <LibWeb/Bindings/RustSerialization.h>
+ #include <LibWeb/Bindings/Wrappable.h>
+ #include <LibWeb/Bindings/WrapperWorld.h>
++#include <LibWeb/Fingerprinting/Farbling.h>
+ #include <LibWeb/HTML/EventLoop/EventLoop.h>
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/Scripting/TemporaryExecutionContext.h>
+@@ -22,7 +23,6 @@
+ #include <LibWeb/Platform/EventLoopPlugin.h>
+ #include <LibWeb/WebIDL/AbstractOperations.h>
+ #include <LibWeb/WebIDL/CallbackType.h>
+-#include <LibWeb/Fingerprinting/Farbling.h>
+ #include <LibWeb/WebIDL/DOMException.h>
+ #include <LibWeb/WebIDL/ExceptionOrUtils.h>
+ #include <LibWeb/WebIDL/Promise.h>
+diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
+index 84f34902548257496fd3d0f79dc005f11026a50a..1b8b1924f8c314105c0f38b382f687ce9944333b 100644
+--- a/Libraries/LibWeb/Internals/Internals.cpp
++++ b/Libraries/LibWeb/Internals/Internals.cpp
+@@ -1401,6 +1401,12 @@ void Internals::set_user_agent(Utf16String const& user_agent)
+     Web::update_loader_config([&](auto& config) { config.user_agent = user_agent.to_utf8(); });
+ }
+ 
++// Test mode forces fingerprinting protection off so output stays deterministic. Tests of farbling turn it back on.
++void Internals::set_fingerprinting_protection(bool enabled)
++{
++    Web::update_loader_config([&](auto& config) { config.enable_fingerprinting_protection = enabled; });
++}
++
+ void Internals::set_content_blocking_enabled(bool enabled)
+ {
+     page().set_content_blocking_policy(enabled, {});
+diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
+index 8d9df67e6fa8473fb3247f38870a7d8c38e0972a..338a61effa14ada82598302e3acaeaae4f3941e8 100644
+--- a/Libraries/LibWeb/Internals/Internals.h
++++ b/Libraries/LibWeb/Internals/Internals.h
+@@ -171,6 +171,7 @@ public:
+     WebIDL::ExceptionOr<void> set_content_blockers(Utf16String const& patterns);
+     WebIDL::ExceptionOr<void> set_site_compatibility_data(Utf16String const& source);
+     void set_user_agent(Utf16String const& user_agent);
++    void set_fingerprinting_protection(bool enabled);
+     void set_content_blocking_enabled(bool enabled);
+     Optional<String> cosmetic_filter_for_element(DOM::Element&);
+     WebIDL::UnsignedLongLong partial_layout_count();
+diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
+index 089003b4e1b46ce50ed357a39d37c360607a090a..9ca6124aa6b32574238f26dafab4ea8909208bc4 100644
+--- a/Libraries/LibWeb/Internals/Internals.idl
++++ b/Libraries/LibWeb/Internals/Internals.idl
+@@ -169,6 +169,7 @@ interface Internals {
+     undefined setContentBlockers(DOMString patterns);
+     undefined setSiteCompatibilityData(DOMString source);
+     undefined setUserAgent(DOMString userAgent);
++    undefined setFingerprintingProtection(boolean enabled);
+     undefined setContentBlockingEnabled(boolean enabled);
+     DOMString? cosmeticFilterForElement(Element element);
+     unsigned long long partialLayoutCount();
+diff --git a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
+index c4af9f1bedf1587d5e6c957ab2242c455d7acab8..5fe0717028cb2cc4066746bd8760a2fa67ca7cc7 100644
+--- a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
++++ b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
+@@ -332,6 +332,13 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_to_channel(GC::Root<JS::Float32Array
+         bytes.copy_to({ reinterpret_cast<u8*>(channel_data.data() + buffer_offset), bytes.size() });
+     });
+ 
++    // Fingerprinting protection: a live getChannelData() view already saw farbled samples, so newly written
++    // samples are farbled too. Unfarbled channels stay clean until the next read.
++    if (channel.farbled && Fingerprinting::protection_enabled()) {
++        Fingerprinting::farble_audio({ channel_data.data() + buffer_offset, count },
++            Fingerprinting::seed_for_relevant_global(*source));
++    }
++
+     return {};
+ }
+ 
+diff --git a/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt b/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..3cff823f90350a96fc916fc11db2a1dc182128c8
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
+@@ -0,0 +1,15 @@
++webdriver is false: PASS
++user agent is chrome-shaped: PASS
++user agent has no Ladybird token: PASS
++vendor is Google Inc.: PASS
++canvas readback is exact with protection off: PASS
++canvas getImageData is stable: PASS
++canvas getImageData differs when farbled: PASS
++canvas toDataURL is stable: PASS
++canvas toDataURL differs when farbled: PASS
++canvas pattern depends on the image: PASS
++audio getChannelData scales in [0.99, 1): PASS
++audio is scaled once across an acquire: PASS
++audio copyFromChannel scales in [0.99, 1): PASS
++hardwareConcurrency is in range: PASS
++deviceMemory is 1, 2, or 4: PASS
+diff --git a/Tests/LibWeb/Text/input/Fingerprinting/protection.html b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..819a5ea813ce222dcc01f71754a1855f49d2b988
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
+@@ -0,0 +1,106 @@
++<!DOCTYPE html>
++<script src="../include.js"></script>
++<script>
++    function imageDataEqual(a, b)
++    {
++        if (a.width !== b.width || a.height !== b.height || a.data.length !== b.data.length)
++            return false;
++        for (let i = 0; i < a.data.length; i++) {
++            if (a.data[i] !== b.data[i])
++                return false;
++        }
++        return true;
++    }
++
++    function allEqual(samples)
++    {
++        return samples.length > 0 && samples.every(sample => sample === samples[0]);
++    }
++
++    test(() => {
++        try {
++        println(`webdriver is false: ${navigator.webdriver === false ? "PASS" : `FAIL (${navigator.webdriver})`}`);
++
++        const chromeShaped = /^Mozilla\/5\.0 \([^)]*\) AppleWebKit\/537\.36 \(KHTML, like Gecko\) Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/.test(navigator.userAgent);
++        println(`user agent is chrome-shaped: ${chromeShaped ? "PASS" : `FAIL (${navigator.userAgent})`}`);
++        println(`user agent has no Ladybird token: ${navigator.userAgent.includes("Ladybird") ? `FAIL (${navigator.userAgent})` : "PASS"}`);
++        println(`vendor is Google Inc.: ${navigator.vendor === "Google Inc." ? "PASS" : `FAIL (${navigator.vendor})`}`);
++
++        const canvas = document.createElement("canvas");
++        canvas.width = 64;
++        canvas.height = 64;
++        const context = canvas.getContext("2d");
++        context.fillStyle = "#000000";
++        context.fillRect(0, 0, 64, 64);
++
++        internals.setFingerprintingProtection(false);
++        const exactPixels = context.getImageData(0, 0, 64, 64);
++        const exactPixel = exactPixels.data;
++        println(`canvas readback is exact with protection off: ${exactPixel[0] === 0 && exactPixel[1] === 0 && exactPixel[2] === 0 && exactPixel[3] === 255 ? "PASS" : `FAIL (${exactPixel[0]},${exactPixel[1]},${exactPixel[2]},${exactPixel[3]})`}`);
++        const exactUrl = canvas.toDataURL();
++
++        internals.setFingerprintingProtection(true);
++        const farbledPixels = context.getImageData(0, 0, 64, 64);
++        const farbledPixelsAgain = context.getImageData(0, 0, 64, 64);
++        const farbledUrl = canvas.toDataURL();
++        const farbledUrlAgain = canvas.toDataURL();
++
++        println(`canvas getImageData is stable: ${imageDataEqual(farbledPixels, farbledPixelsAgain) ? "PASS" : "FAIL"}`);
++        println(`canvas getImageData differs when farbled: ${imageDataEqual(exactPixels, farbledPixels) ? "FAIL" : "PASS"}`);
++        println(`canvas toDataURL is stable: ${farbledUrl === farbledUrlAgain ? "PASS" : "FAIL"}`);
++        println(`canvas toDataURL differs when farbled: ${exactUrl === farbledUrl ? "FAIL" : "PASS"}`);
++
++        // An image drawn to learn which bits get flipped says nothing about another image: one grey pixel in the last
++        // row changes the pattern everywhere else too.
++        const other = document.createElement("canvas");
++        other.width = 64;
++        other.height = 64;
++        const otherContext = other.getContext("2d");
++        otherContext.fillStyle = "#000000";
++        otherContext.fillRect(0, 0, 64, 64);
++        otherContext.fillStyle = "#808080";
++        otherContext.fillRect(63, 63, 1, 1);
++        const otherPixels = otherContext.getImageData(0, 0, 64, 64);
++        let samePattern = true;
++        for (let i = 0; i < 63 * 64 * 4; i++) {
++            if (otherPixels.data[i] !== farbledPixels.data[i]) {
++                samePattern = false;
++                break;
++            }
++        }
++        println(`canvas pattern depends on the image: ${samePattern ? "FAIL" : "PASS"}`);
++
++        const buffer = new AudioBuffer({ length: 128, sampleRate: 44100 });
++        buffer.copyToChannel(new Float32Array(128).fill(1), 0);
++        const channel = buffer.getChannelData(0);
++        println(`audio getChannelData scales in [0.99, 1): ${allEqual(channel) && channel[0] >= 0.99 && channel[0] < 1 ? "PASS" : `FAIL (${channel[0]})`}`);
++
++        // Playing the buffer acquires its content, and getChannelData() then hands back a copy of samples that were
++        // already scaled. They mustn't be scaled again.
++        const context = new OfflineAudioContext(1, 128, 8000);
++        const played = context.createBuffer(1, 128, 8000);
++        played.copyToChannel(new Float32Array(128).fill(1), 0);
++        const firstRead = played.getChannelData(0)[0];
++        const source = new AudioBufferSourceNode(context);
++        source.buffer = played;
++        source.start();
++        const secondRead = played.getChannelData(0)[0];
++        println(`audio is scaled once across an acquire: ${secondRead === firstRead ? "PASS" : `FAIL (${firstRead}, ${secondRead})`}`);
++
++        const unread = new AudioBuffer({ length: 128, sampleRate: 44100 });
++        unread.copyToChannel(new Float32Array(128).fill(1), 0);
++        const copied = new Float32Array(128);
++        unread.copyFromChannel(copied, 0);
++        println(`audio copyFromChannel scales in [0.99, 1): ${allEqual(copied) && copied[0] >= 0.99 && copied[0] < 1 ? "PASS" : `FAIL (${copied[0]})`}`);
++
++        const concurrency = navigator.hardwareConcurrency;
++        println(`hardwareConcurrency is in range: ${Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 8 ? "PASS" : `FAIL (${concurrency})`}`);
++        println(`deviceMemory is 1, 2, or 4: ${[1, 2, 4].includes(navigator.deviceMemory) ? "PASS" : `FAIL (${navigator.deviceMemory})`}`);
++
++        internals.setFingerprintingProtection(false);
++        } catch (error) {
++            println(`FAIL: ${error}`);
++            internals.setFingerprintingProtection(false);
++        }
++    });
++</script>

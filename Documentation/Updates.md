@@ -1,11 +1,13 @@
 # Updates and releases
 
-Xenon updates itself on macOS with [Sparkle 2](https://sparkle-project.org), as Helium does. Releases are built on a
-Mac with `Meta/release.py` and published as GitHub releases of
+Xenon updates itself on macOS with [Sparkle 2](https://sparkle-project.org), as Helium does. On Linux, a release is an
+AppImage, which AppImage updaters update. Releases are built with `Meta/release.py`, on a Mac and on Linux or by the
+release workflow on GitHub's runners, and published as GitHub releases of
 [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases), a repository of their own.
 
 - [The published releases](#the-published-releases)
 - [Making a release](#making-a-release)
+- [The AppImage](#the-appimage)
 - [Signing](#signing)
 - [In Xenon](#in-xenon)
 - [Testing](#testing)
@@ -13,7 +15,7 @@ Mac with `Meta/release.py` and published as GitHub releases of
 
 ## The published releases
 
-Each version is a GitHub release of ThaRae/xenon-releases, tagged `v<version>`, with two files:
+Each version is a GitHub release of ThaRae/xenon-releases, tagged `v<version>`, with these files:
 
 - `Xenon-<version>.dmg`, the installer people download. It opens a window with `Xenon.app` beside a link to
   Applications, over a background that says to drag one onto the other (`UI/Icons/macos/installer-background.svg`,
@@ -21,6 +23,9 @@ Each version is a GitHub release of ThaRae/xenon-releases, tagged `v<version>`, 
   [dmgbuild](https://github.com/dmgbuild/dmgbuild), which lays the window out without scripting Finder, so it works the
   same on GitHub's runners as on a Mac. It's signed with the release certificate, like the app.
 - `Xenon-<version>.tar.xz`, which holds `Xenon.app`, for Sparkle to update from.
+- `Xenon-<version>-x86_64.AppImage`, Xenon for Linux, in one file ([The AppImage](#the-appimage)).
+- `Xenon-<version>-x86_64.AppImage.zsync`, which AppImage updaters read to find out what changed, and download only
+  that.
 
 The repository's `main` holds `appcast.xml`, Sparkle's feed, which lists the newest release:
 
@@ -57,18 +62,23 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
    - `Xenon-<version>.tar.xz`, signed with the update key;
    - `appcast.xml`, which lists it, signed too.
 3. Try `Build/distribution/Xenon.app`, and open the installer to see its window.
-4. `./Meta/release.py publish` asks, then creates the GitHub release with the installer and the archive
-   (`gh release create`), commits
-   the appcast to ThaRae/xenon-releases' `main`, and tags the commit `v<version>` in ThaRae/Xenon. It publishes the
-   appcast only once the archive it names is up. It refuses a tree with uncommitted changes, and a commit that isn't
-   on ThaRae/Xenon's `main`. It pushes over HTTPS with `gh`'s credentials, whatever Xenon's `origin` is.
+4. Put `Xenon-<version>-x86_64.AppImage` and its `.zsync` file in `Build/distribution` too, after `package`, which
+   empties it: from `Meta/release.py package` on Linux ([The AppImage](#the-appimage)), or the `Xenon-<version>-linux`
+   artifact of a run of the release workflow on the same commit.
+5. `./Meta/release.py publish` asks, then creates the GitHub release with the installer, the archive, and the AppImage
+   and its `.zsync` file if `Build/distribution` has them (`gh release create`), commits the appcast to
+   ThaRae/xenon-releases' `main`, and tags the commit `v<version>` in ThaRae/Xenon. It publishes the appcast only once
+   the archive it names is up. It refuses a tree with uncommitted changes, and a commit that isn't on ThaRae/Xenon's
+   `main`. It pushes over HTTPS with `gh`'s credentials, whatever Xenon's `origin` is. It reads the version and the
+   feed the release was packaged for from the app in the archive the appcast names, so it runs on Linux too, from those
+   files alone.
 
-The release workflow can do steps 2 and 4 instead, without a Mac ([On GitHub's runners](#on-githubs-runners)).
+The release workflow can do steps 2, 4 and 5 instead, without a Mac ([On GitHub's runners](#on-githubs-runners)).
 
 ### On GitHub's runners
 
-`.github/workflows/release.yml` does step 2 on one of GitHub's `macos-26` runners, and step 4 too with **publish**
-ticked, when it's run by hand, from **Actions → Release → Run workflow** or with:
+`.github/workflows/release.yml` does steps 2 and 4, and step 5 too with **publish** ticked, when it's run by hand,
+from **Actions → Release → Run workflow** or with:
 
 ```bash
 gh workflow run release.yml --repo ThaRae/Xenon --ref main
@@ -80,24 +90,114 @@ or, to publish what it builds:
 gh workflow run release.yml --repo ThaRae/Xenon --ref main -f publish=true
 ```
 
-It also runs on pull requests that change it. Before it builds, it checks the secrets: the certificate's SHA-1 and the
-update key's public half must be the ones [below](#setting-up-a-mac-to-release-from), so a secret holding another one
-stops the run at once. It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A
-cold build doesn't fit in one run, so with no caches to start from, it stops there. It runs `Meta/release.py test` with
-the release certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote: the
-archive's and the appcast's signatures, with `sign_update --verify`, the app's `SUPublicEDKey`, and the app's and the
-installer's code signatures.
+It also runs on pull requests that change it, `Meta/release.py`, the AppImage's scripts in `Meta/ci`, or `UI/Linux`.
+Its jobs:
 
-`Xenon-<version>.dmg`, `Xenon-<version>.tar.xz` and `appcast.xml` are the run's artifact, `Xenon-<version>`, for 30
-days, with the installer's and the archive's SHA-256 in the run's summary. The certificate and the update key are the
-repository's secrets ([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The run imports the
-certificate into a keychain of its own, and deletes the keychain and the key's file when it's done.
+- **macos**, on a `macos-26` runner. Before it builds, it checks the secrets: the certificate's SHA-1 and the update
+  key's public half must be the ones [below](#setting-up-a-mac-to-release-from), so a secret holding another one stops
+  the run at once. It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A cold
+  build doesn't fit in one run, so with no caches to start from, it stops there. It runs `Meta/release.py test` with
+  the release certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote:
+  the archive's and the appcast's signatures, with `sign_update --verify`, the app's `SUPublicEDKey`, and the app's
+  and the installer's code signatures. `Xenon-<version>.dmg`, `Xenon-<version>.tar.xz` and `appcast.xml` are the
+  artifact `Xenon-<version>-macos`. The certificate and the update key are the repository's secrets
+  ([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The job imports the certificate into a keychain
+  of its own, and deletes the keychain and the key's file when it's done.
+- **linux**, on an `ubuntu-24.04` runner, builds Xenon in Ladybird's CI image as CI's Linux job does, from `main`'s
+  build caches, and runs `Meta/release.py package` there (`Meta/ci/package-appimage.sh`). The AppImage, its `.zsync`
+  file and `linux-requirements.txt` (the glibc and libstdc++ it needs) are the artifact `Xenon-<version>-linux`, and
+  linuxdeploy's log is the artifact `linuxdeploy-log`.
+- **linux-test** runs `Meta/release.py test` against that AppImage in containers of Ubuntu 26.04, Fedora 44 and Arch
+  Linux that have nothing of the build ([Testing the AppImage](#testing-the-appimage)), with each one's render of the
+  welcome page as an artifact.
+- **publish**, with **publish** ticked, once the other three have passed: it downloads both artifacts into
+  `Build/distribution` and runs `Meta/release.py publish --yes`, which puts up the release, the appcast and the tag as
+  it does on a Mac, and the run's summary links the release. That needs the `XENON_RELEASES_TOKEN` secret, and the
+  run has to be on `main`. Before it builds, the macos job checks both, and that ThaRae/xenon-releases has no release
+  of `VERSION.txt`'s version yet, so a run that couldn't publish stops at once rather than after the build. If
+  publishing fails anyway, the release is still the run's artifacts.
 
-With **publish** ticked, it then runs `Meta/release.py publish --yes`, which puts up the release, the appcast, and the
-tag as it does on a Mac, and the run's summary links the release. That needs the `XENON_RELEASES_TOKEN` secret, and
-the run has to be on `main`. Before it builds, it checks both, and that ThaRae/xenon-releases has no release of
-`VERSION.txt`'s version yet, so a run that couldn't publish stops at once rather than after the build. If publishing
-fails anyway, the release is still the run's artifact.
+The artifacts are kept for 30 days, and the run's summary has each file's SHA-256.
+
+## The AppImage
+
+`Xenon-<version>-x86_64.AppImage` is one file that runs Xenon on Linux without installing anything: make it
+executable and run it. Inside is an AppDir laid out as the build's own prefix (`Build/release/xenon`, from
+`UI/Xenon.cmake`), where Xenon finds its helper processes and resources relative to its executable:
+
+| In the AppDir | What it is |
+| --- | --- |
+| `usr/bin/Xenon` | Xenon, and `qt.conf`, which points Qt at `usr/plugins` |
+| `usr/libexec/` | The engine's helper processes: WebContent, RequestServer, ImageDecoder, WebWorker, and the rest |
+| `usr/share/Lagom/` | Ladybird's resources, with Xenon's overrides and its own, as the build installs them |
+| `usr/plugins/` | Qt's plugins: the X11 and Wayland platforms, and what each needs to draw and take input, the image formats, and GeoClue for geolocation |
+| `usr/lib/` | Every library those load that systems don't bring themselves: the engine's, vcpkg's, Qt's |
+| `usr/share/applications/org.xenon.Xenon.desktop` | The desktop file (`UI/Linux`), which Xenon names as its own to Wayland and X11 |
+| `usr/share/icons/hicolor/` | The icon, in eight sizes (`UI/Icons/linux`, from `Meta/generate-app-icon.py`) |
+| `AppRun` | The entry point (`UI/Linux/AppRun`) |
+
+`Meta/release.py package`, on Linux, builds Xenon and copies all of that in, then runs
+[linuxdeploy](https://github.com/linuxdeploy/linuxdeploy), which copies in the libraries the binaries load, from the
+build, vcpkg's tree and the system. It leaves out the ones every system has its own of, which have to match the
+system's drivers and settings (its excludelist: glibc, libstdc++, OpenGL and EGL, the core of X11 and Wayland,
+fontconfig, freetype, harfbuzz...), and makes every rpath relative: `$ORIGIN/../lib` for the executables, so the
+helpers find their libraries without the environment, which the engine doesn't pass on to them.
+[appimagetool](https://github.com/AppImage/appimagetool) then packs the AppDir behind the
+[type 2 runtime](https://github.com/AppImage/type2-runtime), which mounts it with FUSE when it runs. All three are
+pinned releases, kept under `Build/tools/appimage` and checked against their SHA-256 before each run. `package`
+checks the AppDir before it packs it: every rpath relative, and no library missing or loaded from the build. Then it
+reports the newest glibc and libstdc++ symbol versions anything in it uses, in `linux-requirements.txt` too.
+
+`AppRun` unsets `QT_PLUGIN_PATH`, since the system's Qt plugins are built for another Qt, and points OpenSSL at the
+system's certificates (`SSL_CERT_FILE`), unless the environment already does: the AppImage's OpenSSL looks in
+`/etc/ssl`, which isn't where every distribution keeps them, Fedora among them.
+
+The update information in the AppImage, `gh-releases-zsync|ThaRae|xenon-releases|latest|Xenon-*-x86_64.AppImage.zsync`,
+tells [AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate), and the AppImage managers that use it
+(Gear Lever, AppImageLauncher), to update it from the newest release, downloading only the blocks that changed. Xenon
+doesn't check for updates itself on Linux (`UI/Updater.cpp`), and the AppImage isn't signed.
+
+### Where it runs
+
+An AppImage brings its own libraries, but not glibc or libstdc++, so it runs on systems whose glibc and libstdc++ are
+at least as new as the newest symbol versions it uses. Built in Ladybird's CI image, which is Ubuntu 26.04, that's
+`GLIBC_2.43`, `GLIBCXX_3.4.32` and `CXXABI_1.3.15` (Xenon 0.1.0; `package` reports them for each release): glibc 2.43
+and the libstdc++ of GCC 13.2 or later. That means Ubuntu 26.04 and later, Fedora 44 and later, and Arch Linux, which
+the release workflow tests it on, and other distributions as new; not Fedora 43 (glibc 2.42), Debian 13 (2.41) or
+Ubuntu 24.04 (2.39). The system also needs FUSE, as for any AppImage (`fuse3`, which desktop installs have), or
+`--appimage-extract-and-run`.
+
+Building in an older image would widen that, but Xenon needs Qt 6.10, a compiler and a C++ library new enough for
+Ladybird, and Ladybird's Rust toolchain, and only Ladybird's image is tested with all of them; older distributions
+have Qt 6.4 (Ubuntu 24.04) or 6.8 (Debian 13), so Qt would have to come from vcpkg, as on macOS. A Flatpak, whose
+runtime brings glibc, is the likelier way to older systems.
+
+### Building one on Linux
+
+On Linux, `package` packages the build of `Meta/xenon.py build`, so it needs what that needs, and Qt's Wayland plugin
+and geolocation backends, which Ubuntu has in `qt6-wayland` and `libqt6positioning6-plugins`, and binutils. The release
+workflow builds in Ladybird's CI image (`Meta/ci/build-in-ladybird-image.sh Meta/ci/package-appimage.sh`), which is
+the system the AppImage's requirements come from, so building on a newer one raises them.
+
+```bash
+./Meta/release.py package    # writes Build/distribution/Xenon-<version>-x86_64.AppImage and its .zsync file
+./Meta/release.py test       # runs Meta/xenon.py test's checks against it
+```
+
+### Testing the AppImage
+
+`Meta/release.py test`, on Linux, first checks that the system has every library the AppImage leaves to it, with
+every function the AppImage uses from them (`ldd -r`). Then it runs `Meta/xenon.py test`'s checks of a running Xenon
+against the AppImage, as it's run once downloaded: it loads and renders `about:welcome`, keeps to Xenon's directories
+on a fresh start, blocks what the bundled filter lists block, takes filter list updates, shows the blocking dashboard
+and the certificate warning, runs extensions, sends WebAuthn requests to the UI process, installs password managers,
+and opens Xenon's windows for session restore. Then it loads `https://example.com` over HTTPS, with the system's
+certificates. `--appimage <file>` tests another AppImage.
+
+`Meta/ci/test-appimage.sh <image>` runs it in a container of a distribution's image (Ubuntu or Debian, Fedora, Arch
+Linux) with only what a desktop system has: the libraries the AppImage leaves to the system, fonts, certificates, a
+D-Bus session, Xvfb and FUSE. Nothing of the build is there, so a library the AppImage misses fails it there rather
+than on someone's machine. The release workflow runs it on Ubuntu 26.04, Fedora 44 and Arch Linux.
 
 ## Signing
 
@@ -137,7 +237,8 @@ yet.
 ## In Xenon
 
 `UI/Updater.mm` runs Sparkle. Development builds have no appcast URL or key in their `Info.plist`, so they don't
-update themselves; Settings says so. `UI/Updater.cpp` stands in elsewhere than macOS. Sparkle is fetched by
+update themselves; Settings says so. `UI/Updater.cpp` stands in elsewhere than macOS, where Xenon doesn't update
+itself: AppImage updaters update the AppImage ([The AppImage](#the-appimage)). Sparkle is fetched by
 `UI/Xenon.cmake`, as its release at a pinned SHA-256, and goes in `Contents/Frameworks`.
 
 While **Update Xenon automatically** (**Settings → Updates**) and **Let Xenon connect on its own** (**Settings →

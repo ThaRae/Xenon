@@ -9,6 +9,7 @@
 #include <LibURL/URL.h>
 #include <LibWebView/SessionStore.h>
 #include <LibWebView/URL.h>
+#include <LibWebView/UserAgent.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Application.h>
 #include <UI/BookmarkDialog.h>
@@ -597,6 +598,25 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
         },
         .hide_mode = Core::ArgsParser::OptionHideMode::None,
     });
+}
+
+// Xenon presents itself as the platform's Chrome, so its User-Agent and client hints blend in with the largest crowd
+// of browsers. The preset matches the default User-Agent's shape; selecting it keeps the Spoof User Agent menu honest.
+void Application::create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions& web_content_options)
+{
+    if (web_content_options.user_agent_preset.has_value() || web_content_options.is_test_mode == WebView::IsTestMode::Yes)
+        return;
+
+#if defined(AK_OS_MACOS)
+    static constexpr auto chrome_preset = "Chrome macOS Desktop"sv;
+#elif defined(AK_OS_LINUX) && !defined(AK_OS_ANDROID)
+    static constexpr auto chrome_preset = "Chrome Linux Desktop"sv;
+#else
+    // No preset for this platform; the default User-Agent is already Chrome's for it.
+    static constexpr StringView chrome_preset {};
+#endif
+    if (!chrome_preset.is_empty() && WebView::user_agents.contains(chrome_preset))
+        web_content_options.user_agent_preset = chrome_preset;
 }
 
 void Application::initialize_extensions()

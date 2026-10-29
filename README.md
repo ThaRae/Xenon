@@ -4,7 +4,7 @@ Xenon is a web browser built on the [Ladybird](https://ladybird.org) engine. It 
 [Helium](https://helium.computer): uBlock Origin's ad blocking built in, !bangs in the address bar, a choice of layouts,
 and a private, low-noise setup.
 
-It's early. macOS is the main platform; Linux builds and passes its tests in CI.
+It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 
 ## What it does
 
@@ -27,6 +27,7 @@ It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 - uBlock Origin's filter lists and features built in, scriptlets for YouTube ads and anti-adblock walls included
 - A popup and dashboard laid out like uBlock Origin's, with an element picker
 - The lists update daily, from a signed source
+- Fingerprinting protection inspired by Brave: canvas, audio, and hardware details differ slightly per site and session, and Xenon identifies itself as Chrome
 
 **Password managers**
 
@@ -58,6 +59,17 @@ Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases
 macOS asks you to allow it in **System Settings → Privacy & Security → Open Anyway**. After that, Xenon updates
 itself.
 
+On Linux, download `Xenon-<version>-x86_64.AppImage`, make it executable, and run it:
+
+```bash
+chmod +x Xenon-*-x86_64.AppImage
+./Xenon-*-x86_64.AppImage
+```
+
+It needs a recent distribution: Ubuntu 26.04 or later, Fedora 44 or later, or Arch Linux. It doesn't update itself;
+[AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate), or an AppImage manager like Gear Lever, updates
+it from the next release.
+
 ## Building it
 
 On macOS, with Xcode, CMake 3.30+, and Rust (via rustup) installed:
@@ -81,6 +93,7 @@ incremental. The app ends up at `Build/release/bin/Xenon.app`.
 | [Extensions.md](Documentation/Extensions.md) | How Chrome extensions run in Xenon, and how far each password manager gets |
 | [WebAuthn.md](Documentation/WebAuthn.md) | Security key support |
 | [FilterListUpdates.md](Documentation/FilterListUpdates.md) | How the daily filter list updates are built, signed, and checked |
+| [Fingerprinting.md](Documentation/Fingerprinting.md) | How fingerprinting protection works, and how it relates to Brave's |
 | [Updates.md](Documentation/Updates.md) | How releases are made and signed, and how Xenon updates itself |
 | [CLAUDE.md](CLAUDE.md) | The rules for changing Xenon |
 

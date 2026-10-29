@@ -93,7 +93,8 @@ def python_sources() -> list[Path]:
 
 
 def shell_sources() -> list[Path]:
-    scripts = sorted((XENON_SOURCE_DIR / "Meta").rglob("*.sh"))
+    # The AppImage's entry point is a script too (Meta/release.py).
+    scripts = sorted((XENON_SOURCE_DIR / "Meta").rglob("*.sh")) + [XENON_SOURCE_DIR / "UI" / "Linux" / "AppRun"]
     hooks = XENON_SOURCE_DIR / ".githooks"
     return scripts + (sorted(path for path in hooks.iterdir() if path.is_file()) if hooks.exists() else [])
 
@@ -365,12 +366,21 @@ def ladybird_ci_versions() -> dict[str, str]:
     }
 
 
+# A venv's python runs the Python that made it, so updating that Python (as Homebrew does between patch releases, and
+# then removes the old one) breaks the venv without changing its stamp.
+def venv_python_runs(bin_dir: Path) -> bool:
+    try:
+        return subprocess.run([bin_dir / "python", "-c", ""], capture_output=True).returncode == 0
+    except OSError:
+        return False
+
+
 def tools_venv(versions: dict[str, str]) -> Path:
     stamp = f"clang-format~={versions['llvm']}.1 ruff=={versions['ruff']} pyyaml=={PYYAML_VERSION}"
     bin_dir = TOOLS_DIR / "venv" / "bin"
     stamp_file = TOOLS_DIR / "venv" / "xenon-tools"
 
-    if not stamp_file.exists() or stamp_file.read_text() != stamp:
+    if not stamp_file.exists() or stamp_file.read_text() != stamp or not venv_python_runs(bin_dir):
         print(f"Installing {stamp} into {relative(TOOLS_DIR)}", flush=True)
         shutil.rmtree(TOOLS_DIR / "venv", ignore_errors=True)
         venv.create(TOOLS_DIR / "venv", with_pip=True)
