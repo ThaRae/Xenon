@@ -34,6 +34,8 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 
+import patches
+
 XENON_SOURCE_DIR = Path(__file__).resolve().parent.parent
 MEASURE_CRATE_DIR = XENON_SOURCE_DIR / "Meta" / "ci" / "memory-measurement"
 FILTER_LISTS_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "filter-lists"
@@ -189,8 +191,11 @@ def main() -> int:
     }
     log_path.write_text(json.dumps(payload, indent=2) + "\n")
     print(f"wrote {log_path}", flush=True)
-    # A benchmark run that lost a test still writes what the others measured, and then fails.
-    if result.get("failures") or result.get("returncode"):
+    # As Ladybird's runners do, a run that lost a test still counts, with the test named, and fails only when nothing was
+    # measured.
+    if result.get("failures") and os.environ.get("CI"):
+        print(f"::warning title={args.command}::Left out, as they didn't finish: {', '.join(result['failures'])}")
+    if result.get("returncode") or result.get("results") == {}:
         return 1
     return 0
 
@@ -602,7 +607,8 @@ def run_ladybird_benchmarks(name: str, ref: str, arguments: list[str]) -> dict:
         "repository": LADYBIRD_BENCHMARKS[name],
         "commit": commit,
         "xenon_commit": source_commit(XENON_SOURCE_DIR),
-        "ladybird_commit": source_commit(XENON_SOURCE_DIR / "ladybird"),
+        # The commit the patches were applied to; ladybird/'s HEAD is the patched branch.
+        "ladybird_commit": patches.applied_base(),
         "host": host_description(),
         "seconds": time.time() - started,
         "returncode": process.returncode,
@@ -646,8 +652,12 @@ class Measure:
 
     def text(self) -> str:
         unit = "" if self.higher_is_better else " s"
-        spread = f" ± {self.stdev:.3g}" if len(self.runs) > 1 else ""
-        return f"{self.mean:.4g}{spread}{unit}"
+        spread = f" ± {number_text(self.stdev, 3)}" if len(self.runs) > 1 else ""
+        return f"{number_text(self.mean, 4)}{spread}{unit}"
+
+
+def number_text(value: float, digits: int) -> str:
+    return f"{value:,.0f}" if abs(value) >= 10 ** (digits - 1) else f"{value:.{digits}g}"
 
 
 def ladybird_benchmark_measures(command: str, results: dict) -> tuple[dict, dict]:
@@ -795,7 +805,9 @@ def report_browserbench(payload: dict, baseline: dict | None) -> str:
         score = suite.get("score")
         old = old_scores.get(suite["suite"])
         change = f"{(score / old - 1) * 100:+.1f}%" if score and old else ""
-        rows.append([suite["suite"], f"{score:.4g}" if score else "no score", f"{old:.4g}" if old else "", change])
+        rows.append(
+            [suite["suite"], number_text(score, 4) if score else "no score", number_text(old, 4) if old else "", change]
+        )
     lines = [
         "#### BrowserBench",
         "",
