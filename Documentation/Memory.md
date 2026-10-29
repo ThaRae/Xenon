@@ -64,6 +64,19 @@ YouTube with blocking on still adds ~130 MiB in the page's own process versus bl
 of that; the rest is what the lists inject, most likely uBlock Origin's YouTube scriptlets wrapping `fetch` / XHR /
 `JSON.parse`. Pinning that down needs a JS heap profile in a real build.
 
+Linux (AlmaLinux 10 host, Xenon built and run in `ghcr.io/ladybirdbrowser/ladybird-ci:2026.10.16`, headless, 25 s after
+load, PSS so shared mappings are not double-counted), two runs, `Meta/measure.py browsers`:
+
+| Page | Blocking on PSS (run 1 / 2) | Blocking off PSS (run 1 / 2) |
+| --- | ---: | ---: |
+| Local page with cross-site frames | 644 / 644 | 444 / 445 |
+| github.com/LadybirdBrowser/ladybird | 1212 / 1246 | 1225 / 1224 |
+| youtube.com | 2496 / 2495 | 2108 / 2249 |
+| x.com (login wall) | 1413 / 1431 | 1308 / 1309 |
+
+YouTube with blocking on is ~390 MiB PSS above blocking off on this machine. GitHub is slightly *lower* with blocking
+on. JSON: `Meta/measure-results/browsers-1.json` and `browsers-2.json`.
+
 ## Experiments
 
 | # | Change | What it does | Delta | Keep? | Portability |

@@ -206,6 +206,7 @@ def measure_browsers(xenon_path: Path, chrome_path: Path | None, settle: float, 
             print(f"### {page}", flush=True)
             for label, blocking in (("Xenon, blocking on", True), ("Xenon, blocking off", False)):
                 results.append(run_browser(label, xenon_command(xenon, page, blocking), settle))
+                time.sleep(2)
             if chrome_path is not None:
                 chrome = chrome_executable(chrome_path)
                 results.append(
