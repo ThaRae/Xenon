@@ -42,6 +42,14 @@ Ladybird opens new tabs blank, so Xenon makes `about:newtab` the new tab page of
 complete (`UI/main.cpp`). **Settings → Startup and pages** can change it, and its reset button goes back to
 `about:newtab`.
 
+As in Chrome, the address bar never shows the new tab page's address. It stays empty, with its placeholder, after
+it loses focus and when you press Escape, as well as when the tab is selected again, moved to another window,
+restored after a restart, woken from hibernation, or taken back to the page. Ladybird shows the address once the
+bar loses focus. A tab with nothing else to give focus back to focuses the bar, as it did when it opened, and the
+tab and window are titled "New Tab" rather than the address while the page loads. An internal page picked in its
+place, such as `about:blank`, is treated the same. A web page picked there shows its address once you leave the
+bar, as in Ladybird (`NewTabPage::should_hide_url()`, `UI/LocationEdit.cpp`).
+
 ### Settings
 
 `about:settings` (**Settings** in the menu) puts Xenon's own settings first, as Helium's does, and keeps Ladybird's

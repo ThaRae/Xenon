@@ -16,6 +16,7 @@
 #include <UI/Icon.h>
 #include <UI/LocationEdit.h>
 #include <UI/Menu.h>
+#include <UI/NewTabPage.h>
 #include <UI/StringUtils.h>
 #include <UI/XenonSettings.h>
 
@@ -498,10 +499,13 @@ void LocationEdit::focusOutEvent(QFocusEvent* event)
     m_should_show_full_url_on_mouse_release = false;
 
     if (m_url_is_hidden) {
-        m_url_is_hidden = false;
-        m_has_user_edited_hidden_url = false;
-        if (text().isEmpty() && m_url.has_value())
-            setText(display_url());
+        // Xenon: A new tab page's URL stays hidden, rather than showing once the address bar loses focus.
+        if (!url_stays_hidden()) {
+            m_url_is_hidden = false;
+            m_has_user_edited_hidden_url = false;
+            if (text().isEmpty() && m_url.has_value())
+                setText(display_url());
+        }
     } else if (m_url.has_value() && text() == serialized_url()) {
         setText(display_url());
     }
@@ -581,7 +585,10 @@ void LocationEdit::keyPressEvent(QKeyEvent* event)
     if (event->key() == Qt::Key_Escape) {
         if (m_omnibox.escape_pressed() == WebView::Omnibox::EscapeAction::ClosedPopup)
             return;
-        if (m_url.has_value())
+        // Xenon: Nor does Escape show a hidden URL.
+        if (m_url_is_hidden)
+            setText({});
+        else if (m_url.has_value())
             setText(serialized_url());
         clearFocus();
         emit focus_return_requested();
@@ -956,7 +963,14 @@ void LocationEdit::set_text_and_restart_editing(QString const& text)
 
 void LocationEdit::set_url(Optional<URL::URL> url)
 {
+    // Xenon: A new tab page hides its URL however the tab came to it (restored, woken from hibernation, or gone back
+    //        to), and the page the tab goes on to shows its own.
+    auto url_was_hidden_for_good = url_stays_hidden();
     m_url = AK::move(url);
+    if (url_stays_hidden())
+        set_url_is_hidden(true);
+    else if (url_was_hidden_for_good)
+        set_url_is_hidden(false);
 
     if (m_url_is_hidden) {
         if (!m_has_user_edited_hidden_url)
@@ -1071,6 +1085,11 @@ int LocationEdit::serialized_url_position_for_display_position(int display_posit
     }
 
     return last_serialized_position;
+}
+
+bool LocationEdit::url_stays_hidden() const
+{
+    return m_url.has_value() && NewTabPage::should_hide_url(*m_url);
 }
 
 bool LocationEdit::text_matches_current_url() const

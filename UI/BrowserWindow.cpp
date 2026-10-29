@@ -271,6 +271,8 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
                 focus_widget = location_edit;
             else if (auto* tab_focus_widget = tab->focusWidget(); tab_focus_widget && tab->isAncestorOf(tab_focus_widget))
                 focus_widget = tab_focus_widget;
+            else if (auto* location_edit = tab->location_edit_with_hidden_url())
+                focus_widget = location_edit;
 #if defined(AK_OS_MACOS)
             make_appkit_window_first_responder(*focus_widget);
 #endif

@@ -85,6 +85,7 @@ private:
     void schedule_chrome_style_update();
     void animate_focus_glow(int target_alpha);
     void highlight_location();
+    bool url_stays_hidden() const;
     bool text_matches_current_url() const;
     QString serialized_url() const;
     QString display_url() const;

@@ -468,6 +468,11 @@ target_sources(TestXenonNativeMessaging PRIVATE "${XENON_UI_DIR}/Extensions/Nati
 target_include_directories(TestXenonNativeMessaging BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_compile_definitions(TestXenonNativeMessaging PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
 
+# The rule for which pages the address bar leaves the URL out for. The address bar itself needs a running browser.
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestNewTabPage.cpp" Xenon NAME TestXenonNewTabPage LIBS LibURL LibWebView)
+target_sources(TestXenonNewTabPage PRIVATE "${XENON_UI_DIR}/NewTabPage.cpp")
+target_include_directories(TestXenonNewTabPage BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestRecentTabOrder.cpp" Xenon NAME TestXenonRecentTabOrder)
 target_include_directories(TestXenonRecentTabOrder BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
@@ -495,4 +500,4 @@ target_sources(TestXenonBlockingPopover PRIVATE
 target_include_directories(TestXenonBlockingPopover BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonBlockingPopover PRIVATE Qt::Core Qt::Gui Qt::Widgets)
 
-add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonRecentTabOrder TestXenonUserAgent)
+add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUserAgent)
