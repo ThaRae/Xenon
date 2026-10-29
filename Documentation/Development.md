@@ -143,7 +143,8 @@ that step, the accessibility bridges. The Python packages Ladybird's CI installs
 `test-web`'s TLS tests, `six` for WPT's WebSocket server) go in a virtual environment in the build directory. A patch
 that changes what an upstream test checks updates that test's expectation in the same patch, as it would upstream. CI
 runs it after `Meta/xenon.py test` on Linux and macOS; when a web test fails, the `ladybird-test-dumps-linux` or
-`-macos` artifact has what it rendered or printed.
+`-macos` artifact has what it rendered or printed. A test may run for 30 minutes, as in Ladybird's CI; `--timeout`
+gives it longer, which the Sanitizer workflow does.
 
 Should Xenon not finish loading `about:welcome` at all, the checks after it, which all load pages, are skipped rather
 than each waiting out its timeouts, which would add up to more than CI gives the job. A helper process that crashes on a
@@ -158,7 +159,7 @@ CI runs on GitHub Actions, on GitHub's own runners:
 | `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
 | `.github/workflows/release.yml` | by hand, pull requests that change it or how releases are packaged | `Meta/release.py test` and `package` on macOS, and `package` on Linux in Ladybird's CI image, from `main`'s build caches, with the installer, archive and appcast, and the AppImage, as artifacts; `Meta/release.py test` against the AppImage on Ubuntu 26.04, Fedora 44 and Arch Linux; and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases once all of that passed |
 | `.github/workflows/test262.yml` | pull requests and pushes to `main` that change the patches or move the submodule, by hand | `Meta/test262.py` on Linux in Ladybird's CI image, from `main`'s build caches, building only `test262-runner`; the summary has the counts beside Ladybird's and every test whose result differs |
-| `.github/workflows/sanitizer.yml` | nightly on `main` when it changed since the last run that passed, by hand, pull requests that change it | Xenon built with Ladybird's Sanitizer preset (AddressSanitizer and UndefinedBehaviorSanitizer) on Linux in Ladybird's CI image, running `Meta/xenon.py test`, and Ladybird's own tests once `Meta/xenon.py` has `ladybird-test` (`Meta/ci/sanitizer.sh`); it fails on any error the sanitizers report, which are an artifact |
+| `.github/workflows/sanitizer.yml` | nightly on `main` when it changed since the last run that passed, by hand, pull requests that change it | Xenon built with Ladybird's Sanitizer preset (AddressSanitizer and UndefinedBehaviorSanitizer) on Linux in Ladybird's CI image, running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test` with the options Ladybird's Sanitizer test preset sets (`Meta/ci/sanitizer.sh`); it fails if either does, or on any error the sanitizers report in Xenon's tests, and the reports are an artifact |
 | `.github/workflows/benchmarks.yml` | weekly on `main`, by hand, pull requests that change it | Ladybird's web-benchmarks in headless Xenon and its js-benchmarks in the `js` and `wasm` REPLs, on Linux and macOS, from `main`'s build caches, and BrowserBench on the weekly run (`Meta/ci/benchmarks.sh`); each job's summary compares with `main`'s last run, and the results are kept for 90 days ([Memory.md](Memory.md#benchmarks)) |
 | `.github/workflows/memory.yml` | by hand | `Meta/measure.py content-blocker` on Linux and macOS, and with **browsers** ticked, a macOS build measured headless beside Chrome ([Memory.md](Memory.md)) |
 

@@ -2,8 +2,8 @@ name: Sanitizer
 
 # Ladybird's Sanitizer configuration, AddressSanitizer and UndefinedBehaviorSanitizer with its CMake preset and vcpkg
 # triplet, which Ladybird's CI builds and tests every change in (ladybird/.github/workflows/ci.yml and nightly-lagom.yml),
-# applied to Xenon: Meta/ci/sanitizer.sh builds Xenon with it, runs Xenon's tests, and Ladybird's own once Meta/xenon.py
-# has ladybird-test, and fails on anything the sanitizers report.
+# applied to Xenon: Meta/ci/sanitizer.sh builds Xenon with it, runs Xenon's tests and then Ladybird's own against the
+# patched engine (Meta/xenon.py ladybird-test), and fails if either fails or the sanitizers find errors in Xenon's.
 #
 # Nightly on main, when main has changed since the last run that passed, by hand on any branch, and on pull requests that
 # change it. Linux only, in Ladybird's CI image, with build caches of its own: the Sanitizer preset builds every
@@ -98,9 +98,13 @@ jobs:
             echo "### Linux, Sanitizer"
             echo
             echo "Ladybird \`$(git -C ladybird rev-parse --short HEAD)\`, CI image \`$IMAGE_VERSION\`"
-            reports=$(find Build/sanitizer/sanitizer-logs -type f 2> /dev/null | wc -l)
             echo
-            echo "Sanitizer reports: $reports (artifact \`sanitizer-logs\`)"
+            for tests in xenon ladybird; do
+              reports=$(find "Build/sanitizer/sanitizer-logs/$tests" -type f 2> /dev/null | wc -l)
+              echo "- Sanitizer reports from ${tests^}'s tests: $reports"
+            done
+            echo
+            echo "The reports are in the \`sanitizer-logs\` artifact."
             if [ -f Build/sanitizer/ccache-stats.txt ]; then
               echo
               echo '```'

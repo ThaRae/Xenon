@@ -174,6 +174,12 @@ def main():
         "ladybird-test", help="Build Ladybird's own tests and run them against the patched engine"
     )
     ladybird_test_parser.add_argument("--no-build", action="store_true")
+    ladybird_test_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=LADYBIRD_TEST_TIMEOUT_SECONDS,
+        help=f"How long one test may run, in seconds (default {LADYBIRD_TEST_TIMEOUT_SECONDS})",
+    )
     subparsers.add_parser("clean", help="Delete the build directory for the preset")
 
     args = parser.parse_args()
@@ -201,7 +207,7 @@ def main():
         enable_ladybird_tests(build_dir)
         if not args.no_build:
             build_main(build_dir, args.jobs)
-        ladybird_test_main(build_dir)
+        ladybird_test_main(build_dir, args.timeout)
 
 
 def configure_build_env(preset: str, jobs: str | None) -> tuple[Path, Path]:
@@ -322,8 +328,8 @@ def test_main(platform: Platform, build_dir: Path):
 
 # Runs Ladybird's own tests (AK and the libraries' unit tests, test-js, test-web's web tests, the Rust crates' tests) against
 # the engine with Xenon's patches, as Ladybird's CI runs them, so that a patch that breaks something upstream tests says so.
-# TESTS_ONLY has the unit tests skip their benchmarks.
-def ladybird_test_main(build_dir: Path):
+# TESTS_ONLY has the unit tests skip their benchmarks. timeout is how long one test may run, in seconds.
+def ladybird_test_main(build_dir: Path, timeout: int):
     os.environ["TESTS_ONLY"] = "1"
     paths = [ladybird_test_python_packages(build_dir), os.environ.get("PYTHONPATH")]
     os.environ["PYTHONPATH"] = os.pathsep.join(path for path in paths if path)
@@ -334,7 +340,7 @@ def ladybird_test_main(build_dir: Path):
             build_dir,
             "--output-on-failure",
             "--timeout",
-            str(LADYBIRD_TEST_TIMEOUT_SECONDS),
+            str(timeout),
             "--exclude-regex",
             LADYBIRD_TESTS_EXCLUDED,
         ]
