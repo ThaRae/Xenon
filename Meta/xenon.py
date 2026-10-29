@@ -969,7 +969,7 @@ def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
 
 # Each compositor context drops the rasters it caches once it has painted nothing for a while: after 30 s while it is
 # visible, as a headless page is, and after 4 s once it is hidden (Services/Compositor/CompositorState.cpp, engine patch
-# 0048). With LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG set, the compositor logs each context it releases, with the bytes it
+# 0049). With LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG set, the compositor logs each context it releases, with the bytes it
 # dropped, each one it keeps, and each frame and screenshot, with whether it painted released rasters again.
 COMPOSITOR_VISIBLE_RELEASE_DELAY = 30
 COMPOSITOR_RELEASE_PATTERN = re.compile(

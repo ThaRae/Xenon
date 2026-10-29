@@ -177,7 +177,7 @@ Besides hibernating whole tabs, Xenon doesn't keep processes that nothing is usi
 - The compositor drops the images it keeps to redraw a page quickly (its SVG images and repeated backgrounds, drawn
   once) when the page has drawn nothing for 30 seconds, or 4 seconds after its tab is hidden, when it drops its text too.
   Each tab and frame is timed on its own, so an animation in one doesn't hold another's. The memory goes back to the
-  system, and the next frame draws what it needs again (`0048`).
+  system, and the next frame draws what it needs again (`0049`).
 
 [Memory.md](Memory.md) has the measurements.
 
