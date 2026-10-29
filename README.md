@@ -44,7 +44,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 - A welcome flow that asks three questions (search engine, blocking, password manager) or takes Xenon's picks
 - A new tab page with your most visited sites
 - A settings page with Xenon's own settings first
-- Updates itself on macOS, from signed releases, when you quit
+- Updates itself on macOS, from signed releases, when you quit, or sooner from the toolbar's Update button
 
 [Documentation/Features.md](Documentation/Features.md) describes each feature: how to use it, what it does in edge
 cases, and where it lives in the code.

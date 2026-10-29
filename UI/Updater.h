@@ -48,6 +48,8 @@ struct Status {
     // Why the last check, download or install failed, until one succeeds.
     Optional<ByteString> error;
 };
+// NB: In builds that don't update themselves, XENON_TEST_UPDATE_READY=<version> stands in for an update that's ready,
+//     so that tests can see what Xenon offers then without a release to update to. Relaunching then only quits.
 Status status();
 
 // Called whenever the status changes, until the callback returns false.
@@ -57,10 +59,16 @@ void on_status_change(Function<bool()>);
 // Check now.
 void check_for_updates();
 
-// Installs the update that's ready, and relaunches Xenon once every page has agreed to close.
+// Installs the update that's ready, and relaunches Xenon once every page has agreed to close. Every window reopens
+// then, as Chrome's do, whatever the startup setting says (relaunched_to_update()). UI/RelaunchToUpdate.h says first
+// what doesn't reopen.
 void install_and_relaunch();
 
-// Check for Updates…, which macOS shows in the application menu. None where Xenon doesn't update itself.
+// Whether this launch is the relaunch that install_and_relaunch() asked for, with the update installed.
+bool relaunched_to_update();
+
+// Check for Updates…, which macOS shows in the application menu, or Relaunch to Update while an update is ready. None
+// where Xenon doesn't update itself.
 QAction* create_check_for_updates_action(QObject& parent);
 
 }

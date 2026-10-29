@@ -5,10 +5,15 @@
  */
 
 #include <AK/Vector.h>
+#include <LibCore/Environment.h>
 #include <LibWebView/Application.h>
+#include <UI/RelaunchToUpdate.h>
+#include <UI/StringUtils.h>
 #include <UI/XenonSettings.h>
 
 #include <QAction>
+#include <QCoreApplication>
+#include <QPointer>
 
 #import <Cocoa/Cocoa.h>
 #import <Sparkle/Sparkle.h>
@@ -23,6 +28,8 @@ namespace Ladybird::Updater {
 // What Meta/release.py writes into a release's Info.plist: where the appcast is, and the key its updates are signed with.
 static NSString* const FEED_URL_KEY = @"SUFeedURL";
 static NSString* const PUBLIC_KEY_KEY = @"SUPublicEDKey";
+// Where install_and_relaunch() notes the version it installs, for the relaunch to find (relaunched_to_update()).
+static NSString* const RELAUNCH_VERSION_KEY = @"XenonRelaunchToUpdateVersion";
 
 class SettingsFollower;
 
@@ -49,6 +56,18 @@ static bool is_release_build()
 static ByteString to_byte_string(NSString* string)
 {
     return ns_string_to_string(string).to_byte_string();
+}
+
+// XENON_TEST_UPDATE_READY's stand-in for an update that's ready, which only development builds take (UI/Updater.h).
+static Optional<ByteString> const& test_ready_version()
+{
+    static auto const version = []() -> Optional<ByteString> {
+        auto value = Core::Environment::get("XENON_TEST_UPDATE_READY"sv);
+        if (is_release_build() || !value.has_value() || value->is_empty())
+            return {};
+        return ByteString { *value };
+    }();
+    return version;
 }
 
 // Sparkle checks and downloads by itself only while both of Xenon's switches allow it. Checking from the menu still works
@@ -112,6 +131,13 @@ ByteString version()
 
 Status status()
 {
+    if (auto const& stand_in = test_ready_version(); stand_in.has_value()) {
+        Status status;
+        status.availability = Availability::Available;
+        status.ready_version = stand_in;
+        return status;
+    }
+
     auto status = s_status;
     status.availability = is_release_build() ? Availability::Available : Availability::DevelopmentBuild;
     return status;
@@ -130,21 +156,66 @@ void check_for_updates()
 
 void install_and_relaunch()
 {
+    // The stand-in has nothing to install, so Xenon only quits, through the system as Sparkle has it do, which asks every
+    // page first too.
+    if (auto const& stand_in = test_ready_version(); stand_in.has_value()) {
+        dbgln("Relaunching to update to Xenon {}, which XENON_TEST_UPDATE_READY stands in for, so Xenon only quits", *stand_in);
+        QCoreApplication::quit();
+        return;
+    }
+
     // Sparkle starts the installer, then asks the application to quit, which asks every page first (Application::quit()).
     // A page that keeps Xenon open leaves the update to install at the next quit.
-    if (s_install_now)
-        s_install_now();
+    if (!s_install_now || !s_status.ready_version.has_value())
+        return;
+    [[NSUserDefaults standardUserDefaults] setObject:string_to_ns_string(*s_status.ready_version) forKey:RELAUNCH_VERSION_KEY];
+    s_install_now();
+}
+
+bool relaunched_to_update()
+{
+    // NB: The session store and main() both ask as Xenon starts, so the note is read once, then forgotten.
+    static auto const relaunched = [] {
+        auto* defaults = [NSUserDefaults standardUserDefaults];
+        NSString* installing = [defaults stringForKey:RELAUNCH_VERSION_KEY];
+        if (!installing)
+            return false;
+        [defaults removeObjectForKey:RELAUNCH_VERSION_KEY];
+        // A relaunch that a page turned down leaves the update to install when Xenon next quits, and the windows reopen
+        // after that one instead.
+        return to_byte_string(installing) == version();
+    }();
+    return relaunched;
 }
 
 QAction* create_check_for_updates_action(QObject& parent)
 {
     // NB: The menus exist before the updater starts.
-    if (!is_release_build())
+    if (!is_release_build() && !test_ready_version().has_value())
         return nullptr;
 
-    auto* action = new QAction("Check for &Updates…", &parent);
+    auto* action = new QAction(&parent);
     action->setMenuRole(QAction::ApplicationSpecificRole);
-    QObject::connect(action, &QAction::triggered, &parent, [] { check_for_updates(); });
+
+    // While an update is ready, the item installs it instead, as macOS apps' menus do.
+    auto update_action = [action = QPointer<QAction> { action }] {
+        if (!action)
+            return false;
+        if (auto ready_version = status().ready_version; ready_version.has_value())
+            action->setText(qformatted("Relaunch to Update to {}", *ready_version));
+        else
+            action->setText("Check for &Updates…");
+        return true;
+    };
+    update_action();
+    on_status_change(move(update_action));
+
+    QObject::connect(action, &QAction::triggered, &parent, [] {
+        if (status().ready_version.has_value())
+            RelaunchToUpdate::relaunch(nullptr);
+        else
+            check_for_updates();
+    });
     return action;
 }
 

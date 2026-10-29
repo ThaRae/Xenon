@@ -118,6 +118,11 @@ CERTIFICATE_ERROR_TEST_MARKER = "XENON-CERTIFICATE-ERROR-TEST "
 # A page that tries WebAuthn and prints what it found on a line starting with this.
 WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
 
+# XENON_TEST_UPDATE_READY stands in for an update that's ready, in builds that don't update themselves (UI/Updater.h).
+# The toolbar's Update button says so on a line like this when it shows for a version.
+UPDATE_STAND_IN_VERSION = "99.0.0"
+UPDATE_BUTTON_SHOWN = "The toolbar offers to relaunch to update to Xenon "
+
 # Xenon saves the session a second after a change (UI/SessionSaving.cpp). The session restore check waits this long after
 # its changes before it kills Xenon.
 SESSION_SAVE_WAIT_SECONDS = 3
@@ -241,14 +246,20 @@ def run_main(platform: Platform, build_dir: Path, args: list[str]):
 def test_main(platform: Platform, build_dir: Path):
     failures = []
 
+    # The unit tests that draw Xenon's popovers and buttons save how they look beside the welcome page's render, which CI
+    # keeps.
+    smoke_dir = build_dir / "smoke"
+    smoke_dir.mkdir(parents=True, exist_ok=True)
+    test_env = {"XENON_SCREENSHOT_DIR": str(smoke_dir), **os.environ}
+
     for test in sorted((build_dir / "bin").glob("TestXenon*")):
         if test.is_dir() or not os.access(test, os.X_OK):
             continue
         print(f"==> {test.name}", flush=True)
-        if subprocess.run([test]).returncode != 0:
+        if subprocess.run([test], env=test_env).returncode != 0:
             failures.append(test.name)
 
-    failures += check_app(platform, app_executable(platform, build_dir), build_dir / "smoke")
+    failures += check_app(platform, app_executable(platform, build_dir), smoke_dir)
 
     if failures:
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
@@ -370,6 +381,10 @@ def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> lis
     print("==> tabs come back with their pages after a crash and after a quit", flush=True)
     if not check_session_restore(executable, env):
         failures.append("session restore")
+
+    print("==> the toolbar offers an update that's ready", flush=True)
+    if not check_update_button(executable, env):
+        failures.append("update button")
 
     print("==> WebAuthn requests reach the UI process", flush=True)
     if not check_web_authn(executable, env):
@@ -1481,6 +1496,48 @@ def check_session_restore(executable: Path, env: dict) -> bool:
             if process and process.poll() is None:
                 stop(signal.SIGKILL)
             server.shutdown()
+
+
+# Opens a window with XENON_TEST_UPDATE_READY standing in for an update that's ready, and checks that its toolbar offers
+# it. Nothing can click in a window here, so TestXenonUpdateButton clicks the button, against a stand-in for the updater.
+def check_update_button(executable: Path, env: dict) -> bool:
+    expected = UPDATE_BUTTON_SHOWN + UPDATE_STAND_IN_VERSION
+    with tempfile.TemporaryDirectory() as directory:
+        log_path = Path(directory) / "xenon.log"
+        with open(log_path, "w") as log:
+            process = subprocess.Popen(
+                [str(executable), "--profile-path", str(Path(directory) / "profile"), "about:blank"],
+                env={**env, "XENON_TEST_UPDATE_READY": UPDATE_STAND_IN_VERSION},
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        offered = False
+        try:
+            deadline = time.monotonic() + 60
+            while not offered and time.monotonic() < deadline and process.poll() is None:
+                time.sleep(0.5)
+                offered = expected in log_path.read_text(errors="replace")
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                pass
+            # Xenon's helper processes go with it. macOS refuses with EPERM once only zombies are left of the group.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            process.wait()
+        if not offered:
+            print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+            print(f'    no "{expected}"', file=sys.stderr)
+            return False
+    print(
+        f"    the Update button shows for Xenon {UPDATE_STAND_IN_VERSION}, which XENON_TEST_UPDATE_READY stands in for"
+    )
+    return True
 
 
 # Opens a page on a local HTTPS server whose certificate is self-signed. Xenon refuses the certificate, and shows its

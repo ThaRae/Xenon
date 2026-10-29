@@ -38,6 +38,7 @@
 #include <UI/SplitView.h>
 #include <UI/StringUtils.h>
 #include <UI/TabHibernation.h>
+#include <UI/UpdateButton.h>
 #include <UI/WebAuthnPopover.h>
 #include <UI/WindowControlButton.h>
 
@@ -959,6 +960,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     toolbar_layout->addWidget(m_private_badge, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_extension_toolbar, 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_content_blocking_button, 0, Qt::AlignVCenter);
+    toolbar_layout->addWidget(new UpdateButton(*m_toolbar, TOOLBAR_BUTTON_SIZE), 0, Qt::AlignVCenter);
     toolbar_layout->addWidget(m_hamburger_button, 0, Qt::AlignVCenter);
 
     if constexpr (!use_native_macos_window_controls()) {

@@ -12,7 +12,7 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden, Proton Pass,
   1Password, iCloud Passwords, security keys
 - [Security](#security): certificate warnings
-- [Installing and updates](#installing-and-updates): the installer, and Xenon updating itself
+- [Installing and updates](#installing-and-updates): the installer, Xenon updating itself, and the Update button
 - [Look](#look): palette and icon
 - [Not done yet](#not-done-yet)
 
@@ -370,6 +370,26 @@ see [Updates.md](Updates.md#the-appimage).
 Xenon then checks for a new version when it starts and once a day, downloads it in the background, and installs it
 when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch
 to update**, and turns automatic updates off. **Check for Updates…** in the Xenon menu checks at once.
+
+### The Update button
+
+Once a new version is ready, an **Update** button in Xenon's rose shows at the right end of every window's toolbar,
+beside the menu button, like Chrome's and Helium's update chip; in a toolbar narrower than 640 pixels, like the compact
+layout's, it's the arrow alone. It takes no room before that, and you can leave it there and keep browsing. Its tooltip
+says which version is ready, and clicking it opens a popover:
+
+- **Relaunch to Update** installs the update and relaunches Xenon, which reopens every window and tab, even with
+  **Restore the last session's windows and tabs** off. Private windows don't reopen, and the popover says so while any
+  are open. Pages with unsaved changes, and downloads that can't resume, ask first, as when Xenon quits; turning one
+  down leaves the update to install at the next quit.
+- **Later** hides the button in every window until Xenon starts again, or a newer version is ready. The update still
+  installs when you quit. Closing the popover any other way leaves the button where it is.
+
+While an update is ready, **Check for Updates…** in the Xenon menu becomes **Relaunch to Update to <version>**. It and
+**Relaunch to update** in Settings relaunch the same way, asking first when private windows are open.
+`UI/UpdateButton.cpp` is the button and its popover, `UI/RelaunchToUpdate.cpp` the relaunch from the menu and Settings,
+and `UI/Updater.mm` notes the version it's installing, so that the relaunched Xenon knows to reopen everything
+(`Application::launch_restore_policy()`).
 
 Releases come from [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases) on GitHub. Xenon only installs one
 whose archive is signed with its update key, from a signed appcast, and the installer swaps the new app in at once, so
