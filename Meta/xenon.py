@@ -399,6 +399,10 @@ def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> lis
     if not check_media_server_lifecycle(executable, env):
         failures.append("media server lifecycle")
 
+    print("==> a compositor with nothing to paint gives its idle memory back", flush=True)
+    if not check_compositor_idle_memory_release(executable, env):
+        failures.append("compositor idle memory release")
+
     print("==> the blocking dashboard", flush=True)
     if not check_blocking_dashboard(executable, env):
         failures.append("blocking dashboard")
@@ -895,6 +899,92 @@ def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
     finally:
         pages.close()
     return passed
+
+
+# A compositor gives the rasters of its last frame and its allocators' free pages back after 4 s without a frame
+# (Services/Compositor/CompositorState.cpp), and prints this when it does, which it only does when
+# LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG is set.
+COMPOSITOR_IDLE_RELEASE_MARKER = "COMPOSITOR-IDLE-RELEASE"
+# A page with something to draw, in every kind of layer the compositor rasterizes: filtered, transformed, an image, and
+# a canvas.
+COMPOSITOR_IDLE_TEST_PAGE = """<!doctype html><meta charset="utf-8"><title>idle</title>
+<style>
+    body { margin: 0; font: 20px sans-serif; background: #fff; color: #123; }
+    .bar { padding: 10px 16px; background: #ff0050; color: #fff; font-size: 28px; font-weight: bold; }
+    .card { margin: 14px; padding: 14px; border: 3px solid #1c6; border-radius: 12px; width: 520px; }
+    .blur { filter: blur(1.5px); }
+    .shadow { filter: drop-shadow(6px 6px 3px rgba(0, 0, 0, .5)); }
+    .turned { margin: 14px; padding: 10px; width: 560px; transform: rotate(-4deg); opacity: .9; background: #eef; }
+</style>
+<div class="bar">idle compositor</div>
+<div class="card blur">Blurred text in a filtered card, so the layer needs a raster of its own.</div>
+<div class="card shadow"><svg width="160" height="100" viewBox="0 0 160 100">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ff0050"/><stop offset="1" stop-color="#08f"/></linearGradient></defs>
+    <rect x="4" y="4" width="152" height="92" rx="16" fill="url(#g)"/>
+    <circle cx="80" cy="50" r="28" fill="#fff" opacity=".7"/></svg>
+    <p>An SVG image with a gradient, in a card with a drop shadow.</p></div>
+<div class="turned">This block has its own transform and opacity, so it is a composited layer.</div>
+<canvas id="c" width="260" height="100" style="margin:14px;border:2px solid #333"></canvas>
+<script>
+    const context = document.getElementById("c").getContext("2d");
+    const gradient = context.createLinearGradient(0, 0, 260, 0);
+    gradient.addColorStop(0, "#0a0");
+    gradient.addColorStop(1, "#00f");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 260, 100);
+    context.fillStyle = "#fff";
+    context.font = "24px sans-serif";
+    context.fillText("2D canvas", 40, 60);
+</script>
+"""
+# The compositor waits 4 s for a frame, so the early screenshot comes before the release and the late one after it.
+COMPOSITOR_IDLE_TEST_SCREENSHOT_DELAYS = (3, 15)
+
+
+# A page that stops painting is released and then painted again, which the screenshot taken after the release has to
+# show: it is the same page, byte for byte, as the one taken before it.
+def check_compositor_idle_memory_release(executable: Path, env: dict) -> bool:
+    logging_env = dict(env, LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG="1")
+    screenshots = {}
+    with tempfile.TemporaryDirectory() as directory:
+        page = Path(directory) / "idle.html"
+        page.write_text(COMPOSITOR_IDLE_TEST_PAGE)
+        profile = Path(directory) / "profile"
+        profile.mkdir()
+        for label, delay in zip(("before", "after"), COMPOSITOR_IDLE_TEST_SCREENSHOT_DELAYS):
+            screenshot = Path(directory) / f"{label}.png"
+            rendered, output = run_headless(
+                executable,
+                logging_env,
+                [
+                    "--headless=screenshot",
+                    f"--screenshot-delay={delay}",
+                    f"--screenshot-path={screenshot}",
+                    "--window-width=900",
+                    "--window-height=700",
+                    "--profile-path",
+                    str(profile),
+                    page.as_uri(),
+                ],
+            )
+            if not rendered or not screenshot.exists() or screenshot.stat().st_size < SMOKE_TEST_MIN_SCREENSHOT_BYTES:
+                print(f"    the page did not render {delay} s in", file=sys.stderr)
+                print(output[-4000:], file=sys.stderr)
+                return False
+            released = COMPOSITOR_IDLE_RELEASE_MARKER in output
+            if released != (label == "after"):
+                state = "released" if released else "did not release"
+                print(f"    the compositor {state} its idle memory {delay} s in", file=sys.stderr)
+                print(output[-4000:], file=sys.stderr)
+                return False
+            screenshots[label] = screenshot.read_bytes()
+
+    if screenshots["before"] != screenshots["after"]:
+        print("    the page rendered differently after the compositor released its idle memory", file=sys.stderr)
+        return False
+    print("    the compositor released its idle memory once the page stopped painting, and painted it again")
+    return True
 
 
 # Daily filter list updates (UI/FilterListUpdates.h), from a local server publishing the bundles in
