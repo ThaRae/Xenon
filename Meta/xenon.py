@@ -60,6 +60,14 @@ WELCOME_PAGE_TEXT = "Choose for myself"
 # The headless screenshot is taken this long after the load starts, not after it finishes.
 WELCOME_SCREENSHOT_DELAY_SECONDS = 4
 
+# What check_app reports, along with the welcome page, when Xenon doesn't finish loading it: the checks after it load
+# pages too, so they don't run (Meta/release.py's either).
+SKIPPED_CHECKS = "the checks that load pages (skipped: about:welcome didn't load)"
+
+# The crash reports check_app prints when a check fails, and how much of each.
+PRINTED_CRASH_REPORTS = 5
+PRINTED_CRASH_REPORT_CHARACTERS = 6000
+
 # Requests the bundled filter lists block (EasyList: /jquery.popunder.js; EasyPrivacy: -tracking-pixel.), and ordinary
 # ones nothing should block.
 BLOCKED_REQUESTS = {"/jquery.popunder.js": "script", "/site-tracking-pixel.gif": "img"}
@@ -250,6 +258,39 @@ def test_main(platform: Platform, build_dir: Path):
 # The checks that run Xenon itself, and return what failed: the build's, or a release's, which Meta/release.py test runs
 # them against. The welcome page's render goes in smoke_dir.
 def check_app(platform: Platform, executable: Path, smoke_dir: Path) -> list[str]:
+    # A helper process that crashes on a signal says so only in the report it saves, so the check it fails shows nothing
+    # of the crash. When one fails, this prints the reports saved while they ran.
+    reports_dir = crash_report_directory(platform)
+    earlier_reports = saved_crash_reports(reports_dir)
+    failures = run_app_checks(platform, executable, smoke_dir)
+    if failures:
+        reports = saved_crash_reports(reports_dir)
+        new_reports = sorted(reports.keys() - earlier_reports.keys())
+        for name in new_reports[:PRINTED_CRASH_REPORTS]:
+            print(f"==> crash report {name}", file=sys.stderr)
+            print(reports[name].read_text(errors="replace")[:PRINTED_CRASH_REPORT_CHARACTERS], file=sys.stderr)
+        if len(new_reports) > PRINTED_CRASH_REPORTS:
+            print(f"    and {len(new_reports) - PRINTED_CRASH_REPORTS} more in {reports_dir}", file=sys.stderr)
+    return failures
+
+
+# Where Xenon saves crash reports, whatever the profile path (Documentation/Profile.md).
+def crash_report_directory(platform: Platform) -> Path:
+    if data := os.environ.get("XDG_DATA_HOME"):
+        return Path(data) / "Xenon" / "CrashReports"
+    if platform.host_system == HostSystem.macOS:
+        return Path.home() / "Library" / "Application Support" / "Xenon" / "CrashReports"
+    return Path.home() / ".local" / "share" / "Xenon" / "CrashReports"
+
+
+# The reports in the directory, by name. The ones the browser has shown are moved to Seen/ in it.
+def saved_crash_reports(reports_dir: Path) -> dict[str, Path]:
+    if not reports_dir.is_dir():
+        return {}
+    return {path.name: path for path in reports_dir.rglob("*.txt")}
+
+
+def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> list[str]:
     failures = []
 
     # Rendering the welcome page without a window runs Xenon's bundled resources, the WebUI bridge, and the engine's
@@ -294,6 +335,12 @@ def check_app(platform: Platform, executable: Path, smoke_dir: Path) -> list[str
         else:
             print(output[-4000:], file=sys.stderr)
             failures.append("headless render of about:welcome")
+
+    # Should Xenon not finish loading a page at all, every check that follows would wait out its timeouts, which add up
+    # to more than CI gives the job, and a job that's stopped doesn't say what failed.
+    if not loaded:
+        failures.append(SKIPPED_CHECKS)
+        return failures
 
     print("==> a fresh start keeps to Xenon's directories", flush=True)
     if not check_profile_directory(platform, executable, env):

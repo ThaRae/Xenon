@@ -192,7 +192,7 @@ against the AppImage, as it's run once downloaded: it loads and renders `about:w
 on a fresh start, blocks what the bundled filter lists block, takes filter list updates, shows the blocking dashboard
 and the certificate warning, runs extensions, sends WebAuthn requests to the UI process, installs password managers,
 and opens Xenon's windows for session restore. Then it loads `https://example.com` over HTTPS, with the system's
-certificates. `--appimage <file>` tests another AppImage.
+certificates, unless Xenon loaded no page at all, which skips it too. `--appimage <file>` tests another AppImage.
 
 `Meta/ci/test-appimage.sh <image>` runs it in a container of a distribution's image (Ubuntu or Debian, Fedora, Arch
 Linux) with only what a desktop system has: the libraries the AppImage leaves to the system, fonts, certificates, a

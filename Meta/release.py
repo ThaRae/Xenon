@@ -931,9 +931,10 @@ def test_linux_main(args):
 
     failures += xenon.check_app(xenon.Platform(), appimage, DISTRIBUTION_DIR / "smoke")
 
-    print("==> a page over HTTPS, with the system's certificates", flush=True)
-    if not check_https(appimage, xenon):
-        failures.append("HTTPS")
+    if xenon.SKIPPED_CHECKS not in failures:
+        print("==> a page over HTTPS, with the system's certificates", flush=True)
+        if not check_https(appimage, xenon):
+            failures.append("HTTPS")
 
     if failures:
         sys.exit(f"{len(failures)} failed: {', '.join(failures)}")
