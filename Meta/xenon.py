@@ -817,6 +817,16 @@ def check_password_managers(executable: Path, env: dict) -> bool:
             def downloads() -> list[str]:
                 return [path for path in requested if path.startswith("/crx/")]
 
+            found, output = run(profile, "--password-manager=not-a-manager")
+            expect(
+                "names the offered password managers, 1Password included",
+                "There's no password manager called not-a-manager" in output
+                and "1password" in output
+                and "bitwarden" in output
+                and "proton-pass" in output,
+                output,
+            )
+
             found, output = run(profile, "--password-manager=bitwarden", tries=40)
             expect(
                 "installs the chosen one from the store, and it runs at once",

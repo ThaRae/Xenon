@@ -44,6 +44,7 @@ const engineInfo = {
 const passwordManagerInfo = {
     bitwarden: { note: "Open source, can be self-hosted", developer: "Bitwarden" },
     "proton-pass": { note: "Open source, with email aliases", developer: "Proton" },
+    "1password": { note: "Paid", developer: "1Password" },
 };
 
 let settings;
