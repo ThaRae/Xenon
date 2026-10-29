@@ -14,8 +14,8 @@ the architecture and workflow, and `Documentation/Features.md` what each feature
   internal pages. Use those rather than Ladybird's violet/indigo, and don't retheme anything to match Helium.
 - To change one of Ladybird's internal pages, put Xenon's version in `UI/Resources/about-pages/` and add it to
   `XENON_ABOUT_PAGE_OVERRIDES` in `UI/Xenon.cmake`; files upstream doesn't have go in `XENON_ABOUT_PAGE_ADDITIONS`.
-  Never edit the copy in `ladybird/Base/res`. Xenon's own pages share `xenon.css` (the `--xenon-*` tokens, and the
-  app icon's orbit mark and faint backdrop orbits).
+  Never edit the copy in `ladybird/Base/res`. Xenon's own pages share `xenon.css` (the `--xenon-*` tokens, serif
+  headings, the app icon's orbit mark, and the primary button).
 - `UI/` started as a copy of `ladybird/UI/Qt`. Keep upstream's structure, naming, comment style, and the `Ladybird`
   namespace, so upstream changes still merge cleanly. Put Xenon-only features in their own files (`Bangs.cpp`,
   `XenonSettings.cpp`) where possible, and keep edits to copied files small.

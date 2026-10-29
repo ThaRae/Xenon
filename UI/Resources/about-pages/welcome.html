@@ -17,13 +17,6 @@ SPDX-License-Identifier: BSD-2-Clause
         <script type="module" src="resource://ladybird/about-pages/welcome.js"></script>
     </head>
     <body>
-        <div class="orbits" aria-hidden="true">
-            <svg viewBox="0 0 100 100">
-                <ellipse class="orbit" cx="50" cy="50" rx="35" ry="12.5" transform="rotate(45 50 50)" />
-                <ellipse class="orbit orbit-rose" cx="50" cy="50" rx="35" ry="12.5" transform="rotate(-45 50 50)" />
-            </svg>
-        </div>
-
         <nav class="topbar">
             <span class="wordmark">
                 <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
@@ -46,35 +39,40 @@ SPDX-License-Identifier: BSD-2-Clause
 
         <form id="welcome-form">
             <section class="step" data-step="hello" aria-labelledby="hello-title">
-                <span class="app-mark hero-mark">
-                    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
-                        <path
-                            class="orbit"
-                            stroke-width="5"
-                            d="M44.82 62.32A35 12.5 45 0 1 44.49 29.46M55.18 37.68A35 12.5 45 0 1 55.51 70.54"
-                        />
-                        <path
-                            class="orbit orbit-rose"
-                            stroke-width="5"
-                            d="M62.32 55.18A35 12.5 -45 0 1 29.46 55.51M37.68 44.82A35 12.5 -45 0 1 70.54 44.49"
-                        />
-                        <circle class="nucleus" cx="50" cy="50" r="5" />
-                    </svg>
-                </span>
-                <h1 id="hello-title" tabindex="-1">Hello<span class="full-stop">.</span></h1>
+                <h1 id="hello-title" tabindex="-1">Welcome to Xenon</h1>
                 <p class="lede">
-                    Xenon is a quiet, fast browser built on Ladybird. Three questions and you're done, or keep our
-                    picks: DuckDuckGo for search, with ads and trackers blocked.
+                    Before you start, there are three things to decide: where searches go, whether to block ads and
+                    trackers, and which password manager you use. You can keep these defaults, or choose each one
+                    yourself.
                 </p>
+
+                <dl class="defaults">
+                    <div class="default">
+                        <dt>Search</dt>
+                        <dd>DuckDuckGo</dd>
+                    </div>
+                    <div class="default">
+                        <dt>Ads and trackers</dt>
+                        <dd>Blocked</dd>
+                    </div>
+                    <div class="default">
+                        <dt>Password manager</dt>
+                        <dd id="default-password-manager">None for now</dd>
+                    </div>
+                </dl>
+
                 <div class="actions">
-                    <button type="button" class="primary-button" data-go="search" disabled>Choose for myself</button>
-                    <button type="button" id="use-defaults" class="text-button" disabled>Use Xenon's picks</button>
+                    <button type="button" id="use-defaults" class="primary-button" disabled>Keep these</button>
+                    <button type="button" class="text-button" data-go="search" disabled>
+                        Choose for myself <span aria-hidden="true">→</span>
+                    </button>
                 </div>
+                <p class="aside">Settings has all of these later, along with everything else.</p>
             </section>
 
             <section class="step" data-step="search" aria-labelledby="search-title" hidden>
-                <h1 id="search-title" tabindex="-1">Where do searches go?</h1>
-                <p class="lede">Anything you type that isn't a web address goes here.</p>
+                <h1 id="search-title" tabindex="-1">Where should searches go?</h1>
+                <p class="lede">Anything you type in the address bar that isn't a web address goes here.</p>
 
                 <div class="engine-columns">
                     <fieldset class="engine-group">
@@ -95,8 +93,8 @@ SPDX-License-Identifier: BSD-2-Clause
                 </label>
 
                 <p class="aside">
-                    You can always skip the search engine with a !bang. <kbd>!w ladybird</kbd> opens Wikipedia's results
-                    and <kbd>!gh</kbd> opens GitHub.
+                    To skip the search engine for one search, start it with a !bang: <kbd>!w ladybird</kbd> searches
+                    Wikipedia, and <kbd>!gh</kbd> searches GitHub.
                 </p>
 
                 <div class="actions">
@@ -108,8 +106,8 @@ SPDX-License-Identifier: BSD-2-Clause
             <section class="step" data-step="blocking" aria-labelledby="blocking-title" hidden>
                 <h1 id="blocking-title" tabindex="-1">Block ads and trackers?</h1>
                 <p class="lede">
-                    Xenon has uBlock Origin's filter lists built in. They strip ads, trackers, and cookie banners from
-                    every site, and nothing is sent anywhere to do it.
+                    Xenon has uBlock Origin's filter lists built in. They work on every site, and nothing you visit is
+                    sent anywhere to do it.
                 </p>
 
                 <div class="choice-list" role="radiogroup" aria-labelledby="blocking-title">
@@ -127,24 +125,9 @@ SPDX-License-Identifier: BSD-2-Clause
                     </label>
                 </div>
 
-                <dl id="filter-lists" class="filter-lists">
-                    <div class="filter-list">
-                        <dt>Ads</dt>
-                        <dd>uBlock filters, EasyList, AdGuard</dd>
-                    </div>
-                    <div class="filter-list">
-                        <dt>Trackers</dt>
-                        <dd>EasyPrivacy, uBlock Privacy</dd>
-                    </div>
-                    <div class="filter-list">
-                        <dt>Malware and scam sites</dt>
-                        <dd>URLhaus, uBlock Badware risks</dd>
-                    </div>
-                    <div class="filter-list">
-                        <dt>Cookie banners and pop-ups</dt>
-                        <dd>AdGuard, Fanboy, uBlock</dd>
-                    </div>
-                </dl>
+                <p id="filter-lists" class="aside">
+                    This covers ads, trackers, malware and scam sites, and cookie banners.
+                </p>
                 <label id="filter-list-updates" class="check-option">
                     <input id="filter-list-updates-enabled" type="checkbox" checked />
                     <span>Get new lists every day</span>
@@ -158,10 +141,9 @@ SPDX-License-Identifier: BSD-2-Clause
             </section>
 
             <section class="step" data-step="passwords" aria-labelledby="passwords-title" hidden>
-                <h1 id="passwords-title" tabindex="-1">Bring your password manager?</h1>
+                <h1 id="passwords-title" tabindex="-1">Use a password manager?</h1>
                 <p class="lede">
-                    Xenon doesn't keep passwords itself. Pick the one you use, and Xenon adds it and keeps it up to
-                    date.
+                    Xenon doesn't save passwords itself. Pick yours, and Xenon installs it and keeps it up to date.
                 </p>
 
                 <div
@@ -177,9 +159,6 @@ SPDX-License-Identifier: BSD-2-Clause
                     <button type="submit" id="start-browsing" class="primary-button">Start browsing</button>
                     <button type="button" class="text-button" data-go="blocking">Back</button>
                 </div>
-                <p class="aside after-actions">
-                    Compact and vertical tab layouts are a right-click away on the tab strip.
-                </p>
             </section>
         </form>
     </body>

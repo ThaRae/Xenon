@@ -22,8 +22,8 @@ Where Xenon keeps its data is in [Profile.md](Profile.md).
 
 ### Welcome and setup
 
-On first run (or any time at `about:welcome`), either take Xenon's picks (DuckDuckGo, with blocking on) or answer the
-questions:
+On first run (or any time at `about:welcome`), either keep the defaults the first screen lists (DuckDuckGo, with
+blocking on, and no password manager, or the one already installed) or answer the questions:
 
 - which search engine, from a private/mainstream list with a live preview of where a search goes;
 - whether to block ads and trackers (on by default, with all the filter lists);

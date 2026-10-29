@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* Xenon's settings page: the welcome flow's type and hairline rows, with a sidebar of sections. */
+/* Xenon's settings page: the welcome flow's serif headings and hairline rows, with a sidebar of sections. */
 
 html {
     scroll-padding-top: 24px;
@@ -12,13 +12,6 @@ html {
 
 body {
     font-size: 15px;
-}
-
-/* Low in a corner, and fainter than the new tab page's, since this page is mostly read. */
-.orbits {
-    right: -46vmin;
-    bottom: -52vmin;
-    opacity: 0.55;
 }
 
 .settings {
@@ -63,20 +56,7 @@ strong {
 }
 
 .wordmark {
-    display: flex;
-    align-items: center;
-    gap: 10px;
     padding: 0 10px;
-    font-size: 16px;
-    font-weight: 650;
-    letter-spacing: -0.01em;
-    color: var(--xenon-ink);
-    text-decoration: none;
-}
-
-.wordmark .mark {
-    width: 26px;
-    height: 26px;
 }
 
 .find {
@@ -120,17 +100,12 @@ nav {
     gap: 1px;
 }
 
-.nav-group {
-    margin: 14px 10px 6px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--xenon-muted);
-}
-
-.nav-group:first-child {
-    margin-top: 0;
+/* Xenon's own sections come first, as Helium's do, and Ladybird's after the rule. */
+.nav-divider {
+    width: calc(100% - 20px);
+    margin: 10px 10px;
+    border: none;
+    border-top: 1px solid var(--xenon-hairline);
 }
 
 nav a {
@@ -179,10 +154,11 @@ main {
 
 .section h1 {
     margin: 0 0 8px;
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
+    font-family: var(--xenon-serif);
+    font-size: 34px;
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
 }
 
 .lede {
@@ -198,11 +174,11 @@ main {
 
 .group-title {
     display: block;
-    margin: 0 0 8px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    margin: 0 0 6px 10px;
+    font-family: var(--xenon-serif);
+    font-size: 17px;
+    font-style: italic;
+    font-weight: 400;
     color: var(--xenon-muted);
 }
 
@@ -435,7 +411,7 @@ button.link-button,
     font-size: 13px;
     font-weight: 500;
     white-space: nowrap;
-    border-radius: 999px;
+    border-radius: 8px;
 }
 
 button.secondary-button,
@@ -470,7 +446,7 @@ button.primary-button {
     padding: 3px;
     background-color: var(--xenon-row-hover);
     border: 1px solid var(--xenon-hairline);
-    border-radius: 999px;
+    border-radius: 10px;
 }
 
 .segmented label {
@@ -478,7 +454,7 @@ button.primary-button {
     padding: 0 14px;
     font-weight: 500;
     color: var(--xenon-muted);
-    border-radius: 999px;
+    border-radius: 7px;
     cursor: pointer;
 }
 
@@ -972,9 +948,8 @@ dialog .dialog-header {
 }
 
 dialog .dialog-title {
-    font-size: 18px;
-    font-weight: 650;
-    letter-spacing: -0.01em;
+    font-family: var(--xenon-serif);
+    font-size: 21px;
 }
 
 dialog .dialog-body {
@@ -992,10 +967,8 @@ dialog .dialog-body > .row {
 
 dialog .dialog-label {
     margin-top: 8px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     color: var(--xenon-muted);
 }
 
@@ -1134,7 +1107,7 @@ dialog .dialog-controls select {
         gap: 4px;
     }
 
-    .nav-group {
+    .nav-divider {
         display: none;
     }
 

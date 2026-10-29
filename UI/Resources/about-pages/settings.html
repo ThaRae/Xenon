@@ -20,13 +20,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
         <link rel="stylesheet" href="resource://ladybird/about-pages/settings.css" />
     </head>
     <body>
-        <div class="orbits" aria-hidden="true">
-            <svg viewBox="0 0 100 100">
-                <ellipse class="orbit" cx="50" cy="50" rx="35" ry="12.5" transform="rotate(45 50 50)" />
-                <ellipse class="orbit orbit-rose" cx="50" cy="50" rx="35" ry="12.5" transform="rotate(-45 50 50)" />
-            </svg>
-        </div>
-
         <div class="settings">
             <aside class="sidebar">
                 <a class="wordmark" href="#look">
@@ -55,7 +48,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                 </label>
 
                 <nav aria-label="Settings sections">
-                    <p class="nav-group">Xenon</p>
                     <a href="#look">Look and layout</a>
                     <a href="#tabs">Tabs</a>
                     <a href="#search">Search and bangs</a>
@@ -63,7 +55,7 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                     <a href="#passwords">Password manager</a>
                     <a href="#extensions">Extensions</a>
                     <a href="#updates">Updates</a>
-                    <p class="nav-group">Browsing</p>
+                    <hr class="nav-divider" />
                     <a href="#startup">Startup and pages</a>
                     <a href="#privacy">Privacy and data</a>
                     <a href="#permissions">Site permissions</a>
@@ -78,8 +70,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
 
                 <section class="section" id="look" aria-labelledby="look-title">
                     <h1 id="look-title">Look and layout</h1>
-                    <p class="lede">Where the tabs go, and how pages look.</p>
-
                     <div class="group">
                         <h2 class="group-title">Layout</h2>
                         <div class="layouts" role="radiogroup" aria-label="Layout" data-keywords="tabs toolbar sidebar">
@@ -212,8 +202,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
 
                 <section class="section" id="tabs" aria-labelledby="tabs-title">
                     <h1 id="tabs-title">Tabs</h1>
-                    <p class="lede">Switching between tabs, letting idle ones rest, and keeping them side by side.</p>
-
                     <div class="group">
                         <h2 class="group-title">Switching</h2>
                         <div class="rows">
@@ -285,8 +273,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
 
                 <section class="section" id="search" aria-labelledby="search-title">
                     <h1 id="search-title">Search and bangs</h1>
-                    <p class="lede">Where address bar searches go, and the shortcuts that skip the search engine.</p>
-
                     <div class="group">
                         <h2 class="group-title">Search engine</h2>
                         <div class="rows">
@@ -608,8 +594,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
 
                 <section class="section" id="startup" aria-labelledby="startup-title">
                     <h1 id="startup-title">Startup and pages</h1>
-                    <p class="lede">What opens when Xenon starts, and how pages behave.</p>
-
                     <div class="group">
                         <h2 class="group-title">Startup</h2>
                         <div class="rows">
@@ -663,8 +647,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
 
                 <section class="section" id="privacy" aria-labelledby="privacy-title">
                     <h1 id="privacy-title">Privacy and data</h1>
-                    <p class="lede">What sites are told, what Xenon keeps, and what it connects to on its own.</p>
-
                     <div class="group">
                         <h2 class="group-title">Privacy</h2>
                         <div class="rows">
@@ -726,8 +708,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
 
                 <section class="section" id="permissions" aria-labelledby="permissions-title">
                     <h1 id="permissions-title">Site permissions</h1>
-                    <p class="lede">What sites may do without asking.</p>
-
                     <div class="group">
                         <div class="rows">
                             <div class="row">
