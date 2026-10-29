@@ -52,7 +52,7 @@ index 5eaf310ad9e330b21473f210a8011e0b23a84268..8d46089c601d873a58564140559f94d9
  if (HAS_VULKAN)
      target_sources(compositorservice PRIVATE SkiaVulkanMemoryAllocator.cpp)
 diff --git a/Services/Compositor/CompositorState.cpp b/Services/Compositor/CompositorState.cpp
-index 6acec986ed036cd08e5b00bfde2eec65793cc44c..15766002a467199ca8dd739aea94a286793b5b61 100644
+index 6acec986ed036cd08e5b00bfde2eec65793cc44c..c1fcf8e7625f1dce1ec91069f7ff035ee084dc90 100644
 --- a/Services/Compositor/CompositorState.cpp
 +++ b/Services/Compositor/CompositorState.cpp
 @@ -7,17 +7,51 @@
@@ -175,9 +175,9 @@ index 6acec986ed036cd08e5b00bfde2eec65793cc44c..15766002a467199ca8dd739aea94a286
 +        auto released_bytes = raster_cache.release_cached_rasters(keep_text_blobs);
 +        m_free_page_release_is_pending = true;
 +        if (logged) {
-+            dbgln("COMPOSITOR-IDLE-RELEASE context={} nested={} visible={} idle_ms={} tiles={} nested_lists={} text={}",
-+                context_entry.key, context.parent_context_id().has_value(), is_visible, idle_time.to_milliseconds(),
-+                released_bytes.repeated_tiles, released_bytes.nested_display_lists, released_bytes.text_blobs);
++            dbgln("COMPOSITOR-IDLE-RELEASE context={} nested={} visible={} gpu={} idle_ms={} tiles={} nested_lists={} text={}",
++                context_entry.key, context.parent_context_id().has_value(), is_visible, !m_skia_backend_context.is_null(),
++                idle_time.to_milliseconds(), released_bytes.repeated_tiles, released_bytes.nested_display_lists, released_bytes.text_blobs);
 +        }
 +    }
 +

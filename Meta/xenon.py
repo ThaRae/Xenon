@@ -970,19 +970,20 @@ def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
 # Each compositor context drops the rasters it caches once it has painted nothing for a while: after 30 s while it is
 # visible, as a headless page is, and after 4 s once it is hidden (Services/Compositor/CompositorState.cpp, engine patch
 # 0049). With LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG set, the compositor logs each context it releases, with the bytes it
-# dropped, each one it keeps, and each frame and screenshot, with whether it painted released rasters again.
+# dropped and whether it draws on the GPU, each one it keeps, and each frame and screenshot, with whether it painted
+# released rasters again.
 COMPOSITOR_VISIBLE_RELEASE_DELAY = 30
 COMPOSITOR_RELEASE_PATTERN = re.compile(
     r"COMPOSITOR-IDLE-RELEASE context=(?P<context>\d+) nested=(?P<nested>true|false) visible=(?:true|false) "
-    r"idle_ms=\d+ tiles=(?P<tiles>\d+) nested_lists=(?P<nested_lists>\d+) text=\d+"
+    r"gpu=(?P<gpu>true|false) idle_ms=\d+ tiles=(?P<tiles>\d+) nested_lists=(?P<nested_lists>\d+) text=\d+"
 )
 COMPOSITOR_KEEP_PATTERN = re.compile(
     r"COMPOSITOR-IDLE-KEEP context=(?P<context>\d+) nested=(?P<nested>true|false) visible=(?:true|false) "
     r"idle_ms=(?P<idle_ms>\d+)"
 )
 COMPOSITOR_SCREENSHOT_PATTERN = re.compile(r"COMPOSITOR-SCREENSHOT context=(?P<context>\d+) after_release=true")
-# An SVG image, which the compositor rasterizes once and keeps (a nested display list), and keeps as a repeated tile
-# when it is a repeating background.
+# An SVG image, which the compositor rasterizes once and keeps (a nested display list) when it draws on the GPU, and
+# keeps as a repeated tile when it is a repeating background, on the GPU or not.
 COMPOSITOR_IDLE_TEST_SVG_URL = "data:image/svg+xml," + urllib.parse.quote(
     "<svg xmlns='http://www.w3.org/2000/svg' width='160' height='100' viewBox='0 0 160 100'>"
     "<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>"
@@ -1020,25 +1021,35 @@ COMPOSITOR_IDLE_TEST_PAGE = """<!doctype html><meta charset="utf-8"><title>idle<
     context.fillText("2D canvas", 40, 60);
 </script>
 """.replace("SVG_URL", COMPOSITOR_IDLE_TEST_SVG_URL)
-# A page that paints every frame, with an SVG image of its own, and a still frame (a context of its own) beside it.
+# A page that paints every frame, with SVG rasters of its own, and a still frame (a context of its own) beside it.
 COMPOSITOR_BUSY_TEST_PAGE = """<!doctype html><meta charset="utf-8"><title>busy</title>
 <style>
     body { margin: 0; font: 20px sans-serif; }
     .spinner { margin: 14px; width: 60px; height: 60px; background: #ff0050; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    iframe { margin: 14px; width: 600px; height: 260px; border: 0; }
+    .tiles { margin: 14px; width: 560px; height: 100px; background: url("SVG_URL") 0 0 / 80px 50px repeat; }
+    iframe { margin: 14px; width: 600px; height: 300px; border: 0; }
 </style>
 <div class="spinner"></div>
 <img src="SVG_URL" width="240" height="150" alt="">
+<div class="tiles"></div>
 <iframe srcdoc="FRAME"></iframe>
 """.replace("SVG_URL", COMPOSITOR_IDLE_TEST_SVG_URL).replace(
     "FRAME",
     html.escape(
         '<!doctype html><meta charset="utf-8"><body style="margin: 0; font: 20px sans-serif">'
         f'<img src="{COMPOSITOR_IDLE_TEST_SVG_URL}" width="240" height="150" alt="">'
+        '<div style="width: 560px; height: 100px; '
+        f'background: url({COMPOSITOR_IDLE_TEST_SVG_URL}) 0 0 / 80px 50px repeat"></div>'
         "<p>A still frame beside a page that keeps painting.</p>"
     ),
 )
+
+
+# The rasters a release must have dropped: repeated tiles always, and the SVG image's raster too when the compositor
+# draws on the GPU, the only place it keeps one.
+def released_svg_rasters(release: re.Match) -> bool:
+    return int(release["tiles"]) > 0 and (release["gpu"] == "false" or int(release["nested_lists"]) > 0)
 
 
 # A page that stops painting gives its rasters back, and is painted the same afterwards: a screenshot taken after the
@@ -1099,7 +1110,7 @@ def check_compositor_screenshots(before: tuple[bool, str, bytes], after: tuple[b
         return False
 
     releases = [match for match in COMPOSITOR_RELEASE_PATTERN.finditer(after[1]) if match["nested"] == "false"]
-    if not any(int(match["tiles"]) > 0 and int(match["nested_lists"]) > 0 for match in releases):
+    if not any(released_svg_rasters(match) for match in releases):
         print(
             "    the compositor did not give back the page's SVG and tile rasters once it stopped painting",
             file=sys.stderr,
@@ -1134,7 +1145,15 @@ def run_compositor_busy_page(executable: Path, env: dict, directory: Path) -> st
 
     with open(log_path, "w") as log:
         process = subprocess.Popen(
-            [str(executable), "--headless=manual", "--profile-path", str(profile), page.as_uri()],
+            [
+                str(executable),
+                "--headless=manual",
+                "--window-width=900",
+                "--window-height=900",
+                "--profile-path",
+                str(profile),
+                page.as_uri(),
+            ],
             env=env,
             stdout=log,
             stderr=subprocess.STDOUT,
@@ -1156,7 +1175,7 @@ def run_compositor_busy_page(executable: Path, env: dict, directory: Path) -> st
 def check_compositor_busy_page(output: str) -> bool:
     releases = list(COMPOSITOR_RELEASE_PATTERN.finditer(output))
     frame_release = next(
-        (match for match in releases if match["nested"] == "true" and int(match["nested_lists"]) > 0), None
+        (match for match in releases if match["nested"] == "true" and released_svg_rasters(match)), None
     )
     if not frame_release:
         print("    the frame that stopped painting kept its rasters while the page around it painted", file=sys.stderr)
