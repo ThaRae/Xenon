@@ -144,7 +144,7 @@ APPIMAGE_UPDATE_INFORMATION = "gh-releases-zsync|{}|{}|latest|Xenon-*-{}.AppImag
 # A page over HTTPS, which needs the system's certificates: the AppImage brings its own OpenSSL, which looks for them
 # where the build's system keeps them, and its AppRun points it at the system's.
 HTTPS_TEST_URL = "https://example.com/"
-HTTPS_TEST_TEXT = "Example Domain"
+HTTPS_TEST_TEXT = "documentation examples"
 
 
 def load_module(name: str, path: Path):
@@ -863,19 +863,23 @@ def package_linux_main(args):
 
 
 def check_system_libraries(appimage: Path) -> bool:
-    """Whether this system has every library the AppImage leaves to systems (linuxdeploy's excludelist)."""
+    """Whether this system has every library the AppImage leaves to systems (linuxdeploy's excludelist), with every
+    function the AppImage uses from them. ldd -r resolves each binary's symbols as the dynamic linker would."""
     missing: dict[str, Path] = {}
     with tempfile.TemporaryDirectory() as directory:
         run(appimage, "--appimage-extract", cwd=directory)
         root = Path(directory) / "squashfs-root"
         for binary in elf_files(root / "usr"):
-            for library, location in linked_libraries(binary).items():
-                if location == "not found":
-                    missing.setdefault(library, binary.relative_to(root))
-    for library, binary in sorted(missing.items()):
-        print(f"    missing {library}, which {binary} links", file=sys.stderr)
+            output = subprocess.run(["ldd", "-r", str(binary)], capture_output=True, text=True)
+            for line in (output.stdout + output.stderr).splitlines():
+                if match := re.match(r"\s*(\S+) => not found", line):
+                    missing.setdefault(match[1], binary.relative_to(root))
+                elif match := re.match(r"\s*undefined symbol: (\S+)", line):
+                    missing.setdefault(match[1], binary.relative_to(root))
+    for name, binary in sorted(missing.items()):
+        print(f"    missing {name}, which {binary} uses", file=sys.stderr)
     if not missing:
-        print("    all there")
+        print("    all there, with every function the AppImage uses")
     return not missing
 
 

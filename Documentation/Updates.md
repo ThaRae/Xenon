@@ -186,12 +186,13 @@ the system the AppImage's requirements come from, so building on a newer one rai
 
 ### Testing the AppImage
 
-`Meta/release.py test`, on Linux, first checks that the system has every library the AppImage leaves to it. Then it
-runs `Meta/xenon.py test`'s checks of a running Xenon against the AppImage, as it's run once downloaded: it loads and
-renders `about:welcome`, keeps to Xenon's directories on a fresh start, blocks what the bundled filter lists block,
-takes filter list updates, shows the blocking dashboard and the certificate warning, runs extensions, sends WebAuthn
-requests to the UI process, installs password managers, and opens Xenon's windows for session restore. Then it loads
-`https://example.com` over HTTPS, with the system's certificates. `--appimage <file>` tests another AppImage.
+`Meta/release.py test`, on Linux, first checks that the system has every library the AppImage leaves to it, with
+every function the AppImage uses from them (`ldd -r`). Then it runs `Meta/xenon.py test`'s checks of a running Xenon
+against the AppImage, as it's run once downloaded: it loads and renders `about:welcome`, keeps to Xenon's directories
+on a fresh start, blocks what the bundled filter lists block, takes filter list updates, shows the blocking dashboard
+and the certificate warning, runs extensions, sends WebAuthn requests to the UI process, installs password managers,
+and opens Xenon's windows for session restore. Then it loads `https://example.com` over HTTPS, with the system's
+certificates. `--appimage <file>` tests another AppImage.
 
 `Meta/ci/test-appimage.sh <image>` runs it in a container of a distribution's image (Ubuntu or Debian, Fedora, Arch
 Linux) with only what a desktop system has: the libraries the AppImage leaves to the system, fonts, certificates, a
