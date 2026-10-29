@@ -1,0 +1,97 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xenon <xenon@localhost>
+Date: Wed, 28 Oct 2026 23:47:26 -0400
+Subject: [PATCH] LibWebView: Honor --screenshot-delay in headless text mode
+
+BrowserBench suites start on load and only have a numeric score minutes
+later. Dumping page text on load_finish always misses that score. When
+--screenshot-delay is greater than one second, wait that long after
+navigation starts and then dump the text, so Meta/measure.py bench can
+parse Speedometer / JetStream / MotionMark scores.
+---
+ Libraries/LibWebView/Application.cpp | 48 +++++++++++++++++++++-------
+ 1 file changed, 36 insertions(+), 12 deletions(-)
+
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 7125e06b82ffc334cb6a7ef38f7ffdcc2855907b..2a57cbb7b58b12d0edbbf595a3494090cc2218d5 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -404,7 +404,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+         },
+     });
+ 
+-    args_parser.add_option(screenshot_delay, "Set the number of seconds to wait before taking a screenshot (only supported for headless screenshot mode)", "screenshot-delay", 0, "seconds");
++    args_parser.add_option(screenshot_delay, "Set the number of seconds to wait before taking a screenshot or dumping page text (headless screenshot and text modes)", "screenshot-delay", 0, "seconds");
+     args_parser.add_option(screenshot_path, "Save screenshots to the given location (only supported for headless screenshot mode)", "screenshot-path", 0, "path");
+     args_parser.add_option(window_width, "Set viewport width in pixels (default: 800) (currently only supported for headless mode)", "window-width", 0, "pixels");
+     args_parser.add_option(window_height, "Set viewport height in pixels (default: 600) (currently only supported for headless mode)", "window-height", 0, "pixels");
+@@ -2324,26 +2324,47 @@ static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventL
+     return timer;
+ }
+ 
++static void request_page_info_and_quit(Core::EventLoop& event_loop, HeadlessWebView& view, WebView::PageInfoType type)
++{
++    view.request_internal_page_info(type)
++        ->when_resolved([&event_loop](auto const& text) {
++            outln("{}", text);
++            event_loop.quit(0);
++        })
++        .when_rejected([&event_loop](auto const& error) {
++            warnln("Unable to get page info: {}", error);
++            event_loop.quit(1);
++        });
++}
++
+ static void load_page_for_info_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, WebView::PageInfoType type)
+ {
+     view.on_load_finish = [&view, &event_loop, url, type](auto const& loaded_url) {
+         if (!url.equals(loaded_url, URL::ExcludeFragment::Yes))
+             return;
+-
+-        view.request_internal_page_info(type)
+-            ->when_resolved([&event_loop](auto const& text) {
+-                outln("{}", text);
+-                event_loop.quit(0);
+-            })
+-            .when_rejected([&event_loop](auto const& error) {
+-                warnln("Unable to get page info: {}", error);
+-                event_loop.quit(1);
+-            });
++        request_page_info_and_quit(event_loop, view, type);
+     };
+ 
+     view.load(url);
+ }
+ 
++// --screenshot-delay > 1: wait that many seconds after navigation starts, then dump. BrowserBench suites
++// (Speedometer/JetStream/MotionMark) need this: they start on load and only have a score minutes later.
++static NonnullRefPtr<Core::Timer> load_page_for_info_after_delay_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, WebView::PageInfoType type, u32 delay_seconds)
++{
++    outln("Dumping page text after {} seconds", delay_seconds);
++
++    auto timer = Core::Timer::create_single_shot(
++        AK::Duration::from_seconds(delay_seconds),
++        [&]() {
++            request_page_info_and_quit(event_loop, view, type);
++        });
++
++    view.load(url);
++    timer->start();
++    return timer;
++}
++
+ static void load_page_and_exit_on_close(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url)
+ {
+     view.on_close = [&event_loop]() {
+@@ -2376,7 +2397,10 @@ ErrorOr<int> Application::execute()
+                 load_page_for_info_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::LayoutTree);
+                 break;
+             case HeadlessMode::Text:
+-                load_page_for_info_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::Text);
++                if (m_browser_options.screenshot_delay > 1)
++                    screenshot_timer = load_page_for_info_after_delay_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::Text, m_browser_options.screenshot_delay);
++                else
++                    load_page_for_info_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::Text);
+                 break;
+             case HeadlessMode::Manual:
+                 load_page_and_exit_on_close(*m_event_loop, *view, m_browser_options.urls.first());

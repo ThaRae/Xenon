@@ -12,7 +12,7 @@ blocker.
  1 file changed, 11 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 97c28c1a959095d15c85e860a304c060aee12918..f0140a523314ccd8115d065fe7fbd775946a352d 100644
+index 64081496a63583707e8e10ba8b5ed3b68f124c4e..c90070d0ab791077db898784530343f73e552cc2 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -13,6 +13,7 @@
@@ -23,7 +23,7 @@ index 97c28c1a959095d15c85e860a304c060aee12918..f0140a523314ccd8115d065fe7fbd775
  #include <AK/OwnPtr.h>
  #include <AK/QuickSort.h>
  #include <AK/Utf16FlyString.h>
-@@ -3437,6 +3438,16 @@ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web:
+@@ -3445,6 +3446,16 @@ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web:
  {
      if (auto page = this->page(page_id); page.has_value())
          page->page().set_system_visibility_state(system_visibility_state);

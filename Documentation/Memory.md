@@ -20,8 +20,10 @@ From a Xenon checkout with the `ladybird` submodule initialized:
 ./Meta/measure.py browsers --xenon Build/release/bin/Xenon.app
 ./Meta/measure.py browsers --xenon Build/release/xenon/bin/Xenon --chrome /usr/bin/google-chrome --no-remote
 
-# Opens Speedometer / JetStream / MotionMark. Scores need a Start click and a long run; this records load and memory.
+# Speedometer 3.1 / JetStream 2.2 / MotionMark 1.3.1. URLs pass startAutomatically; headless text
+# dumps after --seconds (default 900) via --screenshot-delay so the JSON includes a numeric suite score.
 ./Meta/measure.py bench --xenon Build/release/bin/Xenon.app
+./Meta/measure.py bench --xenon Build/release/xenon/bin/Xenon --seconds 900
 
 # Linux smaps parsing, no Xenon needed:
 ./Meta/measure.py self-test

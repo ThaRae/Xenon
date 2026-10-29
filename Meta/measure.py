@@ -55,13 +55,15 @@ REMOTE_PAGES = [
 ]
 
 BROWSER_BENCH_PAGES = [
-    ("Speedometer 3.1", "https://browserbench.org/Speedometer3.1/"),
-    ("JetStream 2.2", "https://browserbench.org/JetStream2.2/"),
-    ("MotionMark 1.3.1", "https://browserbench.org/MotionMark1.3.1/"),
+    ("Speedometer 3.1", "https://browserbench.org/Speedometer3.1/?startAutomatically"),
+    ("JetStream 2.2", "https://browserbench.org/JetStream2.2/?startAutomatically=true"),
+    ("MotionMark 1.3.1", "https://browserbench.org/MotionMark1.3.1/?startAutomatically=true"),
 ]
 
 SETTLE_SECONDS = 25
-BENCH_SECONDS = 180
+# Default Speedometer 3.1 is 10 iterations and often needs well over 3 minutes on Ladybird.
+BENCH_SECONDS = 900
+BENCH_WINDOW = (1280, 900)
 
 
 def main() -> int:
@@ -227,46 +229,100 @@ def measure_browsers(xenon_path: Path, chrome_path: Path | None, settle: float, 
     return {"pages": pages, "runs": results}
 
 
-def xenon_command(executable: Path, page: str, blocking: bool) -> list[str]:
+def xenon_command(executable: Path, page: str, blocking: bool, extra: list[str] | None = None) -> list[str]:
     profile = Path(tempfile.mkdtemp(prefix="xenon-measure-"))
     config = profile / "config"
     config.mkdir(parents=True, exist_ok=True)
     (config / "Settings.json").write_text(json.dumps({"contentBlockers": {"enabled": blocking}}))
-    return [str(executable), "--headless=manual", "--profile-path", str(profile), page]
+    flags = list(extra) if extra else ["--headless=manual"]
+    return [str(executable), *flags, "--profile-path", str(profile), page]
+
+
+def parse_browserbench_score(suite: str, text: str) -> float | None:
+    """Pull a numeric suite score out of headless page text. Returns None if the suite never finished."""
+    if not text:
+        return None
+    lines = [line.strip() for line in text.splitlines()]
+    for index, line in enumerate(lines):
+        lowered = line.lower()
+        if lowered in {"error", "invalid"} and index > 0 and lines[index - 1].lower().rstrip(":") == "score":
+            return None
+        score_header = lowered == "score" or lowered.startswith("score:")
+        if not score_header:
+            continue
+        candidates: list[str] = []
+        if ":" in line:
+            candidates.append(line.split(":", 1)[1].strip())
+        candidates.extend(lines[index + 1 : index + 8])
+        for candidate in candidates:
+            if candidate.lower() in {"error", "invalid"}:
+                return None
+            match = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*(?:±.*)?$", candidate)
+            if match:
+                value = float(match.group(1))
+                if value > 0:
+                    return value
+    # JetStream sometimes prints "JetStream 2.2 Score: 142.7" on one line.
+    match = re.search(r"(?i)" + re.escape(suite.split()[0]) + r".{0,40}score[:\s]+([0-9]+(?:\.[0-9]+)?)", text)
+    if match:
+        value = float(match.group(1))
+        if value > 0:
+            return value
+    return None
 
 
 def measure_bench(xenon_path: Path, seconds: float) -> dict:
     xenon = xenon_executable(xenon_path)
+    delay = max(2, int(seconds))
+    extra = [
+        "--headless=text",
+        f"--screenshot-delay={delay}",
+        f"--window-width={BENCH_WINDOW[0]}",
+        f"--window-height={BENCH_WINDOW[1]}",
+    ]
     results = []
     for name, url in BROWSER_BENCH_PAGES:
         print(f"### {name} ({url})", flush=True)
-        command = xenon_command(xenon, url, True)
+        command = xenon_command(xenon, url, True, extra)
         started = time.time()
         process = subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, text=True
         )
+        output = ""
+        sample: dict = {}
         try:
-            time.sleep(seconds)
-            sample = sample_tree(process.pid) if process.poll() is None else {"error": f"exited {process.returncode}"}
-            output = ""
-            if process.stdout is not None:
+            try:
+                output, _ = process.communicate(timeout=seconds + 30)
+            except subprocess.TimeoutExpired:
+                sample = sample_tree(process.pid) if process.poll() is None else {"error": f"exited {process.returncode}"}
                 try:
                     process.send_signal(signal.SIGTERM)
                 except ProcessLookupError:
                     pass
+                leftover = process.communicate(timeout=15)[0] if process.stdout is not None else ""
+                output = (output or "") + (leftover or "")
+            else:
+                sample = {"note": "process exited after text dump", "returncode": process.returncode}
         finally:
             stop_process_group(process)
         elapsed = time.time() - started
-        print(
-            f"{name}: ran {elapsed:.0f}s, {process_summary(sample) if isinstance(sample, dict) and 'error' not in sample else sample}",
-            flush=True,
-        )
-        print(
-            "BrowserBench needs a Start click and a long run; this environment records that the page loaded (or failed to) and the memory while it sat, not a score.",
-            flush=True,
-        )
+        score = parse_browserbench_score(name, output or "")
+        if score is None:
+            reason = "suite did not print a numeric score (Start never ran, dump too early, or headless text failed)"
+            print(f"{name}: no score after {elapsed:.0f}s. {reason}", flush=True)
+        else:
+            print(f"{name}: score {score} after {elapsed:.0f}s", flush=True)
+        if sample and "rss" in sample:
+            print(f"{name}: {process_summary(sample)}", flush=True)
         results.append(
-            {"suite": name, "url": url, "seconds": elapsed, "sample": sample, "output_excerpt": output[-2000:]}
+            {
+                "suite": name,
+                "url": url,
+                "seconds": elapsed,
+                "score": score,
+                "sample": sample,
+                "output_excerpt": (output or "")[-4000:],
+            }
         )
     return {"suites": results}
 
@@ -446,6 +502,31 @@ def self_test() -> int:
     fake = "Pss:                 1234 kB\nPss:                    2 kB\n"
     if pss_from_smaps(fake) != (1234 + 2) * 1024:
         print("self-test: pss_from_smaps failed", file=sys.stderr)
+        return 1
+    speedometer_dump = "Speedometer 3.1 Results Summary\nScore\n11.9\n± 0.24\nDetails\n"
+    parsed = parse_browserbench_score("Speedometer 3.1", speedometer_dump)
+    if parsed != 11.9:
+        print(f"self-test: Speedometer parser got {parsed!r}, want 11.9", file=sys.stderr)
+        return 1
+    if parse_browserbench_score("Speedometer 3.1", "Score\nError\n") is not None:
+        print("self-test: invalid Speedometer dump should not yield a score", file=sys.stderr)
+        return 1
+    jetstream_dump = "JetStream 2.2\nScore\n142.7\n"
+    parsed = parse_browserbench_score("JetStream 2.2", jetstream_dump)
+    if parsed != 142.7:
+        print(f"self-test: JetStream parser got {parsed!r}, want 142.7", file=sys.stderr)
+        return 1
+    motion_dump = "MotionMark 1.3.1\nScore: 203.5\n"
+    parsed = parse_browserbench_score("MotionMark 1.3.1", motion_dump)
+    if parsed != 203.5:
+        print(f"self-test: MotionMark parser got {parsed!r}, want 203.5", file=sys.stderr)
+        return 1
+    if parse_browserbench_score("Speedometer 3.1", "Start Test\nYour browser window is too small.") is not None:
+        print("self-test: start page should not yield a score", file=sys.stderr)
+        return 1
+    auto_start = any("startAutomatically" in url for _, url in BROWSER_BENCH_PAGES)
+    if not auto_start:
+        print("self-test: BrowserBench URLs must start the suite without a click", file=sys.stderr)
         return 1
     print("self-test: ok", flush=True)
     return 0
