@@ -26,9 +26,10 @@ status=0
 # Qt on X11 under AddressSanitizer trips over a buffer overflow in libxkbcommon-x11, which keeps Ladybird's CI from
 # testing its own Qt frontend with the sanitizers; so Xenon's windows go to Qt's offscreen platform instead of an X
 # server. Qt and the system libraries it loads keep memory until exit, which LeakSanitizer would report against Xenon.
+# Both sanitizers log to the same files, sanitizer.<pid>: whichever runtime starts last sets where both write.
 QT_QPA_PLATFORM=offscreen \
-  ASAN_OPTIONS="log_path=$logs/asan:detect_leaks=0" \
-  UBSAN_OPTIONS="log_path=$logs/ubsan:print_stacktrace=1" \
+  ASAN_OPTIONS="log_path=$logs/sanitizer:detect_leaks=0" \
+  UBSAN_OPTIONS="log_path=$logs/sanitizer:print_stacktrace=1" \
   dbus-run-session -- "${xenon[@]}" test --no-build || status=$?
 
 # Ladybird's own tests, with the options Ladybird's CI gives them.
@@ -40,7 +41,7 @@ if "${xenon[@]}" ladybird-test --help >/dev/null 2>&1; then
       --load="module-null-sink sink_name=virtual_sink" || true
   fi
   ladybird_status=0
-  ASAN_OPTIONS="log_path=$logs/asan" UBSAN_OPTIONS="log_path=$logs/ubsan" \
+  ASAN_OPTIONS="log_path=$logs/sanitizer" UBSAN_OPTIONS="log_path=$logs/sanitizer" \
     "${xenon[@]}" ladybird-test || ladybird_status=$?
   ((ladybird_status == 0)) || echo "::error::Ladybird's own tests failed against the patched engine (see the ctest output above)"
   ((status != 0)) || status=$ladybird_status
