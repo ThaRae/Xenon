@@ -15,7 +15,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/WorkerProcessManager.h b/Libraries/LibWebView/WorkerProcessManager.h
-index 5087ff7ca41648796b35470029e722d9cf124580..6abd34722f9dd2886712a5ccc6a2651872c188d3 100644
+index 85c59082b3b709c45c24ce85fabba0fd90119c50..71dfdfcc620e1b8c961ecca636db51da8bd96f3f 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.h
 +++ b/Libraries/LibWebView/WorkerProcessManager.h
 @@ -26,11 +26,12 @@

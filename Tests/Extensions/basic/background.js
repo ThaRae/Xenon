@@ -1,5 +1,7 @@
-// The test extension's background service worker, which tests.js talks to.
+// The test extension's background service worker, which tests.js and idle.js talk to.
 const events = [];
+// Which run of the worker this is: idle.js checks that it starts again once it has stopped.
+const instance = crypto.randomUUID();
 
 chrome.runtime.onInstalled.addListener(details => events.push(`installed:${details.reason}`));
 
@@ -11,7 +13,11 @@ self.oninstall = () => {
 };
 self.addEventListener("activate", event => events.push(`activate:${typeof event.waitUntil}`));
 chrome.runtime.onStartup.addListener(() => events.push("startup"));
-chrome.alarms.onAlarm.addListener(alarm => events.push(`alarm:${alarm.name}`));
+chrome.alarms.onAlarm.addListener(alarm => {
+    events.push(`alarm:${alarm.name}`);
+    // idle.js sets this one once the worker has stopped, and hears of it from storage.onChanged.
+    if (alarm.name === "wake") chrome.storage.session.set({ wokenByAlarm: instance });
+});
 
 // What runScriptingTests() checks of webNavigation's events.
 const navigationEvents = [];
@@ -27,6 +33,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 isWorker: typeof window === "undefined" && typeof importScripts === "function",
                 senderUrl: sender.url,
                 location: location.pathname,
+                instance,
             });
             return undefined;
         case "events":

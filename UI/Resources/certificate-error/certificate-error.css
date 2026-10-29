@@ -1,0 +1,145 @@
+/*
+ * Copyright (c) 2026, the Xenon developers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+body {
+    max-width: none;
+    padding: 0 24px;
+}
+
+main {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    max-width: 600px;
+    margin: 14vh auto 48px;
+}
+
+.warning-mark {
+    width: 48px;
+    height: 48px;
+
+    fill: none;
+    stroke: var(--xenon-rose);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+h1 {
+    margin-top: 6px;
+
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+p {
+    color: var(--xenon-muted);
+    overflow-wrap: anywhere;
+}
+
+strong {
+    color: var(--xenon-ink);
+    font-weight: 600;
+}
+
+.reason {
+    color: var(--xenon-ink);
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+
+    margin-top: 12px;
+}
+
+/* Advanced on the left, the way back to safety on the right, as in Chrome. */
+.actions #advanced,
+.actions #retry {
+    margin-right: auto;
+}
+
+.actions #advanced + #retry {
+    margin-right: 0;
+}
+
+.details {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    margin-top: 12px;
+    padding-top: 20px;
+    border-top: 1px solid var(--xenon-hairline);
+}
+
+.problems {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    list-style: none;
+}
+
+.problems:empty {
+    display: none;
+}
+
+.problems li {
+    padding: 2px 10px;
+
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--badge-text);
+    background-color: var(--badge-background);
+    border-radius: 999px;
+}
+
+.certificate {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 20px;
+
+    padding: 14px 16px;
+
+    font-size: 13px;
+    background-color: var(--xenon-row-hover);
+    border: 1px solid var(--xenon-hairline);
+    border-radius: var(--card-radius);
+}
+
+.certificate dt {
+    color: var(--xenon-muted);
+}
+
+.certificate dd {
+    overflow-wrap: anywhere;
+}
+
+.fingerprint {
+    font-family: var(--xenon-mono);
+    font-size: 12px;
+}
+
+.proceed-note:empty {
+    display: none;
+}
+
+.link-button {
+    align-self: flex-start;
+
+    padding: 0;
+
+    font: inherit;
+    color: var(--link);
+    text-decoration: underline;
+    background: none;
+    border: none;
+    cursor: pointer;
+}

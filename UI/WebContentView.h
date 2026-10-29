@@ -27,6 +27,7 @@
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/ViewImplementation.h>
 #include <LibWebView/WebCompatReport.h>
+#include <UI/ScreenshotSelectionOverlay.h>
 
 #include <LibWebCommon/Page/QueuedInputEvent.h>
 #include <QImage>
@@ -87,19 +88,18 @@ using WebContentViewBase = QWidget;
 class CrashOverlayUrlLabel;
 class CrashReportReviewWidget;
 class PageOverlay;
-class ScreenshotSelectionOverlay;
 class ScreenshotViewer;
 class SelectDropdown;
 
 struct WebCompatReportCapture {
     WebView::WebCompatReport::Page page;
-    QImage frame;
     QImage screenshot;
     NonnullRefPtr<Core::Promise<String>> page_dumps;
 };
 
 struct WebContentViewInitialState {
     WebView::IsPrivate is_private { WebView::IsPrivate::No };
+    WebView::EnableContentBlocker enable_content_blocker { WebView::EnableContentBlocker::Yes };
     double maximum_frames_per_second { 60.0 };
     Optional<u64> display_id;
     WebView::ViewImplementation const* owner_view { nullptr };
@@ -157,8 +157,10 @@ public:
     void review_hidden_crash_report(ByteString const& report_name);
     void leave_report_review();
     void review_web_compat_report(WebCompatReportCapture);
+    void select_web_compat_report_screenshot(Function<void(QImage)> on_selected, Function<void()> on_close = {});
 
     Function<void(WebCompatReportCapture)> on_request_web_compat_report_review;
+    Function<void(Function<void(QImage)> on_selected)> on_request_web_compat_report_screenshot;
 
     enum class PaletteMode {
         Default,
@@ -170,6 +172,8 @@ public:
 #ifdef LADYBIRD_QT_USE_IOSURFACE_LAYER
     void set_has_rounded_corners(bool);
 #endif
+    // The radius of the page's rounded corners, which stays zero until a tab rounds its view.
+    double viewport_corner_radius() const { return m_viewport_corner_radius; }
 
     WebView::AccessibilityTreeManager const* accessibility_tree_manager() const { return m_accessibility_manager.ptr(); }
 
@@ -237,7 +241,8 @@ private:
     void show_crash_report_review(Optional<ByteString> const& hidden_crash_report_name = {});
 
     void start_web_compat_report();
-    void select_screenshot(QImage const& frame, Function<void(QImage)> on_selected);
+    ScreenshotSelectionOverlay& select_screenshot(QImage const& frame, ScreenshotSelectionOverlay::Purpose, Function<void()> on_close = {});
+    void start_screenshot();
     QPointer<QWidget> show_transient_overlay(QWidget&);
     void close_transient_overlay(QWidget&, QPointer<QWidget> const& focus_to_restore);
 
@@ -280,6 +285,7 @@ private:
 
     Gfx::IntSize m_viewport_size;
     bool m_viewport_push_pending { false };
+    double m_viewport_corner_radius { 0 };
 
     u64 m_last_click_timestamp { 0 };
     QPointF m_last_click_position;

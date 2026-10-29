@@ -1,8 +1,8 @@
 # Updates and releases
 
 Xenon updates itself on macOS with [Sparkle 2](https://sparkle-project.org), as Helium does. Releases are built on a
-Mac with `Meta/release.py` and published to [tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases), a
-public repository on git.avx512.dev, so that Xenon can fetch them without an account. Xenon itself stays private.
+Mac with `Meta/release.py` and published as GitHub releases of
+[ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases), a repository of their own.
 
 - [The published releases](#the-published-releases)
 - [Making a release](#making-a-release)
@@ -13,8 +13,16 @@ public repository on git.avx512.dev, so that Xenon can fetch them without an acc
 
 ## The published releases
 
-Each version is a release of tharae/xenon-releases, tagged `v<version>`, with one file: `Xenon-<version>.tar.xz`,
-which holds `Xenon.app`. The repository's `main` holds `appcast.xml`, Sparkle's feed, which lists the newest release:
+Each version is a GitHub release of ThaRae/xenon-releases, tagged `v<version>`, with two files:
+
+- `Xenon-<version>.dmg`, the installer people download. It opens a window with `Xenon.app` beside a link to
+  Applications, over a background that says to drag one onto the other (`UI/Icons/macos/installer-background.svg`,
+  rendered by `Meta/generate-app-icon.py`), and has Xenon's icon on its volume. `Meta/release.py` makes it with
+  [dmgbuild](https://github.com/dmgbuild/dmgbuild), which lays the window out without scripting Finder, so it works the
+  same on GitHub's runners as on a Mac. It's signed with the release certificate, like the app.
+- `Xenon-<version>.tar.xz`, which holds `Xenon.app`, for Sparkle to update from.
+
+The repository's `main` holds `appcast.xml`, Sparkle's feed, which lists the newest release:
 
 | In the appcast | What it is |
 | --- | --- |
@@ -23,8 +31,13 @@ which holds `Xenon.app`. The repository's `main` holds `appcast.xml`, Sparkle's 
 | `enclosure` | The archive's URL, size, and `sparkle:edSignature`, its Ed25519 signature |
 | The comment at the end | The appcast's own Ed25519 signature, from Sparkle's `sign_update` |
 
-Xenon reads `https://git.avx512.dev/tharae/xenon-releases/raw/branch/main/appcast.xml`, and downloads the archive from
-the release. Gitea takes attachments up to 100 MB, and the archive is about 57 MiB.
+Xenon reads the appcast from `https://raw.githubusercontent.com/ThaRae/xenon-releases/main/appcast.xml`, a URL that
+stays the same from release to release. It downloads the archive from
+`https://github.com/ThaRae/xenon-releases/releases/download/v<version>/Xenon-<version>.tar.xz`, which GitHub redirects
+to its storage, `release-assets.githubusercontent.com`. Sparkle follows the redirect, takes any status below 400, and
+doesn't mind that GitHub serves the appcast as `text/plain`. raw.githubusercontent.com caches a file for up to five
+minutes, so a new release can take that long to show up. GitHub takes release files up to 2 GiB, and the archive is
+about 54 MiB.
 
 The version is in `VERSION.txt`, as `major.minor.patch`. It can't be called `VERSION`: the repository's root is on the
 include path, and on macOS's case-insensitive disks `#include <version>` would find it.
@@ -39,15 +52,52 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
      and strips the binaries. It uses the functions of Ladybird's `Meta/package-macos-test-bundle.py`, which does the
      same for Ladybird. Its `Info.plist` gets the version, the appcast's URL, and the update key's public half;
    - signed with the release certificate, from the inside out;
+   - `Xenon-<version>.dmg`, the installer, signed with the release certificate too. `package` mounts it and checks it
+     holds the app, the link to Applications, and its window's layout;
    - `Xenon-<version>.tar.xz`, signed with the update key;
    - `appcast.xml`, which lists it, signed too.
-3. Try `Build/distribution/Xenon.app`.
-4. `./Meta/release.py publish` asks, then creates the release with the archive (through `tea`, logged in as `avx512`),
-   commits the appcast to tharae/xenon-releases (over the same SSH host as Xenon's `origin`), and tags the commit
-   `v<version>` in Xenon. It publishes the appcast only once the archive it names is up, and refuses a tree with
-   uncommitted changes.
+3. Try `Build/distribution/Xenon.app`, and open the installer to see its window.
+4. `./Meta/release.py publish` asks, then creates the GitHub release with the installer and the archive
+   (`gh release create`), commits
+   the appcast to ThaRae/xenon-releases' `main`, and tags the commit `v<version>` in ThaRae/Xenon. It publishes the
+   appcast only once the archive it names is up. It refuses a tree with uncommitted changes, and a commit that isn't
+   on ThaRae/Xenon's `main`. It pushes over HTTPS with `gh`'s credentials, whatever Xenon's `origin` is.
 
-CI runs on Linux, so releases are made on a Mac. A macOS runner could run the same script.
+The release workflow can do steps 2 and 4 instead, without a Mac ([On GitHub's runners](#on-githubs-runners)).
+
+### On GitHub's runners
+
+`.github/workflows/release.yml` does step 2 on one of GitHub's `macos-26` runners, and step 4 too with **publish**
+ticked, when it's run by hand, from **Actions → Release → Run workflow** or with:
+
+```bash
+gh workflow run release.yml --repo ThaRae/Xenon --ref main
+```
+
+or, to publish what it builds:
+
+```bash
+gh workflow run release.yml --repo ThaRae/Xenon --ref main -f publish=true
+```
+
+It also runs on pull requests that change it. Before it builds, it checks the secrets: the certificate's SHA-1 and the
+update key's public half must be the ones [below](#setting-up-a-mac-to-release-from), so a secret holding another one
+stops the run at once. It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A
+cold build doesn't fit in one run, so with no caches to start from, it stops there. It runs `Meta/release.py test` with
+the release certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote: the
+archive's and the appcast's signatures, with `sign_update --verify`, the app's `SUPublicEDKey`, and the app's and the
+installer's code signatures.
+
+`Xenon-<version>.dmg`, `Xenon-<version>.tar.xz` and `appcast.xml` are the run's artifact, `Xenon-<version>`, for 30
+days, with the installer's and the archive's SHA-256 in the run's summary. The certificate and the update key are the
+repository's secrets ([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The run imports the
+certificate into a keychain of its own, and deletes the keychain and the key's file when it's done.
+
+With **publish** ticked, it then runs `Meta/release.py publish --yes`, which puts up the release, the appcast, and the
+tag as it does on a Mac, and the run's summary links the release. That needs the `XENON_RELEASES_TOKEN` secret, and
+the run has to be on `main`. Before it builds, it checks both, and that ThaRae/xenon-releases has no release of
+`VERSION.txt`'s version yet, so a run that couldn't publish stops at once rather than after the build. If publishing
+fails anyway, the release is still the run's artifact.
 
 ## Signing
 
@@ -73,7 +123,8 @@ release, so macOS would ask again after each update.
 Sparkle doesn't hold an update to the certificate: once the update key's signature checks out, it only checks that the
 new app's code signature is intact. A new certificate costs one round of those questions, not the updates.
 
-Without notarization, macOS's Gatekeeper still stops the first launch of a downloaded Xenon. Open it once from
+Without notarization, macOS's Gatekeeper still stops the first launch of a Xenon installed from a downloaded
+installer. Open it once from
 **System Settings → Privacy & Security → Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Xenon.app`.
 Updates that Xenon installs itself aren't quarantined, so they open without asking.
 
@@ -117,16 +168,19 @@ Xenon's preferences, `~/Library/Preferences/org.xenon.Xenon.plist`, and the upda
 ```
 
 It packages three test releases of the current build, signed with a throwaway key, with an identifier of their own
-(`org.xenon.Xenon.UpdateTest`) so that Sparkle's state stays apart from Xenon's. It serves them from a local server,
-and runs Xenon with a profile of its own:
+(`org.xenon.Xenon.UpdateTest`) so that Sparkle's state stays apart from Xenon's. It serves them from a local server laid
+out like GitHub's: the appcast at a fixed path, and each archive at `releases/download/v<version>/`, which redirects to
+another host name, as github.com does. It runs Xenon with a profile of its own:
 
-1. 0.0.1 finds 0.0.2, downloads and checks it, and installs it when it quits. The installed app's signature checks
-   out;
-2. 0.0.2 turns down 0.0.3 with a byte changed after it was signed;
-3. and 0.0.3 signed with another key.
+1. 0.0.1's installer holds the app, a link to Applications, and its window's layout. The test installs 0.0.1 from it,
+   copying the app out as dragging it to Applications does;
+2. 0.0.1 finds 0.0.2, downloads it through the redirect, checks it, and installs it when it quits. The installed app's
+   signature checks out;
+3. 0.0.2 turns down 0.0.3 with a byte changed after it was signed;
+4. and 0.0.3 signed with another key.
 
 It opens Xenon's windows while it runs, and needs **Update Xenon automatically** on, since Xenon's own settings aren't
-the profile's. CI can't run it, so run it before a release.
+the profile's. CI's builds don't run it; the release workflow does, before it packages. Run it before a release.
 
 ## Setting up a Mac to release from
 
@@ -146,8 +200,34 @@ security import "Xenon Release.p12" -k ~/Library/Keychains/login.keychain-db -T 
 ```
 
 `security find-identity -p codesigning` then lists **Xenon Release** as `CSSMERR_TP_NOT_TRUSTED`, as a self-signed
-certificate is, and `codesign` signs with it all the same. `tea` needs a login named `avx512` that can create releases
-on tharae/xenon-releases.
+certificate is, and `codesign` signs with it all the same. `gh` needs to be logged in (`gh auth login`) as an account
+that can create releases on ThaRae/xenon-releases and push to it and to ThaRae/Xenon.
+
+### Releasing from GitHub's runners
+
+The release workflow reads the same backups from the repository's secrets. From the folder that holds them:
+
+```bash
+base64 -i "Xenon Release.p12" | gh secret set XENON_RELEASE_P12 --repo ThaRae/Xenon
+gh secret set XENON_RELEASE_P12_PASSWORD --repo ThaRae/Xenon    # asks for it
+gh secret set XENON_UPDATE_KEY --repo ThaRae/Xenon < xenon-update-key.txt
+```
+
+Publishing from the workflow also needs `XENON_RELEASES_TOKEN`, since the run's own token can't write to
+ThaRae/xenon-releases. Make a fine-grained personal access token at **GitHub → Settings → Developer settings →
+Personal access tokens → Fine-grained tokens**, for the repositories ThaRae/Xenon (for the tag) and
+ThaRae/xenon-releases (for the release and the appcast), with the **Contents** permission set to **Read and write**.
+Then:
+
+```bash
+gh secret set XENON_RELEASES_TOKEN --repo ThaRae/Xenon    # asks for it
+```
+
+When the token expires, make a new one and set the secret again. Only publishing needs it: the workflow builds without
+it.
+
+After making a new key or certificate, set its secret again, and change `UPDATE_PUBLIC_KEY` or `CERTIFICATE_SHA1` in
+the workflow to match.
 
 If either is ever lost, make a new one: `generate_keys --account xenon` for the key, or a self-signed code signing
 certificate named **Xenon Release**, from Keychain Access's Certificate Assistant or OpenSSL. A new certificate only

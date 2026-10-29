@@ -77,6 +77,7 @@ main {
 .site a:focus-visible {
     outline: 2px solid var(--xenon-rose);
     outline-offset: 0;
+    box-shadow: none;
 }
 
 .site-icon {

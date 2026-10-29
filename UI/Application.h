@@ -60,6 +60,9 @@ public:
 
     Optional<ByteString> const& password_manager_choice() const { return m_password_manager_choice; }
 
+    // Loads the profile's extensions and those given with --load-extension.
+    void initialize_extensions();
+
     void open_new_tab();
     void open_new_window(WebView::IsPrivate);
     void reopen_recently_closed_tab(BrowserWindow* target_window);
@@ -130,7 +133,6 @@ private:
 
     virtual Core::EventLoop& create_platform_event_loop() override;
     virtual void create_platform_arguments(Core::ArgsParser&) override;
-    virtual void create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&) override;
     virtual void create_platform_actions() override;
 
     virtual Optional<String> ui_font_family() const override;
@@ -172,7 +174,6 @@ private:
     virtual bool supports_system_menu_bar() const override;
     virtual bool supports_vertical_tabs() const override { return true; }
     virtual bool supports_private_browsing_windows() const override { return true; }
-    virtual bool supports_content_blocking_controls() const override { return true; }
     virtual bool supports_client_side_window_decorations() const override
     {
 #if defined(AK_OS_MACOS)

@@ -249,6 +249,7 @@ legend {
 }
 
 button.primary-button {
+    height: auto;
     padding: 12px 22px;
     font-size: 15px;
     font-weight: 600;

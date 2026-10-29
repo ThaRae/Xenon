@@ -42,10 +42,10 @@ again whenever it changes.
  create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.ipc
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 8dfeb482af7984338720bb6de6659194673a19c0..7f429be163984f5862f443e35e6b9fd24a171386 100644
+index f58e653b86a15b82e9df83ed4c05182d44d1fbff..8138f3b6374263fd084b59fc028689d47ee1ef7d 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -80,6 +80,7 @@
+@@ -83,6 +83,7 @@
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWebCommon/Fetch/Infrastructure/DataURL.h>
  #include <LibWebCommon/Fetch/Infrastructure/HTTP/Statuses.h>
@@ -53,7 +53,7 @@ index 8dfeb482af7984338720bb6de6659194673a19c0..7f429be163984f5862f443e35e6b9fd2
  #include <LibWebCommon/Fetch/Infrastructure/URL.h>
  #include <LibWebCommon/Loader/UserAgent.h>
  #include <LibWebCommon/SecureContexts/AbstractOperations.h>
-@@ -606,8 +607,14 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -653,8 +654,14 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
              && request->current_url().scheme() == "file"sv
              && request->destination() == Infrastructure::Request::Destination::Font;
  
@@ -69,7 +69,7 @@ index 8dfeb482af7984338720bb6de6659194673a19c0..7f429be163984f5862f443e35e6b9fd2
              || request->current_url().scheme() == "data"sv
              || (request->mode() == Infrastructure::Request::Mode::Navigate || request->mode() == Infrastructure::Request::Mode::WebSocket)) {
 diff --git a/Libraries/LibWebCommon/CMakeLists.txt b/Libraries/LibWebCommon/CMakeLists.txt
-index bc50496b8f8e2613ba5c440a2b2c6e17dd1d0539..2810ba400c04ec8ed40f099a4c67251748db746c 100644
+index 24967e76030e99568e052e839838b9c3fff0c6ec..01ea1b60c98d583abc3c9a65cc029f34c2f56e69 100644
 --- a/Libraries/LibWebCommon/CMakeLists.txt
 +++ b/Libraries/LibWebCommon/CMakeLists.txt
 @@ -7,6 +7,7 @@ set(SOURCES
@@ -80,14 +80,14 @@ index bc50496b8f8e2613ba5c440a2b2c6e17dd1d0539..2810ba400c04ec8ed40f099a4c672517
      Fetch/Infrastructure/URL.cpp
      FileAPI/BlobURLStore.cpp
      FileAPI/SerializedBlobURLEntry.cpp
-@@ -108,6 +109,7 @@ invoke_py_generator(
+@@ -110,6 +111,7 @@ invoke_py_generator(
                   "${LADYBIRD_SOURCE_DIR}/Meta/Utils/utils.py"
  )
  
 +compile_ipc(Fetch/Infrastructure/OriginAccessAllowList.ipc Fetch/Infrastructure/OriginAccessAllowListCodecs.h)
+ compile_ipc(HTML/NavigationResponse.ipc HTML/NavigationResponseCodecs.h)
  compile_ipc(Page/InputEvent.ipc Page/InputEventCodecs.h)
  compile_ipc(Page/TextEditingCommand.ipc Page/TextEditingCommandCodecs.h)
- compile_ipc(PixelUnits.ipc PixelUnitsCodecs.h)
 diff --git a/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..810b7710a73b6f0b8ed39b7f5cf77807218f82ff
@@ -198,19 +198,19 @@ index 0000000000000000000000000000000000000000..e2893f0ef38fed8f8e513193ffad2597
 +    bool allow_destination_subdomains;
 +}
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 938fda09fc4befc3ef7048dafae2286e11af36a0..11d6db1c210d956ed628b1bd5b7032eb224a44f8 100644
+index d582e884f66cc4cfcdbbdcd27e62ca638a0a9864..b36215738e408a43884b8d86eb18b914e37a6f09 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -1158,6 +1158,8 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
-     client->request_server_site_bindings().did_connect(request_server_connection.client_id);
-     client->async_connect_to_request_server(move(request_server_connection.handle), request_server_connection.client_id);
+@@ -1173,6 +1173,8 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+ 
+     TRY(client->request_server_site_bindings().connect(session));
      client->async_set_site_compatibility_data(m_site_compatibility_data);
 +    if (!m_origin_access_allow_list.is_empty())
 +        client->async_set_origin_access_allow_list(m_origin_access_allow_list);
      connect_to_image_decoder(*client, move(image_decoder));
  
      // NB: A WebDriver BiDi session gives its state to every process hosting web content when it changes.
-@@ -1184,6 +1186,17 @@ ErrorOr<void> Application::reload_site_compatibility_data()
+@@ -1199,6 +1201,17 @@ ErrorOr<void> Application::reload_site_compatibility_data()
      return {};
  }
  
@@ -229,7 +229,7 @@ index 938fda09fc4befc3ef7048dafae2286e11af36a0..11d6db1c210d956ed628b1bd5b7032eb
  {
      VERIFY(m_next_page_or_compositor_context_id > 0);
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 97855467bf83bf5bf7adf998cc9e2fd61d846554..3b3abd034c5a7958ab61f51c6c80dea19a48bb61 100644
+index e376e34d2edadc1d86216ca416c0afba331227fd..038d04c2d009256f68246be0ee2f506f21cbc8ed 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
 @@ -35,6 +35,7 @@
@@ -252,7 +252,7 @@ index 97855467bf83bf5bf7adf998cc9e2fd61d846554..3b3abd034c5a7958ab61f51c6c80dea1
      bool claim_cpu_profiler(ProcessType);
      void set_cpu_profiler_process(Core::Process, OwnPtr<Core::File> control_socket);
  
-@@ -600,6 +606,7 @@ private:
+@@ -604,6 +610,7 @@ private:
      RefPtr<FontService> m_font_service;
      OwnPtr<FontServiceHost> m_font_service_host;
      JsonValue m_site_compatibility_data;
@@ -261,19 +261,19 @@ index 97855467bf83bf5bf7adf998cc9e2fd61d846554..3b3abd034c5a7958ab61f51c6c80dea1
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
 diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
-index 4ce9d4d4313127886d6727fc84aee75b24cd3925..36805f3a3a0d9e7a25a187135a0c62a9e6778281 100644
+index be3c9e975bf37b6918ee85ac79b5b8eda03291ad..ffe16ec6b2a2bb7fdaf7244cfc3330f7f045a3d0 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.cpp
 +++ b/Libraries/LibWebView/WorkerProcessManager.cpp
-@@ -225,6 +225,8 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
-         client->request_server_site_bindings().did_connect(request_server_connection.client_id);
-         client->async_connect_to_request_server(move(request_server_connection.handle), request_server_connection.client_id);
+@@ -212,6 +212,8 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
+         // The worker's requests go through the RequestServers of its owner's sites.
+         TRY(client->request_server_site_bindings().connect(*session));
          client->async_set_site_compatibility_data(Application::the().site_compatibility_data());
 +        if (auto const& allow_list = Application::the().origin_access_allow_list(); !allow_list.is_empty())
 +            client->async_set_origin_access_allow_list(allow_list);
          // The User-Agent string, the navigator compatibility mode, and the preferred languages live in this process.
          // Pages get them through their view; a worker gets the same values here, so its navigator never contradicts
          // the page's.
-@@ -329,6 +331,12 @@ void WorkerProcessManager::update_site_compatibility_data(JsonValue const& data)
+@@ -331,6 +333,12 @@ void WorkerProcessManager::update_site_compatibility_data(JsonValue const& data)
          agent.value.client->async_set_site_compatibility_data(data);
  }
  
@@ -287,7 +287,7 @@ index 4ce9d4d4313127886d6727fc84aee75b24cd3925..36805f3a3a0d9e7a25a187135a0c62a9
  {
      for (auto const& agent : m_agents)
 diff --git a/Libraries/LibWebView/WorkerProcessManager.h b/Libraries/LibWebView/WorkerProcessManager.h
-index 0d1b1fd0a2fa42f89a19a617cf19ac8726c9a141..5087ff7ca41648796b35470029e722d9cf124580 100644
+index ae2d5d80dc7a8084e0fe49ab27b4142fc153b7e5..85c59082b3b709c45c24ce85fabba0fd90119c50 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.h
 +++ b/Libraries/LibWebView/WorkerProcessManager.h
 @@ -19,6 +19,7 @@
@@ -307,11 +307,11 @@ index 0d1b1fd0a2fa42f89a19a617cf19ac8726c9a141..5087ff7ca41648796b35470029e722d9
      // reaches every live worker too.
      void update_user_agent(String const&);
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 7049a3ca628b73d78082dec00d24c8d10c47e471..91de3b4d4e851270cb8c83a719cdfd358fbb84df 100644
+index 37ace966e10ae02d18cc4967b89248cc63c66694..e85da3260db1b1084b7db2fdccef279e3b0ff33c 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -530,6 +530,11 @@ void ConnectionFromClient::set_site_compatibility_data(JsonValue data)
-     Web::ResourceLoader::the().set_site_compatibility_data(parsed_data.release_value());
+@@ -534,6 +534,11 @@ void ConnectionFromClient::set_site_compatibility_data(JsonValue data)
+     Web::set_site_compatibility_data(parsed_data.release_value());
  }
  
 +void ConnectionFromClient::set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list)
@@ -323,7 +323,7 @@ index 7049a3ca628b73d78082dec00d24c8d10c47e471..91de3b4d4e851270cb8c83a719cdfd35
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 022bbed019c8805664daed827253223b05292d6c..4673d4e820bf7f2bd3844b7fece234f2e1bb7177 100644
+index 9d628a2841689eb922f874af6c10f958783b5c3c..18d3d5ddce0d51962e2a09f094f28dd11094ab97 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -120,6 +120,7 @@ private:
@@ -335,7 +335,7 @@ index 022bbed019c8805664daed827253223b05292d6c..4673d4e820bf7f2bd3844b7fece234f2
      virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 4afae00ee9d06a8be4aebc3dd26e63324c1bd710..c7040bc4cc5e9b085cd9d69b7ca679d1ffba6eb3 100644
+index 6917594a59d890d5350110199f1c8e7c843ec421..e45c2d2daa1e322d6f1bd2fef952643a78e925d2 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -15,6 +15,7 @@
@@ -355,11 +355,11 @@ index 4afae00ee9d06a8be4aebc3dd26e63324c1bd710..c7040bc4cc5e9b085cd9d69b7ca679d1
      update_system_theme(Web::PageId page_id, Core::AnonymousBuffer theme_buffer) =|
      update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen_index) =|
 diff --git a/Services/WebWorker/ConnectionFromClient.cpp b/Services/WebWorker/ConnectionFromClient.cpp
-index 53fbfbb31ebb6274787036a70d5e990ac556afea..d4fa5eea0f6fb4cd1d9f55fa52a9454ba6d151b8 100644
+index 343f8da08ba10bafb6e94d8f7a65cb64bc896eb2..8de2e2e20b1629c7d2cda72971061fabc6b26564 100644
 --- a/Services/WebWorker/ConnectionFromClient.cpp
 +++ b/Services/WebWorker/ConnectionFromClient.cpp
-@@ -85,6 +85,11 @@ void ConnectionFromClient::set_site_compatibility_data(JsonValue data)
-     Web::ResourceLoader::the().set_site_compatibility_data(parsed_data.release_value());
+@@ -86,6 +86,11 @@ void ConnectionFromClient::set_site_compatibility_data(JsonValue data)
+     Web::set_site_compatibility_data(parsed_data.release_value());
  }
  
 +void ConnectionFromClient::set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list)
@@ -369,9 +369,9 @@ index 53fbfbb31ebb6274787036a70d5e990ac556afea..d4fa5eea0f6fb4cd1d9f55fa52a9454b
 +
  void ConnectionFromClient::set_user_agent(String user_agent)
  {
-     Web::ResourceLoader::the().set_user_agent(move(user_agent));
+     Web::update_loader_config([&](auto& config) { config.user_agent = move(user_agent); });
 diff --git a/Services/WebWorker/ConnectionFromClient.h b/Services/WebWorker/ConnectionFromClient.h
-index edc9cabc189fb6c521095fadbc5a36ac8d66f7c3..93f027bd458f3adbd80c95f638c8bab438b2942f 100644
+index 6f56e46c4cfde7b6833a674db68638fc90586de0..2d429a57877c285982c41e152fcf3a9d8a0b0839 100644
 --- a/Services/WebWorker/ConnectionFromClient.h
 +++ b/Services/WebWorker/ConnectionFromClient.h
 @@ -61,6 +61,7 @@ private:
@@ -383,7 +383,7 @@ index edc9cabc189fb6c521095fadbc5a36ac8d66f7c3..93f027bd458f3adbd80c95f638c8bab4
      virtual void set_navigator_compatibility_mode(Web::NavigatorCompatibilityMode mode) override;
      virtual void set_preferred_languages(Vector<String> preferred_languages) override;
 diff --git a/Services/WebWorker/WebWorkerServer.ipc b/Services/WebWorker/WebWorkerServer.ipc
-index a8fdcf6565c47537c44c76049c4ef0955e04076b..7e9e3355db2844de293230d94424b94702b2395e 100644
+index 16de63536d04975dddeea89b0d740313c84ca7a8..78909d234ade10689d9461de89c697a9efdc6b4a 100644
 --- a/Services/WebWorker/WebWorkerServer.ipc
 +++ b/Services/WebWorker/WebWorkerServer.ipc
 @@ -3,6 +3,7 @@

@@ -18,9 +18,11 @@
 #include <LibCore/System.h>
 #include <LibFileSystem/FileSystem.h>
 #include <LibGfx/SystemTheme.h>
+#include <LibURL/Site.h>
 #include <LibWebCommon/WebView/Utilities.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/HeadlessWebView.h>
+#include <LibWebView/RequestServerManager.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Extensions/CRX.h>
 #include <UI/Extensions/ContentScripts.h>
@@ -44,11 +46,21 @@ Registry& Registry::the()
     return *registry;
 }
 
+// As in Chrome, an extension's pages may copy and paste from script, with no user gesture, if it has the clipboard
+// permissions. Proton Pass clears what it copied from its offscreen document this way.
+static bool page_has_permission(WebView::ScriptBridgeEndpoint const& endpoint, StringView permission)
+{
+    auto extension = Registry::the().extension_for_url(endpoint.url());
+    return extension && extension->has_permission(permission);
+}
+
 void Registry::register_url_scheme()
 {
     WebView::URLSchemeBridge bridge {
         .bootstrap_script = [](WebView::ScriptBridgeEndpoint const& endpoint) { return Router::the().bootstrap_script(endpoint); },
         .on_message = [](WebView::ScriptBridgeEndpoint const& endpoint, String message) { Router::the().on_message(endpoint, message); },
+        .may_read_clipboard = [](WebView::ScriptBridgeEndpoint const& endpoint) { return page_has_permission(endpoint, "clipboardRead"sv); },
+        .may_write_clipboard = [](WebView::ScriptBridgeEndpoint const& endpoint) { return page_has_permission(endpoint, "clipboardWrite"sv); },
     };
 
     auto handler = [this](WebView::URLSchemeRequest const& request) { return respond(request); };
@@ -422,7 +434,9 @@ void Registry::notify_extensions_changed()
 // --- Background pages --------------------------------------------------------------------------------------------------
 
 // A view no one sees, for background pages and offscreen documents. A headless view reports itself visible, so its
-// page's timers, and its workers, run at full speed.
+// page's timers, and its workers, run at full speed. Its pages are the extension's own, which the content blocker
+// leaves alone, as uBlock Origin doesn't see other extensions' requests in Chrome, so it goes without the content
+// blocker, whose engine would otherwise take tens of MiB in its process.
 OwnPtr<WebView::HeadlessWebView> Registry::create_hidden_view(URL::URL const& url)
 {
     if (!m_theme.has_value()) {
@@ -435,13 +449,18 @@ OwnPtr<WebView::HeadlessWebView> Registry::create_hidden_view(URL::URL const& ur
         m_theme = theme.release_value();
     }
 
-    auto view = WebView::HeadlessWebView::create(*m_theme, BACKGROUND_PAGE_SIZE);
+    auto view = WebView::HeadlessWebView::create(*m_theme, BACKGROUND_PAGE_SIZE, WebView::IsPrivate::No, WebView::EnableContentBlocker::No);
     view->load(url);
     return view;
 }
 
 void Registry::close_hidden_view(NonnullOwnPtr<WebView::HeadlessWebView> view)
 {
+    // The extension's RequestServer has nothing more to do once its pages are gone, so it goes with their processes
+    // rather than a minute later, as a site's RequestServer otherwise does in case the site is visited again.
+    if (auto site = URL::Site::serialize_for_partitioning(view->url().origin()); site.has_value())
+        WebView::RequestServerManager::the().retire_when_idle(view->session(), *site);
+
     auto request_close = view->prepare_for_immediate_close();
     request_close();
     // NB: The view goes once its page has had the chance to close.
@@ -453,8 +472,27 @@ void Registry::start_background_page(Extension const& extension)
     if (!m_can_start_background_pages || !extension.manifest().background_service_worker.has_value())
         return;
     Router::the().background_will_start(extension);
+    open_background_page(extension);
+}
+
+bool Registry::restart_background_page(Extension const& extension)
+{
+    if (!m_can_start_background_pages || !extension.manifest().background_service_worker.has_value() || m_background_pages.contains(extension.id()))
+        return false;
+    open_background_page(extension);
+    return m_background_pages.contains(extension.id());
+}
+
+void Registry::open_background_page(Extension const& extension)
+{
     if (auto view = create_hidden_view(extension.url_for(BACKGROUND_PAGE_PATH)))
         m_background_pages.set(extension.id(), view.release_nonnull());
+}
+
+void Registry::stop_idle_background_page(Extension const& extension)
+{
+    if (auto view = m_background_pages.take(extension.id()); view.has_value())
+        close_hidden_view(view.release_value());
 }
 
 void Registry::stop_background_page(StringView id)

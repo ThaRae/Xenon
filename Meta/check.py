@@ -109,19 +109,68 @@ def check_includes(checks: Checks):
                 checks.fail("includes", f"{relative(path)}:{number} includes from UI/Qt/; use <UI/...>")
 
 
+# C++ tokens that can hold text: raw and plain string literals, character literals, and comments.
+CXX_TEXT_TOKEN = re.compile(
+    r'R"(?P<delimiter>[^()\\\s]*)\((?P<raw>.*?)\)(?P=delimiter)"|"(?P<plain>(?:[^"\\\n]|\\.)*)"'
+    r"|'(?:[^'\\\n]|\\.)*'|(?P<comment>//[^\n]*|/\*.*?\*/)",
+    re.DOTALL,
+)
+CXX_WHITESPACE = re.compile(r"\s*")
+# An escape in a plain string literal. Those that name a character by its number can name a non-ASCII one.
+CXX_ESCAPE = re.compile(r"\\(?:u([0-9A-Fa-f]{4})|U([0-9A-Fa-f]{8})|x([0-9A-Fa-f]+)|([0-7]{1,3})|.)", re.DOTALL)
+
+
+def cxx_without_comments(source: str) -> str:
+    # Blanks out comments, keeping line numbers, and leaves "//" in a string alone.
+    def blank(token: re.Match) -> str:
+        return re.sub(r"[^\n]", " ", token.group()) if token.group("comment") else token.group()
+
+    return CXX_TEXT_TOKEN.sub(blank, source)
+
+
+def cxx_string_literal_text(source: str, position: int) -> str | None:
+    # The text of the string literals at position, as the compiler reads them: adjacent ones joined, and escapes such as
+    # \u201C decoded. None when there's no literal there.
+    def unescape(escape: re.Match) -> str:
+        if number := escape.group(1) or escape.group(2) or escape.group(3):
+            return chr(min(int(number, 16), 0x10FFFF))
+        if number := escape.group(4):
+            return chr(int(number, 8))
+        return "?"
+
+    pieces = []
+    while literal := CXX_TEXT_TOKEN.match(source, CXX_WHITESPACE.match(source, position).end()):
+        if literal.group("raw") is not None:
+            pieces.append(literal.group("raw"))
+        elif literal.group("plain") is not None:
+            pieces.append(CXX_ESCAPE.sub(unescape, literal.group("plain")))
+        else:
+            break
+        position = literal.end()
+    return "".join(pieces) if pieces else None
+
+
 def check_format_strings(checks: Checks):
     # qformatted() and Utf16String::formatted() copy a format string's literal text into a UTF-16 builder one ASCII
-    # character at a time, and assert on anything else, so a "…" or "—" in one crashes the moment it's formatted.
-    # Non-ASCII text goes through tr("…%1").arg() instead.
-    call = re.compile(r'\b(qformatted|Utf16String::formatted)\s*\(\s*"((?:[^"\\]|\\.)*)"')
+    # character at a time, and assert on anything else, so a "…" or "—" in one crashes the moment it's formatted. That
+    # includes text spelled with an escape, such as "\u201C". Non-ASCII text goes through tr("…%1").arg() instead.
+    # The format string has to be a literal, so that this check can read it.
+    call = re.compile(r"\b(?:qformatted|Utf16String::formatted)\s*\(")
     for path in cxx_sources():
-        for number, line in enumerate(path.read_text().splitlines(), 1):
-            for match in call.finditer(line):
-                if not match.group(2).isascii():
-                    checks.fail(
-                        "format strings",
-                        f'{relative(path)}:{number} formats a string with non-ASCII text; use tr("...%1").arg()',
-                    )
+        source = cxx_without_comments(path.read_text())
+        for match in call.finditer(source):
+            number = source.count("\n", 0, match.start()) + 1
+            # qformatted()'s own declaration.
+            if source[match.end() :].lstrip().startswith("CheckedFormatString"):
+                continue
+            text = cxx_string_literal_text(source, match.end())
+            if text is None:
+                checks.fail("format strings", f"{relative(path)}:{number} formats a string that isn't a literal")
+            elif not text.isascii():
+                checks.fail(
+                    "format strings",
+                    f'{relative(path)}:{number} formats a string with non-ASCII text; use tr("...%1").arg()',
+                )
 
 
 def check_build_lists_every_source(checks: Checks):
@@ -404,10 +453,10 @@ print(json.dumps(steps))
 """
 
 
-# A workflow's shell step that doesn't parse only fails once a runner reaches it, which on slab-large can be hours later.
+# A workflow's shell step that doesn't parse only fails once a runner reaches it, which can be hours into a build.
 # Each step is checked as Gitea runs it, by bash, with its ${{ }} expressions filled in by a placeholder.
 def check_workflow_steps(checks: Checks, python: Path):
-    workflows = [relative(path) for path in sorted((XENON_SOURCE_DIR / ".gitea" / "workflows").glob("*.yml"))]
+    workflows = [relative(path) for path in sorted((XENON_SOURCE_DIR / ".github" / "workflows").glob("*.yml"))]
     result = subprocess.run(
         [str(python), "-c", WORKFLOW_STEPS_PROGRAM, *workflows], cwd=XENON_SOURCE_DIR, capture_output=True, text=True
     )

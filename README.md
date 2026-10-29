@@ -2,8 +2,7 @@
 
 Xenon is a web browser built on the [Ladybird](https://ladybird.org) engine. It brings over the features of
 [Helium](https://helium.computer): uBlock Origin's ad blocking built in, !bangs in the address bar, a choice of layouts,
-and a private, low-noise setup. It has its own look, built around a rose accent (**#ff0050**), and doesn't copy
-Helium's.
+and a private, low-noise setup.
 
 It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 
@@ -33,6 +32,11 @@ It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 
 - Pick Bitwarden or Proton Pass when you first start Xenon, and it installs and updates it for you
 - Sign in with a USB security key (WebAuthn, on macOS)
+- Extensions stop running in the background when idle, as in Chrome, and start again when needed
+
+**Security**
+
+- A warning for sites whose certificate can't be verified that says why, with a way past it for your own servers
 
 **Setup**
 
@@ -46,6 +50,13 @@ cases, and where it lives in the code.
 
 **Not done yet**: frameless mode, restoring split views after a restart, passkeys beyond USB security keys, and Linux
 support for security keys.
+
+## Installing it
+
+Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases/releases) has a
+`Xenon-<version>.dmg`. Open it and drag Xenon into Applications. Releases aren't notarized yet, so the first time,
+macOS asks you to allow it in **System Settings → Privacy & Security → Open Anyway**. After that, Xenon updates
+itself.
 
 ## Building it
 

@@ -34,6 +34,7 @@
 #include <UI/Menu.h>
 #include <UI/NewTabPage.h>
 #include <UI/Popover.h>
+#include <UI/SessionSaving.h>
 #include <UI/SplitView.h>
 #include <UI/StringUtils.h>
 #include <UI/TabHibernation.h>
@@ -866,7 +867,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     };
     view().on_element_picker_filter = [this](auto const& filter) { ElementPicker::confirm_filter(*this, filter); };
     update_content_blocking_controls(view().content_blocking_snapshot());
-    content_blocker_count_visibility_changed();
+    xenon_settings_changed();
 
     m_hamburger_button = new HamburgerButton(m_toolbar);
     m_hamburger_button->setObjectName("LadybirdHamburgerButton");
@@ -989,6 +990,18 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         tab.enter_report_review(this, tr("Report Website Issue"));
     };
 
+    // A review takes its screenshot on the page it reports, in the tab it was opened from, and comes back once done.
+    view().on_request_web_compat_report_screenshot = [this](Function<void(QImage)> on_selected) {
+        auto* reported_tab = m_tab_to_activate_on_close.data();
+        if (!reported_tab)
+            return;
+        m_window->activate_tab(m_window->tab_index(reported_tab));
+        reported_tab->view().select_web_compat_report_screenshot(AK::move(on_selected), [this, review_tab = QPointer { this }] {
+            if (review_tab)
+                m_window->activate_tab(m_window->tab_index(this));
+        });
+    };
+
     view().on_link_hover = [this](auto const& url) {
         m_hover_label->setText(qstring_from_ak_string(url.to_byte_string()));
         update_hover_label();
@@ -1016,6 +1029,11 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         m_suppress_javascript_dialogs_until_navigation = false;
         if (NewTabPage::is_new_tab_page(url))
             NewTabPage::populate(view(), m_window->session());
+
+        // Only mark the end of loads that finished, rather than being stopped, which don't end here. The browser's own
+        // about: pages are not marked.
+        if (!view().is_loading() && url.scheme() != "about"sv)
+            emit loading_finished();
     };
 
     view().on_top_level_navigation_commit = [this] {
@@ -1029,6 +1047,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
             }
         }
         m_suppress_javascript_dialogs_until_navigation = false;
+        // Xenon: The session saves the tab's new page within a second, rather than in up to 30.
+        SessionSaving::save_soon();
     };
 
     view().on_browser_history_traversal_complete = [this] {
@@ -1037,6 +1057,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     view().on_url_change = [this](auto const& url) {
         m_location_edit->set_url(url);
+        // Xenon: As do a navigation within the page, and a restored tab's page.
+        SessionSaving::save_soon();
     };
 
     m_location_edit->on_navigation = [this](auto input, auto fallback_url, auto destination_kind) {
@@ -1837,12 +1859,12 @@ void Tab::config_variable_changed(WebView::ConfigVariableID variable)
         update_tab_title();
 }
 
-void Tab::content_blocker_count_visibility_changed()
+void Tab::xenon_settings_changed()
 {
     if (!is_loaded())
         return;
 
-    m_content_blocking_button->set_show_count_badge(WebView::Application::settings().show_content_blocker_count());
+    m_content_blocking_button->set_show_count_badge(XenonSettings::show_blocked_request_count());
 }
 
 void Tab::set_loading(bool is_loading)
@@ -1862,11 +1884,6 @@ void Tab::set_loading(bool is_loading)
     update_tab_icon();
 
     m_reload_button->set_loading(m_is_loading);
-
-    // Only mark the end of loads that finished, rather than being stopped. The browser's own about: pages are not
-    // marked.
-    if (!m_is_loading && view().last_load_finished() && view().url().scheme() != "about"sv)
-        emit loading_finished();
 }
 
 void Tab::update_tab_icon()

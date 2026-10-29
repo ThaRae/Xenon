@@ -23,7 +23,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 26 insertions(+)
 
 diff --git a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
-index 89d9215bef4ceea10c85bf0260982e51f41d9754..153be49a66599aa4d0222d3b1e304fda0c6c2de3 100644
+index e412cefd3e3f31f9c5dc6ad5e02bfec5a660e3e0..92d28a2c02f99651a9e89feca2560f2192da49ce 100644
 --- a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 +++ b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 @@ -7,6 +7,7 @@
@@ -31,12 +31,12 @@ index 89d9215bef4ceea10c85bf0260982e51f41d9754..153be49a66599aa4d0222d3b1e304fda
  #include <AK/AnyOf.h>
  #include <LibGC/Heap.h>
 +#include <LibURL/EmbedderSchemes.h>
+ #include <LibWeb/Bindings/PrincipalHostDefined.h>
  #include <LibWeb/ContentSecurityPolicy/BlockingAlgorithms.h>
  #include <LibWeb/ContentSecurityPolicy/Directives/DirectiveOperations.h>
- #include <LibWeb/ContentSecurityPolicy/Directives/HTMLIntegration.h>
-@@ -42,6 +43,12 @@ ViolationReporter violation_reporter_for_request(JS::Realm& realm, GC::Ref<Fetch
+@@ -73,6 +74,12 @@ ViolationReporter violation_reporter_for_request(JS::Realm& realm, NonnullRefPtr
  // https://w3c.github.io/webappsec-csp/#should-block-navigation-request
- Directives::Directive::Result should_navigation_request_of_type_be_blocked_by_content_security_policy(GC::Ref<Fetch::Infrastructure::Request> navigation_request, Directives::Directive::NavigationType navigation_type)
+ Directives::Directive::Result should_navigation_request_of_type_be_blocked_by_content_security_policy(NonnullRefPtr<Fetch::Infrastructure::Request> navigation_request, Directives::Directive::NavigationType navigation_type)
  {
 +    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
 +    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages

@@ -77,7 +77,7 @@ ninja -C Build/release xenon     # an incremental rebuild once configured
 ```bash
 ./Meta/check.py            # formatting and Xenon's invariants, in seconds
 ./Meta/check.py --fix      # apply the formatters first
-./Meta/xenon.py test       # unit tests, and Xenon run headless against local test pages
+./Meta/xenon.py test       # unit tests, and Xenon run against local test pages
 git config core.hooksPath .githooks   # run Meta/check.py before every push
 ```
 
@@ -90,27 +90,36 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
 - a page override for a page upstream no longer ships
 - a malformed or duplicate !bang
 - Ladybird's violet coming back into the chrome
-- a format string that would crash on non-ASCII text
+- a format string that would crash on non-ASCII text (escapes such as `\u201C` included), or one it can't read
 - a workflow step whose shell script doesn't parse
 - engine changes in `ladybird/` that aren't exported to `Patches/ladybird`, or a pinned commit that doesn't exist
   upstream
 
 `Meta/xenon.py test` runs the unit tests in `Tests/`, then runs Xenon headless: it renders `about:welcome`, checks that
 a fresh start writes only to Xenon's directories, and checks content blocking, daily filter list updates, the blocking
-dashboard, extensions, WebAuthn, and password manager installs against pages and servers it starts locally.
+dashboard, the certificate warning, extensions, WebAuthn, and password manager installs against pages and servers it
+starts locally. Session restore needs Xenon's windows, since a headless run never saves its session, so that check opens
+them: it kills Xenon, and then quits it, and checks that the tabs come back with their pages. Linux CI runs the tests
+under Xvfb, so the windows are real X11 ones; without a display, they go to Qt's offscreen platform.
 
-CI runs on Gitea Actions at git.avx512.dev, on slab's ephemeral runners:
+CI runs on GitHub Actions, on GitHub's own runners:
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| `.gitea/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online` on `slab`, then a Linux build and `Meta/xenon.py test` on `slab-large`, with the welcome page render as an artifact |
-| `.gitea/workflows/upstream.yml` | weekly, by hand | the same build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
+| `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test`, with the welcome page render as an artifact |
+| `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
+| `.github/workflows/release.yml` | by hand, pull requests that change it | `Meta/release.py test` and `package` on macOS, from `main`'s build caches, with the release's installer, archive and appcast as an artifact, and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases |
 
-The builds run in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
-`ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with. The
-`CCACHE_TOKEN` repository secret points ccache and vcpkg's package cache at slab-ccache; without it, every build starts
-cold and takes a couple of hours. slab-large runs one build at a time, so a pull request's build checks first whether
-the pull request is still open, and skips itself if it was merged or closed while it waited.
+- **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
+  `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
+- **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
+  (`ladybird/.github/actions/setup`).
+- **Caches**: ccache's objects (`Build/caches`) and vcpkg's prebuilt packages (`ladybird/Build/caches`) are kept in
+  GitHub's cache, one entry per platform. Builds on `main` save them, and a pull request starts from `main`'s. A pull
+  request whose build misses ccache more than 500 times (a Ladybird bump, say) saves its own too, so its next push
+  starts from there instead of recompiling the same files; smaller ones don't, to leave room in GitHub's 10 GB. A cold
+  build takes a few hours, so the build step stops itself in time to save the caches, and the next run carries on from
+  there.
 
 ## Changing the engine
 
@@ -135,6 +144,11 @@ git -C ladybird fetch --depth 1 origin master
 ./Meta/xenon.py build
 ```
 
+`git am --3way` falls back to a merge with the blobs a patch was made from, which a shallow `ladybird/` has only for the
+first patch. If a later one fails with "Repository lacks necessary blobs", apply the series to the old pin once, in a
+throwaway worktree (`git -C ladybird worktree add --detach /tmp/old-series <old pin>`, then `git am` the patches there),
+and retry; the blobs are then in the shared object store.
+
 If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon last synced with, and port the relevant
 changes into `UI/`. The weekly Upstream workflow applies the series to `master`, names any patch that no longer
 applies, builds, and lists those UI changes, so a bump holds no surprises.
@@ -146,12 +160,17 @@ applies, builds, and lists those UI changes, so a bump holds no surprises.
 ./Meta/update-filter-lists.py --no-build   # copies what ../xenon-ublock last built
 ```
 
-The lists come from [xenon-ublock](https://git.avx512.dev/tharae/xenon-ublock), which converts uBlock Origin's lists
+The lists come from [xenon-ublock](https://github.com/ThaRae/xenon-ublock), which converts uBlock Origin's lists
 for Ladybird's content blocker. The script expects its checkout next to this one, at `../xenon-ublock`. Xenon ships its `helium` preset, except for Peter Lowe's list, which states no license, and Helium's own two
 lists (AGPL-3.0, and almost nothing survives conversion). The content blocker patches (`Patches/ladybird`
 `0004`–`0009`) let the lists keep scriptlets, procedural filters, and `$redirect`, `$removeparam`, `$popup` and CNAME
 filters. uBlock Origin's own lists go in `trusted-lists/`, and its scriptlets and redirect surrogates in
 `resources/`.
+
+A list costs memory in every WebContent process, since each builds its own engine from all of them: roughly 5 to 12 MiB
+per process for a large list like EasyList or AdGuard's. `||host^$document` and `||host/path^$document` filters are the
+exception: engine patch `0027` keeps those as hashes (8 bytes each), so a list made of them, like URLhaus, costs almost
+nothing.
 
 `UI/Resources/filter-lists/NOTICE.txt` credits every list's source and license, and the GPL-3.0 text ships beside
 them. `Meta/check.py` fails if a list ships without a cleared license. `Meta/xenon.py test` checks that Xenon applies
@@ -159,8 +178,8 @@ the lists without being given any, with blocking on and off: requests that EasyL
 scriptlet and a hiding rule for a listed site, on a page served locally at that site's address.
 
 Between releases, Xenon fetches the lists daily from
-[tharae/xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists). That public repository's workflow (kept
-here as `Meta/ci/filter-lists-workflow.yml`) runs the same script every day with `--output`, through
+[ThaRae/xenon-filter-lists](https://github.com/ThaRae/xenon-filter-lists). That public repository's GitHub Actions
+workflow (kept here as `Meta/ci/filter-lists-workflow.yml`) runs the same script every day with `--output`, through
 `Meta/ci/publish-filter-lists.sh`, and signs the manifest. See [FilterListUpdates.md](FilterListUpdates.md).
 
 ## Updating the !bangs
@@ -196,14 +215,18 @@ the build ships in place of Ladybird's (internal pages use them as their favicon
 ## Releases
 
 Xenon updates itself on macOS with Sparkle, from releases published to
-[tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases). They're made on a Mac:
+[ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases) on GitHub. They're made on a Mac:
 
 ```bash
 ./Meta/release.py test       # a release updates itself to the next, and turns down tampered ones
-./Meta/release.py package    # builds Xenon, and writes a signed Xenon.app, its archive and the appcast to Build/distribution
+./Meta/release.py package    # builds Xenon, and writes a signed Xenon.app, its installer (a .dmg), its archive and the appcast to Build/distribution
 ./Meta/release.py publish    # publishes them, and tags the commit
 ```
 
 Bump `VERSION.txt` first. Releases are signed with a self-signed certificate and an update key, both in the login
 keychain of the Mac they're made on. [Updates.md](Updates.md) covers setting those up, what Xenon checks, and the test.
 The build fetches Sparkle's release (`UI/Xenon.cmake`) by itself, on macOS.
+
+`.github/workflows/release.yml` runs `test` and `package` on GitHub's macOS runner instead, by hand, with the
+certificate and the update key as the repository's secrets, and keeps the installer, the archive and the appcast as the
+run's artifact. With **publish** ticked, on `main`, it runs `publish` too, with a token for ThaRae/xenon-releases.

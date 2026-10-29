@@ -20,10 +20,10 @@ A Window that outlives its initial about:blank document runs it once.
  3 files changed, 14 insertions(+)
 
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index dba2d9e44efdfcf6307e55356f1e7f64333835fe..30d86afc096398371a813e803737ff10ee6e2798 100644
+index 790ab8a16078a2456bfef364640be936069799b3..e5bed560bf427c05c44791c8c4405830ad2c6c13 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -7983,6 +7983,9 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+@@ -8014,6 +8014,9 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
          if (!scrolling_blocked_in_new_document)
              try_to_scroll_to_the_fragment(allow_text_directive_scroll);
  
@@ -34,10 +34,10 @@ index dba2d9e44efdfcf6307e55356f1e7f64333835fe..30d86afc096398371a813e803737ff10
          set_ready_to_run_scripts();
      }
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index da2013674ae286a5ce89d214a3f51e5beeb95994..30b50766b056206ab5923ca32a783f2d56c2a923 100644
+index e2c1a44b9e1f051ec4fe007a2aaa8a2ac8cef223..1ac48f9d7b48f2ed9236869170bff4a3e94aa48d 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-@@ -81,6 +81,7 @@
+@@ -83,6 +83,7 @@
  #include <LibWeb/Layout/Node.h>
  #include <LibWeb/Layout/NodeArena.h>
  #include <LibWeb/Layout/Viewport.h>
@@ -45,7 +45,7 @@ index da2013674ae286a5ce89d214a3f51e5beeb95994..30b50766b056206ab5923ca32a783f2d
  #include <LibWeb/Loader/GeneratedPagesLoader.h>
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Page/RenderingStats.h>
-@@ -1134,6 +1135,11 @@ void LocalNavigable::initialize_navigable(NonnullRefPtr<DocumentState> document_
+@@ -1170,6 +1171,11 @@ void LocalNavigable::initialize_navigable(NonnullRefPtr<DocumentState> document_
      //         top-level traversable by the window handle it gets once it is created, so it does that once it has one.
      if (WebDriver::BiDi::is_active() && !is_top_level_traversable() && !is_stand_in)
          WebDriver::BiDi::document_is_ready_for_scripts(document);

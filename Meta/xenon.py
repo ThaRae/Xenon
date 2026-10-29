@@ -14,10 +14,13 @@ import http.server
 import json
 import os
 import shutil
+import signal
+import ssl
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.parse
 
 from pathlib import Path
@@ -97,8 +100,17 @@ FILTER_LIST_UPDATES_MARKER = "XENON-FILTER-LIST-UPDATES-TEST "
 TEST_EXTENSION_DIR = XENON_SOURCE_DIR / "Tests" / "Extensions" / "basic"
 EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
 
+# A local HTTPS server's self-signed certificate (Tests/CertificateErrors). Xenon's certificate warning and the server's
+# page each print what they found on a line starting with the marker.
+CERTIFICATE_ERRORS_DIR = XENON_SOURCE_DIR / "Tests" / "CertificateErrors"
+CERTIFICATE_ERROR_TEST_MARKER = "XENON-CERTIFICATE-ERROR-TEST "
+
 # A page that tries WebAuthn and prints what it found on a line starting with this.
 WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
+
+# Xenon saves the session a second after a change (UI/SessionSaving.cpp). The session restore check waits this long after
+# its changes before it kills Xenon.
+SESSION_SAVE_WAIT_SECONDS = 3
 
 # Stand-ins for the password managers, served from a stand-in for the Chrome Web Store and signed with keys of their own
 # (Tests/ExtensionStore/make-crxs.py). The page that looks for them prints what it found on a line starting with this.
@@ -233,6 +245,8 @@ def test_main(platform: Platform, build_dir: Path):
     screenshot = smoke_dir / "welcome.png"
     screenshot.unlink(missing_ok=True)
 
+    # The session restore check opens Xenon's windows. CI gives Linux a real X server for them
+    # (Meta/ci/build-and-test.sh); without a display, they go to Qt's offscreen platform.
     env = dict(os.environ)
     if platform.host_system != HostSystem.macOS and not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
         env["QT_QPA_PLATFORM"] = "offscreen"
@@ -286,9 +300,17 @@ def test_main(platform: Platform, build_dir: Path):
     if not check_blocking_dashboard(app_executable(platform, build_dir), env):
         failures.append("blocking dashboard")
 
+    print("==> the certificate warning, for a local HTTPS server with a self-signed certificate", flush=True)
+    if not check_certificate_errors(app_executable(platform, build_dir), env):
+        failures.append("certificate warning")
+
     print("==> extension pages and their chrome.* APIs", flush=True)
     if not check_extensions(app_executable(platform, build_dir), env):
         failures.append("extensions")
+
+    print("==> tabs come back with their pages after a crash and after a quit", flush=True)
+    if not check_session_restore(app_executable(platform, build_dir), env):
+        failures.append("session restore")
 
     print("==> WebAuthn requests reach the UI process", flush=True)
     if not check_web_authn(app_executable(platform, build_dir), env):
@@ -888,19 +910,29 @@ def unpacked_extension_id(directory: Path) -> str:
 
 
 # Runs a page in a headless browser until the page closes itself, and returns the results it printed after
-# EXTENSION_TEST_MARKER. The profile is a throwaway one, unless one is given.
-def run_extension_test_page(executable: Path, env: dict, url: str, profile: str | None = None) -> dict | None:
+# EXTENSION_TEST_MARKER. The profile is a throwaway one with content blocking on, unless one is given. The page gets
+# Ladybird's internals object, whose grantTransientActivation() stands in for the user's gesture that some APIs need.
+def run_extension_test_page(
+    executable: Path, env: dict, url: str, profile: str | None = None, arguments: tuple[str, ...] = ()
+) -> dict | None:
     with tempfile.TemporaryDirectory() as temporary_profile:
+        if not profile:
+            turn_on_content_blocking(temporary_profile)
         command = [
             str(executable),
             "--headless=manual",
+            "--expose-internals-object",
             "--profile-path",
             profile or temporary_profile,
             f"--load-extension={TEST_EXTENSION_DIR}",
+            *arguments,
             url,
         ]
         try:
-            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)
+            # The browser prints what it would have asked the user, which isn't ASCII.
+            result = subprocess.run(
+                command, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
+            )
         except subprocess.TimeoutExpired:
             print(f"    timed out on {url}", file=sys.stderr)
             return None
@@ -919,6 +951,11 @@ def run_extension_test_page(executable: Path, env: dict, url: str, profile: str 
     return None
 
 
+def turn_on_content_blocking(profile: str):
+    (Path(profile) / "config").mkdir(exist_ok=True)
+    (Path(profile) / "config" / "Settings.json").write_text(json.dumps({"contentBlockers": {"enabled": True}}))
+
+
 def check_extensions(executable: Path, env: dict) -> bool:
     extension_id = unpacked_extension_id(TEST_EXTENSION_DIR)
     passed = True
@@ -926,26 +963,39 @@ def check_extensions(executable: Path, env: dict) -> bool:
     # A web page, and JSON with no CORS headers, from two local servers: two origins.
     page = f"""<!doctype html><script>
         const results = {{ "no chrome.runtime": typeof chrome === "undefined" || !chrome.runtime }};
+        // Only an extension's pages copy and paste from script without a user gesture.
+        const text = document.createElement("textarea");
+        document.documentElement.append(text);
+        text.focus();
+        text.value = "web page";
+        text.select();
+        results["no copy without a user gesture"] = !document.execCommand("copy");
+        text.value = "";
+        results["no paste"] = !document.execCommand("paste") && text.value === "";
         const base = "chrome-extension://{extension_id}/";
-        const image = new Promise(resolve => {{
+        const image_fails = src => new Promise(resolve => {{
             const img = new Image();
             img.onload = () => resolve(false);
             img.onerror = () => resolve(true);
-            img.src = base + "popup.css";
+            img.src = src;
         }});
         Promise.all([
             fetch(base + "manifest.json").then(() => false, () => true),
-            image,
+            image_fails(base + "popup.css"),
             fetch(new URLSearchParams(location.search).get("data")).then(() => false, () => true),
-        ]).then(([fetch_failed, image_failed, data_fetch_failed]) => {{
+            image_fails("/site-tracking-pixel.gif"),
+        ]).then(([fetch_failed, image_failed, data_fetch_failed, tracker_failed]) => {{
             results["fetch blocked"] = fetch_failed;
             results["subresource blocked"] = image_failed;
             results["CORS still applies to web pages"] = data_fetch_failed;
+            results["the content blocker still applies to web pages"] = tracker_failed;
             console.log("{EXTENSION_TEST_MARKER}" + JSON.stringify(results));
             window.close();
         }});
     </script>""".encode()
     data = b'{"ok": true}'
+    # A 1x1 GIF, at a path the bundled lists block (BLOCKED_REQUESTS).
+    gif = bytes.fromhex("47494638396101000100800000000000ffffff21f90401000000002c00000000010001000002024401003b")
     content_script_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "content-scripts.html").read_bytes()
     connectable_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "externally-connectable.html").read_bytes()
 
@@ -953,6 +1003,8 @@ def check_extensions(executable: Path, env: dict) -> bool:
         def do_GET(self):
             if self.path == "/data.json":
                 body, content_type = data, "application/json"
+            elif self.path == "/site-tracking-pixel.gif":
+                body, content_type = gif, "image/gif"
             elif self.path.startswith("/content-scripts"):
                 body, content_type = content_script_page, "text/html"
             elif self.path.startswith("/connectable"):
@@ -980,6 +1032,7 @@ def check_extensions(executable: Path, env: dict) -> bool:
         # An extension page gets chrome.* and its extension's origin, and its background worker runs. The page runs
         # twice in one profile: the first time, the extension is installed; the second, the browser starts up with it.
         with tempfile.TemporaryDirectory() as profile:
+            turn_on_content_blocking(profile)
             for run, expected_event in enumerate(("installed:install", "startup"), 1):
                 url = f"chrome-extension://{extension_id}/tests.html?data={urllib.parse.quote(data_url, safe='')}"
                 results = run_extension_test_page(executable, env, url, profile)
@@ -1011,6 +1064,13 @@ def check_extensions(executable: Path, env: dict) -> bool:
         # A web page that the extension's externally_connectable matches messages it with chrome.runtime.
         connectable_url = f"http://127.0.0.1:{page_server.server_address[1]}/connectable?id={extension_id}"
         connectable_results = run_extension_test_page(executable, env, connectable_url)
+
+        # The background worker stops once it's idle, and starts again for what it listens to.
+        idle_url = f"chrome-extension://{extension_id}/idle.html"
+        idle_results = run_extension_test_page(executable, env, idle_url, arguments=("--extension-idle-timeout=2",))
+
+        # A background that stops takes its processes with it, the RequestServer of its extension's site too.
+        stopped_results = check_stopped_background(executable, env, extension_id)
     finally:
         for server in (page_server, data_server):
             server.shutdown()
@@ -1019,6 +1079,8 @@ def check_extensions(executable: Path, env: dict) -> bool:
         ("web page", results),
         ("content scripts", content_script_results),
         ("externally connectable page", connectable_results),
+        ("idle background", idle_results),
+        ("stopped background", stopped_results),
     ):
         if page_results is None:
             return False
@@ -1030,6 +1092,88 @@ def check_extensions(executable: Path, env: dict) -> bool:
         else:
             print(f"    {name}: {len(checks)} checks passed")
     return passed
+
+
+# Starts Xenon with the test extension and a blank tab, and watches the RequestServer of the extension's site: it starts
+# with the background, and goes once the background has stopped when idle, as nothing else of the extension needs it. A
+# site's RequestServer otherwise stays a minute after its last page has gone.
+def check_stopped_background(executable: Path, env: dict, extension_id: str) -> dict | None:
+    site_argument = f"--site chrome-extension://{extension_id}"
+    with tempfile.TemporaryDirectory() as profile:
+        turn_on_content_blocking(profile)
+        process = subprocess.Popen(
+            [
+                str(executable),
+                "--headless=manual",
+                "--profile-path",
+                profile,
+                f"--load-extension={TEST_EXTENSION_DIR}",
+                "--extension-idle-timeout=2",
+                "about:blank",
+            ],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+        def request_server_running() -> bool:
+            return any(site_argument in command for command in descendant_command_lines(process.pid))
+
+        def wait_for(condition, seconds: int) -> bool:
+            deadline = time.monotonic() + seconds
+            while time.monotonic() < deadline and process.poll() is None:
+                if condition():
+                    return True
+                time.sleep(0.1)
+            return False
+
+        try:
+            started = wait_for(request_server_running, 60)
+            stopped = started and wait_for(lambda: not request_server_running(), 30)
+        finally:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+
+    return {
+        "its extension's site has a RequestServer while it runs": started,
+        "that RequestServer goes with it": stopped,
+    }
+
+
+# The command lines of a process's descendants, from /proc on Linux and from ps(1) on macOS.
+def descendant_command_lines(root: int) -> list[str]:
+    processes: list[tuple[int, int, str]] = []
+    if Path("/proc/self/stat").exists():
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                # The process's name, in parentheses, may hold spaces; its parent comes second after it.
+                parent = int((entry / "stat").read_text().rsplit(")", 1)[1].split()[1])
+                command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+            except (OSError, IndexError, ValueError):
+                continue
+            processes.append((int(entry.name), parent, command))
+    else:
+        output = subprocess.run(["ps", "-A", "-o", "pid=,ppid=,args="], capture_output=True, text=True).stdout
+        for line in output.splitlines():
+            pid, parent, *command = line.split(None, 2)
+            processes.append((int(pid), int(parent), command[0] if command else ""))
+
+    children: dict[int, list[tuple[int, str]]] = {}
+    for pid, parent, command in processes:
+        children.setdefault(parent, []).append((pid, command))
+    commands = []
+    pending = [root]
+    while pending:
+        for pid, command in children.get(pending.pop(), []):
+            commands.append(command)
+            pending.append(pid)
+    return commands
 
 
 # Loads the blocking dashboard, whose lists only show up once its page and Xenon have talked over the script bridge.
@@ -1046,6 +1190,307 @@ def check_blocking_dashboard(executable: Path, env: dict) -> bool:
         return False
     print(f"    shows all {len(titles)} bundled lists")
     return True
+
+
+# A test extension's background worker sends the test's server the tabs every half second, and makes the calls to
+# chrome.tabs that the server answers with, each on the tab at an index or on none.
+SESSION_RESTORE_EXTENSION_MANIFEST = {
+    "manifest_version": 3,
+    "name": "Xenon session restore test",
+    "version": "1.0",
+    "permissions": ["tabs"],
+    "host_permissions": ["http://127.0.0.1/*"],
+    "background": {"service_worker": "background.js"},
+}
+SESSION_RESTORE_EXTENSION_BACKGROUND = """
+    async function report() {
+        const tabs = (await chrome.tabs.query({})).sort((a, b) => a.windowId - b.windowId || a.index - b.index);
+        const summary = tabs.map(tab => ({ url: tab.url, active: tab.active, status: tab.status, discarded: tab.discarded }));
+        const response = await fetch("REPORT_URL?tabs=" + encodeURIComponent(JSON.stringify(summary)));
+        for (const { call, tab, args } of await response.json())
+            await chrome.tabs[call](...(tab === undefined ? [] : [tabs[tab].id]), ...args);
+    }
+    (async () => {
+        for (;;) {
+            await report().catch(error => console.log(`Session restore test: ${error}`));
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    })();
+"""
+
+
+# Session restore runs Xenon with its windows, since a headless run's session is never saved. Xenon is started three
+# times on one profile with the setting to restore the last session on: it's killed right after it opens and duplicates
+# tabs (a duplicate restores its source's history, as a reopened tab does), then quits normally after changes made to
+# the restored session, and each time its tabs have to come back with their pages.
+def check_session_restore(executable: Path, env: dict) -> bool:
+    state = {"tabs": None, "commands": [], "requests": []}
+    changed = threading.Condition()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            path, _, query = self.path.partition("?")
+            with changed:
+                if path == "/report":
+                    state["tabs"] = json.loads(urllib.parse.parse_qs(query)["tabs"][0])
+                    body, content_type = json.dumps(state["commands"]).encode(), "application/json"
+                    state["commands"] = []
+                else:
+                    state["requests"].append(path)
+                    body, content_type = f"<!doctype html><title>{path}</title><p>{path}".encode(), "text/html"
+                changed.notify_all()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    origin = f"http://127.0.0.1:{server.server_address[1]}"
+    pages = [f"{origin}/page-{number}" for number in (1, 2, 3)]
+
+    def urls(tabs) -> list[str | None]:
+        return [tab.get("url") for tab in tabs or []]
+
+    def active_index(tabs) -> int | None:
+        return next((index for index, tab in enumerate(tabs or []) if tab["active"]), None)
+
+    def loaded(tabs) -> bool:
+        return all(tab["status"] == "complete" for tab in tabs or [])
+
+    with tempfile.TemporaryDirectory() as directory:
+        profile = Path(directory) / "profile"
+        (profile / "config").mkdir(parents=True)
+        (profile / "config" / "Settings.json").write_text(
+            json.dumps({"restorePreviousSession": True, "firstRunComplete": True})
+        )
+        extension = Path(directory) / "extension"
+        extension.mkdir()
+        (extension / "manifest.json").write_text(json.dumps(SESSION_RESTORE_EXTENSION_MANIFEST))
+        (extension / "background.js").write_text(
+            SESSION_RESTORE_EXTENSION_BACKGROUND.replace("REPORT_URL", f"{origin}/report")
+        )
+        log_path = Path(directory) / "xenon.log"
+        process = None
+
+        def start(*args: str):
+            nonlocal process
+            with changed:
+                state["tabs"] = None
+                state["requests"] = []
+            with open(log_path, "w") as log:
+                process = subprocess.Popen(
+                    [str(executable), "--profile-path", str(profile), f"--load-extension={extension}", *args],
+                    env=env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+
+        def stop(how: signal.Signals) -> int | None:
+            if how == signal.SIGTERM:
+                process.terminate()
+            try:
+                returncode = process.wait(timeout=60) if how == signal.SIGTERM else None
+            except subprocess.TimeoutExpired:
+                returncode = None
+            # A crash takes Xenon's helper processes with it, and so does a quit.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+            return returncode
+
+        def wait_for(step: str, condition, commands: list | None = None) -> bool:
+            deadline = time.monotonic() + 120
+            with changed:
+                state["commands"] = commands or []
+                while not condition(state["tabs"]):
+                    if time.monotonic() > deadline or process.poll() is not None:
+                        print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+                        print(f"    {step}: no, the tabs were {state['tabs']}", file=sys.stderr)
+                        return False
+                    changed.wait(1)
+            print(f"    {step}")
+            return True
+
+        try:
+            # A tab the session store hasn't written since it opened comes back as about:blank. The store writes every
+            # 30 seconds by itself, and Xenon has it write a change within a second, so a crash a few seconds after
+            # tabs open has to keep them.
+            start(pages[0])
+            if not wait_for("the first page loads", lambda tabs: urls(tabs) == pages[:1] and loaded(tabs)):
+                return False
+            commands = [
+                {"call": "create", "args": [{"url": pages[1], "active": False}]},
+                {"call": "duplicate", "tab": 0, "args": []},
+            ]
+            expected = [pages[0], pages[0], pages[1]]
+            if not wait_for(
+                "a page opens and one is duplicated", lambda tabs: urls(tabs) == expected and loaded(tabs), commands
+            ):
+                return False
+            time.sleep(SESSION_SAVE_WAIT_SECONDS)
+            stop(signal.SIGKILL)
+
+            # The tabs come back, the duplicate active, as when Xenon was killed. The others wait to be selected, and
+            # then load their pages.
+            start()
+            if not wait_for(
+                "after a crash, the tabs come back with their pages",
+                lambda tabs: urls(tabs) == expected and active_index(tabs) == 1,
+            ):
+                return False
+            commands = [{"call": "update", "tab": 2, "args": [{"active": True}]}]
+            if not wait_for(
+                "a restored tab loads its page when it's selected",
+                lambda tabs: (
+                    urls(tabs) == expected
+                    and active_index(tabs) == 2
+                    and not tabs[2]["discarded"]
+                    and loaded(tabs)
+                    and "/page-2" in state["requests"]
+                ),
+                commands,
+            ):
+                return False
+            commands = [{"call": "create", "args": [{"url": pages[2]}]}]
+            expected = [pages[0], pages[0], pages[1], pages[2]]
+            if not wait_for("another page opens", lambda tabs: urls(tabs) == expected and loaded(tabs), commands):
+                return False
+            if (returncode := stop(signal.SIGTERM)) != 0:
+                print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+                print(f"    Xenon exited with {returncode} when it was asked to quit", file=sys.stderr)
+                return False
+
+            start()
+            passed = wait_for(
+                "after a quit, the tabs come back with their pages",
+                lambda tabs: urls(tabs) == expected and active_index(tabs) == 3,
+            )
+            stop(signal.SIGTERM)
+            return passed
+        finally:
+            if process and process.poll() is None:
+                stop(signal.SIGKILL)
+            server.shutdown()
+
+
+# Opens a page on a local HTTPS server whose certificate is self-signed. Xenon refuses the certificate, and shows its
+# warning in place of the page, saying why (UI/CertificateErrors.h). Nothing can click in a headless browser, so XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS
+# has the warning print what it shows and then proceed, as the user would. The page then loads, and closes the browser.
+def check_certificate_errors(executable: Path, env: dict) -> bool:
+    page = f"""<!doctype html><title>Xenon certificate test</title><script>
+        console.log("{CERTIFICATE_ERROR_TEST_MARKER}" + JSON.stringify({{ loaded: location.href }}));
+        window.close();
+    </script>""".encode()
+    requested: list[str] = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            requested.append(self.path)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(page)))
+            self.end_headers()
+            self.wfile.write(page)
+
+        def log_message(self, *args):
+            pass
+
+    class Server(http.server.ThreadingHTTPServer):
+        # Xenon hangs up as soon as it has seen the certificate, until it's told to accept it.
+        def handle_error(self, request, client_address):
+            pass
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(CERTIFICATE_ERRORS_DIR / "self-signed.pem", CERTIFICATE_ERRORS_DIR / "self-signed-key.pem")
+    server = Server(("127.0.0.1", 0), Handler)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"https://127.0.0.1:{server.server_address[1]}/"
+    try:
+        with tempfile.TemporaryDirectory() as profile:
+            command = [str(executable), "--headless=manual", "--profile-path", profile, url]
+            test_env = {**env, "XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS": "1"}
+            try:
+                result = subprocess.run(
+                    command, env=test_env, capture_output=True, encoding="utf-8", errors="replace", timeout=60
+                )
+                output = result.stdout + result.stderr
+            except subprocess.TimeoutExpired as error:
+                output = "".join(
+                    part.decode(errors="replace") if isinstance(part, bytes) else part
+                    for part in (error.stdout, error.stderr)
+                    if part
+                )
+                output += f"\ntimed out after {error.timeout} s"
+    finally:
+        server.shutdown()
+
+    reports = certificate_error_reports(output)
+    warning = next((report for report in reports if "problems" in report), None)
+    loaded = next((report for report in reports if "loaded" in report), None)
+
+    passed = True
+
+    def expect(step: str, ok: bool, details: str):
+        nonlocal passed
+        if ok:
+            print(f"    {step}")
+            return
+        print(f"    FAIL: {step} ({details})", file=sys.stderr)
+        passed = False
+
+    expect(
+        "shows the warning, saying the certificate is self-signed",
+        warning is not None and warning["problems"] == ["selfSigned"] and warning["canProceed"] is True,
+        f"the warning reported {warning}",
+    )
+    expect(
+        "proceeds to the site, which loads",
+        loaded is not None and loaded["loaded"] == url and "/" in requested,
+        f"the page reported {loaded}, and the server was asked for {requested}",
+    )
+    # The warning on its own, opened at its address, knows of no certificate to accept for the site.
+    with tempfile.TemporaryDirectory() as profile:
+        warning_url = "xenon://certificate-error/?url=" + urllib.parse.quote(url, safe="")
+        command = [str(executable), "--headless=manual", "--profile-path", profile, warning_url]
+        try:
+            result = subprocess.run(
+                command, env=test_env, capture_output=True, encoding="utf-8", errors="replace", timeout=60
+            )
+            direct_output = result.stdout + result.stderr
+        except subprocess.TimeoutExpired:
+            direct_output = "timed out"
+    direct = next((report for report in certificate_error_reports(direct_output) if "problems" in report), None)
+    expect(
+        "opened at its address, the warning has nothing to proceed past",
+        direct is not None and direct["canProceed"] is False,
+        f"the warning reported {direct}: {direct_output[-2000:]}",
+    )
+
+    if not passed:
+        # A crash's stack trace would push what the pages printed out of the output's tail.
+        for line in output.splitlines():
+            if CERTIFICATE_ERROR_TEST_MARKER in line or "VERIFICATION FAILED" in line or "Failed load" in line:
+                print(line, file=sys.stderr)
+        print(output[-4000:], file=sys.stderr)
+    return passed
+
+
+def certificate_error_reports(output: str) -> list[dict]:
+    # The console prints the logged string in quotes.
+    return [
+        json.loads(line.split(CERTIFICATE_ERROR_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
+        for line in output.splitlines()
+        if CERTIFICATE_ERROR_TEST_MARKER in line
+    ]
 
 
 def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, str]:

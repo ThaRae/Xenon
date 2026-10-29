@@ -23,21 +23,21 @@ The blocker now also gets the request method, so $method filters match.
  2 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 7f429be163984f5862f443e35e6b9fd24a171386..f4b0c8ebf6e65884630eec95dc0d6ba681da937d 100644
+index 8138f3b6374263fd084b59fc028689d47ee1ef7d..8f16e0969d1f5fd8cfe5e4eea807e6f6d25247e2 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -62,6 +62,7 @@
+@@ -63,6 +63,7 @@
  #include <LibWeb/HTML/WorkerGlobalScope.h>
  #include <LibWeb/HighResolutionTime/TimeOrigin.h>
  #include <LibWeb/Infra/SerializedURL.h>
 +#include <LibWeb/Loader/ContentBlocker.h>
  #include <LibWeb/Loader/LoadRequest.h>
+ #include <LibWeb/Loader/LoaderConfig.h>
  #include <LibWeb/Loader/ResourceLoader.h>
- #include <LibWeb/MixedContent/AbstractOperations.h>
-@@ -496,6 +497,29 @@ void populate_request_from_client(Infrastructure::Request& request)
+@@ -539,6 +540,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
+         request.set_client_snapshot(client->visit([](auto const& client) { return snapshot_client_context(*client); }));
  }
  
- // https://fetch.spec.whatwg.org/#concept-main-fetch
 +static URL::URL content_blocker_source_url_for_request(Infrastructure::Request&);
 +
 +// Non-standard: Removes tracking parameters that the content blocker's $removeparam filters name from the request's URL,
@@ -49,9 +49,9 @@ index 7f429be163984f5862f443e35e6b9fd24a171386..f4b0c8ebf6e65884630eec95dc0d6ba6
 +        return;
 +
 +    Optional<URL::URL> top_level_creation_url;
-+    if (auto environment = request.reserved_client())
-+        top_level_creation_url = environment->top_level_creation_url;
-+    else if (auto client = request.client())
++    if (auto const& reserved_client = request.reserved_client_snapshot())
++        top_level_creation_url = reserved_client->top_level_creation_url;
++    else if (auto const& client = request.client_snapshot())
 +        top_level_creation_url = client->top_level_creation_url;
 +    if (!Bindings::principal_host_defined_page(realm).content_blocking_enabled_for_url(top_level_creation_url))
 +        return;
@@ -61,10 +61,10 @@ index 7f429be163984f5862f443e35e6b9fd24a171386..f4b0c8ebf6e65884630eec95dc0d6ba6
 +        request.current_url() = decision.url.release_value();
 +}
 +
+ // https://fetch.spec.whatwg.org/#concept-main-fetch
  GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParams const& fetch_params, Recursive recursive)
  {
-     dbgln_if(WEB_FETCH_DEBUG, "Fetch: Running 'main fetch' with: fetch_params @ {}", &fetch_params);
-@@ -566,6 +590,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -613,6 +637,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
          request->current_url().set_scheme("https"sv);
      }
  
@@ -74,10 +74,10 @@ index 7f429be163984f5862f443e35e6b9fd24a171386..f4b0c8ebf6e65884630eec95dc0d6ba6
          dbgln_if(WEB_FETCH_DEBUG, "Fetch: Running 'main fetch' get_response() function");
          auto const* origin = request->origin().get_pointer<URL::Origin>();
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index 09b91b2b6c3f09ddf39159256acd62f124313a69..b7fe074afee5d1b172961970d3b809ffc2188f5e 100644
+index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24929ffde9 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-@@ -28,6 +28,7 @@
+@@ -29,6 +29,7 @@
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
  #include <LibWeb/Platform/Timer.h>
@@ -85,8 +85,8 @@ index 09b91b2b6c3f09ddf39159256acd62f124313a69..b7fe074afee5d1b172961970d3b809ff
  #include <LibWebCommon/Loader/UserAgent.h>
  
  namespace Web {
-@@ -213,7 +214,12 @@ static void log_filtered_request(LoadRequest const& request)
-     dbgln("ResourceLoader: Filtered request to: \"{}\"", url_for_logging);
+@@ -297,7 +298,12 @@ static StringView blocked_resource_kind(LoadRequest const& request)
+     VERIFY_NOT_REACHED();
  }
  
 -static bool should_block_request(LoadRequest const& request)
@@ -99,7 +99,7 @@ index 09b91b2b6c3f09ddf39159256acd62f124313a69..b7fe074afee5d1b172961970d3b809ff
  {
      auto const& url = request.url().value();
  
-@@ -228,20 +234,46 @@ static bool should_block_request(LoadRequest const& request)
+@@ -312,20 +318,46 @@ static bool should_block_request(LoadRequest const& request)
  
      if (is_port_blocked(url.port_or_default())) {
          log_failure(request, ByteString::formatted("Port #{} is blocked", url.port_or_default()));
@@ -115,7 +115,7 @@ index 09b91b2b6c3f09ddf39159256acd62f124313a69..b7fe074afee5d1b172961970d3b809ff
 +        if (decision.action == ContentBlocker::RequestDecision::Action::Block || decision.action == ContentBlocker::RequestDecision::Action::Redirect) {
              log_filtered_request(request);
              if (page)
-                 page->client().page_did_block_resource();
+                 page->client().page_did_block_resource(url, blocked_resource_kind(request));
 -            return true;
 +            return BlockedRequest { move(decision.url) };
          }
@@ -150,7 +150,7 @@ index 09b91b2b6c3f09ddf39159256acd62f124313a69..b7fe074afee5d1b172961970d3b809ff
  }
  
  template<typename FileHandler, typename ErrorHandler>
-@@ -436,7 +468,9 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+@@ -520,7 +552,9 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
      log_request_start(request);
      request.start_timer();
  

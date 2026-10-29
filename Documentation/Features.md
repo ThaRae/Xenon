@@ -4,13 +4,15 @@ What each feature does, how to reach it, and where it lives in the code. The [RE
 version. Xenon brings over [Helium](https://helium.computer)'s feature set, measured against Helium, in its own look.
 
 - [Setup and internal pages](#setup-and-internal-pages): welcome flow, new tab page, settings
-- [Tabs and windows](#tabs-and-windows): layouts, split view, tab groups, recently used order, hibernation, memory use
+- [Tabs and windows](#tabs-and-windows): layouts, split view, tab groups, recently used order, hibernation, memory use,
+  restoring tabs
 - [Search and the address bar](#search-and-the-address-bar): !bangs, quick link copy
 - [Ads and trackers](#ads-and-trackers): uBlock Origin's filters and engine features, its popup and dashboard, daily
   updates
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden and Proton Pass,
   security keys
-- [Updates](#updates): Xenon updating itself
+- [Security](#security): certificate warnings
+- [Installing and updates](#installing-and-updates): the installer, and Xenon updating itself
 - [Look](#look): palette and icon
 - [Not done yet](#not-done-yet)
 
@@ -35,17 +37,23 @@ Your eight most visited sites, one per site with its favicon, ranked by Ladybird
 windows say so instead and show no history. The page is static, so Xenon's UI hands it the sites once it has loaded
 (`UI/NewTabPage.cpp`).
 
+Ladybird opens new tabs blank, so Xenon makes `about:newtab` the new tab page of a profile until its first run is
+complete (`UI/main.cpp`). **Settings → Startup and pages** can change it, and its reset button goes back to
+`about:newtab`.
+
 ### Settings
 
 `about:settings` (**Settings** in the menu) puts Xenon's own settings first, as Helium's does, and keeps Ladybird's
 below them. Every change applies at once, and the page follows changes made from the menus.
 
 - Xenon's sections:
-  - **Look and layout**: the three layouts, the sidebar's side, the bookmarks bar, zoom, dark pages.
+  - **Look and layout**: the three layouts, the sidebar's side, the bookmarks bar, zoom, whether sites are asked for
+    light or dark, dark pages.
   - **Tabs**: recently used order, hibernation and its timeout, dragging a tab to a page's edge to split, groups.
   - **Search and bangs**: the engine, suggestions, bangs on or off, and a lookup of all 13,000.
-  - **Ads and trackers**: blocking, which lists are in use and when they were last checked, daily updates with
-    **Check now**, subscriptions and local lists, and links into the blocking dashboard.
+  - **Ads and trackers**: blocking, the count on the shield, which lists are in use and when they were last checked,
+    daily updates with **Check now**, the sites let through (each with **Turn back on**), subscriptions and local
+    lists, and links into the blocking dashboard.
   - **Password manager** and **Extensions**.
   - **Updates**: the version, whether a new one is ready, automatic updates, and **Check now** or **Relaunch to
     update**.
@@ -55,7 +63,7 @@ below them. Every change applies at once, and the page follows changes made from
 
 The page is Xenon's `UI/Resources/about-pages/settings.*`. It runs Ladybird's own settings scripts, by their element
 ids, for Ladybird's settings. `UI/SettingsPage.cpp` answers it about Xenon's (`UI/XenonSettings`), through engine patch
-`0022` (`LibWebView: Let the embedder add interfaces to its WebUI pages`), which lets the browser give WebUI pages
+`0025` (`LibWebView: Let the embedder add interfaces to its WebUI pages`), which lets the browser give WebUI pages
 interfaces of its own (`UI/WebUIInterfaces.cpp`).
 
 ## Tabs and windows
@@ -127,7 +135,7 @@ A tab never hibernates while it's:
 
 Right-click the tab strip (or open **Settings → Tabs**) for **Tab Hibernation → Off** or a timeout from 15 minutes to 6
 hours, or right-click a background tab for **Hibernate Tab**. The code is `UI/TabHibernation.cpp`, with engine patch
-`0021`, which saves the scroll position first.
+`0023`, which saves the scroll position first.
 
 ### Memory use on hover
 
@@ -139,8 +147,23 @@ As in Chromium's tab hover cards: hovering a tab, the current one included, show
   "about".
 - A hibernated tab uses none, and its card says how much hibernating it freed.
 
-It's measured as the card shows, at most once a second (`UI/TabMemory.cpp`, with engine patch `0022`, which lets the UI
+It's measured as the card shows, at most once a second (`UI/TabMemory.cpp`, with engine patch `0024`, which lets the UI
 see which tab a worker belongs to).
+
+### Restoring tabs
+
+With **Settings → Startup and pages → Restore the last session's windows and tabs** on, Xenon opens the windows it had
+open when it last quit or crashed. With it off, only pinned tabs come back, and **Reopen Recently Closed Tab**
+(<kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>T</kbd>, or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>T</kbd> on macOS) brings back the rest of a
+window.
+
+- Each tab comes back with its page and its back/forward history, in its place, with the window's active tab and pinned
+  tabs. At launch, tab groups come back too. Tabs other than a window's current one load when they're selected.
+- After two crashes in a row, nothing comes back by itself, in case a page is what crashes Xenon. Reopen Recently Closed
+  Tab still brings the windows back.
+- Ladybird's session store (`LibWebView/SessionStore`, the profile's `Sessions.db`) writes the session every 30 seconds
+  and when Xenon quits. Xenon has it write a tab's new page, the active tab, and the tab order within a second of a
+  change (`UI/SessionSaving.cpp`), so that tabs opened, reopened, or duplicated just before a crash don't come back blank.
 
 ## Search and the address bar
 
@@ -168,12 +191,24 @@ locally, with no request to a search engine, from Kagi's list of about 13,400 tr
 
 The lists Helium's uBlock Origin fork turns on (uBlock filters, EasyList, EasyPrivacy, AdGuard, URLhaus, and the
 cookie banner and annoyance lists), converted for Ladybird's content blocker by
-[xenon-ublock](https://git.avx512.dev/tharae/xenon-ublock). They keep 99.3% of their filters (378,644 of 381,140), with
+[xenon-ublock](https://github.com/ThaRae/xenon-ublock). They keep 99.3% of their filters (378,644 of 381,140), with
 uBlock Origin's scriptlets and redirect resources.
 
 They block ads, trackers, malware sites, and cookie banners whenever content blocking is on, which the welcome flow
 turns on by default. They ship with Xenon in `UI/Resources/filter-lists`, and update daily (below). Ladybird's own
 downloadable catalog stays off, since it holds raw copies of the same lists.
+
+Every WebContent process builds its own engine from the lists. That means every tab, every cross-site frame, and the
+spare process kept ready for the next tab. Three engine patches keep each engine small:
+
+- `0027` keeps the malware lists' 100,000 `||host/path^$document` filters as 8-byte hashes, not as engine filters of
+  over 100 bytes each;
+- `0030` gives back the memory used to build the engine, several times what the engine keeps;
+- `0029` sends no lists to any process while blocking is off.
+
+Extensions' own pages get no lists at all: their background pages, offscreen documents, and popups each open in a
+process of their own that never builds the engine (`0032`). uBlock Origin doesn't filter other extensions' requests in
+Chrome either. Frames from other sites in those pages still get the lists, in their own processes.
 
 ### uBlock Origin's engine features
 
@@ -196,12 +231,16 @@ The toolbar shield opens a popup laid out like uBlock Origin's:
 Its dashboard, `xenon://blocking/`, has the filter lists (each can be turned off), My filters, and trusted sites.
 **Settings → Ads and trackers** links to each.
 
+**Settings → Ads and trackers → Count what's blocked on the shield** puts the page's count on the shield, as uBlock
+Origin's badge does. It's a Xenon setting (`UI/XenonSettings`), off by default. The engine lists what was blocked by
+host and kind, once each; engine patch `0026` adds the count of every blocked request that the popup and the badge show.
+
 uBlock Origin's switches for large media, cosmetic filtering and JavaScript, and which domains had requests blocked,
 need engine work.
 
 ### Daily filter list updates
 
-[xenon-filter-lists](https://git.avx512.dev/tharae/xenon-filter-lists) rebuilds the lists every day and signs them. Once
+[xenon-filter-lists](https://github.com/ThaRae/xenon-filter-lists) rebuilds the lists every day and signs them. Once
 a day Xenon downloads the lists that changed, checks them against the signed manifest, and switches to them without a
 restart. It falls back to the bundled lists if anything fails.
 
@@ -216,7 +255,8 @@ Manifest V3 extensions, for password managers first, as Helium offers Bitwarden,
 still in progress; [Extensions.md](Extensions.md) has the details.
 
 - Unpacked extensions load from the Extensions dialog or with `--load-extension=<dir>`, get a toolbar button and
-  popup, and run their background service worker.
+  popup, and run their background service worker. As in Chrome, the worker stops after 30 seconds without events or
+  calls, and its processes with it, and starts again for the next event it listens to (`UI/Extensions/Router`).
 - They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`, `action`, `commands`, and
   `offscreen`, and fetch from the hosts they have permission for.
 - Their content scripts run in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and
@@ -230,7 +270,8 @@ remove it.
 
 - **Bitwarden** logs in (with a security key too) and autofills logins.
 - **Proton Pass** signs in through Proton's account page, unlocks with its extra password, autofills logins, and saves
-  new ones.
+  new ones. Once allowed to use the clipboard, it clears a copied password when its timer runs out (engine patch
+  `0028`; see [Extensions.md](Extensions.md)).
 
 ### Security keys (WebAuthn)
 
@@ -238,13 +279,50 @@ On macOS, sites and password managers can register a USB security key and sign i
 (`navigator.credentials.create()` and `get()`), PINs included, and in cross-origin frames that are allowed to. A prompt
 over the page says what the key needs. It comes from engine patches `0010`–`0015`; see [WebAuthn.md](WebAuthn.md).
 
-## Updates
+## Security
 
-On macOS, Xenon checks for a new version when it starts and once a day, downloads it in the background, and installs it
+### Certificate warnings
+
+A site whose certificate can't be verified gets a warning in place of the page, as in Chrome and Helium: **Your
+connection isn't private**, and why, first of all:
+
+- the certificate is self-signed;
+- it's for other names than the site's (it lists them);
+- it expired, or isn't valid yet (with the date);
+- or no authority the computer trusts issued it.
+
+**Go back** leaves. **Advanced** shows the certificate (who it's issued to and by, when it's valid, the names it's for,
+and its SHA-256 fingerprint) and **Proceed to *host* (unsafe)**, for a site you know, like a homelab server with a
+self-signed certificate.
+
+- **What proceeding accepts**: that certificate, and only it, for the site's host and port, WebSockets included. Another
+  port, or another certificate on the same one, gets the warning again. Xenon forgets it when it quits, or a private
+  window's when the private windows close.
+- **Sites that can't be proceeded to**: a site that told Xenon to reach it securely only (HSTS), whose certificate
+  errors are fatal (RFC 6797 §12.1), as in Chrome. A site reached over a certificate the user accepted can't become
+  one that way.
+- **Frames**: a frame whose certificate fails shows the plain error page, with no way past it.
+- **The address bar** shows `xenon://certificate-error/?url=…` while the warning is up.
+- **Redirects**: a page that redirects to a site whose certificate fails shows the plain error page.
+
+RequestServer reports each certificate it refuses to the UI process, and takes the ones the user accepts, which curl
+then pins by their public key (engine patch `0031`, `RequestServer+LibWebView: Let the user accept a certificate that
+fails verification`). It learns which certificate it refused by making the request once more with curl's
+`CURLOPT_CERTINFO`, which costs every connection otherwise; the handshake failed before anything was sent.
+`UI/CertificateErrors.cpp` keeps the certificates and serves the warning, `UI/CertificateDetails.cpp` works out what's
+wrong with one, and the page is in `UI/Resources/certificate-error`. RequestServer reports a certificate before the
+navigation that failed on it ends, so the UI process sends a tab whose page it was to the warning in its place.
+
+## Installing and updates
+
+On macOS, Xenon installs from a disk image, `Xenon-<version>.dmg`: open it and drag Xenon into Applications, as the
+window shows. Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases/releases) has one.
+
+Xenon then checks for a new version when it starts and once a day, downloads it in the background, and installs it
 when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch
 to update**, and turns automatic updates off. **Check for Updates…** in the Xenon menu checks at once.
 
-Releases come from [tharae/xenon-releases](https://git.avx512.dev/tharae/xenon-releases). Xenon only installs one
+Releases come from [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases) on GitHub. Xenon only installs one
 whose archive is signed with its update key, from a signed appcast, and the installer swaps the new app in at once, so
 a failed update leaves the old one as it was. Development builds,
 and Xenon elsewhere than macOS, don't update themselves. `UI/Updater.mm` runs Sparkle, and `Meta/release.py` makes and

@@ -1,0 +1,64 @@
+<!doctype html>
+<!--
+Copyright (c) 2026, the Xenon developers.
+SPDX-License-Identifier: BSD-2-Clause
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Privacy error</title>
+        <link rel="stylesheet" href="ladybird.css" />
+        <link rel="stylesheet" href="webui.css" />
+        <link rel="stylesheet" href="xenon.css" />
+        <link rel="stylesheet" href="certificate-error.css" />
+        <script src="certificate-error.js" defer></script>
+    </head>
+    <body>
+        <main>
+            <svg class="warning-mark" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2.75 4.25 5.6v5.9c0 4.7 3.2 8.6 7.75 9.75 4.55-1.15 7.75-5.05 7.75-9.75V5.6z" />
+                <path d="M12 7.75v5" />
+                <path d="M12 16.25v.25" />
+            </svg>
+
+            <h1 id="title">Your connection isn’t private</h1>
+            <p id="summary"></p>
+            <p id="reason" class="reason"></p>
+
+            <div class="actions">
+                <button
+                    type="button"
+                    class="secondary-button"
+                    id="advanced"
+                    aria-expanded="false"
+                    aria-controls="details"
+                >
+                    Advanced
+                </button>
+                <button type="button" class="secondary-button hidden" id="retry">Try again</button>
+                <button type="button" class="primary-button" id="back" autofocus>Go back</button>
+            </div>
+
+            <section id="details" class="details hidden">
+                <p id="explanation"></p>
+                <ul id="problems" class="problems"></ul>
+
+                <dl id="certificate" class="certificate">
+                    <dt>Issued to</dt>
+                    <dd id="subject"></dd>
+                    <dt>Issued by</dt>
+                    <dd id="issuer"></dd>
+                    <dt>Valid</dt>
+                    <dd id="validity"></dd>
+                    <dt>For</dt>
+                    <dd id="names"></dd>
+                    <dt>SHA-256 fingerprint</dt>
+                    <dd id="fingerprint" class="fingerprint"></dd>
+                </dl>
+
+                <p id="proceed-note" class="proceed-note"></p>
+                <button type="button" class="link-button" id="proceed"></button>
+            </section>
+        </main>
+    </body>
+</html>

@@ -87,16 +87,39 @@ function method(name, transform = result => result) {
     return api((...args) => call(name, args.map(toJSON)).then(transform));
 }
 
+// The events the background worker has listeners for, by the name the UI process sends them by, and how many of
+// chrome.*'s events with listeners each is: storage.onChanged is chrome.storage's and each storage area's. A background
+// that stopped when idle starts again for these, as Chrome's service workers do, so the UI process hears of each.
+const listenedEvents = new Map();
+
+function setListening(name, listening) {
+    if (!config.isBackground || !name) return;
+    const count = (listenedEvents.get(name) ?? 0) + (listening ? 1 : -1);
+    if (count > 0) listenedEvents.set(name, count);
+    else listenedEvents.delete(name);
+    if (count === (listening ? 1 : 0)) post({ type: "listening", name, listening });
+}
+
 class ExtensionEvent {
     #listeners = [];
+    #name;
+
+    // An event the UI process sends has its name.
+    constructor(name) {
+        this.#name = name;
+    }
 
     addListener(listener) {
         if (typeof listener !== "function") throw new TypeError("The listener must be a function.");
-        if (!this.hasListener(listener)) this.#listeners.push(listener);
+        if (this.hasListener(listener)) return;
+        this.#listeners.push(listener);
+        if (this.#listeners.length === 1) setListening(this.#name, true);
     }
 
     removeListener(listener) {
+        if (!this.hasListener(listener)) return;
         this.#listeners = this.#listeners.filter(existing => existing !== listener);
+        if (this.#listeners.length === 0) setListening(this.#name, false);
     }
 
     hasListener(listener) {
@@ -121,7 +144,7 @@ class ExtensionEvent {
 }
 
 function event(name) {
-    const extensionEvent = new ExtensionEvent();
+    const extensionEvent = new ExtensionEvent(name);
     events.set(name, extensionEvent);
     return extensionEvent;
 }
@@ -288,7 +311,7 @@ class StorageArea {
     constructor(name, quotas) {
         this.#name = name;
         Object.assign(this, quotas);
-        this.onChanged = new ExtensionEvent();
+        this.onChanged = new ExtensionEvent("storage.onChanged");
 
         this.get = api(keys => {
             let names = null;

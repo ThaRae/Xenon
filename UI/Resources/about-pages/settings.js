@@ -13,6 +13,7 @@ const isMac = navigator.platform.startsWith("Mac");
 // link to those tabs. Each comes to the section that holds the same settings here.
 const SECTION_FOR_LADYBIRD_TAB = {
     general: "startup",
+    languages: "startup",
     services: "privacy",
     appearance: "look",
 };
@@ -257,6 +258,18 @@ function showBangs({ query, bangs }) {
     );
 }
 
+// The count of what's blocked on the toolbar's shield.
+const showContentBlockerCount = document.querySelector("#show-content-blocker-count");
+
+function renderContentBlockerCount() {
+    showContentBlockerCount.checked = XENON.showContentBlockerCount;
+    showContentBlockerCount.disabled = false;
+}
+
+showContentBlockerCount.addEventListener("change", () =>
+    ladybird.sendMessage("xenon/setShowContentBlockerCount", showContentBlockerCount.checked)
+);
+
 // Filter lists.
 const filterListsSummary = document.querySelector("#filter-lists-summary");
 const filterListsStatus = document.querySelector("#filter-lists-status");
@@ -427,6 +440,15 @@ document
     .querySelector("#show-extensions")
     .addEventListener("click", () => ladybird.sendMessage("xenon/showExtensions"));
 
+// Ladybird's startup.js resets the new tab page to about:blank. Xenon's is its own about:newtab, so this runs after that
+// and resets it to about:newtab instead.
+const newTabPageURL = document.querySelector("#new-tab-page-url");
+
+document.querySelector("#new-tab-page-url-reset").addEventListener("click", () => {
+    newTabPageURL.value = "about:newtab";
+    newTabPageURL.dispatchEvent(new Event("change"));
+});
+
 // Profile.
 function renderProfile() {
     const { name, temporary, locations } = XENON.profile;
@@ -540,6 +562,7 @@ function render() {
     renderLayout();
     renderTabs();
     renderBangs();
+    renderContentBlockerCount();
     renderFilterLists();
     renderBlockingDashboard();
     renderExtensions();
