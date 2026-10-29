@@ -1,0 +1,24 @@
+#!/bin/sh
+# The AppImage's entry point (Meta/release.py packages it). The AppImage's runtime mounts the image and starts this from
+# it; Xenon then finds its helper processes, libraries and resources relative to its own executable, in usr/.
+
+appdir=$(dirname "$(readlink -f "$0")")
+
+# Qt plugins that the system's settings point at are built for the system's Qt, not the one in the AppImage.
+unset QT_PLUGIN_PATH
+
+# OpenSSL looks for the system's certificates where the build's was configured to, in /etc/ssl, which isn't where every
+# distribution keeps them (Fedora's are in /etc/pki). Unless they've been pointed elsewhere already, point it at the
+# system's bundle. The engine passes SSL_CERT_FILE on to the process that makes requests.
+if [ -z "${SSL_CERT_FILE:-}" ] && [ -z "${SSL_CERT_DIR:-}" ]; then
+    for bundle in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem \
+        /etc/pki/tls/cacert.pem /etc/ssl/cert.pem; do
+        if [ -f "$bundle" ]; then
+            SSL_CERT_FILE=$bundle
+            export SSL_CERT_FILE
+            break
+        fi
+    done
+fi
+
+exec "$appdir/usr/bin/Xenon" "$@"

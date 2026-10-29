@@ -239,15 +239,27 @@ def test_main(platform: Platform, build_dir: Path):
         if subprocess.run([test]).returncode != 0:
             failures.append(test.name)
 
+    failures += check_app(platform, app_executable(platform, build_dir), build_dir / "smoke")
+
+    if failures:
+        print(f"Failed: {', '.join(failures)}", file=sys.stderr)
+        sys.exit(1)
+    print("All tests passed.")
+
+
+# The checks that run Xenon itself, and return what failed: the build's, or a release's, which Meta/release.py test runs
+# them against. The welcome page's render goes in smoke_dir.
+def check_app(platform: Platform, executable: Path, smoke_dir: Path) -> list[str]:
+    failures = []
+
     # Rendering the welcome page without a window runs Xenon's bundled resources, the WebUI bridge, and the engine's
     # helper processes together, which unit tests can't.
-    smoke_dir = build_dir / "smoke"
-    smoke_dir.mkdir(exist_ok=True)
+    smoke_dir.mkdir(parents=True, exist_ok=True)
     screenshot = smoke_dir / "welcome.png"
     screenshot.unlink(missing_ok=True)
 
-    # The session restore check opens Xenon's windows. CI gives Linux a real X server for them
-    # (Meta/ci/build-and-test.sh); without a display, they go to Qt's offscreen platform.
+    # The session restore check opens Xenon's windows. CI gives Linux a real X server for them (Meta/ci/start-xvfb.sh);
+    # without a display, they go to Qt's offscreen platform.
     env = dict(os.environ)
     if platform.host_system != HostSystem.macOS and not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
         env["QT_QPA_PLATFORM"] = "offscreen"
@@ -256,9 +268,7 @@ def test_main(platform: Platform, build_dir: Path):
     with tempfile.TemporaryDirectory() as profile:
         # Text mode waits for the page to finish loading, so this checks the page itself whatever the machine's speed.
         # It also gets the first launch's one-off work, like building the font cache, out of the screenshot's time.
-        loaded, output = run_headless(
-            app_executable(platform, build_dir), env, ["--headless=text", "--profile-path", profile, "about:welcome"]
-        )
+        loaded, output = run_headless(executable, env, ["--headless=text", "--profile-path", profile, "about:welcome"])
         if loaded and WELCOME_PAGE_TEXT in output:
             print(f'    loaded, with "{WELCOME_PAGE_TEXT}"')
         else:
@@ -266,7 +276,7 @@ def test_main(platform: Platform, build_dir: Path):
             failures.append("loading about:welcome")
 
         rendered, output = run_headless(
-            app_executable(platform, build_dir),
+            executable,
             env,
             [
                 "--headless=screenshot",
@@ -286,45 +296,42 @@ def test_main(platform: Platform, build_dir: Path):
             failures.append("headless render of about:welcome")
 
     print("==> a fresh start keeps to Xenon's directories", flush=True)
-    if not check_profile_directory(platform, app_executable(platform, build_dir), env):
+    if not check_profile_directory(platform, executable, env):
         failures.append("profile directory")
 
     print("==> content blocking with the bundled filter lists", flush=True)
-    if not check_content_blocking(app_executable(platform, build_dir), env):
+    if not check_content_blocking(executable, env):
         failures.append("content blocking")
 
     print("==> daily filter list updates from a local server", flush=True)
-    if not check_filter_list_updates(app_executable(platform, build_dir), env):
+    if not check_filter_list_updates(executable, env):
         failures.append("filter list updates")
 
     print("==> the blocking dashboard", flush=True)
-    if not check_blocking_dashboard(app_executable(platform, build_dir), env):
+    if not check_blocking_dashboard(executable, env):
         failures.append("blocking dashboard")
 
     print("==> the certificate warning, for a local HTTPS server with a self-signed certificate", flush=True)
-    if not check_certificate_errors(app_executable(platform, build_dir), env):
+    if not check_certificate_errors(executable, env):
         failures.append("certificate warning")
 
     print("==> extension pages and their chrome.* APIs", flush=True)
-    if not check_extensions(app_executable(platform, build_dir), env):
+    if not check_extensions(executable, env):
         failures.append("extensions")
 
     print("==> tabs come back with their pages after a crash and after a quit", flush=True)
-    if not check_session_restore(app_executable(platform, build_dir), env):
+    if not check_session_restore(executable, env):
         failures.append("session restore")
 
     print("==> WebAuthn requests reach the UI process", flush=True)
-    if not check_web_authn(app_executable(platform, build_dir), env):
+    if not check_web_authn(executable, env):
         failures.append("WebAuthn")
 
     print("==> password managers from a stand-in for the Chrome Web Store", flush=True)
-    if not check_password_managers(app_executable(platform, build_dir), env):
+    if not check_password_managers(executable, env):
         failures.append("password managers")
 
-    if failures:
-        print(f"Failed: {', '.join(failures)}", file=sys.stderr)
-        sys.exit(1)
-    print("All tests passed.")
+    return failures
 
 
 # Starts Xenon as on a fresh install, with no profile arguments and a home directory of its own, and checks that its
@@ -572,9 +579,10 @@ def check_filter_list_updates(executable: Path, env: dict) -> bool:
                 files = list(Path(profile).rglob("ContentBlocking/Xenon/state.json"))
                 return json.loads(files[0].read_text()) if files else {}
 
+            # NB: A Xenon that didn't start wrote no state, which the steps report on.
             def a_day_passes():
-                file = next(Path(profile).rglob("ContentBlocking/Xenon/state.json"))
-                file.write_text(json.dumps({**state(), "checkedAt": 0}))
+                for file in Path(profile).rglob("ContentBlocking/Xenon/state.json"):
+                    file.write_text(json.dumps({**state(), "checkedAt": 0}))
 
             results, output = run(profile, "/poll", "/xenon-update-test.js")
             expect(
@@ -812,8 +820,8 @@ def check_password_managers(executable: Path, env: dict) -> bool:
                 }
 
             def a_day_passes():
-                file = next(Path(profile).rglob("Extensions/password-manager-updates.json"))
-                file.write_text(json.dumps({"checkedAt": 0}))
+                for file in Path(profile).rglob("Extensions/password-manager-updates.json"):
+                    file.write_text(json.dumps({"checkedAt": 0}))
 
             def downloads() -> list[str]:
                 return [path for path in requested if path.startswith("/crx/")]
@@ -1542,8 +1550,20 @@ def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, st
     try:
         result = subprocess.run([str(executable), *args], env=env, capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired as error:
-        return False, f"timed out after {error.timeout} s"
-    return result.returncode == 0, result.stdout + result.stderr
+        # What it printed before it was stopped, which can be bytes even in text mode.
+        parts = (error.stdout, error.stderr)
+        output = "".join(part.decode(errors="replace") if isinstance(part, bytes) else part for part in parts if part)
+        return False, f"{output}\ntimed out after {error.timeout} s"
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        # A crash can print nothing, so say how it ended.
+        how = (
+            f"was killed by signal {-result.returncode}"
+            if result.returncode < 0
+            else f"exited with {result.returncode}"
+        )
+        output += f"\nXenon {how}"
+    return result.returncode == 0, output
 
 
 def run_command(command: list):

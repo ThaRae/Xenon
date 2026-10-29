@@ -4,7 +4,7 @@
 # UI/Xenon.cmake turns into app_icon.icns, the window icon (UI/Icons/xenon.png) that xenon.qrc embeds, Xenon's
 # versions of Ladybird's logo (UI/Resources/icons), which the build ships in place of Ladybird's, and the background of
 # the installer disk image's window (UI/Icons/macos/installer-background.png, from installer-background.svg), which
-# Meta/release.py makes.
+# Meta/release.py makes, and the icon theme sizes the Linux AppImage installs (UI/Icons/linux/hicolor).
 #
 #   Meta/generate-app-icon.py
 #
@@ -34,6 +34,12 @@ ICONSET = {f"icon_{size}x{size}.png": size for size in (16, 32, 128, 256, 512)} 
 }
 
 WINDOW_ICON_SIZE = 256
+
+# The Linux AppImage's icon, in the sizes of the hicolor icon theme, named after the desktop file
+# (UI/Linux/org.xenon.Xenon.desktop). It's the same picture as the window icon.
+LINUX_ICONS_DIR = ICONS_DIR / "linux" / "hicolor"
+LINUX_ICON_NAME = "org.xenon.Xenon.png"
+LINUX_ICON_SIZES = (16, 24, 32, 48, 64, 128, 256, 512)
 
 # Ladybird's logo, as its internal pages show it (their favicon, and the picture on an empty history or bookmarks page)
 # and its task manager shows it for the browser, by path under resource://icons, and its size. The 48px one is mostly
@@ -100,6 +106,11 @@ def main():
             render(small if size <= SMALL_ARTWORK_MAX_SIZE else large, size, ICONSET_DIR / name)
         render(large, WINDOW_ICON_SIZE, ICONS_DIR / "xenon.png")
 
+        for size in LINUX_ICON_SIZES:
+            output = LINUX_ICONS_DIR / f"{size}x{size}" / "apps" / LINUX_ICON_NAME
+            output.parent.mkdir(parents=True, exist_ok=True)
+            render(small if size <= SMALL_ARTWORK_MAX_SIZE else large, size, output)
+
         for path, size in LADYBIRD_ICONS.items():
             output = LADYBIRD_ICONS_DIR / path
             output.parent.mkdir(parents=True, exist_ok=True)
@@ -114,8 +125,8 @@ def main():
         )  # fmt: skip
 
     print(
-        f"Rendered {len(ICONSET)} iconset sizes, the {WINDOW_ICON_SIZE}px window icon, {len(LADYBIRD_ICONS)} of"
-        " Ladybird's logo icons, and the installer's background."
+        f"Rendered {len(ICONSET)} iconset sizes, the {WINDOW_ICON_SIZE}px window icon, {len(LINUX_ICON_SIZES)} Linux"
+        f" icon sizes, {len(LADYBIRD_ICONS)} of Ladybird's logo icons, and the installer's background."
     )
 
 

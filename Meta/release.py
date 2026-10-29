@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 
-# Packages Xenon for release on macOS, publishes the release, and tests that one release updates itself to the next.
+# Packages Xenon for release on macOS and Linux, publishes the release, and tests what it packaged.
 #
-#   Meta/release.py package    build Xenon, then write Build/distribution: a Xenon.app that runs on any Mac, signed;
-#                              Xenon-<version>.dmg, the disk image people install it from; Xenon-<version>.tar.xz,
-#                              signed with Xenon's update key; and appcast.xml, which lists it
-#   Meta/release.py publish    publish what package wrote, as a release of ThaRae/xenon-releases on GitHub
-#   Meta/release.py test       check that a release finds, checks and installs the next one from a local server, and
-#                              turns down ones that were tampered with
+#   Meta/release.py package    build Xenon, then write Build/distribution. On macOS: a Xenon.app that runs on any Mac,
+#                              signed; Xenon-<version>.dmg, the disk image people install it from; Xenon-<version>.tar.xz,
+#                              signed with Xenon's update key; and appcast.xml, which lists it. On Linux:
+#                              Xenon-<version>-x86_64.AppImage, and the .zsync file AppImage updaters read
+#   Meta/release.py publish    publish what package wrote, as a release of ThaRae/xenon-releases on GitHub: the macOS
+#                              release, with the AppImage if Build/distribution has it
+#   Meta/release.py test       on macOS, check that a release finds, checks and installs the next one from a local
+#                              server, and turns down ones that were tampered with. On Linux, run Meta/xenon.py test's
+#                              checks against the AppImage
 #
-# The version is VERSION.txt's. Xenon updates itself with Sparkle (UI/Updater.h), which finds the appcast's URL and the
-# update key's public half in the Info.plist this writes. Documentation/Updates.md describes the whole process, and how
-# to set up the signing certificate and the update key.
+# The version is VERSION.txt's. Xenon updates itself on macOS with Sparkle (UI/Updater.h), which finds the appcast's URL
+# and the update key's public half in the Info.plist this writes. Documentation/Updates.md describes the whole process,
+# and how to set up the signing certificate and the update key.
 
 from __future__ import annotations
 
@@ -19,6 +22,7 @@ import argparse
 import base64
 import email.utils
 import functools
+import hashlib
 import http.server
 import importlib.util
 import json
@@ -29,11 +33,14 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
+import urllib.request
 
 from pathlib import Path
+from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 from xml.sax.saxutils import quoteattr
 
@@ -83,51 +90,118 @@ TEST_BUNDLE_IDENTIFIER = "org.xenon.Xenon.UpdateTest"
 TEST_VERSIONS = ("0.0.1", "0.0.2", "0.0.3")
 TEST_TIMEOUT_SECONDS = 180
 
+# On Linux, a release is an AppImage: one file that runs on any distribution whose glibc and libstdc++ are at least as
+# new as the ones it was built with. It holds an AppDir laid out as the build's prefix is (UI/Xenon.cmake), where Xenon
+# finds its helper processes and resources relative to its own executable.
+LINUX_ARCHITECTURE = "x86_64"
+LINUX_PREFIX_DIR = BUILD_DIR / "xenon"
+LINUX_DIR = XENON_SOURCE_DIR / "UI" / "Linux"
+LINUX_ICONS_DIR = XENON_SOURCE_DIR / "UI" / "Icons" / "linux" / "hicolor"
 
-def load_ladybird_bundler():
-    """Ladybird's Meta/package-macos-test-bundle.py, which makes its own app run on other Macs. Xenon's bundle needs the
-    same: Qt's plugins copied in, the libraries it links copied in, and rpaths relative to the bundle."""
-    path = LADYBIRD_SOURCE_DIR / "Meta" / "package-macos-test-bundle.py"
-    spec = importlib.util.spec_from_file_location("package_macos_test_bundle", path)
+# linuxdeploy copies in the libraries the binaries load, from the build, vcpkg's tree and the system, except the ones
+# every system has its own of (its excludelist: glibc, libstdc++, OpenGL, the core of X11 and Wayland, fontconfig,
+# freetype...), and makes every rpath relative to the AppDir. appimagetool packs the AppDir behind the AppImage runtime.
+# Each is a pinned release, checked against its SHA-256 before it runs.
+APPIMAGE_TOOLS = {
+    "linuxdeploy": (
+        "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage",
+        "c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d",
+    ),
+    "appimagetool": (
+        "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage",
+        "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0",
+    ),
+    "runtime": (
+        "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64",
+        "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d",
+    ),
+}
+
+# The Qt plugins the AppImage carries, under Qt's plugin directory: the platforms (X11, and Wayland, which comes with
+# qt6-wayland), what each needs to draw and take input, the image formats, and GeoClue for geolocation. Qt only uses the
+# system's plugins when they're built for the same Qt, so the AppImage can't count on them.
+LINUX_QT_PLUGINS = (
+    "platforms/libqxcb.so",
+    "platforms/libqwayland*.so",
+    "xcbglintegrations/*.so",
+    "wayland-shell-integration/*.so",
+    "wayland-decoration-client/*.so",
+    "wayland-graphics-integration-client/*.so",
+    "platforminputcontexts/*.so",
+    "imageformats/*.so",
+    "iconengines/*.so",
+    "position/libqtposition_geoclue2.so",
+    "position/libqtposition_positionpoll.so",
+)
+REQUIRED_LINUX_QT_PLUGINS = ("platforms/libqxcb.so", "platforms/libqwayland*.so")
+
+# What AppImage updaters (AppImageUpdate, and the AppImage managers that use it) read to find the next release: the
+# .zsync file of the newest GitHub release of ThaRae/xenon-releases.
+APPIMAGE_UPDATE_INFORMATION = "gh-releases-zsync|{}|{}|latest|Xenon-*-{}.AppImage.zsync".format(
+    *RELEASES_REPOSITORY.split("/"), LINUX_ARCHITECTURE
+)
+
+# A page over HTTPS, which needs the system's certificates: the AppImage brings its own OpenSSL, which looks for them
+# where the build's system keeps them, and its AppRun points it at the system's.
+HTTPS_TEST_URL = "https://example.com/"
+HTTPS_TEST_TEXT = "documentation examples"
+
+
+def load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-bundler = load_ladybird_bundler()
+# Ladybird's Meta/package-macos-test-bundle.py, which makes its own app run on other Macs. Xenon's bundle needs the same:
+# Qt's plugins copied in, the libraries it links copied in, and rpaths relative to the bundle.
+bundler = load_module("package_macos_test_bundle", LADYBIRD_SOURCE_DIR / "Meta" / "package-macos-test-bundle.py")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Package, publish and test Xenon's releases on macOS")
+    parser = argparse.ArgumentParser(description="Package, publish and test Xenon's releases")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     package_parser = subparsers.add_parser("package", help="build and package a release into Build/distribution")
     package_parser.add_argument("--no-build", action="store_true", help="package the build as it is")
     package_parser.add_argument("--version", help="the version to release as, rather than VERSION.txt's")
-    package_parser.add_argument("--sign", default=SIGNING_IDENTITY, help='the signing identity, or "-" for ad hoc')
     package_parser.add_argument(
-        "--update-key", type=Path, help="a file with the update key, rather than the keychain's"
+        "--sign", default=SIGNING_IDENTITY, help='the signing identity, or "-" for ad hoc (macOS)'
     )
-    package_parser.add_argument("--feed-url", default=FEED_URL, help="where the release looks for updates")
-    package_parser.add_argument("--notes", type=Path, help="a file with the release notes, in plain text")
+    package_parser.add_argument(
+        "--update-key", type=Path, help="a file with the update key, rather than the keychain's (macOS)"
+    )
+    package_parser.add_argument("--feed-url", default=FEED_URL, help="where the release looks for updates (macOS)")
+    package_parser.add_argument("--notes", type=Path, help="a file with the release notes, in plain text (macOS)")
 
     publish_parser = subparsers.add_parser("publish", help="publish Build/distribution to ThaRae/xenon-releases")
     publish_parser.add_argument("--yes", action="store_true", help="don't ask before publishing")
 
-    test_parser = subparsers.add_parser("test", help="test that a release updates itself to the next")
-    test_parser.add_argument("--no-build", action="store_true", help="test the build as it is")
-    test_parser.add_argument("--sign", default="-", help='the signing identity, or "-" for ad hoc (the default)')
+    test_parser = subparsers.add_parser(
+        "test", help="test that a release updates itself to the next (macOS), or that the AppImage runs (Linux)"
+    )
+    test_parser.add_argument("--no-build", action="store_true", help="test the build as it is (macOS)")
+    test_parser.add_argument(
+        "--sign", default="-", help='the signing identity, or "-" for ad hoc (the default) (macOS)'
+    )
+    test_parser.add_argument("--appimage", type=Path, help="the AppImage to test, rather than package's (Linux)")
 
     args = parser.parse_args()
-    if sys.platform != "darwin":
-        sys.exit("Xenon's releases are packaged on macOS")
+    if sys.platform not in ("darwin", "linux"):
+        sys.exit("Xenon's releases are packaged on macOS and Linux")
+    on_mac = sys.platform == "darwin"
 
-    if args.command == "package":
+    if args.command == "package" and on_mac:
         package_main(args)
+    elif args.command == "package":
+        package_linux_main(args)
     elif args.command == "publish":
         publish_main(args)
-    elif args.command == "test":
+    elif args.command == "test" and on_mac:
         test_main(args)
+    elif args.command == "test":
+        test_linux_main(args)
 
 
 def run(*command, **kwargs) -> str:
@@ -501,6 +575,14 @@ def installer_name(version: str) -> str:
     return f"Xenon-{version}.dmg"
 
 
+def appimage_name(version: str) -> str:
+    return f"Xenon-{version}-{LINUX_ARCHITECTURE}.AppImage"
+
+
+def zsync_path(appimage: Path) -> Path:
+    return appimage.with_name(f"{appimage.name}.zsync")
+
+
 def package_main(args):
     version = args.version or read_version()
     check_signing_identity(args.sign)
@@ -544,19 +626,343 @@ def package_main(args):
     print("Check the app, then publish it with Meta/release.py publish.")
 
 
+def appimage_tool(name: str) -> Path:
+    """One of the tools that make the AppImage, from its pinned release, kept under Build/tools. It's downloaded the first
+    time, and checked against its SHA-256 every time."""
+    url, sha256 = APPIMAGE_TOOLS[name]
+    tag, file_name = url.split("/")[-2:]
+    path = XENON_SOURCE_DIR / "Build" / "tools" / "appimage" / f"{name}-{tag}" / file_name
+    if not path.is_file():
+        print(f"Downloading {url}", flush=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        partial = path.with_name(f"{file_name}.partial")
+        with urllib.request.urlopen(url, timeout=120) as response, partial.open("wb") as file:
+            shutil.copyfileobj(response, file)
+        partial.rename(path)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != sha256:
+        path.unlink()
+        sys.exit(f"{file_name} from {url} has the SHA-256 {digest}, not {sha256}")
+    path.chmod(0o755)
+    return path
+
+
+def run_appimage_tool(name: str, *arguments, cwd: Path | None = None, **variables) -> str:
+    """Runs one of the tools, and returns what it printed, which is mostly on stderr."""
+    # The tools are AppImages themselves, which mount themselves with FUSE, which containers don't have. They run from a
+    # copy they extract instead.
+    environment = dict(os.environ, APPIMAGE_EXTRACT_AND_RUN="1", **variables)
+    command = [str(part) for part in (appimage_tool(name), *arguments)]
+    result = subprocess.run(
+        command, cwd=cwd, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    )
+    if result.returncode != 0:
+        sys.exit(f"{name} failed:\n{result.stdout}")
+    return result.stdout
+
+
+def elf_files(directory: Path) -> list[Path]:
+    files = []
+    for path in sorted(directory.rglob("*")):
+        if path.is_file() and not path.is_symlink():
+            with path.open("rb") as file:
+                if file.read(4) == b"\x7fELF":
+                    files.append(path)
+    return files
+
+
+def linked_libraries(binary: Path) -> dict[str, str]:
+    """The libraries a binary loads, by name, and where the dynamic linker finds each, or "not found"."""
+    libraries = {}
+    # NB: ldd fails on a binary that links nothing, which isn't a problem here.
+    output = subprocess.run(["ldd", str(binary)], capture_output=True, text=True).stdout
+    for line in output.splitlines():
+        if match := re.match(r"\s*(\S+) => (.+?)(?: \(0x[0-9a-f]+\))?$", line):
+            libraries[match[1]] = match[2]
+    return libraries
+
+
+def needed_libraries(binary: Path) -> set[str]:
+    """The libraries a binary names as its own dependencies."""
+    return set(re.findall(r"\(NEEDED\)\s+Shared library: \[(.+)\]", run("readelf", "--dynamic", "--wide", binary)))
+
+
+def dynamic_symbols(binary: Path, kind: str) -> set[str]:
+    """A binary's dynamic symbols, without their versions: "defined" ones, or "undefined" ones, which it imports."""
+    output = run("nm", "--dynamic", f"--{kind}-only", "--format=just-symbols", binary)
+    return {symbol.split("@")[0] for symbol in output.split()}
+
+
+def choose_shared_libraries(app_dir: Path, log: str):
+    """linuxdeploy copies in one library of each name. Where the build or vcpkg has one of the same name as the system's
+    (ICU, libpng, zstd...), it takes the system's, which the system's Qt is built against, and the build's code runs
+    with that too. It's kept, unless it lacks something the binaries in the AppDir use from it: vcpkg's libpng has APNG's
+    functions, which Ubuntu's lacks. Then the build's takes its place, if it has all that the system's Qt uses."""
+    sources: dict[str, set[Path]] = {}
+    for path in re.findall(r"^Deploying shared library (\S+)", log, re.MULTILINE):
+        sources.setdefault(Path(path).name, set()).add(Path(path))
+    needs = {binary: needed_libraries(binary) for binary in elf_files(app_dir / "usr")}
+    for name, paths in sorted(sources.items()):
+        own = sorted(path for path in paths if path.resolve().is_relative_to(XENON_SOURCE_DIR))
+        system = sorted(path for path in paths if not path.resolve().is_relative_to(XENON_SOURCE_DIR))
+        if not own or not system:
+            continue
+        used = set().union(*(dynamic_symbols(binary, "undefined") for binary, names in needs.items() if name in names))
+        own_symbols, system_symbols = dynamic_symbols(own[0], "defined"), dynamic_symbols(system[0], "defined")
+        if not (used & (own_symbols - system_symbols)):
+            continue
+        if missing := sorted(used & (system_symbols - own_symbols)):
+            sys.exit(f"Neither {own[0]} nor {system[0]} has all that the AppImage uses from it: {', '.join(missing)}")
+        shutil.copy2(own[0], app_dir / "usr" / "lib" / name)
+        print(f"    {name} is the build's, not the system's, which lacks {len(used & (own_symbols - system_symbols))}"
+              " functions the build uses")  # fmt: skip
+
+
+def qt_plugins_directory(executable: Path) -> Path:
+    """The plugin directory of the Qt that Xenon links: the system's, laid out as Debian does, or one laid out as Qt's
+    own installer does."""
+    qt_core = linked_libraries(executable).get("libQt6Core.so.6", "not found")
+    if not qt_core.startswith("/"):
+        sys.exit(f"{executable} doesn't link Qt, or the linker can't find it")
+    library_directory = Path(qt_core).resolve().parent
+    for candidate in (library_directory / "qt6" / "plugins", library_directory.parent / "plugins"):
+        if (candidate / "platforms").is_dir():
+            return candidate
+    sys.exit(f"No Qt plugins beside {qt_core}")
+
+
+def make_app_dir(app_dir: Path):
+    """The AppDir that the AppImage holds: Xenon in usr/bin, the engine's helper processes in usr/libexec and the
+    resources in usr/share/Lagom, as in the build's prefix; Qt's plugins in usr/plugins; and in usr/lib, every library
+    they load that systems don't bring themselves. linuxdeploy copies those in and makes every rpath relative."""
+    executable = LINUX_PREFIX_DIR / "bin" / "Xenon"
+    if not executable.is_file():
+        sys.exit(f"No Xenon at {executable}. Build it first.")
+
+    if app_dir.exists():
+        shutil.rmtree(app_dir)
+    usr = app_dir / "usr"
+    (usr / "bin").mkdir(parents=True)
+    shutil.copy2(executable, usr / "bin" / "Xenon")
+    (usr / "libexec").mkdir()
+    for helper in sorted((LINUX_PREFIX_DIR / "libexec").iterdir()):
+        if helper.is_file() and os.access(helper, os.X_OK):
+            shutil.copy2(helper, usr / "libexec" / helper.name)
+    # The build's prefix may link its resources to their sources; the AppImage takes copies.
+    shutil.copytree(LINUX_PREFIX_DIR / "share" / "Lagom", usr / "share" / "Lagom")
+    shutil.copytree(LINUX_ICONS_DIR, usr / "share" / "icons" / "hicolor")
+
+    plugins_directory = qt_plugins_directory(executable)
+    for pattern in LINUX_QT_PLUGINS:
+        plugins = sorted(plugins_directory.glob(pattern))
+        if not plugins and pattern in REQUIRED_LINUX_QT_PLUGINS:
+            sys.exit(f"Qt has no {pattern} in {plugins_directory}. On Ubuntu, it's in qt6-wayland.")
+        for plugin in plugins:
+            destination = usr / "plugins" / plugin.relative_to(plugins_directory)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(plugin, destination)
+    # Qt finds this beside the executable, and its plugins relative to it.
+    (usr / "bin" / "qt.conf").write_text("[Paths]\nPrefix = ..\nPlugins = plugins\n")
+
+    # linuxdeploy takes usr/bin's executables as they are. --executable would copy the helpers into usr/bin, so they
+    # and the plugins are files whose dependencies it deploys where they are, setting their rpaths to match.
+    arguments = [
+        "--appdir", app_dir.resolve(),
+        "--desktop-file", LINUX_DIR / "org.xenon.Xenon.desktop",
+        "--icon-file", LINUX_ICONS_DIR / "256x256" / "apps" / "org.xenon.Xenon.png",
+        "--custom-apprun", LINUX_DIR / "AppRun",
+    ]  # fmt: skip
+    for binary in elf_files(usr / "libexec") + elf_files(usr / "plugins"):
+        arguments += ["--deploy-deps-only", binary.resolve()]
+    # Nothing is stripped, so that crash reports name every function, as the macOS bundle's exported ones. The release
+    # build has no debug information to strip anyway.
+    log = run_appimage_tool("linuxdeploy", *arguments, NO_STRIP="1")
+    (app_dir.parent / "linuxdeploy.log").write_text(log)
+    print(f"    linuxdeploy copied {len(list((usr / 'lib').glob('*.so*')))} libraries into usr/lib", flush=True)
+    choose_shared_libraries(app_dir, log)
+
+
+def check_app_dir(app_dir: Path) -> list[str]:
+    """What's wrong with an AppDir, if anything: an rpath that isn't relative to the binary, or a library the linker
+    can't find, or finds somewhere other than the AppDir or the system's directories, like the build's."""
+    problems = []
+    for binary in elf_files(app_dir):
+        name = binary.relative_to(app_dir)
+        dynamic = run("readelf", "--dynamic", "--wide", binary)
+        for rpath in re.findall(r"\((?:RPATH|RUNPATH)\)\s+Library r(?:un)?path: \[(.*)\]", dynamic):
+            if any(not entry.startswith("$ORIGIN") for entry in rpath.split(":")):
+                problems.append(f"{name} has the rpath {rpath}")
+        for library, location in linked_libraries(binary).items():
+            if location == "not found":
+                problems.append(f"{name} links {library}, which isn't there")
+                continue
+            resolved = Path(location).resolve()
+            if resolved.is_relative_to(XENON_SOURCE_DIR) and not resolved.is_relative_to(app_dir.resolve()):
+                problems.append(f"{name} loads {library} from {location}")
+    return problems
+
+
+def system_requirements(app_dir: Path) -> dict[str, str]:
+    """The newest versions of glibc's and libstdc++'s symbols that anything in the AppDir uses, which the system it runs
+    on has to have, by name: GLIBC, GLIBCXX and CXXABI."""
+    newest: dict[str, tuple] = {}
+    for binary in elf_files(app_dir):
+        references = run("objdump", "--private-headers", binary).partition("Version References:")[2]
+        for name, version in re.findall(r"\b(GLIBC|GLIBCXX|CXXABI)_(\d+(?:\.\d+)*)\b", references):
+            numbers = tuple(int(part) for part in version.split("."))
+            if numbers > newest.get(name, ((),))[0]:
+                newest[name] = (numbers, version)
+    return {name: version for name, (_, version) in sorted(newest.items())}
+
+
+def make_appimage(app_dir: Path, appimage: Path):
+    """Packs the AppDir behind the AppImage runtime, with the update information that AppImage updaters read, and writes
+    the .zsync file they download first beside it."""
+    appimage.unlink(missing_ok=True)
+    zsync_path(appimage).unlink(missing_ok=True)
+    run_appimage_tool(
+        "appimagetool",
+        "--runtime-file",
+        appimage_tool("runtime"),
+        "--updateinformation",
+        APPIMAGE_UPDATE_INFORMATION,
+        app_dir,
+        appimage,
+        cwd=appimage.parent,
+        ARCH=LINUX_ARCHITECTURE,
+    )
+    if not appimage.is_file() or not zsync_path(appimage).is_file():
+        sys.exit(f"appimagetool didn't write {appimage.name} and its .zsync file")
+    appimage.chmod(0o755)
+
+
+def package_linux_main(args):
+    version = args.version or read_version()
+    if not args.no_build:
+        build()
+
+    print(f"==> Packaging Xenon {version} as an AppImage", flush=True)
+    DISTRIBUTION_DIR.mkdir(parents=True, exist_ok=True)
+    app_dir = DISTRIBUTION_DIR / "Xenon.AppDir"
+    make_app_dir(app_dir)
+    if problems := check_app_dir(app_dir):
+        sys.exit("The AppDir isn't right:\n    " + "\n    ".join(problems))
+    requirements = system_requirements(app_dir)
+    requirements_text = ", ".join(f"{name}_{number}" for name, number in requirements.items())
+
+    print("==> Making the AppImage", flush=True)
+    appimage = DISTRIBUTION_DIR / appimage_name(version)
+    make_appimage(app_dir, appimage)
+    # For the release workflow's summary.
+    (DISTRIBUTION_DIR / "linux-requirements.txt").write_text(f"{requirements_text}\n")
+
+    print(f"    {appimage} ({appimage.stat().st_size / (1024 * 1024):.0f} MiB)")
+    print(f"    {zsync_path(appimage)}")
+    print(f"    It needs these of the system's glibc and libstdc++, or newer: {requirements_text}")
+    print("Check it with Meta/release.py test, then publish it with the macOS release.")
+
+
+def check_system_libraries(appimage: Path) -> bool:
+    """Whether this system has every library the AppImage leaves to systems (linuxdeploy's excludelist), with every
+    function the AppImage uses from them. ldd -r resolves each binary's symbols as the dynamic linker would."""
+    missing: dict[str, Path] = {}
+    with tempfile.TemporaryDirectory() as directory:
+        run(appimage, "--appimage-extract", cwd=directory)
+        root = Path(directory) / "squashfs-root"
+        for binary in elf_files(root / "usr"):
+            output = subprocess.run(["ldd", "-r", str(binary)], capture_output=True, text=True)
+            for line in (output.stdout + output.stderr).splitlines():
+                if match := re.match(r"\s*(\S+) => not found", line):
+                    missing.setdefault(match[1], binary.relative_to(root))
+                elif match := re.match(r"\s*undefined symbol: (\S+)", line):
+                    missing.setdefault(match[1], binary.relative_to(root))
+    for name, binary in sorted(missing.items()):
+        print(f"    missing {name}, which {binary} uses", file=sys.stderr)
+    if not missing:
+        print("    all there, with every function the AppImage uses")
+    return not missing
+
+
+def check_https(appimage: Path, xenon) -> bool:
+    env = dict(os.environ)
+    with tempfile.TemporaryDirectory() as profile:
+
+        def loads(url: str) -> tuple[bool, str]:
+            _, output = xenon.run_headless(appimage, env, ["--headless=text", "--profile-path", profile, url])
+            return HTTPS_TEST_TEXT in output, output
+
+        # The site is on the internet, so it gets a few tries.
+        for _ in range(3):
+            loaded, output = loads(HTTPS_TEST_URL)
+            if loaded:
+                print(f'    loaded {HTTPS_TEST_URL}, with "{HTTPS_TEST_TEXT}"')
+                return True
+            time.sleep(10)
+        print(output[-4000:], file=sys.stderr)
+
+        # Whether it's the certificates, Xenon's network, or the system's.
+        plain_url = HTTPS_TEST_URL.replace("https://", "http://")
+        verb = "loads" if loads(plain_url)[0] else "doesn't load"
+        print(f"    Xenon {verb} {plain_url}", file=sys.stderr)
+        try:
+            urllib.request.urlopen(HTTPS_TEST_URL, timeout=30).read()
+            print(f"    Python loads {HTTPS_TEST_URL}", file=sys.stderr)
+        except OSError as error:
+            print(f"    Python doesn't load {HTTPS_TEST_URL} either: {error}", file=sys.stderr)
+    return False
+
+
+def test_linux_main(args):
+    """Runs Meta/xenon.py test's checks of a running Xenon against the AppImage, as installed: they load local pages,
+    render one, block what the bundled filter lists block, run extensions, and open Xenon's windows. Then a page over
+    HTTPS. Run on a system that has nothing of the build, it shows what the AppImage misses."""
+    appimage = (args.appimage or DISTRIBUTION_DIR / appimage_name(read_version())).resolve()
+    if not appimage.is_file():
+        sys.exit(f"No {appimage}. Package it first.")
+    # Downloads lose the executable bit, the release workflow's artifacts among them.
+    appimage.chmod(0o755)
+
+    xenon = load_module("xenon", XENON_SOURCE_DIR / "Meta" / "xenon.py")
+    print(f"==> Testing {appimage.name}", flush=True)
+    failures = []
+    print("==> the system has every library the AppImage leaves to it", flush=True)
+    if not check_system_libraries(appimage):
+        failures.append("system libraries")
+
+    failures += xenon.check_app(xenon.Platform(), appimage, DISTRIBUTION_DIR / "smoke")
+
+    print("==> a page over HTTPS, with the system's certificates", flush=True)
+    if not check_https(appimage, xenon):
+        failures.append("HTTPS")
+
+    if failures:
+        sys.exit(f"{len(failures)} failed: {', '.join(failures)}")
+    print("All passed.")
+
+
 def publish_main(args):
     appcast = DISTRIBUTION_DIR / "appcast.xml"
-    app = DISTRIBUTION_DIR / APP_NAME
-    if not appcast.is_file() or not app.is_dir():
-        sys.exit("Nothing to publish. Run Meta/release.py package first.")
-    info = plistlib.loads((app / "Contents" / "Info.plist").read_bytes())
+    if not appcast.is_file():
+        sys.exit("Nothing to publish. Run Meta/release.py package first, on a Mac.")
+    # The appcast names the archive, and the app in it has the version and the feed it was packaged for. That's what goes
+    # up, and Build/distribution may not have the app beside it: the release workflow publishes from its artifacts.
+    enclosure = ElementTree.parse(appcast).find("channel/item/enclosure")
+    archive_url = enclosure.get("url", "") if enclosure is not None else ""
+    archive = DISTRIBUTION_DIR / archive_url.rsplit("/", 1)[-1]
+    if not archive_url or not archive.is_file():
+        sys.exit("Build/distribution has no archive that its appcast names. Package it again.")
+    with tarfile.open(archive) as tar:
+        info = plistlib.load(tar.extractfile(f"{APP_NAME}/Contents/Info.plist"))
     version = info["CFBundleShortVersionString"]
-    archive = DISTRIBUTION_DIR / archive_name(version)
     installer = DISTRIBUTION_DIR / installer_name(version)
-    if info["SUFeedURL"] != FEED_URL or not archive.is_file() or archive.name not in appcast.read_text():
+    if info["SUFeedURL"] != FEED_URL or archive.name != archive_name(version):
         sys.exit(f"Build/distribution isn't a release for {RELEASES_REPOSITORY}. Package it again.")
     if not installer.is_file():
         sys.exit(f"Build/distribution has no {installer.name}. Package it again.")
+    # The Linux release, from Meta/release.py package on Linux, or the release workflow's linux job.
+    appimage = DISTRIBUTION_DIR / appimage_name(version)
+    linux_files = [path for path in (appimage, zsync_path(appimage)) if appimage.is_file() and path.is_file()]
+    files = [installer, archive, *linux_files]
     if subprocess.run(["gh", "auth", "status"], capture_output=True).returncode != 0:
         sys.exit("gh isn't logged in to GitHub: gh auth login")
 
@@ -571,11 +977,15 @@ def publish_main(args):
     if on_main.returncode != 0:
         sys.exit(f"{commit[:10]} isn't on {XENON_REPOSITORY}'s main. Release from a commit that is.")
 
-    signing = subprocess.run(["codesign", "-dvv", app], capture_output=True, text=True).stderr
-    authority = re.search(r"^Authority=(.+)$", signing, re.MULTILINE)
-    signed_as = authority.group(1) if authority else "ad hoc"
     if not args.yes:
-        print(f"Xenon {version} from {commit[:10]}, signed {'' if signed_as == 'ad hoc' else 'as '}{signed_as}.")
+        print(f"Xenon {version} from {commit[:10]}: {', '.join(path.name for path in files)}.")
+        app = DISTRIBUTION_DIR / APP_NAME
+        if sys.platform == "darwin" and app.is_dir():
+            signing = subprocess.run(["codesign", "-dvv", app], capture_output=True, text=True).stderr
+            authority = re.search(r"^Authority=(.+)$", signing, re.MULTILINE)
+            print(f"The app is signed {f'as {authority.group(1)}' if authority else 'ad hoc'}.")
+        if not linux_files:
+            print(f"There's no {appimage.name} in Build/distribution, so the release has nothing for Linux.")
         answer = input(f"Publish it to {RELEASES_REPOSITORY}, and tag it {tag}? [y/N] ")
         if answer.strip().lower() != "y":
             sys.exit("Not published.")
@@ -584,9 +994,9 @@ def publish_main(args):
     notes = notes_file.read_text().strip() if notes_file.is_file() else f"Xenon {version}"
     notes += f"\n\nBuilt from https://github.com/{XENON_REPOSITORY}/commit/{commit}."
 
-    print(f"==> Creating the {tag} release, with {installer.name} and {archive.name}", flush=True)
+    print(f"==> Creating the {tag} release, with {', '.join(path.name for path in files)}", flush=True)
     run(
-        "gh", "release", "create", tag, installer, archive, "--repo", RELEASES_REPOSITORY, "--target", "main",
+        "gh", "release", "create", tag, *files, "--repo", RELEASES_REPOSITORY, "--target", "main",
         "--title", f"Xenon {version}", "--notes", notes,
     )  # fmt: skip
 
