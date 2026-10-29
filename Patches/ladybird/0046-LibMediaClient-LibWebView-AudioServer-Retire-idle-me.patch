@@ -1,27 +1,29 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: ThaRae <76752281+ThaRae@users.noreply.github.com>
-Date: Thu, 29 Oct 2026 08:53:46 -0400
-Subject: [PATCH] LibMediaClient+AudioServer: Retire idle media servers on
- their own
+From: Ryan <ryan@esterlines.com>
+Date: Thu, 29 Oct 2026 09:40:57 -0400
+Subject: [PATCH] LibMediaClient+LibWebView+AudioServer: Retire idle media
+ servers
 
-A renderer gave its MediaServer up 30 s after it last held a media stream,
-playback session, or decode request, which is longer than the 25 s a page
-sits idle in the memory measurement; 15 s covers a pause between two
-playback requests just as well.
+A renderer gives up its MediaServer once it has had no media stream,
+playback session, or decode request for a while. Shorten that from 30
+to 15 seconds, which still covers a pause between two playback
+requests; a playing or paused media element keeps its session.
 
 The AudioServer only ever exited when the Browser dropped its control
-connection, which the Browser held for the whole renderer's life, so a
-page that had finished with audio kept one forever. It now exits 15 s
-after its last client connection goes, and the Browser launches a new
-one when a renderer next asks for a client.
+connection, which the Browser held for the renderer's whole life, so a
+page that had finished playing kept one for good. Have it exit 15
+seconds after its last client goes. The Browser already launches a new
+one when a renderer next asks for a client, and now also does so when
+that request finds the server gone just before it arrived.
 
-Neither helper starts for a page without media, and a playing or paused
-media element keeps its session, so nothing a page is using is retired.
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibMediaClient/Client.cpp |  4 +++-
- Services/AudioServer/Tabs.cpp       | 21 +++++++++++++++++++++
- Services/AudioServer/Tabs.h         |  5 +++++
- 3 files changed, 29 insertions(+), 1 deletion(-)
+ Libraries/LibMediaClient/Client.cpp       |  4 +++-
+ Libraries/LibWebView/WebContentClient.cpp | 10 +++++++++-
+ Libraries/LibWebView/WebWorkerClient.cpp  |  7 ++++++-
+ Services/AudioServer/Tabs.cpp             | 21 +++++++++++++++++++++
+ Services/AudioServer/Tabs.h               |  5 +++++
+ 5 files changed, 44 insertions(+), 3 deletions(-)
 
 diff --git a/Libraries/LibMediaClient/Client.cpp b/Libraries/LibMediaClient/Client.cpp
 index e57a7113283fed6a2ddcc292671031f7f854772e..47d69519229e8741c89b7d969e53d2a608dcf84b 100644
@@ -38,6 +40,45 @@ index e57a7113283fed6a2ddcc292671031f7f854772e..47d69519229e8741c89b7d969e53d2a6
  
  static NeverDestroyed<Client::TransportFactory> s_transport_factory;
  static NeverDestroyed<RefPtr<Client>> s_client;
+diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
+index 713bf8413d4f48f7bde67b11a662c8b55ad119ef..005cec787a38a984dd00908792bf8544fef52a2c 100644
+--- a/Libraries/LibWebView/WebContentClient.cpp
++++ b/Libraries/LibWebView/WebContentClient.cpp
+@@ -910,7 +910,15 @@ ErrorOr<IPC::TransportHandle> WebContentClient::connect_audio_server_client()
+ {
+     // The server must know of the permission before any client gets its connection.
+     TRY(ensure_audio_server_controller());
+-    return connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
++    auto handle = connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
++
++    // An idle AudioServer exits by itself, so it may have gone just before this request reached it, while its
++    // connection still looked open. The failed request closes that connection, and a second try launches a new server.
++    if (handle.is_error() && !m_audio_server_client->is_open()) {
++        TRY(ensure_audio_server_controller());
++        handle = connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
++    }
++    return handle;
+ }
+ 
+ ErrorOr<void> WebContentClient::ensure_audio_server_controller()
+diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
+index 4961614f17103e7d863e1759619aa24688b2d3b2..2a2a4cc554ab2bbbc35a59ad74cddd555d7ec958 100644
+--- a/Libraries/LibWebView/WebWorkerClient.cpp
++++ b/Libraries/LibWebView/WebWorkerClient.cpp
+@@ -179,7 +179,12 @@ Messages::WebWorkerClient::RequestImageDecoderConnectionResponse WebWorkerClient
+ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient::request_media_server_connection()
+ {
+     auto connection = connect_new_media_server_client(m_media_server_client, child_id(), [this] {
+-        return connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
++        auto handle = connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
++        // An idle AudioServer exits by itself, so it may have gone just before this request reached it. The failed
++        // request closes its connection, and a second try launches a new server.
++        if (handle.is_error() && m_audio_server_client && !m_audio_server_client->is_open())
++            handle = connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
++        return handle;
+     });
+     if (connection.is_error()) {
+         warnln("Unable to connect a MediaServer client: {}", connection.error());
 diff --git a/Services/AudioServer/Tabs.cpp b/Services/AudioServer/Tabs.cpp
 index 97b05ff0bc14059e384bcdf5d12f59e476889d14..8051f401b3f985ccc05516820e366472177e74d5 100644
 --- a/Services/AudioServer/Tabs.cpp

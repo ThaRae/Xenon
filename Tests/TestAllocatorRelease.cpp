@@ -8,10 +8,15 @@
 #include <AK/kmalloc.h>
 #include <LibTest/TestCase.h>
 
+#include <string.h>
+
 #if defined(AK_OS_LINUX)
 #    include <stdio.h>
-#    include <string.h>
 #    include <unistd.h>
+#endif
+
+#if defined(AK_OS_MACOS)
+#    include <mach/mach.h>
 #endif
 
 #if defined(AK_OS_LINUX)
@@ -33,6 +38,57 @@ static Optional<size_t> current_rss_bytes()
 }
 
 #endif
+
+#if defined(AK_OS_MACOS)
+
+// The physical footprint the kernel keeps for this process, which is Activity Monitor's Memory column and what the
+// macOS browser measurements use.
+static Optional<size_t> current_footprint_bytes()
+{
+    task_vm_info_data_t info {};
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    if (task_info(mach_task_self(), TASK_VM_INFO, reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS)
+        return {};
+    return static_cast<size_t>(info.phys_footprint);
+}
+
+#endif
+
+// On macOS, mimalloc purges by decommitting, which takes freed pages out of the footprint at once. A decommitting
+// collect has to leave it that way: if it left purges resetting pages instead (MADV_FREE), they would stay in the
+// footprint, and no later collect in the process would give memory back.
+TEST_CASE(collects_after_a_decommitting_collect_still_return_freed_pages)
+{
+#if defined(AK_OS_MACOS)
+    static constexpr size_t block_size = 32 * 1024;
+    static constexpr size_t block_count = 4096;
+
+    ak_kmalloc_decommit_free_pages();
+
+    Vector<void*> blocks;
+    blocks.ensure_capacity(block_count);
+    for (size_t index = 0; index < block_count; ++index) {
+        auto* block = kmalloc(block_size);
+        EXPECT(block != nullptr);
+        if (!block)
+            break;
+        memset(block, 0x5a, block_size);
+        blocks.unchecked_append(block);
+    }
+
+    auto footprint_allocated = current_footprint_bytes();
+    for (auto* block : blocks)
+        kfree(block);
+    ak_kmalloc_collect();
+    auto footprint_released = current_footprint_bytes();
+
+    EXPECT(footprint_allocated.has_value());
+    EXPECT(footprint_released.has_value());
+    if (!footprint_allocated.has_value() || !footprint_released.has_value())
+        return;
+    EXPECT(*footprint_released + 64 * 1024 * 1024 <= *footprint_allocated);
+#endif
+}
 
 TEST_CASE(decommitting_collect_returns_freed_pages_to_the_os)
 {

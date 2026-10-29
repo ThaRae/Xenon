@@ -95,6 +95,7 @@ incremental. The app ends up at `Build/release/bin/Xenon.app`.
 | [FilterListUpdates.md](Documentation/FilterListUpdates.md) | How the daily filter list updates are built, signed, and checked |
 | [Fingerprinting.md](Documentation/Fingerprinting.md) | How fingerprinting protection works, and how it relates to Brave's |
 | [Updates.md](Documentation/Updates.md) | How releases are made and signed, and how Xenon updates itself |
+| [Memory.md](Documentation/Memory.md) | How Xenon's memory use compares with Chrome's, how to measure it, and what changed it |
 | [CLAUDE.md](CLAUDE.md) | The rules for changing Xenon |
 
 ## Contributing

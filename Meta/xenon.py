@@ -16,6 +16,7 @@ import io
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import ssl
@@ -318,11 +319,11 @@ def check_app(platform: Platform, executable: Path, smoke_dir: Path) -> list[str
     if not check_filter_list_updates(executable, env):
         failures.append("filter list updates")
 
-    print("==> image decoding starts with the first image and stops when the decoder is gone", flush=True)
+    print("==> an ImageDecoder starts with a page's first image, and goes once idle", flush=True)
     if not check_image_decoder_lifecycle(executable, env):
         failures.append("image decoder lifecycle")
 
-    print("==> a page without media starts no media server, and an idle one goes away", flush=True)
+    print("==> media servers start when a page needs one, stay while it is paused, and go once idle", flush=True)
     if not check_media_server_lifecycle(executable, env):
         failures.append("media server lifecycle")
 
@@ -474,173 +475,217 @@ def check_content_blocking(executable: Path, env: dict) -> bool:
     return passed
 
 
-# A renderer asks the Browser for an ImageDecoder when it first decodes an image, and lets it go once it has been idle,
-# so a page without images never starts one and a page that has finished decoding does not keep one. This counts the
-# browser's children, so it needs /proc.
+# The lifecycle checks' pages report how far they got with /event?name=..., and wait at /go?step=N until the check lets
+# them on with release(N), so that the check can look at Xenon's processes in between rather than guess at timings.
+class LifecyclePages:
+    SCRIPT = """
+    function report(name) {
+        return fetch("/event?name=" + name).catch(() => {});
+    }
+    function waitForStep(step) {
+        return new Promise(resolve => {
+            const poll = () => fetch("/go?step=" + step)
+                .then(response => response.text())
+                .then(go => go === "1" ? resolve() : setTimeout(poll, 200), () => setTimeout(poll, 200));
+            poll();
+        });
+    }
+"""
+
+    def __init__(self, pages: dict[str, tuple[str, bytes]]):
+        self.events: set[str] = set()
+        self.released: set[str] = set()
+        owner = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                url = urllib.parse.urlsplit(self.path)
+                query = urllib.parse.parse_qs(url.query)
+                if url.path == "/event":
+                    owner.events.add(query.get("name", [""])[0])
+                    content_type, body = "text/plain", b"ok"
+                elif url.path == "/go":
+                    content_type, body = "text/plain", b"1" if query.get("step", [""])[0] in owner.released else b"0"
+                elif url.path in pages:
+                    content_type, body = pages[url.path]
+                else:
+                    self.send_response(404)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.origin = f"http://127.0.0.1:{self.server.server_address[1]}"
+
+    def release(self, step: int):
+        self.released.add(str(step))
+
+    def close(self):
+        self.server.shutdown()
+
+
+# Opens a lifecycle check's page in headless Xenon with a profile of its own, which stop_lifecycle_page() removes.
+def start_lifecycle_page(executable: Path, env: dict, url: str) -> tuple[subprocess.Popen, str]:
+    profile = tempfile.mkdtemp(prefix="xenon-lifecycle-")
+    process = subprocess.Popen(
+        [str(executable), "--headless=manual", "--profile-path", profile, url],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        start_new_session=True,
+    )
+    return process, profile
+
+
+# Stops the page's Xenon unless it has quit by itself, and returns what it printed.
+def stop_lifecycle_page(process: subprocess.Popen, profile: str) -> str:
+    try:
+        output, _ = process.communicate(timeout=1)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGTERM)
+        try:
+            output, _ = process.communicate(timeout=15)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            output, _ = process.communicate()
+    shutil.rmtree(profile, ignore_errors=True)
+    return output
+
+
+# Whether the condition holds within the timeout, checked five times a second.
+def wait_until(condition, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if condition():
+            return True
+        time.sleep(0.2)
+    return bool(condition())
+
+
+# The last result a lifecycle page logged after its marker.
+def lifecycle_results(output: str, marker: str):
+    results = None
+    for line in output.splitlines():
+        if marker in line:
+            results = json.loads(line.split(marker, 1)[1].rstrip().removesuffix('"'))
+    return results
+
+
+# A renderer asks the Browser for an ImageDecoder when it first decodes an image, and lets it go once it has had nothing
+# to decode for 15 s; one that crashes is replaced at the next image. So a page without images never starts one, and a
+# page that has finished decoding does not keep one.
 def check_image_decoder_lifecycle(executable: Path, env: dict) -> bool:
-    if sys.platform != "linux":
-        print("    skipped: counting the browser's children needs /proc")
-        return True
-
-    def descendants(root: int) -> list[int]:
-        children: dict[int, list[int]] = {}
-        for entry in Path("/proc").iterdir():
-            if not entry.name.isdigit():
-                continue
-            try:
-                status = (entry / "status").read_text()
-            except OSError:
-                continue
-            ppid = 0
-            for line in status.splitlines():
-                if line.startswith("PPid:"):
-                    ppid = int(line.split()[1])
-                    break
-            children.setdefault(ppid, []).append(int(entry.name))
-        found: list[int] = []
-        stack = [root]
-        while stack:
-            pid = stack.pop()
-            found.append(pid)
-            stack.extend(children.get(pid, []))
-        return found
-
-    def decoder_pids(root: int) -> list[int]:
-        pids = []
-        for pid in descendants(root):
-            try:
-                name = Path(f"/proc/{pid}/comm").read_text().strip()
-            except OSError:
-                continue
-            if "ImageDecoder" in name:
-                pids.append(pid)
-        return pids
-
     image_page = f"""<!doctype html><title>image decoder</title>
 <p>images</p>
-<img id="first" src="/pixel.png">
 <script>
-    let results = {{}};
-    const first = document.querySelector("#first");
-    first.onload = () => {{
-        results.first = first.naturalWidth;
-        // Long enough for the harness to stop the decoder the first image started.
-        setTimeout(() => {{
-            const second = new Image();
-            second.onload = () => {{
-                results.second = second.naturalWidth;
-                console.log("{IMAGE_DECODER_TEST_MARKER}" + JSON.stringify(results));
-                window.close();
-            }};
-            second.onerror = () => {{
-                console.log("{IMAGE_DECODER_TEST_MARKER}" + JSON.stringify({{ ...results, error: "second image failed" }}));
-                window.close();
-            }};
-            second.src = "/pixel.png?second";
-        }}, 3000);
-    }};
+    {LifecyclePages.SCRIPT}
+    const results = {{}};
+    function load(name) {{
+        return new Promise(resolve => {{
+            const image = new Image();
+            image.onload = () => {{ results[name] = image.naturalWidth; resolve(); }};
+            image.onerror = () => {{ results[name] = "failed"; resolve(); }};
+            image.src = "/pixel.png?" + name;
+        }});
+    }}
+    (async () => {{
+        await load("first");
+        await report("first");
+        // The check stops the decoder the first image started.
+        await waitForStep(1);
+        await load("second");
+        await report("second");
+        // The check waits for the second image's decoder to go by itself.
+        await waitForStep(2);
+        await load("third");
+        console.log("{IMAGE_DECODER_TEST_MARKER}" + JSON.stringify(results));
+        window.close();
+    }})();
 </script>"""
-    pages = {
-        "/": b"<!doctype html><title>no images</title><p>no images</p>",
-        "/image": image_page.encode(),
-        "/pixel.png": IMAGE_DECODER_TEST_PNG,
-    }
+    pages = LifecyclePages(
+        {
+            "/": ("text/html", b"<!doctype html><title>no images</title><p>no images</p>"),
+            "/image": ("text/html", image_page.encode()),
+            "/pixel.png": ("image/png", IMAGE_DECODER_TEST_PNG),
+        }
+    )
 
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):
-            route = urllib.parse.urlsplit(self.path).path
-            body = pages.get(route, b"")
-            self.send_response(200 if route in pages else 404)
-            self.send_header("Content-Type", "text/html" if route in ("/", "/image") else "image/png")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def log_message(self, *args):
-            pass
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    origin = f"http://127.0.0.1:{server.server_address[1]}"
     passed = True
     try:
-        with tempfile.TemporaryDirectory() as profile:
-            plain = subprocess.Popen(
-                [str(executable), "--headless=manual", "--profile-path", profile, f"{origin}/"],
-                env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-            try:
-                time.sleep(3)
-                started = decoder_pids(plain.pid)
-            finally:
-                os.killpg(plain.pid, signal.SIGTERM)
-                plain.wait(timeout=15)
-            if started:
-                print(f"    a page without images started {len(started)} ImageDecoder process(es)", file=sys.stderr)
-                passed = False
-            else:
-                print("    a page without images started no ImageDecoder")
+        browser, profile = start_lifecycle_page(executable, env, f"{pages.origin}/")
+        try:
+            time.sleep(3)
+            started = helper_pids(browser.pid, "ImageDecoder")
+        finally:
+            stop_lifecycle_page(browser, profile)
+        if started:
+            print(f"    a page without images started {len(started)} ImageDecoder process(es)", file=sys.stderr)
+            passed = False
+        else:
+            print("    a page without images started no ImageDecoder")
 
-        with tempfile.TemporaryDirectory() as profile:
-            browser = subprocess.Popen(
-                [str(executable), "--headless=manual", "--profile-path", profile, f"{origin}/image"],
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                start_new_session=True,
-            )
-            saw_decoder = False
-            stopped_decoder = False
-            try:
-                deadline = time.monotonic() + 10
-                while time.monotonic() < deadline and browser.poll() is None:
-                    pids = decoder_pids(browser.pid)
-                    if pids:
-                        saw_decoder = True
-                        time.sleep(2)
-                        pids = decoder_pids(browser.pid)
-                        if pids:
-                            os.kill(pids[0], signal.SIGKILL)
-                            stopped_decoder = True
-                        break
-                    time.sleep(0.1)
-                output, _ = browser.communicate(timeout=30)
-            finally:
-                if browser.poll() is None:
-                    os.killpg(browser.pid, signal.SIGKILL)
-                    browser.wait()
-            results = None
-            for line in output.splitlines():
-                if IMAGE_DECODER_TEST_MARKER in line:
-                    results = json.loads(line.split(IMAGE_DECODER_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
-            if not saw_decoder:
-                print("    an image did not start an ImageDecoder", file=sys.stderr)
-                passed = False
-            if not stopped_decoder:
-                print("    could not stop the first ImageDecoder", file=sys.stderr)
-                passed = False
-            if results != {"first": 1, "second": 1}:
-                print(f"    the images decoded to {results}", file=sys.stderr)
-                print(output[-4000:], file=sys.stderr)
-                passed = False
+        browser, profile = start_lifecycle_page(executable, env, f"{pages.origin}/image")
+        problems = []
+        try:
+            first = []
+            if not wait_until(lambda: "first" in pages.events, 20):
+                problems.append("the first image did not load")
+            elif not (first := helper_pids(browser.pid, "ImageDecoder")):
+                problems.append("the first image did not start an ImageDecoder")
             else:
-                print(
-                    "    the first image started a decoder, and a second image started a new one after it was stopped"
-                )
+                os.kill(first[0], signal.SIGKILL)
+                if not wait_until(lambda: first[0] not in helper_pids(browser.pid, "ImageDecoder"), 10):
+                    problems.append("the first ImageDecoder did not stop")
+            pages.release(1)
+
+            if not wait_until(lambda: "second" in pages.events, 20):
+                problems.append("the second image did not load")
+            elif not [pid for pid in helper_pids(browser.pid, "ImageDecoder") if pid not in first]:
+                problems.append("the second image did not start a new ImageDecoder")
+            elif not wait_until(lambda: not helper_pids(browser.pid, "ImageDecoder"), 30):
+                problems.append("an ImageDecoder with nothing to decode for 30 s is still running")
+            pages.release(2)
+
+            try:
+                browser.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                pass
+        finally:
+            output = stop_lifecycle_page(browser, profile)
+
+        results = lifecycle_results(output, IMAGE_DECODER_TEST_MARKER)
+        if results != {"first": 1, "second": 1, "third": 1}:
+            problems.append(f"the images decoded to {results}")
+        if problems:
+            for problem in problems:
+                print(f"    {problem}", file=sys.stderr)
+            print(output[-4000:], file=sys.stderr)
+            passed = False
+        else:
+            print(
+                "    an image started a decoder, a new one replaced it when it was killed, it went once idle, and the "
+                "next image started another"
+            )
     finally:
-        server.shutdown()
+        pages.close()
     return passed
 
 
-# A renderer asks the Browser for a MediaServer when it first needs one, not with its WebContent process, and the
-# server exits once nothing has used it for a while; the AudioServer it plays through exits with it. This counts the
-# browser's children, so it needs /proc.
 MEDIA_SERVER_TEST_MARKER = "XENON-MEDIA-SERVER-TEST "
 MEDIA_SERVER_TEST_TONE_SECONDS = 1
+# Longer than a MediaServer's idle timeout and then its AudioServer's (15 s each, engine patch 0046), plus a margin.
+MEDIA_SERVER_TEST_PAUSE_SECONDS = 35
 
 
 # A tone for a page to play, so a playback session starts without a media file on disk.
@@ -658,53 +703,10 @@ def media_test_tone() -> bytes:
     return buffer.getvalue()
 
 
+# A renderer asks the Browser for a MediaServer when it first needs one, not with its WebContent process, and gives it
+# up once nothing has used it for 15 s; the AudioServer it plays through exits 15 s after its last client. A paused
+# media element keeps its session, so a page can pause for longer than that and play on.
 def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
-    if sys.platform != "linux":
-        print("    skipped: counting the browser's children needs /proc")
-        return True
-
-    def pids_named(root: int, names: tuple[str, ...]) -> list[int]:
-        children: dict[int, list[int]] = {}
-        for entry in Path("/proc").iterdir():
-            if not entry.name.isdigit():
-                continue
-            try:
-                status = (entry / "status").read_text()
-            except OSError:
-                continue
-            ppid = 0
-            for line in status.splitlines():
-                if line.startswith("PPid:"):
-                    ppid = int(line.split()[1])
-                    break
-            children.setdefault(ppid, []).append(int(entry.name))
-        found: list[int] = []
-        stack = [root]
-        while stack:
-            pid = stack.pop()
-            found.append(pid)
-            stack.extend(children.get(pid, []))
-        matches = []
-        for pid in found:
-            try:
-                name = Path(f"/proc/{pid}/comm").read_text().strip()
-            except OSError:
-                continue
-            if name in names:
-                matches.append(pid)
-        return matches
-
-    def media_pids(root: int) -> list[int]:
-        return pids_named(root, ("MediaServer", "AudioServer", "VideoDecoderSer"))
-
-    def wait_until(predicate, timeout: float) -> bool:
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            if predicate():
-                return True
-            time.sleep(0.2)
-        return predicate()
-
     probe_page = f"""<!doctype html><title>media probe</title>
 <p>no media</p>
 <script>
@@ -713,108 +715,62 @@ def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
     console.log("{MEDIA_SERVER_TEST_MARKER}" + JSON.stringify({{ supported }}));
 </script>"""
 
-    audio_page = f"""<!doctype html><title>media playback</title>
-<audio src="/tone.wav" preload="auto" muted></audio>
+    playback_page = f"""<!doctype html><title>media playback</title>
+<audio src="/tone.wav" loop muted></audio>
 <script>
+    {LifecyclePages.SCRIPT}
     const audio = document.querySelector("audio");
-    const events = [];
-    for (const name of ["loadedmetadata", "canplay", "playing", "pause", "ended"])
-        audio.addEventListener(name, () => events.push(name));
-    audio.play().then(() => events.push("play resolved"), error => events.push("play rejected: " + error.name));
-    // The tone is over soon after this; the page then goes quiet, as a page showing a paused video does.
-    setTimeout(() => {{
-        events.push("currentTime " + audio.currentTime.toFixed(2));
-        console.log("{MEDIA_SERVER_TEST_MARKER}" + JSON.stringify({{ events }}));
+    const results = {{}};
+    audio.addEventListener("error", () => {{ results.error = audio.error ? audio.error.code : "unknown"; }});
+    (async () => {{
+        results.played = await audio.play().then(() => true, error => error.name);
+        audio.pause();
+        await report("paused");
+        // The check waits for longer than an idle media server would last.
+        await waitForStep(1);
+        results.resumed = await audio.play().then(() => true, error => error.name);
+        // Then the page is done with media, as one that has finished a video is.
         audio.pause();
         audio.removeAttribute("src");
         audio.load();
         audio.remove();
-    }}, 3000);
+        console.log("{MEDIA_SERVER_TEST_MARKER}" + JSON.stringify(results));
+        await report("stopped");
+    }})();
 </script>"""
 
-    pages = {
-        "/": b"<!doctype html><title>no media</title><p>no media</p>",
-        "/probe": probe_page.encode(),
-        "/audio": audio_page.encode(),
-        "/tone.wav": media_test_tone(),
-    }
+    pages = LifecyclePages(
+        {
+            "/": ("text/html", b"<!doctype html><title>no media</title><p>no media</p>"),
+            "/probe": ("text/html", probe_page.encode()),
+            "/playback": ("text/html", playback_page.encode()),
+            "/tone.wav": ("audio/wav", media_test_tone()),
+        }
+    )
 
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):
-            route = urllib.parse.urlsplit(self.path).path
-            body = pages.get(route, b"")
-            self.send_response(200 if route in pages else 404)
-            self.send_header("Content-Type", "audio/wav" if route == "/tone.wav" else "text/html")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+    def media_pids(root: int) -> list[int]:
+        return helper_pids(root, "MediaServer", "AudioServer", "VideoDecoderServer")
 
-        def log_message(self, *args):
-            pass
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    origin = f"http://127.0.0.1:{server.server_address[1]}"
     passed = True
-
-    def start(route: str) -> subprocess.Popen:
-        return subprocess.Popen(
-            [
-                str(executable),
-                "--headless=manual",
-                "--profile-path",
-                tempfile.mkdtemp(prefix="xenon-media-"),
-                f"{origin}{route}",
-            ],
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            start_new_session=True,
-        )
-
-    def stop(browser: subprocess.Popen) -> str:
-        # The page has no reason to close its window, so it is stopped once the check is over; its console output is
-        # still in the pipe.
-        try:
-            output, _ = browser.communicate(timeout=1)
-            return output
-        except subprocess.TimeoutExpired:
-            pass
-        os.killpg(browser.pid, signal.SIGTERM)
-        try:
-            output, _ = browser.communicate(timeout=15)
-        except subprocess.TimeoutExpired:
-            os.killpg(browser.pid, signal.SIGKILL)
-            output, _ = browser.communicate()
-        return output
-
-    def reported(output: str):
-        results = None
-        for line in output.splitlines():
-            if MEDIA_SERVER_TEST_MARKER in line:
-                results = json.loads(line.split(MEDIA_SERVER_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
-        return results
-
     try:
-        browser = start("/")
+        browser, profile = start_lifecycle_page(executable, env, f"{pages.origin}/")
         try:
             time.sleep(3)
             started = media_pids(browser.pid)
         finally:
-            stop(browser)
+            stop_lifecycle_page(browser, profile)
         if started:
             print("    a page without media started a media server", file=sys.stderr)
             passed = False
         else:
             print("    a page without media started no MediaServer and no AudioServer")
 
-        browser = start("/probe")
+        browser, profile = start_lifecycle_page(executable, env, f"{pages.origin}/probe")
         try:
-            started = wait_until(lambda: pids_named(browser.pid, ("MediaServer",)), 10)
-            retired = started and wait_until(lambda: not pids_named(browser.pid, ("MediaServer",)), 25)
+            started = wait_until(lambda: helper_pids(browser.pid, "MediaServer"), 10)
+            retired = started and wait_until(lambda: not helper_pids(browser.pid, "MediaServer"), 25)
         finally:
-            output = stop(browser)
+            output = stop_lifecycle_page(browser, profile)
         if not started:
             print("    a media feature test did not start a MediaServer", file=sys.stderr)
             print(output[-4000:], file=sys.stderr)
@@ -825,25 +781,43 @@ def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
         else:
             print("    a media feature test started a MediaServer, and it went away once the page stopped using it")
 
-        browser = start("/audio")
+        browser, profile = start_lifecycle_page(executable, env, f"{pages.origin}/playback")
+        problems = []
         try:
-            played = wait_until(lambda: pids_named(browser.pid, ("AudioServer",)), 15)
-            retired = played and wait_until(lambda: not media_pids(browser.pid), 45)
+            if not wait_until(lambda: "paused" in pages.events, 20):
+                problems.append("the page did not get to pause its audio")
+            elif not wait_until(lambda: helper_pids(browser.pid, "AudioServer"), 10):
+                problems.append("playback did not start an AudioServer")
+            else:
+                time.sleep(MEDIA_SERVER_TEST_PAUSE_SECONDS)
+                if not helper_pids(browser.pid, "MediaServer") or not helper_pids(browser.pid, "AudioServer"):
+                    problems.append(
+                        f"the media servers of an element paused for {MEDIA_SERVER_TEST_PAUSE_SECONDS} s went away"
+                    )
+            pages.release(1)
+
+            if not wait_until(lambda: "stopped" in pages.events, 20):
+                problems.append("the page did not get to play on and stop")
+            elif not wait_until(lambda: not media_pids(browser.pid), 45):
+                problems.append("the media servers are still running 45 s after the page stopped playing")
         finally:
-            output = stop(browser)
-        results = reported(output)
-        if not played:
-            print("    playback did not start an AudioServer", file=sys.stderr)
-            print(f"    playback reported {results}", file=sys.stderr)
+            output = stop_lifecycle_page(browser, profile)
+
+        results = lifecycle_results(output, MEDIA_SERVER_TEST_MARKER)
+        if not results or results.get("played") is not True or results.get("resumed") is not True or "error" in results:
+            problems.append(f"playback reported {results}")
+        if problems:
+            for problem in problems:
+                print(f"    {problem}", file=sys.stderr)
             print(output[-4000:], file=sys.stderr)
             passed = False
-        elif not retired:
-            print("    the media servers are still running 45 s after the page stopped playing", file=sys.stderr)
-            passed = False
         else:
-            print("    playback started an AudioServer, and it went away with the MediaServer once the page was quiet")
+            print(
+                "    playback started an AudioServer, a paused element kept its servers and played on, and they went "
+                "away once the page was done"
+            )
     finally:
-        server.shutdown()
+        pages.close()
     return passed
 
 
@@ -1591,6 +1565,17 @@ def check_stopped_background(executable: Path, env: dict, extension_id: str) -> 
 
 # The command lines of a process's descendants, from /proc on Linux and from ps(1) on macOS.
 def descendant_command_lines(root: int) -> list[str]:
+    return [command for _, command in descendant_processes(root)]
+
+
+# The process IDs of a process's descendants that run one of the named helpers (ImageDecoder, MediaServer, ...).
+def helper_pids(root: int, *names: str) -> list[int]:
+    executable = re.compile(rf"^(?:.*/)?(?:{'|'.join(re.escape(name) for name in names)})(?:\s|$)")
+    return [pid for pid, command in descendant_processes(root) if executable.match(command)]
+
+
+# A process's descendants, as process IDs and command lines.
+def descendant_processes(root: int) -> list[tuple[int, str]]:
     processes: list[tuple[int, int, str]] = []
     if Path("/proc/self/stat").exists():
         for entry in Path("/proc").iterdir():
@@ -1612,13 +1597,13 @@ def descendant_command_lines(root: int) -> list[str]:
     children: dict[int, list[tuple[int, str]]] = {}
     for pid, parent, command in processes:
         children.setdefault(parent, []).append((pid, command))
-    commands = []
+    descendants = []
     pending = [root]
     while pending:
         for pid, command in children.get(pending.pop(), []):
-            commands.append(command)
+            descendants.append((pid, command))
             pending.append(pid)
-    return commands
+    return descendants
 
 
 # Loads the blocking dashboard, whose lists only show up once its page and Xenon have talked over the script bridge.

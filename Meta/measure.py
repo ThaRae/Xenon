@@ -74,8 +74,7 @@ BENCH_SUBSTITUTIONS = {
         {"url": MOTIONMARK_PAGE, "file": str(MOTIONMARK_START_PAGE), "content_type": "text/html"},
     ],
 }
-# The recorded MotionMark score came from the software rasterizer (307.56 at 60 fps); there is no working GPU backend
-# under Xvfb on this box, so the measured launch forces CPU painting.
+# Headless Linux under Xvfb has no working GPU backend, so MotionMark is measured with CPU painting.
 BENCH_EXTRA_FLAGS = {"MotionMark 1.3.1": ["--force-cpu-painting"]}
 
 SETTLE_SECONDS = 25
@@ -84,7 +83,7 @@ BENCH_SECONDS = 900
 # JetStream 2.2 runs every plan's iterations to completion; 20 minutes was still 55 of 64 tests.
 # MotionMark's full run, every test at three seconds plus warm-up, finished inside 600 s on the software rasterizer.
 BENCH_SECONDS_BY_SUITE = {"JetStream 2.2": 1800, "MotionMark 1.3.1": 600}
-# A finished MotionMark dump is a 20 MB layout tree that Xenon writes and then tears down after the delay.
+# How long Xenon gets to write its dump and quit after the delay, which a page as big as MotionMark's results takes.
 BENCH_DUMP_GRACE = 180
 BENCH_WINDOW = (1280, 900)
 
@@ -303,9 +302,10 @@ def scan_quoted_score(lines: list[str], header_index: int) -> list[float]:
 def visible_page_lines(text: str) -> list[str]:
     """Split a suite dump into the strings a user could read.
 
-    Xenon's text mode prints the page's inner text, then the layout tree, then the GC graph. The last two can be
-    tens of megabytes and never hold a score, so cut them off first. A dump can also be the accessibility tree
-    instead; there the visible strings are the name="..." attributes of text leaves and headings/links/buttons.
+    Xenon's text mode prints the page's inner text. Builds from before engine patch 0040 captured the dump's type
+    by reference, so their delayed dumps could print the layout tree and the GC graph after the text, or the
+    accessibility tree instead. The first two can be tens of megabytes and never hold a score, so cut them off; in an
+    accessibility tree the visible strings are the name="..." attributes of text leaves and headings/links/buttons.
     """
     text = text.split("\nViewport <#document> at [", 1)[0]
     if 'text leaf name="' not in text:
@@ -331,7 +331,7 @@ def parse_browserbench_score(suite: str, text: str) -> float | None:
             value = float(match.group(1))
             if value > 0:
                 return value
-        if suite.startswith("JetStream") and 'level=3' in text:
+        if suite.startswith("JetStream") and "level=3" in text:
             # Benchmark rows keep their per-benchmark score after the suite stops, but a dump without the
             # summary leaf has no suite total; the fallbacks below would return the first row's number.
             return None
@@ -475,24 +475,7 @@ def measure_bench(
 
 
 def run_browser(label: str, command: list[str], settle: float) -> dict:
-    executable = command[0]
-    try:
-        os.chmod(executable, 0o755)
-    except OSError:
-        pass
-    try:
-        process = subprocess.Popen(
-            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
-        )
-    except PermissionError:
-        time.sleep(1)
-        try:
-            os.chmod(executable, 0o755)
-        except OSError:
-            pass
-        process = subprocess.Popen(
-            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
-        )
+    process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     try:
         time.sleep(settle)
         if process.poll() is not None:
@@ -690,8 +673,8 @@ def self_test() -> int:
     if parsed != 142.7:
         print(f"self-test: number-before-Score parser got {parsed!r}, want 142.7", file=sys.stderr)
         return 1
-    # Real 300 s JetStream dump shape (scratch/measure-after/F3-js-rest2.txt): the suite total is a text
-    # leaf before the label, and each benchmark heading further down holds its own score.
+    # The shape of a 300 s JetStream accessibility dump: the suite total is a text leaf before the label, and each
+    # benchmark heading further down holds its own score.
     jetstream_a11y_dump = (
         "document\n"
         "  generic\n"
@@ -731,9 +714,8 @@ def self_test() -> int:
     if parsed != 203.5:
         print(f"self-test: accessibility dump parser got {parsed!r}, want 203.5", file=sys.stderr)
         return 1
-    # The real 600 s Speedometer dump (scratch/bench-baseline-speedometer.txt) had no page text at all;
-    # the score survived only as the first decimal text leaf under the Score heading. Real Michael
-    # snippet below, including the "3.1" version leaf that must not be picked up.
+    # A 600 s Speedometer accessibility dump had no page text at all; the score survived only as the first decimal
+    # text leaf under the Score heading. The "3.1" version leaf must not be picked up.
     speedometer_a11y_dump = (
         '    link name="Speedometer 3.1" url="#home"\n'
         '      image name="Speedometer"\n'
@@ -760,8 +742,8 @@ def self_test() -> int:
     if parse_browserbench_score("Speedometer 3.1", swap_dump) != 7.44:
         print("self-test: Speedometer accessibility dump ignored its fixture number", file=sys.stderr)
         return 1
-    # The real 120 s Speedometer layout dump (scratch/prof/sp-prof.txt) put the result in
-    # div#result-number as a quoted fragment, followed by the ± confidence fragment.
+    # A 120 s Speedometer layout dump put the result in div#result-number as a quoted fragment, followed by the ±
+    # confidence fragment.
     speedometer_layout_dump = (
         "        BlockContainer <h1> at [240,180] [0+0+0 800 0+0+0] [30+0+0 44 0+0+26.796875] children: inline\n"
         "          frag 0 from TextNode start: 0, length: 5, rect: [587.734375,180 104.515625x44] baseline: 35.875\n"
