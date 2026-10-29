@@ -446,7 +446,7 @@ button.primary-button {
     padding: 3px;
     background-color: var(--xenon-row-hover);
     border: 1px solid var(--xenon-hairline);
-    border-radius: 999px;
+    border-radius: 10px;
 }
 
 .segmented label {
@@ -454,7 +454,7 @@ button.primary-button {
     padding: 0 14px;
     font-weight: 500;
     color: var(--xenon-muted);
-    border-radius: 999px;
+    border-radius: 7px;
     cursor: pointer;
 }
 
