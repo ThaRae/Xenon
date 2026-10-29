@@ -7,25 +7,28 @@ What's shared is the design: small, deterministic randomization keyed per sessio
 
 ## Seeds
 
-`Web::Fingerprinting::session_secret()` is 64 random bits from the system's random source, made once per process.
-`seed_for_host()` mixes it with the host of the origin asking, so one site always sees the same values in a session,
-two sites see unrelated values, and a restart changes all of them. Opaque origins use the session secret alone.
-Each API derives its own stream from the seed (`seed_for_key()`), so learning one value tells nothing about another.
+`Web::Fingerprinting::session_secret()` is 64 random bits that the browser makes once per run
+(`WebView::Application::fingerprinting_session_secret()`) and sends to every WebContent and WebWorker process with the
+setting, as `LoaderConfig::fingerprinting_session_secret`. `seed_for_host()` mixes it with the host of the origin
+asking, so one site always sees the same values in a session, two sites see unrelated values, and a restart changes
+all of them. Opaque origins use the session secret alone. Each API derives its own stream from the seed
+(`seed_for_key()`), so learning one value tells nothing about another.
 
-The secret is per WebContent or WebWorker process. With site isolation each site has its own process anyway; a
-dedicated worker may see different values from its page.
+The secret is shared because a site that got different values in each process could open a few tabs, popups, or workers
+and combine their readings: the highest `deviceMemory` seen would approach the real one, and a per-pixel majority vote
+over three canvas readbacks would undo the noise. A process that hasn't been sent the secret yet makes up its own.
 
 ## What's farbled
 
 | API | What happens |
 | --- | --- |
-| `HTMLCanvasElement.toDataURL()` / `toBlob()`, `OffscreenCanvas.convertToBlob()` | The serialized copy has the low bit of one color channel flipped on roughly one pixel in eight (fully transparent pixels and premultiplied limits respected) |
+| `HTMLCanvasElement.toDataURL()` / `toBlob()`, `OffscreenCanvas.convertToBlob()` | The serialized copy has the low bit of one color channel flipped on roughly one pixel in eight (fully transparent pixels and premultiplied limits respected). Which pixels depends on the seed and the image together: the same image always comes out the same, but a script can't learn the pattern from an image it drew and undo it on another |
 | `CanvasRenderingContext2D.getImageData()` | The same, on the returned `ImageData` |
 | `AudioBuffer.getChannelData()` | The channel is scaled once, in place, by a factor in [0.99, 1), since the returned array is live |
 | `AudioBuffer.copyFromChannel()` | The copy is scaled, unless `getChannelData()` already scaled the channel |
 | `AudioBuffer.copyToChannel()` | If a live view was already farbled, newly written samples are scaled too so the view stays consistent |
 | `AnalyserNode.get{Float,Byte}{Frequency,TimeDomain}Data()` | The data is scaled before it's written |
-| `navigator.hardwareConcurrency` | Between 4 and min(8, real count); between 2 and the real count below 4 |
+| `navigator.hardwareConcurrency` | Between 4 and min(8, real count); between 2 and the real count below 4. In WebKit navigator compatibility mode it stays 4 or 8, as Safari reports, since anything else would give the navigator away |
 | `navigator.deviceMemory` | One of 1, 2, 4, never above the real value |
 
 The default User-Agent is Chrome's, without a Ladybird token, and the `Sec-CH-UA` brand list for it is GREASE,
@@ -43,5 +46,5 @@ through `set_enable_fingerprinting_protection` on WebContent and workers through
 lands in `LoaderConfig::enable_fingerprinting_protection`. In test mode it's forced off, since test output has to be
 deterministic. `internals.setFingerprintingProtection()` turns it back on for the LibWeb text tests of farbling.
 
-Engine patches `0030`–`0033` carry the LibWeb farbling, the setting, the Chrome User-Agent, and the AudioBuffer
-write-path fix plus text tests.
+Engine patches `0034`–`0037` carry the LibWeb farbling, the setting, the Chrome User-Agent, and the AudioBuffer
+write path plus text tests.

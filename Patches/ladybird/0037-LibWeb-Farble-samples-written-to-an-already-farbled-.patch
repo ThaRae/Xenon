@@ -1,26 +1,31 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Wed, 28 Oct 2026 23:13:08 +0000
-Subject: [PATCH] LibWeb: Fix AudioBuffer farbling after writes and add tests
+Subject: [PATCH] LibWeb: Farble samples written to an already farbled
+ AudioBuffer
 
-copyToChannel after getChannelData wrote unfarbled samples into a live
-view, and attaching acquired channels left the farbled flag set so the
-fresh copy was never scaled. Newly written samples are now scaled when
-the view is already farbled, and attaching acquired data clears the
-flag.
+copyToChannel after getChannelData wrote unfarbled samples into the
+live view script already had, so the view mixed scaled and unscaled
+samples. Samples written to a channel that's already farbled are now
+scaled too.
+
+Playing a buffer acquires its content, and the next getChannelData
+attaches a copy of it. That copy was taken from samples that were
+already scaled, so the channel stays marked as farbled, and a test
+checks that it isn't scaled a second time.
 
 internals.setFingerprintingProtection() lets tests turn protection on
 despite test mode. A text test covers canvas, audio, hardwareConcurrency,
 deviceMemory, the Chrome User-Agent, and navigator.webdriver.
 ---
- .../LibWeb/Bindings/RustBindingsServices.cpp  |  2 +-
- Libraries/LibWeb/Internals/Internals.cpp      |  6 ++
- Libraries/LibWeb/Internals/Internals.h        |  1 +
- Libraries/LibWeb/Internals/Internals.idl      |  1 +
- Libraries/LibWeb/WebAudio/AudioBuffer.cpp     |  9 +++
- .../expected/Fingerprinting/protection.txt    | 13 ++++
- .../Text/input/Fingerprinting/protection.html | 74 +++++++++++++++++++
- 7 files changed, 105 insertions(+), 1 deletion(-)
+ .../LibWeb/Bindings/RustBindingsServices.cpp  |   2 +-
+ Libraries/LibWeb/Internals/Internals.cpp      |   6 +
+ Libraries/LibWeb/Internals/Internals.h        |   1 +
+ Libraries/LibWeb/Internals/Internals.idl      |   1 +
+ Libraries/LibWeb/WebAudio/AudioBuffer.cpp     |   7 ++
+ .../expected/Fingerprinting/protection.txt    |  15 +++
+ .../Text/input/Fingerprinting/protection.html | 106 ++++++++++++++++++
+ 7 files changed, 137 insertions(+), 1 deletion(-)
  create mode 100644 Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
  create mode 100644 Tests/LibWeb/Text/input/Fingerprinting/protection.html
 
@@ -86,19 +91,10 @@ index 089003b4e1b46ce50ed357a39d37c360607a090a..9ca6124aa6b32574238f26dafab4ea89
      DOMString? cosmeticFilterForElement(Element element);
      unsigned long long partialLayoutCount();
 diff --git a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
-index c4af9f1bedf1587d5e6c957ab2242c455d7acab8..e414b65e80e6a891c9dfcc824b1740664fa23624 100644
+index c4af9f1bedf1587d5e6c957ab2242c455d7acab8..5fe0717028cb2cc4066746bd8760a2fa67ca7cc7 100644
 --- a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
 +++ b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
-@@ -172,6 +172,8 @@ void AudioBuffer::attach_acquired_channels()
-         auto const& samples = m_contents->channels[i];
-         auto& data = m_channels[i].data;
-         ReadonlyBytes { reinterpret_cast<u8 const*>(samples.data()), samples.size() * sizeof(float) }.copy_to({ data.data(), data.size() });
-+        // The attached samples are a fresh unfarbled copy of the acquired snapshot.
-+        m_channels[i].farbled = false;
-     }
- 
-     m_contents = nullptr;
-@@ -332,6 +334,13 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_to_channel(GC::Root<JS::Float32Array
+@@ -332,6 +332,13 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_to_channel(GC::Root<JS::Float32Array
          bytes.copy_to({ reinterpret_cast<u8*>(channel_data.data() + buffer_offset), bytes.size() });
      });
  
@@ -106,7 +102,7 @@ index c4af9f1bedf1587d5e6c957ab2242c455d7acab8..e414b65e80e6a891c9dfcc824b174066
 +    // samples are farbled too. Unfarbled channels stay clean until the next read.
 +    if (channel.farbled && Fingerprinting::protection_enabled()) {
 +        Fingerprinting::farble_audio({ channel_data.data() + buffer_offset, count },
-+            Fingerprinting::seed_for_current_settings_object());
++            Fingerprinting::seed_for_relevant_global(*source));
 +    }
 +
      return {};
@@ -114,10 +110,10 @@ index c4af9f1bedf1587d5e6c957ab2242c455d7acab8..e414b65e80e6a891c9dfcc824b174066
  
 diff --git a/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt b/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
 new file mode 100644
-index 0000000000000000000000000000000000000000..a487b3414b1314282f0894a8b4f847e33095468f
+index 0000000000000000000000000000000000000000..3cff823f90350a96fc916fc11db2a1dc182128c8
 --- /dev/null
 +++ b/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,15 @@
 +webdriver is false: PASS
 +user agent is chrome-shaped: PASS
 +user agent has no Ladybird token: PASS
@@ -127,16 +123,18 @@ index 0000000000000000000000000000000000000000..a487b3414b1314282f0894a8b4f847e3
 +canvas getImageData differs when farbled: PASS
 +canvas toDataURL is stable: PASS
 +canvas toDataURL differs when farbled: PASS
++canvas pattern depends on the image: PASS
 +audio getChannelData scales in [0.99, 1): PASS
++audio is scaled once across an acquire: PASS
 +audio copyFromChannel scales in [0.99, 1): PASS
 +hardwareConcurrency is in range: PASS
 +deviceMemory is 1, 2, or 4: PASS
 diff --git a/Tests/LibWeb/Text/input/Fingerprinting/protection.html b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
 new file mode 100644
-index 0000000000000000000000000000000000000000..c71c676d4e1e4c56a51ec4cbd9f637d1f6151230
+index 0000000000000000000000000000000000000000..819a5ea813ce222dcc01f71754a1855f49d2b988
 --- /dev/null
 +++ b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,106 @@
 +<!DOCTYPE html>
 +<script src="../include.js"></script>
 +<script>
@@ -189,10 +187,42 @@ index 0000000000000000000000000000000000000000..c71c676d4e1e4c56a51ec4cbd9f637d1
 +        println(`canvas toDataURL is stable: ${farbledUrl === farbledUrlAgain ? "PASS" : "FAIL"}`);
 +        println(`canvas toDataURL differs when farbled: ${exactUrl === farbledUrl ? "FAIL" : "PASS"}`);
 +
++        // An image drawn to learn which bits get flipped says nothing about another image: one grey pixel in the last
++        // row changes the pattern everywhere else too.
++        const other = document.createElement("canvas");
++        other.width = 64;
++        other.height = 64;
++        const otherContext = other.getContext("2d");
++        otherContext.fillStyle = "#000000";
++        otherContext.fillRect(0, 0, 64, 64);
++        otherContext.fillStyle = "#808080";
++        otherContext.fillRect(63, 63, 1, 1);
++        const otherPixels = otherContext.getImageData(0, 0, 64, 64);
++        let samePattern = true;
++        for (let i = 0; i < 63 * 64 * 4; i++) {
++            if (otherPixels.data[i] !== farbledPixels.data[i]) {
++                samePattern = false;
++                break;
++            }
++        }
++        println(`canvas pattern depends on the image: ${samePattern ? "FAIL" : "PASS"}`);
++
 +        const buffer = new AudioBuffer({ length: 128, sampleRate: 44100 });
 +        buffer.copyToChannel(new Float32Array(128).fill(1), 0);
 +        const channel = buffer.getChannelData(0);
 +        println(`audio getChannelData scales in [0.99, 1): ${allEqual(channel) && channel[0] >= 0.99 && channel[0] < 1 ? "PASS" : `FAIL (${channel[0]})`}`);
++
++        // Playing the buffer acquires its content, and getChannelData() then hands back a copy of samples that were
++        // already scaled. They mustn't be scaled again.
++        const context = new OfflineAudioContext(1, 128, 8000);
++        const played = context.createBuffer(1, 128, 8000);
++        played.copyToChannel(new Float32Array(128).fill(1), 0);
++        const firstRead = played.getChannelData(0)[0];
++        const source = new AudioBufferSourceNode(context);
++        source.buffer = played;
++        source.start();
++        const secondRead = played.getChannelData(0)[0];
++        println(`audio is scaled once across an acquire: ${secondRead === firstRead ? "PASS" : `FAIL (${firstRead}, ${secondRead})`}`);
 +
 +        const unread = new AudioBuffer({ length: 128, sampleRate: 44100 });
 +        unread.copyToChannel(new Float32Array(128).fill(1), 0);
