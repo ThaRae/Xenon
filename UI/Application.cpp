@@ -5,6 +5,7 @@
  */
 
 #include <LibCore/ArgsParser.h>
+#include <LibCore/Environment.h>
 #include <LibURL/InternalURLs.h>
 #include <LibURL/URL.h>
 #include <LibWebView/SessionStore.h>
@@ -602,8 +603,15 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
 
 // Xenon presents itself as the platform's Chrome, so its User-Agent and client hints blend in with the largest crowd
 // of browsers. The preset matches the default User-Agent's shape; selecting it keeps the Spoof User Agent menu honest.
-void Application::create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions& web_content_options)
+void Application::create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions&, WebView::WebContentOptions& web_content_options)
 {
+    // A pre-warmed WebContent process costs ~60 MiB while it waits for a tab that may never come. Xenon opens each tab
+    // with a fresh process instead, as Chrome does, and spends that memory on the page the user asked for.
+    // XENON_PREWARM_SPARE_PROCESS is temporary, for comparing both policies with one binary; remove it before landing.
+    auto prewarm_spare_process = Core::Environment::get("XENON_PREWARM_SPARE_PROCESS"sv).has_value();
+    browser_options.prewarm_spare_web_content_process = prewarm_spare_process ? WebView::PrewarmSpareWebContentProcess::Yes
+                                                                             : WebView::PrewarmSpareWebContentProcess::No;
+
     if (web_content_options.user_agent_preset.has_value() || web_content_options.is_test_mode == WebView::IsTestMode::Yes)
         return;
 

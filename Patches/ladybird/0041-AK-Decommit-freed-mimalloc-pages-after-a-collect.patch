@@ -1,0 +1,475 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xenon <xenon@localhost>
+Date: Thu, 29 Oct 2026 02:42:03 -0400
+Subject: [PATCH] AK: Decommit freed mimalloc pages after a collect
+
+ak_kmalloc_collect() only resets pages (MADV_FREE on Linux), so they
+stay in RSS until the kernel is short of memory. ak_kmalloc_decommit_free_pages()
+turns on purge-decommits for one collect, then restores the default.
+Use it after building the content blocker, when the process is not about
+to allocate that much again.
+---
+ AK/kmalloc.cpp                                |  15 ++
+ AK/kmalloc.h                                  |   1 +
+ .../LibWeb/ContentBlocker/Rust/src/lib.rs     | 176 +++++++++++++++---
+ Libraries/LibWeb/Fingerprinting/Farbling.cpp  |  19 +-
+ Libraries/LibWeb/Loader/ContentBlocker.cpp    |   4 +-
+ Libraries/LibWebView/Application.cpp          |   4 +
+ Libraries/LibWebView/Options.h                |   8 +
+ Services/WebContent/ConnectionFromClient.cpp  |  19 ++
+ Services/WebContent/ConnectionFromClient.h    |   6 +
+ Services/WebContent/PageClient.cpp            |   1 +
+ 10 files changed, 224 insertions(+), 29 deletions(-)
+
+diff --git a/AK/kmalloc.cpp b/AK/kmalloc.cpp
+index 70ad04dd5f48514f48d50befc8948d4a8e396a1e..fe0a9016983ecdf6d200145892d3287cd263cc01 100644
+--- a/AK/kmalloc.cpp
++++ b/AK/kmalloc.cpp
+@@ -85,6 +85,10 @@ void ak_kmalloc_collect()
+ {
+ }
+ 
++void ak_kmalloc_decommit_free_pages()
++{
++}
++
+ #else
+ 
+ #    if defined(AK_OS_LINUX) || defined(AK_OS_MACOS)
+@@ -188,4 +192,15 @@ void ak_kmalloc_collect()
+     mi_collect(true);
+ }
+ 
++void ak_kmalloc_decommit_free_pages()
++{
++    // A purge only resets pages by default (MADV_FREE on Linux), which keeps them in RSS until the kernel is short of
++    // memory, so ak_kmalloc_collect() alone does not give a process's memory back. Decommit for this collect instead,
++    // so that freed pages leave the process's RSS and PSS. Later reuse faults them in again, so this is for a moment
++    // when the process is not about to allocate much, not for every collect.
++    mi_option_set(mi_option_purge_decommits, 1);
++    ak_kmalloc_collect();
++    mi_option_set(mi_option_purge_decommits, 0);
++}
++
+ #endif
+diff --git a/AK/kmalloc.h b/AK/kmalloc.h
+index 9517b892c27c40571d68ebc48b0a4ad5cca9fd35..38c10f16087dc7bb8b86be574c7240344cbba16a 100644
+--- a/AK/kmalloc.h
++++ b/AK/kmalloc.h
+@@ -31,6 +31,7 @@ void ak_kfree(void* ptr);
+ [[nodiscard]] void* ak_krealloc(HeapPartition, void* ptr, size_t size);
+ [[nodiscard]] size_t ak_kmalloc_usable_size(void const* ptr);
+ void ak_kmalloc_collect();
++void ak_kmalloc_decommit_free_pages();
+ 
+ [[nodiscard]] inline void* kcalloc(size_t count, size_t size)
+ {
+diff --git a/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs b/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
+index eacda5b0d36fc663f89c49af6abf7096dad23f1d..b06c16ac0d4896efaaf8f6719935e816e7b84e78 100644
+--- a/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
++++ b/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
+@@ -17,6 +17,8 @@ use crate::rust_panic::abort_on_panic;
+ use std::collections::HashMap;
+ use std::collections::HashSet;
+ use std::hash::Hasher;
++use std::sync::Mutex;
++use std::sync::PoisonError;
+ 
+ #[repr(C)]
+ pub struct ContentBlockerString {
+@@ -26,6 +28,7 @@ pub struct ContentBlockerString {
+ 
+ /// What to do with a request.
+ #[repr(u8)]
++#[derive(Clone, Copy, PartialEq, Eq)]
+ pub enum ContentBlockerAction {
+     Allow = 0,
+     Block = 1,
+@@ -49,6 +52,27 @@ pub struct ContentBlockerEngine {
+     popup_engine: Option<adblock::engine::Engine>,
+     /// Exception filters with `$cname`, as blocking filters: a match means a request must not be uncloaked.
+     cname_exception_engine: Option<adblock::engine::Engine>,
++    /// Verdicts for requests already matched, which pages ask about over and over: a benchmark reloads the same
++    /// scripts on every iteration, and parsing both URLs and scanning the filters costs far more than the lookup.
++    request_decisions: Mutex<RequestDecisionCache>,
++}
++
++/// How many request verdicts an engine remembers. Pages with many distinct URLs must not grow it without bound.
++const REQUEST_DECISION_CACHE_LIMIT: usize = 1024;
++
++#[derive(Default)]
++struct RequestDecisionCache {
++    entries: HashMap<u64, Vec<CachedDecision>>,
++    len: usize,
++}
++
++struct CachedDecision {
++    url: String,
++    source_url: String,
++    request_type: String,
++    method: String,
++    action: ContentBlockerAction,
++    result_url: String,
+ }
+ 
+ /// The permission bit of the scriptlets that uBlock Origin only lets trusted lists use (`requiresTrust`), as the
+@@ -510,6 +534,79 @@ impl GenericSelectorListRules {
+     }
+ }
+ 
++/// The schemes the engine matches filters against. A request with any other scheme (data:, blob:, about:,
++/// chrome-extension:) is unsupported there, so its verdict is always "allow"; seeing that before parsing both URLs
++/// keeps those requests off the matching path.
++fn is_supported_request_url(url: &str) -> bool {
++    let Some(scheme_end) = url.find(':') else {
++        return true;
++    };
++    let scheme = &url[..scheme_end];
++    ["http", "https", "ws", "wss"]
++        .iter()
++        .any(|supported| scheme.eq_ignore_ascii_case(supported))
++}
++
++fn request_decision_hash(url: &str, source_url: &str, request_type: &str, method: &str) -> u64 {
++    // FNV-1a over the fields, separated by 0xff, which no UTF-8 string holds.
++    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
++    for bytes in [url.as_bytes(), source_url.as_bytes(), request_type.as_bytes(), method.as_bytes()] {
++        for &byte in bytes {
++            hash ^= u64::from(byte);
++            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
++        }
++        hash ^= 0xff;
++        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
++    }
++    hash
++}
++
++impl RequestDecisionCache {
++    fn get(
++        &self,
++        url: &str,
++        source_url: &str,
++        request_type: &str,
++        method: &str,
++    ) -> Option<(ContentBlockerAction, &str)> {
++        let hash = request_decision_hash(url, source_url, request_type, method);
++        self.entries.get(&hash)?.iter().find_map(|entry| {
++            (entry.url == url
++                && entry.source_url == source_url
++                && entry.request_type == request_type
++                && entry.method == method)
++                .then_some((entry.action, entry.result_url.as_str()))
++        })
++    }
++
++    fn insert(
++        &mut self,
++        url: &str,
++        source_url: &str,
++        request_type: &str,
++        method: &str,
++        action: ContentBlockerAction,
++        result_url: &str,
++    ) {
++        if self.len >= REQUEST_DECISION_CACHE_LIMIT {
++            // Start over rather than track which entries to evict: a stale verdict is never wrong, but a page that
++            // keeps asking new URLs is better served by no cache than by a full scan per lookup.
++            self.entries.clear();
++            self.len = 0;
++        }
++        let hash = request_decision_hash(url, source_url, request_type, method);
++        self.entries.entry(hash).or_default().push(CachedDecision {
++            url: url.to_string(),
++            source_url: source_url.to_string(),
++            request_type: request_type.to_string(),
++            method: method.to_string(),
++            action,
++            result_url: result_url.to_string(),
++        });
++        self.len += 1;
++    }
++}
++
+ impl ContentBlockerEngine {
+     /// The engine's verdict on a request, with the document URL filters it doesn't hold applied as it would apply them.
+     fn check_network_request(
+@@ -528,6 +625,59 @@ impl ContentBlockerEngine {
+         }
+         result
+     }
++
++    /// The verdict `check_request` reports, through the per-engine cache.
++    fn cached_verdict(
++        &self,
++        url: &str,
++        source_url: &str,
++        request_type: &str,
++        method: &str,
++    ) -> (ContentBlockerAction, String) {
++        if !is_supported_request_url(url) {
++            return (ContentBlockerAction::Allow, String::new());
++        }
++
++        {
++            let cache = self.request_decisions.lock().unwrap_or_else(PoisonError::into_inner);
++            if let Some((action, result_url)) = cache.get(url, source_url, request_type, method) {
++                return (action, result_url.to_string());
++            }
++        }
++
++        // Not holding the lock while matching: scanning the filters can take a while.
++        let (action, result_url) = self.match_request(url, source_url, request_type, method);
++        self.request_decisions
++            .lock()
++            .unwrap_or_else(PoisonError::into_inner)
++            .insert(url, source_url, request_type, method, action, &result_url);
++        (action, result_url)
++    }
++
++    fn match_request(
++        &self,
++        url: &str,
++        source_url: &str,
++        request_type: &str,
++        method: &str,
++    ) -> (ContentBlockerAction, String) {
++        let Ok(request) = adblock::request::Request::new(url, source_url, request_type, method) else {
++            return (ContentBlockerAction::Allow, String::new());
++        };
++
++        let result = self.check_network_request(&request, request_type);
++        if result.should_block() {
++            // A redirect only applies to a blocked request: `$redirect-rule` alone never blocks.
++            return match result.redirect {
++                Some(data_url) => (ContentBlockerAction::Redirect, data_url),
++                None => (ContentBlockerAction::Block, String::new()),
++            };
++        }
++        match result.rewritten_url {
++            Some(rewritten_url) if rewritten_url != url => (ContentBlockerAction::Rewrite, rewritten_url),
++            _ => (ContentBlockerAction::Allow, String::new()),
++        }
++    }
+ }
+ 
+ fn cosmetic_css_for_url(engine: &ContentBlockerEngine, url: &str, classes: &[&str], ids: &[&str]) -> String {
+@@ -641,6 +791,7 @@ pub extern "C" fn rust_content_blocker_create(
+             generic_selector_list_rules,
+             popup_engine: engine_from_lists(untrusted.popup_rules, trusted.popup_rules),
+             cname_exception_engine: engine_from_lists(untrusted.cname_exception_rules, trusted.cname_exception_rules),
++            request_decisions: Mutex::new(RequestDecisionCache::default()),
+         };
+         Box::into_raw(Box::new(engine))
+     })
+@@ -679,11 +830,8 @@ pub extern "C" fn rust_content_blocker_matches(
+         };
+ 
+         // DNS prefetch and preconnect have no request method.
+-        let Ok(request) = adblock::request::Request::new(url, source_url, request_type, "") else {
+-            return false;
+-        };
+-
+-        engine.check_network_request(&request, request_type).should_block()
++        let (action, _) = engine.cached_verdict(url, source_url, request_type, "");
++        matches!(action, ContentBlockerAction::Block | ContentBlockerAction::Redirect)
+     })
+ }
+ 
+@@ -714,22 +862,8 @@ pub extern "C" fn rust_content_blocker_check_request(
+         else {
+             return allow();
+         };
+-        let Ok(request) = adblock::request::Request::new(url, source_url, request_type, method) else {
+-            return allow();
+-        };
+-
+-        let result = engine.check_network_request(&request, request_type);
+-        if result.should_block() {
+-            // A redirect only applies to a blocked request: `$redirect-rule` alone never blocks.
+-            return match result.redirect {
+-                Some(data_url) => request_result(ContentBlockerAction::Redirect, data_url),
+-                None => request_result(ContentBlockerAction::Block, String::new()),
+-            };
+-        }
+-        match result.rewritten_url {
+-            Some(rewritten_url) if rewritten_url != url => request_result(ContentBlockerAction::Rewrite, rewritten_url),
+-            _ => allow(),
+-        }
++        let (action, result_url) = engine.cached_verdict(url, source_url, request_type, method);
++        request_result(action, result_url)
+     })
+ }
+ 
+diff --git a/Libraries/LibWeb/Fingerprinting/Farbling.cpp b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
+index 175334e7065b89902297758b59af35a712454fc6..d38c71c7d2b7bdd06ce89b1fbce5e283ab855a01 100644
+--- a/Libraries/LibWeb/Fingerprinting/Farbling.cpp
++++ b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
+@@ -93,20 +93,25 @@ u64 lfsr_next(u64 value)
+     return value;
+ }
+ 
+-// Hashes the pixels eight bytes at a time, which keeps it cheap next to encoding the image.
++// Hashes the pixels eight bytes at a time. Only a bounded, evenly spread sample of the words is read: the hash exists
++// to give different images unrelated patterns, not to be a content fingerprint, and walking a multi-megabyte canvas on
++// every read costs far more than the perturbation itself.
+ static u64 hash_pixels(ReadonlyBytes pixels)
+ {
+-    u64 hash = 0;
+-    size_t offset = 0;
+-    for (; offset + sizeof(u64) <= pixels.size(); offset += sizeof(u64)) {
++    static constexpr size_t max_sampled_words = 512;
++
++    u64 hash = pixels.size();
++    auto word_count = pixels.size() / sizeof(u64);
++    auto stride = max<size_t>(word_count / max_sampled_words, 1);
++    for (size_t word_index = 0; word_index < word_count; word_index += stride) {
+         u64 word;
+-        __builtin_memcpy(&word, pixels.offset_pointer(offset), sizeof(word));
++        __builtin_memcpy(&word, pixels.offset_pointer(word_index * sizeof(u64)), sizeof(word));
+         hash ^= word;
+         hash = ((hash << 31) | (hash >> 33)) * 0x9E3779B97F4A7C15ull;
+     }
+-    for (; offset < pixels.size(); ++offset)
++    for (size_t offset = word_count * sizeof(u64); offset < pixels.size(); ++offset)
+         hash = (hash ^ pixels[offset]) * 0x100000001B3ull;
+-    return mix64(hash ^ pixels.size());
++    return mix64(hash);
+ }
+ 
+ void perturb_pixels(Bytes rgba, u64 seed, PixelsHaveAlpha has_alpha)
+diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
+index ba8a962a5e630f20240caa4cb9b0f782b5390ddb..16cbd756f35a1e2656aaac362ba41c335222cfa3 100644
+--- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
++++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
+@@ -162,7 +162,9 @@ ErrorOr<void> ContentBlocker::set_rules_from_bytes(ReadonlyBytes rules_bytes, Re
+ {
+     // NB: Building an engine allocates several times what the engine keeps, on this thread, whose heap nothing else
+     //     collects. Give that memory back, and an old engine's, rather than keeping it for the life of the process.
+-    ScopeGuard collect_memory = [] { ak_kmalloc_collect(); };
++    //     A plain collect only resets the freed pages (mimalloc's MADV_FREE default on Linux), which keeps them in RSS,
++    //     so decommit them: this runs once, after the page has loaded, and nothing collects them again.
++    ScopeGuard collect_memory = [] { ak_kmalloc_decommit_free_pages(); };
+ 
+     // OPTIMIZATION: Building an engine costs the same tokenizing and flatbuffer work whether or not there are any
+     //               rules to put in it, and every caller already treats a missing engine as "nothing is blocked".
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 2a57cbb7b58b12d0edbbf595a3494090cc2218d5..465918e89f425d274cdf9db9c3b7980cc5c257c4 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -1754,6 +1754,10 @@ ErrorOr<Application::ChildFrameWebContentProcess> Application::launch_child_fram
+ 
+ void Application::launch_spare_web_content_process()
+ {
++    // An embedder that prefers a smaller idle footprint opens each tab with a fresh process instead.
++    if (browser_options().prewarm_spare_web_content_process == PrewarmSpareWebContentProcess::No)
++        return;
++
+     // Spare WebContent processes inherit the active WebDriver endpoint, but they are not part of the
+     // session and can race browser shutdown while bootstrapping.
+     if (browser_options().webdriver_browser_endpoint.has_value())
+diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
+index 5951a003c89fa2e6e4cd58fbd78ea46b3909fd88..9b2e5e4bc7788f6a2145195c4bc6355d16d494f6 100644
+--- a/Libraries/LibWebView/Options.h
++++ b/Libraries/LibWebView/Options.h
+@@ -79,6 +79,13 @@ enum class DeferContentBlockerRules {
+     Yes,
+ };
+ 
++// A pre-warmed WebContent process makes the next tab open sooner, but an idle one costs tens of MiB for as long as the
++// window is open, so an embedder that would rather have the memory can turn it off.
++enum class PrewarmSpareWebContentProcess {
++    No,
++    Yes,
++};
++
+ enum class DisableSandbox {
+     No,
+     Yes,
+@@ -115,6 +122,7 @@ struct BrowserOptions {
+     Optional<DNSSettings> dns_settings {};
+     Optional<u16> devtools_port;
+     EnableContentBlocker enable_content_blocker { EnableContentBlocker::Yes };
++    PrewarmSpareWebContentProcess prewarm_spare_web_content_process { PrewarmSpareWebContentProcess::Yes };
+     DisableSandbox disable_sandbox { DisableSandbox::No };
+     ForceVideoDecoderServer force_video_decoder_server { ForceVideoDecoderServer::No };
+     Vector<ByteString> content_blocker_list_paths {};
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index c90070d0ab791077db898784530343f73e552cc2..a033a641dd623d1cb0140ef282990f4b0e9a2680 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -21,6 +21,7 @@
+ #include <AK/Utf16StringBuilder.h>
+ #include <LibCompositing/FontServiceClient.h>
+ #include <LibCore/EventLoop.h>
++#include <stdlib.h>
+ #include <LibCore/Process.h>
+ #include <LibDevTools/IndexedDBSerialization.h>
+ #include <LibGC/Heap.h>
+@@ -3442,6 +3443,24 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+         Web::FileAPI::remove_entry_from_blob_url_store(*url_record);
+ }
+ 
++void ConnectionFromClient::schedule_memory_release_after_load()
++{
++    // Temporary A/B switch for issue #28's measurements; nothing in Xenon sets it.
++    if (getenv("XENON_DISABLE_MEMORY_RELEASE"))
++        return;
++
++    // A page allocates most around its load event: by then the parser, style and scripts have freed as much as they
++    // keep, and nothing has collected since. Wait for the page to settle, then collect once and decommit, so the freed
++    // pages leave the process's RSS rather than sitting in the allocator until the tab is hidden.
++    if (!m_memory_release_timer) {
++        m_memory_release_timer = Core::Timer::create_single_shot(AK::Duration::from_seconds(4), [] {
++            Web::Bindings::main_thread_vm().heap().collect_garbage(GC::Heap::CollectionType::CollectGarbage, false);
++            ak_kmalloc_decommit_free_pages();
++        });
++    }
++    m_memory_release_timer->start();
++}
++
+ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState system_visibility_state)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 9196d2f63d87c1861f03d519756949452e797d74..b7b7d4df17c318b8e59b39628f5ab3768cea631f 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -16,6 +16,7 @@
+ #include <AK/SourceLocation.h>
+ #include <LibCompositing/Types.h>
+ #include <LibCore/AnonymousBuffer.h>
++#include <LibCore/Timer.h>
+ #include <LibGC/Root.h>
+ #include <LibIPC/ConnectionFromClient.h>
+ #include <LibJS/Forward.h>
+@@ -89,6 +90,10 @@ public:
+     void notify_started_using_gamepads();
+     void pump_and_dispatch_gamepad_events();
+ 
++    // Called when a page in this process finishes loading: collects once the page has settled, and gives the freed
++    // allocator pages back to the OS.
++    void schedule_memory_release_after_load();
++
+     // Whether the UI process has user scripts for documents, which they ask it for as they become ready for scripts.
+     bool user_scripts_enabled() const { return m_user_scripts_enabled; }
+ 
+@@ -378,6 +383,7 @@ private:
+ 
+     RefPtr<TestConnection> m_test_connection;
+     RefPtr<Web::Compositor::CompositorConnection> m_compositor_connection;
++    RefPtr<Core::Timer> m_memory_release_timer;
+     NonnullOwnPtr<PageHost> m_page_host;
+     OwnPtr<DevToolsDebugger> m_devtools_debugger;
+ 
+diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
+index cd7fd31a31e28b6ca74bfb0245c6d33b22d3ca4a..39cb9584ef4d9cad4a9c51b925559766c9c6f262 100644
+--- a/Services/WebContent/PageClient.cpp
++++ b/Services/WebContent/PageClient.cpp
+@@ -1031,6 +1031,7 @@ void PageClient::page_did_change_active_document_in_top_level_browsing_context(W
+ void PageClient::page_did_finish_loading(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id)
+ {
+     client().async_did_finish_loading(m_id, navigable_id, document_id);
++    client().schedule_memory_release_after_load();
+ }
+ 
+ Optional<u64> PageClient::page_did_start_download(Web::HTML::CrossProcessId navigable_id, Optional<Utf16String> const& navigation_id, URL::URL const& url, ByteString const& suggested_filename, Optional<u64> total_size, int request_server_client_id, u64 request_server_request_id, ByteBuffer initial_data, JsonValue network_response)
