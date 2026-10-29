@@ -57,10 +57,10 @@ PRESETS = {
 APP_TARGET = "xenon"
 TESTS_TARGET = "xenon-tests"
 
-# Ladybird's tests that ladybird-test leaves out, as Ladybird's own CI does in its Test step
-# (ladybird/.github/workflows/build-and-test.yml): the accessibility bridges, which need a desktop's accessibility bus
-# (AT-SPI2) or macOS's, and which Ladybird runs apart.
-LADYBIRD_TESTS_EXCLUDED = "LibWebAccessibilityBridge|AccessibilityBridgeMac"
+# The tests that ladybird-test leaves out: Xenon's own, which test runs, and those Ladybird's own CI leaves out of its Test
+# step (ladybird/.github/workflows/build-and-test.yml), the accessibility bridges, which need a desktop's accessibility
+# bus (AT-SPI2) or macOS's, and which Ladybird runs apart.
+LADYBIRD_TESTS_EXCLUDED = "^TestXenon|LibWebAccessibilityBridge|AccessibilityBridgeMac"
 # How long one of Ladybird's tests may run, as in Ladybird's CI. LibWeb's runs every web test, so it's the long one.
 LADYBIRD_TEST_TIMEOUT_SECONDS = 1800
 # The Python packages Ladybird's CI installs for its tests (ladybird/.github/actions/setup): test-web's HTTP server makes

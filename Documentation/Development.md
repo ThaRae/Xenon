@@ -138,8 +138,8 @@ test` sets).
 `Meta/xenon.py ladybird-test` builds Ladybird's own tests and runs them with ctest, as Ladybird's CI does: AK's and
 the libraries' unit tests, `test-js`, `test-web`'s web tests (text, layout, ref, screenshot, and crash tests), and the
 Rust crates' tests, against the engine with Xenon's patches applied. It turns `BUILD_TESTING` on in the build directory
-the first time, so the tests build from the same objects as Xenon, and leaves out only what Ladybird's CI leaves out of
-that step, the accessibility bridges. The Python packages Ladybird's CI installs for its tests (`cryptography` for
+the first time, so the tests build from the same objects as Xenon. It leaves out Xenon's own tests, which
+`Meta/xenon.py test` runs, and what Ladybird's CI leaves out of that step, the accessibility bridges. The Python packages Ladybird's CI installs for its tests (`cryptography` for
 `test-web`'s TLS tests, `six` for WPT's WebSocket server) go in a virtual environment in the build directory. A patch
 that changes what an upstream test checks updates that test's expectation in the same patch, as it would upstream. CI
 runs it after `Meta/xenon.py test` on Linux and macOS; when a web test fails, the `ladybird-test-dumps-linux` or
