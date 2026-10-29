@@ -525,7 +525,8 @@ def measure_bench(
 
 
 def measure_web_benchmarks(xenon_path: Path, benchmarks: str, iterations: int, ref: str) -> dict:
-    xenon = xenon_executable(xenon_path)
+    # Absolute, as run.py runs from its checkout.
+    xenon = xenon_executable(xenon_path).resolve()
     # run.py gives the browser a fresh profile of its own (--profile-path), so Xenon runs with its defaults.
     arguments = ["--executable", str(xenon), "--benchmarks", benchmarks, "--iterations", str(iterations)]
     result = run_ladybird_benchmarks("web-benchmarks", ref, arguments)
@@ -536,8 +537,9 @@ def measure_web_benchmarks(xenon_path: Path, benchmarks: str, iterations: int, r
 
 
 def measure_js_benchmarks(build_dir: Path, suites: str, iterations: int, ref: str) -> dict:
-    js = build_dir / "bin" / "js"
-    wasm = build_dir / "bin" / "wasm"
+    # Absolute, as run.py runs from its checkout.
+    js = build_dir.resolve() / "bin" / "js"
+    wasm = build_dir.resolve() / "bin" / "wasm"
     if not js.exists() or not wasm.exists():
         print(f"{js} and {wasm} are built by: Meta/xenon.py build js && Meta/xenon.py build wasm", file=sys.stderr)
         sys.exit(1)
