@@ -41,6 +41,8 @@ public:
         StringView id;
         StringView name;
         String extension_id;
+        // False when this platform can't run it.
+        bool available { true };
     };
 
     static PasswordManagers& the();

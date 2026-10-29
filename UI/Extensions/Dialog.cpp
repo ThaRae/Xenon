@@ -154,8 +154,12 @@ ExtensionsDialog::ExtensionsDialog(QWidget* parent)
     password_manager->addWidget(new QLabel("Password manager", this));
     m_password_manager = new QComboBox(this);
     m_password_manager->addItem("None", QString {});
-    for (auto const& choice : PasswordManagers::the().choices())
+    auto current = PasswordManagers::the().current();
+    for (auto const& choice : PasswordManagers::the().choices()) {
+        if (!choice.available && (!current.has_value() || current->id != choice.id))
+            continue;
         m_password_manager->addItem(qstring_from_ak_string(choice.name), qstring_from_ak_string(choice.id));
+    }
     QObject::connect(m_password_manager, &QComboBox::activated, this, [this](int index) { choose_password_manager(index); });
     password_manager->addWidget(m_password_manager);
     m_password_manager_status = new QLabel(this);

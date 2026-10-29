@@ -41,6 +41,21 @@ static constexpr auto TICK_INTERVAL = AK::Duration::from_seconds(10 * 60);
 // The first check waits a moment, so that its downloads don't compete with the pages the browser opens with.
 static constexpr auto FIRST_CHECK_DELAY = AK::Duration::from_seconds(5);
 
+static String offered_ids(Vector<PasswordManagers::Choice> const& choices)
+{
+    StringBuilder builder;
+    bool first = true;
+    for (auto const& choice : choices) {
+        if (!choice.available)
+            continue;
+        if (!first)
+            builder.append(", "sv);
+        first = false;
+        builder.append(choice.id);
+    }
+    return MUST(builder.to_string());
+}
+
 PasswordManagers& PasswordManagers::the()
 {
     static NeverDestroyed<PasswordManagers> password_managers;
@@ -81,15 +96,8 @@ void PasswordManagers::initialize(Optional<ByteString> const& command_line_choic
             choose({});
         else if (choice(*command_line_choice).has_value())
             choose(command_line_choice->view());
-        else {
-            StringBuilder offered;
-            for (size_t i = 0; i < m_choices.size(); ++i) {
-                if (i)
-                    offered.append(", "sv);
-                offered.append(m_choices[i].id);
-            }
-            warnln("There's no password manager called {}; Xenon offers {}", *command_line_choice, offered.string_view());
-        }
+        else
+            warnln("There's no password manager called {}; Xenon offers {}", *command_line_choice, offered_ids(m_choices));
     }
 
     // The chosen password manager stays installed: one whose files are gone is installed again.
@@ -213,7 +221,10 @@ void PasswordManagers::register_web_ui_interfaces(WebView::WebUI& web_ui)
 void PasswordManagers::send_status(WebView::WebUI& web_ui) const
 {
     JsonArray choices;
+    auto current = this->current();
     for (auto const& choice : m_choices) {
+        if (!choice.available && (!current.has_value() || current->id != choice.id))
+            continue;
         JsonObject json;
         json.set("id"sv, choice.id);
         json.set("name"sv, choice.name);
@@ -228,7 +239,7 @@ void PasswordManagers::send_status(WebView::WebUI& web_ui) const
 
     JsonObject status;
     status.set("choices"sv, move(choices));
-    status.set("current"sv, id_or_null(current()));
+    status.set("current"sv, id_or_null(current));
     status.set("installing"sv, id_or_null(installing()));
     status.set("error"sv, m_error.has_value() ? JsonValue { *m_error } : JsonValue {});
     web_ui.async_send_message("passwordManagers"sv, move(status));
