@@ -22,7 +22,7 @@ if [[ ${1:-} != --in-container ]]; then
     "$image" bash Meta/ci/test-appimage.sh --in-container
 fi
 
-# In the container, as root.
+# In the container, as root. The engine needs a sans-serif and a monospace font, as a desktop has: here, DejaVu's.
 if command -v apt-get >/dev/null; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -q
@@ -32,7 +32,7 @@ if command -v apt-get >/dev/null; then
     libasound2t64 libfontconfig1 libfreetype6 libharfbuzz0b libexpat1 libusb-1.0-0 libfribidi0
 elif command -v dnf >/dev/null; then
   dnf install -y -q \
-    python3 xorg-x11-server-Xvfb dbus-daemon dbus-tools fuse3 ca-certificates dejavu-sans-fonts \
+    python3 xorg-x11-server-Xvfb dbus-daemon dbus-tools fuse3 ca-certificates dejavu-sans-fonts dejavu-sans-mono-fonts \
     mesa-libGL mesa-libEGL libglvnd-opengl mesa-dri-drivers mesa-libgbm libdrm libxcb libX11 libX11-xcb \
     libwayland-client alsa-lib fontconfig freetype harfbuzz expat libusb1 fribidi
 elif command -v pacman >/dev/null; then
