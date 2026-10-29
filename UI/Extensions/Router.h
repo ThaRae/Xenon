@@ -20,6 +20,7 @@
 #include <LibWebView/URLSchemeHandler.h>
 #include <UI/Extensions/Alarms.h>
 #include <UI/Extensions/Extension.h>
+#include <UI/Extensions/NativeMessaging.h>
 
 namespace Ladybird::Extensions {
 
@@ -103,6 +104,7 @@ private:
     };
 
     // A runtime.connect() port. The opener talks to every context that accepted; each of those talks to the opener.
+    // A native messaging port has `native` instead of receivers: the opener talks to the host process.
     struct Port {
         String extension_id;
         WebView::ScriptBridgeEndpoint opener;
@@ -110,6 +112,7 @@ private:
         Vector<WebView::ScriptBridgeEndpoint> receivers;
         // What the opener posted before every context answered, for each one that accepts.
         Vector<String> early_messages;
+        RefPtr<NativeHostProcess> native;
     };
 
     Optional<Context&> context_for(WebView::ScriptBridgeEndpoint const&);
@@ -168,6 +171,7 @@ private:
     void finish_pending_message(u64 message_id, Optional<JsonValue> response);
 
     void open_port(Context&, String const& port_id, String const& name, Vector<WebView::ScriptBridgeEndpoint> receivers);
+    void open_native_port(Context&, String const& port_id, String const& application);
     void handle_port_accepted(Context&, String const& port_id, bool accepted);
     void handle_port_message(Context&, String const& port_id, JsonValue message);
     void handle_port_disconnect(Context&, String const& port_id);

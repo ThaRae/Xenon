@@ -588,7 +588,7 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
     });
     args_parser.add_option(Core::ArgsParser::Option {
         .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
-        .help_string = "Install this password manager (bitwarden or proton-pass) in place of the profile's, or remove it with none",
+        .help_string = "Install this password manager (bitwarden, proton-pass, 1password, or icloud-passwords on macOS) in place of the profile's, or remove it with none",
         .long_name = "password-manager",
         .short_name = 0,
         .value_name = "name",

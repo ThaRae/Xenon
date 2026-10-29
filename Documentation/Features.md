@@ -9,8 +9,8 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
 - [Search and the address bar](#search-and-the-address-bar): !bangs, quick link copy
 - [Ads and trackers](#ads-and-trackers): uBlock Origin's filters and engine features, its popup and dashboard, daily
   updates
-- [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden and Proton Pass,
-  security keys
+- [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden, Proton Pass,
+  1Password, iCloud Passwords, security keys
 - [Security](#security): certificate warnings
 - [Installing and updates](#installing-and-updates): the installer, and Xenon updating itself
 - [Look](#look): palette and icon
@@ -22,12 +22,13 @@ Where Xenon keeps its data is in [Profile.md](Profile.md).
 
 ### Welcome and setup
 
-On first run (or any time at `about:welcome`), either take Xenon's picks (DuckDuckGo, with blocking on) or answer the
-questions:
+On first run (or any time at `about:welcome`), either keep the defaults the first screen lists (DuckDuckGo, with
+blocking on, and no password manager, or the one already installed) or answer the questions:
 
 - which search engine, from a private/mainstream list with a live preview of where a search goes;
 - whether to block ads and trackers (on by default, with all the filter lists);
-- which password manager, if any: Bitwarden or Proton Pass, as Helium's setup offers.
+- which password manager, if any: Bitwarden, Proton Pass, or 1Password, as Helium's setup offers, and iCloud Passwords
+  on macOS.
 
 Nothing is saved until you finish.
 
@@ -276,21 +277,30 @@ still in progress; [Extensions.md](Extensions.md) has the details.
 - Unpacked extensions load from the Extensions dialog or with `--load-extension=<dir>`, get a toolbar button and
   popup, and run their background service worker. As in Chrome, the worker stops after 30 seconds without events or
   calls, and its processes with it, and starts again for the next event it listens to (`UI/Extensions/Router`).
-- They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`, `action`, `commands`, and
-  `offscreen`, and fetch from the hosts they have permission for.
+- They have `chrome.runtime` (with ports and native messaging), `storage`, `i18n`, `alarms`, `tabs`, `windows`,
+  `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for.
 - Their content scripts run in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and
   stylesheets on request.
 
-### Bitwarden and Proton Pass
+### Bitwarden, Proton Pass, 1Password, and iCloud Passwords
 
-The welcome flow offers both, as Helium's setup does. Xenon installs the one picked from the Chrome Web Store, after
-checking its signatures, and keeps it up to date. **Settings → Password manager** and the Extensions window switch or
-remove it.
+The welcome flow offers Bitwarden, Proton Pass, and 1Password, as Helium's setup does, and iCloud Passwords on macOS.
+Xenon installs the one picked from the Chrome Web Store, after checking its signatures, and keeps it up to date.
+**Settings → Password manager** and the Extensions window switch or remove it.
 
 - **Bitwarden** logs in (with a security key too) and autofills logins.
 - **Proton Pass** signs in through Proton's account page, unlocks with its extra password, autofills logins, and saves
   new ones. Once allowed to use the clipboard, it clears a copied password when its timer runs out (engine patch
   `0028`; see [Extensions.md](Extensions.md)).
+- **1Password** installs from its Chrome Web Store listing (`aeblfdkhhhdcdjpifhhbdiojplfjncoa`) the same way. Unlocking
+  through the 1Password desktop app goes through native messaging, which Xenon now has (below), but whether the desktop
+  app accepts Xenon hasn't been tried, nor how far the extension works on its own; see [Extensions.md](Extensions.md).
+- **iCloud Passwords** (macOS Sonoma or later) fills passwords from iCloud Keychain. Its extension talks to Apple's
+  Password Manager through native messaging (`UI/Extensions/NativeMessaging.cpp`), using the helper macOS already
+  registers for Chrome (`com.apple.passwordmanager`). Xenon is not Chrome, so it looks in Chrome's NativeMessagingHosts
+  directories as well as its own. Linux has no helper from Apple, so the welcome flow and settings don't offer it there.
+  Windows with iCloud for Windows is not a Xenon target. Autofill still depends on the extension's content scripts, as
+  with the others.
 
 ### Security keys (WebAuthn)
 

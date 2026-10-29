@@ -180,7 +180,25 @@ async function run() {
     check("privacy setting takes booleans", await passwordSaving.set({ value: "no" }).then(() => false, () => true));
     await passwordSaving.clear({});
     check("privacy setting cleared", (await passwordSaving.get({})).levelOfControl === "controllable_by_this_extension");
-    check("no native messaging without its permission", chrome.runtime.connectNative === undefined);
+    check(
+        "native messaging APIs",
+        typeof chrome.runtime.connectNative === "function" && typeof chrome.runtime.sendNativeMessage === "function"
+    );
+    const missingHost = await new Promise(resolve => {
+        const port = chrome.runtime.connectNative("com.xenon.missing");
+        port.onDisconnect.addListener(() => resolve(chrome.runtime.lastError?.message ?? ""));
+        setTimeout(() => resolve("timed out"), 2000);
+    });
+    check("missing native host", missingHost.includes("not found"));
+    const echoed = await chrome.runtime.sendNativeMessage("com.xenon.test", { ping: 1 }).catch(error => ({ error: String(error) }));
+    check(
+        "native messaging echo",
+        echoed?.echo?.ping === 1 && typeof echoed?.origin === "string" && echoed.origin.startsWith("chrome-extension://")
+    );
+    const forbidden = await chrome.runtime
+        .sendNativeMessage("com.xenon.forbidden", { ping: 1 })
+        .then(() => "", error => String(error.message));
+    check("forbidden native host", forbidden.includes("forbidden"));
 
     // Meta/xenon.py serves JSON with no CORS headers from a host the extension has permission for, which its pages and
     // its background reach as Chrome lets them: without CORS. The header would otherwise need a preflight.

@@ -20,6 +20,7 @@ const filterListUpdatesEnabled = document.querySelector("#filter-list-updates-en
 const filterListsNote = document.querySelector("#filter-lists-note");
 const passwordManagerList = document.querySelector("#password-managers");
 const passwordManagerNote = document.querySelector("#password-manager-note");
+const defaultPasswordManager = document.querySelector("#default-password-manager");
 const startBrowsing = document.querySelector("#start-browsing");
 const saveStatus = document.querySelector("#save-status");
 
@@ -44,6 +45,8 @@ const engineInfo = {
 const passwordManagerInfo = {
     bitwarden: { note: "Open source, can be self-hosted", developer: "Bitwarden" },
     "proton-pass": { note: "Open source, with email aliases", developer: "Proton" },
+    "1password": { note: "Paid", developer: "1Password" },
+    "icloud-passwords": { note: "Your iCloud Keychain, on this Mac", developer: "Apple" },
 };
 
 let settings;
@@ -65,7 +68,7 @@ function showStep(name, { focus = true } = {}) {
     document.body.dataset.step = steps[index].dataset.step;
 
     // The greeting stands on its own; the questions are counted.
-    stepCounter.textContent = index === 0 ? "" : `${index} of ${steps.length - 1}`;
+    stepCounter.textContent = index === 0 ? "" : `Step ${index} of ${steps.length - 1}`;
 
     if (location.hash.slice(1) !== steps[index].dataset.step)
         history.replaceState(null, "", `#${steps[index].dataset.step}`);
@@ -205,6 +208,12 @@ function updatePasswordManagerDetails() {
             `Xenon downloads ${name} from the Chrome Web Store, checks that ${developer} signed it, and looks for ` +
                 "updates once a day. To fill in your logins, it can read and change the sites you visit."
         );
+        if (id === "icloud-passwords") {
+            notes.push(
+                "It talks to Apple's Password Manager on this Mac, the same helper Chrome uses. macOS Sonoma or later, " +
+                    "and iCloud Keychain, are required."
+            );
+        }
     }
     if (id && id === current) notes.push(`${passwordManagerName(id)} is installed, and Xenon keeps it up to date.`);
     if (current && id !== current) notes.push(`${passwordManagerName(current)} is removed, with its data in Xenon.`);
@@ -237,6 +246,8 @@ function initialize() {
 
     populatePasswordManagers();
     updatePasswordManagerDetails();
+    // Keeping the defaults keeps whichever password manager is already installed.
+    if (passwordManagers.current) defaultPasswordManager.textContent = passwordManagerName(passwordManagers.current);
 
     for (const button of document.querySelectorAll("button")) button.disabled = false;
 }

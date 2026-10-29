@@ -229,11 +229,11 @@ for now (`UI/PasswordManagers`):
    until it's removed, which deletes its files with its storage. A new version of an extension that's running waits for
    the next start, as Chrome waits for an extension to be idle; the start after removes the old version's files.
 
-Xenon bundles neither password manager. Bitwarden's extension is GPL-3.0, with parts under the Bitwarden License,
-and Bitwarden grants no rights to its marks; Proton Pass is GPL-3.0. Fetching the developers' own store builds, at the
-user's choice, means Xenon redistributes nothing, and the page names them in plain text, with no logos. Helium
-installs them from the store too, through a proxy of its own that keeps Google from seeing which extensions a user
-installs; Xenon asks the store directly, and the welcome page says so.
+Xenon bundles none of the password managers. Bitwarden's extension is GPL-3.0, with parts under the Bitwarden License,
+and Bitwarden grants no rights to its marks; Proton Pass is GPL-3.0; 1Password is proprietary. Fetching the developers'
+own store builds, at the user's choice, means Xenon redistributes nothing, and the page names them in plain text, with
+no logos. Helium installs them from the store too, through a proxy of its own that keeps Google from seeing which
+extensions a user installs; Xenon asks the store directly, and the welcome page says so.
 
 ### Serving `chrome-extension://`
 
@@ -417,8 +417,8 @@ yet, so that an extension's startup doesn't throw. Bitwarden feature-detects `si
 | **1. Extension pages** | Loading unpacked, `chrome-extension://`, the toolbar button and popup. `runtime`: `id`, `getURL`, `getManifest`, `getPlatformInfo`, `lastError`, `sendMessage`/`onMessage` between pages of one extension. `storage`: `local`, `session`, `sync` (stored locally), `managed` (empty), `get`/`set`/`remove`/`clear`/`getKeys`/`getBytesInUse`, `onChanged` on `chrome.storage` and on each area, `setAccessLevel`. `i18n`: `getMessage`, `getUILanguage`, `getAcceptLanguages`, `__MSG_` in the manifest. | A test extension's popup runs and keeps its state. Bitwarden's popup loads, but waits for the background. |
 | **2. Background** | The background service worker. `runtime`: `connect`/`onConnect` and ports (`sender` with `tab`, `frameId`, `url`, `origin`, `documentId`), `onInstalled`, `onStartup`, `getContexts`, `reload`, `openOptionsPage`, `setUninstallURL`. `alarms`. `tabs`: `query` (with URL patterns), `get`, `getCurrent`, `create`, `update`, `remove`, `sendMessage`, `connect`, `captureVisibleTab`, `onActivated`, `onAttached`, `onCreated`, `onDetached`, `onRemoved`, `onReplaced`, `onUpdated`. `windows`: `getAll`, `get`, `getCurrent`, `getLastFocused`, `create` (including `type: "popup"`, for Bitwarden's popout), `update`, `remove`, `onCreated`, `onFocusChanged`, `onRemoved`. `action`: `setIcon`, `setBadgeText`, `setBadgeBackgroundColor`, `setTitle`, `setPopup`, `openPopup`. `commands`. `idle` (with the `locked` state). `permissions`: `contains`, `getAll`, `request`, `onAdded`. `offscreen` and the clipboard. `management.getSelf`. | Bitwarden's popup reaches its unlock screen; Bitwarden unlocks, syncs, and keeps its vault in the background; the badge shows matching logins |
 | **3. Content scripts** | Isolated worlds, `content_scripts` (Bitwarden's two, at `document_start`, one in all frames), `web_accessible_resources` (with `use_dynamic_url`), sandboxed pages. `scripting`: `executeScript` (`files`, `func` with results, `allFrames`/`frameIds`, `injectImmediately`, `world: "MAIN"`), `insertCSS`, `removeCSS`, `registerContentScripts`/`unregisterContentScripts` (Bitwarden's passkey support registers a `world: "MAIN"` script). `webNavigation`: `getFrame`, `getAllFrames`, `onCommitted`, `onCompleted`, `onErrorOccurred`, `onBeforeNavigate`. `tabs.sendMessage` with `frameId`. `activeTab`. | Autofill, the inline menu, saving new logins, and passkeys |
-| **4. The rest of Bitwarden** | `contextMenus`. `notifications` (with buttons). `webRequest`: `onAuthRequired` with `asyncBlocking` (`webRequestAuthProvider`, for HTTP auth dialogs), and the non-blocking `onBeforeRequest`, `onBeforeRedirect`, `onHeadersReceived` (with `responseHeaders`), `onCompleted`, `onErrorOccurred`. `sidePanel`. `privacy.services` `passwordSavingEnabled`, `autofillAddressEnabled`, `autofillCreditCardEnabled` (stubs: Ladybird has no password manager or autofill of its own to turn off). `nativeMessaging` (`connectNative("com.8bit.bitwarden")`), for unlocking through the desktop app. Web Push for the background. | Feature parity with Bitwarden in Chrome |
-| **5. Installing from the store** | CRX3 install and updates, the Chrome Web Store, offering password managers in the welcome flow as Helium does. Then whatever 1Password uses beyond the above, found the way Bitwarden's and Proton Pass's needs were. | The setup flow Helium has |
+| **4. The rest of Bitwarden** | `contextMenus`. `notifications` (with buttons). `webRequest`: `onAuthRequired` with `asyncBlocking` (`webRequestAuthProvider`, for HTTP auth dialogs), and the non-blocking `onBeforeRequest`, `onBeforeRedirect`, `onHeadersReceived` (with `responseHeaders`), `onCompleted`, `onErrorOccurred`. `sidePanel`. `privacy.services` `passwordSavingEnabled`, `autofillAddressEnabled`, `autofillCreditCardEnabled` (stubs: Ladybird has no password manager or autofill of its own to turn off). `nativeMessaging` (`connectNative`), for iCloud Passwords (`com.apple.passwordmanager`) and for unlocking Bitwarden through the desktop app (`com.8bit.bitwarden`). Web Push for the background. | Feature parity with Bitwarden in Chrome; iCloud Passwords' helper |
+| **5. Installing from the store** | CRX3 install and updates, the Chrome Web Store, offering password managers in the welcome flow as Helium does, plus iCloud Passwords on macOS. Then whatever 1Password uses beyond the above, found the way Bitwarden's and Proton Pass's needs were. | The setup flow Helium has, and Apple's |
 
 Passkeys need more than Bitwarden's scripts: Ladybird's `navigator.credentials` rejects `get()`, `store()`, and
 `create()` as not implemented, and there is no `PublicKeyCredential`. Bitwarden's passkey support replaces
@@ -445,7 +445,8 @@ for Bitwarden in Chrome.
 | `alarms` | | `UI/Extensions/Alarms` |
 | Managing extensions | | `UI/Extensions/Dialog` (Qt), and `--load-extension`. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
 | Installing from the Chrome Web Store | | `UI/Extensions/WebStore` (update checks and downloads), `CRX` (verifying CRX3 files and unpacking their zip), `Registry` (installed extensions, under `<profile data>/Extensions/Installed/`) |
-| Choosing a password manager | 0025 | `UI/PasswordManagers` (installs, switches, removes, and updates them daily; the `loadPasswordManagers` and `setPasswordManager` WebUI messages), `UI/WebUIInterfaces`, the welcome page's last step, the Extensions dialog's picker, and `--password-manager` |
+| Choosing a password manager | 0025 | `UI/PasswordManagers` (installs, switches, removes, and updates them daily; the `loadPasswordManagers` and `setPasswordManager` WebUI messages), `UI/WebUIInterfaces`, the welcome page's last step, the Extensions dialog's picker, and `--password-manager`. iCloud Passwords is offered on macOS only. |
+| Native messaging | | `UI/Extensions/NativeMessaging`: host lookup, Chrome's stdio framing, `connectNative` / `sendNativeMessage`. iCloud Passwords uses `com.apple.passwordmanager`. |
 
 ### The toolbar and the popup
 
@@ -483,18 +484,22 @@ for Bitwarden in Chrome.
   content scripts from running, since the UI process injects them, but what they insert into the page (a `<script>`,
   an `<img>`) is still subject to it, as in Chrome, except the extension's own resources, which bypass it (patch 19).
 - **Storage** is per extension ID, in the profile, and deleted with the extension.
-- **Native messaging** (milestone 4) runs only hosts registered in Chrome's manifest locations whose
+- **Native messaging** (`chrome.runtime.connectNative` / `sendNativeMessage`) runs only hosts registered in Xenon's
+  NativeMessagingHosts directories, or Chrome's on macOS (where Apple registers iCloud Passwords' helper), whose
   `allowed_origins` list the extension, over stdin/stdout with Chrome's length-prefixed framing. It needs no engine
-  change: the UI process spawns the host with `Core::Process` and pipes, as LibWebView spawns its helpers. Not with
+  change: the UI process spawns the host with `posix_spawn` and pipes (`UI/Extensions/NativeMessaging.cpp`). Not with
   `QProcess`, whose exit status LibWebView's `ProcessMonitor` would reap first: it calls `waitpid(-1)` on every
-  `SIGCHLD`.
+  `SIGCHLD`. An open native port keeps the background service worker from stopping when idle. As in Chrome, the host
+  gets only stdin, stdout, and stderr of the browser's files; a host that's still running when its port closes is sent
+  `SIGTERM`; and writing to one that has exited fails instead of raising `SIGPIPE`, which would end the browser.
 - **No `file://` access** for content scripts unless the user turns it on per extension, as in Chrome.
 
 ## Testing
 
 - Unit tests (`Tests/TestExtension*.cpp`, run by `Meta/xenon.py test`): manifest parsing and validation, IDs (against
   IDs Chrome computes for the same keys), locales and `__MSG_`, match patterns, URL-to-file resolution including path
-  traversal, and storage.
+  traversal, and storage. `TestXenonNativeMessaging` checks host lookup (names, allowed origins, absolute paths) and
+  Chrome's length-prefixed framing.
 - `Tests/Extensions/` holds small test extensions. `Meta/xenon.py test` loads one headlessly with
   `--load-extension`, opens its page, and checks what its scripts report through `chrome.*` and storage. It also
   serves `Tests/Extensions/content-scripts.html` from a local server, where the test extension's content scripts run,
@@ -503,9 +508,11 @@ for Bitwarden in Chrome.
   signs with test keys: a valid one, one for another extension, one changed after it was signed, one the store didn't
   sign, and one whose zip has an entry named `../escape.txt`. It checks the store's update check answers and version
   comparisons too. `Meta/xenon.py test` serves the same files from a stand-in for the store, and, with
-  `--password-manager`, installs a stand-in for Bitwarden, finds it running at once and at the next start, installs it
-  again once its files are deleted, updates it a day later from the next start, turns down a tampered update and one
-  the store didn't sign, switches to a stand-in for Proton Pass, and removes it.
+  `--password-manager`, names the offered managers (1Password among them) when asked for one it doesn't have, installs a
+  stand-in for Bitwarden, finds it running at once and at the next start, installs it again once its files are deleted,
+  updates it a day later from the next start, turns down a tampered update and one the store didn't sign, switches to a
+  stand-in for Proton Pass, and removes it. The test extension also talks to a local native messaging host
+  (`Tests/NativeMessaging/echo_host.py`), and is refused a missing host and one that doesn't list it.
 - The real store, by hand: Bitwarden 2026.10.0 and Proton Pass 1.43.0 install from it with their store IDs, which
   checks Google's publisher key and the store's real files.
 - Real extensions: Bitwarden's unpacked Chrome MV3 build (`npm run build:chrome` in `bitwarden/clients/apps/browser`)
@@ -644,7 +651,12 @@ for Bitwarden in Chrome.
   - Copying from the popup asks for `clipboardRead` and `clipboardWrite` the first time the clipboard is set to clear
     itself. Once allowed, the offscreen document clears it when the time runs out (patch 28); `Meta/xenon.py test`
     clears the clipboard the same way from the test extension's offscreen document. Not yet tried by hand.
-- [ ] Milestone 4: the rest of Bitwarden
+- [ ] Milestone 4: the rest of Bitwarden. Native messaging (`connectNative` / `sendNativeMessage`) is in:
+  host lookup, Chrome's stdio framing, and keeping an idle background running while a native port is open. The rest
+  of this milestone (`webRequest` events, notifications, `contextMenus`) is not.
 - [ ] **Milestone 5: installing from the store** (under way). Done: CRX3 installs, updates once a day, and removal,
-  for the password managers the welcome page offers, Bitwarden and Proton Pass. Left: installing any extension from
-  the store (from its page or ID), and 1Password.
+  for the password managers the welcome page offers: Bitwarden, Proton Pass, 1Password
+  (`aeblfdkhhhdcdjpifhhbdiojplfjncoa`), and iCloud Passwords on macOS. Left: installing any extension from the store
+  (from its page or ID). Neither 1Password nor iCloud Passwords has been tried by hand: 1Password's desktop-app unlock
+  goes through `nativeMessaging` now, and whatever else it uses beyond Bitwarden and Proton Pass hasn't been catalogued
+  yet; iCloud Passwords' extension hasn't been tried against Apple's helper.

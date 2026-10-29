@@ -5,8 +5,10 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+/* Set like a letter: serif questions, sans-serif answers, and hairline rows. */
+
 .topbar {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     right: 0;
@@ -16,48 +18,14 @@
     padding: 22px 32px;
 }
 
-.wordmark {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 16px;
-    font-weight: 650;
-    letter-spacing: -0.01em;
-}
-
-.wordmark .mark {
-    width: 26px;
-    height: 26px;
-}
-
-/* The orbits sit off to the right, turning slowly, so the questions stay on a quiet part of the page. */
-.orbits {
-    top: 50%;
-    right: -38vmin;
-    width: 140vmin;
-    height: 140vmin;
-    margin-top: -70vmin;
-}
-
-.orbits svg {
-    animation: orbit-turn 240s linear infinite;
-}
-
-@keyframes orbit-turn {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 .step-counter {
-    font-family: var(--xenon-mono);
-    font-size: 13px;
+    font-size: 14px;
     color: var(--xenon-muted);
 }
 
 form {
     position: relative;
-    max-width: 680px;
+    max-width: 640px;
     min-height: 100vh;
     margin: 0 auto;
     padding: 112px 32px 72px;
@@ -67,56 +35,69 @@ form {
 }
 
 .step:not([hidden]) {
-    animation: step-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation: step-in 0.3s ease-out both;
 }
 
 @keyframes step-in {
     from {
         opacity: 0;
-        transform: translateY(12px);
     }
     to {
         opacity: 1;
-        transform: none;
     }
 }
 
 h1 {
-    margin: 0 0 14px;
-    font-size: 46px;
-    font-weight: 700;
-    line-height: 1.05;
-    letter-spacing: -0.035em;
+    margin: 0 0 16px;
+    font-family: var(--xenon-serif);
+    font-size: 42px;
+    font-weight: 400;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
 }
 
 h1:focus {
     outline: none;
 }
 
-.hero-mark {
-    width: 112px;
-    height: 112px;
-}
-
 [data-step="hello"] h1 {
-    margin-top: 40px;
-    font-size: 76px;
-}
-
-.full-stop {
-    color: var(--xenon-rose);
+    font-size: 52px;
 }
 
 .lede {
-    max-width: 34em;
-    margin: 0 0 36px;
-    font-size: 19px;
+    max-width: 32em;
+    margin: 0 0 32px;
+    font-size: 17px;
+    line-height: 1.55;
     color: var(--xenon-muted);
 }
 
-/* The greeting shows the icon itself, so the wordmark waits for the questions. */
-body[data-step="hello"] .wordmark {
-    visibility: hidden;
+/* What "Keep these" keeps, so the quick way through says what it agrees to. */
+.defaults {
+    max-width: 420px;
+    margin: 0;
+}
+
+.default {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 11px 0;
+    border-top: 1px solid var(--xenon-hairline);
+}
+
+.default:last-child {
+    border-bottom: 1px solid var(--xenon-hairline);
+}
+
+.default dt {
+    color: var(--xenon-muted);
+}
+
+.default dd {
+    margin: 0;
+    font-family: var(--xenon-serif);
+    font-size: 17px;
 }
 
 .engine-columns {
@@ -133,12 +114,11 @@ fieldset {
 }
 
 legend {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     padding: 0;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--xenon-serif);
+    font-size: 17px;
+    font-style: italic;
     color: var(--xenon-muted);
 }
 
@@ -191,7 +171,6 @@ legend {
 
 .choice-name {
     font-size: 16px;
-    font-weight: 500;
 }
 
 .choice-note {
@@ -239,32 +218,14 @@ legend {
 }
 
 .aside {
+    max-width: 34em;
     margin: 20px 0 0;
     font-size: 14px;
     color: var(--xenon-muted);
 }
 
-.filter-lists {
-    max-width: 420px;
-    margin: 22px 0 0;
-}
-
-.filter-list {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px;
-    padding: 7px 10px;
-}
-
-.filter-list dt {
-    font-size: 14px;
-}
-
-.filter-list dd {
-    margin: 0;
-    font-size: 13px;
-    color: var(--xenon-muted);
-    text-align: right;
+#filter-lists {
+    margin: 18px 10px 0;
 }
 
 #filter-list-updates {
@@ -272,7 +233,7 @@ legend {
 }
 
 #filter-lists-note {
-    margin: 10px 10px 0;
+    margin: 8px 10px 0 34px;
     font-size: 13px;
 }
 
@@ -283,34 +244,43 @@ legend {
 .actions {
     display: flex;
     align-items: center;
-    gap: 22px;
-    margin-top: 40px;
+    gap: 24px;
+    margin-top: 36px;
 }
 
 button.primary-button {
     height: auto;
-    padding: 13px 26px;
+    padding: 12px 22px;
     font-size: 15px;
     font-weight: 600;
-    border-radius: 999px;
-}
-
-button.primary-button:disabled {
-    cursor: default;
+    border-radius: 10px;
 }
 
 .text-button {
-    padding: 13px 2px;
+    padding: 12px 0;
     font: inherit;
     font-size: 15px;
-    color: var(--xenon-muted);
+    color: var(--xenon-ink);
     background: none;
     border: none;
     cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--xenon-hairline);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 4px;
 }
 
 .text-button:hover:not(:disabled) {
-    color: var(--xenon-ink);
+    text-decoration-color: var(--xenon-rose);
+}
+
+.text-button:disabled {
+    cursor: default;
+    color: var(--xenon-muted);
+}
+
+[data-step="hello"] .aside {
+    margin-top: 28px;
 }
 
 .save-status:empty {
@@ -319,7 +289,7 @@ button.primary-button:disabled {
 
 .save-status {
     margin: 24px 0 0;
-    color: var(--xenon-rose);
+    color: var(--xenon-rose-pressed);
 }
 
 /* Work in progress, like a password manager's download, isn't an error. */
@@ -333,21 +303,21 @@ button.primary-button:disabled {
     font-size: 13px;
 }
 
-.after-actions {
-    margin-top: 32px;
-    font-size: 13px;
+@media (prefers-color-scheme: dark) {
+    .save-status {
+        color: var(--xenon-rose);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .step:not([hidden]),
-    .orbits svg {
+    .step:not([hidden]) {
         animation: none;
     }
 }
 
 @media (max-width: 640px) {
     form {
-        padding: 96px 20px 48px;
+        padding: 88px 20px 48px;
     }
 
     .topbar {
@@ -355,19 +325,14 @@ button.primary-button:disabled {
     }
 
     h1 {
-        font-size: 36px;
+        font-size: 34px;
     }
 
     [data-step="hello"] h1 {
-        font-size: 56px;
+        font-size: 40px;
     }
 
     .engine-columns {
         grid-template-columns: 1fr;
-    }
-
-    .hero-mark {
-        width: 88px;
-        height: 88px;
     }
 }
