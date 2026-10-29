@@ -20,6 +20,7 @@ const filterListUpdatesEnabled = document.querySelector("#filter-list-updates-en
 const filterListsNote = document.querySelector("#filter-lists-note");
 const passwordManagerList = document.querySelector("#password-managers");
 const passwordManagerNote = document.querySelector("#password-manager-note");
+const defaultPasswordManager = document.querySelector("#default-password-manager");
 const startBrowsing = document.querySelector("#start-browsing");
 const saveStatus = document.querySelector("#save-status");
 
@@ -65,7 +66,7 @@ function showStep(name, { focus = true } = {}) {
     document.body.dataset.step = steps[index].dataset.step;
 
     // The greeting stands on its own; the questions are counted.
-    stepCounter.textContent = index === 0 ? "" : `${index} of ${steps.length - 1}`;
+    stepCounter.textContent = index === 0 ? "" : `Step ${index} of ${steps.length - 1}`;
 
     if (location.hash.slice(1) !== steps[index].dataset.step)
         history.replaceState(null, "", `#${steps[index].dataset.step}`);
@@ -237,6 +238,8 @@ function initialize() {
 
     populatePasswordManagers();
     updatePasswordManagerDetails();
+    // Keeping the defaults keeps whichever password manager is already installed.
+    if (passwordManagers.current) defaultPasswordManager.textContent = passwordManagerName(passwordManagers.current);
 
     for (const button of document.querySelectorAll("button")) button.disabled = false;
 }

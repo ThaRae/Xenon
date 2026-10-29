@@ -52,7 +52,7 @@ TESTS_TARGET = "xenon-tests"
 SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
 
 # Text on Xenon's welcome page that Ladybird's doesn't have.
-WELCOME_PAGE_TEXT = "Use Xenon's picks"
+WELCOME_PAGE_TEXT = "Choose for myself"
 
 # The headless screenshot is taken this long after the load starts, not after it finishes.
 WELCOME_SCREENSHOT_DELAY_SECONDS = 4

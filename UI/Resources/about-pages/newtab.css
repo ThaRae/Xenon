@@ -9,27 +9,23 @@ body {
     flex-direction: column;
 }
 
-/* Centered behind the sites, still, and fainter than the welcome flow's, since this page is seen all day. */
-.orbits {
-    top: 50%;
-    left: 50%;
-    margin: -60vmin 0 0 -60vmin;
-    opacity: 0.7;
+.topbar {
+    padding: 22px 32px;
 }
 
-.page-mark {
-    width: 56px;
-    height: 56px;
-    margin-bottom: 44px;
+.topbar .mark {
+    width: 22px;
+    height: 22px;
 }
 
+/* A little above the middle, where the eye lands in a new tab. */
 main {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 96px 32px 120px;
+    padding: 32px 32px 18vh;
 }
 
 .visually-hidden {
@@ -41,10 +37,19 @@ main {
     white-space: nowrap;
 }
 
+.top-sites-title {
+    margin: 0 0 12px;
+    font-family: var(--xenon-serif);
+    font-size: 17px;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--xenon-muted);
+}
+
 .top-sites {
     display: grid;
     grid-template-columns: repeat(4, 112px);
-    gap: 12px 16px;
+    gap: 8px 16px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -62,15 +67,11 @@ main {
     padding: 14px 6px 12px;
     color: var(--xenon-ink);
     text-decoration: none;
-    border-radius: 14px;
+    border-radius: 12px;
 }
 
 .site a:hover {
     background-color: var(--xenon-row-hover);
-}
-
-.site a:hover .site-icon {
-    border-color: var(--xenon-rose);
 }
 
 .site a:focus-visible {
@@ -82,21 +83,24 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 52px;
-    height: 52px;
-    font-family: var(--xenon-mono);
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--xenon-muted);
+    width: 56px;
+    height: 56px;
+    font-family: var(--xenon-serif);
+    font-size: 26px;
+    color: var(--xenon-ink);
     text-transform: uppercase;
     background-color: var(--xenon-row-hover);
     border: 1px solid var(--xenon-hairline);
-    border-radius: 22.5%;
+    border-radius: 14px;
+}
+
+.site a:hover .site-icon {
+    border-color: var(--xenon-muted);
 }
 
 .site-icon img {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
 }
 
 .site-name {
@@ -117,8 +121,10 @@ main {
 
 .note strong {
     display: block;
-    margin-bottom: 4px;
-    font-weight: 600;
+    margin-bottom: 6px;
+    font-family: var(--xenon-serif);
+    font-size: 26px;
+    font-weight: 400;
     color: var(--xenon-ink);
 }
 
