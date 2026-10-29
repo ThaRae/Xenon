@@ -57,6 +57,9 @@ TESTS_TARGET = "xenon-tests"
 LADYBIRD_TESTS_EXCLUDED = "LibWebAccessibilityBridge|AccessibilityBridgeMac"
 # How long one of Ladybird's tests may run, as in Ladybird's CI. LibWeb's runs every web test, so it's the long one.
 LADYBIRD_TEST_TIMEOUT_SECONDS = 1800
+# The Python packages Ladybird's CI installs for its tests (ladybird/.github/actions/setup): test-web's HTTP server makes
+# the certificates for its TLS tests with cryptography, and WPT's WebSocket server needs six.
+LADYBIRD_TEST_PYTHON_PACKAGES = ["pyyaml", "requests", "six", "cryptography"]
 
 # A page rendered with nothing on it compresses to a few kilobytes; the welcome page is well over this.
 SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
@@ -232,9 +235,17 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
 # Xenon's builds leave Ladybird's tests out (configure_main). ladybird-test turns them on in the build directory, so they
 # build against the same engine Xenon does, from the same objects.
 def enable_ladybird_tests(build_dir: Path):
-    if "BUILD_TESTING:BOOL=ON" in (build_dir / "CMakeCache.txt").read_text(errors="replace"):
+    if cmake_cache_value(build_dir, "BUILD_TESTING") == "ON":
         return
     run_command(["cmake", "-B", build_dir, "-DBUILD_TESTING=ON"])
+
+
+def cmake_cache_value(build_dir: Path, name: str) -> str | None:
+    for line in (build_dir / "CMakeCache.txt").read_text(errors="replace").splitlines():
+        key, _, value = line.partition("=")
+        if key.split(":", 1)[0] == name:
+            return value
+    return None
 
 
 def build_main(build_dir: Path, jobs: str | None, *targets: str):
@@ -285,6 +296,8 @@ def test_main(platform: Platform, build_dir: Path):
 # TESTS_ONLY has the unit tests skip their benchmarks.
 def ladybird_test_main(build_dir: Path):
     os.environ["TESTS_ONLY"] = "1"
+    paths = [ladybird_test_python_packages(build_dir), os.environ.get("PYTHONPATH")]
+    os.environ["PYTHONPATH"] = os.pathsep.join(path for path in paths if path)
     run_command(
         [
             "ctest",
@@ -297,6 +310,22 @@ def ladybird_test_main(build_dir: Path):
             LADYBIRD_TESTS_EXCLUDED,
         ]
     )
+
+
+# The tests run their Python scripts with the Python the build was configured with, so the packages they need go in a
+# virtual environment of that Python, in the build directory, whose packages the tests get through PYTHONPATH. Pointing
+# the build at another Python instead would run all of its code generators again. Returns the packages' directory.
+def ladybird_test_python_packages(build_dir: Path) -> str:
+    environment = build_dir / "ladybird-test-python"
+    python = environment / "bin" / "python3"
+    if not python.exists():
+        run_command([cmake_cache_value(build_dir, "Python3_EXECUTABLE") or sys.executable, "-m", "venv", environment])
+    run_command(
+        [python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *LADYBIRD_TEST_PYTHON_PACKAGES]
+    )
+    return subprocess.check_output(
+        [python, "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"], text=True
+    ).strip()
 
 
 # The checks that run Xenon itself, and return what failed: the build's, or a release's, which Meta/release.py test runs
