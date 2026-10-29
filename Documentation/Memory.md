@@ -62,9 +62,11 @@ Ladybird's CI runs two suites of its own on every push to master, and posts the 
 Each command checks out the suite's `master` (`--ref` for another revision) in `Build/benchmarks`, with a venv for its
 runner, runs every test `--iterations` times (5 by default, as Ladybird's CI does), and logs the runner's results with
 the suite's, Xenon's and Ladybird's commits and the machine's CPU. `--benchmarks` / `--suites` take run.py's names,
-comma-separated. A test that fails is left out of the results, named in the log, and fails the command once the rest
-are measured. `report` prints a log as markdown: each suite's total, every test, and with `--baseline`, how each
-compares with the earlier log. A difference counts as a change only when it's more than 3% and more than two standard
+comma-separated. As in Ladybird's CI, a benchmark with a test that fails, or that doesn't finish in 30 s, is left out
+of the results and named in the log and the job's summary; the command fails only when nothing was measured. On
+GitHub's runners, WebKitDOM's `textarea-edit` sometimes doesn't finish (so far on every macOS run, and on some Linux
+ones), which leaves WebKitDOM out of that run. `report` prints a log as markdown: each suite's total, every test, and
+with `--baseline`, how each compares with the earlier log. A difference counts as a change only when it's more than 3% and more than two standard
 errors of the difference; anything less is labelled noise.
 
 [`.github/workflows/benchmarks.yml`](../.github/workflows/benchmarks.yml) runs both suites on Linux (in Ladybird's CI
