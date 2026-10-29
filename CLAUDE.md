@@ -41,7 +41,8 @@ the architecture and workflow, and `Documentation/Features.md` what each feature
 - `./Meta/xenon.py run`: build and launch `Build/release/bin/Xenon.app`.
 - `ninja -C Build/release xenon`: incremental rebuild once configured.
 - `./Meta/check.py` (`--fix` to format): run before committing. CI runs it too, along with `./Meta/xenon.py test`
-  (unit tests in `Tests/`, then Xenon run headless against local test pages and servers).
+  (unit tests in `Tests/`, then Xenon run headless against local test pages and servers) and, on Linux,
+  `./Meta/xenon.py ladybird-test` (Ladybird's own tests against the patched engine).
 - New unit tests are `Tests/Test*.cpp`, registered in `UI/Xenon.cmake` as `TestXenon*` targets under `xenon-tests`.
 - `./Meta/patches.py apply` / `export` / `pin` / `status`: the engine patch series (see the top of the script).
 - `./Meta/release.py test` / `package` / `publish`: macOS releases, which Xenon updates itself from

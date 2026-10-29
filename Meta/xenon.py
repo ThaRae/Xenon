@@ -51,6 +51,13 @@ PRESETS = {
 APP_TARGET = "xenon"
 TESTS_TARGET = "xenon-tests"
 
+# Ladybird's tests that ladybird-test leaves out, as Ladybird's own CI does in its Test step
+# (ladybird/.github/workflows/build-and-test.yml): the accessibility bridges, which need a desktop's accessibility bus
+# (AT-SPI2) or macOS's, and which Ladybird runs apart.
+LADYBIRD_TESTS_EXCLUDED = "LibWebAccessibilityBridge|AccessibilityBridgeMac"
+# How long one of Ladybird's tests may run, as in Ladybird's CI. LibWeb's runs every web test, so it's the long one.
+LADYBIRD_TEST_TIMEOUT_SECONDS = 1800
+
 # A page rendered with nothing on it compresses to a few kilobytes; the welcome page is well over this.
 SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
 
@@ -143,6 +150,10 @@ def main():
     run_parser.add_argument("args", nargs=argparse.REMAINDER)
     test_parser = subparsers.add_parser("test", help="Build and run the unit tests and the headless smoke test")
     test_parser.add_argument("--no-build", action="store_true")
+    ladybird_test_parser = subparsers.add_parser(
+        "ladybird-test", help="Build Ladybird's own tests and run them against the patched engine"
+    )
+    ladybird_test_parser.add_argument("--no-build", action="store_true")
     subparsers.add_parser("clean", help="Delete the build directory for the preset")
 
     args = parser.parse_args()
@@ -166,6 +177,11 @@ def main():
         if not args.no_build:
             build_main(build_dir, args.jobs, APP_TARGET, TESTS_TARGET)
         test_main(platform, build_dir)
+    elif args.command == "ladybird-test":
+        enable_ladybird_tests(build_dir)
+        if not args.no_build:
+            build_main(build_dir, args.jobs)
+        ladybird_test_main(build_dir)
 
 
 def configure_build_env(preset: str, jobs: str | None) -> tuple[Path, Path]:
@@ -204,12 +220,21 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
             f"-DCMAKE_C_COMPILER={cc}",
             f"-DCMAKE_CXX_COMPILER={cxx}",
             f"-DCMAKE_PROJECT_ladybird_INCLUDE={XENON_SOURCE_DIR / 'Meta' / 'CMake' / 'XenonHook.cmake'}",
-            # Tests and utilities are Ladybird's concern; Xenon only needs the engine and helper processes.
+            # Xenon only needs the engine and helper processes. Ladybird's tests are built by ladybird-test, which turns them
+            # on (enable_ladybird_tests).
             "-DBUILD_TESTING=OFF",
         ]
     )
 
     return build_dir
+
+
+# Xenon's builds leave Ladybird's tests out (configure_main). ladybird-test turns them on in the build directory, so they
+# build against the same engine Xenon does, from the same objects.
+def enable_ladybird_tests(build_dir: Path):
+    if "BUILD_TESTING:BOOL=ON" in (build_dir / "CMakeCache.txt").read_text(errors="replace"):
+        return
+    run_command(["cmake", "-B", build_dir, "-DBUILD_TESTING=ON"])
 
 
 def build_main(build_dir: Path, jobs: str | None, *targets: str):
@@ -253,6 +278,25 @@ def test_main(platform: Platform, build_dir: Path):
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
         sys.exit(1)
     print("All tests passed.")
+
+
+# Runs Ladybird's own tests (AK and the libraries' unit tests, test-js, test-web's web tests, the Rust crates' tests) against
+# the engine with Xenon's patches, as Ladybird's CI runs them, so that a patch that breaks something upstream tests says so.
+# TESTS_ONLY has the unit tests skip their benchmarks.
+def ladybird_test_main(build_dir: Path):
+    os.environ["TESTS_ONLY"] = "1"
+    run_command(
+        [
+            "ctest",
+            "--test-dir",
+            build_dir,
+            "--output-on-failure",
+            "--timeout",
+            str(LADYBIRD_TEST_TIMEOUT_SECONDS),
+            "--exclude-regex",
+            LADYBIRD_TESTS_EXCLUDED,
+        ]
+    )
 
 
 # The checks that run Xenon itself, and return what failed: the build's, or a release's, which Meta/release.py test runs

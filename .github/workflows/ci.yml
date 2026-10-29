@@ -1,6 +1,8 @@
 name: CI
 
-# GitHub-hosted runners. The checks run first; then Xenon is built and tested on Linux and macOS side by side.
+# GitHub-hosted runners. The checks run first; then Xenon is built and tested on Linux and macOS side by side. On Linux,
+# Ladybird's own tests then run against the engine with Xenon's patches (Meta/xenon.py ladybird-test), as Ladybird's CI
+# runs them for a Release build in the same image, so a patch that breaks something upstream tests fails the build.
 #
 # - Linux builds in Ladybird's own CI image (Meta/ci/build-in-ladybird-image.sh), at the version the pinned submodule
 #   names, so Xenon is built with exactly the compilers, Qt, and system libraries Ladybird is tested with.
@@ -75,7 +77,7 @@ jobs:
           key: linux-${{ env.IMAGE_VERSION }}-${{ github.sha }}
           restore-keys: linux-${{ env.IMAGE_VERSION }}-
 
-      - name: Build Xenon and run its tests
+      - name: Build Xenon and run its tests, and Ladybird's
         timeout-minutes: 320
         run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/build-and-test.sh
 
@@ -111,6 +113,16 @@ jobs:
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # What the web tests that failed rendered or printed, beside what they should have, as Ladybird's CI keeps them.
+      - name: Upload the failed web tests' output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ladybird-test-dumps-linux
+          path: Build/release/Tests/LibWeb/test-web/test-dumps/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload the dependency build logs
         if: failure()
