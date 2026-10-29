@@ -331,7 +331,24 @@ def measure_bench(xenon_path: Path, seconds: float) -> dict:
 
 
 def run_browser(label: str, command: list[str], settle: float) -> dict:
-    process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    executable = command[0]
+    try:
+        os.chmod(executable, 0o755)
+    except OSError:
+        pass
+    try:
+        process = subprocess.Popen(
+            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
+        )
+    except PermissionError:
+        time.sleep(1)
+        try:
+            os.chmod(executable, 0o755)
+        except OSError:
+            pass
+        process = subprocess.Popen(
+            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
+        )
     try:
         time.sleep(settle)
         if process.poll() is not None:
