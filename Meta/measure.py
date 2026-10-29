@@ -6,6 +6,9 @@
 #   Meta/measure.py processes --pid PID          # RSS/PSS of a running process tree
 #   Meta/measure.py browsers --xenon PATH [...]  # headless Xenon (and Chrome) on sample pages
 #   Meta/measure.py bench --xenon PATH [...]     # Speedometer / JetStream / MotionMark, if reachable
+#   Meta/measure.py web-benchmarks --xenon PATH  # Ladybird's web-benchmarks suites, in headless Xenon
+#   Meta/measure.py js-benchmarks                # Ladybird's js-benchmarks suites, in the js and wasm REPLs
+#   Meta/measure.py report LOG [--baseline LOG]  # a benchmark log as markdown, compared with an earlier one
 #   Meta/measure.py self-test                    # Linux smaps parsing, no Xenon needed
 #
 # Writes JSON to --log (default Meta/measure-results/<stamp>.json) and a markdown table to stdout.
@@ -15,13 +18,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
+import platform
 import re
 import signal
+import statistics
 import subprocess
 import sys
 import tempfile
 import time
+import venv
 
 from datetime import datetime
 from datetime import timezone
@@ -87,6 +94,22 @@ BENCH_SECONDS_BY_SUITE = {"JetStream 2.2": 1800, "MotionMark 1.3.1": 600}
 BENCH_DUMP_GRACE = 180
 BENCH_WINDOW = (1280, 900)
 
+# Ladybird's own benchmark suites, which its CI runs on every push to master (ladybird/.github/workflows/
+# web-benchmarks.yml and js-and-wasm-benchmarks.yml). web-benchmarks drives a browser, headless, through a local server
+# its runner starts; js-benchmarks runs the js and wasm REPLs, which Xenon's build makes from the same patched engine.
+# Each is checked out, with a venv for its runner, under Build/benchmarks.
+LADYBIRD_BENCHMARKS = {
+    "web-benchmarks": "https://github.com/LadybirdBrowser/web-benchmarks.git",
+    "js-benchmarks": "https://github.com/LadybirdBrowser/js-benchmarks.git",
+}
+LADYBIRD_BENCHMARKS_DIR = XENON_SOURCE_DIR / "Build" / "benchmarks"
+# Ladybird's CI runs each test five times.
+LADYBIRD_BENCHMARK_ITERATIONS = 5
+# report counts a difference as a change only when it's bigger than this many standard errors of the difference, and
+# than this share of the earlier value. GitHub's runners are shared machines, where a few percent either way is noise.
+SIGNIFICANT_STANDARD_ERRORS = 2
+SIGNIFICANT_SHARE = 0.03
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Measure Xenon's memory and BrowserBench scores (issue #28)")
@@ -116,6 +139,22 @@ def main() -> int:
     )
     bench.add_argument("--dump-dir", type=Path, help="write each suite's full headless text dump here")
 
+    web_benchmarks = subparsers.add_parser("web-benchmarks", help="Run Ladybird's web-benchmarks in headless Xenon")
+    web_benchmarks.add_argument("--xenon", type=Path, required=True)
+    web_benchmarks.add_argument("--benchmarks", default="all", help="comma-separated, as run.py takes them")
+    web_benchmarks.add_argument("--iterations", type=int, default=LADYBIRD_BENCHMARK_ITERATIONS)
+    web_benchmarks.add_argument("--ref", default="master", help="the suite's branch or commit")
+
+    js_benchmarks = subparsers.add_parser("js-benchmarks", help="Run Ladybird's js-benchmarks in the js and wasm REPLs")
+    js_benchmarks.add_argument("--build-dir", type=Path, default=XENON_SOURCE_DIR / "Build" / "release")
+    js_benchmarks.add_argument("--suites", default="all", help="comma-separated, as run.py takes them")
+    js_benchmarks.add_argument("--iterations", type=int, default=LADYBIRD_BENCHMARK_ITERATIONS)
+    js_benchmarks.add_argument("--ref", default="master", help="the suite's branch or commit")
+
+    report = subparsers.add_parser("report", help="Print a benchmark log as markdown")
+    report.add_argument("result", type=Path)
+    report.add_argument("--baseline", type=Path, help="an earlier log of the same command to compare with")
+
     subparsers.add_parser("self-test", help="Check Linux smaps parsing against this process")
 
     args = parser.parse_args()
@@ -128,6 +167,14 @@ def main() -> int:
         result = measure_browsers(args.xenon, args.chrome, args.settle, not args.no_remote)
     elif args.command == "bench":
         result = measure_bench(args.xenon, args.seconds, args.suite, args.dump_dir)
+    elif args.command == "web-benchmarks":
+        result = measure_web_benchmarks(args.xenon, args.benchmarks, args.iterations, args.ref)
+    elif args.command == "js-benchmarks":
+        result = measure_js_benchmarks(args.build_dir, args.suites, args.iterations, args.ref)
+    elif args.command == "report":
+        baseline = json.loads(args.baseline.read_text()) if args.baseline and args.baseline.exists() else None
+        print(report_log(json.loads(args.result.read_text()), baseline))
+        return 0
     elif args.command == "self-test":
         return self_test()
     else:
@@ -142,6 +189,9 @@ def main() -> int:
     }
     log_path.write_text(json.dumps(payload, indent=2) + "\n")
     print(f"wrote {log_path}", flush=True)
+    # A benchmark run that lost a test still writes what the others measured, and then fails.
+    if result.get("failures") or result.get("returncode"):
+        return 1
     return 0
 
 
@@ -472,6 +522,290 @@ def measure_bench(
             }
         )
     return {"suites": results}
+
+
+def measure_web_benchmarks(xenon_path: Path, benchmarks: str, iterations: int, ref: str) -> dict:
+    xenon = xenon_executable(xenon_path)
+    # run.py gives the browser a fresh profile of its own (--profile-path), so Xenon runs with its defaults.
+    arguments = ["--executable", str(xenon), "--benchmarks", benchmarks, "--iterations", str(iterations)]
+    result = run_ladybird_benchmarks("web-benchmarks", ref, arguments)
+    # run.py drops a benchmark that didn't finish from its results, and names it last.
+    failed = re.search(r"The following benchmarks failed: (.*)", result.pop("output"))
+    result["failures"] = failed.group(1).strip().split(", ") if failed else []
+    return {"executable": str(xenon), "selection": benchmarks, "iterations": iterations, **result}
+
+
+def measure_js_benchmarks(build_dir: Path, suites: str, iterations: int, ref: str) -> dict:
+    js = build_dir / "bin" / "js"
+    wasm = build_dir / "bin" / "wasm"
+    if not js.exists() or not wasm.exists():
+        print(f"{js} and {wasm} are built by: Meta/xenon.py build js && Meta/xenon.py build wasm", file=sys.stderr)
+        sys.exit(1)
+    # Without --continue-on-failure, the first test that fails stops the run and loses every result before it. With it,
+    # run.py leaves that test out and says so, and the run fails here once the rest are measured.
+    arguments = [
+        "--executable",
+        str(js),
+        "--wasm-executable",
+        str(wasm),
+        "--suites",
+        suites,
+        "--iterations",
+        str(iterations),
+        "--continue-on-failure",
+    ]
+    result = run_ladybird_benchmarks("js-benchmarks", ref, arguments)
+    # The command ends with the test, as a path: ... PosixPath('Octane/box2d.js')]'
+    result["failures"] = re.findall(r"Test execution failure: Command '\[.*'([^']+)'\)?\]'", result.pop("output"))
+    return {"executable": str(js), "selection": suites, "iterations": iterations, **result}
+
+
+def run_ladybird_benchmarks(name: str, ref: str, arguments: list[str]) -> dict:
+    directory = LADYBIRD_BENCHMARKS_DIR / name
+    directory.mkdir(parents=True, exist_ok=True)
+    if not (directory / ".git").exists():
+        subprocess.run(["git", "init", "--quiet"], cwd=directory, check=True)
+    subprocess.run(
+        ["git", "fetch", "--quiet", "--depth", "1", LADYBIRD_BENCHMARKS[name], ref], cwd=directory, check=True
+    )
+    subprocess.run(["git", "checkout", "--quiet", "--force", "FETCH_HEAD"], cwd=directory, check=True)
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=directory, text=True).strip()
+
+    # The runners' own packages (scipy, tabulate, ...), in a venv beside each, as Ladybird's CI installs them.
+    environment = directory / ".venv"
+    python = environment / "bin" / "python3"
+    if not python.exists():
+        venv.create(environment, with_pip=True)
+    pip = [python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "-r", "requirements.txt"]
+    subprocess.run(pip, cwd=directory, check=True)
+
+    output_path = directory / "results.json"
+    output_path.unlink(missing_ok=True)
+    print(f"### {name} {commit[:10]}", flush=True)
+    started = time.time()
+    process = subprocess.Popen(
+        [python, "run.py", *arguments, "--output", str(output_path)],
+        cwd=directory,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    output = []
+    for line in process.stdout:
+        print(line, end="", flush=True)
+        output.append(line)
+    process.wait()
+
+    return {
+        "repository": LADYBIRD_BENCHMARKS[name],
+        "commit": commit,
+        "xenon_commit": source_commit(XENON_SOURCE_DIR),
+        "ladybird_commit": source_commit(XENON_SOURCE_DIR / "ladybird"),
+        "host": host_description(),
+        "seconds": time.time() - started,
+        "returncode": process.returncode,
+        "results": json.loads(output_path.read_text()) if output_path.exists() else {},
+        "output": "".join(output),
+    }
+
+
+def source_commit(directory: Path) -> str:
+    result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=directory, capture_output=True, text=True)
+    return result.stdout.strip()
+
+
+def host_description() -> dict:
+    cpu = platform.processor()
+    if sys.platform == "linux":
+        for line in Path("/proc/cpuinfo").read_text().splitlines():
+            if line.startswith("model name"):
+                cpu = line.split(":", 1)[1].strip()
+                break
+    elif sys.platform == "darwin":
+        cpu = subprocess.run(
+            ["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True
+        ).stdout.strip()
+    return {"system": platform.system(), "machine": platform.machine(), "cpu": cpu, "cpus": os.cpu_count()}
+
+
+# One measured quantity: its runs, and whether more is better (a score) or less (a time).
+class Measure:
+    def __init__(self, runs: list[float], higher_is_better: bool):
+        self.runs = [float(run) for run in runs]
+        self.higher_is_better = higher_is_better
+
+    @property
+    def mean(self) -> float:
+        return statistics.mean(self.runs)
+
+    @property
+    def stdev(self) -> float:
+        return statistics.stdev(self.runs) if len(self.runs) > 1 else 0.0
+
+    def text(self) -> str:
+        unit = "" if self.higher_is_better else " s"
+        spread = f" ± {self.stdev:.3g}" if len(self.runs) > 1 else ""
+        return f"{self.mean:.4g}{spread}{unit}"
+
+
+def ladybird_benchmark_measures(command: str, results: dict) -> tuple[dict, dict]:
+    """A Ladybird suite's results.json as two maps of Measure: one per suite (its total) and one per test."""
+    totals = {}
+    tests = {}
+    for group, entries in results.items():
+        group_tests = {}
+        for name, entry in entries.items():
+            if name == "_total":
+                continue
+            # Octane and WasmCoremark print a score; everything else is timed (js-benchmarks' compare.py picks the same).
+            if "reported_score" in entry:
+                group_tests[f"{group}/{name}"] = Measure(entry["reported_score"]["runs"], True)
+            elif "time" in entry:
+                group_tests[f"{group}/{name}"] = Measure(entry["time"]["runs"], False)
+        tests.update(group_tests)
+
+        total = entries.get("_total", {})
+        if "reported_score" in total:
+            totals[group] = Measure(total["reported_score"]["runs"], True)
+        elif "time" in total:
+            totals[group] = Measure(total["time"]["runs"], False)
+        elif group_tests:
+            # js-benchmarks has no totals of its own: a suite's total is the sum of its tests, run by run.
+            measures = list(group_tests.values())
+            counts = {len(measure.runs) for measure in measures}
+            if len(counts) == 1 and len({measure.higher_is_better for measure in measures}) == 1:
+                runs = [sum(measure.runs[index] for measure in measures) for index in range(counts.pop())]
+                totals[group] = Measure(runs, measures[0].higher_is_better)
+    return totals, tests
+
+
+def change_text(new: Measure, old: Measure | None) -> tuple[str, bool]:
+    """How new compares with old, in words, and whether the difference is bigger than the noise."""
+    if old is None or old.mean <= 0 or new.mean <= 0:
+        return "", False
+    ratio = new.mean / old.mean if new.higher_is_better else old.mean / new.mean
+    words = f"{abs(ratio - 1) * 100:.1f}% {'better' if ratio >= 1 else 'worse'}"
+    standard_error = math.sqrt(new.stdev**2 / len(new.runs) + old.stdev**2 / len(old.runs))
+    difference = abs(new.mean - old.mean)
+    significant = (
+        len(new.runs) > 1
+        and len(old.runs) > 1
+        and difference > SIGNIFICANT_STANDARD_ERRORS * standard_error
+        and difference > SIGNIFICANT_SHARE * old.mean
+    )
+    return (f"**{words}**" if significant else f"{words} (noise)"), significant
+
+
+def markdown_table(header: list[str], rows: list[list[str]]) -> str:
+    # The name and the change read as text; the numbers between them line up on the right.
+    alignment = ["---"] + ["---:"] * (len(header) - 2) + ["---"]
+    lines = ["| " + " | ".join(header) + " |", "| " + " | ".join(alignment) + " |"]
+    lines += ["| " + " | ".join(row) + " |" for row in rows]
+    return "\n".join(lines)
+
+
+def report_log(payload: dict, baseline: dict | None) -> str:
+    command = payload.get("command")
+    if baseline is not None and baseline.get("command") != command:
+        baseline = None
+    if command in LADYBIRD_BENCHMARKS:
+        return report_ladybird_benchmarks(command, payload, baseline)
+    if command == "bench":
+        return report_browserbench(payload, baseline)
+    return f"`{command}` logs have no report."
+
+
+def report_ladybird_benchmarks(command: str, payload: dict, baseline: dict | None) -> str:
+    result = payload["result"]
+    host = result["host"]
+    lines = [
+        f"#### {command}",
+        "",
+        f"[{command}]({result['repository'].removesuffix('.git')}) `{result['commit'][:10]}`, "
+        f"{result['iterations']} runs of each test, in Xenon `{result['xenon_commit'][:10]}` "
+        f"(Ladybird `{result['ladybird_commit'][:10]}` and Xenon's patches), on {host['system']} {host['machine']}, "
+        f"{host['cpu']} ({host['cpus']} CPUs). It took {result['seconds'] / 60:.0f} minutes.",
+        "",
+    ]
+    if result["failures"]:
+        lines += [f"**Failed, and left out:** {', '.join(result['failures'])}", ""]
+
+    totals, tests = ladybird_benchmark_measures(command, result["results"])
+    old_totals, old_tests = {}, {}
+    if baseline is None:
+        lines += ["No earlier run of main to compare with.", ""]
+    else:
+        earlier = baseline["result"]
+        old_totals, old_tests = ladybird_benchmark_measures(command, earlier["results"])
+        lines += [
+            f"Compared with main's run of {baseline['recorded_at'][:10]}: Xenon `{earlier['xenon_commit'][:10]}`, "
+            f"{earlier['iterations']} runs of each test, on {earlier['host']['cpu']}. A change counts when it's more "
+            f"than {SIGNIFICANT_SHARE:.0%} and {SIGNIFICANT_STANDARD_ERRORS} standard errors; anything less is marked "
+            "noise.",
+            "",
+        ]
+        if earlier["commit"] != result["commit"]:
+            lines += [f"The suite has changed since (`{earlier['commit'][:10]}`), which can account for a change.", ""]
+        if earlier["host"]["cpu"] != host["cpu"]:
+            lines += ["That run had another CPU, which can account for a change.", ""]
+
+    rows = []
+    for group, measure in totals.items():
+        old = old_totals.get(group)
+        label = "score" if measure.higher_is_better else "time"
+        rows.append([group, f"{label} {measure.text()}", old.text() if old else "", change_text(measure, old)[0]])
+    # Without an earlier run, the columns for it would be empty.
+    columns = 4 if baseline is not None else 2
+    header = ["Suite", "Xenon", "Main", "Change"][:columns]
+    lines += [markdown_table(header, [row[:columns] for row in rows]), ""]
+
+    test_rows = []
+    changed_rows = []
+    for name, measure in tests.items():
+        old = old_tests.get(name)
+        words, significant = change_text(measure, old)
+        row = [name, measure.text(), old.text() if old else "", words]
+        test_rows.append(row)
+        if significant:
+            changed_rows.append(row)
+    if baseline is not None:
+        if changed_rows:
+            lines += [f"{len(changed_rows)} tests changed more than the noise:", ""]
+            lines += [markdown_table(["Test", "Xenon", "Main", "Change"], changed_rows), ""]
+        else:
+            lines += ["No test changed more than the noise.", ""]
+    lines += [
+        f"<details><summary>Every test ({len(test_rows)})</summary>",
+        "",
+        markdown_table(["Test", *header[1:]], [row[:columns] for row in test_rows]),
+        "",
+        "</details>",
+    ]
+    return "\n".join(lines)
+
+
+def report_browserbench(payload: dict, baseline: dict | None) -> str:
+    old_scores = {}
+    if baseline is not None:
+        old_scores = {suite["suite"]: suite.get("score") for suite in baseline["result"]["suites"]}
+    rows = []
+    for suite in payload["result"]["suites"]:
+        score = suite.get("score")
+        old = old_scores.get(suite["suite"])
+        change = f"{(score / old - 1) * 100:+.1f}%" if score and old else ""
+        rows.append([suite["suite"], f"{score:.4g}" if score else "no score", f"{old:.4g}" if old else "", change])
+    lines = [
+        "#### BrowserBench",
+        "",
+        "One run of each suite, so there's no telling noise from change here; higher is better.",
+        "",
+    ]
+    columns = 2
+    if baseline is not None:
+        lines += [f"The Main column is main's run of {baseline['recorded_at'][:10]}.", ""]
+        columns = 4
+    header = ["Suite", "Xenon", "Main", "Change"][:columns]
+    return "\n".join(lines + [markdown_table(header, [row[:columns] for row in rows])])
 
 
 def run_browser(label: str, command: list[str], settle: float) -> dict:
