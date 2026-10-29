@@ -27,9 +27,11 @@ namespace Ladybird {
 // The Chrome Web Store IDs of the extensions, which their developers' keys give them.
 static constexpr auto BITWARDEN_ID = "nngceckbapebfimnlniiiahkandclblb"sv;
 static constexpr auto PROTON_PASS_ID = "ghmbeldphafepmbegfdlkpapadhbakde"sv;
+static constexpr auto ONE_PASSWORD_ID = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"sv;
 static constexpr auto ICLOUD_PASSWORDS_ID = "pejdijmoenmkgeppbflobdenhhabjlaj"sv;
 
-// For tests, whose extensions are signed with keys of their own: "bitwarden=<id>,proton-pass=<id>,icloud-passwords=<id>".
+// For tests, whose extensions are signed with keys of their own:
+// "bitwarden=<id>,proton-pass=<id>,1password=<id>,icloud-passwords=<id>".
 static constexpr auto EXTENSION_IDS_VARIABLE = "XENON_PASSWORD_MANAGER_IDS"sv;
 
 static constexpr auto STATE_NAME = "password-manager-updates.json"sv;
@@ -67,6 +69,7 @@ PasswordManagers::PasswordManagers()
 {
     m_choices.append({ .id = "bitwarden"sv, .name = "Bitwarden"sv, .extension_id = MUST(String::from_utf8(BITWARDEN_ID)) });
     m_choices.append({ .id = "proton-pass"sv, .name = "Proton Pass"sv, .extension_id = MUST(String::from_utf8(PROTON_PASS_ID)) });
+    m_choices.append({ .id = "1password"sv, .name = "1Password"sv, .extension_id = MUST(String::from_utf8(ONE_PASSWORD_ID)) });
     m_choices.append({
         .id = "icloud-passwords"sv,
         .name = "iCloud Passwords"sv,

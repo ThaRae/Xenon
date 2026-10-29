@@ -22,7 +22,7 @@ namespace Ladybird {
 // The password managers Xenon offers to set up, as Helium offers them during setup: the extension each one's developer
 // publishes in the Chrome Web Store. Choosing one downloads and installs it (UI/Extensions/WebStore.h), and it then
 // loads every session, and is checked for updates once a day, until it's removed or another is chosen. Xenon bundles
-// neither, so it redistributes neither: each is fetched from its developer's own store listing, signed by them.
+// none of them, so it redistributes none: each is fetched from its developer's own store listing, signed by them.
 //
 // iCloud Passwords is offered only on macOS. Its extension talks to Apple's Password Manager through native messaging
 // (UI/Extensions/NativeMessaging.h), using the helper macOS registers for Chrome. Linux has no such helper.

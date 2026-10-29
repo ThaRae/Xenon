@@ -229,11 +229,11 @@ for now (`UI/PasswordManagers`):
    until it's removed, which deletes its files with its storage. A new version of an extension that's running waits for
    the next start, as Chrome waits for an extension to be idle; the start after removes the old version's files.
 
-Xenon bundles neither password manager. Bitwarden's extension is GPL-3.0, with parts under the Bitwarden License,
-and Bitwarden grants no rights to its marks; Proton Pass is GPL-3.0. Fetching the developers' own store builds, at the
-user's choice, means Xenon redistributes nothing, and the page names them in plain text, with no logos. Helium
-installs them from the store too, through a proxy of its own that keeps Google from seeing which extensions a user
-installs; Xenon asks the store directly, and the welcome page says so.
+Xenon bundles none of the password managers. Bitwarden's extension is GPL-3.0, with parts under the Bitwarden License,
+and Bitwarden grants no rights to its marks; Proton Pass is GPL-3.0; 1Password is proprietary. Fetching the developers'
+own store builds, at the user's choice, means Xenon redistributes nothing, and the page names them in plain text, with
+no logos. Helium installs them from the store too, through a proxy of its own that keeps Google from seeing which
+extensions a user installs; Xenon asks the store directly, and the welcome page says so.
 
 ### Serving `chrome-extension://`
 
@@ -508,11 +508,11 @@ for Bitwarden in Chrome.
   signs with test keys: a valid one, one for another extension, one changed after it was signed, one the store didn't
   sign, and one whose zip has an entry named `../escape.txt`. It checks the store's update check answers and version
   comparisons too. `Meta/xenon.py test` serves the same files from a stand-in for the store, and, with
-  `--password-manager`, installs a stand-in for Bitwarden, finds it running at once and at the next start, installs it
-  again once its files are deleted, updates it a day later from the next start, turns down a tampered update and one
-  the store didn't sign, switches to a stand-in for Proton Pass, and removes it. The test extension also talks to a
-  local native messaging host (`Tests/NativeMessaging/echo_host.py`), and is refused a missing host and one that
-  doesn't list it.
+  `--password-manager`, names the offered managers (1Password among them) when asked for one it doesn't have, installs a
+  stand-in for Bitwarden, finds it running at once and at the next start, installs it again once its files are deleted,
+  updates it a day later from the next start, turns down a tampered update and one the store didn't sign, switches to a
+  stand-in for Proton Pass, and removes it. The test extension also talks to a local native messaging host
+  (`Tests/NativeMessaging/echo_host.py`), and is refused a missing host and one that doesn't list it.
 - The real store, by hand: Bitwarden 2026.10.0 and Proton Pass 1.43.0 install from it with their store IDs, which
   checks Google's publisher key and the store's real files.
 - Real extensions: Bitwarden's unpacked Chrome MV3 build (`npm run build:chrome` in `bitwarden/clients/apps/browser`)
@@ -655,6 +655,8 @@ for Bitwarden in Chrome.
   host lookup, Chrome's stdio framing, and keeping an idle background running while a native port is open. The rest
   of this milestone (`webRequest` events, notifications, `contextMenus`) is not.
 - [ ] **Milestone 5: installing from the store** (under way). Done: CRX3 installs, updates once a day, and removal,
-  for the password managers the welcome page offers: Bitwarden, Proton Pass, and iCloud Passwords on macOS. Left:
-  installing any extension from the store (from its page or ID), and 1Password. iCloud Passwords' extension has not
-  been tried by hand against Apple's helper.
+  for the password managers the welcome page offers: Bitwarden, Proton Pass, 1Password
+  (`aeblfdkhhhdcdjpifhhbdiojplfjncoa`), and iCloud Passwords on macOS. Left: installing any extension from the store
+  (from its page or ID). Neither 1Password nor iCloud Passwords has been tried by hand: 1Password's desktop-app unlock
+  goes through `nativeMessaging` now, and whatever else it uses beyond Bitwarden and Proton Pass hasn't been catalogued
+  yet; iCloud Passwords' extension hasn't been tried against Apple's helper.
