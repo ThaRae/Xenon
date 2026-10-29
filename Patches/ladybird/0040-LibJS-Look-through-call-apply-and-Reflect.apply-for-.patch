@@ -1,0 +1,209 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Thu, 29 Oct 2026 09:08:15 -0400
+Subject: [PATCH] LibJS: Look through call, apply and Reflect.apply for a
+ function's caller
+
+A sloppy function's caller property gave null when the function was
+called through Function.prototype.call or apply, or Reflect.apply, as
+the frame below its own is that of the built-in. These call their
+target as a tail call (PrepareForTailCall()), so the function that
+called them is the caller, as in V8, SpiderMonkey and JavaScriptCore.
+
+Ext JS finds the methods it overrides this way, as callParent() calls
+callOverrideParent() through apply(), and that reads caller.caller.
+Without this, Ext JS 6 apps such as the web UI of Proxmox VE threw
+when they started, and showed an empty page.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../src/runtime/ecmascript_function_object.rs | 22 ++++++++-
+ .../Rust/src/runtime/function_prototype.rs    |  6 ++-
+ .../LibJS/Rust/src/runtime/reflect_object.rs  | 13 ++++-
+ .../function-legacy-caller-arguments.js       | 49 +++++++++++++++++++
+ 4 files changed, 87 insertions(+), 3 deletions(-)
+
+diff --git a/Libraries/LibJS/Rust/src/runtime/ecmascript_function_object.rs b/Libraries/LibJS/Rust/src/runtime/ecmascript_function_object.rs
+index c14c3dd80aac982d794312e19f71826ad8f48ec4..63d424e8fa37bfe3b50a8102f699935a8268ec86 100644
+--- a/Libraries/LibJS/Rust/src/runtime/ecmascript_function_object.rs
++++ b/Libraries/LibJS/Rust/src/runtime/ecmascript_function_object.rs
+@@ -24,7 +24,7 @@ use crate::layout::cell::Gc;
+ use crate::layout::environment::{Environment, PrivateEnvironment};
+ use crate::layout::execution_context::{ExecutionContext, ScriptOrModule};
+ pub use crate::layout::function_object::EcmascriptFunctionObject;
+-use crate::layout::function_object::ecmascript_function_flags;
++use crate::layout::function_object::{RawNativeFunction, ecmascript_function_flags};
+ use crate::layout::object::{IndexedStorageKind, Object};
+ use crate::layout::value::Value;
+ use crate::layout_forward::FlyStringSlot;
+@@ -39,6 +39,7 @@ use crate::runtime::error::ErrorKind;
+ use crate::runtime::error_types::ErrorType;
+ use crate::runtime::function_environment::FunctionEnvironment;
+ use crate::runtime::function_object::{FUNCTION_OBJECT_METHODS, FunctionObject};
++use crate::runtime::function_prototype::FunctionPrototype;
+ use crate::runtime::generator_object::{GeneratingFunction, GeneratorObject};
+ use crate::runtime::intrinsics::Intrinsics;
+ use crate::runtime::object::{
+@@ -49,6 +50,7 @@ use crate::runtime::property_attributes::{Attribute, PropertyAttributes};
+ use crate::runtime::property_descriptor::PropertyDescriptor;
+ use crate::runtime::property_key::PropertyKey;
+ use crate::runtime::realm::Realm;
++use crate::runtime::reflect_object::ReflectObject;
+ use crate::runtime::shared_function_instance_data::{
+     ClassFieldInitializerName, ConstructorKind, FunctionKind, SharedFunctionInstanceData, ThisMode,
+ };
+@@ -154,6 +156,17 @@ pub fn value_as_ecmascript_function_object(value: Value) -> Option<Gc<Ecmascript
+     as_ecmascript_function_object(value.as_object())
+ }
+ 
++/// Whether the function is a built-in that calls another function as a tail call: Function.prototype.call or apply, or
++/// Reflect.apply.
++fn calls_target_as_tail_call(vm: &Vm, function: Gc<FunctionObject>) -> bool {
++    let Some(function) = function.upcast::<Object>().downcast::<RawNativeFunction>() else {
++        return false;
++    };
++    FunctionPrototype::is_call_function(vm, &function)
++        || FunctionPrototype::is_apply_function(vm, &function)
++        || ReflectObject::is_apply_function(vm, &function)
++}
++
+ fn prototype_for_function_kind(realm: Gc<Realm>, kind: FunctionKind) -> Gc<Object> {
+     match kind {
+         FunctionKind::Normal => realm.function_prototype(),
+@@ -986,6 +999,13 @@ impl EcmascriptFunctionObject {
+                 return ControlFlow::Continue(());
+             };
+ 
++            // NB: Function.prototype.call and apply and Reflect.apply call their target as a tail call
++            //     (PrepareForTailCall()), so the function that called them is the caller, as in other engines. Ext JS
++            //     finds the methods it overrides this way.
++            if calls_target_as_tail_call(vm, function) {
++                return ControlFlow::Continue(());
++            }
++
+             caller = as_ecmascript_function_object(function);
+             ControlFlow::Break(())
+         });
+diff --git a/Libraries/LibJS/Rust/src/runtime/function_prototype.rs b/Libraries/LibJS/Rust/src/runtime/function_prototype.rs
+index f97d8317d2eac50046b8e190bf66b38aa9ece2c2..8e0fda4a94b29ef4756a3a67892f0f624e0f23ed 100644
+--- a/Libraries/LibJS/Rust/src/runtime/function_prototype.rs
++++ b/Libraries/LibJS/Rust/src/runtime/function_prototype.rs
+@@ -83,7 +83,11 @@ define_object_class!(FunctionPrototype, extends: [FunctionObject, Object], metho
+ pub(crate) static APPLY_FUNCTION: RawNativeFunctionPointer = raw_native!(FunctionPrototype::apply);
+ pub(crate) static CALL_FUNCTION: RawNativeFunctionPointer = raw_native!(FunctionPrototype::call);
+ 
+-fn is_native_function(vm: &Vm, function: &RawNativeFunction, native_function: RawNativeFunctionPointer) -> bool {
++pub(crate) fn is_native_function(
++    vm: &Vm,
++    function: &RawNativeFunction,
++    native_function: RawNativeFunctionPointer,
++) -> bool {
+     let address = |pointer: RawNativeFunctionPointer| pointer.map(|pointer| pointer as usize);
+     address(function.native_function(vm)) == address(native_function)
+ }
+diff --git a/Libraries/LibJS/Rust/src/runtime/reflect_object.rs b/Libraries/LibJS/Rust/src/runtime/reflect_object.rs
+index 553471e5aac5b2c886b7a3c5a9fb1692a99f6b97..c16a28c67258209fe2dd9b9c57f7abefa21c37ef 100644
+--- a/Libraries/LibJS/Rust/src/runtime/reflect_object.rs
++++ b/Libraries/LibJS/Rust/src/runtime/reflect_object.rs
+@@ -9,13 +9,16 @@ use libjs_runtime_macros::Trace;
+ use crate::gc::class::{GcCell, define_cell};
+ use crate::interpreter::vm::Vm;
+ use crate::layout::cell::Gc;
++use crate::layout::function_object::RawNativeFunction;
+ use crate::layout::object::Object;
+ use crate::layout::value::Value;
++use crate::layout_forward::RawNativeFunctionPointer;
+ use crate::runtime::abstract_operations::{call_function_object, construct, create_list_from_array_like};
+ use crate::runtime::array::Array;
+ use crate::runtime::completion::ThrowCompletionOr;
+ use crate::runtime::error::ErrorKind;
+ use crate::runtime::error_types::ErrorType;
++use crate::runtime::function_prototype::is_native_function;
+ use crate::runtime::native_function::raw_native;
+ use crate::runtime::object::{
+     MayInterfereWithIndexedPropertyAccess, ORDINARY_OBJECT_METHODS, PropertyLookupPhase, define_object_class,
+@@ -37,7 +40,15 @@ define_object_class!(ReflectObject, extends: [Object], methods: {
+     ..ORDINARY_OBJECT_METHODS
+ });
+ 
++/// The native function of Reflect.apply, which calls its target as a tail call.
++pub(crate) static APPLY_FUNCTION: RawNativeFunctionPointer = raw_native!(ReflectObject::apply);
++
+ impl ReflectObject {
++    /// Whether the function is Reflect.apply (of any realm).
++    pub fn is_apply_function(vm: &Vm, function: &RawNativeFunction) -> bool {
++        is_native_function(vm, function, APPLY_FUNCTION)
++    }
++
+     pub fn create(vm: &Vm, realm: Gc<Realm>) -> Gc<ReflectObject> {
+         realm.create_object(vm, |_| ReflectObject {
+             base: Object::new_with_prototype(
+@@ -55,7 +66,7 @@ impl ReflectObject {
+         let define_native_function = |property_key: &PropertyKey, function, length| {
+             object.define_native_function(vm, realm, property_key, function, length, attr, None);
+         };
+-        define_native_function(&names.apply, raw_native!(ReflectObject::apply), 3);
++        define_native_function(&names.apply, APPLY_FUNCTION, 3);
+         define_native_function(&names.construct, raw_native!(ReflectObject::construct), 2);
+         define_native_function(&names.defineProperty, raw_native!(ReflectObject::define_property), 3);
+         define_native_function(&names.deleteProperty, raw_native!(ReflectObject::delete_property), 2);
+diff --git a/Tests/LibJS/Runtime/functions/function-legacy-caller-arguments.js b/Tests/LibJS/Runtime/functions/function-legacy-caller-arguments.js
+index 0b11557dca96ac1d934da6791fdc2a6da963a51e..855400d67882ec1b1d9b0de755962715428b3138 100644
+--- a/Tests/LibJS/Runtime/functions/function-legacy-caller-arguments.js
++++ b/Tests/LibJS/Runtime/functions/function-legacy-caller-arguments.js
+@@ -23,6 +23,55 @@ test("legacy caller property exposes only ordinary sloppy callers", () => {
+     expect([1].map(getCaller)[0]).toBeNull();
+ });
+ 
++test("legacy caller looks through call, apply and Reflect.apply", () => {
++    function getCaller() {
++        return getCaller.caller;
++    }
++
++    function viaCall() {
++        return getCaller.call(this);
++    }
++
++    function viaApply() {
++        return getCaller.apply(this, []);
++    }
++
++    function viaReflectApply() {
++        return Reflect.apply(getCaller, this, []);
++    }
++
++    function viaCallOfCall() {
++        return Function.prototype.call.call(getCaller, this);
++    }
++
++    function strictViaApply() {
++        "use strict";
++        return getCaller.apply(this, []);
++    }
++
++    expect(viaCall()).toBe(viaCall);
++    expect(viaApply()).toBe(viaApply);
++    expect(viaReflectApply()).toBe(viaReflectApply);
++    expect(viaCallOfCall()).toBe(viaCallOfCall);
++    expect(strictViaApply()).toBeNull();
++    expect(getCaller.apply(this, [])).toBeNull();
++
++    // Ext JS calls the methods it overrides like this.
++    function callOverridden() {
++        return callOverridden.caller.caller;
++    }
++
++    function callParent() {
++        return callOverridden.apply(this, arguments);
++    }
++
++    function overridingMethod() {
++        return callParent();
++    }
++
++    expect(overridingMethod()).toBe(overridingMethod);
++});
++
+ test("legacy arguments property exposes the active arguments object", () => {
+     function getArguments(a, b) {
+         return getArguments.arguments;

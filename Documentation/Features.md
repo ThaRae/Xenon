@@ -327,9 +327,12 @@ connection isn't private**, and why, first of all:
 and its SHA-256 fingerprint) and **Proceed to *host* (unsafe)**, for a site you know, like a homelab server with a
 self-signed certificate.
 
-- **What proceeding accepts**: that certificate, and only it, for the site's host and port, WebSockets included. Another
-  port, or another certificate on the same one, gets the warning again. Xenon forgets it when it quits, or a private
-  window's when the private windows close.
+- **What proceeding accepts**: that certificate, and only it, for the site's host and port: the page and everything it
+  loads from there, `fetch()`, `XMLHttpRequest` and WebSockets included. Another port, or another certificate on the
+  same one, gets the warning again. Xenon forgets it when it quits, or a private window's when the private windows close.
+- **Web UIs built on Ext JS**, like Proxmox VE's, find the methods they override by reading a function's `caller`
+  through `apply()`. Engine patch `0040` (`LibJS: Look through call, apply and Reflect.apply for a function's caller`)
+  makes that work as in other browsers; without it, they showed an empty page past the warning.
 - **Sites that can't be proceeded to**: a site that told Xenon to reach it securely only (HSTS), whose certificate
   errors are fatal (RFC 6797 §12.1), as in Chrome. A site reached over a certificate the user accepted can't become
   one that way.

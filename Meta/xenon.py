@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import http.server
 import json
@@ -1485,21 +1486,97 @@ def check_session_restore(executable: Path, env: dict) -> bool:
 # Opens a page on a local HTTPS server whose certificate is self-signed. Xenon refuses the certificate, and shows its
 # warning in place of the page, saying why (UI/CertificateErrors.h). Nothing can click in a headless browser, so XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS
 # has the warning print what it shows and then proceed, as the user would. The page then loads, and closes the browser.
+#
+# The page is made like the web UIs of homelab servers, such as Proxmox VE's: it loads a stylesheet and a script, and
+# calls fetch(), XMLHttpRequest and a WebSocket on the same host and port, which the accepted certificate has to cover
+# too. Its script calls a method the way Ext JS (which Proxmox VE's UI is built on) does, reading caller through apply().
 def check_certificate_errors(executable: Path, env: dict) -> bool:
-    page = f"""<!doctype html><title>Xenon certificate test</title><script>
-        console.log("{CERTIFICATE_ERROR_TEST_MARKER}" + JSON.stringify({{ loaded: location.href }}));
-        window.close();
-    </script>""".encode()
+    page = f"""<!doctype html><title>Xenon certificate test</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/script.js"></script>
+    <script>
+        const report = {{ loaded: location.href, script: window.scriptResult ?? null }};
+        // The console escapes quotes in what it prints, which the report's JSON has to do without.
+        const failure = error => `failed: ${{String(error).replaceAll('"', "'")}}`;
+        async function attempt(name, request) {{
+            try {{
+                report[name] = await request();
+            }} catch (error) {{
+                report[name] = failure(error);
+            }}
+        }}
+        addEventListener("load", async () => {{
+            report.stylesheet = getComputedStyle(document.body).color;
+            await attempt("fetch", async () => (await fetch("/data.json")).json());
+            await attempt("xhr", () => new Promise((resolve, reject) => {{
+                const request = new XMLHttpRequest();
+                request.open("GET", "/data.json?xhr");
+                request.onload = () => resolve(JSON.parse(request.responseText));
+                request.onerror = () => reject("error");
+                request.send();
+            }}));
+            await attempt("webSocket", () => new Promise((resolve, reject) => {{
+                const socket = new WebSocket(`wss://${{location.host}}/socket`);
+                socket.onmessage = event => resolve(event.data);
+                socket.onclose = event => reject(`closed with ${{event.code}}`);
+                setTimeout(() => reject("timed out"), 10000);
+            }}));
+            console.log("{CERTIFICATE_ERROR_TEST_MARKER}" + JSON.stringify(report));
+            window.close();
+        }});
+    </script>
+    <body>Xenon certificate test</body>""".encode()
+    # Ext JS's callParent() calls the method an override replaced through apply(), and that finds the override from
+    # caller.caller.
+    script = b"""
+        function callOverridden() { return callOverridden.caller.caller.name; }
+        function callParent() { return callOverridden.apply(this, arguments); }
+        function overridingMethod() { return callParent(); }
+        try {
+            window.scriptResult = overridingMethod();
+        } catch (error) {
+            window.scriptResult = `failed: ${String(error).replaceAll('"', "'")}`;
+        }
+    """
+    resources = {
+        "/": ("text/html", page),
+        "/style.css": ("text/css", b"body { color: rgb(1, 2, 3); }"),
+        "/script.js": ("text/javascript", script),
+        "/data.json": ("application/json", b'{"ok": true}'),
+    }
+    web_socket_message = "hello over the accepted certificate"
     requested: list[str] = []
 
     class Handler(http.server.BaseHTTPRequestHandler):
+        # WebSockets need HTTP/1.1.
+        protocol_version = "HTTP/1.1"
+
         def do_GET(self):
             requested.append(self.path)
+            if self.path == "/socket":
+                self.answer_web_socket()
+                return
+            content_type, body = resources.get(urllib.parse.urlsplit(self.path).path, resources["/"])
             self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.send_header("Content-Length", str(len(page)))
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(page)
+            self.wfile.write(body)
+
+        # https://www.rfc-editor.org/rfc/rfc6455#section-4.2.2: the handshake, then one unmasked text frame.
+        def answer_web_socket(self):
+            key = self.headers.get("Sec-WebSocket-Key", "") + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+            self.send_response(101)
+            self.send_header("Upgrade", "websocket")
+            self.send_header("Connection", "Upgrade")
+            self.send_header("Sec-WebSocket-Accept", base64.b64encode(hashlib.sha1(key.encode()).digest()).decode())
+            self.end_headers()
+            message = web_socket_message.encode()
+            self.wfile.write(bytes([0x81, len(message)]) + message)
+            self.wfile.flush()
+            # The page closes the browser once it has the message.
+            time.sleep(5)
+            self.close_connection = True
 
         def log_message(self, *args):
             pass
@@ -1557,6 +1634,20 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
         "proceeds to the site, which loads",
         loaded is not None and loaded["loaded"] == url and "/" in requested,
         f"the page reported {loaded}, and the server was asked for {requested}",
+    )
+    loaded = loaded or {}
+    expect(
+        "the site's stylesheet, fetch(), XMLHttpRequest and WebSocket go over the accepted certificate",
+        loaded.get("stylesheet") == "rgb(1, 2, 3)"
+        and loaded.get("fetch") == {"ok": True}
+        and loaded.get("xhr") == {"ok": True}
+        and loaded.get("webSocket") == web_socket_message,
+        f"the page reported {loaded}, and the server was asked for {requested}",
+    )
+    expect(
+        "its script runs, and finds the caller of a function called through apply(), as Ext JS does",
+        loaded.get("script") == "overridingMethod",
+        f"the script reported {loaded.get('script')}",
     )
     # The warning on its own, opened at its address, knows of no certificate to accept for the site.
     with tempfile.TemporaryDirectory() as profile:
