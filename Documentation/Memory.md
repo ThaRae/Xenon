@@ -77,6 +77,10 @@ load, PSS so shared mappings are not double-counted), two runs, `Meta/measure.py
 YouTube with blocking on is ~390 MiB PSS above blocking off on this machine. GitHub is slightly *lower* with blocking
 on. JSON: `Meta/measure-results/browsers-1.json` and `browsers-2.json`.
 
+After skipping the spare WebContent process, decommitting after load, and caching blocker verdicts, PSS with blocking
+on was local 439, github 1161, youtube 2152, x.com 1290 (one fewer WebContent on each page). Speedometer 3.1 headless
+on this box scored 7.24.
+
 ## Experiments
 
 | # | Change | What it does | Delta | Keep? | Portability |
@@ -85,6 +89,9 @@ on. JSON: `Meta/measure-results/browsers-1.json` and `browsers-2.json`.
 | 1 | Hibernate on memory pressure | Background tabs discard when PSI / MemAvailable say the machine is short of memory, as Chromium Memory Saver does, not only after the 2 h timeout | Not re-measured in this environment (no full Xenon build). Chromium's equivalent is the difference between "many background tabs sit forever" and "they go away under pressure". Unit-tested in `TestXenonMemoryPressure`. | keep | Xenon UI only (`UI/MemoryPressure.cpp`, `TabHibernation.cpp`, a XenonSettings key). Survives a Ladybird rebase as long as `prepare_for_discard()` (#23) still exists. |
 | 2 | Spare process skips the content blocker | The pre-warmed WebContent process no longer builds the engine until a tab takes it | About 10–13 MiB RSS in the spare process, plus the ~90 MiB peak while it used to build, from #34's per-process engine cost. New tabs pay ~0.4 s to build the engine on first use. | keep | One small `LibWebView` patch (`0039`). Touches `send_content_blockers()` / spare launch, the same seam #34 and #35 already use. |
 | 3 | GC when a page is hidden | WebContent collects the JS heap and returns mimalloc pages when the UI hides the tab | Helps background tabs, not the foreground YouTube/GitHub/X tab. Same idea as #34's `ak_kmalloc_collect()` after building the engine. | keep | One small `WebContent` patch (`0038`). Hooks `set_system_visibility_state`, which Ladybird already has. |
+| 4 | Skip spare WebContent | Xenon does not pre-warm an idle WebContent process | Linux PSS: local 644→439, github 1212→1161, youtube 2496→2152, x.com 1413→1290 (WC count −1) | keep | `UI/Application.cpp` + `LibWebView` option (`0041`) |
+| 5 | Decommit after load | GC + `ak_kmalloc_decommit_free_pages` 4s after load finish | Folded into the PSS numbers above; `TestXenonAllocatorRelease` drives the shipped decommit | keep | `WebContent` + `AK` in `0041` |
+| 6 | Blocker verdict cache | Cache 1024 request checks; skip data:/blob:/about: | Crate: 0 mismatches on 1,818,984 requests | keep | ContentBlocker Rust in `0041` |
 
 Reverted: none. LTO/PGO, a process cap, a shared mmap'd engine, and dropping YouTube scriptlets were considered and
 left alone: the first two need a full build and a BrowserBench score to judge, sharing the engine needs an adblock-rust
