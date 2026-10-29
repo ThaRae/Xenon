@@ -32,7 +32,7 @@ index 75c2ea530cde6fd62f57339fa7ca4b5814f7fc3b..550c576aa9819e8a0f9ef35938957099
      // session and can race browser shutdown while bootstrapping.
      if (browser_options().webdriver_browser_endpoint.has_value())
 diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
-index b5484cc53edfe3e90ada0ae3134d06f18837b033..2a3ecdd54302a6e79f71dfc62785270a734f5caa 100644
+index c5ac486082e9426a7649dff35c8dca36938c3fd7..2afb8ed0fd1912667cbb00d49c2897f32def19a0 100644
 --- a/Libraries/LibWebView/Options.h
 +++ b/Libraries/LibWebView/Options.h
 @@ -79,6 +79,13 @@ enum class DeferContentBlockerRules {

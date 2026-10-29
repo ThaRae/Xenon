@@ -111,7 +111,7 @@ index 7125e06b82ffc334cb6a7ef38f7ffdcc2855907b..75c2ea530cde6fd62f57339fa7ca4b58
              case HeadlessMode::Manual:
                  load_page_and_exit_on_close(*m_event_loop, *view, m_browser_options.urls.first());
 diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
-index 5951a003c89fa2e6e4cd58fbd78ea46b3909fd88..b5484cc53edfe3e90ada0ae3134d06f18837b033 100644
+index 5951a003c89fa2e6e4cd58fbd78ea46b3909fd88..c5ac486082e9426a7649dff35c8dca36938c3fd7 100644
 --- a/Libraries/LibWebView/Options.h
 +++ b/Libraries/LibWebView/Options.h
 @@ -100,7 +100,7 @@ struct BrowserOptions {
@@ -119,7 +119,7 @@ index 5951a003c89fa2e6e4cd58fbd78ea46b3909fd88..b5484cc53edfe3e90ada0ae3134d06f1
      Optional<HeadlessMode> headless_mode;
      Optional<ByteString> screenshot_path {};
 -    u32 screenshot_delay { 1 };
-+    Optional<u32> screenshot_delay;
++    Optional<u32> screenshot_delay {};
      int window_width { 800 };
      int window_height { 600 };
      NewWindow new_window { NewWindow::No };
