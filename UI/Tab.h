@@ -192,6 +192,8 @@ public slots:
     void focus_location_editor();
     void park_location_editing();
     LocationEdit* location_edit_with_parked_editing() const { return is_loaded() && m_location_edit->has_parked_editing_session() ? m_location_edit : nullptr; }
+    // Xenon: A new tab page's address bar, which takes focus when the tab is selected, as it did when the tab opened.
+    LocationEdit* location_edit_with_hidden_url() const { return is_loaded() && m_location_edit->url_is_hidden() ? m_location_edit : nullptr; }
 
 signals:
     void title_changed(int id, QString const&);

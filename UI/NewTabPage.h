@@ -15,6 +15,13 @@
 namespace Ladybird::NewTabPage {
 
 bool is_new_tab_page(URL::URL const&);
+
+// The address bar leaves out a new tab page's URL, as Chrome's leaves out chrome://newtab, however the tab came to the
+// page: Xenon's own, or an internal page such as about:blank that the user picked in its place. A page on the web that
+// the user picked shows its URL once they leave the address bar, as any other page does.
+bool should_hide_url(URL::URL const&);
+bool should_hide_url(URL::URL const&, URL::URL const& new_tab_page_url);
+
 void populate(WebView::ViewImplementation&, WebView::BrowsingSession&);
 
 }
