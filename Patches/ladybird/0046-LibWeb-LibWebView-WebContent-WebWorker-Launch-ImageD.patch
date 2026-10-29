@@ -20,6 +20,10 @@ Animation session IDs handed to the page are now the plugin's own,
 mapped to the decoder's, since each decoder numbers its sessions from 1
 and a session of a decoder that died must not name a new decoder's.
 
+TestImageDecoderIsolation and the ImageDecoder crash report test now
+decode an image before looking for a decoder, and the isolation test
+checks that a crashed decoder is replaced on the next decode.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  .../Platform/RemoteImageCodecPlugin.cpp       | 89 ++++++++++++++++---
@@ -43,7 +47,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Services/WebWorker/WebWorkerClient.ipc        |  1 +
  Services/WebWorker/WebWorkerServer.ipc        |  1 -
  Services/WebWorker/main.cpp                   |  7 ++
- 21 files changed, 171 insertions(+), 70 deletions(-)
+ .../LibWebView/TestImageDecoderIsolation.cpp  | 82 +++++++++++++----
+ .../LibWebView/test-webdriver-crash-report.py | 17 ++++
+ 23 files changed, 255 insertions(+), 85 deletions(-)
 
 diff --git a/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp b/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp
 index 33c261b5c9cf2c2885f347587f23db5540ef186c..53daee2b0463b5fed678d9ee65c76c0cfcd661e5 100644
@@ -660,3 +666,147 @@ index 0a67011a7a3af1b1a0ac72d205265163066eb67c..b26162a2040be76a4a3dfef7995dd33f
      MediaClient::Client::set_transport_factory([client] {
          return client->request_media_server_transport();
      });
+diff --git a/Tests/LibWebView/TestImageDecoderIsolation.cpp b/Tests/LibWebView/TestImageDecoderIsolation.cpp
+index c774f6187321d70e5c6a62cec81922ec7cf80f8b..76aa57f50a6bd56d69c36a063d98efe3cd837359 100644
+--- a/Tests/LibWebView/TestImageDecoderIsolation.cpp
++++ b/Tests/LibWebView/TestImageDecoderIsolation.cpp
+@@ -4,6 +4,7 @@
+  * SPDX-License-Identifier: BSD-2-Clause
+  */
+ 
++#include <AK/HashMap.h>
+ #include <AK/HashTable.h>
+ #include <AK/LexicalPath.h>
+ #include <AK/Random.h>
+@@ -52,10 +53,31 @@ HashTable<pid_t> processes_of_type(WebView::ProcessType type)
+     return pids;
+ }
+ 
++// The image decoders, by the child ID of the renderer each belongs to. A renderer never has more than one.
++HashMap<u64, pid_t> image_decoders_by_renderer()
++{
++    HashTable<u64> renderers;
++    WebView::Application::process_manager().for_each_process([&](WebView::Process& process) {
++        if (process.type() == WebView::ProcessType::WebContent)
++            renderers.set(process.child_id());
++    });
++
++    HashMap<u64, pid_t> decoders;
++    WebView::Application::process_manager().for_each_process([&](WebView::Process& process) {
++        if (process.type() != WebView::ProcessType::ImageDecoder)
++            return;
++        auto renderer = process.owner_child_id();
++        VERIFY(renderer.has_value() && renderers.contains(*renderer));
++        VERIFY(decoders.set(*renderer, process.pid()) == HashSetResult::InsertedNewEntry);
++    });
++    return decoders;
++}
++
+ }
+ 
+ // An ImageDecoder parses untrusted images, so each renderer has one of its own, and never sees another's images. A
+-// decoder that crashes is replaced for its renderer alone.
++// renderer asks for its decoder when it first decodes an image, and a decoder that crashes is replaced for its renderer
++// alone, when that renderer next decodes one.
+ 
+ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+ {
+@@ -77,26 +99,56 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+ 
+     auto first_view = WebView::HeadlessWebView::create(theme, { 800, 600 });
+     auto second_view = WebView::HeadlessWebView::create(theme, { 800, 600 });
++    VERIFY(processes_of_type(WebView::ProcessType::WebContent).size() >= 2);
++
++    // Wait out the initial about:blank loads; loading a page before they complete would drop it.
++    size_t loads_finished = 0;
++    first_view->on_load_finish = [&](auto const&) { ++loads_finished; };
++    second_view->on_load_finish = [&](auto const&) { ++loads_finished; };
++    Core::EventLoop::current().spin_until([&] { return loads_finished >= 2; });
+ 
+-    auto renderers = processes_of_type(WebView::ProcessType::WebContent);
+-    auto decoders = processes_of_type(WebView::ProcessType::ImageDecoder);
+-    VERIFY(renderers.size() >= 2);
+-    VERIFY(decoders.size() == renderers.size());
++    // A page without images never needs a decoder.
++    VERIFY(processes_of_type(WebView::ProcessType::ImageDecoder).is_empty());
+ 
+-    auto crashed_decoder = *decoders.begin();
+-    TRY(Core::System::kill(crashed_decoder, SIGKILL));
++    auto page_with_an_image = R"(<!doctype html><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAD0lEQVR4AQEEAPv/AACAAAEEAIEu/TP9AAAAAElFTkSuQmCC">)"sv;
++    first_view->load_html(page_with_an_image);
++    second_view->load_html(page_with_an_image);
++    Core::EventLoop::current().spin_until([&] { return image_decoders_by_renderer().size() == 2; });
+ 
+-    // The replacement is launched as the Browser learns that the decoder died, so this cannot finish without it.
++    auto decoders = image_decoders_by_renderer();
++    auto crashed = *decoders.begin();
++    TRY(Core::System::kill(crashed.value, SIGKILL));
+     Core::EventLoop::current().spin_until([&] {
+-        return !processes_of_type(WebView::ProcessType::ImageDecoder).contains(crashed_decoder);
++        return !processes_of_type(WebView::ProcessType::ImageDecoder).contains(crashed.value);
+     });
+ 
+-    // A spare renderer may have been launched meanwhile, with a decoder of its own.
+-    auto decoders_after_crash = processes_of_type(WebView::ProcessType::ImageDecoder);
+-    VERIFY(decoders_after_crash.size() == processes_of_type(WebView::ProcessType::WebContent).size());
+-    for (auto decoder : decoders) {
+-        if (decoder != crashed_decoder)
+-            VERIFY(decoders_after_crash.contains(decoder));
++    // A decode may reach the dead decoder before its renderer learns that it died, and fail, so the page tries until
++    // one works. The fragment makes each attempt a new image.
++    auto decode_another_image = R"(
++        (async () => {
++            for (let attempt = 0; attempt < 100; ++attempt) {
++                const image = new Image();
++                image.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGgAAACEAIHJde6SAAAAAElFTkSuQmCC#" + attempt;
++                try {
++                    await image.decode();
++                    return;
++                } catch {
++                    await new Promise(resolve => setTimeout(resolve, 50));
++                }
++            }
++        })();
++    )"_string;
++    first_view->run_javascript(decode_another_image);
++    second_view->run_javascript(decode_another_image);
++    Core::EventLoop::current().spin_until([&] { return image_decoders_by_renderer().contains(crashed.key); });
++
++    // The renderer whose decoder crashed has a new one, and the other kept its own.
++    auto decoders_after_crash = image_decoders_by_renderer();
++    VERIFY(decoders_after_crash.size() == 2);
++    VERIFY(decoders_after_crash.get(crashed.key).value() != crashed.value);
++    for (auto const& decoder : decoders) {
++        if (decoder.key != crashed.key)
++            VERIFY(decoders_after_crash.get(decoder.key).value_or(0) == decoder.value);
+     }
+ 
+     outln("PASS: each renderer has an image decoder of its own, which is replaced alone when it crashes");
+diff --git a/Tests/LibWebView/test-webdriver-crash-report.py b/Tests/LibWebView/test-webdriver-crash-report.py
+index 0742d08f0851358d491bc0f2eb1658f85ce484df..b692f40196650335da289ad6c81acad7de42d7a2 100755
+--- a/Tests/LibWebView/test-webdriver-crash-report.py
++++ b/Tests/LibWebView/test-webdriver-crash-report.py
+@@ -95,6 +95,23 @@ def run_test(webdriver_binary, process_name):
+                         },
+                     )
+                     assert status == 200 and payload == {"value": None}, body
++                elif process_name == "ImageDecoder":
++                    # A renderer launches its image decoder when it first decodes an image.
++                    status, payload, body = webdriver_helpers.request(
++                        port,
++                        "POST",
++                        f"/session/{session}/execute/async",
++                        {
++                            "script": """
++                            const done = arguments[0];
++                            const image = new Image();
++                            image.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAD0lEQVR4AQEEAPv/AACAAAEEAIEu/TP9AAAAAElFTkSuQmCC";
++                            image.decode().then(() => done(), () => done('decode failed'));
++                        """,
++                            "args": [],
++                        },
++                    )
++                    assert status == 200 and payload == {"value": None}, body
+                 crash_helper(webdriver.pid, process_name)
+             directory = Path(temporary) / "data/Ladybird/CrashReports"
+             deadline = time.monotonic() + webdriver_helpers.EVENT_TIMEOUT_SECONDS

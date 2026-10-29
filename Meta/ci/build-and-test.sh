@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Builds Xenon and runs its tests inside Ladybird's CI image (see Meta/ci/build-in-ladybird-image.sh).
+# Builds Xenon and runs its tests inside Ladybird's CI image (see Meta/ci/build-in-ladybird-image.sh), then Ladybird's own
+# tests against the patched engine (Meta/xenon.py ladybird-test), as Ladybird's CI runs them in the same image. Both run,
+# whatever the other's result, and the script fails if either does.
 #
 # ccache's counters for the run go in Build/release/ccache-stats.txt, for people, and ccache-stats.tsv, which CI reads
 # to decide whether a pull request saves its own caches. Meta/ci/build-environment.sh sets up the build (JOBS and
@@ -15,6 +17,18 @@ source Meta/ci/start-xvfb.sh
 # The tests run in a D-Bus session of their own, as a desktop session has.
 status=0
 dbus-run-session -- ./Meta/xenon.py --jobs "$JOBS" test || status=$?
+
+# Ladybird's CI gives its tests a PulseAudio server with a sink that plays nothing.
+if command -v pulseaudio >/dev/null; then
+  export PULSE_SERVER=unix:/tmp/pulse-native
+  pulseaudio --system -D --exit-idle-time=1800 \
+    --load="module-native-protocol-unix auth-anonymous=1 socket=/tmp/pulse-native" \
+    --load="module-null-sink sink_name=virtual_sink" || true
+fi
+ladybird_status=0
+./Meta/xenon.py --jobs "$JOBS" ladybird-test || ladybird_status=$?
+((ladybird_status == 0)) || echo "::error::Ladybird's own tests failed against the patched engine (see the ctest output above)"
+((status != 0)) || status=$ladybird_status
 
 ccache --show-stats > Build/release/ccache-stats.txt 2>&1 || true
 ccache --print-stats > Build/release/ccache-stats.tsv 2>/dev/null || true
