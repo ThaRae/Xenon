@@ -55,7 +55,7 @@ TESTS_TARGET = "xenon-tests"
 SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
 
 # Text on Xenon's welcome page that Ladybird's doesn't have.
-WELCOME_PAGE_TEXT = "Use Xenon's picks"
+WELCOME_PAGE_TEXT = "Choose for myself"
 
 # The headless screenshot is taken this long after the load starts, not after it finishes.
 WELCOME_SCREENSHOT_DELAY_SECONDS = 4
@@ -99,6 +99,7 @@ FILTER_LIST_UPDATES_MARKER = "XENON-FILTER-LIST-UPDATES-TEST "
 # A test extension whose pages check the chrome.* APIs and print what they found on a line starting with this.
 TEST_EXTENSION_DIR = XENON_SOURCE_DIR / "Tests" / "Extensions" / "basic"
 EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
+NATIVE_MESSAGING_ECHO_HOST = XENON_SOURCE_DIR / "Tests" / "NativeMessaging" / "echo_host.py"
 
 # A local HTTPS server's self-signed certificate (Tests/CertificateErrors). Xenon's certificate warning and the server's
 # page each print what they found on a line starting with the marker.
@@ -817,6 +818,16 @@ def check_password_managers(executable: Path, env: dict) -> bool:
             def downloads() -> list[str]:
                 return [path for path in requested if path.startswith("/crx/")]
 
+            found, output = run(profile, "--password-manager=not-a-manager")
+            expect(
+                "names the offered password managers, 1Password included",
+                "There's no password manager called not-a-manager" in output
+                and "1password" in output
+                and "bitwarden" in output
+                and "proton-pass" in output,
+                output,
+            )
+
             found, output = run(profile, "--password-manager=bitwarden", tries=40)
             expect(
                 "installs the chosen one from the store, and it runs at once",
@@ -899,6 +910,15 @@ def check_password_managers(executable: Path, env: dict) -> bool:
             expect(
                 "removes it when none is chosen", found is None and installed() == {}, output, f"{found}, {installed()}"
             )
+
+            if sys.platform != "darwin":
+                found, output = run(profile, "--password-manager=icloud-passwords")
+                expect(
+                    "does not offer iCloud Passwords off macOS",
+                    "available on macOS" in output and found is None and installed() == {},
+                    output,
+                    f"{found}, {installed()}",
+                )
     finally:
         server.shutdown()
     return passed
@@ -956,9 +976,33 @@ def turn_on_content_blocking(profile: str):
     (Path(profile) / "config" / "Settings.json").write_text(json.dumps({"contentBlockers": {"enabled": True}}))
 
 
+def write_native_messaging_host(directory: Path, name: str, allowed_origin: str, executable: Path) -> None:
+    (directory / f"{name}.json").write_text(
+        json.dumps(
+            {
+                "name": name,
+                "description": "Xenon native messaging test host",
+                "path": str(executable),
+                "type": "stdio",
+                "allowed_origins": [allowed_origin],
+            }
+        )
+        + "\n"
+    )
+
+
 def check_extensions(executable: Path, env: dict) -> bool:
     extension_id = unpacked_extension_id(TEST_EXTENSION_DIR)
     passed = True
+    hosts_directory = Path(tempfile.mkdtemp(prefix="xenon-native-messaging-"))
+    echo_host = NATIVE_MESSAGING_ECHO_HOST.resolve()
+    echo_host.chmod(echo_host.stat().st_mode | 0o111)
+    origin = f"chrome-extension://{extension_id}/"
+    write_native_messaging_host(hosts_directory, "com.xenon.test", origin, echo_host)
+    write_native_messaging_host(
+        hosts_directory, "com.xenon.forbidden", "chrome-extension://notthisextension/", echo_host
+    )
+    env = {**env, "XENON_NATIVE_MESSAGING_HOSTS": str(hosts_directory)}
 
     # A web page, and JSON with no CORS headers, from two local servers: two origins.
     page = f"""<!doctype html><script>
@@ -1068,15 +1112,20 @@ def check_extensions(executable: Path, env: dict) -> bool:
         # The background worker stops once it's idle, and starts again for what it listens to.
         idle_url = f"chrome-extension://{extension_id}/idle.html"
         idle_results = run_extension_test_page(executable, env, idle_url, arguments=("--extension-idle-timeout=2",))
+
+        # A background that stops takes its processes with it, the RequestServer of its extension's site too.
+        stopped_results = check_stopped_background(executable, env, extension_id)
     finally:
         for server in (page_server, data_server):
             server.shutdown()
+        shutil.rmtree(hosts_directory, ignore_errors=True)
 
     for name, page_results in (
         ("web page", results),
         ("content scripts", content_script_results),
         ("externally connectable page", connectable_results),
         ("idle background", idle_results),
+        ("stopped background", stopped_results),
     ):
         if page_results is None:
             return False
@@ -1088,6 +1137,88 @@ def check_extensions(executable: Path, env: dict) -> bool:
         else:
             print(f"    {name}: {len(checks)} checks passed")
     return passed
+
+
+# Starts Xenon with the test extension and a blank tab, and watches the RequestServer of the extension's site: it starts
+# with the background, and goes once the background has stopped when idle, as nothing else of the extension needs it. A
+# site's RequestServer otherwise stays a minute after its last page has gone.
+def check_stopped_background(executable: Path, env: dict, extension_id: str) -> dict | None:
+    site_argument = f"--site chrome-extension://{extension_id}"
+    with tempfile.TemporaryDirectory() as profile:
+        turn_on_content_blocking(profile)
+        process = subprocess.Popen(
+            [
+                str(executable),
+                "--headless=manual",
+                "--profile-path",
+                profile,
+                f"--load-extension={TEST_EXTENSION_DIR}",
+                "--extension-idle-timeout=2",
+                "about:blank",
+            ],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+        def request_server_running() -> bool:
+            return any(site_argument in command for command in descendant_command_lines(process.pid))
+
+        def wait_for(condition, seconds: int) -> bool:
+            deadline = time.monotonic() + seconds
+            while time.monotonic() < deadline and process.poll() is None:
+                if condition():
+                    return True
+                time.sleep(0.1)
+            return False
+
+        try:
+            started = wait_for(request_server_running, 60)
+            stopped = started and wait_for(lambda: not request_server_running(), 30)
+        finally:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+
+    return {
+        "its extension's site has a RequestServer while it runs": started,
+        "that RequestServer goes with it": stopped,
+    }
+
+
+# The command lines of a process's descendants, from /proc on Linux and from ps(1) on macOS.
+def descendant_command_lines(root: int) -> list[str]:
+    processes: list[tuple[int, int, str]] = []
+    if Path("/proc/self/stat").exists():
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                # The process's name, in parentheses, may hold spaces; its parent comes second after it.
+                parent = int((entry / "stat").read_text().rsplit(")", 1)[1].split()[1])
+                command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+            except (OSError, IndexError, ValueError):
+                continue
+            processes.append((int(entry.name), parent, command))
+    else:
+        output = subprocess.run(["ps", "-A", "-o", "pid=,ppid=,args="], capture_output=True, text=True).stdout
+        for line in output.splitlines():
+            pid, parent, *command = line.split(None, 2)
+            processes.append((int(pid), int(parent), command[0] if command else ""))
+
+    children: dict[int, list[tuple[int, str]]] = {}
+    for pid, parent, command in processes:
+        children.setdefault(parent, []).append((pid, command))
+    commands = []
+    pending = [root]
+    while pending:
+        for pid, command in children.get(pending.pop(), []):
+            commands.append(command)
+            pending.append(pid)
+    return commands
 
 
 # Loads the blocking dashboard, whose lists only show up once its page and Xenon have talked over the script bridge.

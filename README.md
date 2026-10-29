@@ -30,7 +30,7 @@ It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 
 **Password managers**
 
-- Pick Bitwarden or Proton Pass when you first start Xenon, and it installs and updates it for you
+- Pick Bitwarden, Proton Pass, 1Password, or (on macOS) iCloud Passwords when you first start Xenon, and it installs and updates it for you
 - Sign in with a USB security key (WebAuthn, on macOS)
 - Extensions stop running in the background when idle, as in Chrome, and start again when needed
 

@@ -4,24 +4,25 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* What Xenon's own pages (welcome, new tab) share: its neutrals, type, and the orbit mark from the app icon. */
+/*
+ * What Xenon's own pages (welcome, new tab, settings) share: a plain page, its neutrals, serif headings over sans-serif
+ * text, and the orbit mark from the app icon.
+ */
 
 :root {
     --xenon-page: #faf8f9;
-    --xenon-page-top: #fbf0f4;
     --xenon-ink: #1a1517;
     --xenon-muted: #6e6569;
     --xenon-hairline: rgba(26, 21, 23, 0.12);
     --xenon-row-hover: rgba(26, 21, 23, 0.04);
     --xenon-row-selected: rgba(255, 0, 80, 0.06);
-    --xenon-glow: rgba(255, 0, 80, 0.08);
 
     /* The app icon's white orbit and nucleus, which turn to ink on a light page. */
     --xenon-orbit: var(--xenon-ink);
-    --xenon-backdrop-orbit: rgba(26, 21, 23, 0.08);
-    --xenon-backdrop-rose: rgba(255, 0, 80, 0.2);
 
     --xenon-sans: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    /* Named first, since Ladybird treats ui-serif as plain serif (Times). */
+    --xenon-serif: "Iowan Old Style", Charter, Georgia, ui-serif, serif;
     --xenon-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -29,17 +30,13 @@
 @media (prefers-color-scheme: dark) {
     :root {
         --xenon-page: #0d0a0c;
-        --xenon-page-top: #2e1621;
         --xenon-ink: #f4eff1;
         --xenon-muted: #b0a5aa;
         --xenon-hairline: rgba(244, 239, 241, 0.12);
         --xenon-row-hover: rgba(244, 239, 241, 0.06);
         --xenon-row-selected: rgba(255, 0, 80, 0.12);
-        --xenon-glow: rgba(255, 0, 80, 0.14);
 
         --xenon-orbit: #ffffff;
-        --xenon-backdrop-orbit: rgba(255, 255, 255, 0.07);
-        --xenon-backdrop-rose: rgba(255, 0, 80, 0.24);
     }
 }
 
@@ -56,7 +53,7 @@ body {
     font-size: 15px;
     line-height: 1.5;
     color: var(--xenon-ink);
-    background: linear-gradient(var(--xenon-page-top), var(--xenon-page) 75vh) no-repeat var(--xenon-page);
+    background: var(--xenon-page);
 }
 
 /*
@@ -83,49 +80,34 @@ body {
     stroke: none;
 }
 
-/* The mark on the icon's own tile, as it sits in the dock. */
-.app-mark {
-    --xenon-orbit: #ffffff;
-
-    display: block;
-    overflow: hidden;
-    background: linear-gradient(#2e1621, #0d0a0c);
-    border-radius: 22.5%;
-    box-shadow:
-        inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-        0 12px 32px rgba(13, 10, 12, 0.3);
+/* The mark beside the page's name, at the top of each page. */
+.wordmark {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--xenon-ink);
+    text-decoration: none;
 }
 
-.app-mark .mark {
-    width: 100%;
-    height: 100%;
+.wordmark .mark {
+    width: 22px;
+    height: 22px;
 }
 
-/*
- * The icon's two orbits drawn large and faint behind a page, around a soft rose light where the nucleus would be.
- */
-.orbits {
-    position: fixed;
-    width: 120vmin;
-    height: 120vmin;
-    background: radial-gradient(closest-side, var(--xenon-glow), transparent);
-    pointer-events: none;
+/* A shade darker than the accent, so the white label is readable (4.6:1). */
+button.primary-button {
+    background-color: var(--xenon-rose-hover);
 }
 
-.orbits svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-    fill: none;
-    stroke-width: 0.15;
+button.primary-button:hover {
+    background-color: var(--xenon-rose-pressed);
 }
 
-.orbits .orbit {
-    stroke: var(--xenon-backdrop-orbit);
-}
-
-.orbits .orbit-rose {
-    stroke: var(--xenon-backdrop-rose);
+button.primary-button:disabled {
+    cursor: default;
+    background-color: var(--xenon-rose-light);
 }
 
 kbd {

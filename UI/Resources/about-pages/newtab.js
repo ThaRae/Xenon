@@ -10,6 +10,7 @@ window.xenonNewTab = {
     show({ sites = [], isPrivate = false }) {
         const list = document.querySelector("#top-sites");
         list.replaceChildren(...sites.map(siteTile));
+        document.querySelector("#top-sites-title").hidden = sites.length === 0;
 
         document.querySelector("#private-window").hidden = !isPrivate;
         document.querySelector("#no-sites").hidden = isPrivate || sites.length > 0;
