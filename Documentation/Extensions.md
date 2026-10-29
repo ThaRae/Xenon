@@ -487,7 +487,9 @@ for Bitwarden in Chrome.
   `allowed_origins` list the extension, over stdin/stdout with Chrome's length-prefixed framing. It needs no engine
   change: the UI process spawns the host with `posix_spawn` and pipes (`UI/Extensions/NativeMessaging.cpp`). Not with
   `QProcess`, whose exit status LibWebView's `ProcessMonitor` would reap first: it calls `waitpid(-1)` on every
-  `SIGCHLD`. An open native port keeps the background service worker from stopping when idle.
+  `SIGCHLD`. An open native port keeps the background service worker from stopping when idle. As in Chrome, the host
+  gets only stdin, stdout, and stderr of the browser's files; a host that's still running when its port closes is sent
+  `SIGTERM`; and writing to one that has exited fails instead of raising `SIGPIPE`, which would end the browser.
 - **No `file://` access** for content scripts unless the user turns it on per extension, as in Chrome.
 
 ## Testing

@@ -29,6 +29,10 @@ namespace Ladybird::Extensions {
 
 static constexpr size_t MAX_HOST_MESSAGE_SIZE = 1024 * 1024;
 static constexpr size_t MAX_BROWSER_MESSAGE_SIZE = 1024 * 1024 * 1024;
+// A host's stdout is read this much at a time, and at most a message's worth each time it's readable, so that a host
+// that never stops writing can't hold up the event loop: the notifier fires again for the rest.
+static constexpr size_t READ_CHUNK_SIZE = 16 * 1024;
+static constexpr size_t MAX_READ_PER_ACTIVATION = sizeof(u32) + MAX_HOST_MESSAGE_SIZE;
 static constexpr auto HOSTS_VARIABLE = "XENON_NATIVE_MESSAGING_HOSTS"sv;
 
 static String host_error(StringView message)
@@ -214,6 +218,36 @@ static void close_fd(int& fd)
     fd = -1;
 }
 
+// Writes to a host's stdin. Writing to a host that has gone must fail with EPIPE instead of raising SIGPIPE, which would
+// end the browser: macOS turns SIGPIPE off for the pipe itself (F_SETNOSIGPIPE, when the host starts), and elsewhere it's
+// blocked for the write, and the one the write raised is taken before it's unblocked.
+static ssize_t write_to_host(int fd, ReadonlyBytes bytes)
+{
+#if defined(F_SETNOSIGPIPE)
+    return ::write(fd, bytes.data(), bytes.size());
+#else
+    sigset_t sigpipe;
+    sigemptyset(&sigpipe);
+    sigaddset(&sigpipe, SIGPIPE);
+
+    sigset_t pending;
+    sigpending(&pending);
+    bool was_pending = sigismember(&pending, SIGPIPE);
+
+    sigset_t previous_mask;
+    pthread_sigmask(SIG_BLOCK, &sigpipe, &previous_mask);
+    auto written = ::write(fd, bytes.data(), bytes.size());
+    auto write_errno = errno;
+    if (written < 0 && write_errno == EPIPE && !was_pending) {
+        timespec no_wait {};
+        while (sigtimedwait(&sigpipe, nullptr, &no_wait) < 0 && errno == EINTR) { }
+    }
+    pthread_sigmask(SIG_SETMASK, &previous_mask, nullptr);
+    errno = write_errno;
+    return written;
+#endif
+}
+
 ErrorOr<NonnullRefPtr<NativeHostProcess>, String> NativeHostProcess::start(
     StringView application,
     StringView extension_id,
@@ -243,10 +277,19 @@ ErrorOr<NonnullRefPtr<NativeHostProcess>, String> NativeHostProcess::start(
     if (set_cloexec(stdin_pipe[0]).is_error() || set_cloexec(stdin_pipe[1]).is_error()
         || set_cloexec(stdout_pipe[0]).is_error() || set_cloexec(stdout_pipe[1]).is_error())
         return fail_pipes();
+#if defined(F_SETNOSIGPIPE)
+    if (fcntl(stdin_pipe[1], F_SETNOSIGPIPE, 1) < 0)
+        return fail_pipes();
+#endif
 
     posix_spawn_file_actions_t actions;
     if (posix_spawn_file_actions_init(&actions) != 0)
         return fail_pipes();
+    posix_spawnattr_t attributes;
+    if (posix_spawnattr_init(&attributes) != 0) {
+        posix_spawn_file_actions_destroy(&actions);
+        return fail_pipes();
+    }
 
     auto host_path = host.path.to_byte_string();
     auto origin = MUST(String::formatted("chrome-extension://{}/", extension_id)).to_byte_string();
@@ -262,10 +305,21 @@ ErrorOr<NonnullRefPtr<NativeHostProcess>, String> NativeHostProcess::start(
     posix_spawn_file_actions_addchdir_np(&actions, working_directory.characters());
 #endif
 
+    // The host gets stdin, stdout, and stderr, and none of the browser's other files and sockets, as in Chrome.
+#if defined(AK_OS_MACOS)
+    posix_spawn_file_actions_addinherit_np(&actions, STDERR_FILENO);
+    posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT);
+#elif defined(__GLIBC__)
+#    if __GLIBC_PREREQ(2, 34)
+    posix_spawn_file_actions_addclosefrom_np(&actions, STDERR_FILENO + 1);
+#    endif
+#endif
+
     char* argv[] = { const_cast<char*>(host_path.characters()), const_cast<char*>(origin.characters()), nullptr };
 
     pid_t pid = -1;
-    auto spawned = posix_spawn(&pid, host_path.characters(), &actions, nullptr, argv, environ);
+    auto spawned = posix_spawn(&pid, host_path.characters(), &actions, &attributes, argv, environ);
+    posix_spawnattr_destroy(&attributes);
     posix_spawn_file_actions_destroy(&actions);
     ::close(stdin_pipe[0]);
     ::close(stdout_pipe[1]);
@@ -333,7 +387,7 @@ void NativeHostProcess::flush_outgoing()
 {
     NonnullRefPtr protect = *this;
     while (!m_outgoing.is_empty() && m_stdin_fd >= 0) {
-        auto written = ::write(m_stdin_fd, m_outgoing.data(), m_outgoing.size());
+        auto written = write_to_host(m_stdin_fd, m_outgoing.bytes());
         if (written < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
                 break;
@@ -351,15 +405,15 @@ void NativeHostProcess::flush_outgoing()
 void NativeHostProcess::read_from_host()
 {
     NonnullRefPtr protect = *this;
-    if (m_stdout_fd < 0)
-        return;
 
-    u8 chunk[4096];
-    while (true) {
+    // Each message goes to the opener as soon as it's whole, so that a reply arrives even when the host exits right after
+    // sending it, and one that's too large is refused before the rest of it is read.
+    u8 chunk[READ_CHUNK_SIZE];
+    for (size_t read_so_far = 0; read_so_far < MAX_READ_PER_ACTIVATION && !m_closed;) {
         auto nread = ::read(m_stdout_fd, chunk, sizeof(chunk));
         if (nread < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
-                break;
+                return;
             closed_by_host(host_error(NATIVE_HOST_COMMUNICATION_ERROR));
             return;
         }
@@ -367,20 +421,37 @@ void NativeHostProcess::read_from_host()
             closed_by_host(host_error(NATIVE_HOST_EXITED));
             return;
         }
+        read_so_far += nread;
         MUST(m_incoming.try_append(ReadonlyBytes { chunk, static_cast<size_t>(nread) }));
-    }
 
-    while (true) {
-        auto message = take_native_message(m_incoming);
-        if (message.is_error()) {
-            closed_by_host(message.release_error());
-            return;
+        while (!m_closed) {
+            auto message = take_native_message(m_incoming);
+            if (message.is_error()) {
+                closed_by_host(message.release_error());
+                return;
+            }
+            if (!message.value().has_value())
+                break;
+            if (m_on_message)
+                m_on_message(*message.value());
         }
-        if (!message.value().has_value())
-            break;
-        if (m_on_message)
-            m_on_message(*message.value());
     }
+}
+
+// Whether the host still has its end of stdout open: reading what's left in the pipe gets to the end of the file once
+// it's closed, and to EAGAIN while it's open.
+bool NativeHostProcess::host_holds_stdout() const
+{
+    u8 chunk[READ_CHUNK_SIZE];
+    for (size_t read_so_far = 0; read_so_far < MAX_READ_PER_ACTIVATION;) {
+        auto nread = ::read(m_stdout_fd, chunk, sizeof(chunk));
+        if (nread == 0)
+            return false;
+        if (nread < 0)
+            return errno == EAGAIN || errno == EWOULDBLOCK;
+        read_so_far += nread;
+    }
+    return true;
 }
 
 void NativeHostProcess::closed_by_host(Optional<String> error)
@@ -402,6 +473,11 @@ void NativeHostProcess::close_pipes()
     m_stdout_notifier = nullptr;
     m_stdin_notifier = nullptr;
     close_fd(m_stdin_fd);
+    // A host should exit once its stdin closes, but one that doesn't would run on with no port, so Xenon terminates it, as
+    // Chrome does. Only while it still holds stdout, though: once that's closed it has exited, and LibWebView's
+    // ProcessMonitor, which reaps every child, may have reaped it and freed its pid for another process.
+    if (m_pid > 0 && m_stdout_fd >= 0 && host_holds_stdout())
+        ::kill(m_pid, SIGTERM);
     close_fd(m_stdout_fd);
     if (m_pid > 0) {
         ::waitpid(m_pid, nullptr, WNOHANG);

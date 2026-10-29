@@ -72,6 +72,7 @@ private:
 
     void flush_outgoing();
     void read_from_host();
+    bool host_holds_stdout() const;
     void closed_by_host(Optional<String> error);
     void close_pipes();
 
