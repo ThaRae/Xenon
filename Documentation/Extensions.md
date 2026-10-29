@@ -299,13 +299,15 @@ Xenon runs the background script the way Chrome ran MV2 background pages, with a
   it has a listener for. Each event, runtime message, port message, and call to or from the background keeps it running
   another 30 seconds, and so does a runtime message it owes a response to or waits for one on. Stopping closes the
   background page, which takes its four processes with it (WebContent, WebWorker, and an ImageDecoder for each); its
-  ports close, and its offscreen document stays open. `--extension-idle-timeout=<seconds>` changes the 30 seconds.
+  ports close, and its offscreen document stays open. The extension's RequestServer goes as soon as none of its pages
+  is left, rather than a minute later as a site's otherwise does (engine patch `0033`).
+  `--extension-idle-timeout=<seconds>` changes the 30 seconds.
 - To know what to start it for, the worker's `chrome-api.js` tells the router when one of its events gets its first
   listener or loses its last (`listening` messages); the router keeps that list while the background is stopped, as
   Chrome keeps a stopped worker's listeners. Runtime messages and ports count as `runtime.onMessage` and
   `runtime.onConnect` (or their `External` versions). An event for a background that is starting waits for its script
   to run, like runtime messages do. Starting again is no new session: there's no `runtime.onStartup`.
-- Its hidden view goes without the content blocker (engine patch `0031`), as do offscreen documents and popups. Each
+- Its hidden view goes without the content blocker (engine patch `0032`), as do offscreen documents and popups. Each
   opens in a WebContent process of its own, rather than the spare one, and that process never gets the filter lists, so
   it doesn't build the content blocker's engine (about 13 MiB, and over 100 MiB while it builds). In Chrome, uBlock
   Origin doesn't see other extensions' requests either. Their cross-site frames are in other processes, which do.
@@ -438,7 +440,7 @@ for Bitwarden in Chrome.
 | Web pages messaging an extension (`externally_connectable`) | | `UI/Extensions/ContentScripts` (the page's `chrome.runtime` and a relay world per extension), `Router` (their `ExternalPage` contexts), `UI/Resources/extensions/externally-connectable.js` and `externally-connectable-relay.js` |
 | Web accessible resources as web pages' subresources | 0022 | `UI/Extensions/Registry` |
 | `chrome.scripting`, `webNavigation` frames | 0017 | `UI/Extensions/Scripting.cpp` (the `Router`'s injections, registered content scripts, and Chrome's frame IDs), `Registry` (registered scripts that persist) |
-| Background worker, offscreen documents | 0001 (workers' loads), 0031 (no content blocker) | `UI/Extensions/Registry` (their hidden views and generated files), `Router` (stopping the background when idle, and starting it for events), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
+| Background worker, offscreen documents | 0001 (workers' loads), 0032 (no content blocker), 0033 (no lingering RequestServer) | `UI/Extensions/Registry` (their hidden views and generated files), `Router` (stopping the background when idle, and starting it for events), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
 | Managing extensions | | `UI/Extensions/Dialog` (Qt), and `--load-extension`. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
