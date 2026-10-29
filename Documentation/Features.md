@@ -207,7 +207,7 @@ spare process kept ready for the next tab. Three engine patches keep each engine
 - `0029` sends no lists to any process while blocking is off.
 
 Extensions' own pages get no lists at all: their background pages, offscreen documents, and popups each open in a
-process of their own that never builds the engine (`0031`). uBlock Origin doesn't filter other extensions' requests in
+process of their own that never builds the engine (`0032`). uBlock Origin doesn't filter other extensions' requests in
 Chrome either. Frames from other sites in those pages still get the lists, in their own processes.
 
 ### uBlock Origin's engine features
@@ -256,7 +256,7 @@ still in progress; [Extensions.md](Extensions.md) has the details.
 
 - Unpacked extensions load from the Extensions dialog or with `--load-extension=<dir>`, get a toolbar button and
   popup, and run their background service worker. As in Chrome, the worker stops after 30 seconds without events or
-  calls, and its four processes with it, and starts again for the next event it listens to (`UI/Extensions/Router`).
+  calls, and its processes with it, and starts again for the next event it listens to (`UI/Extensions/Router`).
 - They have `chrome.runtime` (with ports), `storage`, `i18n`, `alarms`, `tabs`, `windows`, `action`, `commands`, and
   `offscreen`, and fetch from the hosts they have permission for.
 - Their content scripts run in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and
@@ -306,7 +306,7 @@ self-signed certificate.
 - **Redirects**: a page that redirects to a site whose certificate fails shows the plain error page.
 
 RequestServer reports each certificate it refuses to the UI process, and takes the ones the user accepts, which curl
-then pins by their public key (engine patch `0030`, `RequestServer+LibWebView: Let the user accept a certificate that
+then pins by their public key (engine patch `0031`, `RequestServer+LibWebView: Let the user accept a certificate that
 fails verification`). It learns which certificate it refused by making the request once more with curl's
 `CURLOPT_CERTINFO`, which costs every connection otherwise; the handshake failed before anything was sent.
 `UI/CertificateErrors.cpp` keeps the certificates and serves the warning, `UI/CertificateDetails.cpp` works out what's
