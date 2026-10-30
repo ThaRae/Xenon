@@ -63,9 +63,11 @@ Each command checks out the suite's `master` (`--ref` for another revision) in `
 runner, runs every test `--iterations` times (5 by default, as Ladybird's CI does), and logs the runner's results with
 the suite's, Xenon's and Ladybird's commits and the machine's CPU. `--benchmarks` / `--suites` take run.py's names,
 comma-separated. As in Ladybird's CI, a benchmark with a test that fails, or that doesn't finish in 30 s, is left out
-of the results and named in the log and the job's summary; the command fails only when nothing was measured. On
-GitHub's runners, WebKitDOM's `textarea-edit` sometimes doesn't finish (so far on every macOS run, and on some Linux
-ones), which leaves WebKitDOM out of that run. `report` prints a log as markdown: each suite's total, every test, and
+of the results and named in the log and the job's summary; the command fails only when nothing was measured. WebKitDOM's
+`textarea-edit` inserts text into a textarea a million times an iteration, and Ladybird queued a `select` event for
+each insertion. Running those after the timed loop took the test past 30 s on every macOS run (Ladybird's own CI leaves
+WebKitDOM out on macOS for this) and on some Linux ones. Engine patch `0049` stops edits from firing `select`, which
+other browsers don't fire for them either. `report` prints a log as markdown: each suite's total, every test, and
 with `--baseline`, how each compares with the earlier log. A difference counts as a change only when it's more than 3% and more than two standard
 errors of the difference; anything less is labelled noise.
 
