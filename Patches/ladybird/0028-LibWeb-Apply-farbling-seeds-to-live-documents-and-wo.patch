@@ -1,0 +1,108 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Fri, 30 Oct 2026 22:09:39 +0000
+Subject: [PATCH] LibWeb: Apply farbling seeds to live documents and workers
+
+Send the seed before a navigation starts, copy it onto documents that
+already exist when the IPC arrives, and expose internals in worker
+processes so tests can read the inherited seed.
+---
+ Libraries/LibWeb/Page/Page.cpp              | 9 +++++++++
+ Libraries/LibWeb/Page/Page.h                | 2 +-
+ Libraries/LibWebView/HelperProcess.cpp      | 2 ++
+ Libraries/LibWebView/ViewImplementation.cpp | 5 +++++
+ Services/WebWorker/main.cpp                 | 5 +++++
+ 5 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/Libraries/LibWeb/Page/Page.cpp b/Libraries/LibWeb/Page/Page.cpp
+index bff560416e25a2ecd63b0f3965ac3a9440e53a84..2e6ce1e0b252e6c203d845872e0e2274f8042719 100644
+--- a/Libraries/LibWeb/Page/Page.cpp
++++ b/Libraries/LibWeb/Page/Page.cpp
+@@ -133,6 +133,15 @@ Compositor::CompositorHost const& Page::compositor_host() const
+     return *compositor_host;
+ }
+ 
++void Page::set_farbling_seed(Farbling::Seed seed)
++{
++    m_farbling_seed = seed;
++    for (auto navigable : hosted_navigables()) {
++        if (auto document = navigable->active_document())
++            document->relevant_settings_object().set_farbling_seed(seed);
++    }
++}
++
+ void Page::visit_edges(JS::Cell::Visitor& visitor)
+ {
+     Base::visit_edges(visitor);
+diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
+index 6d5080c3935b9ab56369a127b201cebc7ba6ae45..f4048858c2563826dfbde2917ed89dede3f25934 100644
+--- a/Libraries/LibWeb/Page/Page.h
++++ b/Libraries/LibWeb/Page/Page.h
+@@ -247,7 +247,7 @@ public:
+     void set_enable_primary_paste(bool b) { m_enable_primary_paste = b; }
+ 
+     Farbling::Seed farbling_seed() const { return m_farbling_seed; }
+-    void set_farbling_seed(Farbling::Seed seed) { m_farbling_seed = seed; }
++    void set_farbling_seed(Farbling::Seed);
+ 
+     u64 wheel_event_listener_state_generation() const { return m_wheel_event_listener_state_generation; }
+     u64 keyboard_scroll_state_generation() const { return m_keyboard_scroll_state_generation; }
+diff --git a/Libraries/LibWebView/HelperProcess.cpp b/Libraries/LibWebView/HelperProcess.cpp
+index 5b05a4af0c47785d5eb8016b67741bef5f31d466..dff01fced9104463849223ebceeddfc5f0031582 100644
+--- a/Libraries/LibWebView/HelperProcess.cpp
++++ b/Libraries/LibWebView/HelperProcess.cpp
+@@ -561,6 +561,8 @@ ErrorOr<NonnullRefPtr<WebWorkerClient>> launch_web_worker_process(Web::HTML::Age
+         arguments.append("--disable-sandbox"sv);
+     if (web_content_options.is_test_mode == WebView::IsTestMode::Yes)
+         arguments.append("--test-mode"sv);
++    if (web_content_options.expose_internals_object == WebView::ExposeInternalsObject::Yes)
++        arguments.append("--expose-internals-object"sv);
+     if (web_content_options.expose_experimental_interfaces == WebView::ExposeExperimentalInterfaces::Yes)
+         arguments.append("--expose-experimental-interfaces"sv);
+     if (web_content_options.enable_http_memory_cache == WebView::EnableMemoryHTTPCache::Yes)
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index 53259b5f13240095db0df22f52b48d9e507b3aaa..d608f474f653f6244a3c09d5e7890fdb22da11d6 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -401,6 +401,11 @@ void ViewImplementation::load(URL::URL const& url, Web::Bindings::NavigationHist
+ // source is still that page.
+ void ViewImplementation::load(Web::HTML::PreparedNavigationDescriptor navigation)
+ {
++    traversable().for_each_hosting_page([&](WebContentPage& page) {
++        auto seed = Application::farbling_seed_store().effective_seed(navigation.url, is_private());
++        page.async_set_farbling_seed(to_underlying(seed.level), seed.high, seed.low);
++    });
++
+     if (on_before_browser_initiated_navigation)
+         on_before_browser_initiated_navigation();
+ 
+diff --git a/Services/WebWorker/main.cpp b/Services/WebWorker/main.cpp
+index 9f322d2c40d9df6d842a217357a398968d568a7d..bf16c4d37939d7c66adcd1405fa7af551fa17b18 100644
+--- a/Services/WebWorker/main.cpp
++++ b/Services/WebWorker/main.cpp
+@@ -26,6 +26,7 @@
+ #include <LibURL/Parser.h>
+ #include <LibWeb/Bindings/MainThreadVM.h>
+ #include <LibWeb/Fetch/Fetching/Fetching.h>
++#include <LibWeb/HTML/Window.h>
+ #include <LibWeb/HTML/WindowOrWorkerGlobalScope.h>
+ #include <LibWeb/Loader/GeneratedPagesLoader.h>
+ #include <LibWeb/Loader/ResourceLoader.h>
+@@ -84,6 +85,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+     args_parser.add_option(embedder_schemes, "A URL scheme the UI process serves", "embedder-scheme", 0, "scheme");
+     args_parser.add_option(disable_sandbox, "Disable process sandboxing", "disable-sandbox");
+     args_parser.add_option(enable_test_mode, "Enable test mode", "test-mode");
++    bool expose_internals_object = false;
++    args_parser.add_option(expose_internals_object, "Expose internals object", "expose-internals-object");
+     args_parser.add_option(Core::ArgsParser::Option {
+         .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
+         .help_string = "URL of a PAC file (not supported yet, requests fail)",
+@@ -132,6 +135,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+     OPENSSL_TRY(OSSL_set_max_threads(nullptr, Core::System::hardware_concurrency()));
+ 
+     Web::HTML::WindowOrWorkerGlobalScopeMixin::set_experimental_interfaces_exposed(expose_experimental_interfaces);
++    if (enable_test_mode || expose_internals_object)
++        Web::HTML::Window::set_internals_object_exposed(true);
+ 
+     Web::Platform::EventLoopPlugin::install(*new Web::Platform::EventLoopPlugin);
+ 

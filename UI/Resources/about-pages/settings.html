@@ -365,6 +365,17 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                 <label for="show-content-blocker-count">Count what's blocked on the shield</label>
                                 <input id="show-content-blocker-count" type="checkbox" switch disabled />
                             </div>
+                            <div class="row" data-keywords="fingerprinting farbling seed canvas webgl">
+                                <div class="label">
+                                    Fingerprinting protection
+                                    <p class="description">
+                                        Each site gets its own noise, which changes when you restart Xenon. Standard is
+                                        on. Turn it off for a site from the shield in the address bar. Strict exists
+                                        only as a hidden flag.
+                                    </p>
+                                </div>
+                                <span class="description" id="farbling-default-level">Standard</span>
+                            </div>
                             <div class="row" id="blocking-dashboard-row" hidden>
                                 <div class="label">
                                     Blocking dashboard
@@ -380,6 +391,11 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                     <div class="group" id="content-blocker-disabled-sites-section" hidden>
                         <h2 class="group-title">Sites let through</h2>
                         <div id="content-blocker-disabled-sites" class="rows site-rows"></div>
+                    </div>
+
+                    <div class="group" id="farbling-off-sites-section" hidden>
+                        <h2 class="group-title">Sites without fingerprinting protection</h2>
+                        <div id="farbling-off-sites" class="rows site-rows"></div>
                     </div>
 
                     <div class="group">

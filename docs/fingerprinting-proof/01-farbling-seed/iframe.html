@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Farbling iframe</title>
+<script>
+function info() {
+    try {
+        if (typeof internals === "undefined") return "no-internals";
+        return internals.farblingSeedInfo();
+    } catch (error) {
+        return "error:" + error;
+    }
+}
+const kind = new URLSearchParams(location.search).get("kind") || "iframe";
+const payload = kind + "-iframe " + location.origin + " " + info();
+document.title = payload;
+if (window.parent !== window) window.parent.postMessage(payload, "*");
+</script>

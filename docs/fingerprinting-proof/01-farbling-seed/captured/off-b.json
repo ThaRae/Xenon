@@ -1,0 +1,30 @@
+{
+  "runId": "off-b",
+  "host": "site-b.test:8080",
+  "samples": [
+    {
+      "origin": "http://site-b.test:8080",
+      "document": "standard:dd1729cf6a6a4a87",
+      "sameIframe": "same-iframe http://site-b.test:8080 standard:dd1729cf6a6a4a87",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:dd1729cf6a6a4a87",
+      "worker": "standard:dd1729cf6a6a4a87",
+      "internalsPresent": true
+    },
+    {
+      "origin": "http://site-b.test:8080",
+      "document": "standard:dd1729cf6a6a4a87",
+      "sameIframe": "same-iframe http://site-b.test:8080 standard:dd1729cf6a6a4a87",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:dd1729cf6a6a4a87",
+      "worker": "standard:dd1729cf6a6a4a87",
+      "internalsPresent": true
+    },
+    {
+      "origin": "http://site-b.test:8080",
+      "document": "standard:dd1729cf6a6a4a87",
+      "sameIframe": "same-iframe http://site-b.test:8080 standard:dd1729cf6a6a4a87",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:dd1729cf6a6a4a87",
+      "worker": "standard:dd1729cf6a6a4a87",
+      "internalsPresent": true
+    }
+  ]
+}

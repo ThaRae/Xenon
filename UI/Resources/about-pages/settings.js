@@ -270,6 +270,29 @@ showContentBlockerCount.addEventListener("change", () =>
     ladybird.sendMessage("xenon/setShowContentBlockerCount", showContentBlockerCount.checked)
 );
 
+const farblingOffSites = document.querySelector("#farbling-off-sites");
+const farblingOffSitesSection = document.querySelector("#farbling-off-sites-section");
+
+function renderFarbling() {
+    const sites = XENON.farblingOffSites ?? [];
+    farblingOffSitesSection.hidden = sites.length === 0;
+    farblingOffSites.replaceChildren(
+        ...sites.map(site => {
+            const row = document.createElement("div");
+            row.className = "row";
+            const label = document.createElement("div");
+            label.className = "label";
+            label.textContent = site;
+            const button = document.createElement("button");
+            button.className = "secondary-button";
+            button.textContent = "Turn back on";
+            button.addEventListener("click", () => ladybird.sendMessage("xenon/setFarblingOnForSite", site));
+            row.append(label, button);
+            return row;
+        })
+    );
+}
+
 // Filter lists.
 const filterListsSummary = document.querySelector("#filter-lists-summary");
 const filterListsStatus = document.querySelector("#filter-lists-status");
@@ -563,6 +586,7 @@ function render() {
     renderTabs();
     renderBangs();
     renderContentBlockerCount();
+    renderFarbling();
     renderFilterLists();
     renderBlockingDashboard();
     renderExtensions();

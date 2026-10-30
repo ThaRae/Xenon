@@ -51,8 +51,9 @@ below them. Every change applies at once, and the page follows changes made from
   - **Tabs**: recently used order, hibernation and its timeout, dragging a tab to a page's edge to split, groups.
   - **Search and bangs**: the engine, suggestions, bangs on or off, and a lookup of all 13,000.
   - **Ads and trackers**: blocking, the count on the shield, which lists are in use and when they were last checked,
-    daily updates with **Check now**, the sites let through (each with **Turn back on**), subscriptions and local
-    lists, and links into the blocking dashboard.
+    daily updates with **Check now**, the sites let through (each with **Turn back on**), fingerprinting protection
+    (Standard, with a per-site Off switch on the shield), subscriptions and local lists, and links into the blocking
+    dashboard.
   - **Password manager** and **Extensions**.
   - **Updates**: the version, whether a new one is ready, automatic updates, and **Check now** or **Relaunch to
     update**.
@@ -224,6 +225,13 @@ host and kind, once each; engine patch `0026` adds the count of every blocked re
 
 uBlock Origin's switches for large media, cosmetic filtering and JavaScript, and which domains had requests blocked,
 need engine work.
+
+### Fingerprinting protection
+
+Each site gets a 128-bit token, mixed with entropy that lasts only for this run of Xenon, so a restart rotates every
+site without rewriting settings. Iframes and workers inherit the top-level site's seed. The shield in the address bar
+turns protection **Off** for the current site; **Settings → Ads and trackers** lists those sites. Strict exists in the
+engine for tests, and is not shown. Engine patch `0027`, `LibWebView::FarblingSeedStore`, `Libraries/LibWeb/Farbling`.
 
 ### Daily filter list updates
 

@@ -25,6 +25,7 @@ It's early. macOS is the main platform; Linux builds and passes its tests in CI.
 **Ads and trackers**
 
 - uBlock Origin's filter lists and features built in, scriptlets for YouTube ads and anti-adblock walls included
+- Per-site fingerprinting protection, off from the address bar shield
 - A popup and dashboard laid out like uBlock Origin's, with an element picker
 - The lists update daily, from a signed source
 

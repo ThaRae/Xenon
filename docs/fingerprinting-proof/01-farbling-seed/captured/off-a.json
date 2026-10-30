@@ -1,0 +1,30 @@
+{
+  "runId": "off-a",
+  "host": "site-a.test:8080",
+  "samples": [
+    {
+      "origin": "http://site-a.test:8080",
+      "document": "off",
+      "sameIframe": "same-iframe http://site-a.test:8080 off",
+      "crossIframe": "cross-iframe http://site-b.test:8080 off",
+      "worker": "off",
+      "internalsPresent": true
+    },
+    {
+      "origin": "http://site-a.test:8080",
+      "document": "off",
+      "sameIframe": "same-iframe http://site-a.test:8080 off",
+      "crossIframe": "cross-iframe http://site-b.test:8080 off",
+      "worker": "off",
+      "internalsPresent": true
+    },
+    {
+      "origin": "http://site-a.test:8080",
+      "document": "off",
+      "sameIframe": "same-iframe http://site-a.test:8080 off",
+      "crossIframe": "cross-iframe http://site-b.test:8080 off",
+      "worker": "off",
+      "internalsPresent": true
+    }
+  ]
+}

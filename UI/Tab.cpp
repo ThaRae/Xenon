@@ -14,6 +14,7 @@
 #include <LibWebCommon/HTML/SelectedFile.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/DownloadPresentation.h>
+#include <LibWebView/FarblingSeedStore.h>
 #include <LibWebView/URL.h>
 #include <LibWebView/Utilities.h>
 #include <LibWebView/WebContentClient.h>
@@ -2276,6 +2277,15 @@ void Tab::show_content_blocking_popover()
         m_content_blocking_popover_reload_site = site;
         view().reload();
     };
+
+    m_content_blocking_popover->on_farbling_toggle = [this](bool enabled) {
+        auto level = enabled ? Web::Farbling::Level::Standard : Web::Farbling::Level::Off;
+        WebView::Application::farbling_seed_store().set_level(view().url(), view().is_private(), level);
+        view().reload();
+    };
+
+    auto farbling = WebView::Application::farbling_seed_store().effective_seed(view().url(), view().is_private());
+    m_content_blocking_popover->set_farbling_enabled(farbling.enabled());
 
     m_content_blocking_popover->update_chrome_style(palette());
     m_content_blocking_popover->set_favicon(m_favicon);

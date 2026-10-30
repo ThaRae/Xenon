@@ -1,0 +1,1048 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Fri, 30 Oct 2026 21:58:34 +0000
+Subject: [PATCH] LibWeb: Add per-site farbling seeds and a keyed PRNG
+
+The UI process keeps a 128-bit token per site, mixed with session entropy
+that is never written to disk, and sends the effective seed to each page
+and worker. Environment settings objects copy it at creation so two tabs
+in one WebContent process cannot share a seed. A small xorshift generator
+in LibWeb/Farbling produces a stable stream per (seed, key).
+---
+ Libraries/LibWeb/CMakeLists.txt               |   1 +
+ Libraries/LibWeb/Farbling/FarblingRNG.cpp     |  82 +++++++
+ Libraries/LibWeb/Farbling/FarblingRNG.h       |  40 ++++
+ .../LibWeb/HTML/Scripting/Environments.cpp    |   7 +
+ .../LibWeb/HTML/Scripting/Environments.h      |  14 ++
+ .../WindowEnvironmentSettingsObject.cpp       |   2 +
+ .../WorkerEnvironmentSettingsObject.cpp       |  17 ++
+ Libraries/LibWeb/Internals/Internals.cpp      |   6 +
+ Libraries/LibWeb/Internals/Internals.h        |   1 +
+ Libraries/LibWeb/Internals/Internals.idl      |   2 +
+ Libraries/LibWeb/Page/Page.h                  |   5 +
+ .../LibWebCommon/Farbling/FarblingSeed.h      |  55 +++++
+ Libraries/LibWebView/Application.cpp          |   2 +
+ Libraries/LibWebView/Application.h            |   3 +
+ Libraries/LibWebView/CMakeLists.txt           |   1 +
+ Libraries/LibWebView/FarblingSeedStore.cpp    | 204 ++++++++++++++++++
+ Libraries/LibWebView/FarblingSeedStore.h      |  65 ++++++
+ Libraries/LibWebView/Forward.h                |   1 +
+ Libraries/LibWebView/ViewImplementation.cpp   |  11 +
+ Libraries/LibWebView/WorkerProcessManager.cpp |  18 ++
+ Services/WebContent/ConnectionFromClient.cpp  |   6 +
+ Services/WebContent/ConnectionFromClient.h    |   1 +
+ Services/WebContent/WebContentServer.ipc      |   1 +
+ Services/WebWorker/ConnectionFromClient.cpp   |   5 +
+ Services/WebWorker/ConnectionFromClient.h     |   1 +
+ Services/WebWorker/WebWorkerServer.ipc        |   1 +
+ Tests/LibWeb/CMakeLists.txt                   |   1 +
+ Tests/LibWeb/TestFarblingRNG.cpp              |  53 +++++
+ 28 files changed, 606 insertions(+)
+ create mode 100644 Libraries/LibWeb/Farbling/FarblingRNG.cpp
+ create mode 100644 Libraries/LibWeb/Farbling/FarblingRNG.h
+ create mode 100644 Libraries/LibWebCommon/Farbling/FarblingSeed.h
+ create mode 100644 Libraries/LibWebView/FarblingSeedStore.cpp
+ create mode 100644 Libraries/LibWebView/FarblingSeedStore.h
+ create mode 100644 Tests/LibWeb/TestFarblingRNG.cpp
+
+diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
+index 8cd9d3a8094dde4b3ca8355074a2515e04a5372a..a712535db1241713004ba1fc1f68420b5a182428 100644
+--- a/Libraries/LibWeb/CMakeLists.txt
++++ b/Libraries/LibWeb/CMakeLists.txt
+@@ -349,6 +349,7 @@ set(SOURCES
+     EventTiming/EventCounts.cpp
+     EventTiming/EventTiming.cpp
+     EventTiming/PerformanceEventTiming.cpp
++    Farbling/FarblingRNG.cpp
+     Fetch/Body.cpp
+     Fetch/BodyInit.cpp
+     Fetch/Engine/FetchBodyDeliveryGate.cpp
+diff --git a/Libraries/LibWeb/Farbling/FarblingRNG.cpp b/Libraries/LibWeb/Farbling/FarblingRNG.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..dbea43fef2cb5b93ff39fe30050a80b14c0f4d9c
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/FarblingRNG.cpp
+@@ -0,0 +1,82 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/String.h>
++#include <LibWeb/Farbling/FarblingRNG.h>
++
++namespace Web::Farbling {
++
++RNG::RNG(Seed seed)
++    : m_seed(seed)
++{
++}
++
++u64 RNG::splitmix64(u64 state)
++{
++    u64 z = state + 0x9e3779b97f4a7c15ULL;
++    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
++    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
++    return z ^ (z >> 31);
++}
++
++u64 RNG::hash_key(StringView key)
++{
++    u64 hash = 14695981039346656037ULL;
++    for (auto byte : key.bytes()) {
++        hash ^= byte;
++        hash *= 1099511628211ULL;
++    }
++    return hash;
++}
++
++u64 RNG::next_unbounded(u64 key_hash)
++{
++    // xorshift128+ seeded from the page seed mixed with the key, so one key is one independent stream.
++    u64 seed_state = m_seed.high ^ key_hash;
++    u64 low = splitmix64(seed_state);
++    seed_state = m_seed.low ^ (key_hash * 0x9e3779b97f4a7c15ULL);
++    u64 high = splitmix64(seed_state);
++    if (low == 0 && high == 0)
++        high = 1;
++
++    u64 s1 = low;
++    u64 const s0 = high;
++    u64 const result = s0 + s1;
++    s1 ^= s1 << 23;
++    s1 ^= s1 >> 18;
++    s1 ^= s0 ^ (s0 >> 5);
++    return result + s1;
++}
++
++u64 RNG::integer(StringView key)
++{
++    if (!m_seed.enabled())
++        return 0;
++
++    auto key_string = MUST(String::from_utf8(key));
++    if (auto cached = m_cache.get(key_string); cached.has_value())
++        return *cached;
++
++    auto value = next_unbounded(hash_key(key));
++    m_cache.set(key_string, value);
++    return value;
++}
++
++String seed_info(Seed const& seed)
++{
++    if (!seed.enabled())
++        return "off"_string;
++
++    auto mixed = seed.high ^ (seed.low + 0x9e3779b97f4a7c15ULL);
++    mixed ^= mixed >> 33;
++    mixed *= 0xff51afd7ed558ccdULL;
++    mixed ^= mixed >> 33;
++    mixed *= 0xc4ceb9fe1a85ec53ULL;
++    mixed ^= mixed >> 33;
++    return MUST(String::formatted("{}:{:016x}", level_name(seed.level), mixed));
++}
++
++}
+diff --git a/Libraries/LibWeb/Farbling/FarblingRNG.h b/Libraries/LibWeb/Farbling/FarblingRNG.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..68536351b22efde6a5ad94ea6aa74ec86a55f09e
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/FarblingRNG.h
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/HashMap.h>
++#include <AK/String.h>
++#include <AK/StringView.h>
++#include <AK/Types.h>
++#include <AK/kmalloc.h>
++#include <LibWeb/Export.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
++
++namespace Web::Farbling {
++
++// A small deterministic generator keyed by the page's farbling seed. The same seed and key always produce the same
++// stream. Integers already returned for a key are cached, so a page that reads one value twice sees the same number.
++class WEB_API RNG {
++public:
++    AK_ALLOC_WITH_KMALLOC;
++
++    explicit RNG(Seed);
++
++    u64 integer(StringView key);
++
++private:
++    static u64 splitmix64(u64);
++    static u64 hash_key(StringView);
++    u64 next_unbounded(u64 key_hash);
++
++    Seed m_seed;
++    HashMap<String, u64> m_cache;
++};
++
++WEB_API String seed_info(Seed const&);
++
++}
+diff --git a/Libraries/LibWeb/HTML/Scripting/Environments.cpp b/Libraries/LibWeb/HTML/Scripting/Environments.cpp
+index 30f4e3db4923f96a62a8e70d6579d99d6d952c19..8d4c70004be4e860fd4d31b4661c1ebabcb63e0d 100644
+--- a/Libraries/LibWeb/HTML/Scripting/Environments.cpp
++++ b/Libraries/LibWeb/HTML/Scripting/Environments.cpp
+@@ -120,6 +120,13 @@ void EnvironmentSettingsObject::discard_environment()
+     set_discarded(true);
+ }
+ 
++Farbling::RNG& EnvironmentSettingsObject::farbling_rng()
++{
++    if (!m_farbling_rng)
++        m_farbling_rng = make<Farbling::RNG>(m_farbling_seed);
++    return *m_farbling_rng;
++}
++
+ void EnvironmentSettingsObject::add_owned_worker_agent(WorkerAgentParent& worker_agent)
+ {
+     m_owned_worker_agents.append(worker_agent);
+diff --git a/Libraries/LibWeb/HTML/Scripting/Environments.h b/Libraries/LibWeb/HTML/Scripting/Environments.h
+index 4fca160bf7a523ea9fceeeb589b9f8d35631dc08..5100450720092d3b3384ec298c599da0e0ee4da2 100644
+--- a/Libraries/LibWeb/HTML/Scripting/Environments.h
++++ b/Libraries/LibWeb/HTML/Scripting/Environments.h
+@@ -8,6 +8,7 @@
+ 
+ #pragma once
+ 
++#include <AK/OwnPtr.h>
+ #include <AK/Utf16String.h>
+ #include <AK/Utf16View.h>
+ #include <LibGC/Weak.h>
+@@ -22,7 +23,9 @@
+ #include <LibWeb/HTML/Scripting/EnvironmentSettingsObjectAddress.h>
+ #include <LibWeb/HTML/Scripting/ModuleMap.h>
+ #include <LibWeb/HighResolutionTime/TimeOrigin.h>
++#include <LibWeb/Farbling/FarblingRNG.h>
+ #include <LibWeb/ServiceWorker/Registration.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
+ #include <LibWebCommon/HTML/Scripting/EnvironmentId.h>
+ #include <LibWebCommon/HTML/Scripting/SerializedEnvironmentSettingsObject.h>
+ 
+@@ -160,6 +163,14 @@ public:
+     void remove_owned_worker_agent(WorkerAgentParent&);
+     void release_owned_worker_agents();
+ 
++    Farbling::Seed farbling_seed() const { return m_farbling_seed; }
++    void set_farbling_seed(Farbling::Seed seed)
++    {
++        m_farbling_seed = seed;
++        m_farbling_rng.clear();
++    }
++    Farbling::RNG& farbling_rng();
++
+     // FIXME: This method below is from HighResolutionTime spec in section 3. Section for Specification Authors.
+     // The following other methods are currently not supported:
+     // `current relative timestamp`     https://www.w3.org/TR/hr-time-3/#dfn-current-relative-timestamp
+@@ -218,6 +229,9 @@ private:
+     bool m_discarded { false };
+ 
+     Vector<GC::Ref<WorkerAgentParent>> m_owned_worker_agents;
++
++    Farbling::Seed m_farbling_seed;
++    OwnPtr<Farbling::RNG> m_farbling_rng;
+ };
+ 
+ RunScriptDecision can_run_script(EnvironmentSettingsObject const&);
+diff --git a/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.cpp b/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.cpp
+index b776a890407aae3dc841843b434446e13601841c..3c592c5316ef205c878cf328d9514813bb92ad29 100644
+--- a/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.cpp
++++ b/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.cpp
+@@ -14,6 +14,7 @@
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.h>
+ #include <LibWeb/HTML/Window.h>
++#include <LibWeb/Page/Page.h>
+ #include <LibWebCommon/HTML/CrossOrigin/OpenerPolicy.h>
+ 
+ namespace Web::HTML {
+@@ -78,6 +79,7 @@ void WindowEnvironmentSettingsObject::setup(Page& page, URL::URL const& creation
+     settings_object->creation_url = creation_url;
+     settings_object->top_level_creation_url = move(top_level_creation_url);
+     settings_object->top_level_origin = move(top_level_origin);
++    settings_object->set_farbling_seed(page.farbling_seed());
+ 
+     // 7. Set realm's [[HostDefined]] field to settings object.
+     // Non-Standard: We store the ESO next to the web intrinsics in a custom HostDefined object
+diff --git a/Libraries/LibWeb/HTML/Scripting/WorkerEnvironmentSettingsObject.cpp b/Libraries/LibWeb/HTML/Scripting/WorkerEnvironmentSettingsObject.cpp
+index 2776720255550c3e7ac093a35ec89569a0b1c2da..d80269ebce9264208223b13c0e32f02aabb4c578 100644
+--- a/Libraries/LibWeb/HTML/Scripting/WorkerEnvironmentSettingsObject.cpp
++++ b/Libraries/LibWeb/HTML/Scripting/WorkerEnvironmentSettingsObject.cpp
+@@ -7,10 +7,16 @@
+ 
+ #include <AK/Random.h>
+ #include <LibGC/Heap.h>
++#include <LibJS/Runtime/NativeFunction.h>
++#include <LibJS/Runtime/Object.h>
++#include <LibJS/Runtime/PrimitiveString.h>
+ #include <LibWeb/Bindings/Intrinsics.h>
+ #include <LibWeb/Bindings/PrincipalHostDefined.h>
++#include <LibWeb/Farbling/FarblingRNG.h>
+ #include <LibWeb/HTML/BrowsingContext.h>
+ #include <LibWeb/HTML/DedicatedWorkerGlobalScope.h>
++#include <LibWeb/HTML/Window.h>
++#include <LibWeb/Page/Page.h>
+ #include <LibWeb/HTML/PolicyContainers.h>
+ #include <LibWeb/HTML/Scripting/WorkerEnvironmentSettingsObject.h>
+ #include <LibWeb/HTML/WorkerGlobalScope.h>
+@@ -53,6 +59,7 @@ GC::Ref<WorkerEnvironmentSettingsObject> WorkerEnvironmentSettingsObject::setup(
+     //     https://github.com/whatwg/html/issues/11340.
+     settings_object->id = move(id);
+     settings_object->creation_url = worker->url();
++    settings_object->set_farbling_seed(page->farbling_seed());
+ 
+     // 6. If worker global scope is a DedicatedWorkerGlobalScope object, then set settings object's top-level origin to
+     //    outside settings's top-level origin.
+@@ -78,6 +85,16 @@ GC::Ref<WorkerEnvironmentSettingsObject> WorkerEnvironmentSettingsObject::setup(
+     //    the realm's [[HostDefined]] internal slot as the internal slot contains the web platform intrinsics
+     Bindings::initialize_worker_web_interfaces(*worker);
+ 
++    if (Window::is_internals_object_exposed()) {
++        auto internals = JS::Object::create(*realm, realm->intrinsics().object_prototype());
++        auto function = JS::NativeFunction::create(*realm, "farblingSeedInfo"_utf16_fly_string, [](JS::VM& vm) -> JS::ThrowCompletionOr<JS::Value> {
++            auto& settings = principal_realm_settings_object(*vm.current_realm());
++            return JS::PrimitiveString::create(vm, Utf16String::from_utf8(Web::Farbling::seed_info(settings.farbling_seed())));
++        });
++        internals->define_direct_property("farblingSeedInfo"_utf16_fly_string, function, JS::default_attributes);
++        realm->global_object().define_direct_property("internals"_utf16_fly_string, internals, JS::default_attributes);
++    }
++
+     // 9. Return settings object.
+     return settings_object;
+ }
+diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
+index 4b53524203119e3b413cd2ed91cd5eba217f9205..3baa081d3361b6f04b23bf7315bd558acd8fec55 100644
+--- a/Libraries/LibWeb/Internals/Internals.cpp
++++ b/Libraries/LibWeb/Internals/Internals.cpp
+@@ -61,6 +61,7 @@
+ #include <LibWeb/DOMURL/DOMURL.h>
+ #include <LibWeb/Dump.h>
+ #include <LibWeb/Editing/SpellingMarkers.h>
++#include <LibWeb/Farbling/FarblingRNG.h>
+ #include <LibWeb/Editing/WritingSuggestionController.h>
+ #include <LibWeb/Fetch/Fetching/Fetching.h>
+ #include <LibWeb/Fetch/Infrastructure/NetworkPartitionKey.h>
+@@ -1714,6 +1715,11 @@ void Internals::set_browser_zoom(double factor)
+     page().client().page_did_set_browser_zoom(factor);
+ }
+ 
++Utf16String Internals::farbling_seed_info()
++{
++    return Utf16String::from_utf8(Farbling::seed_info(window().associated_document().relevant_settings_object().farbling_seed()));
++}
++
+ void Internals::set_device_pixel_ratio(double ratio)
+ {
+     page().client().page_did_set_device_pixel_ratio_for_testing(ratio);
+diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
+index f7de6b8876f10b6ce314080077ead0abb69bd108..11670b026fc97ef4539c11b0c87334df5d117200 100644
+--- a/Libraries/LibWeb/Internals/Internals.h
++++ b/Libraries/LibWeb/Internals/Internals.h
+@@ -204,6 +204,7 @@ public:
+     WebIDL::ExceptionOr<bool> is_known_hsts_host(Utf16String const& domain);
+ 
+     void set_browser_zoom(double factor);
++    Utf16String farbling_seed_info();
+     void set_device_pixel_ratio(double ratio);
+     void resize_window(i32 width, i32 height);
+ 
+diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
+index 9e2d05f2d650a846c222c18fca1f89cbc6687641..f4ecb1b8b4dc90be382e14e78d584488aa6f0175 100644
+--- a/Libraries/LibWeb/Internals/Internals.idl
++++ b/Libraries/LibWeb/Internals/Internals.idl
+@@ -205,6 +205,8 @@ interface Internals {
+     boolean isKnownHSTSHost(DOMString domain);
+ 
+     undefined setBrowserZoom(double factor);
++    // Test-only readout of this document's farbling seed. Not exposed to ordinary web content.
++    DOMString farblingSeedInfo();
+     undefined setDevicePixelRatio(double ratio);
+     undefined resizeWindow(long width, long height);
+ 
+diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
+index a9de244f60a81233e1d0303355c1627c1aa34fe2..6d5080c3935b9ab56369a127b201cebc7ba6ae45 100644
+--- a/Libraries/LibWeb/Page/Page.h
++++ b/Libraries/LibWeb/Page/Page.h
+@@ -62,6 +62,7 @@
+ #include <LibWebCommon/CSS/PreferredColorScheme.h>
+ #include <LibWebCommon/CSS/PreferredContrast.h>
+ #include <LibWebCommon/CSS/PreferredMotion.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
+ #include <LibWebCommon/FileAPI/SerializedBlobURLEntry.h>
+ #include <LibWebCommon/Fullscreen/FullscreenRequestType.h>
+ #include <LibWebCommon/Gamepad/GamepadSnapshot.h>
+@@ -245,6 +246,9 @@ public:
+     bool enable_primary_paste() const { return m_enable_primary_paste; }
+     void set_enable_primary_paste(bool b) { m_enable_primary_paste = b; }
+ 
++    Farbling::Seed farbling_seed() const { return m_farbling_seed; }
++    void set_farbling_seed(Farbling::Seed seed) { m_farbling_seed = seed; }
++
+     u64 wheel_event_listener_state_generation() const { return m_wheel_event_listener_state_generation; }
+     u64 keyboard_scroll_state_generation() const { return m_keyboard_scroll_state_generation; }
+     void invalidate_compositor_wheel_event_listener_state(DOM::Document&);
+@@ -538,6 +542,7 @@ private:
+     bool m_should_block_pop_ups { true };
+     bool m_enable_autoscroll { true };
+     bool m_enable_primary_paste { true };
++    Farbling::Seed m_farbling_seed;
+     u64 m_wheel_event_listener_state_generation { 0 };
+     u64 m_keyboard_scroll_state_generation { 0 };
+     bool m_keyboard_scroll_state_is_current { false };
+diff --git a/Libraries/LibWebCommon/Farbling/FarblingSeed.h b/Libraries/LibWebCommon/Farbling/FarblingSeed.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..1ee629119abecd6f7420cbe9f076553816f65cf6
+--- /dev/null
++++ b/Libraries/LibWebCommon/Farbling/FarblingSeed.h
+@@ -0,0 +1,55 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/StringView.h>
++#include <AK/Types.h>
++
++namespace Web::Farbling {
++
++enum class Level : u8 {
++    Off = 0,
++    Standard = 1,
++    Strict = 2,
++};
++
++struct Seed {
++    Level level { Level::Off };
++    u64 high { 0 };
++    u64 low { 0 };
++
++    bool enabled() const { return level != Level::Off; }
++
++    bool operator==(Seed const&) const = default;
++};
++
++inline StringView level_name(Level level)
++{
++    switch (level) {
++    case Level::Off:
++        return "off"sv;
++    case Level::Strict:
++        return "strict"sv;
++    case Level::Standard:
++        return "standard"sv;
++    }
++    return "off"sv;
++}
++
++inline Level level_from_u8(u8 value)
++{
++    switch (value) {
++    case to_underlying(Level::Standard):
++        return Level::Standard;
++    case to_underlying(Level::Strict):
++        return Level::Strict;
++    default:
++        return Level::Off;
++    }
++}
++
++}
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 8f310ec7639cc829a9eacda1ae11513b2ff0d323..6d9c2a1e6d2b56ff3189d2308da4b61a6594dd9c 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -669,6 +669,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+     auto platform_languages = m_web_content_options.is_test_mode == IsTestMode::Yes ? Vector<String> {} : platform_preferred_languages();
+ 
+     m_settings = make<Settings>(Settings::create(LexicalPath::join(profile().paths().config, "Settings.json"sv).string(), move(platform_languages)));
++    m_farbling_seed_store = make<FarblingSeedStore>(LexicalPath::join(profile().paths().config, "FarblingSeeds.json"sv).string());
+     m_bookmark_store = make<BookmarkStore>(BookmarkStore::create(LexicalPath::join(profile().paths().config, "Bookmarks.json"sv).string()));
+ 
+     if (m_web_content_options.is_test_mode == IsTestMode::Yes) {
+@@ -2679,6 +2680,7 @@ NonnullRefPtr<Core::Promise<Empty>> Application::clear_browsing_data(ClearBrowsi
+         m_file_downloader.remove_inactive_downloads_created_since(options.since);
+ 
+     if (options.delete_site_data == ClearBrowsingDataOptions::Delete::Yes) {
++        m_farbling_seed_store->clear_all_persisted();
+         m_default_session->cookie_jar->expire_cookies_accessed_since(options.since);
+         m_default_session->storage_jar->remove_items_accessed_since(options.since);
+         m_default_session->hsts_store->remove_policies_observed_since(options.since);
+diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
+index d3a73370adde6f99893ab871edde3662a4beb6c4..06f68c316cf5125ccf393387a04d89b39d0ba36b 100644
+--- a/Libraries/LibWebView/Application.h
++++ b/Libraries/LibWebView/Application.h
+@@ -51,6 +51,7 @@
+ #include <LibWebView/BrowsingSession.h>
+ #include <LibWebView/DownloadStore.h>
+ #include <LibWebView/ExternalURLHandler.h>
++#include <LibWebView/FarblingSeedStore.h>
+ #include <LibWebView/FileDownloader.h>
+ #include <LibWebView/Forward.h>
+ #include <LibWebView/Options.h>
+@@ -94,6 +95,7 @@ public:
+     static bool is_initialized() { return s_the != nullptr; }
+ 
+     static Settings& settings() { return *the().m_settings; }
++    static FarblingSeedStore& farbling_seed_store() { return *the().m_farbling_seed_store; }
+     static Profile const& profile() { return *the().m_profile; }
+     BrowserProcess& browser_process() { return *m_browser_process; }
+     bool should_exit_after_profile_coordination() const { return m_should_exit_after_profile_coordination; }
+@@ -608,6 +610,7 @@ private:
+ 
+     Optional<Profile> m_profile;
+     OwnPtr<Settings> m_settings;
++    OwnPtr<FarblingSeedStore> m_farbling_seed_store;
+     OwnPtr<BrowserProcess> m_browser_process;
+     bool m_should_exit_after_profile_coordination { false };
+     OwnPtr<ApplicationSettingsObserver> m_settings_observer;
+diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
+index 81a87e4cdba59878a2f7e83035afd6ade81ba4b7..f5f37e77d7a3336c913fa8567e1bc88950bf6fd1 100644
+--- a/Libraries/LibWebView/CMakeLists.txt
++++ b/Libraries/LibWebView/CMakeLists.txt
+@@ -31,6 +31,7 @@ set(SOURCES
+     DownloadSegmentation.cpp
+     DownloadStore.cpp
+     ExternalURLHandler.cpp
++    FarblingSeedStore.cpp
+     FaviconStore.cpp
+     FileDownloader.cpp
+     FontService.cpp
+diff --git a/Libraries/LibWebView/FarblingSeedStore.cpp b/Libraries/LibWebView/FarblingSeedStore.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..f26ae58dff32e0c5bee442cbcc4f2e633448ac3b
+--- /dev/null
++++ b/Libraries/LibWebView/FarblingSeedStore.cpp
+@@ -0,0 +1,204 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/JsonArray.h>
++#include <AK/JsonObject.h>
++#include <AK/JsonValue.h>
++#include <AK/QuickSort.h>
++#include <AK/Random.h>
++#include <LibURL/Site.h>
++#include <LibWebView/FarblingSeedStore.h>
++#include <LibWebView/Utilities.h>
++
++namespace WebView {
++
++static u8 nibble_from_hex(char character)
++{
++    if (character >= '0' && character <= '9')
++        return static_cast<u8>(character - '0');
++    if (character >= 'a' && character <= 'f')
++        return static_cast<u8>(character - 'a' + 10);
++    if (character >= 'A' && character <= 'F')
++        return static_cast<u8>(character - 'A' + 10);
++    return 0;
++}
++
++static String encode_token(u64 high, u64 low)
++{
++    return MUST(String::formatted("{:016x}{:016x}", high, low));
++}
++
++Optional<FarblingSeedStore::Token> decode_token(StringView hex)
++{
++    if (hex.length() != 32)
++        return {};
++    u64 high = 0;
++    u64 low = 0;
++    for (size_t i = 0; i < 16; ++i) {
++        high = (high << 4) | nibble_from_hex(hex[i]);
++        low = (low << 4) | nibble_from_hex(hex[i + 16]);
++    }
++    return FarblingSeedStore::Token { high, low };
++}
++
++FarblingSeedStore::FarblingSeedStore(ByteString persist_path)
++    : m_persist_path(move(persist_path))
++{
++    m_session_entropy = generate_token();
++    load();
++}
++
++void FarblingSeedStore::set_default_level(Web::Farbling::Level level)
++{
++    if (level == Web::Farbling::Level::Off)
++        level = Web::Farbling::Level::Standard;
++    m_default_level = level;
++}
++
++Optional<String> FarblingSeedStore::site_key(URL::URL const& url)
++{
++    auto key = URL::Site::serialize_for_partitioning(url.origin());
++    if (!key.has_value())
++        return {};
++    return key->to_utf8();
++}
++
++Web::Farbling::Level FarblingSeedStore::level_for(URL::URL const& url, IsPrivate is_private) const
++{
++    auto key = site_key(url);
++    if (!key.has_value())
++        return Web::Farbling::Level::Off;
++
++    auto const& off_sites = is_private == IsPrivate::Yes ? m_private_off_sites : m_off_sites;
++    if (off_sites.contains(*key))
++        return Web::Farbling::Level::Off;
++    return m_default_level;
++}
++
++Web::Farbling::Seed FarblingSeedStore::effective_seed(URL::URL const& url, IsPrivate is_private)
++{
++    auto key = site_key(url);
++    if (!key.has_value())
++        return {};
++
++    auto level = level_for(url, is_private);
++    if (level == Web::Farbling::Level::Off)
++        return { .level = Web::Farbling::Level::Off };
++
++    auto token = persistent_token(*key, is_private);
++    return {
++        .level = level,
++        .high = token.high ^ m_session_entropy.high,
++        .low = token.low ^ m_session_entropy.low,
++    };
++}
++
++void FarblingSeedStore::set_level(URL::URL const& url, IsPrivate is_private, Web::Farbling::Level level)
++{
++    auto key = site_key(url);
++    if (!key.has_value())
++        return;
++
++    auto& off_sites = is_private == IsPrivate::Yes ? m_private_off_sites : m_off_sites;
++    if (level == Web::Farbling::Level::Off)
++        off_sites.set(*key);
++    else
++        off_sites.remove(*key);
++
++    if (is_private == IsPrivate::No)
++        persist();
++}
++
++Vector<String> FarblingSeedStore::persisted_off_sites() const
++{
++    Vector<String> sites;
++    sites.ensure_capacity(m_off_sites.size());
++    for (auto const& site : m_off_sites)
++        sites.unchecked_append(site);
++    quick_sort(sites);
++    return sites;
++}
++
++void FarblingSeedStore::clear_site(URL::URL const& url)
++{
++    auto key = site_key(url);
++    if (!key.has_value())
++        return;
++    m_tokens.remove(*key);
++    m_off_sites.remove(*key);
++    persist();
++}
++
++void FarblingSeedStore::clear_all_persisted()
++{
++    m_tokens.clear();
++    m_off_sites.clear();
++    persist();
++}
++
++FarblingSeedStore::Token FarblingSeedStore::generate_token() const
++{
++    Token token;
++    do {
++        token.high = get_random<u64>();
++        token.low = get_random<u64>();
++    } while (token.high == 0 && token.low == 0);
++    return token;
++}
++
++FarblingSeedStore::Token FarblingSeedStore::persistent_token(String const& key, IsPrivate is_private)
++{
++    auto& tokens = is_private == IsPrivate::Yes ? m_private_tokens : m_tokens;
++    if (auto existing = tokens.get(key); existing.has_value())
++        return *existing;
++
++    auto token = generate_token();
++    tokens.set(key, token);
++    if (is_private == IsPrivate::No)
++        persist();
++    return token;
++}
++
++void FarblingSeedStore::load()
++{
++    auto json = read_json_file(m_persist_path);
++    if (json.is_error())
++        return;
++
++    if (auto tokens = json.value().get_object("tokens"sv); tokens.has_value()) {
++        tokens->for_each_member([&](auto const& site, JsonValue const& value) {
++            if (!value.is_string())
++                return;
++            if (auto token = decode_token(value.as_string()); token.has_value())
++                m_tokens.set(site, *token);
++        });
++    }
++
++    if (auto off_sites = json.value().get_array("offSites"sv); off_sites.has_value()) {
++        off_sites->for_each([&](JsonValue const& value) {
++            if (value.is_string())
++                m_off_sites.set(value.as_string());
++        });
++    }
++}
++
++void FarblingSeedStore::persist() const
++{
++    JsonObject tokens;
++    for (auto const& [site, token] : m_tokens)
++        tokens.set(site, encode_token(token.high, token.low));
++
++    JsonArray off_sites;
++    for (auto const& site : persisted_off_sites())
++        off_sites.must_append(site);
++
++    JsonObject root;
++    root.set("tokens"sv, move(tokens));
++    root.set("offSites"sv, move(off_sites));
++    (void)write_json_file(m_persist_path, move(root));
++}
++
++}
+diff --git a/Libraries/LibWebView/FarblingSeedStore.h b/Libraries/LibWebView/FarblingSeedStore.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..35ac0b06390750c4d1928bdeb11175938d6f1ff7
+--- /dev/null
++++ b/Libraries/LibWebView/FarblingSeedStore.h
+@@ -0,0 +1,65 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/ByteString.h>
++#include <AK/HashMap.h>
++#include <AK/HashTable.h>
++#include <AK/Optional.h>
++#include <AK/String.h>
++#include <AK/kmalloc.h>
++#include <LibURL/URL.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
++#include <LibWebView/BrowsingSession.h>
++#include <LibWebView/Export.h>
++
++namespace WebView {
++
++// Persistent per-site farbling tokens and the session entropy that rotates them, owned by the UI process so every
++// WebContent process (and a restarted one) sees the same values. Private windows keep a memory-only map.
++class WEBVIEW_API FarblingSeedStore {
++public:
++    AK_ALLOC_WITH_KMALLOC;
++
++    explicit FarblingSeedStore(ByteString persist_path);
++
++    Web::Farbling::Level default_level() const { return m_default_level; }
++    void set_default_level(Web::Farbling::Level);
++
++    Web::Farbling::Seed effective_seed(URL::URL const&, IsPrivate);
++    Web::Farbling::Level level_for(URL::URL const&, IsPrivate) const;
++    void set_level(URL::URL const&, IsPrivate, Web::Farbling::Level);
++
++    Vector<String> persisted_off_sites() const;
++    void clear_site(URL::URL const&);
++    void clear_all_persisted();
++
++    static Optional<String> site_key(URL::URL const&);
++
++private:
++    struct Token {
++        u64 high { 0 };
++        u64 low { 0 };
++    };
++
++    Token persistent_token(String const& key, IsPrivate);
++    Token generate_token() const;
++    void persist() const;
++    void load();
++
++    friend Optional<Token> decode_token(StringView);
++
++    ByteString m_persist_path;
++    Web::Farbling::Level m_default_level { Web::Farbling::Level::Standard };
++    Token m_session_entropy;
++    HashMap<String, Token> m_tokens;
++    HashTable<String> m_off_sites;
++    HashMap<String, Token> m_private_tokens;
++    HashTable<String> m_private_off_sites;
++};
++
++}
+diff --git a/Libraries/LibWebView/Forward.h b/Libraries/LibWebView/Forward.h
+index 3322ab830ed0422df2e472850e9db55ac447c468..0f11b45b80c2764e775820c2848a0a63b07104ae 100644
+--- a/Libraries/LibWebView/Forward.h
++++ b/Libraries/LibWebView/Forward.h
+@@ -39,6 +39,7 @@ class CompositorPresentationClient;
+ class CookieJar;
+ class DownloadStore;
+ class ExternalURLHandler;
++class FarblingSeedStore;
+ class FaviconStore;
+ class FontService;
+ class FontServiceHost;
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index c465cdae5e56b5bac18fa8f5a56a565b020b3c3a..53259b5f13240095db0df22f52b48d9e507b3aaa 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -32,6 +32,7 @@
+ #include <LibWebView/BookmarkStore.h>
+ #include <LibWebView/CrashReportReview.h>
+ #include <LibWebView/ErrorHTML.h>
++#include <LibWebView/FarblingSeedStore.h>
+ #include <LibWebView/FaviconStore.h>
+ #include <LibWebView/HelperProcess.h>
+ #include <LibWebView/HistoryDebug.h>
+@@ -199,6 +200,12 @@ URL::URL ViewImplementation::url() const
+     return m_top_level_traversable->active_document_url();
+ }
+ 
++static void send_farbling_seed(ViewImplementation const& view, WebContentPage const& page)
++{
++    auto seed = Application::farbling_seed_store().effective_seed(view.url(), view.is_private());
++    page.async_set_farbling_seed(to_underlying(seed.level), seed.high, seed.low);
++}
++
+ void ViewImplementation::did_update_url()
+ {
+     update_bookmark_action();
+@@ -206,6 +213,9 @@ void ViewImplementation::did_update_url()
+     if (auto page = traversable().display_page(); page && page->routed_connection())
+         page->routed_connection()->update_audio_capture_permission();
+     update_displayed_url();
++    traversable().for_each_hosting_page([&](WebContentPage& page) {
++        send_farbling_seed(*this, page);
++    });
+ }
+ 
+ Optional<URL::URL const&> ViewImplementation::browser_ui_load_url() const
+@@ -1415,6 +1425,7 @@ void ViewImplementation::send_preferences_to_page(WebContentPage& page)
+     page.async_set_preferred_contrast(m_preferred_contrast);
+     page.async_set_preferred_motion(m_preferred_motion);
+     page.async_set_preferred_languages(Application::settings().languages());
++    send_farbling_seed(*this, page);
+     page.async_set_zoom_level(m_zoom_level);
+     send_browsing_behavior(page);
+     send_autoplay_settings(page);
+diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
+index 1337e8b871b55edc284a161d881e43644120d1db..8dd699a3954e1fc08392daa897794e25c6251f94 100644
+--- a/Libraries/LibWebView/WorkerProcessManager.cpp
++++ b/Libraries/LibWebView/WorkerProcessManager.cpp
+@@ -11,6 +11,7 @@
+ #include <LibURL/Parser.h>
+ #include <LibWebView/Application.h>
+ #include <LibWebView/CanonicalEnvironmentSettingsObject.h>
++#include <LibWebView/FarblingSeedStore.h>
+ #include <LibWebView/CanonicalNavigable.h>
+ #include <LibWebView/HelperProcess.h>
+ #include <LibWebView/RequestServerManager.h>
+@@ -220,6 +221,23 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
+         client->async_set_user_agent(Application::the().user_agent_string());
+         client->async_set_navigator_compatibility_mode(Application::the().navigator_compatibility_mode());
+         client->async_set_preferred_languages(Application::settings().languages());
++        auto farbling_seed = [&]() -> Web::Farbling::Seed {
++            if (!outside_settings.has_value())
++                return {};
++            if (request.agent_type == Web::HTML::AgentType::ServiceWorker)
++                return Application::farbling_seed_store().effective_seed(request.url, is_private);
++            auto const& top_level_origin = outside_settings->top_level_origin();
++            if (top_level_origin.has_value() && !top_level_origin->is_opaque()) {
++                if (auto url = URL::Parser::basic_parse(top_level_origin->serialize()); url.has_value())
++                    return Application::farbling_seed_store().effective_seed(*url, is_private);
++            }
++            if (outside_settings->origin().is_opaque())
++                return {};
++            if (auto url = URL::Parser::basic_parse(outside_settings->origin().serialize()); url.has_value())
++                return Application::farbling_seed_store().effective_seed(*url, is_private);
++            return {};
++        }();
++        client->async_set_farbling_seed(to_underlying(farbling_seed.level), farbling_seed.high, farbling_seed.low);
+         connect_to_image_decoder(*client, move(image_decoder));
+ 
+         if (auto compositor_handle = Application::the().connect_new_compositor_canvas_client(); !compositor_handle.is_error())
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 97c28c1a959095d15c85e860a304c060aee12918..fa112ed693860ccc54d9f6940a869de68fa9cde6 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3268,6 +3268,12 @@ void ConnectionFromClient::set_preferred_languages(Web::PageId, Vector<String> p
+     Web::update_loader_config([&](auto& config) { config.preferred_languages = move(preferred_languages); });
+ }
+ 
++void ConnectionFromClient::set_farbling_seed(Web::PageId page_id, u8 level, u64 high, u64 low)
++{
++    if (auto page = this->page(page_id); page.has_value())
++        page->page().set_farbling_seed({ Web::Farbling::level_from_u8(level), high, low });
++}
++
+ void ConnectionFromClient::set_browsing_behavior(Web::PageId page_id, WebView::BrowsingBehavior browsing_behavior)
+ {
+     if (auto page = this->page(page_id); page.has_value()) {
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 8891b5b1749470ccaeea882cd9e459d0bb10dd4a..d7513523a83e193521372df7b0a5cf64a09e69a4 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -258,6 +258,7 @@ private:
+     virtual void set_preferred_contrast(Web::PageId page_id, Web::CSS::PreferredContrast) override;
+     virtual void set_preferred_motion(Web::PageId page_id, Web::CSS::PreferredMotion) override;
+     virtual void set_preferred_languages(Web::PageId page_id, Vector<String>) override;
++    virtual void set_farbling_seed(Web::PageId page_id, u8 level, u64 high, u64 low) override;
+     virtual void set_browsing_behavior(Web::PageId page_id, WebView::BrowsingBehavior) override;
+     virtual void set_enable_global_privacy_control(Web::PageId page_id, bool) override;
+     virtual void set_spell_checking_available(Web::PageId page_id, bool available) override;
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 0a782f27a78e9670b1e4ee6d8dcdbf03efccf9ca..582ba643254355f27508fc83c3756cf06cf5a0ea 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -263,6 +263,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     set_preferred_contrast(Web::PageId page_id, Web::CSS::PreferredContrast contrast) =|
+     set_preferred_motion(Web::PageId page_id, Web::CSS::PreferredMotion motion) =|
+     set_preferred_languages(Web::PageId page_id, Vector<String> preferred_languages) =|
++    set_farbling_seed(Web::PageId page_id, u8 level, u64 high, u64 low) =|
+     set_browsing_behavior(Web::PageId page_id, WebView::BrowsingBehavior browsing_behavior) =|
+     set_enable_global_privacy_control(Web::PageId page_id, bool enable) =|
+     set_spell_checking_available(Web::PageId page_id, bool available) =|
+diff --git a/Services/WebWorker/ConnectionFromClient.cpp b/Services/WebWorker/ConnectionFromClient.cpp
+index 8de2e2e20b1629c7d2cda72971061fabc6b26564..69a072aa84951c1b409e329712ba6b0cc7d43394 100644
+--- a/Services/WebWorker/ConnectionFromClient.cpp
++++ b/Services/WebWorker/ConnectionFromClient.cpp
+@@ -106,6 +106,11 @@ void ConnectionFromClient::set_preferred_languages(Vector<String> preferred_lang
+     Web::update_loader_config([&](auto& config) { config.preferred_languages = move(preferred_languages); });
+ }
+ 
++void ConnectionFromClient::set_farbling_seed(u8 level, u64 high, u64 low)
++{
++    page().set_farbling_seed({ Web::Farbling::level_from_u8(level), high, low });
++}
++
+ void ConnectionFromClient::close_worker()
+ {
+     async_did_close_worker();
+diff --git a/Services/WebWorker/ConnectionFromClient.h b/Services/WebWorker/ConnectionFromClient.h
+index 2d429a57877c285982c41e152fcf3a9d8a0b0839..316b62bd44b0162a91188c96db3d9594c4529986 100644
+--- a/Services/WebWorker/ConnectionFromClient.h
++++ b/Services/WebWorker/ConnectionFromClient.h
+@@ -65,6 +65,7 @@ private:
+     virtual void set_user_agent(String user_agent) override;
+     virtual void set_navigator_compatibility_mode(Web::NavigatorCompatibilityMode mode) override;
+     virtual void set_preferred_languages(Vector<String> preferred_languages) override;
++    virtual void set_farbling_seed(u8 level, u64 high, u64 low) override;
+     virtual void set_system_font_family(String family) override;
+     virtual void start_worker(URL::URL url, Web::HTML::WorkerType type, Web::HTML::RequestCredentials credentials, String name, Web::HTML::TransferDataEncoder, Web::HTML::SerializedEnvironmentSettingsObject, Web::HTML::AgentType, URL::Origin origin, Web::HTML::EnvironmentId environment_id) override;
+     virtual void connect_shared_worker(Web::HTML::TransferDataEncoder, Web::HTML::SerializedEnvironmentSettingsObject) override;
+diff --git a/Services/WebWorker/WebWorkerServer.ipc b/Services/WebWorker/WebWorkerServer.ipc
+index 78909d234ade10689d9461de89c697a9efdc6b4a..d422420de006935d96afeedc1a62612f62878c29 100644
+--- a/Services/WebWorker/WebWorkerServer.ipc
++++ b/Services/WebWorker/WebWorkerServer.ipc
+@@ -24,6 +24,7 @@ endpoint WebWorkerServer {
+     set_user_agent(String user_agent) =|
+     set_navigator_compatibility_mode(Web::NavigatorCompatibilityMode mode) =|
+     set_preferred_languages(Vector<String> preferred_languages) =|
++    set_farbling_seed(u8 level, u64 high, u64 low) =|
+ 
+     set_system_font_family(String family) =|
+ 
+diff --git a/Tests/LibWeb/CMakeLists.txt b/Tests/LibWeb/CMakeLists.txt
+index 31e8cec3ffd571c1abdf5fe0c969dfb452eeec80..cd23d0b85187547a41b3136065e7e6b3d9b5eb49 100644
+--- a/Tests/LibWeb/CMakeLists.txt
++++ b/Tests/LibWeb/CMakeLists.txt
+@@ -25,6 +25,7 @@ set(TEST_SOURCES
+     TestDownloadReader.cpp
+     TestDump.cpp
+     TestEventLoop.cpp
++    TestFarblingRNG.cpp
+     TestFaviconDecoding.cpp
+     TestFetchBodyDeliveryGate.cpp
+     TestFetchByteChannel.cpp
+diff --git a/Tests/LibWeb/TestFarblingRNG.cpp b/Tests/LibWeb/TestFarblingRNG.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..a9bb8a5800e24e8cc7968f3f3d151e9f1347b99b
+--- /dev/null
++++ b/Tests/LibWeb/TestFarblingRNG.cpp
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibTest/TestCase.h>
++#include <LibWeb/Farbling/FarblingRNG.h>
++
++TEST_CASE(same_seed_and_key_are_deterministic)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 0x0123456789abcdefULL, .low = 0xfedcba9876543210ULL };
++    Web::Farbling::RNG first(seed);
++    Web::Farbling::RNG second(seed);
++
++    EXPECT_EQ(first.integer("canvas"sv), second.integer("canvas"sv));
++    EXPECT_EQ(first.integer("webgl"sv), second.integer("webgl"sv));
++}
++
++TEST_CASE(a_second_read_of_the_same_key_does_not_change)
++{
++    Web::Farbling::RNG rng({ .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 });
++    auto first = rng.integer("audio"sv);
++    auto second = rng.integer("audio"sv);
++    EXPECT_EQ(first, second);
++}
++
++TEST_CASE(different_keys_differ)
++{
++    Web::Farbling::RNG rng({ .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 });
++    EXPECT_NE(rng.integer("a"sv), rng.integer("b"sv));
++}
++
++TEST_CASE(different_seeds_differ)
++{
++    Web::Farbling::RNG first({ .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 });
++    Web::Farbling::RNG second({ .level = Web::Farbling::Level::Standard, .high = 3, .low = 4 });
++    EXPECT_NE(first.integer("canvas"sv), second.integer("canvas"sv));
++}
++
++TEST_CASE(off_returns_zero)
++{
++    Web::Farbling::RNG rng({ .level = Web::Farbling::Level::Off });
++    EXPECT_EQ(rng.integer("canvas"sv), 0u);
++}
++
++TEST_CASE(seed_info_names_the_level)
++{
++    EXPECT_EQ(Web::Farbling::seed_info({}), "off"sv);
++    auto info = Web::Farbling::seed_info({ .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 });
++    EXPECT(info.starts_with_bytes("standard:"sv));
++    EXPECT_EQ(info.byte_count(), "standard:"sv.length() + 16);
++}

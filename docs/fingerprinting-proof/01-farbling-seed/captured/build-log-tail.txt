@@ -1,0 +1,30 @@
+[62/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/SettingsPage.cpp.o
+[63/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/WebCompatReportReview.cpp.o
+[64/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/TabHibernation.cpp.o
+[65/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/WindowScreenObserver.cpp.o
+[66/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/ExternalURLActivationToken.cpp.o
+[67/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/WindowControlButton.cpp.o
+[68/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/XenonSettings.cpp.o
+[69/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/TabCycler.cpp.o
+[70/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/TabBar.cpp.o
+[71/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/GeolocationProviderQt.cpp.o
+[72/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/TabGroups.cpp.o
+[73/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/WebContentView.cpp.o
+[74/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/WebAuthnPopover.cpp.o
+[75/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/Tab.cpp.o
+[76/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/TabMemory.cpp.o
+[77/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/ExternalURLHandler.cpp.o
+[78/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/AccessibilityInterface.cpp.o
+[79/89] Building CXX object CMakeFiles/xenon.dir/xenon_autogen/JO3QTDJ4FR/qrc_xenon.cpp.o
+[80/89] Building CXX object CMakeFiles/xenon.dir/Xenon/ChromeAPI.cpp.o
+[81/89] Building CXX object CMakeFiles/xenon.dir/Xenon/BackgroundPage.cpp.o
+[82/89] Building CXX object CMakeFiles/xenon.dir/Xenon/ExternallyConnectable.cpp.o
+[83/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/Updater.cpp.o
+[84/89] Building CXX object CMakeFiles/xenon.dir/Xenon/ExternallyConnectableRelay.cpp.o
+[85/89] Building CXX object CMakeFiles/xenon.dir/Xenon/WorkerBridge.cpp.o
+[86/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/X11Window.cpp.o
+[87/89] Building CXX object CMakeFiles/xenon.dir/home/user/work/xenon/UI/WebContentViewLinux.cpp.o
+[88/89] Linking CXX executable xenon/bin/Xenon
+NINJA_EXIT:0
+2026-10-30T21:52:23Z
+===== TESTS BUILD Fri Oct 30 21:55:59 UTC 2026 =====

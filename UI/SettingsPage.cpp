@@ -15,6 +15,7 @@
 #include <LibURL/Parser.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/CrashReportStore.h>
+#include <LibWebView/FarblingSeedStore.h>
 #include <LibWebView/WebUI.h>
 #include <UI/Bangs.h>
 #include <UI/Blocking.h>
@@ -296,6 +297,11 @@ private:
 
         settings.set("showContentBlockerCount"sv, XenonSettings::show_blocked_request_count());
 
+        JsonArray farbling_off_sites;
+        for (auto const& site : WebView::Application::farbling_seed_store().persisted_off_sites())
+            farbling_off_sites.must_append(site);
+        settings.set("farblingOffSites"sv, move(farbling_off_sites));
+
         if (auto status = FilterLists::Updater::status(); status.has_value()) {
             JsonObject filter_lists;
             filter_lists.set("generatedAt"sv, status->generated_at.view());
@@ -373,6 +379,23 @@ void register_interfaces(WebView::WebUI& web_ui)
     web_ui.register_interface("xenon/setShowContentBlockerCount"sv, [](auto const& data) {
         if (data.is_bool())
             XenonSettings::set_show_blocked_request_count(data.as_bool());
+    });
+
+    web_ui.register_interface("xenon/setFarblingOffForSite"sv, [bridge](auto const& data) {
+        if (!data.is_string())
+            return;
+        if (auto url = URL::Parser::basic_parse(data.as_string()); url.has_value()) {
+            WebView::Application::farbling_seed_store().set_level(*url, WebView::IsPrivate::No, Web::Farbling::Level::Off);
+            bridge->send_settings();
+        }
+    });
+    web_ui.register_interface("xenon/setFarblingOnForSite"sv, [bridge](auto const& data) {
+        if (!data.is_string())
+            return;
+        if (auto url = URL::Parser::basic_parse(data.as_string()); url.has_value()) {
+            WebView::Application::farbling_seed_store().set_level(*url, WebView::IsPrivate::No, Web::Farbling::Level::Standard);
+            bridge->send_settings();
+        }
     });
 
     web_ui.register_interface("xenon/searchBangs"sv, [bridge](auto const& data) {

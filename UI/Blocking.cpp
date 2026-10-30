@@ -10,6 +10,7 @@
 #include <AK/TypeCasts.h>
 #include <LibURL/Parser.h>
 #include <LibWebView/Application.h>
+#include <LibWebView/FarblingSeedStore.h>
 #include <LibWebView/UserScriptHandler.h>
 #include <LibWebView/ViewImplementation.h>
 #include <UI/Blocking.h>
@@ -221,6 +222,8 @@ void connect_popover(Tab& tab, BlockingPopover& popover)
             for (auto site_switch : { BlockingSiteSwitch::Popups, BlockingSiteSwitch::RemoteFonts })
                 popover.set_site_switch(site_switch, site_switch_enabled(site_switch, *site));
         }
+        auto farbling = WebView::Application::farbling_seed_store().effective_seed(tab.view().url(), tab.view().is_private());
+        popover.set_farbling_enabled(farbling.enabled());
         domains_timer->start();
     };
 

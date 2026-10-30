@@ -1,0 +1,30 @@
+{
+  "runId": "site-a",
+  "host": "site-a.test:8080",
+  "samples": [
+    {
+      "origin": "http://site-a.test:8080",
+      "document": "standard:695ebf6315d3bcc6",
+      "sameIframe": "same-iframe http://site-a.test:8080 standard:695ebf6315d3bcc6",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:695ebf6315d3bcc6",
+      "worker": "standard:695ebf6315d3bcc6",
+      "internalsPresent": true
+    },
+    {
+      "origin": "http://site-a.test:8080",
+      "document": "standard:695ebf6315d3bcc6",
+      "sameIframe": "same-iframe http://site-a.test:8080 standard:695ebf6315d3bcc6",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:695ebf6315d3bcc6",
+      "worker": "standard:695ebf6315d3bcc6",
+      "internalsPresent": true
+    },
+    {
+      "origin": "http://site-a.test:8080",
+      "document": "standard:695ebf6315d3bcc6",
+      "sameIframe": "same-iframe http://site-a.test:8080 standard:695ebf6315d3bcc6",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:695ebf6315d3bcc6",
+      "worker": "standard:695ebf6315d3bcc6",
+      "internalsPresent": true
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+TestXenonFarblingSeedStore: 7/7 passed
+TestXenonBangs: 19/19 passed
+TestXenonBlockingPopover: 4/4 passed
+TestXenonCRX: 11/11 passed
+TestXenonExtensions: 19/19 passed
+TestXenonFilterLists: 8/8 passed
+TestXenonRecentTabOrder: 15/15 passed
+Total: 83/83 Xenon unit tests passed

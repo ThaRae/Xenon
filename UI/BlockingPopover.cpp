@@ -270,6 +270,14 @@ BlockingPopover::BlockingPopover(QWidget* parent)
     m_power_caption->setWordWrap(true);
     layout->addWidget(m_power_caption);
 
+    m_farbling_switch = make_tool(&card(), "Fingerprinting", "Protect this site against fingerprinting", true);
+    m_farbling_switch->setObjectName("XenonBlockingFarbling");
+    QObject::connect(m_farbling_switch, &QToolButton::toggled, this, [this](bool enabled) {
+        if (on_farbling_toggle)
+            on_farbling_toggle(enabled);
+    });
+    layout->addWidget(m_farbling_switch);
+
     // What was blocked, and where the page connected.
     auto* stats = new QFrame(&card());
     stats->setObjectName("XenonBlockingStats");
@@ -400,6 +408,7 @@ void BlockingPopover::set_snapshot(WebView::ContentBlockingSnapshot const& snaps
 
     for (auto* site_switch : { m_popups_switch, m_fonts_switch })
         site_switch->setEnabled(snapshot.site.has_value());
+    m_farbling_switch->setEnabled(snapshot.site.has_value());
     for (auto* tool : { m_pick_button, m_zap_button })
         tool->setEnabled(snapshot.site.has_value());
 
@@ -443,6 +452,14 @@ void BlockingPopover::set_site_switch(BlockingSiteSwitch site_switch, bool enabl
     auto* button = site_switch == BlockingSiteSwitch::Popups ? m_popups_switch : m_fonts_switch;
     QSignalBlocker blocker(button);
     button->setChecked(enabled);
+}
+
+void BlockingPopover::set_farbling_enabled(bool enabled)
+{
+    QSignalBlocker blocker(m_farbling_switch);
+    m_farbling_switch->setChecked(enabled);
+    m_farbling_switch->setAccessibleName(enabled ? "Turn fingerprinting protection off for this site" : "Turn fingerprinting protection on for this site");
+    m_farbling_switch->setToolTip(m_farbling_switch->accessibleName());
 }
 
 void BlockingPopover::update_counts()
@@ -568,7 +585,8 @@ QFrame#XenonBlockingPopover QFrame#XenonBlockingStats {{
     background: {3};
     border-radius: 10px;
 }}
-QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool {{
+QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool,
+QFrame#XenonBlockingPopover QToolButton#XenonBlockingFarbling {{
     color: {0};
     background: transparent;
     border: 1px solid {5};
@@ -576,15 +594,18 @@ QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool {{
     padding: 6px 2px 4px 2px;
     font-size: 11px;
 }}
-QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool:hover {{
+QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool:hover,
+QFrame#XenonBlockingPopover QToolButton#XenonBlockingFarbling:hover {{
     background: {4};
 }}
-QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool:checked {{
+QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool:checked,
+QFrame#XenonBlockingPopover QToolButton#XenonBlockingFarbling:checked {{
     color: {7};
     background: {8};
     border-color: {7};
 }}
-QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool:disabled {{
+QFrame#XenonBlockingPopover QToolButton#XenonBlockingTool:disabled,
+QFrame#XenonBlockingPopover QToolButton#XenonBlockingFarbling:disabled {{
     color: {1};
 }}
 QFrame#XenonBlockingPopover QToolButton#XenonBlockingDashboard {{

@@ -60,6 +60,7 @@ public:
     // The domains the page's documents loaded from, or none while they aren't known.
     void set_domains(Optional<Vector<BlockingDomain>>);
     void set_site_switch(BlockingSiteSwitch, bool enabled);
+    void set_farbling_enabled(bool);
 
     Function<void(bool)> on_toggle;
     Function<void()> on_keyboard_dismiss;
@@ -70,6 +71,7 @@ public:
     // Asks for what the snapshot doesn't carry, when the popover shows, and when its page or blocked count changes.
     Function<void()> on_refresh;
     Function<void()> on_hide;
+    Function<void(bool)> on_farbling_toggle;
 
 private:
     virtual void keyPressEvent(QKeyEvent*) override;
@@ -98,6 +100,7 @@ private:
     QToolButton* m_zap_button { nullptr };
     QToolButton* m_popups_switch { nullptr };
     QToolButton* m_fonts_switch { nullptr };
+    QToolButton* m_farbling_switch { nullptr };
     QLabel* m_domains_heading { nullptr };
     QScrollArea* m_domains_scroll { nullptr };
     QVBoxLayout* m_domains_layout { nullptr };
