@@ -67,6 +67,8 @@ def main() -> int:
     extra = ["--expose-internals-object"]
     same_process = CAPTURED / "same-process.json"
     same_process.unlink(missing_ok=True)
+    pending = CAPTURED / "nav-pending-after.json"
+    pending.unlink(missing_ok=True)
 
     profile = Path(tempfile.mkdtemp(prefix="fp-same-"))
     run_xenon_until(
@@ -78,6 +80,18 @@ def main() -> int:
         lambda data: "a-direct" in data.get("reads", {})
         and "b-location" in data.get("reads", {})
         and "complete" in data,
+    )
+    pending_profile = Path(tempfile.mkdtemp(prefix="fp-pending-"))
+    run_xenon_until(
+        args.xenon,
+        pending_profile,
+        "http://site-a.test:8080/pending.html?run=nav-pending-after",
+        extra,
+        pending,
+        lambda data: "delay-same-iframe" in data.get("reads", {})
+        and "b-first" in data.get("reads", {})
+        and "complete" in data,
+        timeout=50,
     )
 
     pr1 = tempfile.mkdtemp(prefix="fp-rs1-")
@@ -104,7 +118,7 @@ def main() -> int:
         [],
     )
 
-    names = ["same-process", "restart-1", "restart-2", "off-a", "off-b", "no-internals"]
+    names = ["same-process", "nav-pending-after", "restart-1", "restart-2", "off-a", "off-b", "no-internals"]
     for name in names:
         path = CAPTURED / f"{name}.json"
         print("====", name, args.label, "====")

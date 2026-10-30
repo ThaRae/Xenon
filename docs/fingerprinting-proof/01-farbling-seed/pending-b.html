@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>B after pending navigations</title>
+<script>
+window.__farblingFirst = (function () {
+    try {
+        if (typeof internals === "undefined") return "no-internals";
+        return internals.farblingSeedInfo();
+    } catch (error) {
+        return "error:" + String(error);
+    }
+})();
+</script>
+<script>
+const RUN = new URLSearchParams(location.search).get("run") || "nav-pending";
+fetch("/report?run=" + encodeURIComponent(RUN), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+        key: "b-first",
+        value: window.__farblingFirst,
+        origin: location.origin,
+        host: location.host,
+    }),
+})
+    .then(() =>
+        fetch("/report?run=" + encodeURIComponent(RUN), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                key: "complete",
+                bFirst: window.__farblingFirst,
+                origin: location.origin,
+            }),
+        })
+    )
+    .catch(() => {});
+</script>

@@ -1,15 +1,10 @@
 [0/2] Re-checking globbed directories...
 [1/13] Generating BuildInformation.stamp
-[2/13] Building CXX object Libraries/LibWebView/CMakeFiles/LibWebView.dir/CrashReport.cpp.o
-[3/13] Building CXX object Libraries/LibWebView/CMakeFiles/LibWebView.dir/WebUI/VersionUI.cpp.o
-[4/13] Building CXX object Libraries/LibWebView/CMakeFiles/LibWebView.dir/WebCompatReport.cpp.o
-[5/13] Linking CXX shared library lib/liblagom-webview.so.0.1.0
-[6/13] Creating library symlink lib/liblagom-webview.so.0 lib/liblagom-webview.so
-[7/13] Building CXX object Libraries/LibWeb/CMakeFiles/LibWeb.dir/Page/Page.cpp.o
-[8/13] Linking CXX shared library lib/liblagom-web.so.0.1.0
-[9/13] Creating library symlink lib/liblagom-web.so.0 lib/liblagom-web.so
-[10/13] Linking CXX executable xenon/libexec/WebWorker
-[11/13] Linking CXX executable xenon/libexec/WebContent
-[12/13] Linking CXX executable xenon/bin/Xenon
+[2/8] Building CXX object Libraries/LibWeb/CMakeFiles/LibWeb.dir/DOM/Document.cpp.o
+[3/8] Linking CXX shared library lib/liblagom-web.so.0.1.0
+[4/8] Creating library symlink lib/liblagom-web.so.0 lib/liblagom-web.so
+[5/8] Linking CXX executable xenon/libexec/WebWorker
+[6/8] Linking CXX executable xenon/libexec/WebContent
+[7/8] Linking CXX executable xenon/bin/Xenon
 NINJA_EXIT:0
-2026-10-30T22:54:40Z
+2026-10-30T23:10:00Z

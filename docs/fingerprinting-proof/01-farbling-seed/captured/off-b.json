@@ -4,26 +4,26 @@
   "samples": [
     {
       "origin": "http://site-b.test:8080",
-      "document": "standard:242fe15402c9fef8",
-      "sameIframe": "same-iframe http://site-b.test:8080 standard:242fe15402c9fef8",
-      "crossIframe": "cross-iframe http://site-b.test:8080 standard:242fe15402c9fef8",
-      "worker": "standard:242fe15402c9fef8",
+      "document": "standard:f2539a0a12ccfdf5",
+      "sameIframe": "same-iframe http://site-b.test:8080 standard:f2539a0a12ccfdf5",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:f2539a0a12ccfdf5",
+      "worker": "standard:f2539a0a12ccfdf5",
       "internalsPresent": true
     },
     {
       "origin": "http://site-b.test:8080",
-      "document": "standard:242fe15402c9fef8",
-      "sameIframe": "same-iframe http://site-b.test:8080 standard:242fe15402c9fef8",
-      "crossIframe": "cross-iframe http://site-b.test:8080 standard:242fe15402c9fef8",
-      "worker": "standard:242fe15402c9fef8",
+      "document": "standard:f2539a0a12ccfdf5",
+      "sameIframe": "same-iframe http://site-b.test:8080 standard:f2539a0a12ccfdf5",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:f2539a0a12ccfdf5",
+      "worker": "standard:f2539a0a12ccfdf5",
       "internalsPresent": true
     },
     {
       "origin": "http://site-b.test:8080",
-      "document": "standard:242fe15402c9fef8",
-      "sameIframe": "same-iframe http://site-b.test:8080 standard:242fe15402c9fef8",
-      "crossIframe": "cross-iframe http://site-b.test:8080 standard:242fe15402c9fef8",
-      "worker": "standard:242fe15402c9fef8",
+      "document": "standard:f2539a0a12ccfdf5",
+      "sameIframe": "same-iframe http://site-b.test:8080 standard:f2539a0a12ccfdf5",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:f2539a0a12ccfdf5",
+      "worker": "standard:f2539a0a12ccfdf5",
       "internalsPresent": true
     }
   ]

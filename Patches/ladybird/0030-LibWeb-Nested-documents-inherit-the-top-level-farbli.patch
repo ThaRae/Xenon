@@ -1,0 +1,86 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Fri, 30 Oct 2026 23:06:46 +0000
+Subject: [PATCH] LibWeb: Nested documents inherit the top-level farbling seed
+
+Page holds the pending top-level navigation's seed. A child document
+created while that navigation is in flight, or after a 204 or download
+that never commits, must not take it. Nested windows copy the seed from
+the top-level traversable's active document instead.
+---
+ Libraries/LibWeb/DOM/Document.cpp                     |  3 ++-
+ Libraries/LibWeb/HTML/BrowsingContext.cpp             |  3 ++-
+ .../Scripting/WindowEnvironmentSettingsObject.cpp     | 11 +++++++++--
+ .../HTML/Scripting/WindowEnvironmentSettingsObject.h  |  2 +-
+ 4 files changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
+index b932d5d44cfac527d6a269da17943c8f056908c9..02ff71f2e54dcc96533c7c7246dd2138664df966 100644
+--- a/Libraries/LibWeb/DOM/Document.cpp
++++ b/Libraries/LibWeb/DOM/Document.cpp
+@@ -454,7 +454,8 @@ WebIDL::ExceptionOr<GC::Ref<Document>> Document::create_and_initialize(Type type
+             top_level_creation_url.value(),
+             top_level_origin,
+             agent_cluster_id,
+-            agent_cluster_cross_origin_isolation_mode);
++            agent_cluster_cross_origin_isolation_mode,
++            navigation_params.navigable->parent() != nullptr);
+     }
+ 
+     // AD-HOC: The fetch controller is only available in the process that ran the navigation fetch. Navigation params
+diff --git a/Libraries/LibWeb/HTML/BrowsingContext.cpp b/Libraries/LibWeb/HTML/BrowsingContext.cpp
+index 159d1201d531d4d852a207eeb5f5d17ebb93fc26..6a99074df7f0c28c98e95f2ac1e5ceb72ee95f1b 100644
+--- a/Libraries/LibWeb/HTML/BrowsingContext.cpp
++++ b/Libraries/LibWeb/HTML/BrowsingContext.cpp
+@@ -167,7 +167,8 @@ BrowsingContext::BrowsingContextAndDocument BrowsingContext::create_a_new_browsi
+         top_level_creation_url,
+         top_level_origin,
+         agent_cluster_id,
+-        agent_cluster_cross_origin_isolation_mode);
++        agent_cluster_cross_origin_isolation_mode,
++        embedder != nullptr);
+ 
+     // 14. Let loadTimingInfo be a new document load timing info with its navigation start time set to the result of calling
+     //     coarsen time with unsafeContextCreationTime and the new environment settings object's cross-origin isolated capability.
+diff --git a/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.cpp b/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.cpp
+index 3c592c5316ef205c878cf328d9514813bb92ad29..0af6d6937533a9bc7b27c170bf726097881d6c6d 100644
+--- a/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.cpp
++++ b/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.cpp
+@@ -37,7 +37,7 @@ void WindowEnvironmentSettingsObject::visit_edges(JS::Cell::Visitor& visitor)
+ }
+ 
+ // https://html.spec.whatwg.org/multipage/window-object.html#set-up-a-window-environment-settings-object
+-void WindowEnvironmentSettingsObject::setup(Page& page, URL::URL const& creation_url, NonnullOwnPtr<JS::ExecutionContext> execution_context, GC::Ptr<Environment> reserved_environment, URL::URL top_level_creation_url, URL::Origin top_level_origin, Optional<u64> agent_cluster_id, CrossOriginIsolationMode agent_cluster_cross_origin_isolation_mode)
++void WindowEnvironmentSettingsObject::setup(Page& page, URL::URL const& creation_url, NonnullOwnPtr<JS::ExecutionContext> execution_context, GC::Ptr<Environment> reserved_environment, URL::URL top_level_creation_url, URL::Origin top_level_origin, Optional<u64> agent_cluster_id, CrossOriginIsolationMode agent_cluster_cross_origin_isolation_mode, bool nested_navigable)
+ {
+     // 1. Let realm be the value of execution context's Realm component.
+     auto realm = execution_context->realm;
+@@ -79,7 +79,14 @@ void WindowEnvironmentSettingsObject::setup(Page& page, URL::URL const& creation
+     settings_object->creation_url = creation_url;
+     settings_object->top_level_creation_url = move(top_level_creation_url);
+     settings_object->top_level_origin = move(top_level_origin);
+-    settings_object->set_farbling_seed(page.farbling_seed());
++    auto farbling_seed = page.farbling_seed();
++    if (nested_navigable && page.has_top_level_traversable()) {
++        if (auto* local_top = as_if<LocalNavigable>(*page.top_level_traversable())) {
++            if (auto document = local_top->active_document())
++                farbling_seed = document->relevant_settings_object().farbling_seed();
++        }
++    }
++    settings_object->set_farbling_seed(farbling_seed);
+ 
+     // 7. Set realm's [[HostDefined]] field to settings object.
+     // Non-Standard: We store the ESO next to the web intrinsics in a custom HostDefined object
+diff --git a/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.h b/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.h
+index d165893f67522c78788c8fa07360fc856872ccc6..63fbb7927c672ee878b4128b5aaaaeb1ee0f0395 100644
+--- a/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.h
++++ b/Libraries/LibWeb/HTML/Scripting/WindowEnvironmentSettingsObject.h
+@@ -16,7 +16,7 @@ class WindowEnvironmentSettingsObject final : public EnvironmentSettingsObject {
+     GC_DECLARE_ALLOCATOR(WindowEnvironmentSettingsObject);
+ 
+ public:
+-    static WEB_API void setup(Page&, URL::URL const& creation_url, NonnullOwnPtr<JS::ExecutionContext>, GC::Ptr<Environment>, URL::URL top_level_creation_url, URL::Origin top_level_origin, Optional<u64> agent_cluster_id, CrossOriginIsolationMode agent_cluster_cross_origin_isolation_mode);
++    static WEB_API void setup(Page&, URL::URL const& creation_url, NonnullOwnPtr<JS::ExecutionContext>, GC::Ptr<Environment>, URL::URL top_level_creation_url, URL::Origin top_level_origin, Optional<u64> agent_cluster_id, CrossOriginIsolationMode agent_cluster_cross_origin_isolation_mode, bool nested_navigable = false);
+ 
+     virtual ~WindowEnvironmentSettingsObject() override;
+ 

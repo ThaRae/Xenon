@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>A pending navigation</title>
+<script>
+const RUN = new URLSearchParams(location.search).get("run") || "nav-pending";
+
+function seed(win) {
+    try {
+        if (!win || typeof win.internals === "undefined") return "no-internals";
+        return win.internals.farblingSeedInfo();
+    } catch (error) {
+        return "error:" + String(error);
+    }
+}
+
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(RUN), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function addIframe(src) {
+    return new Promise(resolve => {
+        const iframe = document.createElement("iframe");
+        iframe.addEventListener("load", () => resolve(iframe), { once: true });
+        iframe.src = src;
+        document.body.appendChild(iframe);
+    });
+}
+
+async function readChildSeeds() {
+    const same = await addIframe("http://site-a.test:8080/blank.html");
+    const blank = await addIframe("about:blank");
+    await sleep(50);
+    return {
+        same: seed(same.contentWindow),
+        blank: seed(blank.contentWindow),
+        document: seed(window),
+    };
+}
+
+async function main() {
+    location.href = "http://site-b.test:8080/slow";
+    await sleep(500);
+    const delayed = await readChildSeeds();
+    await post("delay-document", delayed.document);
+    await post("delay-same-iframe", delayed.same);
+    await post("delay-blank-iframe", delayed.blank);
+
+    await sleep(3200);
+    location.href = "http://site-b.test:8080/no-content";
+    await sleep(500);
+    const noContent = await readChildSeeds();
+    await post("no-content-document", noContent.document);
+    await post("no-content-iframe", noContent.same);
+
+    location.href = "http://site-b.test:8080/download";
+    await sleep(500);
+    const attachment = await readChildSeeds();
+    await post("attachment-document", attachment.document);
+    await post("attachment-iframe", attachment.same);
+
+    location.href = "http://site-b.test:8080/pending-b.html?run=" + encodeURIComponent(RUN);
+}
+
+main();
+</script>

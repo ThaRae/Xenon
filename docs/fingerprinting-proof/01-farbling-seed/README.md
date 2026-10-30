@@ -12,6 +12,17 @@ What was proven against the compiled Xenon binary (`Build/release/xenon/bin/Xeno
 
 Raw JSON: `captured/same-process.json` (after the navigation-seed fix). `captured/nav-before.json` is the same sequence on the unfixed binary, where B's first script reported A's hash.
 
+## Pending navigation (one profile)
+
+While A has a top-level navigation to B in flight, new child documents must still report A. After a 204 or a Content-Disposition attachment, A stays A. A later committed navigation to B still reports B on its first read.
+
+- During a 3s delayed B response, a new same-site iframe and a new about:blank iframe report A.
+- After B returns 204, a new same-site iframe and A's document report A.
+- After B returns an attachment, the same.
+- Then a normal load of B reports B.
+
+`captured/nav-pending-before.json` is that sequence on the 0029 binary (same-site iframe took B's seed). `captured/nav-pending-after.json` is after nested documents inherit the top-level active document's seed.
+
 ## Other checks (same binary)
 
 1. Site A is stable across three reloads. A same-site iframe, a cross-site iframe, and a dedicated worker all report site A's hash (`captured/site-a.json`).
@@ -45,4 +56,4 @@ python3 docs/fingerprinting-proof/01-farbling-seed/serve.py 8080
 python3 docs/fingerprinting-proof/01-farbling-seed/run-proof.py
 ```
 
-`run-proof.py` launches Xenon `--headless=manual --expose-internals-object` against `http://site-a.test:8080/start.html` in one profile, then the restart / Off / no-internals pages. Each page POSTs JSON to `/report`.
+`run-proof.py` launches Xenon `--headless=manual --expose-internals-object` against `start.html` and `pending.html` in one profile each, then the restart / Off / no-internals pages. Each page POSTs JSON to `/report`.

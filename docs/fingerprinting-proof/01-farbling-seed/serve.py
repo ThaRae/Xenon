@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import json
 import sys
+import time
 
 HERE = Path(__file__).resolve().parent
 REPORTS = HERE / "captured"
@@ -16,6 +17,28 @@ class Handler(SimpleHTTPRequestHandler):
 
     def log_message(self, format, *args):
         sys.stderr.write("%s - %s\n" % (self.headers.get("Host", ""), format % args))
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/slow":
+            time.sleep(3)
+            self.send_response(204)
+            self.end_headers()
+            return
+        if parsed.path == "/no-content":
+            self.send_response(204)
+            self.end_headers()
+            return
+        if parsed.path == "/download":
+            body = b"download"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Disposition", 'attachment; filename="seed.bin"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        super().do_GET()
 
     def do_POST(self):
         parsed = urlparse(self.path)

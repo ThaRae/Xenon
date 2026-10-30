@@ -1,0 +1,73 @@
+{
+  "runId": "nav-pending-after",
+  "events": [
+    {
+      "key": "delay-document",
+      "value": "standard:6a3700dd2e82ce96",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "delay-same-iframe",
+      "value": "standard:6a3700dd2e82ce96",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "delay-blank-iframe",
+      "value": "standard:6a3700dd2e82ce96",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "no-content-document",
+      "value": "standard:6a3700dd2e82ce96",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "no-content-iframe",
+      "value": "standard:6a3700dd2e82ce96",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "attachment-document",
+      "value": "standard:6a3700dd2e82ce96",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "attachment-iframe",
+      "value": "standard:6a3700dd2e82ce96",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-first",
+      "value": "standard:7b7c1626519c362e",
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "bFirst": "standard:7b7c1626519c362e",
+      "origin": "http://site-b.test:8080"
+    }
+  ],
+  "reads": {
+    "delay-document": "standard:6a3700dd2e82ce96",
+    "delay-same-iframe": "standard:6a3700dd2e82ce96",
+    "delay-blank-iframe": "standard:6a3700dd2e82ce96",
+    "no-content-document": "standard:6a3700dd2e82ce96",
+    "no-content-iframe": "standard:6a3700dd2e82ce96",
+    "attachment-document": "standard:6a3700dd2e82ce96",
+    "attachment-iframe": "standard:6a3700dd2e82ce96",
+    "b-first": "standard:7b7c1626519c362e"
+  },
+  "complete": {
+    "key": "complete",
+    "bFirst": "standard:7b7c1626519c362e",
+    "origin": "http://site-b.test:8080"
+  }
+}
