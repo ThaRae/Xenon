@@ -1029,8 +1029,12 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     view().on_load_finish = [this](auto const& url) {
         m_suppress_javascript_dialogs_until_navigation = false;
-        if (NewTabPage::is_new_tab_page(url))
-            NewTabPage::populate(view(), m_window->session());
+        if (NewTabPage::is_new_tab_page(url)) {
+            auto show_recently_closed = XenonSettings::new_tab_page_shows_recently_closed()
+                ? NewTabPage::ShowRecentlyClosed::Yes
+                : NewTabPage::ShowRecentlyClosed::No;
+            NewTabPage::populate(view(), m_window->session(), show_recently_closed);
+        }
 
         // Only mark the end of loads that finished, rather than being stopped, which don't end here. The browser's own
         // about: pages are not marked.

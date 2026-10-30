@@ -18,7 +18,6 @@
 #include <LibWebView/SessionStore.h>
 #include <LibWebView/ViewImplementation.h>
 #include <UI/NewTabPage.h>
-#include <UI/XenonSettings.h>
 
 namespace Ladybird::NewTabPage {
 
@@ -169,7 +168,7 @@ static JsonArray bookmarks_bar(WebView::BrowsingSession& session)
     return bookmarks;
 }
 
-void populate(WebView::ViewImplementation& view, WebView::BrowsingSession& session)
+void populate(WebView::ViewImplementation& view, WebView::BrowsingSession& session, ShowRecentlyClosed show_recently_closed)
 {
     auto is_private = session.is_private() == WebView::IsPrivate::Yes;
 
@@ -179,7 +178,7 @@ void populate(WebView::ViewImplementation& view, WebView::BrowsingSession& sessi
     // A private window's page says what it keeps instead, so it gets neither of these.
     if (!is_private) {
         data.set("bookmarksBar"sv, bookmarks_bar(session));
-        if (XenonSettings::new_tab_page_shows_recently_closed())
+        if (show_recently_closed == ShowRecentlyClosed::Yes)
             data.set("recentlyClosed"sv, recently_closed(session));
     }
 

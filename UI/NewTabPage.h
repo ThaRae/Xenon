@@ -22,6 +22,13 @@ bool is_new_tab_page(URL::URL const&);
 bool should_hide_url(URL::URL const&);
 bool should_hide_url(URL::URL const&, URL::URL const& new_tab_page_url);
 
-void populate(WebView::ViewImplementation&, WebView::BrowsingSession&);
+// Whether the page lists recently closed tabs is one of Xenon's settings, which the caller reads, so that this file needs
+// nothing of Qt's and the unit test can build it on its own.
+enum class ShowRecentlyClosed {
+    No,
+    Yes,
+};
+
+void populate(WebView::ViewImplementation&, WebView::BrowsingSession&, ShowRecentlyClosed);
 
 }
