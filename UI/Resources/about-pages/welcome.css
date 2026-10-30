@@ -5,37 +5,131 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* Set like a letter: serif questions, sans-serif answers, and hairline rows. */
+/*
+ * The first run: the defaults on one screen, as preset keys, then a step for each choice under a rail that counts them
+ * off. Choices are pictures of the result where there's something to picture, and lists where there isn't.
+ */
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+.topbar,
+.rail,
+form {
+    width: 1100px;
+    max-width: calc(100% - 64px);
+    margin: 0 auto;
+}
 
 .topbar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 22px 32px;
+    gap: 24px;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 20px 28px 0;
 }
 
-.step-counter {
-    font-size: 14px;
+.come-back {
+    font-size: 13px;
     color: var(--xenon-muted);
 }
 
+.come-back code {
+    color: var(--xenon-ink);
+}
+
+body[data-step="hello"] .topbar {
+    visibility: hidden;
+}
+
+/* The rail */
+
+.rail {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    column-gap: 6px;
+    margin-top: 18px;
+    padding: 0;
+    list-style: none;
+}
+
+body[data-step="hello"] .rail {
+    display: none;
+}
+
+.rail .bar {
+    display: block;
+    height: 6px;
+    background-color: var(--xenon-stone);
+    border-radius: 3px;
+    box-shadow: inset 0 1px 1px var(--xenon-hairline);
+}
+
+.rail-step {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 2px 0;
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
+.rail .done .bar {
+    background-color: var(--xenon-rose);
+    box-shadow: none;
+    opacity: 0.45;
+}
+
+.rail .done .rail-step {
+    color: var(--xenon-ink-soft);
+}
+
+.rail .done .rail-step::before {
+    content: "✓";
+    font-weight: 600;
+    color: var(--xenon-rose-ink);
+}
+
+.rail .current .bar {
+    background-color: var(--xenon-rose);
+    box-shadow: 0 1px 0 var(--xenon-rose-pressed);
+}
+
+.rail .current .rail-step {
+    font-weight: 600;
+    color: var(--xenon-ink);
+}
+
+.rail .current .rail-step::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    background-color: var(--xenon-rose);
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 2px rgba(255, 0, 80, 0.16),
+        0 0 6px rgba(255, 0, 80, 0.55);
+}
+
+/* The steps */
+
 form {
-    position: relative;
-    max-width: 640px;
-    min-height: 100vh;
-    margin: 0 auto;
-    padding: 112px 32px 72px;
+    flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: center;
 }
 
 .step:not([hidden]) {
-    animation: step-in 0.3s ease-out both;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-top: 30px;
+    animation: step-in 0.25s ease-out both;
 }
 
 @keyframes step-in {
@@ -47,292 +141,532 @@ form {
     }
 }
 
-h1 {
-    margin: 0 0 16px;
-    font-family: var(--xenon-serif);
-    font-size: 42px;
-    font-weight: 400;
-    line-height: 1.12;
-    letter-spacing: -0.01em;
+.page-lede {
+    max-width: 720px;
 }
 
-h1:focus {
-    outline: none;
-}
-
-[data-step="hello"] h1 {
-    font-size: 52px;
-}
-
-.lede {
-    max-width: 32em;
-    margin: 0 0 32px;
-    font-size: 17px;
-    line-height: 1.55;
-    color: var(--xenon-muted);
-}
-
-/* What "Keep these" keeps, so the quick way through says what it agrees to. */
-.defaults {
-    max-width: 420px;
-    margin: 0;
-}
-
-.default {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px;
-    padding: 11px 0;
-    border-top: 1px solid var(--xenon-hairline);
-}
-
-.default:last-child {
-    border-bottom: 1px solid var(--xenon-hairline);
-}
-
-.default dt {
-    color: var(--xenon-muted);
-}
-
-.default dd {
-    margin: 0;
-    font-family: var(--xenon-serif);
-    font-size: 17px;
-}
-
-.engine-columns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 28px;
-}
-
-fieldset {
-    min-width: 0;
-    margin: 0;
-    padding: 0;
-    border: none;
-}
-
-legend {
-    margin-bottom: 6px;
-    padding: 0;
-    font-family: var(--xenon-serif);
-    font-size: 17px;
-    font-style: italic;
-    color: var(--xenon-muted);
-}
-
-.choice {
-    position: relative;
-    display: grid;
-    grid-template-columns: 14px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 12px;
-    padding: 11px 10px;
-    border-top: 1px solid var(--xenon-hairline);
-    cursor: pointer;
-}
-
-.choice:last-child {
-    border-bottom: 1px solid var(--xenon-hairline);
-}
-
-.choice:hover {
-    background-color: var(--xenon-row-hover);
-}
-
-.choice:has(input:checked) {
-    background-color: var(--xenon-row-selected);
-}
-
-.choice:has(input:focus-visible) {
-    outline: 2px solid var(--xenon-rose);
-    outline-offset: -2px;
-}
-
-/* The row is the control, so the native radio button only takes keyboard focus. */
-.choice input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.marker {
-    width: 14px;
-    height: 14px;
-    border: 1.5px solid var(--xenon-muted);
-    border-radius: 50%;
-    box-sizing: border-box;
-}
-
-.choice:has(input:checked) .marker {
-    border: 4px solid var(--xenon-rose);
-}
-
-.choice-name {
-    font-size: 16px;
-}
-
-.choice-note {
-    font-size: 13px;
-    color: var(--xenon-muted);
-}
-
-.choice-list {
-    max-width: 420px;
-}
-
-.search-preview {
-    margin: 24px 0 18px;
-    font-size: 14px;
-    color: var(--xenon-muted);
-}
-
-.preview-url {
-    font-family: var(--xenon-mono);
-    font-size: 13px;
-    color: var(--xenon-ink);
-    text-decoration: underline;
-    text-decoration-color: var(--xenon-rose);
-    text-decoration-thickness: 1.5px;
-    text-underline-offset: 3px;
-}
-
-.check-option {
+.foot {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 14px;
-    cursor: pointer;
+    gap: 18px;
+    margin-top: auto;
+    padding: 28px 0 26px;
 }
 
-.check-option input {
-    flex-shrink: 0;
-    margin: 0;
-    accent-color: var(--xenon-rose);
-}
-
-.check-option:has(input:disabled) {
-    cursor: default;
+.foot-note {
+    font-size: 13px;
     color: var(--xenon-muted);
+}
+
+.foot .primary-button {
+    margin-left: auto;
 }
 
 .aside {
-    max-width: 34em;
-    margin: 20px 0 0;
-    font-size: 14px;
-    color: var(--xenon-muted);
-}
-
-#filter-lists {
-    margin: 18px 10px 0;
-}
-
-#filter-list-updates {
-    margin: 14px 10px 0;
-}
-
-#filter-lists-note {
-    margin: 8px 10px 0 34px;
+    margin: 18px 0 0 2px;
     font-size: 13px;
-}
-
-.hidden {
-    display: none;
-}
-
-.actions {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    margin-top: 36px;
-}
-
-button.primary-button {
-    height: auto;
-    padding: 12px 22px;
-    font-size: 15px;
-    font-weight: 600;
-    border-radius: 10px;
-}
-
-.text-button {
-    padding: 12px 0;
-    font: inherit;
-    font-size: 15px;
-    color: var(--xenon-ink);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-color: var(--xenon-hairline);
-    text-decoration-thickness: 1.5px;
-    text-underline-offset: 4px;
-}
-
-.text-button:hover:not(:disabled) {
-    text-decoration-color: var(--xenon-rose);
-}
-
-.text-button:disabled {
-    cursor: default;
     color: var(--xenon-muted);
 }
 
-[data-step="hello"] .aside {
-    margin-top: 28px;
+.save-status {
+    margin: 18px 0 0 2px;
+    font-size: 14px;
+    color: var(--xenon-rose-ink);
 }
 
 .save-status:empty {
     display: none;
 }
 
-.save-status {
-    margin: 24px 0 0;
-    color: var(--xenon-rose-pressed);
-}
-
-/* Work in progress, like a password manager's download, isn't an error. */
 .save-status.in-progress {
     color: var(--xenon-muted);
 }
 
-.password-manager-note {
-    max-width: 420px;
-    margin: 18px 10px 0;
+/* The first screen */
+
+.step[data-step="hello"] {
+    justify-content: center;
+    padding-bottom: 72px;
+}
+
+.hello-mark {
+    width: 56px;
+    height: 56px;
+}
+
+.step[data-step="hello"] .page-title {
+    margin-top: 22px;
+    font-size: 54px;
+    letter-spacing: -0.015em;
+}
+
+.step[data-step="hello"] .page-lede {
+    margin-top: 12px;
+    font-size: 16.5px;
+}
+
+.step[data-step="hello"] .box-title {
+    margin-top: 40px;
+}
+
+.presets.defaults,
+.presets.summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.presets.defaults .preset {
+    width: 100%;
+}
+
+.preset-hint {
+    display: block;
+    margin: 12px 2px 0;
+    font-size: 12.5px;
+    color: var(--xenon-muted);
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 34px;
+}
+
+/* Picture choices */
+
+.choices {
+    display: grid;
+    gap: 22px;
+    margin-top: 36px;
+}
+
+.choices.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.choices.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 26px;
+    margin-top: 28px;
+}
+
+.choices.two .choice-picture {
+    padding: 14px 22px 0;
+}
+
+.choice-extra {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 50px;
+    margin: 12px 4px 0;
+    padding-top: 12px;
+    font-size: 13px;
+    color: var(--xenon-muted);
+    border-top: 1px solid var(--xenon-hairline);
+}
+
+.choice-extra.side {
+    justify-content: space-between;
+    color: var(--xenon-ink);
+}
+
+.keys {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.key.small {
+    position: relative;
+    height: 30px;
+    padding: 0 12px;
     font-size: 13px;
 }
 
-@media (prefers-color-scheme: dark) {
-    .save-status {
-        color: var(--xenon-rose);
+.choice-name .tag {
+    margin-left: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--xenon-rose-ink);
+}
+
+.covers {
+    margin: 12px 4px 0;
+    padding-top: 12px;
+    font-size: 13px;
+    color: var(--xenon-ink-soft);
+    border-top: 1px solid var(--xenon-hairline);
+}
+
+/* The drawings. Their parts take their colours from these classes, so they follow the page into the dark. */
+.picture .win {
+    fill: var(--xenon-card);
+    stroke: var(--xenon-hairline);
+}
+
+.picture .chrome,
+.picture .ln {
+    fill: var(--xenon-hairline);
+}
+
+.picture .face,
+.picture .cookie {
+    fill: var(--xenon-card);
+}
+
+.picture .well,
+.picture .blk {
+    fill: var(--xenon-hairline-soft);
+}
+
+.picture .ln2,
+.picture .hd {
+    fill: var(--xenon-lamp-off);
+}
+
+.picture .dot {
+    fill: var(--xenon-lamp-off);
+}
+
+.picture .ic {
+    fill: none;
+    stroke: var(--xenon-muted);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.picture .sep {
+    fill: none;
+    stroke: var(--xenon-hairline);
+}
+
+.picture .rose,
+.picture .badge {
+    fill: var(--xenon-rose);
+}
+
+.picture .gone {
+    fill: none;
+    stroke: var(--xenon-rose-ink);
+    stroke-width: 1.3;
+    stroke-dasharray: 4 3;
+}
+
+.picture .ad {
+    stroke: var(--xenon-muted);
+    stroke-width: 1;
+}
+
+.picture .ad-label {
+    font: 600 7px var(--xenon-sans);
+    fill: var(--xenon-muted);
+}
+
+.picture .badge-text {
+    font: 600 8.5px var(--xenon-sans);
+    fill: #fff;
+}
+
+.picture .cookie {
+    stroke: var(--xenon-lamp-off);
+}
+
+.picture .btn {
+    fill: var(--xenon-ink-soft);
+}
+
+.picture .btn-quiet {
+    fill: none;
+    stroke: var(--xenon-lamp-off);
+}
+
+/* Lists of choices: the search engines */
+
+.pick-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 18px 0 8px 2px;
+}
+
+.pick-head h2 {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.pick-head span {
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
+.preview {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 16px 0 0;
+    padding: 10px 14px;
+    font-size: 13.5px;
+    color: var(--xenon-muted);
+    background-color: var(--xenon-sand);
+    border-radius: 10px;
+}
+
+.preview .preview-url {
+    font-family: var(--xenon-mono);
+    font-size: 12.5px;
+    color: var(--xenon-ink);
+}
+
+.check-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 14px 0 0 2px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.check-line input {
+    margin-top: 2px;
+}
+
+.check-line:has(input:disabled) {
+    cursor: default;
+    color: var(--xenon-muted);
+}
+
+.check-note {
+    display: block;
+    margin-top: 1px;
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
+.tip {
+    margin: 6px 0 0 28px;
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
+/* Blocking */
+
+.updates {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 22px;
+}
+
+.updates .check-line {
+    margin-top: 0;
+}
+
+.updates.hidden-updates .check-line {
+    visibility: hidden;
+}
+
+.local {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
+.local svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+}
+
+/* Password managers: each a key with its initial for a picture, and none as a long key below. */
+
+.choices.managers {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 18px;
+}
+
+.managers .choice-picture {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 92px;
+    padding: 0;
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--xenon-ink-soft);
+}
+
+.managers .choice:has(.choice-input:checked) .choice-picture {
+    color: var(--xenon-rose-ink);
+}
+
+.managers .choice.none {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+}
+
+.managers .choice.none:has(.choice-input:checked) {
+    padding: 11px 15px;
+}
+
+.managers .choice.none .choice-name,
+.managers .choice.none .choice-note {
+    margin: 0;
+}
+
+.managers .choice.none .choice-name {
+    font-size: 15px;
+}
+
+.managers .choice.none .choice-note {
+    flex: 1;
+}
+
+.manager-note {
+    max-width: 760px;
+    margin: 18px 2px 0;
+    font-size: 13.5px;
+    color: var(--xenon-muted);
+}
+
+.manager-note:empty {
+    display: none;
+}
+
+/* Done */
+
+.step[data-step="done"] .presets {
+    margin-top: 32px;
+}
+
+.installing {
+    display: none;
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 12px;
+    color: var(--xenon-muted);
+}
+
+.progress {
+    display: none;
+    height: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+    background-color: var(--xenon-hairline);
+    border-radius: 2px;
+}
+
+.progress span {
+    display: block;
+    width: 40%;
+    height: 100%;
+    background-color: var(--xenon-rose);
+    border-radius: 2px;
+    animation: progress 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes progress {
+    from {
+        transform: translateX(-20%);
+    }
+    to {
+        transform: translateX(170%);
     }
 }
 
+#password-manager-preset.is-installing .installing,
+#password-manager-preset.is-installing .progress {
+    display: block;
+}
+
+.box.tips {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tip-cell {
+    padding: 16px 18px 18px;
+}
+
+.tip-cell + .tip-cell {
+    border-left: 1px solid var(--xenon-hairline-soft);
+}
+
+.caps {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.caps kbd {
+    height: 28px;
+    padding: 0 9px;
+    font-size: 13px;
+    line-height: 25px;
+}
+
+.tip-title {
+    font-weight: 600;
+}
+
+.tip-note {
+    margin-top: 2px;
+    font-size: 13px;
+    color: var(--xenon-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .step:not([hidden]) {
+    .step:not([hidden]),
+    .progress span {
         animation: none;
     }
 }
 
+@media (max-width: 900px) {
+    .choices.three {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .presets.defaults,
+    .presets.summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .box.tips {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tip-cell + .tip-cell {
+        border-left: none;
+        border-top: 1px solid var(--xenon-hairline-soft);
+    }
+
+    .come-back {
+        display: none;
+    }
+}
+
 @media (max-width: 640px) {
-    form {
-        padding: 88px 20px 48px;
+    .choices.two {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .topbar {
-        padding: 18px 20px;
-    }
-
-    h1 {
-        font-size: 34px;
-    }
-
-    [data-step="hello"] h1 {
+    .step[data-step="hello"] .page-title {
         font-size: 40px;
     }
 
-    .engine-columns {
-        grid-template-columns: 1fr;
+    .updates {
+        flex-direction: column;
     }
 }

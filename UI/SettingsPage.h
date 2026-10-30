@@ -14,7 +14,8 @@
 // where the profile keeps its data. The page hears "xenon/settings" back whenever any of them changes, from the page or from a menu.
 namespace Ladybird::SettingsPage {
 
-// Gives an about:settings page these interfaces (see UI/WebUIInterfaces.cpp).
+// Gives an about:settings page these interfaces, and about:welcome too, whose layout step uses them (see
+// UI/WebUIInterfaces.cpp).
 void register_interfaces(WebView::WebUI&);
 
 }

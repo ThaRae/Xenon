@@ -10,8 +10,8 @@
 #include <LibWebView/Forward.h>
 
 // Xenon's new tab page (UI/Resources/about-pages/newtab.*) is static, so it has no channel to the browser of its own.
-// When a tab finishes loading it, the browser hands it what it shows, the user's most visited sites, by calling the
-// page's own xenonNewTab.show().
+// When a tab finishes loading it, the browser hands it what it shows, by calling the page's own xenonNewTab.show(): the
+// user's most visited sites, the links on the bookmarks bar, and the tabs closed most recently.
 namespace Ladybird::NewTabPage {
 
 bool is_new_tab_page(URL::URL const&);

@@ -280,6 +280,7 @@ private:
         settings.set("layout"sv, layout_name(XenonSettings::chrome_layout()));
         settings.set("cycleTabsInRecentlyUsedOrder"sv, XenonSettings::cycle_tabs_in_recently_used_order());
         settings.set("splitViewDragAndDrop"sv, XenonSettings::split_view_drag_and_drop());
+        settings.set("newTabPageShowsRecentlyClosed"sv, XenonSettings::new_tab_page_shows_recently_closed());
 
         JsonArray timeout_choices;
         for (auto minutes : TabHibernation::timeout_choices_in_minutes())
@@ -367,6 +368,11 @@ void register_interfaces(WebView::WebUI& web_ui)
     web_ui.register_interface("xenon/setSplitViewDragAndDrop"sv, [](auto const& data) {
         if (data.is_bool())
             XenonSettings::set_split_view_drag_and_drop(data.as_bool());
+    });
+
+    web_ui.register_interface("xenon/setNewTabPageShowsRecentlyClosed"sv, [](auto const& data) {
+        if (data.is_bool())
+            XenonSettings::set_new_tab_page_shows_recently_closed(data.as_bool());
     });
 
     web_ui.register_interface("xenon/setBangsEnabled"sv, [](auto const& data) {

@@ -11,15 +11,23 @@
 #include <AK/QuickSort.h>
 #include <LibURL/Parser.h>
 #include <LibWebView/Application.h>
+#include <LibWebView/BookmarkStore.h>
 #include <LibWebView/BrowsingSession.h>
+#include <LibWebView/FaviconStore.h>
 #include <LibWebView/HistoryStore.h>
+#include <LibWebView/SessionStore.h>
 #include <LibWebView/ViewImplementation.h>
 #include <UI/NewTabPage.h>
+#include <UI/XenonSettings.h>
 
 namespace Ladybird::NewTabPage {
 
 static constexpr size_t MAX_TOP_SITES = 8;
 static constexpr size_t HISTORY_ENTRIES_CONSIDERED = 500;
+static constexpr size_t MAX_RECENTLY_CLOSED = 3;
+// Closed tabs on internal pages are passed over, so a few more are looked at than are shown.
+static constexpr size_t RECENTLY_CLOSED_CONSIDERED = 10;
+static constexpr size_t MAX_BOOKMARKS_BAR_ITEMS = 8;
 
 bool is_new_tab_page(URL::URL const& url)
 {
@@ -38,6 +46,22 @@ bool should_hide_url(URL::URL const& url, URL::URL const& new_tab_page_url)
     return url.scheme() == "about"sv && url == new_tab_page_url;
 }
 
+static Optional<String> favicon_data_url(ReadonlyBytes favicon_png)
+{
+    auto icon = encode_base64(favicon_png);
+    if (icon.is_error())
+        return {};
+    return MUST(String::formatted("data:image/png;base64,{}", icon.value()));
+}
+
+// The host a tile names, for the pages on the web that the new tab page shows.
+static Optional<String> web_host(URL::URL const& url)
+{
+    if (!url.scheme().is_one_of("http"sv, "https"sv))
+        return {};
+    return MUST(String::from_utf8(url.serialized_host()));
+}
+
 // The sites visited most, by the history's decaying visit score, one per host so a single busy site can't fill the page.
 static JsonArray top_sites(WebView::HistoryStore& history)
 {
@@ -52,21 +76,21 @@ static JsonArray top_sites(WebView::HistoryStore& history)
     JsonArray sites;
     for (auto const& entry : entries) {
         auto url = URL::Parser::basic_parse(entry.url);
-        if (!url.has_value() || !url->scheme().is_one_of("http"sv, "https"sv))
+        if (!url.has_value())
             continue;
 
-        auto host = MUST(String::from_utf8(url->serialized_host()));
-        if (hosts.set(host) != HashSetResult::InsertedNewEntry)
+        auto host = web_host(*url);
+        if (!host.has_value() || hosts.set(*host) != HashSetResult::InsertedNewEntry)
             continue;
 
         JsonObject site;
         site.set("url"sv, entry.url);
-        site.set("host"sv, host);
+        site.set("host"sv, host.release_value());
         if (entry.title.has_value())
             site.set("title"sv, *entry.title);
         if (entry.favicon_png.has_value()) {
-            if (auto icon = encode_base64(*entry.favicon_png); !icon.is_error())
-                site.set("icon"sv, MUST(String::formatted("data:image/png;base64,{}", icon.value())));
+            if (auto icon = favicon_data_url(*entry.favicon_png); icon.has_value())
+                site.set("icon"sv, icon.release_value());
         }
         sites.must_append(move(site));
 
@@ -76,11 +100,88 @@ static JsonArray top_sites(WebView::HistoryStore& history)
     return sites;
 }
 
+// The tabs and windows closed most recently, newest first, by the page each was on. The session store keeps only that
+// page's URL, so its title and favicon come from the history.
+static JsonArray recently_closed(WebView::BrowsingSession& session)
+{
+    JsonArray closed;
+    if (!session.session_store)
+        return closed;
+
+    for (auto const& unit : session.session_store->recently_closed_units(RECENTLY_CLOSED_CONSIDERED)) {
+        auto host = web_host(unit.active_url);
+        if (!host.has_value())
+            continue;
+
+        JsonObject item;
+        item.set("url"sv, unit.active_url.serialize());
+        item.set("host"sv, host.release_value());
+        item.set("closedAt"sv, unit.closed_at.milliseconds_since_epoch());
+        if (unit.was_window)
+            item.set("tabCount"sv, static_cast<u64>(unit.tab_count));
+        if (session.history_store) {
+            if (auto entry = session.history_store->entry_for_url(unit.active_url); entry.has_value()) {
+                if (entry->title.has_value())
+                    item.set("title"sv, *entry->title);
+                if (entry->favicon_png.has_value()) {
+                    if (auto icon = favicon_data_url(*entry->favicon_png); icon.has_value())
+                        item.set("icon"sv, icon.release_value());
+                }
+            }
+        }
+        closed.must_append(move(item));
+
+        if (closed.size() == MAX_RECENTLY_CLOSED)
+            break;
+    }
+    return closed;
+}
+
+// The links on the bookmarks bar, in its order. Its folders are left out, since a tile opens one page.
+static JsonArray bookmarks_bar(WebView::BrowsingSession& session)
+{
+    JsonArray bookmarks;
+    for (auto const& item : WebView::Application::bookmark_store().root_items()) {
+        if (!item.is_bookmark())
+            continue;
+
+        auto const& bookmark = item.bookmark();
+        auto host = web_host(bookmark.url);
+        if (!host.has_value())
+            continue;
+
+        JsonObject site;
+        site.set("url"sv, bookmark.url.serialize());
+        site.set("host"sv, host.release_value());
+        if (bookmark.title.has_value())
+            site.set("title"sv, *bookmark.title);
+        if (bookmark.favicon_hash.has_value() && session.favicon_store) {
+            if (auto png = session.favicon_store->favicon_png(*bookmark.favicon_hash); png.has_value()) {
+                if (auto icon = favicon_data_url(*png); icon.has_value())
+                    site.set("icon"sv, icon.release_value());
+            }
+        }
+        bookmarks.must_append(move(site));
+
+        if (bookmarks.size() == MAX_BOOKMARKS_BAR_ITEMS)
+            break;
+    }
+    return bookmarks;
+}
+
 void populate(WebView::ViewImplementation& view, WebView::BrowsingSession& session)
 {
+    auto is_private = session.is_private() == WebView::IsPrivate::Yes;
+
     JsonObject data;
-    data.set("isPrivate"sv, session.is_private() == WebView::IsPrivate::Yes);
+    data.set("isPrivate"sv, is_private);
     data.set("sites"sv, session.history_store ? top_sites(*session.history_store) : JsonArray {});
+    // A private window's page says what it keeps instead, so it gets neither of these.
+    if (!is_private) {
+        data.set("bookmarksBar"sv, bookmarks_bar(session));
+        if (XenonSettings::new_tab_page_shows_recently_closed())
+            data.set("recentlyClosed"sv, recently_closed(session));
+    }
 
     // NB: JSON is a JavaScript expression, so the data can be passed as the call's argument as it is.
     view.run_javascript(MUST(String::formatted("window.xenonNewTab?.show({});", data.serialized())));
