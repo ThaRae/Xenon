@@ -91,11 +91,24 @@ ships. `Meta/xenon.py` reconfigures a build directory made before this, which th
 git config core.hooksPath .githooks   # run Meta/check.py before every push
 ./Meta/measure.py self-test            # RSS/PSS sampling, no Xenon build
 ./Meta/measure.py content-blocker      # filter-list engine memory, after Patches/ladybird
+./Meta/xenon.py build test262-runner && ./Meta/test262.py   # test262, compared with Ladybird's own run
 ```
 
 Memory and BrowserBench measurements for issue #28 live in `Meta/measure.py`, with the filter-list crate in
 `Meta/ci/memory-measurement/`. [Memory.md](Memory.md) has the commands, the Xenon-versus-upstream finding, and the
 experiment table.
+
+Benchmarks live there too: BrowserBench, and Ladybird's own suites, which `Meta/measure.py web-benchmarks` and
+`js-benchmarks` check out and run against Xenon and against the `js` and `wasm` REPLs Xenon's build can make.
+[Memory.md](Memory.md#benchmarks) has the commands and what the weekly runs compare.
+
+`Meta/test262.py` runs test262, the ECMAScript conformance suite, with the `test262-runner` built from the engine with
+Xenon's patches, as Ladybird's CI does on every change. Ladybird publishes each of those runs to
+[LadybirdBrowser/libjs-data](https://github.com/LadybirdBrowser/libjs-data), with every test's result and the test262
+revision it used. The script runs that same revision and compares test by test with Ladybird's run of the pinned commit
+(or of whatever commit the patches were applied to), so a difference comes from the patches. It fails if a test that
+passes upstream fails here; a timeout only shows in the summary, as GitHub's runners are slower than Ladybird's (each
+test gets 30 seconds here, and 10 there). Everything it writes goes in `Build/test262`.
 
 `Meta/check.py` formats C++ with clang-format, web pages with prettier, and Python with ruff, at the versions
 Ladybird's CI uses, read from the submodule. It installs clang-format, ruff, and PyYAML into `Build/tools` itself;
@@ -125,12 +138,13 @@ display, they go to Qt's offscreen platform. The unit tests that draw Xenon's po
 `Meta/xenon.py ladybird-test` builds Ladybird's own tests and runs them with ctest, as Ladybird's CI does: AK's and
 the libraries' unit tests, `test-js`, `test-web`'s web tests (text, layout, ref, screenshot, and crash tests), and the
 Rust crates' tests, against the engine with Xenon's patches applied. It turns `BUILD_TESTING` on in the build directory
-the first time, so the tests build from the same objects as Xenon, and leaves out only what Ladybird's CI leaves out of
-that step, the accessibility bridges. The Python packages Ladybird's CI installs for its tests (`cryptography` for
+the first time, so the tests build from the same objects as Xenon. It leaves out Xenon's own tests, which
+`Meta/xenon.py test` runs, and what Ladybird's CI leaves out of that step, the accessibility bridges. The Python packages Ladybird's CI installs for its tests (`cryptography` for
 `test-web`'s TLS tests, `six` for WPT's WebSocket server) go in a virtual environment in the build directory. A patch
 that changes what an upstream test checks updates that test's expectation in the same patch, as it would upstream. CI
 runs it after `Meta/xenon.py test` on Linux and macOS; when a web test fails, the `ladybird-test-dumps-linux` or
-`-macos` artifact has what it rendered or printed.
+`-macos` artifact has what it rendered or printed. A test may run for 30 minutes, as in Ladybird's CI; `--timeout`
+gives it longer, which the Sanitizer workflow does.
 
 Should Xenon not finish loading `about:welcome` at all, the checks after it, which all load pages, are skipped rather
 than each waiting out its timeouts, which would add up to more than CI gives the job. A helper process that crashes on a
@@ -144,6 +158,10 @@ CI runs on GitHub Actions, on GitHub's own runners:
 | `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test`, with the welcome page's render and the unit tests' renders as an artifact |
 | `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
 | `.github/workflows/release.yml` | by hand, pull requests that change it or how releases are packaged | `Meta/release.py test` and `package` on macOS, and `package` on Linux in Ladybird's CI image, from `main`'s build caches, with the installer, archive and appcast, and the AppImage, as artifacts; `Meta/release.py test` against the AppImage on Ubuntu 26.04, Fedora 44 and Arch Linux; and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases once all of that passed |
+| `.github/workflows/test262.yml` | pull requests and pushes to `main` that change the patches or move the submodule, by hand | `Meta/test262.py` on Linux in Ladybird's CI image, from `main`'s build caches, building only `test262-runner`; the summary has the counts beside Ladybird's and every test whose result differs |
+| `.github/workflows/sanitizer.yml` | nightly on `main` when it changed since the last run that passed, by hand, pull requests that change it | Xenon built with Ladybird's Sanitizer preset (AddressSanitizer and UndefinedBehaviorSanitizer) on Linux in Ladybird's CI image, running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test` with the options Ladybird's Sanitizer test preset sets (`Meta/ci/sanitizer.sh`); it fails if either does, or on any error the sanitizers report in Xenon's tests, and the reports are an artifact |
+| `.github/workflows/benchmarks.yml` | weekly on `main`, by hand, pull requests that change it | Ladybird's web-benchmarks in headless Xenon and its js-benchmarks in the `js` and `wasm` REPLs, on Linux and macOS, from `main`'s build caches, and BrowserBench on the weekly run (`Meta/ci/benchmarks.sh`); each job's summary compares with `main`'s last run, and the results are kept for 90 days ([Memory.md](Memory.md#benchmarks)) |
+| `.github/workflows/memory.yml` | by hand | `Meta/measure.py content-blocker` on Linux and macOS, and with **browsers** ticked, a macOS build measured headless beside Chrome ([Memory.md](Memory.md)) |
 
 - **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
   `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
@@ -157,6 +175,11 @@ CI runs on GitHub Actions, on GitHub's own runners:
   there. A change to the flags every file compiles with (the baseline CPU, say) misses all of ccache, though not
   vcpkg's packages. Land it on `main`, and let CI's build of `main` finish and save new caches, before running the
   release workflow, which builds from `main`'s caches and can't do a cold build in one run.
+- **The other workflows' caches**: `test262.yml` and `benchmarks.yml` start from `main`'s Linux and macOS caches and
+  save none of their own. `sanitizer.yml` keeps its own (`sanitizer-linux-…`), since its preset compiles everything,
+  dependencies included, differently. Its first runs after a change to the flags, or to the CI image, fill them, one
+  run's worth at a time, before the tests run. GitHub keeps 10 GB of caches per repository and drops the ones used
+  longest ago once there's more, so a pull request's own caches go first.
 
 ## Changing the engine
 

@@ -812,7 +812,8 @@ ErrorOr<JsonValue, String> Router::handle_privacy_call(Context& context, String 
         return JsonValue { setting_details(setting, extension) };
 
     if (name == "privacy.set"sv) {
-        auto value = object_argument(args, 1).get("value"sv);
+        auto details = object_argument(args, 1);
+        auto value = details.get("value"sv);
         if (!value.has_value() || !value->is_bool())
             return "The value has to be a boolean."_string;
         Registry::the().set_controlled_setting(setting, extension, *value);
