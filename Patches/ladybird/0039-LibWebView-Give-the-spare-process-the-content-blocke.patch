@@ -1,12 +1,12 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Wed, 28 Oct 2026 23:41:45 +0000
-Subject: [PATCH] LibWebView: Don't give the spare process the content blocker
- until a tab takes it
+Subject: [PATCH] LibWebView: Give the spare process the content blocker when
+ it's taken
 
-The spare WebContent process was building the content blocker's engine as
-soon as it launched, tens of MiB for a process that has no page. Leave it
-without the rules until a tab takes it, and send them then.
+The spare WebContent process was building the content blocker's engine
+as soon as it launched, tens of MiB for a process that has no page.
+Leave it without the rules until a tab takes it, and send them then.
 ---
  Libraries/LibWebView/Application.cpp    | 13 ++++++++-----
  Libraries/LibWebView/Application.h      |  2 +-

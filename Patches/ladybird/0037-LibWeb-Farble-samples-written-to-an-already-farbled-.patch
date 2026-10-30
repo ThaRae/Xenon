@@ -15,8 +15,9 @@ already scaled, so the channel stays marked as farbled, and a test
 checks that it isn't scaled a second time.
 
 internals.setFingerprintingProtection() lets tests turn protection on
-despite test mode. A text test covers canvas, audio, hardwareConcurrency,
-deviceMemory, the Chrome User-Agent, and navigator.webdriver.
+despite test mode. A text test covers canvas, audio,
+hardwareConcurrency, deviceMemory, the Chrome User-Agent, and
+navigator.webdriver.
 ---
  .../LibWeb/Bindings/RustBindingsServices.cpp  |   2 +-
  Libraries/LibWeb/Internals/Internals.cpp      |   6 +

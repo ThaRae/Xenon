@@ -9,9 +9,9 @@ and hide it from then on. ViewImplementation::start_element_picker()
 does the same with the node picker DevTools uses: it highlights what is
 under the pointer, and on a click asks WebContent for a cosmetic filter
 that hides the picked element on its site. The filter uses the element's
-id, or its tag and classes, when they pick out only it, and otherwise the
-shortest path of child combinators (from the nearest ancestor with an id)
-that does. A text node stands for the element holding it.
+id, or its tag and classes, when they pick out only it, and otherwise
+the shortest path of child combinators (from the nearest ancestor with
+an id) that does. A text node stands for the element holding it.
 
 The page and image context menus get a Block Element... action that
 starts it. A frontend can show the resulting filter for the user to

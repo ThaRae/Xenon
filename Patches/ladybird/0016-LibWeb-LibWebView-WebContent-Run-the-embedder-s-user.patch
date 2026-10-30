@@ -1,8 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 20:55:01 -0400
-Subject: [PATCH] LibWeb+LibWebCommon+LibWebView+WebContent: Run the embedder's
- user scripts
+Subject: [PATCH] LibWeb+LibWebView+WebContent: Run the embedder's user scripts
 
 A browser's extensions run content scripts in web pages: at document
 start, end, or idle, in the page's own world or in an isolated world of

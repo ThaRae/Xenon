@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 22:34:25 -0400
-Subject: [PATCH] LibWebView: Let the embedder replace the lists it started the
- blocker with
+Subject: [PATCH] LibWebView: Let the embedder replace the filter lists it
+ started with
 
 A browser that ships its own filter lists, and keeps them up to date
 itself, needs the new lists to take effect without a restart. Lists

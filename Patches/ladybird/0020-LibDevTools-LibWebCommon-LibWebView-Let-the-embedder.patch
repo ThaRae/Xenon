@@ -2,7 +2,7 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 22:28:00 -0400
 Subject: [PATCH] LibDevTools+LibWebCommon+LibWebView: Let the embedder name
- its directories
+ its directory
 
 Profiles, crash reports, and the DevTools Firefox profile go in a
 directory named "Ladybird" under the platform's config, data, cache, and

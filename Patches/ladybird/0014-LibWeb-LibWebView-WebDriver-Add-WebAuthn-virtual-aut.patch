@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 19:58:04 -0400
-Subject: [PATCH] LibWeb+LibWebCommon+LibWebView+WebDriver: Add WebAuthn
- virtual authenticators
+Subject: [PATCH] LibWeb+LibWebView+WebDriver: Add WebAuthn virtual
+ authenticators
 
 This adds the virtual authenticators of WebAuthn's WebDriver extension:
 software CTAP1/U2F and CTAP2 authenticators with P-256 credentials,
@@ -13,10 +13,10 @@ their credentials, and set whether the user is verified. With a virtual
 authenticator present, a tab's ceremonies run without asking anyone, as
 under automation nobody is there to answer.
 
-Tests reach the same commands through Internals, and testdriver-vendor.js
-uses them for WPT's add_virtual_authenticator() and its relatives. A
-test's virtual authenticators belong to its own tab, since test-web runs
-tests side by side in one browser process.
+Tests reach the same commands through Internals, and
+testdriver-vendor.js uses them for WPT's add_virtual_authenticator() and
+its relatives. A test's virtual authenticators belong to its own tab,
+since test-web runs tests side by side in one browser process.
 
 The new tests register a credential and sign in with it, checking the
 assertion's signature with WebCrypto, run a ceremony in a cross-origin

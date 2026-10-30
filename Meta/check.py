@@ -353,6 +353,35 @@ def check_submodule(checks: Checks, online: bool, unpinned: bool):
             checks.fail("submodule", f"the pinned commit {pinned[2][:10]} doesn't exist upstream")
 
 
+def check_patch_messages(checks: Checks):
+    # Each patch's commit message, as `git am` makes it, through the commit lint Ladybird's own hooks run (category,
+    # capitalization, lines of at most 72 characters), so that the series could go upstream as it is.
+    lint = LADYBIRD_SOURCE_DIR / "Meta" / "lint-commit.sh"
+    if not lint.exists():
+        return
+
+    with tempfile.TemporaryDirectory() as temporary:
+        body_path = Path(temporary) / "body"
+        message_path = Path(temporary) / "message"
+        for path in patches.patch_files():
+            with path.open("rb") as patch:
+                info = subprocess.run(
+                    ["git", "mailinfo", str(body_path), os.devnull], stdin=patch, capture_output=True, text=True
+                )
+            subject = re.search(r"^Subject: (.*)$", info.stdout, re.MULTILINE)
+            if info.returncode != 0 or not subject:
+                checks.fail("patches", f"{relative(path)} has no commit message git can read")
+                continue
+
+            body = body_path.read_text()
+            message_path.write_text(f"{subject.group(1)}\n\n{body}" if body else f"{subject.group(1)}\n")
+            result = subprocess.run(["bash", str(lint), str(message_path)], capture_output=True, text=True)
+            if result.returncode != 0:
+                # The lint prints the rule that failed, in color, and then the message.
+                output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout).splitlines() or [result.stderr.strip()]
+                checks.fail("patches", f"{relative(path)}: {output[0].removesuffix(':')}")
+
+
 # --- Formatters -------------------------------------------------------------------------------------------------------
 
 
@@ -518,6 +547,7 @@ def main():
     check_filter_lists(checks)
     check_symlinks(checks)
     check_submodule(checks, online=args.online, unpinned=args.unpinned)
+    check_patch_messages(checks)
     if not args.skip_formatting:
         check_formatting(checks)
 

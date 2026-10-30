@@ -2,16 +2,17 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Wed, 28 Oct 2026 19:39:01 -0400
 Subject: [PATCH] LibWebView: Let the embedder retire a site's RequestServer
- once it's idle
+ once idle
 
 A site's RequestServer stays for a minute after its last client goes, in
 case the site is visited again. An embedder that closes a view of a site
-it doesn't expect back soon, such as a browser stopping an idle extension
-background page, has no use for that minute: the process just lingers.
+it doesn't expect back soon, such as a browser stopping an idle
+extension background page, has no use for that minute: the process just
+lingers.
 
-RequestServerManager::retire_when_idle() lets the session's RequestServer
-of a site go as soon as it has no clients. A client that connects before
-then keeps it the usual while.
+RequestServerManager::retire_when_idle() lets the session's
+RequestServer of a site go as soon as it has no clients. A client that
+connects before then keeps it the usual while.
 ---
  Libraries/LibWebView/RequestServerManager.cpp | 15 ++++++++++++++-
  Libraries/LibWebView/RequestServerManager.h   |  6 ++++++

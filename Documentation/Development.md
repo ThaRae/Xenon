@@ -108,6 +108,7 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
 - Ladybird's violet coming back into the chrome
 - a format string that would crash on non-ASCII text (escapes such as `\u201C` included), or one it can't read
 - a workflow step whose shell script doesn't parse
+- an engine patch whose commit message Ladybird's commit lint (`ladybird/Meta/lint-commit.sh`) would reject
 - engine changes in `ladybird/` that aren't exported to `Patches/ladybird`, or a pinned commit that doesn't exist
   upstream
 
@@ -168,7 +169,8 @@ CI runs on GitHub Actions, on GitHub's own runners:
 
 `Meta/xenon.py build` applies the series by itself when `ladybird/` is at the pinned commit, and builds whatever is
 checked out otherwise, so a rebuild in the middle of an edit builds the edit. `Meta/check.py` fails while `ladybird/`
-holds changes that aren't exported. `.gitmodules` sets the submodule to `ignore = all`, so the patched checkout never
+holds changes that aren't exported, and when a commit message breaks Ladybird's rules (`Category: Subject`, lines of
+at most 72 characters), as upstream's CI would. `.gitmodules` sets the submodule to `ignore = all`, so the patched checkout never
 shows up as a change in Xenon.
 
 ## Updating Ladybird

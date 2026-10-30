@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Thu, 29 Oct 2026 09:08:15 -0400
-Subject: [PATCH] LibJS: Look through call, apply and Reflect.apply for a
+Subject: [PATCH] LibJS: Look past call, apply and Reflect.apply for a
  function's caller
 
 A sloppy function's caller property gave null when the function was

@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 18:08:49 -0400
-Subject: [PATCH] LibWeb+LibWebCommon+LibWebView+WebContent+WebWorker: Add an
- origin access allowlist
+Subject: [PATCH] LibWeb+LibWebCommon+LibWebView: Add an origin access
+ allowlist
 
 An embedder may now let an origin of its own fetch from some others as
 if they were the same origin: with no CORS, and with the credentials of
@@ -17,9 +17,10 @@ as same-origin, so its response tainting stays "basic". A redirect to a
 destination outside the list falls back to CORS, as a same-origin
 request redirected to another origin does.
 
-The UI process keeps the list (Application::set_origin_access_allow_list)
-and gives it to every WebContent and WebWorker process as it starts, and
-again whenever it changes.
+The UI process keeps the list
+(Application::set_origin_access_allow_list) and gives it to every
+WebContent and WebWorker process as it starts, and again whenever it
+changes.
 ---
  Libraries/LibWeb/Fetch/Fetching/Fetching.cpp  |  7 +++
  Libraries/LibWebCommon/CMakeLists.txt         |  2 +
