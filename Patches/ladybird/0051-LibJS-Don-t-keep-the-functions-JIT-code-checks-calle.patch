@@ -1,0 +1,464 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Fri, 30 Oct 2026 10:29:52 -0400
+Subject: [PATCH] LibJS: Don't keep the functions JIT code checks callees
+ against alive
+
+JIT code that checks a call's callee against the function the call site
+saw, to inline it or call it directly, kept that function alive for as
+long as the code lived, and with it the function's environment and
+everything that holds. A site that saw a closure once kept it after
+nothing else did: pages that make new closures on every render, as
+React does, kept old closures and through their environments whole DOM
+trees they had already removed.
+
+The compiler now lists those functions as the code's guard cells,
+apart from the cells it embeds, unless it also needs them otherwise.
+The code keeps them alive only while a frame runs it, as the callee
+does then, and is discarded during the collection that finds one of
+them dead, before another cell can take its address and pass the
+check. The discard isn't a fruitless one: the recompile checks against
+the functions alive by then.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../LibJS/JIT/Rust/src/builder/inlining.rs    | 16 +++--
+ .../LibJS/JIT/Rust/src/builder/intrinsics.rs  |  7 +-
+ .../JIT/Rust/src/builder/property_access.rs   |  8 +++
+ Libraries/LibJS/JIT/Rust/src/builder/tests.rs |  8 ++-
+ Libraries/LibJS/JIT/Rust/src/code.rs          |  6 ++
+ Libraries/LibJS/JIT/Rust/src/codegen/tests.rs |  9 +--
+ Libraries/LibJS/JIT/Rust/src/ir/mod.rs        |  3 +
+ Libraries/LibJS/JIT/Rust/src/lib.rs           |  5 ++
+ .../Rust/src/interpreter/execution_context.rs |  6 ++
+ Libraries/LibJS/Rust/src/interpreter/vm.rs    |  1 +
+ Libraries/LibJS/Rust/src/jit/code.rs          | 69 ++++++++++++++++++-
+ Libraries/LibJS/Rust/src/jit/disabled.rs      |  4 ++
+ Libraries/LibJS/Rust/src/jit/tier_up.rs       |  9 +++
+ Tests/LibJS/Runtime/jit/callee-guards-gc.js   | 48 +++++++++++++
+ 14 files changed, 183 insertions(+), 16 deletions(-)
+ create mode 100644 Tests/LibJS/Runtime/jit/callee-guards-gc.js
+
+diff --git a/Libraries/LibJS/JIT/Rust/src/builder/inlining.rs b/Libraries/LibJS/JIT/Rust/src/builder/inlining.rs
+index 32ec28758e1c62c86e9790d6ef862a1f76ba103e..04af1c0468d6662c99eb1366d8b2b5ef9eb3fe7c 100644
+--- a/Libraries/LibJS/JIT/Rust/src/builder/inlining.rs
++++ b/Libraries/LibJS/JIT/Rust/src/builder/inlining.rs
+@@ -590,7 +590,7 @@ impl GraphBuilder<'_> {
+         if target.closures {
+             self.embed(target.function.shared_data);
+         } else {
+-            self.embed(target.function.function);
++            self.embed_guard(target.function.function);
+         }
+         self.embed(target.executable);
+         self.embed(target.function.realm);
+@@ -1522,7 +1522,13 @@ impl GraphBuilder<'_> {
+             }
+         };
+ 
+-        self.embed(function.function);
++        // NB: Materialized frames run the function. A callee checked against
++        //     it keeps it alive while they can exist (see `check_callee()`).
++        if closure.is_some() || callee.is_none() {
++            self.embed(function.function);
++        } else {
++            self.embed_guard(function.function);
++        }
+         // NB: Materialized frames store the realm.
+         self.embed(function.realm);
+         if let Some(closure) = closure
+@@ -1538,11 +1544,11 @@ impl GraphBuilder<'_> {
+             );
+         }
+         let expected_callee = expected_callee.unwrap_or(function.function);
+-        self.embed(expected_callee);
+         // NB: A callee folded to this function (a method from a prototype)
+         //     needs no check.
+-        if let Some(callee) = callee {
+-            self.check_callee(callee, expected_callee)?;
++        match callee {
++            Some(callee) => self.check_callee(callee, expected_callee)?,
++            None => self.embed(expected_callee),
+         }
+         let receiver = match &construct {
+             Some(construct) => self.construct_this(function.function, construct),
+diff --git a/Libraries/LibJS/JIT/Rust/src/builder/intrinsics.rs b/Libraries/LibJS/JIT/Rust/src/builder/intrinsics.rs
+index 68e894e90f7d67db67b104299117f2a07cd5a56d..5528a81d5ea4d9086e12bd2a0e0f00726af916a3 100644
+--- a/Libraries/LibJS/JIT/Rust/src/builder/intrinsics.rs
++++ b/Libraries/LibJS/JIT/Rust/src/builder/intrinsics.rs
+@@ -728,14 +728,17 @@ impl GraphBuilder<'_> {
+     }
+ 
+     /// Makes the code exit unless the value of `operand` is the function
+-    /// `expected`, which needs no check where it is that constant.
++    /// `expected`, which needs no check where it is that constant. The code
++    /// keeps a function it checks against alive only while it runs, as a
++    /// callee that is the function keeps it alive then.
+     pub(super) fn check_callee(&mut self, operand: Operand, expected: CellId) -> Result<(), CompileFailure> {
+         let value = self.read(operand)?;
+         let expected_bits = self.boxed_object(expected);
+         if self.graph.constant_value(value) == Some(expected_bits) {
++            self.embed(expected);
+             return Ok(());
+         }
+-        self.embed(expected);
++        self.embed_guard(expected);
+         self.emit_checked(
+             Op::CheckValue {
+                 expected: expected_bits,
+diff --git a/Libraries/LibJS/JIT/Rust/src/builder/property_access.rs b/Libraries/LibJS/JIT/Rust/src/builder/property_access.rs
+index d2923ea0f6f2045e34bfc1bb691cc48ce1ff6268..f6c6dd6d425f4bbb1995f6bebd71da505396f0e0 100644
+--- a/Libraries/LibJS/JIT/Rust/src/builder/property_access.rs
++++ b/Libraries/LibJS/JIT/Rust/src/builder/property_access.rs
+@@ -81,6 +81,14 @@ impl GraphBuilder<'_> {
+         }
+     }
+ 
++    /// Embeds a function the code only checks callees against (see
++    /// `CompiledCode::guard_cells`).
++    pub(super) fn embed_guard(&mut self, function: CellId) {
++        if !self.graph.guard_cells.contains(&function) {
++            self.graph.guard_cells.push(function);
++        }
++    }
++
+     /// Emits a node that may exit with the current instruction's eager frame
+     /// state. The value of a check is the input it refines (see
+     /// `Op::refined_input()`).
+diff --git a/Libraries/LibJS/JIT/Rust/src/builder/tests.rs b/Libraries/LibJS/JIT/Rust/src/builder/tests.rs
+index ab070ab02f8ee83847230fa96cd7570efcc6ff91..d8d1bd7ac906673c0a38ad543f72a67c004ca81e 100644
+--- a/Libraries/LibJS/JIT/Rust/src/builder/tests.rs
++++ b/Libraries/LibJS/JIT/Rust/src/builder/tests.rs
+@@ -2396,7 +2396,9 @@ pub(crate) mod inlining {
+         let text = dump(&graph, &test_layout());
+         assert!(text.contains("CheckValue 0xfff9000000009100"), "{text}");
+         assert!(text.contains("Return (#7)"), "{text}");
+-        assert!(graph.embedded_cells.contains(&CellId(0x9100)));
++        // NB: The code only checks the callee against the bound function.
++        assert!(graph.guard_cells.contains(&CellId(0x9100)));
++        assert!(!graph.embedded_cells.contains(&CellId(0x9100)));
+ 
+         // Five bound arguments from the middle of the table: the callee gets the last.
+         let fifth_argument = Operand::from_raw(test_layout().arguments_base() + 4);
+@@ -2453,9 +2455,11 @@ pub(crate) mod inlining {
+         assert!(text.contains(&expected), "{text}");
+         // NB: The call's value is its result.
+         assert!(!text.contains("LoadSlot r5"), "{text}");
+-        for cell in [CALLEE_FUNCTION, 0x7000, REALM, GLOBAL_THIS] {
++        for cell in [0x7000, REALM, GLOBAL_THIS] {
+             assert!(graph.embedded_cells.contains(&CellId(cell)), "{cell:#x}");
+         }
++        // NB: The code only checks the callee against the function.
++        assert_eq!(graph.guard_cells, [CellId(CALLEE_FUNCTION)]);
+ 
+         // Calls with more operands than a direct call takes as inputs in
+         // registers take them anywhere, and store them to the frame.
+diff --git a/Libraries/LibJS/JIT/Rust/src/code.rs b/Libraries/LibJS/JIT/Rust/src/code.rs
+index 0a262ab0d83c2196cb915f73c25dc543f0ca7697..9234521e3b4f988dd40acb41662242c303286e9e 100644
+--- a/Libraries/LibJS/JIT/Rust/src/code.rs
++++ b/Libraries/LibJS/JIT/Rust/src/code.rs
+@@ -39,6 +39,12 @@ pub struct CompiledCode {
+     /// Cells the code depends on (compares against or uses). The runtime keeps
+     /// them alive for as long as the code may run.
+     pub embedded_cells: Vec<CellId>,
++    /// Functions the code only checks callees against, and none of the
++    /// `embedded_cells`. The runtime keeps them alive while the code runs,
++    /// and discards the code once one dies otherwise, so that a site that
++    /// saw a closure once does not keep it and all its environment holds
++    /// alive.
++    pub guard_cells: Vec<CellId>,
+     /// What the code assumes keeps holding. The runtime installs the code
+     /// only if all of them still hold, and invalidates it when one stops
+     /// holding.
+diff --git a/Libraries/LibJS/JIT/Rust/src/codegen/tests.rs b/Libraries/LibJS/JIT/Rust/src/codegen/tests.rs
+index 962a1a82b548482afb04a1d77ba369e657641102..24196f13fd347f656dcb1cd7166bbe560646d12e 100644
+--- a/Libraries/LibJS/JIT/Rust/src/codegen/tests.rs
++++ b/Libraries/LibJS/JIT/Rust/src/codegen/tests.rs
+@@ -3251,14 +3251,11 @@ mod direct_calls {
+     fn the_target_is_embedded() {
+         let callee = Callee::new();
+         let (_, compiled) = compile_caller(callee.target(false, true));
+-        for cell in [
+-            callee.function.as_ptr() as u64,
+-            callee.executable.as_ptr() as u64,
+-            REALM,
+-            GLOBAL_THIS,
+-        ] {
++        for cell in [callee.executable.as_ptr() as u64, REALM, GLOBAL_THIS] {
+             assert!(compiled.embedded_cells.contains(&CellId(cell)), "{cell:#x}");
+         }
++        // NB: The code only checks the callee against the function.
++        assert_eq!(compiled.guard_cells, [CellId(callee.function.as_ptr() as u64)]);
+     }
+ 
+     #[cfg(target_arch = "x86_64")]
+diff --git a/Libraries/LibJS/JIT/Rust/src/ir/mod.rs b/Libraries/LibJS/JIT/Rust/src/ir/mod.rs
+index a3332a3881488597a84c2cebfb2b5ae7f65345ec..2628c2c913441bc91c8bddf8b545ab8bf358cc86 100644
+--- a/Libraries/LibJS/JIT/Rust/src/ir/mod.rs
++++ b/Libraries/LibJS/JIT/Rust/src/ir/mod.rs
+@@ -2082,6 +2082,9 @@ pub struct Graph {
+     /// holders, validity cells, inlined functions). The code is only valid
+     /// while they live.
+     pub embedded_cells: Vec<CellId>,
++    /// Functions the graph only checks callees against. The code is only
++    /// valid while they live too, but need not keep them alive.
++    pub guard_cells: Vec<CellId>,
+     /// What the code assumes keeps holding where it has `Op::AssumeValid`
+     /// nodes (see `Dependency`).
+     pub dependencies: Vec<crate::code::Dependency>,
+diff --git a/Libraries/LibJS/JIT/Rust/src/lib.rs b/Libraries/LibJS/JIT/Rust/src/lib.rs
+index f034c2247a11a17fd2771977f213111a9f7f8047..7faefdfdf376c934caadeabbd634b64c9cc3edd7 100644
+--- a/Libraries/LibJS/JIT/Rust/src/lib.rs
++++ b/Libraries/LibJS/JIT/Rust/src/lib.rs
+@@ -134,6 +134,11 @@ pub fn compile_for<M: asm::PortableMacroAssembler>(
+         osr_loop_back_edges: graph.osr_loop_back_edges,
+         osr_outer_loop_back_edges: graph.osr_outer_loop_back_edges,
+         uncaught_handlers: graph.uncaught_handlers,
++        guard_cells: graph
++            .guard_cells
++            .into_iter()
++            .filter(|cell| !graph.embedded_cells.contains(cell))
++            .collect(),
+         embedded_cells: graph.embedded_cells,
+         dependencies: graph.dependencies,
+         invalidation_patches: generated.invalidation_patches,
+diff --git a/Libraries/LibJS/Rust/src/interpreter/execution_context.rs b/Libraries/LibJS/Rust/src/interpreter/execution_context.rs
+index 8f7feedc54ded8e6edf1cd7fe3b73c0fe5015636..248660c27d0eb1f73708be31a6239c40fde8f019 100644
+--- a/Libraries/LibJS/Rust/src/interpreter/execution_context.rs
++++ b/Libraries/LibJS/Rust/src/interpreter/execution_context.rs
+@@ -8,6 +8,7 @@ use core::cell::{Cell, RefCell};
+ use core::ptr::NonNull;
+ use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
+ 
++use crate::bytecode::executable::Executable;
+ use crate::gc::visitor::{Trace, Visitor};
+ use crate::layout::execution_context::{ExecutionContext, ScriptOrModule};
+ use crate::layout::value::Value;
+@@ -157,6 +158,11 @@ unsafe impl Trace for ExecutionContext {
+         self.private_environment.trace(visitor);
+         self.this_value.trace(visitor);
+         self.executable.trace(visitor);
++        if self.runs_jit_code.get()
++            && let Some(executable) = self.executable.get()
++        {
++            Executable::from_head(executable).trace_running_jit_code(visitor);
++        }
+         match self.script_or_module.get() {
+             ScriptOrModule::Empty => {}
+             ScriptOrModule::Script(script) => script.trace(visitor),
+diff --git a/Libraries/LibJS/Rust/src/interpreter/vm.rs b/Libraries/LibJS/Rust/src/interpreter/vm.rs
+index ed0195f1df1c739c604681dc35e56b88da5637ee..26cd643f9a5f946b69322c65dc5270afc4f811e3 100644
+--- a/Libraries/LibJS/Rust/src/interpreter/vm.rs
++++ b/Libraries/LibJS/Rust/src/interpreter/vm.rs
+@@ -1384,6 +1384,7 @@ impl Vm {
+                 return false;
+             }
+             executable.remove_dead_cells(sweep);
++            executable.discard_jit_code_with_dead_guard_cell(self, sweep);
+             true
+         });
+         self.static_property_lookup_caches.remove_dead_entries(sweep);
+diff --git a/Libraries/LibJS/Rust/src/jit/code.rs b/Libraries/LibJS/Rust/src/jit/code.rs
+index bb947bd5d6d5a09a4204c070286d98af80a26b4c..bdde278f23f0b91799e26ca5077020f10b3bbedf 100644
+--- a/Libraries/LibJS/Rust/src/jit/code.rs
++++ b/Libraries/LibJS/Rust/src/jit/code.rs
+@@ -147,6 +147,11 @@ pub struct JitCode {
+     /// The cells the code compares against or uses. The executable the code is attached to keeps them alive, so they
+     /// keep their addresses for as long as the code may run.
+     embedded_cells: Vec<Gc<CellHeader>>,
++    /// The functions the code only checks callees against (see `libjs_jit::code::CompiledCode::guard_cells`), and
++    /// the functions of the snapshot executables among them. They are kept alive only while a frame runs the code,
++    /// and the code is discarded once one dies, before a cell can take its address (see
++    /// `discard_jit_code_with_dead_guard_cell()`).
++    guard_cells: Vec<Gc<CellHeader>>,
+     snapshot_executables: Vec<SnapshotExecutable>,
+     /// Where a frame running in the interpreter at `pc` can continue in this code (see `osr_entry()`).
+     osr_entries: Vec<(u32, JitEntry)>,
+@@ -217,6 +222,7 @@ impl JitCode {
+             entry,
+             sites,
+             embedded_cells,
++            guard_cells: Vec::new(),
+             snapshot_executables,
+             osr_entries,
+             osr_loop_back_edges,
+@@ -287,6 +293,25 @@ impl JitCode {
+         self.invalidation_patches = invalidation_patches;
+     }
+ 
++    pub fn set_guard_cells(&mut self, guard_cells: Vec<Gc<CellHeader>>) {
++        self.guard_cells = guard_cells;
++    }
++
++    /// Visits the cells the code keeps alive only while a frame runs it.
++    pub fn trace_guard_cells(&self, visitor: &mut Visitor) {
++        for cell in &self.guard_cells {
++            visitor.visit(*cell);
++        }
++    }
++
++    fn is_guard_cell(&self, function: InlinedFunction) -> bool {
++        let address = match function {
++            InlinedFunction::Ecmascript(function) => function.as_ptr() as usize,
++            InlinedFunction::Builtin(function) => function.as_ptr() as usize,
++        };
++        self.guard_cells.iter().any(|cell| cell.as_ptr() as usize == address)
++    }
++
+     /// Gives the code the loop back edges in the loops around those of its on-stack replacement entries.
+     pub fn set_osr_outer_loop_back_edges(&mut self, osr_outer_loop_back_edges: Vec<u32>) {
+         self.osr_outer_loop_back_edges = osr_outer_loop_back_edges;
+@@ -426,7 +451,14 @@ unsafe impl Trace for JitCode {
+         for materialized in self.materialized_objects.borrow().iter() {
+             visitor.visit(materialized.object);
+         }
+-        self.snapshot_executables.trace(visitor);
++        for snapshot_executable in &self.snapshot_executables {
++            visitor.visit(snapshot_executable.executable);
++            if let Some(function) = snapshot_executable.function
++                && !self.is_guard_cell(function)
++            {
++                function.trace(visitor);
++            }
++        }
+     }
+ }
+ 
+@@ -595,6 +627,41 @@ impl Executable {
+         }
+     }
+ 
++    /// Visits the cells the executable's attached JIT code keeps alive while a frame runs it, for a frame that does.
++    pub fn trace_running_jit_code(&self, visitor: &mut Visitor) {
++        if let Some(code) = self.jit_code(Vm::of_cell(self)) {
++            code.trace_guard_cells(visitor);
++        }
++    }
++
++    /// Discards the executable's JIT code if one of the cells it keeps alive only while a frame runs it died, which
++    /// means that no frame runs it. The code checks callees against those cells, and a cell that takes the address of
++    /// one could pass the check.
++    pub fn discard_jit_code_with_dead_guard_cell(&self, vm: &Vm, sweep: &Sweep<'_>) {
++        let Some(code) = self.jit_code(vm) else {
++            return;
++        };
++        if !code.guard_cells.iter().any(|cell| sweep.is_dead(*cell)) {
++            return;
++        }
++        if vm.jit.options.log_exits {
++            eprintln!(
++                "JIT invalidate: {}, a function it checks callees against died",
++                super::describe_executable(self)
++            );
++        }
++        code.invalidate();
++        // NB: The recompile checks against the functions alive by then, so the discard is no fruitless one.
++        self.note_learned_jit_exit_site();
++        match self.jit_compile_state() {
++            CompileState::Installed => self.discard_jit_code(vm),
++            CompileState::Discarding => {
++                self.detach_discarded_jit_code_if_unused(vm);
++            }
++            _ => {}
++        }
++    }
++
+     pub fn jit_exit_sites(&self) -> Vec<(u32, ExitKind)> {
+         self.jit_state().exit_sites.borrow().clone()
+     }
+diff --git a/Libraries/LibJS/Rust/src/jit/disabled.rs b/Libraries/LibJS/Rust/src/jit/disabled.rs
+index fce35264a768c906bdf2763c3df7582ea95fcdd8..a8311a55609fe3197990edf5491a11b70adbd70f 100644
+--- a/Libraries/LibJS/Rust/src/jit/disabled.rs
++++ b/Libraries/LibJS/Rust/src/jit/disabled.rs
+@@ -109,6 +109,10 @@ pub mod code {
+ 
+         pub fn trace_jit_code(&self, _visitor: &mut Visitor) {}
+ 
++        pub fn trace_running_jit_code(&self, _visitor: &mut Visitor) {}
++
++        pub fn discard_jit_code_with_dead_guard_cell(&self, _vm: &Vm, _sweep: &Sweep<'_>) {}
++
+         pub fn jit_compile_state(&self) -> CompileState {
+             CompileState::None
+         }
+diff --git a/Libraries/LibJS/Rust/src/jit/tier_up.rs b/Libraries/LibJS/Rust/src/jit/tier_up.rs
+index 68bdc95091194cbffd5bfb2690c46bf91219e94f..0d959a06414e948badd56f2b62e28ad626537b9f 100644
+--- a/Libraries/LibJS/Rust/src/jit/tier_up.rs
++++ b/Libraries/LibJS/Rust/src/jit/tier_up.rs
+@@ -362,6 +362,14 @@ fn install(
+             unsafe { Gc::from_non_null(NonNull::new(cell.0 as *mut CellHeader).expect("embedded cells are not null")) }
+         })
+         .collect();
++    let guard_cells = compiled
++        .guard_cells
++        .iter()
++        .map(|cell| {
++            // SAFETY: As for the embedded cells.
++            unsafe { Gc::from_non_null(NonNull::new(cell.0 as *mut CellHeader).expect("guard cells are not null")) }
++        })
++        .collect();
+     let id = vm.jit.next_code_id();
+     let mut code = JitCode::new(
+         memory,
+@@ -374,6 +382,7 @@ fn install(
+         defer_gc,
+     );
+     code.set_invalidation(id, compiled.invalidation_patches);
++    code.set_guard_cells(guard_cells);
+     code.set_frame_offsets(compiled.site_index_frame_offset, compiled.register_dump_frame_offset);
+     code.set_osr_outer_loop_back_edges(compiled.osr_outer_loop_back_edges);
+     code.set_uncaught_handlers(compiled.uncaught_handlers);
+diff --git a/Tests/LibJS/Runtime/jit/callee-guards-gc.js b/Tests/LibJS/Runtime/jit/callee-guards-gc.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..95422fd733ac0f862ba53d291c8ff4c115568a80
+--- /dev/null
++++ b/Tests/LibJS/Runtime/jit/callee-guards-gc.js
+@@ -0,0 +1,48 @@
++// JIT code may check the callee of a call against the function the call site
++// saw, and inline it. The code does not keep that function alive: once it
++// dies, the code is discarded, so that a function that takes its address is
++// never mistaken for it.
++
++describe("JIT code that checks callees against a function", () => {
++    test("does not keep a closure alive once nothing else does", () => {
++        const caller = new Function("callee", "return callee() + 1;");
++        jit.prepare(caller);
++        const registry = new FinalizationRegistry(() => {});
++
++        function makeCallee(value) {
++            const callee = () => value;
++            registry.register(callee, value);
++            return callee;
++        }
++
++        function compileWithCallee() {
++            const callee = makeCallee(1);
++            for (let i = 0; i < 10; ++i) expect(caller(callee)).toBe(2);
++            return jit.compile(caller);
++        }
++
++        expect(compileWithCallee()).toBe(jit.enabled);
++        gc();
++
++        const collected = [];
++        cleanupFinalizationRegistry(registry, value => collected.push(value));
++        expect(collected).toEqual([1]);
++        expect(jit.isCompiled(caller)).toBeFalse();
++
++        expect(caller(makeCallee(2))).toBe(3);
++    });
++
++    test("keeps the function while it is called", () => {
++        const caller = new Function("callee", "return callee() + 1;");
++        jit.prepare(caller);
++        let callee = () => 1;
++        for (let i = 0; i < 10; ++i) expect(caller(callee)).toBe(2);
++        expect(jit.compile(caller)).toBe(jit.enabled);
++        expect(caller(callee)).toBe(2);
++
++        gc();
++        expect(jit.isCompiled(caller)).toBe(jit.enabled);
++        expect(caller(callee)).toBe(2);
++        callee = null;
++    });
++});
