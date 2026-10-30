@@ -545,7 +545,21 @@ private:
 };
 
 Application::Application() = default;
-Application::~Application() = default;
+Application::~Application()
+{
+    // NB: A run stopped by a signal leaves its windows open for the next launch to recover. Their pages must still go
+    //     before the QApplication does, since the processes torn down after it end their navigations, which updates
+    //     their widgets.
+    if (!m_application)
+        return;
+    Vector<QPointer<BrowserWindow>> windows;
+    for (auto* widget : QApplication::topLevelWidgets()) {
+        if (auto* window = as_if<BrowserWindow>(widget))
+            windows.append(window);
+    }
+    for (auto& window : windows)
+        delete window.data();
+}
 
 void Application::show_process_manager()
 {
