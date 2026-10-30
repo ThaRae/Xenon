@@ -14,10 +14,11 @@ namespace Ladybird {
 void install_web_ui_interfaces()
 {
     WebView::WebUI::set_embedder_interfaces([](WebView::WebUI& web_ui) {
-        if (web_ui.host().is_one_of("settings"sv, "welcome"sv))
+        // The welcome flow's layout step reads and sets the layout through Xenon's settings, as about:settings does.
+        if (web_ui.host().is_one_of("settings"sv, "welcome"sv)) {
             PasswordManagers::the().register_web_ui_interfaces(web_ui);
-        if (web_ui.host() == "settings"sv)
             SettingsPage::register_interfaces(web_ui);
+        }
     });
 }
 

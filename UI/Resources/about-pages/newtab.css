@@ -4,133 +4,426 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+/*
+ * The new tab page: a greeting, the sites you go to most as a speed dial of keys, and the tabs you closed last. A
+ * private window's page says what it does and doesn't keep instead, on the dark ground in either theme.
+ */
+
 body {
+    overflow-x: hidden;
+}
+
+.column {
+    width: 920px;
+    max-width: calc(100% - 48px);
+    margin: 0 auto;
+    padding: 32px 0 72px;
+}
+
+.greeting {
     display: flex;
-    flex-direction: column;
-}
-
-.topbar {
-    padding: 22px 32px;
-}
-
-.topbar .mark {
-    width: 22px;
-    height: 22px;
-}
-
-/* A little above the middle, where the eye lands in a new tab. */
-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 32px 32px 18vh;
+    gap: 18px;
 }
 
-.visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+.greeting .mark {
+    width: 32px;
+    height: 32px;
 }
 
-.top-sites-title {
-    margin: 0 0 12px;
-    font-family: var(--xenon-serif);
-    font-size: 17px;
-    font-style: italic;
-    font-weight: 400;
+.greeting .page-title {
+    font-size: 36px;
+}
+
+.greeting .page-lede {
+    margin-top: 4px;
+    font-size: 14px;
+}
+
+/* The dial groups, switched like tabs. */
+.groups-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 30px 0 18px;
+}
+
+.keys {
+    display: flex;
+    gap: 8px;
+}
+
+.keys .key {
+    position: relative;
+}
+
+.keys .key[aria-selected="true"] {
+    background-color: var(--xenon-key-down);
+    box-shadow: inset 0 1px 2px rgba(26, 21, 23, 0.14);
+    transform: translateY(2px);
+}
+
+.keys .key[aria-selected="true"] .lamp {
+    background-color: var(--xenon-rose);
+    box-shadow:
+        0 0 0 2px rgba(255, 0, 80, 0.16),
+        0 0 6px rgba(255, 0, 80, 0.55);
+}
+
+.dial-note,
+.section-note {
+    font-size: 13px;
     color: var(--xenon-muted);
 }
 
-.top-sites {
+/* The dial: a site per key, its rank as the legend. */
+.dial {
     display: grid;
-    grid-template-columns: repeat(4, 112px);
-    gap: 8px 16px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-.top-sites:empty {
+.dial:empty {
     display: none;
 }
 
-.site a {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 6px 12px;
+.tile a {
+    display: block;
     color: var(--xenon-ink);
     text-decoration: none;
     border-radius: 12px;
 }
 
-.site a:hover {
-    background-color: var(--xenon-row-hover);
-}
-
-.site a:focus-visible {
+.tile a:focus-visible {
     outline: 2px solid var(--xenon-rose);
-    outline-offset: 0;
+    outline-offset: 4px;
     box-shadow: none;
 }
 
-.site-icon {
+.tile-face {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 56px;
-    height: 56px;
-    font-family: var(--xenon-serif);
-    font-size: 26px;
-    color: var(--xenon-ink);
+    height: 104px;
+    overflow: hidden;
+    font-size: 38px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
     text-transform: uppercase;
-    background-color: var(--xenon-row-hover);
-    border: 1px solid var(--xenon-hairline);
-    border-radius: 14px;
+    background-color: var(--xenon-sand);
+    border: 1px solid var(--xenon-key-edge);
+    border-radius: 12px;
+    box-shadow:
+        0 4px 0 var(--xenon-key-lip),
+        0 6px 14px rgba(26, 21, 23, 0.05);
 }
 
-.site a:hover .site-icon {
+.tile:nth-child(3n + 2) .tile-face {
+    background-color: var(--xenon-stone);
+}
+
+.tile:nth-child(4n + 3) .tile-face {
+    background-color: var(--xenon-card);
+}
+
+.tile a:hover .tile-face {
     border-color: var(--xenon-muted);
 }
 
-.site-icon img {
-    width: 28px;
-    height: 28px;
+.tile a:active .tile-face {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--xenon-key-lip);
 }
 
-.site-name {
-    max-width: 100%;
+.tile-face img {
+    width: 36px;
+    height: 36px;
+}
+
+.legend {
+    position: absolute;
+    top: 9px;
+    left: 9px;
+    min-width: 20px;
+    height: 20px;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 18px;
+    letter-spacing: 0;
+    text-align: center;
+    color: var(--xenon-ink-soft);
+    background-color: var(--xenon-key-face);
+    border: 1px solid var(--xenon-key-edge);
+    border-radius: 5px;
+}
+
+.tile-name,
+.tile-detail {
+    display: block;
+    margin: 0 2px;
     overflow: hidden;
-    font-size: 13px;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.note {
-    max-width: 30em;
-    margin: 0;
-    font-size: 15px;
-    text-align: center;
+.tile-name {
+    margin-top: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.tile-detail {
+    font-size: 12px;
     color: var(--xenon-muted);
 }
 
-.note strong {
-    display: block;
-    margin-bottom: 6px;
-    font-family: var(--xenon-serif);
-    font-size: 26px;
-    font-weight: 400;
+/* A new profile's dial: empty keys that fill in as the sites come. */
+.dial.empty .tile-face {
+    background: none;
+    border: 1.5px dashed var(--xenon-hairline);
+    box-shadow: none;
+}
+
+.dial.empty .legend {
+    color: var(--xenon-muted);
+    background: none;
+    border: none;
+}
+
+.empty-note {
+    margin: 22px 2px 0;
+    font-size: 14px;
+    color: var(--xenon-muted);
+}
+
+/* Recently closed */
+
+.recently-closed {
+    margin-top: 32px;
+}
+
+.section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.section-head .box-title {
+    margin-top: 0;
+}
+
+.closed-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.closed-list li + li {
+    border-top: 1px solid var(--xenon-hairline-soft);
+}
+
+.closed-list a {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 14px;
+    min-height: 46px;
+    padding: 8px 18px;
+    font-size: 14px;
+    color: var(--xenon-ink);
+    text-decoration: none;
+}
+
+.closed-list a:hover {
+    background-color: var(--xenon-row-hover);
+}
+
+.closed-list a:focus-visible {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: -2px;
+    box-shadow: none;
+}
+
+.closed-list .monogram {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    border-radius: 5px;
+}
+
+.closed-list .monogram img {
+    width: 16px;
+    height: 16px;
+}
+
+.closed-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.closed-host,
+.closed-when {
+    font-size: 13px;
+    color: var(--xenon-muted);
+    white-space: nowrap;
+}
+
+.closed-when {
+    min-width: 70px;
+    text-align: right;
+}
+
+.customize {
+    position: fixed;
+    right: 24px;
+    bottom: 22px;
+}
+
+/* A private window: the app icon's dark ground, in either theme. */
+
+body.private {
+    --xenon-page: #0d0a0c;
+    --xenon-card: #171214;
+    --xenon-sand: #1f191b;
+    --xenon-ink: #f4eff1;
+    --xenon-ink-soft: #dcd3d6;
+    --xenon-muted: #b0a5aa;
+    --xenon-hairline: rgba(244, 239, 241, 0.13);
+    --xenon-hairline-soft: rgba(244, 239, 241, 0.07);
+    --xenon-key-face: #1e181a;
+    --xenon-key-edge: rgba(244, 239, 241, 0.12);
+    --xenon-orbit: #ffffff;
+
+    color: var(--xenon-ink);
+    background-color: var(--xenon-page);
+}
+
+html:has(body.private) {
+    background-color: #0d0a0c;
+}
+
+.private-column {
+    width: 760px;
+    padding-top: 120px;
+}
+
+.private-column > .mark {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 26px;
+}
+
+.private-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 40px;
+}
+
+.private-card {
+    padding: 18px 22px 8px;
+}
+
+.card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.card-head svg {
+    width: 16px;
+    height: 16px;
+    color: var(--xenon-muted);
+}
+
+.private-card:first-child .card-head svg {
+    color: var(--xenon-rose);
+}
+
+.private-card dl {
+    margin: 0;
+    padding-left: 26px;
+}
+
+.private-card dt {
+    padding-top: 10px;
+    font-size: 14px;
+}
+
+.private-card dd {
+    margin: 0;
+    padding-bottom: 10px;
+    font-size: 13px;
+    color: var(--xenon-muted);
+    border-bottom: 1px solid var(--xenon-hairline-soft);
+}
+
+.private-card dd:last-child {
+    border-bottom: none;
+}
+
+.restart {
+    margin: 16px 0 0;
+    padding: 12px 18px;
+    font-size: 13.5px;
+    color: var(--xenon-muted);
+    background-color: var(--xenon-sand);
+    border: 1px solid var(--xenon-hairline);
+    border-radius: 12px;
+}
+
+.restart svg {
+    width: 15px;
+    height: 15px;
+    margin-right: 8px;
+    vertical-align: -3px;
+}
+
+.restart strong {
+    font-weight: 600;
     color: var(--xenon-ink);
 }
 
-@media (max-width: 600px) {
-    .top-sites {
-        grid-template-columns: repeat(2, 112px);
+.badge {
+    padding: 1px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--xenon-ink);
+    background-color: var(--xenon-key-face);
+    border: 1px solid var(--xenon-key-edge);
+    border-radius: 6px;
+}
+
+@media (max-width: 1000px) {
+    .closed-host {
+        display: none;
+    }
+
+    .closed-list a {
+        grid-template-columns: 20px minmax(0, 1fr) auto;
+    }
+}
+
+@media (max-width: 700px) {
+    .dial {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .private-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .dial-note {
+        display: none;
     }
 }

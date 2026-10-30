@@ -5,17 +5,34 @@
  */
 
 /*
- * What Xenon's own pages (welcome, new tab, settings) share: a plain page, its neutrals, serif headings over sans-serif
- * text, and the orbit mark from the app icon.
+ * What Xenon's own pages (welcome, new tab, settings) share: a warm page, serif titles over sans-serif text, the orbit
+ * mark from the app icon, and the controls the three pages are built from. Choices are keys that stand on a lip and
+ * sink when chosen, and a small rose lamp marks whatever is on.
+ *
+ * Ladybird draws weight 500 as bold, and with antialiased font smoothing it draws 600 as regular inside transformed
+ * boxes, so these pages use 400 and 600 and leave the smoothing alone.
  */
 
 :root {
-    --xenon-page: #faf8f9;
+    --xenon-page: #f7f4f1;
+    --xenon-card: #fffdfb;
+    --xenon-sand: #f3eee9;
+    --xenon-stone: #ebe4e6;
     --xenon-ink: #1a1517;
+    --xenon-ink-soft: #3a3235;
     --xenon-muted: #6e6569;
     --xenon-hairline: rgba(26, 21, 23, 0.12);
+    --xenon-hairline-soft: rgba(26, 21, 23, 0.07);
     --xenon-row-hover: rgba(26, 21, 23, 0.04);
-    --xenon-row-selected: rgba(255, 0, 80, 0.06);
+    --xenon-row-selected: rgba(255, 0, 80, 0.08);
+    /* Rose text on the page, 4.6:1. */
+    --xenon-rose-ink: var(--xenon-rose-pressed);
+
+    --xenon-key-face: #fffdfb;
+    --xenon-key-edge: rgba(26, 21, 23, 0.14);
+    --xenon-key-lip: #ddd4d0;
+    --xenon-key-down: #f0ebe8;
+    --xenon-lamp-off: #cfc7c4;
 
     /* The app icon's white orbit and nucleus, which turn to ink on a light page. */
     --xenon-orbit: var(--xenon-ink);
@@ -30,11 +47,23 @@
 @media (prefers-color-scheme: dark) {
     :root {
         --xenon-page: #0d0a0c;
+        --xenon-card: #171214;
+        --xenon-sand: #1f191b;
+        --xenon-stone: #262022;
         --xenon-ink: #f4eff1;
+        --xenon-ink-soft: #dcd3d6;
         --xenon-muted: #b0a5aa;
-        --xenon-hairline: rgba(244, 239, 241, 0.12);
+        --xenon-hairline: rgba(244, 239, 241, 0.13);
+        --xenon-hairline-soft: rgba(244, 239, 241, 0.07);
         --xenon-row-hover: rgba(244, 239, 241, 0.06);
-        --xenon-row-selected: rgba(255, 0, 80, 0.12);
+        --xenon-row-selected: rgba(255, 0, 80, 0.15);
+        --xenon-rose-ink: var(--xenon-rose-light);
+
+        --xenon-key-face: #1e181a;
+        --xenon-key-edge: rgba(244, 239, 241, 0.12);
+        --xenon-key-lip: #050304;
+        --xenon-key-down: #141012;
+        --xenon-lamp-off: #4a4245;
 
         --xenon-orbit: #ffffff;
     }
@@ -42,6 +71,11 @@
 
 html {
     background-color: var(--xenon-page);
+}
+
+/* Hidden means hidden, whatever display a component's own rule gives it. */
+[hidden] {
+    display: none !important;
 }
 
 body {
@@ -96,26 +130,530 @@ body {
     height: 22px;
 }
 
-/* A shade darker than the accent, so the white label is readable (4.6:1). */
-button.primary-button {
-    background-color: var(--xenon-rose-hover);
+/* A page's title is its only serif. */
+.page-title {
+    margin: 0;
+    font-family: var(--xenon-serif);
+    font-size: 40px;
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
 }
 
-button.primary-button:hover {
+.page-title:focus {
+    outline: none;
+}
+
+.page-lede {
+    margin: 8px 0 0;
+    font-size: 15px;
+    color: var(--xenon-muted);
+}
+
+kbd {
+    display: inline-block;
+    min-width: 18px;
+    padding: 0 5px;
+    font-family: var(--xenon-sans);
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 17px;
+    text-align: center;
+    color: var(--xenon-ink-soft);
+    background-color: var(--xenon-key-face);
+    border: 1px solid var(--xenon-key-edge);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    vertical-align: 1px;
+}
+
+code {
+    font-family: var(--xenon-mono);
+    font-size: 0.9em;
+}
+
+/*
+ * Keys: Xenon's buttons. A key stands on a lip, and one that's chosen (pressed, or holding a checked input) sinks onto
+ * it. button.primary-button, which Ladybird's own scripts also use, is the rose key.
+ */
+.key,
+button.primary-button,
+button.secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 14px;
+    font: 600 13.5px/1 var(--xenon-sans);
+    color: var(--xenon-ink);
+    white-space: nowrap;
+    text-decoration: none;
+    background-color: var(--xenon-key-face);
+    border: 1px solid var(--xenon-key-edge);
+    border-radius: 8px;
+    box-shadow: 0 2px 0 var(--xenon-key-lip);
+    cursor: pointer;
+}
+
+.key svg {
+    flex: none;
+    width: 15px;
+    height: 15px;
+}
+
+.key:hover:not(:disabled),
+button.secondary-button:hover:not(:disabled) {
+    background-color: var(--xenon-sand);
+}
+
+.key[aria-pressed="true"],
+.key:has(input:checked) {
+    background-color: var(--xenon-key-down);
+    box-shadow: inset 0 1px 2px rgba(26, 21, 23, 0.14);
+    transform: translateY(2px);
+}
+
+.key input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.key:focus-visible,
+.key:has(input:focus-visible),
+button.primary-button:focus-visible,
+button.secondary-button:focus-visible {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+.key:disabled,
+button.secondary-button:disabled {
+    color: var(--xenon-muted);
+    cursor: default;
+    opacity: 0.6;
+}
+
+.key.big,
+button.primary-button.big {
+    height: 42px;
+    padding: 0 20px;
+    font-size: 14.5px;
+    border-radius: 10px;
+    box-shadow: 0 3px 0 var(--xenon-key-lip);
+}
+
+/* A shade darker than the accent, so the white label is readable (4.6:1). */
+button.primary-button {
+    color: #fff;
+    background-color: var(--xenon-rose-hover);
+    border-color: var(--xenon-rose-pressed);
+    box-shadow:
+        0 3px 0 var(--xenon-rose-pressed),
+        0 5px 12px rgba(204, 0, 66, 0.18);
+}
+
+button.primary-button:hover:not(:disabled) {
     background-color: var(--xenon-rose-pressed);
 }
 
 button.primary-button:disabled {
     cursor: default;
     background-color: var(--xenon-rose-light);
+    border-color: var(--xenon-rose-light);
+    box-shadow: none;
 }
 
-kbd {
-    padding: 2px 7px;
-    font-family: var(--xenon-mono);
-    font-size: 13px;
+/* Keys that do less than a key: Skip, Back to a list. */
+.text-key {
+    padding: 0;
+    font: inherit;
+    font-size: 14px;
+    color: var(--xenon-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.text-key:hover {
     color: var(--xenon-ink);
-    background-color: var(--xenon-row-hover);
+}
+
+/* A small lamp: lit means on. */
+.lamp {
+    display: inline-block;
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--xenon-lamp-off);
+    box-shadow: inset 0 1px 1px rgba(26, 21, 23, 0.25);
+}
+
+.lamp.on {
+    background-color: var(--xenon-rose);
+    box-shadow:
+        0 0 0 2px rgba(255, 0, 80, 0.16),
+        0 0 6px rgba(255, 0, 80, 0.55);
+}
+
+/* A site's initial in a rounded square, where the site has no favicon. */
+.monogram {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    color: #fff;
+    text-transform: uppercase;
+    background-color: #3a3235;
+    border-radius: 7px;
+}
+
+.monogram.soft {
+    color: var(--xenon-ink);
+    background-color: var(--xenon-sand);
     border: 1px solid var(--xenon-hairline);
-    border-radius: 6px;
+}
+
+.monogram img {
+    width: 18px;
+    height: 18px;
+}
+
+/* A box of rows, each with its control on the right. */
+.box {
+    overflow: hidden;
+    background-color: var(--xenon-card);
+    border: 1px solid var(--xenon-hairline);
+    border-radius: 12px;
+}
+
+.box-title {
+    margin: 22px 0 7px 2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--xenon-ink-soft);
+}
+
+/* Presets: a setting as one key that shows its value. Settings opens with them, and the welcome lists its defaults so. */
+.presets {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+}
+
+.preset {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    min-height: 104px;
+    padding: 14px 14px 13px;
+    font: inherit;
+    color: var(--xenon-ink);
+    text-align: left;
+    background-color: var(--xenon-key-face);
+    border: 1px solid var(--xenon-key-edge);
+    border-radius: 12px;
+    box-shadow:
+        0 4px 0 var(--xenon-key-lip),
+        0 6px 14px rgba(26, 21, 23, 0.05);
+}
+
+button.preset {
+    cursor: pointer;
+}
+
+button.preset:hover {
+    background-color: var(--xenon-sand);
+}
+
+button.preset[aria-expanded="true"] {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--xenon-key-lip);
+}
+
+.preset:focus-visible {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: 2px;
+}
+
+.preset > svg {
+    width: 18px;
+    height: 18px;
+    margin-bottom: auto;
+    color: var(--xenon-ink-soft);
+}
+
+.preset .lamp {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+}
+
+.preset-name {
+    font-size: 12.5px;
+    color: var(--xenon-muted);
+}
+
+.preset-value {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.preset-value svg {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    color: var(--xenon-muted);
+}
+
+/* Picture choices: a key with a picture of the result, ringed in rose and sunk when chosen. */
+.choice {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 12px 16px;
+    background-color: var(--xenon-key-face);
+    border: 1px solid var(--xenon-key-edge);
+    border-radius: 12px;
+    box-shadow:
+        0 5px 0 var(--xenon-key-lip),
+        0 8px 16px rgba(26, 21, 23, 0.06);
+    cursor: pointer;
+}
+
+.choice:has(.choice-input:checked) {
+    padding: 11px 11px 15px;
+    border: 2px solid var(--xenon-rose);
+    transform: translateY(3px);
+    box-shadow:
+        0 2px 0 var(--xenon-rose-pressed),
+        0 4px 10px rgba(204, 0, 66, 0.12);
+}
+
+.choice:has(.choice-input:focus-visible) {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: 3px;
+}
+
+.choice-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* A choice with a control of its own below it is a box, and the part that chooses it is this label. */
+.choice-main {
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+}
+
+.choice-picture {
+    display: block;
+    padding: 18px 18px 0;
+    overflow: hidden;
+    background-color: var(--xenon-stone);
+    border-radius: 7px;
+}
+
+.choice:has(.choice-input:checked) .choice-picture {
+    background-color: var(--xenon-row-selected);
+}
+
+.choice-picture svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.choice-name {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 16px 4px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.choice-note {
+    margin: 3px 4px 0;
+    font-size: 13.5px;
+    color: var(--xenon-muted);
+}
+
+.choice:has(.choice-input:checked) .lamp {
+    background-color: var(--xenon-rose);
+    box-shadow:
+        0 0 0 2px rgba(255, 0, 80, 0.16),
+        0 0 6px rgba(255, 0, 80, 0.55);
+}
+
+/*
+ * The window drawn in a layout choice. Its parts take their colours from these classes, so the drawing follows the
+ * page into the dark.
+ */
+.window .frame {
+    fill: var(--xenon-stone);
+    stroke: var(--xenon-hairline);
+}
+
+.window .chrome {
+    fill: var(--xenon-key-face);
+}
+
+.window .page {
+    fill: var(--xenon-card);
+}
+
+.window .rule {
+    stroke: var(--xenon-hairline);
+}
+
+.window .dot,
+.window .line {
+    fill: var(--xenon-hairline);
+}
+
+.window .heading,
+.window .block {
+    fill: var(--xenon-stone);
+}
+
+.window .icon {
+    fill: none;
+    stroke: var(--xenon-muted);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.window .current {
+    fill: var(--xenon-rose);
+}
+
+/* List choices, as a choice screen lists search engines: rows with a monogram, a note and a radio, two to a line. */
+.picks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+    background-color: var(--xenon-card);
+    border: 1px solid var(--xenon-hairline);
+    border-radius: 12px;
+}
+
+.pick {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--xenon-hairline-soft);
+    cursor: pointer;
+}
+
+.pick:nth-child(-n + 2) {
+    border-top: none;
+}
+
+.pick:nth-child(odd) {
+    border-right: 1px solid var(--xenon-hairline-soft);
+}
+
+.pick:hover {
+    background-color: var(--xenon-row-hover);
+}
+
+.pick:has(input:checked) {
+    background-color: var(--xenon-row-selected);
+}
+
+.pick:has(input:checked) .monogram:not(.soft) {
+    background-color: var(--xenon-rose-hover);
+}
+
+.pick:has(input:focus-visible) {
+    outline: 2px solid var(--xenon-rose);
+    outline-offset: -2px;
+}
+
+.pick:has(input:disabled) {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.pick > input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pick-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.pick-name {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.pick-note {
+    display: block;
+    font-size: 12.5px;
+    color: var(--xenon-muted);
+}
+
+/* The radio a pick shows, since the real one only takes keyboard focus. */
+.dot {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    background-color: var(--xenon-card);
+    border: 1.5px solid var(--xenon-hairline);
+    border-color: color-mix(in srgb, var(--xenon-ink) 35%, transparent);
+    border-radius: 50%;
+}
+
+.pick:has(input:checked) .dot {
+    background-color: #fff;
+    border: 5px solid var(--xenon-rose);
+}
+
+@media (max-width: 760px) {
+    .picks {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .pick:nth-child(2) {
+        border-top: 1px solid var(--xenon-hairline-soft);
+    }
+
+    .pick:nth-child(odd) {
+        border-right: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .key,
+    .preset,
+    .choice {
+        transition: none;
+    }
 }

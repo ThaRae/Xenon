@@ -16,31 +16,152 @@ SPDX-License-Identifier: BSD-2-Clause
         <script src="resource://ladybird/about-pages/newtab.js"></script>
     </head>
     <body>
-        <header class="topbar">
+        <main id="everyday" class="column" hidden>
+            <header class="greeting">
+                <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+                    <path
+                        class="orbit"
+                        stroke-width="10"
+                        d="M43.01 61.99A33 13.5 45 0 1 42.30 27.68M56.99 38.01A33 13.5 45 0 1 57.70 72.32"
+                    />
+                    <path
+                        class="orbit orbit-rose"
+                        stroke-width="10"
+                        d="M61.99 56.99A33 13.5 -45 0 1 27.68 57.70M38.01 43.01A33 13.5 -45 0 1 72.32 42.30"
+                    />
+                    <circle class="nucleus" cx="50" cy="50" r="6.5" />
+                </svg>
+                <div>
+                    <h1 id="greeting" class="page-title">Hello.</h1>
+                    <p class="page-lede">Type in the address bar to search, or pick up where you left off.</p>
+                </div>
+            </header>
+
+            <div class="groups-row">
+                <div id="dial-groups" class="keys" role="tablist" aria-label="Sites">
+                    <button type="button" class="key" role="tab" data-group="sites" aria-selected="true">
+                        <span class="lamp on"></span>Most visited
+                    </button>
+                    <button type="button" class="key" role="tab" data-group="bookmarksBar" aria-selected="false" hidden>
+                        <span class="lamp"></span>Bookmarks bar
+                    </button>
+                </div>
+                <span id="dial-note" class="dial-note">Busiest first, by how often you visit</span>
+            </div>
+
+            <ol id="dial" class="dial" aria-label="Most visited"></ol>
+            <p id="no-sites" class="empty-note" hidden>The sites you visit most will show up here, busiest first.</p>
+
+            <section id="recently-closed" class="recently-closed" aria-labelledby="recently-closed-title" hidden>
+                <div class="section-head">
+                    <h2 id="recently-closed-title" class="box-title">Recently closed</h2>
+                    <span class="section-note">
+                        Closed one by mistake? <kbd data-other="Ctrl">⌘</kbd> <kbd data-other="Shift">⇧</kbd>
+                        <kbd>T</kbd> brings it back.
+                    </span>
+                </div>
+                <ol id="recently-closed-list" class="box closed-list"></ol>
+            </section>
+        </main>
+
+        <main id="private-window" class="column private-column" hidden>
             <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
                 <path
                     class="orbit"
-                    stroke-width="8"
+                    stroke-width="10"
                     d="M43.01 61.99A33 13.5 45 0 1 42.30 27.68M56.99 38.01A33 13.5 45 0 1 57.70 72.32"
                 />
                 <path
                     class="orbit orbit-rose"
-                    stroke-width="8"
+                    stroke-width="10"
                     d="M61.99 56.99A33 13.5 -45 0 1 27.68 57.70M38.01 43.01A33 13.5 -45 0 1 72.32 42.30"
                 />
-                <circle class="nucleus" cx="50" cy="50" r="5.5" />
+                <circle class="nucleus" cx="50" cy="50" r="6.5" />
             </svg>
-        </header>
+            <h1 class="page-title">This is a private window.</h1>
+            <p class="page-lede">
+                Nothing you do here is saved to your history, and its cookies go when you close it.<br />
+                It's private from this computer, not from the internet.
+            </p>
 
-        <main>
-            <h1 class="visually-hidden">New Tab</h1>
-            <h2 id="top-sites-title" class="top-sites-title" hidden>Most visited</h2>
-            <ol id="top-sites" class="top-sites" aria-labelledby="top-sites-title"></ol>
-            <p id="no-sites" class="note" hidden>Sites you visit often will show up here.</p>
-            <p id="private-window" class="note" hidden>
-                <strong>This is a private window.</strong>
-                Nothing you do here is saved to your history, and its cookies go when you close it.
+            <div class="private-cards">
+                <section class="box private-card" aria-labelledby="wont-keep-title">
+                    <h2 id="wont-keep-title" class="card-head">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            aria-hidden="true"
+                        >
+                            <circle cx="8" cy="8" r="5.8" />
+                            <path d="M3.9 12.1l8.2-8.2" />
+                        </svg>
+                        What I won't keep
+                    </h2>
+                    <dl>
+                        <dt>Your history</dt>
+                        <dd>The pages you open here</dd>
+                        <dt>Cookies and site data</dt>
+                        <dd>Gone when you close the window</dd>
+                        <dt>Your tabs</dt>
+                        <dd>Not reopened the next time you start Xenon</dd>
+                    </dl>
+                </section>
+                <section class="box private-card" aria-labelledby="can-see-title">
+                    <h2 id="can-see-title" class="card-head">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            aria-hidden="true"
+                        >
+                            <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" />
+                            <circle cx="8" cy="8" r="2" />
+                        </svg>
+                        Who can still see it
+                    </h2>
+                    <dl>
+                        <dt>The sites you visit</dt>
+                        <dd>They still see each visit</dd>
+                        <dt>Your network or employer</dt>
+                        <dd>Like whoever runs the Wi-Fi you're on</dd>
+                    </dl>
+                </section>
+            </div>
+
+            <p class="restart">
+                <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    aria-hidden="true"
+                >
+                    <path d="M13 8a5 5 0 1 1-1.5-3.6" />
+                    <path d="M13 2.5v3h-3" />
+                </svg>
+                To start over now, press <span class="badge">Private</span> on the toolbar and choose
+                <strong>Restart Private Session</strong>.
             </p>
         </main>
+
+        <a id="customize" class="key customize" href="about:settings#startup" hidden>
+            <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                aria-hidden="true"
+            >
+                <path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" />
+                <circle cx="10" cy="4.5" r="1.5" />
+                <circle cx="6" cy="11.5" r="1.5" />
+            </svg>
+            Customize
+        </a>
     </body>
 </html>

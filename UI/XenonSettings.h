@@ -55,6 +55,10 @@ void set_hibernate_on_memory_pressure(bool);
 bool split_view_drag_and_drop();
 void set_split_view_drag_and_drop(bool);
 
+// Whether Xenon's new tab page lists the tabs closed most recently, below the most visited sites. On by default.
+bool new_tab_page_shows_recently_closed();
+void set_new_tab_page_shows_recently_closed(bool);
+
 // Whether the address bar resolves !bangs (UI/Bangs.h). On by default. With bangs off, "!w ladybird" is searched for as
 // it's typed, like any other text.
 bool bangs_enabled();

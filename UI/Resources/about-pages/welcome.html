@@ -16,10 +16,39 @@ SPDX-License-Identifier: BSD-2-Clause
         <link rel="stylesheet" href="resource://ladybird/about-pages/welcome.css" />
         <script type="module" src="resource://ladybird/about-pages/welcome.js"></script>
     </head>
-    <body>
-        <nav class="topbar">
+    <body data-step="hello">
+        <header class="topbar">
             <span class="wordmark">
                 <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+                    <path
+                        class="orbit"
+                        stroke-width="10"
+                        d="M43.01 61.99A33 13.5 45 0 1 42.30 27.68M56.99 38.01A33 13.5 45 0 1 57.70 72.32"
+                    />
+                    <path
+                        class="orbit orbit-rose"
+                        stroke-width="10"
+                        d="M61.99 56.99A33 13.5 -45 0 1 27.68 57.70M38.01 43.01A33 13.5 -45 0 1 72.32 42.30"
+                    />
+                    <circle class="nucleus" cx="50" cy="50" r="6.5" />
+                </svg>
+                Setting up Xenon
+            </span>
+            <span class="come-back">You can come back to this any time at <code>about:welcome</code></span>
+        </header>
+
+        <!-- The steps after the first, as a rail across the top: done steps are ticked, the current one is lit. -->
+        <ol id="rail" class="rail" aria-label="Setup steps">
+            <li data-for="layout"><span class="bar"></span><span class="rail-step">1 Layout</span></li>
+            <li data-for="search"><span class="bar"></span><span class="rail-step">2 Search</span></li>
+            <li data-for="blocking"><span class="bar"></span><span class="rail-step">3 Blocking</span></li>
+            <li data-for="passwords"><span class="bar"></span><span class="rail-step">4 Passwords</span></li>
+            <li data-for="done"><span class="bar"></span><span class="rail-step">5 Done</span></li>
+        </ol>
+
+        <form id="welcome-form">
+            <section class="step" data-step="hello" aria-labelledby="hello-title">
+                <svg class="mark hello-mark" viewBox="0 0 100 100" aria-hidden="true">
                     <path
                         class="orbit"
                         stroke-width="8"
@@ -32,132 +61,623 @@ SPDX-License-Identifier: BSD-2-Clause
                     />
                     <circle class="nucleus" cx="50" cy="50" r="5.5" />
                 </svg>
-                Xenon
-            </span>
-            <span id="step-counter" class="step-counter" aria-live="polite"></span>
-        </nav>
-
-        <form id="welcome-form">
-            <section class="step" data-step="hello" aria-labelledby="hello-title">
-                <h1 id="hello-title" tabindex="-1">Welcome to Xenon</h1>
-                <p class="lede">
-                    Before you start, there are three things to decide: where searches go, whether to block ads and
-                    trackers, and which password manager you use. You can keep these defaults, or choose each one
-                    yourself.
+                <h1 id="hello-title" class="page-title" tabindex="-1">Welcome to Xenon.</h1>
+                <p class="page-lede">
+                    I've set things up the way most people like them. Keep them, or go through them one by one.
                 </p>
 
-                <dl class="defaults">
-                    <div class="default">
-                        <dt>Search</dt>
-                        <dd>DuckDuckGo</dd>
+                <h2 class="box-title">What I've set up</h2>
+                <div class="presets defaults">
+                    <div>
+                        <button type="button" class="preset" data-go="layout" disabled>
+                            <svg
+                                viewBox="0 0 18 18"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                aria-hidden="true"
+                            >
+                                <rect x="2.5" y="3" width="13" height="12" rx="2" />
+                                <path d="M2.5 6.5h13" />
+                            </svg>
+                            <span class="preset-name">Layout</span>
+                            <span class="preset-value" data-summary="layout">Classic</span>
+                        </button>
+                        <span class="preset-hint" data-summary="layout-note">Tabs above the toolbar</span>
                     </div>
-                    <div class="default">
-                        <dt>Ads and trackers</dt>
-                        <dd>Blocked</dd>
+                    <div>
+                        <button type="button" class="preset" data-go="search" disabled>
+                            <svg
+                                viewBox="0 0 18 18"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                aria-hidden="true"
+                            >
+                                <circle cx="8" cy="8" r="4.8" />
+                                <path d="M11.6 11.6l3.6 3.6" />
+                            </svg>
+                            <span class="preset-name">Search</span>
+                            <span class="preset-value" data-summary="engine">DuckDuckGo</span>
+                        </button>
+                        <span class="preset-hint" data-summary="engine-note"
+                            >It doesn't keep a profile of what you search</span
+                        >
                     </div>
-                    <div class="default">
-                        <dt>Password manager</dt>
-                        <dd id="default-password-manager">None for now</dd>
+                    <div>
+                        <button type="button" class="preset" data-go="blocking" disabled>
+                            <span class="lamp on" data-summary="blocking-lamp"></span>
+                            <svg
+                                viewBox="0 0 18 18"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <path d="M9 2.5l5.5 2v4.2c0 3.5-2.4 5.7-5.5 6.8-3.1-1.1-5.5-3.3-5.5-6.8V4.5z" />
+                            </svg>
+                            <span class="preset-name">Ads and trackers</span>
+                            <span class="preset-value" data-summary="blocking">Blocked</span>
+                        </button>
+                        <span class="preset-hint">With uBlock Origin's lists, on this computer</span>
                     </div>
-                </dl>
+                    <div>
+                        <button type="button" class="preset" data-go="passwords" disabled>
+                            <svg
+                                viewBox="0 0 18 18"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                aria-hidden="true"
+                            >
+                                <circle cx="6" cy="12" r="3.2" />
+                                <path d="M8.3 9.7L15 3M12.6 5.4l2 2M10.6 7.4l1.4 1.4" />
+                            </svg>
+                            <span class="preset-name">Password manager</span>
+                            <span class="preset-value" data-summary="password-manager">None for now</span>
+                        </button>
+                        <span class="preset-hint" data-summary="password-manager-note">Pick one whenever you like</span>
+                    </div>
+                </div>
 
                 <div class="actions">
-                    <button type="button" id="use-defaults" class="primary-button" disabled>Keep these</button>
-                    <button type="button" class="text-button" data-go="search" disabled>
-                        Choose for myself <span aria-hidden="true">→</span>
+                    <button type="button" id="use-defaults" class="primary-button big" disabled>Keep these</button>
+                    <button type="button" class="key big" data-go="layout" disabled>
+                        Choose for myself
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M3 8h10M9 4l4 4-4 4" />
+                        </svg>
                     </button>
                 </div>
-                <p class="aside">Settings has all of these later, along with everything else.</p>
+                <p class="save-status" role="status" data-status></p>
+                <p class="aside">
+                    Settings has all of these later. You can come back to this any time at <code>about:welcome</code>.
+                </p>
+            </section>
+
+            <section class="step" data-step="layout" aria-labelledby="layout-title" hidden>
+                <h1 id="layout-title" class="page-title" tabindex="-1">How do you like your tabs?</h1>
+                <p class="page-lede">
+                    Pick where tabs go. To switch later, right-click an empty part of the tab bar and choose Layout.
+                </p>
+
+                <!-- The radios aren't named "layout": loading about:welcome#layout would take one for the fragment's target
+                     and focus it. -->
+                <div class="choices three" role="radiogroup" aria-labelledby="layout-title">
+                    <label class="choice">
+                        <input class="choice-input" type="radio" name="tab-layout" value="classic" checked />
+                        <span class="choice-picture">
+                            <svg class="picture" viewBox="0 0 300 192" aria-hidden="true">
+                                <rect class="win" x=".5" y=".5" width="299" height="200" rx="9" />
+                                <path class="chrome" d="M1 31V9.5A8.5 8.5 0 0 1 9.5 1h281a8.5 8.5 0 0 1 8.5 8.5V31z" />
+                                <circle class="dot" cx="14" cy="16" r="3.5" />
+                                <circle class="dot" cx="25" cy="16" r="3.5" />
+                                <circle class="dot" cx="36" cy="16" r="3.5" />
+                                <path class="face" d="M50 31V12a6 6 0 0 1 6-6h68a6 6 0 0 1 6 6v19z" />
+                                <circle class="rose" cx="62" cy="18.5" r="4" />
+                                <rect class="ln2" x="71" y="16.5" width="46" height="4" rx="2" />
+                                <circle class="dot" cx="146" cy="18.5" r="4" />
+                                <rect class="ln" x="155" y="16.5" width="40" height="4" rx="2" />
+                                <path class="sep" d="M208 11v15" />
+                                <circle class="dot" cx="222" cy="18.5" r="4" />
+                                <rect class="ln" x="231" y="16.5" width="30" height="4" rx="2" />
+                                <path class="ic" d="M281 14.5v8M277 18.5h8" />
+                                <rect class="face" x="1" y="31" width="298" height="30" />
+                                <path class="ic" d="M15 42l-4 4 4 4M27 42l4 4-4 4" />
+                                <rect class="well" x="44" y="38" width="216" height="16" rx="8" />
+                                <rect class="ln2" x="56" y="44" width="92" height="4" rx="2" />
+                                <path
+                                    class="ic"
+                                    d="M278 39.5l6 2.2v4.3c0 3.4-2.6 5.4-6 6.7-3.4-1.3-6-3.3-6-6.7v-4.3z"
+                                />
+                                <path class="sep" d="M1 61.5H299" />
+                                <rect class="hd" x="24" y="80" width="128" height="9" rx="2" />
+                                <rect class="ln" x="24" y="98" width="236" height="4" rx="2" />
+                                <rect class="ln" x="24" y="108" width="216" height="4" rx="2" />
+                                <rect class="ln" x="24" y="118" width="180" height="4" rx="2" />
+                                <rect class="blk" x="24" y="134" width="112" height="50" rx="4" />
+                                <rect class="ln" x="148" y="136" width="112" height="4" rx="2" />
+                                <rect class="ln" x="148" y="146" width="96" height="4" rx="2" />
+                                <rect class="ln" x="148" y="156" width="104" height="4" rx="2" />
+                            </svg>
+                        </span>
+                        <span class="choice-name">Classic <span class="lamp"></span></span>
+                        <span class="choice-note">Tabs above the toolbar</span>
+                        <span class="choice-extra">The way most browsers look. It's the default.</span>
+                    </label>
+
+                    <label class="choice">
+                        <input class="choice-input" type="radio" name="tab-layout" value="compact" />
+                        <span class="choice-picture">
+                            <svg class="picture" viewBox="0 0 300 192" aria-hidden="true">
+                                <rect class="win" x=".5" y=".5" width="299" height="200" rx="9" />
+                                <path class="chrome" d="M1 34V9.5A8.5 8.5 0 0 1 9.5 1h281a8.5 8.5 0 0 1 8.5 8.5V34z" />
+                                <circle class="dot" cx="14" cy="17" r="3.5" />
+                                <circle class="dot" cx="25" cy="17" r="3.5" />
+                                <circle class="dot" cx="36" cy="17" r="3.5" />
+                                <path class="ic" d="M54 13l-4 4 4 4M64 13l4 4-4 4" />
+                                <rect class="face" x="78" y="7" width="66" height="20" rx="6" />
+                                <circle class="rose" cx="89" cy="17" r="4" />
+                                <rect class="ln2" x="98" y="15" width="38" height="4" rx="2" />
+                                <circle class="dot" cx="158" cy="17" r="4" />
+                                <rect class="ln" x="167" y="15" width="28" height="4" rx="2" />
+                                <rect class="face" x="206" y="9" width="64" height="16" rx="8" />
+                                <rect class="ln" x="216" y="15" width="34" height="4" rx="2" />
+                                <path
+                                    class="ic"
+                                    d="M283 10.5l6 2.2v4.3c0 3.4-2.6 5.4-6 6.7-3.4-1.3-6-3.3-6-6.7v-4.3z"
+                                />
+                                <path class="sep" d="M1 34.5H299" />
+                                <rect class="hd" x="24" y="53" width="128" height="9" rx="2" />
+                                <rect class="ln" x="24" y="71" width="236" height="4" rx="2" />
+                                <rect class="ln" x="24" y="81" width="216" height="4" rx="2" />
+                                <rect class="ln" x="24" y="91" width="180" height="4" rx="2" />
+                                <rect class="blk" x="24" y="107" width="112" height="50" rx="4" />
+                                <rect class="ln" x="148" y="109" width="112" height="4" rx="2" />
+                                <rect class="ln" x="148" y="119" width="96" height="4" rx="2" />
+                                <rect class="ln" x="148" y="129" width="104" height="4" rx="2" />
+                                <rect class="ln" x="24" y="167" width="236" height="4" rx="2" />
+                            </svg>
+                        </span>
+                        <span class="choice-name">Compact <span class="lamp"></span></span>
+                        <span class="choice-note">Tabs and toolbar in one row</span>
+                        <span class="choice-extra">One row less, so the page gets more room.</span>
+                    </label>
+
+                    <div class="choice">
+                        <label class="choice-main">
+                            <input class="choice-input" type="radio" name="tab-layout" value="vertical" />
+                            <span class="choice-picture">
+                                <svg class="picture vertical-picture" viewBox="0 0 300 192" aria-hidden="true">
+                                    <rect class="win" x=".5" y=".5" width="299" height="200" rx="9" />
+                                    <path class="chrome" d="M9.5 1H79v200H1V9.5A8.5 8.5 0 0 1 9.5 1z" />
+                                    <circle class="dot" cx="14" cy="16" r="3.5" />
+                                    <circle class="dot" cx="25" cy="16" r="3.5" />
+                                    <circle class="dot" cx="36" cy="16" r="3.5" />
+                                    <rect class="face" x="7" y="32" width="66" height="18" rx="5" />
+                                    <circle class="rose" cx="17" cy="41" r="4" />
+                                    <rect class="ln2" x="26" y="39" width="38" height="4" rx="2" />
+                                    <circle class="dot" cx="17" cy="61" r="4" />
+                                    <rect class="ln" x="26" y="59" width="34" height="4" rx="2" />
+                                    <circle class="dot" cx="17" cy="79" r="4" />
+                                    <rect class="ln" x="26" y="77" width="40" height="4" rx="2" />
+                                    <circle class="dot" cx="17" cy="97" r="4" />
+                                    <rect class="ln" x="26" y="95" width="28" height="4" rx="2" />
+                                    <circle class="dot" cx="17" cy="115" r="4" />
+                                    <rect class="ln" x="26" y="113" width="36" height="4" rx="2" />
+                                    <path class="ic" d="M13 133.5h8M17 129.5v8" />
+                                    <path class="sep" d="M79.5 1v200" />
+                                    <path class="ic" d="M94 12l-4 4 4 4M106 12l4 4-4 4" />
+                                    <rect class="well" x="122" y="8" width="144" height="16" rx="8" />
+                                    <rect class="ln2" x="134" y="14" width="70" height="4" rx="2" />
+                                    <path
+                                        class="ic"
+                                        d="M282 9.5l6 2.2v4.3c0 3.4-2.6 5.4-6 6.7-3.4-1.3-6-3.3-6-6.7v-4.3z"
+                                    />
+                                    <path class="sep" d="M80 31.5H299" />
+                                    <rect class="hd" x="100" y="50" width="110" height="9" rx="2" />
+                                    <rect class="ln" x="100" y="68" width="176" height="4" rx="2" />
+                                    <rect class="ln" x="100" y="78" width="160" height="4" rx="2" />
+                                    <rect class="ln" x="100" y="88" width="138" height="4" rx="2" />
+                                    <rect class="blk" x="100" y="104" width="86" height="50" rx="4" />
+                                    <rect class="ln" x="196" y="106" width="80" height="4" rx="2" />
+                                    <rect class="ln" x="196" y="116" width="68" height="4" rx="2" />
+                                    <rect class="ln" x="196" y="126" width="74" height="4" rx="2" />
+                                    <rect class="ln" x="100" y="166" width="176" height="4" rx="2" />
+                                </svg>
+                            </span>
+                            <span class="choice-name">Vertical <span class="lamp"></span></span>
+                            <span class="choice-note">Tabs in a sidebar</span>
+                        </label>
+                        <span class="choice-extra side">
+                            Sidebar on the
+                            <span class="keys" role="radiogroup" aria-label="Sidebar side">
+                                <label class="key small"
+                                    ><input type="radio" name="sidebar-side" value="left" checked />Left</label
+                                >
+                                <label class="key small"
+                                    ><input type="radio" name="sidebar-side" value="right" />Right</label
+                                >
+                            </span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="foot">
+                    <button type="button" class="key big" data-go="hello">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M13 8H3M7 4L3 8l4 4" />
+                        </svg>
+                        Back
+                    </button>
+                    <span class="foot-note">Nothing is saved until you finish.</span>
+                    <button type="button" class="primary-button big" data-go="search">Continue</button>
+                </div>
             </section>
 
             <section class="step" data-step="search" aria-labelledby="search-title" hidden>
-                <h1 id="search-title" tabindex="-1">Where should searches go?</h1>
-                <p class="lede">Anything you type in the address bar that isn't a web address goes here.</p>
+                <h1 id="search-title" class="page-title" tabindex="-1">Where should searches go?</h1>
+                <p class="page-lede">
+                    When you type something that isn't an address, I send it to the engine you pick.
+                </p>
 
-                <div class="engine-columns">
-                    <fieldset class="engine-group">
-                        <legend>Private</legend>
-                        <div id="private-engines"></div>
-                    </fieldset>
-                    <fieldset class="engine-group">
-                        <legend>Mainstream</legend>
-                        <div id="mainstream-engines"></div>
-                    </fieldset>
+                <div class="pick-head">
+                    <h2>Private</h2>
+                    <span>They don't keep a profile of what you search</span>
                 </div>
+                <div id="private-engines" class="picks" role="radiogroup" aria-label="Private search engines"></div>
+                <div class="pick-head">
+                    <h2>Mainstream</h2>
+                    <span>Bigger, and they use what you search for ads</span>
+                </div>
+                <div
+                    id="mainstream-engines"
+                    class="picks"
+                    role="radiogroup"
+                    aria-label="Mainstream search engines"
+                ></div>
 
-                <p id="search-preview" class="search-preview" aria-live="polite"></p>
-
-                <label class="check-option">
+                <p id="search-preview" class="preview" aria-live="polite"></p>
+                <label class="check-line">
                     <input id="search-suggestions-enabled" type="checkbox" />
                     <span id="search-suggestions-label">Suggest searches while I type</span>
                 </label>
-
-                <p class="aside">
-                    To skip the search engine for one search, start it with a !bang: <kbd>!w ladybird</kbd> searches
-                    Wikipedia, and <kbd>!gh</kbd> searches GitHub.
+                <p class="tip">
+                    To skip the engine once, start with a !bang: <kbd>!w ladybird</kbd> searches Wikipedia,
+                    <kbd>!gh</kbd>
+                    searches GitHub.
                 </p>
 
-                <div class="actions">
-                    <button type="button" class="primary-button" data-go="blocking">Continue</button>
-                    <button type="button" class="text-button" data-go="hello">Back</button>
+                <div class="foot">
+                    <button type="button" class="key big" data-go="layout">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M13 8H3M7 4L3 8l4 4" />
+                        </svg>
+                        Back
+                    </button>
+                    <span class="foot-note">Nothing is saved until you finish.</span>
+                    <button type="button" class="primary-button big" data-go="blocking">Continue</button>
                 </div>
             </section>
 
             <section class="step" data-step="blocking" aria-labelledby="blocking-title" hidden>
-                <h1 id="blocking-title" tabindex="-1">Block ads and trackers?</h1>
-                <p class="lede">
-                    Xenon has uBlock Origin's filter lists built in. They work on every site, and nothing you visit is
-                    sent anywhere to do it.
-                </p>
+                <h1 id="blocking-title" class="page-title" tabindex="-1">Block ads and trackers?</h1>
+                <p class="page-lede">uBlock Origin's filter lists are built in, and they work on every site.</p>
 
-                <div class="choice-list" role="radiogroup" aria-labelledby="blocking-title">
+                <div class="choices two" role="radiogroup" aria-labelledby="blocking-title">
                     <label class="choice">
-                        <input type="radio" name="ad-blocking" value="on" checked />
-                        <span class="marker" aria-hidden="true"></span>
-                        <span class="choice-name">Block them</span>
-                        <span class="choice-note">Recommended</span>
+                        <input class="choice-input" type="radio" name="ad-blocking" value="on" checked />
+                        <span class="choice-picture">
+                            <svg class="picture" viewBox="0 0 300 152" aria-hidden="true">
+                                <rect class="win" x=".5" y=".5" width="299" height="200" rx="9" />
+                                <path class="chrome" d="M1 29V9.5A8.5 8.5 0 0 1 9.5 1h281a8.5 8.5 0 0 1 8.5 8.5V29z" />
+                                <circle class="dot" cx="14" cy="15" r="3.5" />
+                                <circle class="dot" cx="25" cy="15" r="3.5" />
+                                <circle class="dot" cx="36" cy="15" r="3.5" />
+                                <path class="ic" d="M55 11l-4 4 4 4M65 11l4 4-4 4" />
+                                <rect class="face" x="80" y="7" width="168" height="16" rx="8" />
+                                <rect class="ln2" x="92" y="13" width="74" height="4" rx="2" />
+                                <path class="ic" d="M266 8l6 2.2v4.3c0 3.4-2.6 5.4-6 6.7-3.4-1.3-6-3.3-6-6.7v-4.3z" />
+                                <rect class="badge" x="270" y="3.5" width="17" height="11" rx="5.5" />
+                                <text class="badge-text" x="278.5" y="12" text-anchor="middle">14</text>
+                                <path class="sep" d="M1 29.5H299" />
+                                <rect class="hd" x="20" y="41" width="44" height="8" rx="2" />
+                                <rect class="ln" x="196" y="43" width="22" height="4" rx="2" />
+                                <rect class="ln" x="224" y="43" width="22" height="4" rx="2" />
+                                <rect class="ln" x="252" y="43" width="28" height="4" rx="2" />
+                                <rect class="gone" x="20.5" y="58.5" width="259" height="22" rx="3" />
+                                <rect class="hd" x="20" y="92" width="132" height="9" rx="2" />
+                                <rect class="ln" x="20" y="109" width="168" height="4" rx="2" />
+                                <rect class="ln" x="20" y="118" width="160" height="4" rx="2" />
+                                <rect class="ln" x="20" y="127" width="146" height="4" rx="2" />
+                                <rect class="blk" x="20" y="139" width="78" height="40" rx="3" />
+                                <rect class="ln" x="106" y="141" width="82" height="4" rx="2" />
+                                <rect class="ln" x="106" y="150" width="70" height="4" rx="2" />
+                                <rect class="gone" x="204.5" y="92.5" width="75" height="66" rx="3" />
+                            </svg>
+                        </span>
+                        <span class="choice-name"
+                            ><span>Block them<span class="tag">Recommended</span></span
+                            ><span class="lamp"></span
+                        ></span>
+                        <span class="choice-note">Pages load without them. The shield counts what it caught.</span>
+                        <span class="covers">Ads · Trackers · Malware and scam sites · Cookie banners</span>
                     </label>
+
                     <label class="choice">
-                        <input type="radio" name="ad-blocking" value="off" />
-                        <span class="marker" aria-hidden="true"></span>
-                        <span class="choice-name">Show everything</span>
-                        <span class="choice-note"></span>
+                        <input class="choice-input" type="radio" name="ad-blocking" value="off" />
+                        <span class="choice-picture">
+                            <svg class="picture" viewBox="0 0 300 152" aria-hidden="true">
+                                <defs>
+                                    <pattern
+                                        id="hatch"
+                                        width="6"
+                                        height="6"
+                                        patternUnits="userSpaceOnUse"
+                                        patternTransform="rotate(45)"
+                                    >
+                                        <rect class="ln2" width="2" height="6" />
+                                    </pattern>
+                                </defs>
+                                <rect class="win" x=".5" y=".5" width="299" height="200" rx="9" />
+                                <path class="chrome" d="M1 29V9.5A8.5 8.5 0 0 1 9.5 1h281a8.5 8.5 0 0 1 8.5 8.5V29z" />
+                                <circle class="dot" cx="14" cy="15" r="3.5" />
+                                <circle class="dot" cx="25" cy="15" r="3.5" />
+                                <circle class="dot" cx="36" cy="15" r="3.5" />
+                                <path class="ic" d="M55 11l-4 4 4 4M65 11l4 4-4 4" />
+                                <rect class="face" x="80" y="7" width="168" height="16" rx="8" />
+                                <rect class="ln2" x="92" y="13" width="74" height="4" rx="2" />
+                                <path class="ic" d="M266 8l6 2.2v4.3c0 3.4-2.6 5.4-6 6.7-3.4-1.3-6-3.3-6-6.7v-4.3z" />
+                                <path class="sep" d="M1 29.5H299" />
+                                <rect class="hd" x="20" y="41" width="44" height="8" rx="2" />
+                                <rect class="ln" x="196" y="43" width="22" height="4" rx="2" />
+                                <rect class="ln" x="224" y="43" width="22" height="4" rx="2" />
+                                <rect class="ln" x="252" y="43" width="28" height="4" rx="2" />
+                                <rect class="ad" fill="url(#hatch)" x="20.5" y="58.5" width="259" height="22" rx="3" />
+                                <rect class="hd" x="20" y="92" width="132" height="9" rx="2" />
+                                <rect class="ln" x="20" y="109" width="168" height="4" rx="2" />
+                                <rect class="ln" x="20" y="118" width="160" height="4" rx="2" />
+                                <rect class="ln" x="20" y="127" width="146" height="4" rx="2" />
+                                <rect class="blk" x="20" y="139" width="78" height="40" rx="3" />
+                                <rect class="ln" x="106" y="141" width="82" height="4" rx="2" />
+                                <rect class="ln" x="106" y="150" width="70" height="4" rx="2" />
+                                <rect class="ad" fill="url(#hatch)" x="204.5" y="92.5" width="75" height="66" rx="3" />
+                                <rect class="face" x="262" y="61" width="15" height="9" rx="2" />
+                                <text class="ad-label" x="269.5" y="68" text-anchor="middle">Ad</text>
+                                <rect class="face" x="262" y="95" width="15" height="9" rx="2" />
+                                <text class="ad-label" x="269.5" y="102" text-anchor="middle">Ad</text>
+                                <rect class="cookie" x="12.5" y="110.5" width="275" height="36" rx="6" />
+                                <circle class="ic" cx="27" cy="128.5" r="5" />
+                                <rect class="ln2" x="40" y="123" width="118" height="4" rx="2" />
+                                <rect class="ln" x="40" y="132" width="92" height="4" rx="2" />
+                                <rect class="btn-quiet" x="193.5" y="121.5" width="40" height="15" rx="4" />
+                                <rect class="btn" x="239" y="121" width="41" height="16" rx="4" />
+                            </svg>
+                        </span>
+                        <span class="choice-name"><span>Show everything</span><span class="lamp"></span></span>
+                        <span class="choice-note">Pages load the way they're sent, ads and all.</span>
+                        <span class="covers">You can turn blocking on later in Settings.</span>
                     </label>
                 </div>
 
-                <p id="filter-lists" class="aside">
-                    This covers ads, trackers, malware and scam sites, and cookie banners.
-                </p>
-                <label id="filter-list-updates" class="check-option">
-                    <input id="filter-list-updates-enabled" type="checkbox" checked />
-                    <span>Get new lists every day</span>
-                </label>
-                <p id="filter-lists-note" class="aside"></p>
+                <div id="filter-list-updates" class="updates">
+                    <label class="check-line">
+                        <input id="filter-list-updates-enabled" type="checkbox" checked />
+                        <span>
+                            Get new lists every day
+                            <span class="check-note"
+                                >From git.avx512.dev, and only lists that carry Xenon's signature.</span
+                            >
+                        </span>
+                    </label>
+                    <p class="local">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <rect x="2" y="3" width="12" height="8.5" rx="1.5" />
+                            <path d="M5.5 14h5M8 11.5V14" />
+                        </svg>
+                        The lists run on this computer. Nothing you visit is sent anywhere.
+                    </p>
+                </div>
 
-                <div class="actions">
-                    <button type="button" class="primary-button" data-go="passwords">Continue</button>
-                    <button type="button" class="text-button" data-go="search">Back</button>
+                <div class="foot">
+                    <button type="button" class="key big" data-go="search">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M13 8H3M7 4L3 8l4 4" />
+                        </svg>
+                        Back
+                    </button>
+                    <span class="foot-note">Nothing is saved until you finish.</span>
+                    <button type="button" class="primary-button big" data-go="passwords">Continue</button>
                 </div>
             </section>
 
             <section class="step" data-step="passwords" aria-labelledby="passwords-title" hidden>
-                <h1 id="passwords-title" tabindex="-1">Use a password manager?</h1>
-                <p class="lede">
-                    Xenon doesn't save passwords itself. Pick yours, and Xenon installs it and keeps it up to date.
+                <h1 id="passwords-title" class="page-title" tabindex="-1">Use a password manager?</h1>
+                <p class="page-lede">
+                    Xenon doesn't save passwords itself. Pick yours, and I'll install it and keep it up to date.
                 </p>
 
                 <div
                     id="password-managers"
-                    class="choice-list"
+                    class="choices managers"
                     role="radiogroup"
                     aria-labelledby="passwords-title"
                 ></div>
-                <p id="password-manager-note" class="aside password-manager-note"></p>
+                <p id="password-manager-note" class="manager-note"></p>
 
-                <p id="save-status" class="save-status" role="status"></p>
-                <div class="actions">
-                    <button type="submit" id="start-browsing" class="primary-button">Start browsing</button>
-                    <button type="button" class="text-button" data-go="blocking">Back</button>
+                <div class="foot">
+                    <button type="button" class="key big" data-go="blocking">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M13 8H3M7 4L3 8l4 4" />
+                        </svg>
+                        Back
+                    </button>
+                    <span class="foot-note">Nothing is saved until you finish.</span>
+                    <button type="button" class="primary-button big" data-go="done">Continue</button>
+                </div>
+            </section>
+
+            <section class="step" data-step="done" aria-labelledby="done-title" hidden>
+                <h1 id="done-title" class="page-title" tabindex="-1">You're set.</h1>
+                <p class="page-lede">Here's what you picked. You can change any of it in Settings.</p>
+
+                <div class="presets summary">
+                    <div class="preset">
+                        <svg
+                            viewBox="0 0 18 18"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            aria-hidden="true"
+                        >
+                            <rect x="2.5" y="3" width="13" height="12" rx="2" />
+                            <path d="M2.5 6.5h13" />
+                        </svg>
+                        <span class="preset-name">Layout</span>
+                        <span class="preset-value" data-summary="layout">Classic</span>
+                    </div>
+                    <div class="preset">
+                        <svg
+                            viewBox="0 0 18 18"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                            aria-hidden="true"
+                        >
+                            <circle cx="8" cy="8" r="4.8" />
+                            <path d="M11.6 11.6l3.6 3.6" />
+                        </svg>
+                        <span class="preset-name">Search</span>
+                        <span class="preset-value" data-summary="engine">DuckDuckGo</span>
+                    </div>
+                    <div class="preset">
+                        <span class="lamp on" data-summary="blocking-lamp"></span>
+                        <svg
+                            viewBox="0 0 18 18"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M9 2.5l5.5 2v4.2c0 3.5-2.4 5.7-5.5 6.8-3.1-1.1-5.5-3.3-5.5-6.8V4.5z" />
+                        </svg>
+                        <span class="preset-name">Ads and trackers</span>
+                        <span class="preset-value" data-summary="blocking">Blocked</span>
+                    </div>
+                    <div class="preset" id="password-manager-preset">
+                        <svg
+                            viewBox="0 0 18 18"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                            aria-hidden="true"
+                        >
+                            <circle cx="6" cy="12" r="3.2" />
+                            <path d="M8.3 9.7L15 3M12.6 5.4l2 2M10.6 7.4l1.4 1.4" />
+                        </svg>
+                        <span class="installing">Installing…</span>
+                        <span class="preset-name">Password manager</span>
+                        <span class="preset-value" data-summary="password-manager">None for now</span>
+                        <span class="progress" aria-hidden="true"><span></span></span>
+                    </div>
+                </div>
+
+                <h2 class="box-title">Three keys worth knowing</h2>
+                <div class="box tips">
+                    <div class="tip-cell">
+                        <div class="caps"><kbd>Ctrl</kbd> <kbd>Tab</kbd></div>
+                        <div class="tip-title">Back through recent tabs</div>
+                        <div class="tip-note">In the order you last used them. Add Shift to go the other way.</div>
+                    </div>
+                    <div class="tip-cell">
+                        <div class="caps">
+                            <kbd data-mac="⌘" data-other="Ctrl">⌘</kbd> <kbd data-mac="⌥" data-other="Alt">⌥</kbd>
+                            <kbd>N</kbd>
+                        </div>
+                        <div class="tip-title">Split view</div>
+                        <div class="tip-note">Opens a new tab beside this one, in the same window.</div>
+                    </div>
+                    <div class="tip-cell">
+                        <div class="caps"><kbd>!w ladybird</kbd></div>
+                        <div class="tip-title">!bangs</div>
+                        <div class="tip-note">
+                            Searches Wikipedia instead. There are over 10,000, like <kbd>!gh</kbd> for GitHub.
+                        </div>
+                    </div>
+                </div>
+
+                <p class="save-status" role="status" data-status></p>
+                <div class="foot">
+                    <button type="button" class="key big" data-go="passwords">
+                        <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M13 8H3M7 4L3 8l4 4" />
+                        </svg>
+                        Back
+                    </button>
+                    <span class="foot-note">Pressing Start browsing saves these.</span>
+                    <button type="submit" id="start-browsing" class="primary-button big">Start browsing</button>
                 </div>
             </section>
         </form>

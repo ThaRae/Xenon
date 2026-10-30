@@ -156,6 +156,19 @@ void set_split_view_drag_and_drop(bool enabled)
     notify_observers();
 }
 
+static constexpr auto NEW_TAB_PAGE_RECENTLY_CLOSED_KEY = "newTab/recentlyClosed";
+
+bool new_tab_page_shows_recently_closed()
+{
+    return settings().value(NEW_TAB_PAGE_RECENTLY_CLOSED_KEY, true).toBool();
+}
+
+void set_new_tab_page_shows_recently_closed(bool shown)
+{
+    settings().setValue(NEW_TAB_PAGE_RECENTLY_CLOSED_KEY, shown);
+    notify_observers();
+}
+
 static constexpr auto BANGS_KEY = "search/bangs";
 
 bool bangs_enabled()
