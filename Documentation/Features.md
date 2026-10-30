@@ -201,6 +201,9 @@ Besides hibernating whole tabs, Xenon doesn't keep processes that nothing is usi
   once) when the page has drawn nothing for 30 seconds, or 4 seconds after its tab is hidden, when it drops its text too.
   Each tab and frame is timed on its own, so an animation in one doesn't hold another's. The memory goes back to the
   system, and the next frame draws what it needs again (`0049`).
+- JavaScript the engine compiled doesn't keep alive the functions it checks its calls against. A call that once saw a
+  closure no longer holds it, and with it the DOM a page like x.com removed; the compiled code is dropped instead, and
+  compiled again if it's still needed (`0051`).
 
 [Memory.md](Memory.md) has the measurements.
 
