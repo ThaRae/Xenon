@@ -24,7 +24,8 @@
     --xenon-hairline: rgba(26, 21, 23, 0.12);
     --xenon-hairline-soft: rgba(26, 21, 23, 0.07);
     --xenon-row-hover: rgba(26, 21, 23, 0.04);
-    --xenon-row-selected: rgba(255, 0, 80, 0.08);
+    /* A chosen row is a step darker, not rose: its radio, check or lamp is the one mark of the accent. */
+    --xenon-row-selected: rgba(26, 21, 23, 0.07);
     /* Rose text on the page, 4.6:1. */
     --xenon-rose-ink: var(--xenon-rose-pressed);
 
@@ -56,7 +57,7 @@
         --xenon-hairline: rgba(244, 239, 241, 0.13);
         --xenon-hairline-soft: rgba(244, 239, 241, 0.07);
         --xenon-row-hover: rgba(244, 239, 241, 0.06);
-        --xenon-row-selected: rgba(255, 0, 80, 0.15);
+        --xenon-row-selected: rgba(244, 239, 241, 0.1);
         --xenon-rose-ink: var(--xenon-rose-light);
 
         --xenon-key-face: #1e181a;
@@ -118,7 +119,7 @@ body {
 .wordmark {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 8px;
     font-size: 15px;
     font-weight: 600;
     color: var(--xenon-ink);
@@ -126,8 +127,8 @@ body {
 }
 
 .wordmark .mark {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
 }
 
 /* A page's title is its only serif. */
@@ -150,12 +151,13 @@ body {
     color: var(--xenon-muted);
 }
 
+/* A key is 20px tall with its lip, and as wide when it holds one character. */
 kbd {
     display: inline-block;
-    min-width: 18px;
-    padding: 0 5px;
+    min-width: 20px;
+    padding: 0 4px;
     font-family: var(--xenon-sans);
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 600;
     line-height: 17px;
     text-align: center;
@@ -183,9 +185,9 @@ button.secondary-button {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 34px;
-    padding: 0 14px;
-    font: 600 13.5px/1 var(--xenon-sans);
+    height: 32px;
+    padding: 0 16px;
+    font: 600 14px/1 var(--xenon-sans);
     color: var(--xenon-ink);
     white-space: nowrap;
     text-decoration: none;
@@ -198,8 +200,8 @@ button.secondary-button {
 
 .key svg {
     flex: none;
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
 }
 
 .key:hover:not(:disabled),
@@ -238,9 +240,9 @@ button.secondary-button:disabled {
 
 .key.big,
 button.primary-button.big {
-    height: 42px;
+    height: 40px;
     padding: 0 20px;
-    font-size: 14.5px;
+    font-size: 15px;
     border-radius: 10px;
     box-shadow: 0 3px 0 var(--xenon-key-lip);
 }
@@ -250,9 +252,7 @@ button.primary-button {
     color: #fff;
     background-color: var(--xenon-rose-hover);
     border-color: var(--xenon-rose-pressed);
-    box-shadow:
-        0 3px 0 var(--xenon-rose-pressed),
-        0 5px 12px rgba(204, 0, 66, 0.18);
+    box-shadow: 0 3px 0 var(--xenon-rose-pressed);
 }
 
 button.primary-button:hover:not(:disabled) {
@@ -281,22 +281,21 @@ button.primary-button:disabled {
     color: var(--xenon-ink);
 }
 
-/* A small lamp: lit means on. */
+/* A small lamp: lit means on. It's the one mark of the accent on a choice, so it doesn't glow. */
 .lamp {
     display: inline-block;
     flex: none;
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background-color: var(--xenon-lamp-off);
     box-shadow: inset 0 1px 1px rgba(26, 21, 23, 0.25);
 }
 
-.lamp.on {
+.lamp.on,
+.choice:has(.choice-input:checked) .lamp {
     background-color: var(--xenon-rose);
-    box-shadow:
-        0 0 0 2px rgba(255, 0, 80, 0.16),
-        0 0 6px rgba(255, 0, 80, 0.55);
+    box-shadow: none;
 }
 
 /* A site's initial in a rounded square, where the site has no favicon. */
@@ -324,8 +323,8 @@ button.primary-button:disabled {
 }
 
 .monogram img {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
 }
 
 /* A box of rows, each with its control on the right. */
@@ -337,7 +336,7 @@ button.primary-button:disabled {
 }
 
 .box-title {
-    margin: 22px 0 7px 2px;
+    margin: 24px 0 8px 2px;
     font-size: 13px;
     font-weight: 600;
     color: var(--xenon-ink-soft);
@@ -346,7 +345,7 @@ button.primary-button:disabled {
 /* Presets: a setting as one key that shows its value. Settings opens with them, and the welcome lists its defaults so. */
 .presets {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(152px, 1fr));
     gap: 12px;
 }
 
@@ -357,7 +356,7 @@ button.primary-button:disabled {
     align-items: stretch;
     gap: 2px;
     min-height: 104px;
-    padding: 14px 14px 13px;
+    padding: 16px 16px 12px;
     font: inherit;
     color: var(--xenon-ink);
     text-align: left;
@@ -388,20 +387,20 @@ button.preset[aria-expanded="true"] {
 }
 
 .preset > svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     margin-bottom: auto;
     color: var(--xenon-ink-soft);
 }
 
 .preset .lamp {
     position: absolute;
-    top: 14px;
-    right: 14px;
+    top: 16px;
+    right: 16px;
 }
 
 .preset-name {
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--xenon-muted);
 }
 
@@ -421,7 +420,7 @@ button.preset[aria-expanded="true"] {
     color: var(--xenon-muted);
 }
 
-/* Picture choices: a key with a picture of the result, ringed in rose and sunk when chosen. */
+/* Picture choices: a key with a picture of the result, sunk and lit when chosen. */
 .choice {
     position: relative;
     display: flex;
@@ -437,12 +436,12 @@ button.preset[aria-expanded="true"] {
 }
 
 .choice:has(.choice-input:checked) {
-    padding: 11px 11px 15px;
-    border: 2px solid var(--xenon-rose);
+    background-color: var(--xenon-key-down);
+    border-color: var(--xenon-ink-soft);
     transform: translateY(3px);
     box-shadow:
-        0 2px 0 var(--xenon-rose-pressed),
-        0 4px 10px rgba(204, 0, 66, 0.12);
+        0 2px 0 var(--xenon-key-lip),
+        inset 0 1px 2px rgba(26, 21, 23, 0.14);
 }
 
 .choice:has(.choice-input:focus-visible) {
@@ -465,14 +464,10 @@ button.preset[aria-expanded="true"] {
 
 .choice-picture {
     display: block;
-    padding: 18px 18px 0;
+    padding: 16px 16px 0;
     overflow: hidden;
     background-color: var(--xenon-stone);
     border-radius: 7px;
-}
-
-.choice:has(.choice-input:checked) .choice-picture {
-    background-color: var(--xenon-row-selected);
 }
 
 .choice-picture svg {
@@ -491,16 +486,9 @@ button.preset[aria-expanded="true"] {
 }
 
 .choice-note {
-    margin: 3px 4px 0;
-    font-size: 13.5px;
+    margin: 4px 4px 0;
+    font-size: 14px;
     color: var(--xenon-muted);
-}
-
-.choice:has(.choice-input:checked) .lamp {
-    background-color: var(--xenon-rose);
-    box-shadow:
-        0 0 0 2px rgba(255, 0, 80, 0.16),
-        0 0 6px rgba(255, 0, 80, 0.55);
 }
 
 /*
@@ -562,7 +550,7 @@ button.preset[aria-expanded="true"] {
     align-items: center;
     gap: 12px;
     min-height: 52px;
-    padding: 10px 14px;
+    padding: 10px 16px;
     border-top: 1px solid var(--xenon-hairline-soft);
     cursor: pointer;
 }
@@ -581,10 +569,6 @@ button.preset[aria-expanded="true"] {
 
 .pick:has(input:checked) {
     background-color: var(--xenon-row-selected);
-}
-
-.pick:has(input:checked) .monogram:not(.soft) {
-    background-color: var(--xenon-rose-hover);
 }
 
 .pick:has(input:focus-visible) {
@@ -616,7 +600,7 @@ button.preset[aria-expanded="true"] {
 
 .pick-note {
     display: block;
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--xenon-muted);
 }
 

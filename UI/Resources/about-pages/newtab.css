@@ -5,7 +5,7 @@
  */
 
 /*
- * The new tab page: a greeting, the sites you go to most as a speed dial of keys, and the tabs you closed last. A
+ * The new tab page: today's date, the sites you go to most as a speed dial of keys, and the tabs you closed last. A
  * private window's page says what it does and doesn't keep instead, on the dark ground in either theme.
  */
 
@@ -20,22 +20,22 @@ body {
     padding: 32px 0 72px;
 }
 
-.greeting {
+.masthead {
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 16px;
 }
 
-.greeting .mark {
+.masthead .mark {
     width: 32px;
     height: 32px;
 }
 
-.greeting .page-title {
+.masthead .page-title {
     font-size: 36px;
 }
 
-.greeting .page-lede {
+.masthead .page-lede {
     margin-top: 4px;
     font-size: 14px;
 }
@@ -46,7 +46,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    margin: 30px 0 18px;
+    margin: 32px 0 16px;
 }
 
 .keys {
@@ -66,9 +66,7 @@ body {
 
 .keys .key[aria-selected="true"] .lamp {
     background-color: var(--xenon-rose);
-    box-shadow:
-        0 0 0 2px rgba(255, 0, 80, 0.16),
-        0 0 6px rgba(255, 0, 80, 0.55);
+    box-shadow: none;
 }
 
 .dial-note,
@@ -81,7 +79,7 @@ body {
 .dial {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
+    gap: 16px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -123,14 +121,6 @@ body {
         0 6px 14px rgba(26, 21, 23, 0.05);
 }
 
-.tile:nth-child(3n + 2) .tile-face {
-    background-color: var(--xenon-stone);
-}
-
-.tile:nth-child(4n + 3) .tile-face {
-    background-color: var(--xenon-card);
-}
-
 .tile a:hover .tile-face {
     border-color: var(--xenon-muted);
 }
@@ -147,11 +137,11 @@ body {
 
 .legend {
     position: absolute;
-    top: 9px;
-    left: 9px;
+    top: 8px;
+    left: 8px;
     min-width: 20px;
     height: 20px;
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 600;
     line-height: 18px;
     letter-spacing: 0;
@@ -173,7 +163,7 @@ body {
 
 .tile-name {
     margin-top: 10px;
-    font-size: 13.5px;
+    font-size: 14px;
     font-weight: 600;
 }
 
@@ -196,7 +186,7 @@ body {
 }
 
 .empty-note {
-    margin: 22px 2px 0;
+    margin: 24px 2px 0;
     font-size: 14px;
     color: var(--xenon-muted);
 }
@@ -232,9 +222,9 @@ body {
     display: grid;
     grid-template-columns: 20px minmax(0, 1fr) auto auto;
     align-items: center;
-    gap: 14px;
-    min-height: 46px;
-    padding: 8px 18px;
+    gap: 16px;
+    min-height: 48px;
+    padding: 8px 16px;
     font-size: 14px;
     color: var(--xenon-ink);
     text-decoration: none;
@@ -276,14 +266,14 @@ body {
 }
 
 .closed-when {
-    min-width: 70px;
+    min-width: 72px;
     text-align: right;
 }
 
 .customize {
     position: fixed;
     right: 24px;
-    bottom: 22px;
+    bottom: 24px;
 }
 
 /* A private window: the app icon's dark ground, in either theme. */
@@ -317,7 +307,7 @@ html:has(body.private) {
 .private-column > .mark {
     width: 40px;
     height: 40px;
-    margin-bottom: 26px;
+    margin-bottom: 24px;
 }
 
 .private-cards {
@@ -328,7 +318,7 @@ html:has(body.private) {
 }
 
 .private-card {
-    padding: 18px 22px 8px;
+    padding: 16px 24px 8px;
 }
 
 .card-head {
@@ -352,7 +342,7 @@ html:has(body.private) {
 
 .private-card dl {
     margin: 0;
-    padding-left: 26px;
+    padding-left: 24px;
 }
 
 .private-card dt {
@@ -374,8 +364,8 @@ html:has(body.private) {
 
 .restart {
     margin: 16px 0 0;
-    padding: 12px 18px;
-    font-size: 13.5px;
+    padding: 12px 16px;
+    font-size: 14px;
     color: var(--xenon-muted);
     background-color: var(--xenon-sand);
     border: 1px solid var(--xenon-hairline);
@@ -383,8 +373,8 @@ html:has(body.private) {
 }
 
 .restart svg {
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
     margin-right: 8px;
     vertical-align: -3px;
 }
