@@ -26,7 +26,27 @@ class Handler(SimpleHTTPRequestHandler):
         body = json.loads(self.rfile.read(length).decode())
         run = parse_qs(parsed.query).get("run", [body.get("runId", "run")])[0]
         path = REPORTS / f"{run}.json"
-        path.write_text(json.dumps(body, indent=2) + "\n")
+        if "samples" in body:
+            path.write_text(json.dumps(body, indent=2) + "\n")
+            self.send_response(204)
+            self.end_headers()
+            return
+        if path.exists():
+            try:
+                data = json.loads(path.read_text())
+            except json.JSONDecodeError:
+                data = {"runId": run, "events": [], "reads": {}}
+        else:
+            data = {"runId": run, "events": [], "reads": {}}
+        if "events" not in data:
+            data = {"runId": run, "events": [data], "reads": {}}
+        data.setdefault("events", []).append(body)
+        data.setdefault("reads", {})
+        if "key" in body and "value" in body:
+            data["reads"][body["key"]] = body["value"]
+        if body.get("key") == "complete":
+            data["complete"] = body
+        path.write_text(json.dumps(data, indent=2) + "\n")
         self.send_response(204)
         self.end_headers()
 

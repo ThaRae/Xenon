@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>A start</title>
+<script>
+window.__farblingFirst = (function () {
+    try {
+        if (typeof internals === "undefined") return "no-internals";
+        return internals.farblingSeedInfo();
+    } catch (error) {
+        return "error:" + String(error);
+    }
+})();
+</script>
+<script>
+function post(key, value) {
+    return fetch("/report?run=same-process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+function goToBByClick() {
+    const link = document.createElement("a");
+    link.href = "http://site-b.test:8080/from-click.html";
+    document.body.appendChild(link);
+    link.click();
+}
+function afterBack() {
+    if (sessionStorage.getItem("did-a-back")) return;
+    sessionStorage.setItem("did-a-back", "1");
+    post("a-back", window.__farblingFirst).finally(goToBByClick);
+}
+const first = window.__farblingFirst;
+if (!sessionStorage.getItem("did-a-direct")) {
+    sessionStorage.setItem("did-a-direct", first);
+    post("a-direct", first).finally(() => {
+        location.href = "http://site-b.test:8080/from-location.html";
+    });
+} else {
+    afterBack();
+}
+window.addEventListener("pageshow", event => {
+    if (event.persisted) afterBack();
+});
+</script>

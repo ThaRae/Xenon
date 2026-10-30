@@ -1,0 +1,56 @@
+{
+  "runId": "same-process",
+  "events": [
+    {
+      "key": "a-direct",
+      "value": "standard:7d5c25dae1d15ec9",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-location",
+      "value": "standard:7d5c25dae1d15ec9",
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "a-back",
+      "value": "standard:d2f25d6442f11028",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-click",
+      "value": "standard:7d5c25dae1d15ec9",
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "aAgain": "standard:d2f25d6442f11028",
+      "origin": "http://site-a.test:8080",
+      "iframeNavFirst": "standard:7d5c25dae1d15ec9",
+      "iframeNavDest": "standard:7d5c25dae1d15ec9"
+    },
+    {
+      "key": "complete",
+      "aAgain": "standard:d2f25d6442f11028",
+      "origin": "http://site-a.test:8080",
+      "iframeNavFirst": "standard:7d5c25dae1d15ec9",
+      "iframeNavDest": "standard:7d5c25dae1d15ec9"
+    }
+  ],
+  "reads": {
+    "a-direct": "standard:7d5c25dae1d15ec9",
+    "b-location": "standard:7d5c25dae1d15ec9",
+    "a-back": "standard:d2f25d6442f11028",
+    "b-click": "standard:7d5c25dae1d15ec9"
+  },
+  "complete": {
+    "key": "complete",
+    "aAgain": "standard:d2f25d6442f11028",
+    "origin": "http://site-a.test:8080",
+    "iframeNavFirst": "standard:7d5c25dae1d15ec9",
+    "iframeNavDest": "standard:7d5c25dae1d15ec9"
+  }
+}

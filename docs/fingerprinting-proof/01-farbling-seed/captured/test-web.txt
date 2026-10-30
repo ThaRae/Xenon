@@ -1,0 +1,21 @@
+TestFarblingRNG: 6/6 passed, RNG_EXIT:0
+
+test-web --disable-sandbox --force-cpu-painting --test-concurrency 8 --per-test-timeout 30
+PATH includes Build/release/xenon/libexec
+
+Text/input/Worker*:     Pass: 33, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
+Text/input/Internals*:  Pass:  8, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
+Text/input/navigation*: Pass: 78, Fail: 0, Skipped: 4, Timeout: 0, Crashed: 0
+Text/input/HTML/*Worker*: Pass: 2, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
+Text/input/HTML/*window*: Pass: 23, Fail: 1, Skipped: 0, Timeout: 0, Crashed: 0
+  Fail: Text/input/HTML/media-source-append-window-trims-audio.html
+  actual: FAIL: test: NotSupportedError: Unsupported MIME type
+  The input and expected files are identical at pin 2529494aaf808818dc4470f2320ad19f237a986f.
+  Patches 0027-0029 do not mention MediaSource. A pin-engine test-web rebuild was not
+  finished here: cmake of a detached pin worktree needs a full LibWeb compile, and a
+  previous dedicated Build/libweb-tests configure hung in vcpkg. This fail is a codec
+  MIME error, not a farbling assertion.
+Ref/input/*window*:     Pass:  1, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
+Ref/input/*Worker* and *Intern*: 0 tests matched
+
+Xenon unit tests: 83/83 passed (see unit-tests.txt)

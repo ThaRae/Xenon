@@ -4,26 +4,26 @@
   "samples": [
     {
       "origin": "http://site-a.test:8080",
-      "document": "standard:06961c14927158d6",
-      "sameIframe": "same-iframe http://site-a.test:8080 standard:06961c14927158d6",
-      "crossIframe": "cross-iframe http://site-b.test:8080 standard:06961c14927158d6",
-      "worker": "standard:06961c14927158d6",
+      "document": "standard:7c30fca05ff24d34",
+      "sameIframe": "same-iframe http://site-a.test:8080 standard:7c30fca05ff24d34",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:7c30fca05ff24d34",
+      "worker": "standard:7c30fca05ff24d34",
       "internalsPresent": true
     },
     {
       "origin": "http://site-a.test:8080",
-      "document": "standard:06961c14927158d6",
-      "sameIframe": "same-iframe http://site-a.test:8080 standard:06961c14927158d6",
-      "crossIframe": "cross-iframe http://site-b.test:8080 standard:06961c14927158d6",
-      "worker": "standard:06961c14927158d6",
+      "document": "standard:7c30fca05ff24d34",
+      "sameIframe": "same-iframe http://site-a.test:8080 standard:7c30fca05ff24d34",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:7c30fca05ff24d34",
+      "worker": "standard:7c30fca05ff24d34",
       "internalsPresent": true
     },
     {
       "origin": "http://site-a.test:8080",
-      "document": "standard:06961c14927158d6",
-      "sameIframe": "same-iframe http://site-a.test:8080 standard:06961c14927158d6",
-      "crossIframe": "cross-iframe http://site-b.test:8080 standard:06961c14927158d6",
-      "worker": "standard:06961c14927158d6",
+      "document": "standard:7c30fca05ff24d34",
+      "sameIframe": "same-iframe http://site-a.test:8080 standard:7c30fca05ff24d34",
+      "crossIframe": "cross-iframe http://site-b.test:8080 standard:7c30fca05ff24d34",
+      "worker": "standard:7c30fca05ff24d34",
       "internalsPresent": true
     }
   ]

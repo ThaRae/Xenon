@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>iframe nav dest</title>
+<script>
+window.__farblingFirst = (function () {
+    try {
+        if (typeof internals === "undefined") return "no-internals";
+        return internals.farblingSeedInfo();
+    } catch (error) {
+        return "error:" + String(error);
+    }
+})();
+</script>
+<script>
+parent.postMessage({ kind: "iframe-nav-dest", value: window.__farblingFirst, origin: location.origin }, "*");
+</script>

@@ -1,0 +1,127 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Fri, 30 Oct 2026 22:53:30 +0000
+Subject: [PATCH] LibWebView: Apply farbling seeds before renderer-initiated
+ navigations
+
+Page::set_farbling_seed only stores the seed for documents created after
+it arrives. Copying onto live documents rewrote the outgoing page during
+cross-site navigation. Top-level navigations, including location.href,
+link clicks, and history traversal, now send the destination site's seed
+before the new document is created. A self-navigating iframe keeps the
+top site's seed.
+---
+ Libraries/LibWeb/Page/Page.cpp                |  4 ----
+ Libraries/LibWebView/CanonicalNavigable.cpp   |  2 ++
+ Libraries/LibWebView/CanonicalTraversable.cpp |  4 ++++
+ Libraries/LibWebView/WebContentPage.cpp       | 13 +++++++++++++
+ Libraries/LibWebView/WebContentPage.h         |  1 +
+ 5 files changed, 20 insertions(+), 4 deletions(-)
+
+diff --git a/Libraries/LibWeb/Page/Page.cpp b/Libraries/LibWeb/Page/Page.cpp
+index 2e6ce1e0b252e6c203d845872e0e2274f8042719..87623eee472823158b0944681a6ac608c4ce9d90 100644
+--- a/Libraries/LibWeb/Page/Page.cpp
++++ b/Libraries/LibWeb/Page/Page.cpp
+@@ -136,10 +136,6 @@ Compositor::CompositorHost const& Page::compositor_host() const
+ void Page::set_farbling_seed(Farbling::Seed seed)
+ {
+     m_farbling_seed = seed;
+-    for (auto navigable : hosted_navigables()) {
+-        if (auto document = navigable->active_document())
+-            document->relevant_settings_object().set_farbling_seed(seed);
+-    }
+ }
+ 
+ void Page::visit_edges(JS::Cell::Visitor& visitor)
+diff --git a/Libraries/LibWebView/CanonicalNavigable.cpp b/Libraries/LibWebView/CanonicalNavigable.cpp
+index be722edd5aee951f63aaaacca960fd1f2acb69a1..575fec085e22f5d334718a7a3209876bf0e2d2fc 100644
+--- a/Libraries/LibWebView/CanonicalNavigable.cpp
++++ b/Libraries/LibWebView/CanonicalNavigable.cpp
+@@ -344,6 +344,8 @@ void CanonicalNavigable::begin_navigation(Web::HTML::PreparedNavigationDescripto
+         .state = CanonicalNavigation::CheckingIfUnloadingIsCanceled { move(start_request) },
+         .page = worker,
+     });
++    if (is_top_level_traversable())
++        worker->apply_farbling_seed_for_url(url);
+     worker->async_set_ongoing_navigation(id(), navigation_id);
+     worker->begin_navigation_unload_check(*this, navigation_id);
+ }
+diff --git a/Libraries/LibWebView/CanonicalTraversable.cpp b/Libraries/LibWebView/CanonicalTraversable.cpp
+index ac8bd7e2f9e767054aa4e0d2864d41b0e4d6dc1b..59bea4441f8002113646ddb9da43d2984064bd4a 100644
+--- a/Libraries/LibWebView/CanonicalTraversable.cpp
++++ b/Libraries/LibWebView/CanonicalTraversable.cpp
+@@ -1410,6 +1410,8 @@ void CanonicalTraversable::continue_history_navigation_population(HistoryOperati
+         }
+         auto& loader = *changing_navigable->population_loader;
+         endpoint->owe_reply({ OwedReply::Kind::ChangingJob, operation_id, navigable_id });
++        if (changing_navigable->navigable().is_top_level_traversable())
++            endpoint->apply_farbling_seed_for_url(changing_navigable->target_entry->url);
+         endpoint->async_continue_history_navigation_population(operation_id, changing_navigable->target_entry_descriptor(), operation->algorithm->navigation_type(),
+             changing_navigable->navigable().ongoing_navigation().has<CanonicalNavigable::Traversal>(), Web::HTML::HistoryNavigationPopulation { loader.request(), loader.take_result() });
+     };
+@@ -1457,6 +1459,8 @@ bool CanonicalTraversable::run_changing_navigable_history_step_job(ApplyHistoryS
+             changing_navigable.populated_document = populated_document->document;
+     }
+     endpoint->owe_reply({ OwedReply::Kind::ChangingJob, operation.operation_id, navigable_id });
++    if (navigable.is_top_level_traversable())
++        endpoint->apply_farbling_seed_for_url(changing_navigable.target_entry->url);
+     endpoint->async_run_changing_navigable_history_job(
+         operation.operation_id, navigable_id,
+         changing_navigable.target_entry_descriptor(), run.user_involvement(),
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 64bdd91b788ee9a0f2659668cc9fa2bf5b569199..497b4c1d644ca8fa1022562c824157208febb591 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -375,6 +375,8 @@ bool WebContentPage::continue_navigation_population_in_selected_process(Web::HTM
+         // 5. Queue a global task on the navigation and traversal task source, given navigable's active window, to run
+         //    these steps:
+         // NB: The page to host the document runs the task.
++        if (navigable->is_top_level_traversable())
++            host->apply_farbling_seed_for_url(weak_loader->request().history_entry.url);
+         host->async_populate_navigation(weak_loader->request(), weak_loader->take_result());
+     };
+     // Wait for the destination RequestServer to acknowledge the import before the host adopts it.
+@@ -478,6 +480,12 @@ void WebContentPage::begin_top_level_load(URL::URL const& url)
+     }
+ }
+ 
++void WebContentPage::apply_farbling_seed_for_url(URL::URL const& url)
++{
++    auto seed = Application::farbling_seed_store().effective_seed(url, view().is_private());
++    async_set_farbling_seed(to_underlying(seed.level), seed.high, seed.low);
++}
++
+ void WebContentPage::request_close()
+ {
+     // The frontend may destroy the view immediately after this for pages that cannot prompt during beforeunload.
+@@ -2333,6 +2341,9 @@ void WebContentPage::did_request_navigation_start(Web::HTML::CrossProcessId navi
+     if (start_request.has_value())
+         start_request->initiator_origin = initiator_origin.release_value();
+ 
++    if (target_navigable->is_top_level_traversable())
++        apply_farbling_seed_for_url(url);
++
+     if (!start_request.has_value()) {
+         if (url.scheme() != "javascript"sv) {
+             client().did_misbehave("did_request_navigation_start"sv, "navigation without a start request is not to a javascript: URL"sv);
+@@ -2394,6 +2405,8 @@ void WebContentPage::did_complete_navigation_unload_check(Web::HTML::CrossProces
+     population_request.target_snapshot_params.sandboxing_flags |= navigable->snapshot_target_snapshot_params().sandboxing_flags;
+     ongoing_navigation->history_entry = MUST(CanonicalSessionHistoryEntry::create_from_descriptor(Web::HTML::create_session_history_entry_descriptor(population_request.history_entry, 0)));
+     ongoing_navigation->state = CanonicalNavigation::CreatingNavigationParams { NavigationLoader::create(client().is_private(), move(population_request)) };
++    if (navigable->is_top_level_traversable())
++        apply_farbling_seed_for_url(ongoing_navigation->url);
+     async_create_navigation_params(ongoing_navigation->loader()->request());
+ 
+     // Requesting navigation params starts the fetch, so a view's top-level population begins its recorded
+diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
+index efc74c7bdab09cbca8ed83b4605b26102fc49ad8..bff63f28a37cb781ff5de4ef8ff61c73cde07be8 100644
+--- a/Libraries/LibWebView/WebContentPage.h
++++ b/Libraries/LibWebView/WebContentPage.h
+@@ -137,6 +137,7 @@ public:
+ 
+     void begin_top_level_load(URL::URL const&);
+     void begin_navigation_unload_check(CanonicalNavigable&, Utf16String const& navigation_id);
++    void apply_farbling_seed_for_url(URL::URL const&);
+ 
+     void request_close();
+     void discard();

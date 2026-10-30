@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>A again</title>
+<script>
+window.__farblingFirst = (function () {
+    try {
+        if (typeof internals === "undefined") return "no-internals";
+        return internals.farblingSeedInfo();
+    } catch (error) {
+        return "error:" + String(error);
+    }
+})();
+</script>
+<iframe id="naviframe" src="http://site-b.test:8080/iframe-nav.html"></iframe>
+<script>
+const sample = {
+    key: "complete",
+    aAgain: window.__farblingFirst,
+    origin: location.origin,
+    iframeNavFirst: null,
+    iframeNavDest: null,
+};
+let remaining = 2;
+function done() {
+    remaining -= 1;
+    if (remaining > 0) return;
+    fetch("/report?run=same-process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sample),
+    }).finally(() => setTimeout(() => window.close(), 50));
+}
+window.addEventListener("message", event => {
+    const data = event.data || {};
+    if (data.kind === "iframe-nav-first") sample.iframeNavFirst = data.value;
+    if (data.kind === "iframe-nav-dest") sample.iframeNavDest = data.value;
+    done();
+});
+setTimeout(() => {
+    sample.iframeNavFirst = sample.iframeNavFirst || "timeout";
+    sample.iframeNavDest = sample.iframeNavDest || "timeout";
+    remaining = 1;
+    done();
+}, 8000);
+</script>

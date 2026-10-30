@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>iframe nav start</title>
+<script>
+window.__farblingFirst = (function () {
+    try {
+        if (typeof internals === "undefined") return "no-internals";
+        return internals.farblingSeedInfo();
+    } catch (error) {
+        return "error:" + String(error);
+    }
+})();
+</script>
+<script>
+parent.postMessage({ kind: "iframe-nav-first", value: window.__farblingFirst, origin: location.origin }, "*");
+location.href = "iframe-nav-dest.html";
+</script>
