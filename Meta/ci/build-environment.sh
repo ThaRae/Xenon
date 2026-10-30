@@ -6,6 +6,10 @@ mkdir -p Build/caches/ccache
 export CCACHE_DIR=$PWD/Build/caches/ccache
 export CCACHE_BASEDIR=$PWD
 export CCACHE_MAXSIZE=${CCACHE_MAXSIZE:-3G}
+if [[ -n ${CCACHE_TOKEN:-} ]]; then
+  export CCACHE_REMOTE_STORAGE="http://10.255.42.1:8642/xenon|bearer-token=$CCACHE_TOKEN|operation-timeout=5000"
+fi
+unset CCACHE_TOKEN
 
 if [[ -z ${JOBS:-} ]]; then
   memory_gb=$(($(awk '/MemTotal/ { print $2 }' /proc/meminfo) / 1024 / 1024))
