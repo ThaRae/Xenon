@@ -28,11 +28,11 @@ synchronous one of a discarded frame included.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .../Platform/RemoteImageCodecPlugin.cpp       |  93 +++++++++++--
+ .../Platform/RemoteImageCodecPlugin.cpp       |  93 ++++++++++--
  .../LibWeb/Platform/RemoteImageCodecPlugin.h  |  19 +++
  Libraries/LibWebView/Application.cpp          |  10 +-
  Libraries/LibWebView/Application.h            |   3 -
- Libraries/LibWebView/HelperProcess.cpp        |  38 ++----
+ Libraries/LibWebView/HelperProcess.cpp        |  38 ++---
  Libraries/LibWebView/HelperProcess.h          |  15 +-
  Libraries/LibWebView/WebContentClient.cpp     |  10 ++
  Libraries/LibWebView/WebContentClient.h       |   1 +
@@ -49,9 +49,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Services/WebWorker/WebWorkerClient.ipc        |   1 +
  Services/WebWorker/WebWorkerServer.ipc        |   1 -
  Services/WebWorker/main.cpp                   |   7 +
- .../LibWebView/TestImageDecoderIsolation.cpp  | 128 +++++++++++++++---
+ .../LibWebView/TestImageDecoderIsolation.cpp  | 138 +++++++++++++++---
  .../LibWebView/test-webdriver-crash-report.py |  17 +++
- 23 files changed, 304 insertions(+), 86 deletions(-)
+ 23 files changed, 313 insertions(+), 87 deletions(-)
 
 diff --git a/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp b/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp
 index adacd0fb3c33832726eafb58e59ba8425e725053..d7033b66aca939aad4a859b22c22f0b29d07fdeb 100644
@@ -681,7 +681,7 @@ index 0a67011a7a3af1b1a0ac72d205265163066eb67c..b26162a2040be76a4a3dfef7995dd33f
          return client->request_media_server_transport();
      });
 diff --git a/Tests/LibWebView/TestImageDecoderIsolation.cpp b/Tests/LibWebView/TestImageDecoderIsolation.cpp
-index c774f6187321d70e5c6a62cec81922ec7cf80f8b..507eac0c5857cf842859ddacda4be0eee7295bbf 100644
+index c774f6187321d70e5c6a62cec81922ec7cf80f8b..ce73355e5f20ff16f0cdee51d913a3c3f30d3ffb 100644
 --- a/Tests/LibWebView/TestImageDecoderIsolation.cpp
 +++ b/Tests/LibWebView/TestImageDecoderIsolation.cpp
 @@ -4,6 +4,7 @@
@@ -692,7 +692,21 @@ index c774f6187321d70e5c6a62cec81922ec7cf80f8b..507eac0c5857cf842859ddacda4be0ee
  #include <AK/HashTable.h>
  #include <AK/LexicalPath.h>
  #include <AK/Random.h>
-@@ -52,10 +53,31 @@ HashTable<pid_t> processes_of_type(WebView::ProcessType type)
+@@ -33,10 +34,12 @@ public:
+     {
+     }
+ 
+-    virtual void create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions&, WebView::WebContentOptions&) override
++    virtual void create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions&, WebView::WebContentOptions& web_content_options) override
+     {
+         browser_options.headless_mode = WebView::HeadlessMode::Test;
+         browser_options.disable_sql_database = WebView::DisableSQLDatabase::Yes;
++        // The pages discard their decoded images through internals.
++        web_content_options.expose_internals_object = WebView::ExposeInternalsObject::Yes;
+     }
+ 
+     virtual bool should_coordinate_browser_process() const override { return false; }
+@@ -52,10 +55,31 @@ HashTable<pid_t> processes_of_type(WebView::ProcessType type)
      return pids;
  }
  
@@ -725,7 +739,7 @@ index c774f6187321d70e5c6a62cec81922ec7cf80f8b..507eac0c5857cf842859ddacda4be0ee
  
  ErrorOr<int> ladybird_main(Main::Arguments arguments)
  {
-@@ -77,28 +99,102 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -77,28 +101,108 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
  
      auto first_view = WebView::HeadlessWebView::create(theme, { 800, 600 });
      auto second_view = WebView::HeadlessWebView::create(theme, { 800, 600 });
@@ -799,8 +813,14 @@ index c774f6187321d70e5c6a62cec81922ec7cf80f8b..507eac0c5857cf842859ddacda4be0ee
 +    // A frame that was discarded to save memory is decoded again when it is used, by a new decoder if the renderer's
 +    // own has gone since, as one that crashed or went idle has.
 +    size_t discardable_images_loaded = 0;
-+    first_view->on_test_finish = [&](auto const&) { ++discardable_images_loaded; };
-+    second_view->on_test_finish = [&](auto const&) { ++discardable_images_loaded; };
++    first_view->on_title_change = [&](Utf16String const& title) {
++        if (title == "loaded"sv)
++            ++discardable_images_loaded;
++    };
++    second_view->on_title_change = [&](Utf16String const& title) {
++        if (title == "loaded"sv)
++            ++discardable_images_loaded;
++    };
 +    auto load_a_discardable_image = R"(
 +        (async () => {
 +            const source = document.createElement("canvas");
@@ -812,7 +832,7 @@ index c774f6187321d70e5c6a62cec81922ec7cf80f8b..507eac0c5857cf842859ddacda4be0ee
 +            window.discardableImage.src = source.toDataURL("image/png");
 +            document.body.appendChild(window.discardableImage);
 +            await window.discardableImage.decode();
-+            internals.signalTestIsDone("loaded");
++            document.title = "loaded";
 +        })();
 +    )"_string;
 +    first_view->run_javascript(load_a_discardable_image);
