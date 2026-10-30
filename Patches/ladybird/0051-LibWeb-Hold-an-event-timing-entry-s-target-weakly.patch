@@ -1,0 +1,190 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Fri, 30 Oct 2026 10:05:15 -0400
+Subject: [PATCH] LibWeb: Hold an event timing entry's target weakly
+
+A PerformanceEventTiming entry kept the node its event was dispatched at
+alive for as long as the entry lived. The performance timeline buffers
+up to 150 "event" entries and the first input for the life of the page,
+so each of them kept its node, and the whole subtree that node was
+removed with, from ever being collected. On a page that replaces its
+content as it goes, such as a feed that renders its timeline again, a
+click or a key press was enough to keep a removed copy of the page
+around.
+
+The target getter returns the node only while it is exposed for paint
+timing, which a node that nothing else keeps alive never is. So hold
+the node weakly: what the getter returns doesn't change, and a removed
+subtree can be collected.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../EventTiming/PerformanceEventTiming.cpp    | 17 +++---
+ .../EventTiming/PerformanceEventTiming.h      | 10 ++--
+ .../removed-target-is-collectable.txt         |  5 ++
+ .../removed-target-is-collectable.html        | 58 +++++++++++++++++++
+ 4 files changed, 78 insertions(+), 12 deletions(-)
+ create mode 100644 Tests/LibWeb/Text/expected/EventTiming/removed-target-is-collectable.txt
+ create mode 100644 Tests/LibWeb/Text/input/EventTiming/removed-target-is-collectable.html
+
+diff --git a/Libraries/LibWeb/EventTiming/PerformanceEventTiming.cpp b/Libraries/LibWeb/EventTiming/PerformanceEventTiming.cpp
+index 42cd526ad627805acf210db4d1d1c3c986ed20ae..f884902153c0a0f07cbd0bb448948429e55422a2 100644
+--- a/Libraries/LibWeb/EventTiming/PerformanceEventTiming.cpp
++++ b/Libraries/LibWeb/EventTiming/PerformanceEventTiming.cpp
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include <LibGC/Heap.h>
++#include <LibGC/WeakInlines.h>
+ #include <LibWeb/DOM/Element.h>
+ #include <LibWeb/DOM/Event.h>
+ #include <LibWeb/EventTiming/PerformanceEventTiming.h>
+@@ -55,12 +56,18 @@ GC::Ptr<DOM::Node> PerformanceEventTiming::target() const
+ {
+     // 1. If this's eventTarget is not exposed for paint timing given null, return null.
+     // NB: Only elements can be exposed for paint timing.
+-    auto const* element = as_if<DOM::Element>(m_event_target.ptr());
++    auto event_target = m_event_target.ptr();
++    auto const* element = as_if<DOM::Element>(event_target.ptr());
+     if (!element || !PaintTiming::is_exposed_for_paint_timing(*element, nullptr))
+         return nullptr;
+ 
+     // 2. Return this's eventTarget.
+-    return m_event_target;
++    return event_target;
++}
++
++void PerformanceEventTiming::set_event_target(GC::Ptr<DOM::Node> event_target)
++{
++    m_event_target = event_target;
+ }
+ 
+ // https://w3c.github.io/event-timing/#should-add-performanceeventtiming
+@@ -91,10 +98,4 @@ PerformanceTimeline::ShouldAddEntry PerformanceEventTiming::should_add_entry(Opt
+     return PerformanceTimeline::ShouldAddEntry::No;
+ }
+ 
+-void PerformanceEventTiming::visit_edges(GC::Cell::Visitor& visitor)
+-{
+-    Base::visit_edges(visitor);
+-    visitor.visit(m_event_target);
+-}
+-
+ }
+diff --git a/Libraries/LibWeb/EventTiming/PerformanceEventTiming.h b/Libraries/LibWeb/EventTiming/PerformanceEventTiming.h
+index d17c98b3d990f0f4160420ff55112471ba30dba2..12f965ac3cbbc67a0ea6986d3158d7807f5d428d 100644
+--- a/Libraries/LibWeb/EventTiming/PerformanceEventTiming.h
++++ b/Libraries/LibWeb/EventTiming/PerformanceEventTiming.h
+@@ -6,6 +6,7 @@
+ 
+ #pragma once
+ 
++#include <LibGC/Weak.h>
+ #include <LibWeb/Forward.h>
+ #include <LibWeb/PerformanceTimeline/PerformanceEntry.h>
+ #include <LibWebCommon/WebIDL/Types.h>
+@@ -43,7 +44,7 @@ public:
+     bool cancelable() const { return m_cancelable; }
+ 
+     GC::Ptr<DOM::Node> target() const;
+-    void set_event_target(GC::Ptr<DOM::Node> event_target) { m_event_target = event_target; }
++    void set_event_target(GC::Ptr<DOM::Node> event_target);
+ 
+     Utf16String const& target_selector() const { return m_target_selector; }
+     void set_target_selector(Utf16String target_selector) { m_target_selector = move(target_selector); }
+@@ -57,8 +58,6 @@ public:
+ private:
+     PerformanceEventTiming(Utf16String const& name, Utf16FlyString const& entry_type, HighResolutionTime::DOMHighResTimeStamp start_time, HighResolutionTime::DOMHighResTimeStamp processing_start, bool cancelable, WebIDL::UnsignedLongLong interaction_id);
+ 
+-    virtual void visit_edges(GC::Cell::Visitor&) override;
+-
+     // NB: An entry is "event", unless it is the copy of an entry that is queued as the first input.
+     Utf16FlyString m_entry_type;
+ 
+@@ -69,7 +68,10 @@ private:
+     bool m_cancelable { false };
+ 
+     // https://w3c.github.io/event-timing/#eventtarget
+-    GC::Ptr<DOM::Node> m_event_target;
++    // NB: Held weakly. target() returns only a node that is exposed for paint timing, which a node that is otherwise
++    //     garbage never is, and the timeline buffers keep entries for the life of the page. Holding the node strongly
++    //     would keep every removed subtree that an event was timed in alive along with its entry.
++    GC::Weak<DOM::Node> m_event_target;
+ 
+     Utf16String m_target_selector;
+     WebIDL::UnsignedLongLong m_interaction_id { 0 };
+diff --git a/Tests/LibWeb/Text/expected/EventTiming/removed-target-is-collectable.txt b/Tests/LibWeb/Text/expected/EventTiming/removed-target-is-collectable.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..28968c272951bb4157372ef18e925ceaa773f4fb
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/EventTiming/removed-target-is-collectable.txt
+@@ -0,0 +1,5 @@
++first-input entries: 1
++click entries: 1
++targets are null: true
++removed target collected: true
++entries kept: 2
+diff --git a/Tests/LibWeb/Text/input/EventTiming/removed-target-is-collectable.html b/Tests/LibWeb/Text/input/EventTiming/removed-target-is-collectable.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..9c49db8840d4cf6e5cb6fd37bff3bb2b9460c7f7
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/EventTiming/removed-target-is-collectable.html
+@@ -0,0 +1,58 @@
++<!DOCTYPE html>
++<script src="../include.js"></script>
++<script>
++promiseTest(async () => {
++    function clickRemovedButton() {
++        const button = document.createElement("button");
++        button.style.width = "100px";
++        button.style.height = "100px";
++        document.body.append(button);
++        // Take long enough that the click is buffered as an "event" entry (104 ms or more), not only as the first input.
++        button.addEventListener("click", () => {
++            const start = performance.now();
++            while (performance.now() - start < 120) { }
++        });
++        const rect = button.getBoundingClientRect();
++        internals.click(rect.x + 50, rect.y + 50);
++        // Move off the button, so that the document's hovered node doesn't keep it.
++        internals.mouseMove(rect.x + 300, rect.y + 300);
++        // Preserve the wrapper so collection checks the native element, not just a disposable JS wrapper.
++        button.gcSentinel = true;
++        const weakButton = new WeakRef(button);
++        button.remove();
++        return weakButton;
++    }
++    // "event" entries aren't available from the timeline, so read the ones it buffered through an observer.
++    function bufferedClicks() {
++        const { promise, resolve } = Promise.withResolvers();
++        const observer = new PerformanceObserver(list => {
++            observer.disconnect();
++            resolve(list.getEntries().filter(entry => entry.name === "click"));
++        });
++        observer.observe({ type: "event", buffered: true });
++        return promise;
++    }
++
++    const weakButton = clickRemovedButton();
++
++    // The next rendering update gives the click's entries their durations and adds them to the timeline.
++    await animationFrame();
++    await animationFrame();
++    const firstInput = performance.getEntriesByType("first-input");
++    const clicks = await bufferedClicks();
++    println(`first-input entries: ${firstInput.length}`);
++    println(`click entries: ${clicks.length}`);
++    println(`targets are null: ${[...firstInput, ...clicks].every(entry => entry.target === null)}`);
++
++    // Collect outside the creating JS job, after its locals and WeakRef kept-alive objects are released.
++    const maximumGcRoundsForConservativeRoots = 100;
++    for (let round = 0; round < maximumGcRoundsForConservativeRoots; ++round) {
++        await timeout(0);
++        await internals.gcAsync();
++        if (weakButton.deref() === undefined)
++            break;
++    }
++    println(`removed target collected: ${weakButton.deref() === undefined}`);
++    println(`entries kept: ${performance.getEntriesByType("first-input").length + (await bufferedClicks()).length}`);
++});
++</script>
