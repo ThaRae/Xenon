@@ -23,10 +23,10 @@ The blocker now also gets the request method, so $method filters match.
  2 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 8138f3b6374263fd084b59fc028689d47ee1ef7d..8f16e0969d1f5fd8cfe5e4eea807e6f6d25247e2 100644
+index 7106daaefea36d36147af7c0d234730239b2e8f4..c7d2b339361445dd0f6dcc90923cb4a79b04e300 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -63,6 +63,7 @@
+@@ -66,6 +66,7 @@
  #include <LibWeb/HTML/WorkerGlobalScope.h>
  #include <LibWeb/HighResolutionTime/TimeOrigin.h>
  #include <LibWeb/Infra/SerializedURL.h>
@@ -34,7 +34,7 @@ index 8138f3b6374263fd084b59fc028689d47ee1ef7d..8f16e0969d1f5fd8cfe5e4eea807e6f6
  #include <LibWeb/Loader/LoadRequest.h>
  #include <LibWeb/Loader/LoaderConfig.h>
  #include <LibWeb/Loader/ResourceLoader.h>
-@@ -539,6 +540,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
+@@ -559,6 +560,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
          request.set_client_snapshot(client->visit([](auto const& client) { return snapshot_client_context(*client); }));
  }
  
@@ -64,20 +64,20 @@ index 8138f3b6374263fd084b59fc028689d47ee1ef7d..8f16e0969d1f5fd8cfe5e4eea807e6f6
  // https://fetch.spec.whatwg.org/#concept-main-fetch
  GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParams const& fetch_params, Recursive recursive)
  {
-@@ -613,6 +637,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -633,6 +657,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
          request->current_url().set_scheme("https"sv);
      }
  
 +    remove_tracking_parameters(realm, *request);
 +
-     auto get_response = GC::create_function(GC::Heap::the(), [&realm, &fetch_params, request]() -> GC::Ref<PendingResponse> {
+     auto get_response = GC::create_function(GC::Heap::the(), [&realm, fetch_params = NonnullRefPtr { fetch_params }, controller = fetch_params.controller(), request]() -> GC::Ref<PendingResponse> {
          dbgln_if(WEB_FETCH_DEBUG, "Fetch: Running 'main fetch' get_response() function");
          auto const* origin = request->origin().get_pointer<URL::Origin>();
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24929ffde9 100644
+index ee85fbe647a1c053a5edf764d1585b10ba721c6c..6fea96b3034f8884f04b83bab441a078308cddbb 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-@@ -29,6 +29,7 @@
+@@ -30,6 +30,7 @@
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
  #include <LibWeb/Platform/Timer.h>
@@ -85,7 +85,7 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
  #include <LibWebCommon/Loader/UserAgent.h>
  
  namespace Web {
-@@ -297,7 +298,12 @@ static StringView blocked_resource_kind(LoadRequest const& request)
+@@ -292,7 +293,12 @@ static StringView blocked_resource_kind(LoadRequest const& request)
      VERIFY_NOT_REACHED();
  }
  
@@ -99,7 +99,7 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
  {
      auto const& url = request.url().value();
  
-@@ -312,20 +318,46 @@ static bool should_block_request(LoadRequest const& request)
+@@ -307,19 +313,45 @@ static bool should_block_request(LoadRequest const& request)
  
      if (is_port_blocked(url.port_or_default())) {
          log_failure(request, ByteString::formatted("Port #{} is blocked", url.port_or_default()));
@@ -113,7 +113,6 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
 +        auto decision = ContentBlocker::the().check_request(url, source_url, request.destination(), request.initiator_type(), request.request_mode(), request.method());
 +        // NB: Rewrites ($removeparam) happen in main fetch, before the request gets here.
 +        if (decision.action == ContentBlocker::RequestDecision::Action::Block || decision.action == ContentBlocker::RequestDecision::Action::Redirect) {
-             log_filtered_request(request);
              if (page)
                  page->client().page_did_block_resource(url, blocked_resource_kind(request));
 -            return true;
@@ -150,7 +149,7 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
  }
  
  template<typename FileHandler, typename ErrorHandler>
-@@ -520,7 +552,9 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+@@ -514,7 +546,9 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
      log_request_start(request);
      request.start_timer();
  

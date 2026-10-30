@@ -118,10 +118,10 @@ index d1c85bd4ae293da1d6626af082b898ce4dd7dfc9..c0bd46d82b65f013fc6dea5f1864ae3b
  // or in isolated worlds of the embedder's (see Web::HTML::UserScript), and the messages of those worlds' bridges.
  struct UserScriptHandler {
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index a018be2493881ace6224c9b182a97403aa8ac85e..de23ab70e546ccad4f49bd58be97b7b15d8de5df 100644
+index 30ca237c3fdc94ff2b5099351b28b96c4064f9b6..b25f9af73c49ff2d10dc74a83479f6baaf2bc303 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -155,6 +155,23 @@ CanonicalTraversable& ViewImplementation::traversable() const
+@@ -172,6 +172,23 @@ CanonicalTraversable& ViewImplementation::traversable() const
      return *m_top_level_traversable;
  }
  
@@ -146,10 +146,10 @@ index a018be2493881ace6224c9b182a97403aa8ac85e..de23ab70e546ccad4f49bd58be97b7b1
  {
      VERIFY(!m_top_level_traversable);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 147f6b25419e16c2fbd17af1958ed60fb6bf683e..9e9f11ab1dec051c90b0c154c5a8bac86a63a8bb 100644
+index 01fdbf534363f8c92c062186420574c111ce99d4..66a11907cc4321e0852490455e8f7315bcdcb99f 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -118,6 +118,8 @@ public:
+@@ -168,6 +168,8 @@ public:
  
      CanonicalTraversable& traversable() const;
      bool has_traversable() const { return m_top_level_traversable != nullptr; }
@@ -159,10 +159,10 @@ index 147f6b25419e16c2fbd17af1958ed60fb6bf683e..9e9f11ab1dec051c90b0c154c5a8bac8
      // navigator compatibility mode, the preferred languages and color scheme, the window geometry, and the rest of
      // what the UI decides for the tab. A page that displays the tab gets its viewport and focus on top of that.
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 78d7f5f65a6d86ecf803053746e66e6b84271af0..e9ddb007a736d67c6ab90cacf44ce82796739f07 100644
+index cfedadad85d775cdbf83125660132940fb1bebc1..f6b7f66fd2a6da4aa57f52825c3e0a1a01b646b8 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -165,7 +165,12 @@ WebContentPage::WebContentPage(WebContentClient& client, Web::PageId id, Canonic
+@@ -166,7 +166,12 @@ WebContentPage::WebContentPage(WebContentClient& client, Web::PageId id, Canonic
  {
  }
  
@@ -176,7 +176,7 @@ index 78d7f5f65a6d86ecf803053746e66e6b84271af0..e9ddb007a736d67c6ab90cacf44ce827
  
  WebContentServerProxy* WebContentPage::routed_proxy() const
  {
-@@ -1646,6 +1651,28 @@ Vector<Web::HTML::UserScript> WebContentPage::did_request_user_scripts(Web::HTML
+@@ -1702,6 +1707,28 @@ Vector<Web::HTML::UserScript> WebContentPage::did_request_user_scripts(Web::HTML
      return scripts;
  }
  
@@ -206,10 +206,10 @@ index 78d7f5f65a6d86ecf803053746e66e6b84271af0..e9ddb007a736d67c6ab90cacf44ce827
  {
      // NB: As for an embedder page's bridge, the sender comes from the UI process's records, never from the message.
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index e312626beea98c1c56f072f9af2146351a4a06f1..2e31e1d48d2245a5026224b0504102a6628ceb94 100644
+index a34bf6f69d62f2fc6ff2021481cf8c703f50b672..a26f3a4060f51dc5b3090a09548772c2b6510aee 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -26,6 +26,7 @@
+@@ -27,6 +27,7 @@
  #include <LibWebView/Export.h>
  #include <LibWebView/Forward.h>
  #include <LibWebView/URLSchemeHandler.h>
@@ -217,7 +217,7 @@ index e312626beea98c1c56f072f9af2146351a4a06f1..2e31e1d48d2245a5026224b0504102a6
  #include <LibWebView/WebAuthn/Coordinator.h>
  #include <WebContent/WebContentClientEndpoint.h>
  #include <WebContent/WebContentServerEndpoint.h>
-@@ -168,6 +169,10 @@ public:
+@@ -180,6 +181,10 @@ public:
      Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
      // An isolated world of the UI process's in a document of this page, which the UI process gave a bridge.
      Optional<ScriptBridgeEndpoint> user_script_endpoint(Web::HTML::CrossProcessId document_id, String const& world);
@@ -228,7 +228,7 @@ index e312626beea98c1c56f072f9af2146351a4a06f1..2e31e1d48d2245a5026224b0504102a6
  
  private:
      // The caller of a WebAuthn ceremony, from this process's records of the documents a page hosts, or the error to
-@@ -179,7 +184,6 @@ private:
+@@ -191,7 +196,6 @@ private:
      bool continue_navigation_population_in_selected_process(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id);
      void for_each_hosted_document(Function<IterationDecision(CanonicalDocument&)> const&) const;
      void for_each_hosted_document(Function<IterationDecision(CanonicalDocument&, CanonicalNavigable const&)> const&) const;
@@ -236,28 +236,28 @@ index e312626beea98c1c56f072f9af2146351a4a06f1..2e31e1d48d2245a5026224b0504102a6
      bool populates_a_navigation_to_local_file(ByteString const& path) const;
      Optional<CanonicalDocument&> document_with_hosted_environment(Web::HTML::EnvironmentId const& environment_id) const;
      StorageJar* storage_jar(Web::StorageAPI::StorageEndpointType) const;
-@@ -276,6 +280,7 @@ private:
+@@ -289,6 +293,7 @@ private:
      virtual void did_request_embedder_resource(URL::URL url, i32 request_id) override;
      virtual void did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message) override;
      virtual void did_post_user_script_message(Web::HTML::CrossProcessId document_id, String world, String message) override;
 +    virtual void did_run_user_script(u64 request_id, bool ran, Optional<String> result) override;
      virtual void did_request_color_picker(Color current_color) override;
-     virtual void did_request_geolocation_position(u64 request_id) override;
+     virtual void did_request_geolocation_position(u64 request_id, Web::HTML::CrossProcessId document_id) override;
      virtual void did_cancel_geolocation_position_request(u64 request_id) override;
-@@ -409,6 +414,8 @@ private:
+@@ -425,6 +430,8 @@ private:
      RefPtr<WebUI> m_web_ui;
      // The isolated worlds of each document that the UI process gave a bridge, which alone may post it messages.
      HashMap<Web::HTML::CrossProcessId, HashTable<String>> m_bridged_user_script_worlds;
 +    HashMap<u64, Function<void(UserScriptResult)>> m_user_script_runs;
 +    u64 m_next_user_script_run_id { 1 };
+     Audio::Audibility m_audibility { Audio::Audibility::Inaudible };
      Optional<PresentedBackingStores> m_presented_backing_stores;
      bool m_needs_beforeunload_check { true };
-     bool m_detached_close_pending { false };
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 92c3220fb14bcd34f07d41a9dfef61b9dc41e316..089077e9942e24f87a47435ade0321c0a172d139 100644
+index 23c1006aafad9419235430fe82990727a14389cc..c99295e431dd97fc83e341dc230e7739ad0781fe 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3371,6 +3371,14 @@ void ConnectionFromClient::post_user_script_message(Web::PageId page_id, Web::HT
+@@ -3403,6 +3403,14 @@ void ConnectionFromClient::post_user_script_message(Web::PageId page_id, Web::HT
          page->deliver_user_script_message(document_id, world, move(message));
  }
  
@@ -273,10 +273,10 @@ index 92c3220fb14bcd34f07d41a9dfef61b9dc41e316..089077e9942e24f87a47435ade0321c0
  {
      if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 8f2fbb6f095e48036fae829cb44391869ad95b12..ff36d5982f563aa741c04db526fce162ef0fd142 100644
+index f841ce7bf396f66bc546c861d60f22b1d1a970b8..118583e46f33755926f0d833a369a05d6ccedc72 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -278,6 +278,7 @@ private:
+@@ -282,6 +282,7 @@ private:
      virtual void handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) override;
      virtual void post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) override;
      virtual void post_user_script_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String world, String message) override;
@@ -285,7 +285,7 @@ index 8f2fbb6f095e48036fae829cb44391869ad95b12..ff36d5982f563aa741c04db526fce162
      virtual void did_delete_all_cookies(Web::PageId page_id, u64 request_id) override;
      virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index 58e1bf5b8ce27a67d4df2373dfc65fc02d3ba767..30ac13bbcab746a50441750b119c672d51283855 100644
+index 7098bff45b445b6f51f72acf2d0be26ff51d5e9d..a006a1e2eb73ab4f52ac68d9ee273d811b7eb67a 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
 @@ -65,6 +65,7 @@ public:
@@ -580,19 +580,19 @@ index 8c72a24be7063922adc0de4bef494a22e4605118..b943d34d7ef9bcd34c101ffefa9ab445
  
  }
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index e09e1d7b336f1a4674790e44f99fd6df75d13107..808fa0cd8becff43664c26bda7c36fbe2262145b 100644
+index 160d071a3aef058731e8b1bbd59bb3ea71155276..e14b59cbaa66dd576723a53ba2fe8333cb217363 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
-@@ -237,6 +237,7 @@ endpoint WebContentClient routed by Web::PageId page_id
+@@ -241,6 +241,7 @@ endpoint WebContentClient routed by Web::PageId page_id
      did_post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) =|
      [NotRouted] did_request_user_scripts(Web::PageId page_id, Web::HTML::CrossProcessId document_id) => (Vector<Web::HTML::UserScript> scripts)
      did_post_user_script_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String world, String message) =|
 +    did_run_user_script(Web::PageId page_id, u64 request_id, bool ran, Optional<String> result) =|
      did_request_color_picker(Web::PageId page_id, Color current_color) =|
-     did_request_geolocation_position(Web::PageId page_id, u64 request_id) =|
+     did_request_geolocation_position(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId document_id) =|
      did_cancel_geolocation_position_request(Web::PageId page_id, u64 request_id) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 0c89e88e8238422f7218e547048de3a96db22e5b..506a8eb4774485593d30fbbfa1a6cd0357233e50 100644
+index f3be7d846f105aaab1c3e9f7642e93fb5a6c7195..48850be52fa3c51e8ed132397ea6dcd4fcbe6831 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -35,6 +35,7 @@
@@ -603,7 +603,7 @@ index 0c89e88e8238422f7218e547048de3a96db22e5b..506a8eb4774485593d30fbbfa1a6cd03
  #include <LibWebCommon/HTML/SelectedFile.h>
  #include <LibWebCommon/HTML/SessionHistoryEntryDescriptor.h>
  #include <LibWebCommon/HTML/UserActivationConsumption.h>
-@@ -285,6 +286,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -290,6 +291,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) =|
      post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) =|
      post_user_script_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String world, String message) =|

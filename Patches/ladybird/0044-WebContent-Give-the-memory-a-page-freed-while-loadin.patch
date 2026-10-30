@@ -19,10 +19,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 21 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 81f158c098973edb58f37f43496a443897d301bb..0ee2771b9bc78aa654e7ce385b0daa1627efa9f9 100644
+index 77fc268927f2204898fc0bf14e7140abd10f6604..d25e5c7e44dccbe8e40dbe005d1d3f823712fd0d 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3442,6 +3442,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+@@ -3474,6 +3474,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
          Web::FileAPI::remove_entry_from_blob_url_store(*url_record);
  }
  
@@ -44,7 +44,7 @@ index 81f158c098973edb58f37f43496a443897d301bb..0ee2771b9bc78aa654e7ce385b0daa16
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 9196d2f63d87c1861f03d519756949452e797d74..b7b7d4df17c318b8e59b39628f5ab3768cea631f 100644
+index af595422a12ff4990d7490329a66285a0f1c61a5..b194c691bb011f5a7d63a2beb6447b06fb5840e8 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -16,6 +16,7 @@
@@ -66,7 +66,7 @@ index 9196d2f63d87c1861f03d519756949452e797d74..b7b7d4df17c318b8e59b39628f5ab376
      // Whether the UI process has user scripts for documents, which they ask it for as they become ready for scripts.
      bool user_scripts_enabled() const { return m_user_scripts_enabled; }
  
-@@ -378,6 +383,7 @@ private:
+@@ -380,6 +385,7 @@ private:
  
      RefPtr<TestConnection> m_test_connection;
      RefPtr<Web::Compositor::CompositorConnection> m_compositor_connection;
@@ -75,10 +75,10 @@ index 9196d2f63d87c1861f03d519756949452e797d74..b7b7d4df17c318b8e59b39628f5ab376
      OwnPtr<DevToolsDebugger> m_devtools_debugger;
  
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index cd7fd31a31e28b6ca74bfb0245c6d33b22d3ca4a..39cb9584ef4d9cad4a9c51b925559766c9c6f262 100644
+index 69df8327844e1d27adb9af267108ca37a5cc9dbd..3a1d25aef62958fc15e9ed123b7dbd9fccd8531e 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -1031,6 +1031,7 @@ void PageClient::page_did_change_active_document_in_top_level_browsing_context(W
+@@ -1050,6 +1050,7 @@ void PageClient::page_did_change_active_document_in_top_level_browsing_context(W
  void PageClient::page_did_finish_loading(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id)
  {
      client().async_did_finish_loading(m_id, navigable_id, document_id);

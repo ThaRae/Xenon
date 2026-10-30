@@ -15,11 +15,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/WorkerProcessManager.h b/Libraries/LibWebView/WorkerProcessManager.h
-index 85c59082b3b709c45c24ce85fabba0fd90119c50..71dfdfcc620e1b8c961ecca636db51da8bd96f3f 100644
+index 9d3fff309425bf639e9c6d1668cc12b1a5a6d495..a50e6e04231a5ca7b6d872487d1ad16ee6d1f549 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.h
 +++ b/Libraries/LibWebView/WorkerProcessManager.h
-@@ -26,11 +26,12 @@
- #include <LibWebCommon/Page/PageId.h>
+@@ -27,11 +27,12 @@
+ #include <LibWebCommon/Permissions/Permissions.h>
  #include <LibWebView/BlobURLStore.h>
  #include <LibWebView/BrowsingSession.h>
 +#include <LibWebView/Export.h>

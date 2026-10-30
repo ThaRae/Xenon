@@ -88,8 +88,8 @@ drive the controls for those settings further down the page, so they follow ever
   - **Updates**: the version, whether a new one is ready, automatic updates, and **Check now** or **Relaunch to
     update**.
 - Browsing: startup and the new tab page (and whether it lists recently closed tabs), languages, privacy and browsing
-  data, background connections, site permissions, DNS, where the profile keeps its files (each with **Show**), and
-  Ladybird's configuration keys.
+  data, background connections, site permissions (autoplay, and the sites allowed or blocked from your location and
+  microphone), DNS, where the profile keeps its files (each with **Show**), and Ladybird's configuration keys.
 - A sidebar of sections that follows the scroll, and **Find a setting** across the top, which hides everything that
   doesn't match, Easy setup included.
 

@@ -89,10 +89,10 @@ index 94d8734923cece5a43cd5c3ba4a6710bc572fd56..86670d95d33ac114566daa0a7d58328f
          Ok(image_data)
      }
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index 4b6e6f8b333aaa6c3066315ec48bfb32664a321b..b09a5542851ba0b1a8f68ca596a90f34ea2a897d 100644
+index 2ed81a7b7e55babee24f8364b95678fac00a6fdd..be8578d40623792d197eb03e2ec10df185ccb9e6 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-@@ -22,6 +22,7 @@
+@@ -23,6 +23,7 @@
  #include <LibWeb/Platform/EventLoopPlugin.h>
  #include <LibWeb/WebIDL/AbstractOperations.h>
  #include <LibWeb/WebIDL/CallbackType.h>
@@ -100,7 +100,7 @@ index 4b6e6f8b333aaa6c3066315ec48bfb32664a321b..b09a5542851ba0b1a8f68ca596a90f34
  #include <LibWeb/WebIDL/DOMException.h>
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
-@@ -98,6 +99,7 @@ void* web_bindings_create_callback_function(JSObject* callable, bool returns_pro
+@@ -103,6 +104,7 @@ void* web_bindings_create_callback_function(JSObject* callable, bool returns_pro
  JSCompletion web_bindings_invoke_callback_function(void* callback, bool has_this_value, JSValue this_value, ReadonlySpan<JSValue> arguments);
  void* web_bindings_invoke_promise_callback_function(void* callback, bool has_this_value, JSValue this_value, ReadonlySpan<JSValue> arguments);
  bool web_bindings_realm_is_window(void* realm);
@@ -108,7 +108,7 @@ index 4b6e6f8b333aaa6c3066315ec48bfb32664a321b..b09a5542851ba0b1a8f68ca596a90f34
  void web_bindings_with_temporary_execution_context(void* realm, bool callbacks_enabled, void* context, void (*steps)(void*));
  bool web_bindings_object_implements_interface(JSObject* object, u16 interface_name);
  JSObject* web_bindings_create_dom_exception(void* realm, ReadonlyBytes name, FlatPtr message);
-@@ -146,6 +148,14 @@ bool web_bindings_realm_is_window(void* realm)
+@@ -151,6 +153,14 @@ bool web_bindings_realm_is_window(void* realm)
      return HTML::window_from_global_object(static_cast<JS::Realm*>(realm)->global_object());
  }
  
@@ -124,13 +124,13 @@ index 4b6e6f8b333aaa6c3066315ec48bfb32664a321b..b09a5542851ba0b1a8f68ca596a90f34
  {
      HTML::TemporaryExecutionContext execution_context { *static_cast<JS::Realm*>(realm), callbacks_enabled ? HTML::TemporaryExecutionContext::CallbacksEnabled::Yes : HTML::TemporaryExecutionContext::CallbacksEnabled::No };
 diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
-index 8cd9d3a8094dde4b3ca8355074a2515e04a5372a..13fd7efad4d84c2b5eae2a85581afbd942c8a8f2 100644
+index 5b749dd1271494f1bef5b4e17578b086107ee768..2116de7a0ee29e6d5ec8fa4349583ade3d0c756a 100644
 --- a/Libraries/LibWeb/CMakeLists.txt
 +++ b/Libraries/LibWeb/CMakeLists.txt
-@@ -394,6 +394,7 @@ set(SOURCES
+@@ -395,6 +395,7 @@ set(SOURCES
+     FileAPI/BlobURLStore.cpp
+     FileAPI/File.cpp
      FileAPI/FileList.cpp
-     FileAPI/FileReader.cpp
-     FileAPI/FileReaderSync.cpp
 +    Fingerprinting/Farbling.cpp
      Gamepad/EventNames.cpp
      Gamepad/Gamepad.cpp

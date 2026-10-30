@@ -52,7 +52,7 @@ The following commits put these to use.
  create mode 100644 Libraries/LibWeb/ContentBlocker/Rust/src/procedural.js
 
 diff --git a/Cargo.lock b/Cargo.lock
-index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b3ed1d424 100644
+index 2024b9457b55361ca8a45f9fb030a1a142158487..1cffb5a8dd27cb908002a1f98dd3d76a0f650665 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -12,6 +12,7 @@ dependencies = [
@@ -144,7 +144,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "either"
  version = "1.16.0"
-@@ -1010,6 +1071,12 @@ version = "1.0.0"
+@@ -1011,6 +1072,12 @@ version = "1.0.0"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
  
@@ -157,7 +157,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "num-bigint"
  version = "0.5.1"
-@@ -1067,6 +1134,58 @@ version = "2.3.2"
+@@ -1068,6 +1135,58 @@ version = "2.3.2"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
  
@@ -216,7 +216,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "potential_utf"
  version = "0.1.5"
-@@ -1133,6 +1252,21 @@ version = "6.0.0"
+@@ -1134,6 +1253,21 @@ version = "6.0.0"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
  
@@ -238,7 +238,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "regex"
  version = "1.12.3"
-@@ -1223,6 +1357,25 @@ version = "4.1.0"
+@@ -1224,6 +1358,25 @@ version = "4.1.0"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
  
@@ -264,7 +264,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "semver"
  version = "1.0.28"
-@@ -1282,6 +1435,15 @@ dependencies = [
+@@ -1283,6 +1436,15 @@ dependencies = [
   "serde_core",
  ]
  
@@ -280,7 +280,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "shlex"
  version = "2.0.1"
-@@ -1294,6 +1456,12 @@ version = "0.1.5"
+@@ -1295,6 +1457,12 @@ version = "0.1.5"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
  
@@ -939,7 +939,7 @@ index 0000000000000000000000000000000000000000..c5c7af90b0effdd29d2ca7a3b146a8f7
 +    schedule();
 +})
 diff --git a/Libraries/LibWeb/HTML/Window.h b/Libraries/LibWeb/HTML/Window.h
-index 601c78b2d6082ab46fe04bee3657699688e17c20..4e67bd0d510c475c037de87c8c636bcd0c950603 100644
+index 6ce69f476d3d5350916145ceda7e9f028ff0afac..896f644f20ed6095e85017eda4d74dda9c7eaa40 100644
 --- a/Libraries/LibWeb/HTML/Window.h
 +++ b/Libraries/LibWeb/HTML/Window.h
 @@ -175,6 +175,11 @@ public:
@@ -954,7 +954,7 @@ index 601c78b2d6082ab46fe04bee3657699688e17c20..4e67bd0d510c475c037de87c8c636bcd
      ReadonlySpan<GC::Ref<Plugin>> pdf_viewer_plugin_objects();
      ReadonlySpan<GC::Ref<MimeType>> pdf_viewer_mime_type_objects();
  
-@@ -416,6 +421,8 @@ private:
+@@ -418,6 +423,8 @@ private:
      // https://w3c.github.io/largest-contentful-paint/#has-dispatched-scroll-event
      // Each Window has has dispatched scroll event, a boolean which is initially set to false.
      bool m_has_dispatched_scroll_event { false };
@@ -1150,10 +1150,10 @@ index be3aa176401dc3cf61c7200da417fc6e0b89b5cc..4ea71815c02582f91e20cb52b19bcb2b
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&) const;
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&, ReadonlySpan<Utf16FlyString> classes, ReadonlySpan<Utf16FlyString> ids) const;
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09511a9d8c 100644
+index aaa42160e6d85b246926d1ce7cab9d3a7e640bc1..95c75dd93259e7372f790c35e1945560486ccd9f 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -355,6 +355,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -370,6 +370,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
      bool disable_sandbox = false;
      bool force_video_decoder_server = false;
      Vector<ByteString> content_blocker_list_paths;
@@ -1162,7 +1162,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
      Optional<StringView> resource_substitution_map_path;
      bool enable_autoplay = false;
      bool expose_experimental_interfaces = false;
-@@ -476,6 +478,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -491,6 +493,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
              return true;
          },
      });
@@ -1183,7 +1183,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
      args_parser.add_option(enable_autoplay, "Enable multimedia autoplay", "enable-autoplay");
      args_parser.add_option(expose_experimental_interfaces, "Expose experimental IDL interfaces", "expose-experimental-interfaces");
      args_parser.add_option(expose_internals_object, "Expose internals object", "expose-internals-object");
-@@ -547,6 +563,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -562,6 +578,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          return Error::from_string_literal("--profile-output requires --profile-tool cpu");
  
      m_explicit_content_blocker_list_paths = move(content_blocker_list_paths);
@@ -1193,7 +1193,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
  
      // Disable site isolation when debugging WebContent. Otherwise, the process swap may interfere with the gdb session.
      if (debug_process_types.contains_slow(ProcessType::WebContent))
-@@ -816,12 +835,67 @@ void Application::rebuild_content_blocker_list_paths()
+@@ -831,12 +850,67 @@ void Application::rebuild_content_blocker_list_paths()
      }
  }
  
@@ -1262,7 +1262,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
          m_content_blocker_list_buffer = TRY(Core::AnonymousBuffer::create_with_size(0));
          return true;
      }
-@@ -855,7 +929,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
+@@ -870,7 +944,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
      VERIFY(offset == bytes.size());
  
      if (m_content_blocker_list_buffer.has_value() && m_content_blocker_list_buffer->bytes() == blocker_list_buffer.bytes())
@@ -1271,7 +1271,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
  
      m_content_blocker_list_buffer = move(blocker_list_buffer);
      return true;
-@@ -1181,8 +1255,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1198,8 +1272,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
      if (auto* webdriver_bidi = WebDriverBiDi::the(); webdriver_bidi && webdriver_bidi->session_state().is_active)
          webdriver_bidi->push_session_state_for_client(*client);
  
@@ -1281,7 +1281,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
  
      m_web_content_clients.set(client);
      return client;
-@@ -3075,7 +3148,7 @@ void Application::apply_content_blocker_settings()
+@@ -3199,7 +3272,7 @@ void Application::apply_content_blocker_settings()
              return IterationDecision::Continue;
          });
          if (rules_changed)
@@ -1291,10 +1291,10 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
      });
      ViewImplementation::for_each_view([](ViewImplementation& view) {
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 038d04c2d009256f68246be0ee2f506f21cbc8ed..63660fd16d3c4501809ce641e6dd2b75fd2dfa82 100644
+index 5b695af6a780427e61fb3b32241a5cb0c816cee3..3e3e7ec0d3632f3fbaa473c9c526f112383571a9 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -469,6 +469,8 @@ private:
+@@ -486,6 +486,8 @@ private:
      ErrorOr<void> launch_devtools_server();
      // Returns whether the combined rules changed.
      ErrorOr<bool> load_content_blocker_lists();
@@ -1303,7 +1303,7 @@ index 038d04c2d009256f68246be0ee2f506f21cbc8ed..63660fd16d3c4501809ce641e6dd2b75
      void apply_content_blocker_settings();
      void rebuild_content_blocker_list_paths();
      ByteString content_blocker_list_path(StringView identifier) const;
-@@ -612,6 +614,8 @@ private:
+@@ -637,6 +639,8 @@ private:
      JsonValue m_site_compatibility_data;
      Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> m_origin_access_allow_list;
      Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
@@ -1312,7 +1312,7 @@ index 038d04c2d009256f68246be0ee2f506f21cbc8ed..63660fd16d3c4501809ce641e6dd2b75
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
          String identifier;
-@@ -622,6 +626,8 @@ private:
+@@ -647,6 +651,8 @@ private:
          u8 redirect_count { 0 };
      };
      Vector<ByteString> m_explicit_content_blocker_list_paths;
@@ -1322,10 +1322,10 @@ index 038d04c2d009256f68246be0ee2f506f21cbc8ed..63660fd16d3c4501809ce641e6dd2b75
      Vector<PendingContentBlockerListUpdate> m_pending_content_blocker_list_updates;
      Optional<PendingContentBlockerListUpdate> m_active_content_blocker_list_update;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index e85da3260db1b1084b7db2fdccef279e3b0ff33c..46986a2423c084c38b89014b66877d45dafaace6 100644
+index ffd87681afc3e85e788d9c8c5651c9296ad79504..1fd44615f3ffc93fa95d54a49dc164b79c19591a 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3155,11 +3155,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
+@@ -3187,11 +3187,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
          page->page().set_content_blocking_policy(enabled, disabled_sites);
  }
  
@@ -1340,10 +1340,10 @@ index e85da3260db1b1084b7db2fdccef279e3b0ff33c..46986a2423c084c38b89014b66877d45
          dbgln("Failed to set content blockers: {}", result.error());
          return;
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 18d3d5ddce0d51962e2a09f094f28dd11094ab97..440589b383922651be36d6730376f4dfb958e1a7 100644
+index ea8af49f78567b77510a11af29a9ff97519a5fb8..befd1bfd84d15acd7927098f8c35168cbaa3bd68 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -244,7 +244,7 @@ private:
+@@ -248,7 +248,7 @@ private:
      virtual void remove_dom_node(Web::PageId page_id, Web::UniqueNodeID node_id) override;
  
      virtual void set_content_blocking_policy(Web::PageId page_id, bool enabled, Vector<String> disabled_sites) override;
@@ -1353,10 +1353,10 @@ index 18d3d5ddce0d51962e2a09f094f28dd11094ab97..440589b383922651be36d6730376f4df
      virtual void set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, Vector<Utf16String> allowlist) override;
      virtual void set_preferred_color_scheme(Web::PageId page_id, Web::CSS::PreferredColorScheme) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index e45c2d2daa1e322d6f1bd2fef952643a78e925d2..30a839f47ba98d4043392aab92b3d7dabef72d3e 100644
+index 2ff6fd47303a0d470636a60174dc71f7f31c2ed9..9f442d07cf1658d523fa354d3ee1107eb304fefa 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -250,7 +250,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -255,7 +255,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      find_in_page_end(Web::PageId page_id) =|
  
      set_content_blocking_policy(Web::PageId page_id, bool enabled, Vector<String> disabled_sites) =|
@@ -1366,10 +1366,10 @@ index e45c2d2daa1e322d6f1bd2fef952643a78e925d2..30a839f47ba98d4043392aab92b3d7da
      set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, Vector<Utf16String> allowlist) =|
      set_preferred_color_scheme(Web::PageId page_id, Web::CSS::PreferredColorScheme color_scheme) =|
 diff --git a/Tests/LibWeb/test-web/TestWebView.cpp b/Tests/LibWeb/test-web/TestWebView.cpp
-index a9a8bc8f5c4cc92641f04c96a8657270a794ab07..7b5288f2aafbf39366e19a1e274ebf7fc887b9ea 100644
+index a406f0afc9469d14f5b75e543687f8c2afe2c89c..ae023228e5b543c73a2f24766310194950742b8b 100644
 --- a/Tests/LibWeb/test-web/TestWebView.cpp
 +++ b/Tests/LibWeb/test-web/TestWebView.cpp
-@@ -30,7 +30,8 @@ TestWebView::TestWebView(Core::AnonymousBuffer theme, Web::DevicePixelSize viewp
+@@ -31,7 +31,8 @@ TestWebView::TestWebView(Core::AnonymousBuffer theme, Web::DevicePixelSize viewp
  
  void TestWebView::clear_content_blockers()
  {

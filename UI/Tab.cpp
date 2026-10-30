@@ -1203,10 +1203,11 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         }
         if (m_external_url_confirmation_dialog)
             m_external_url_confirmation_dialog->close();
-        auto pending_permission_requests = AK::move(m_pending_permission_requests);
-        for (auto& it : pending_permission_requests) {
-            if (it.value.dialog)
-                it.value.dialog->close();
+        auto permission_dialogs = AK::move(m_permission_dialogs);
+        for (auto& it : permission_dialogs) {
+            if (it.dialog)
+                it.dialog->close();
+            it.on_outcome(Web::Permissions::PromptOutcome::Ignored);
         }
     };
 
@@ -1249,13 +1250,11 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     WebAuthnPopover::attach(view());
 
-    view().on_request_permission = [this](auto const& name, auto const& origin, auto on_decided) {
-        auto requester = origin.is_opaque() ? "this page"_string : origin.serialize();
-        auto question = MUST(String::formatted("Allow {} to use your {}?", requester, name));
-        if (auto pending = m_pending_permission_requests.get(question); pending.has_value()) {
-            pending.value().on_decided.append(AK::move(on_decided));
-            return;
-        }
+    view().on_request_permission = [this](WebView::PermissionPromptRequest const& request, WebView::PermissionPromptCallback on_outcome) {
+        auto requester = request.top_level_origin.is_opaque() ? "this page"_string : request.top_level_origin.serialize();
+        if (request.is_file)
+            requester = "this file"_string;
+        auto question = MUST(String::formatted("Allow {} to use your {}?", requester, Web::Permissions::to_string(request.name)));
 
         auto* dialog = new QMessageBox(&view());
         dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -1264,23 +1263,38 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         dialog->setTextFormat(Qt::PlainText);
         dialog->setText(qstring_from_ak_string(question));
         auto* allow_button = dialog->addButton("Allow", QMessageBox::ButtonRole::AcceptRole);
+        auto* allow_once_button = dialog->addButton("Allow This Time", QMessageBox::ButtonRole::AcceptRole);
         auto* block_button = dialog->addButton("Block", QMessageBox::ButtonRole::RejectRole);
         dialog->setDefaultButton(block_button);
+        m_permission_dialogs.append({ request, dialog, AK::move(on_outcome) });
 
-        PendingPermissionRequests pending { .dialog = dialog, .on_decided = {} };
-        pending.on_decided.append(AK::move(on_decided));
-        m_pending_permission_requests.set(question, AK::move(pending));
-
-        QObject::connect(dialog, &QDialog::finished, this, [this, dialog = QPointer<QMessageBox> { dialog }, allow_button, question](auto) {
-            auto pending = m_pending_permission_requests.take(question);
-            if (!pending.has_value())
+        QObject::connect(dialog, &QDialog::finished, this, [this, dialog = QPointer<QMessageBox> { dialog }, allow_button, allow_once_button, block_button](auto) {
+            auto index = m_permission_dialogs.find_first_index_if([&](auto const& it) { return it.dialog == dialog; });
+            if (!index.has_value())
                 return;
-            auto granted = dialog && dialog->clickedButton() == allow_button;
-            for (auto& on_decided : pending.value().on_decided)
-                on_decided(granted);
+            auto pending = m_permission_dialogs.take(*index);
+
+            auto* clicked_button = dialog ? dialog->clickedButton() : nullptr;
+            auto outcome = Web::Permissions::PromptOutcome::Dismissed;
+            if (clicked_button == allow_button)
+                outcome = Web::Permissions::PromptOutcome::AllowAlways;
+            else if (clicked_button == allow_once_button)
+                outcome = Web::Permissions::PromptOutcome::AllowOnce;
+            else if (clicked_button == block_button)
+                outcome = Web::Permissions::PromptOutcome::Block;
+            pending.on_outcome(outcome);
         });
 
         dialog->open();
+    };
+
+    // The view settled the request itself, as when the document that asked went away.
+    view().on_cancel_permission_prompt = [this](WebView::PermissionPromptRequest const& request) {
+        auto index = m_permission_dialogs.find_first_index_if([&](auto const& it) { return it.request.is_same_request_as(request); });
+        if (!index.has_value())
+            return;
+        if (auto dialog = m_permission_dialogs.take(*index).dialog)
+            dialog->close();
     };
 
     view().on_request_accept_dialog = [this]() {
@@ -1423,8 +1437,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         m_window->fullscreen_mode().exit(FullscreenMode::ExitInitiatedBy::WebContent);
     };
 
-    view().on_audio_play_state_changed = [this](auto play_state) {
-        emit audio_play_state_changed(tab_index(), play_state);
+    view().on_audibility_changed = [this](auto audibility) {
+        emit audibility_changed(tab_index(), audibility);
     };
 
     view().on_screen_wake_lock_state_changed = [this](auto wake_lock_state) {

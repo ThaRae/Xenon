@@ -215,6 +215,11 @@ If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon l
 changes into `UI/`. The weekly Upstream workflow applies the series to `master`, names any patch that no longer
 applies, builds, and lists those UI changes, so a bump holds no surprises.
 
+A patch that merges cleanly can still be wrong: read what upstream changed around each patch's code, not just the
+conflicts. A bump that moves Ladybird's CI image (`ladybird/Meta/Docker/ci/VERSION`) also starts the Linux caches over,
+since they're keyed by the image: the pull request's Linux build is cold, and test262, which starts from a Linux cache
+of that image, fails until the Linux job has saved one; then rerun it.
+
 ## Updating the filter lists
 
 ```bash
