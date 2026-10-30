@@ -238,8 +238,10 @@ the runtime's ELF header, rather than running anything it downloaded.
 `xenon` has makepkg clone the tag and Ladybird, and points the `ladybird` submodule at that clone. `Meta/xenon.py build`
 then applies the patch series and builds, with vcpkg fetching and building Ladybird's dependencies as it goes, and
 `Meta/release.py package` puts the AppDir together, as the release workflow's linux job does. It builds with Arch
-Linux's clang and Qt rather than the CI image's, needs the network while it builds (vcpkg, cargo, and the AppImage
-tools), and takes hours and tens of gigabytes from a cold start.
+Linux's clang and Qt rather than the CI image's, but with the Rust Ladybird pins (`rust-toolchain.toml`), which rustup
+installs: Ladybird builds its Rust with warnings as errors, and a newer Rust deprecates what it uses (Rust 1.99
+deprecated `fetch_update`). It needs the network while it builds (rustup, vcpkg, cargo, and the AppImage tools), and
+takes hours and tens of gigabytes from a cold start.
 
 Xenon doesn't update itself on Linux, and Settings says to update it the way it was installed. Installed from the AUR,
 it updates as other AUR packages do, once the packages there move to the next release: with an AUR helper such as yay,

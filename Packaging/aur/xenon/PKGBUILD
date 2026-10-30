@@ -19,9 +19,9 @@ depends=(expat fontconfig freetype2 glibc harfbuzz hicolor-icon-theme libdrm lib
 optdepends=('pulse-native-provider: audio'
             'geoclue: geolocation')
 # What Ladybird's build instructions list for Arch Linux; clang, which Xenon is built with, as Ladybird's CI builds it;
-# and Qt's Wayland platform, which the AppDir carries.
-makedepends=(autoconf-archive cargo clang cmake curl git libpulse lld nasm ninja python qt6-base qt6-positioning
-             qt6-tools qt6-wayland tar unzip xcb-util-wm zip)
+# rustup, for the Rust Ladybird pins; and Qt's Wayland platform, which the AppDir carries.
+makedepends=(autoconf-archive clang cmake curl git libpulse lld nasm ninja python qt6-base qt6-positioning qt6-tools
+             qt6-wayland rustup tar unzip xcb-util-wm zip)
 conflicts=(xenon-bin)
 # Ladybird's build sets its own flags, and its link-time optimization. The binaries keep their symbols, so that crash
 # reports name every function.
@@ -31,17 +31,26 @@ source=("xenon::git+https://github.com/ThaRae/Xenon.git#tag=v$pkgver"
 sha256sums=('SKIP'
             'SKIP')
 
+# Ladybird builds its Rust with warnings as errors, so with the Rust it pins, rather than a newer one that may deprecate
+# what it uses.
+_rust_toolchain() {
+  sed -n 's/^channel = "\(.*\)"/\1/p' "$srcdir/xenon/ladybird/rust-toolchain.toml"
+}
+
 # The ladybird submodule, at the commit Xenon pins, from the clone makepkg keeps rather than GitHub.
 prepare() {
   cd xenon
   git submodule init ladybird
   git config submodule.ladybird.url "$srcdir/ladybird"
   git -c protocol.file.allow=always submodule update --no-recommend-shallow ladybird
+  rustup toolchain install --profile minimal "$(_rust_toolchain)"
 }
 
 build() {
   cd xenon
   export CC=clang CXX=clang++
+  RUSTUP_TOOLCHAIN=$(_rust_toolchain)
+  export RUSTUP_TOOLCHAIN
   unset CARGO_TARGET_DIR
   ./Meta/xenon.py build
   ./Meta/release.py package --no-build
