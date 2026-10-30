@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>B canvas</title>
+<canvas id="c" width="320" height="180"></canvas>
+<script src="scene.js"></script>
+<script>
+function post(key, value) {
+    return fetch("/report?run=same-process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+const canvas = document.getElementById("c");
+drawScene(canvas.getContext("2d"), SCENE_WIDTH, SCENE_HEIGHT);
+measureDrawnCanvas(canvas, false).then(measure => {
+    const payload = { seed: seedInfo(), measure };
+    return post("b-direct", payload).then(() => post("complete", payload));
+}).finally(() => setTimeout(() => window.close(), 50));
+</script>

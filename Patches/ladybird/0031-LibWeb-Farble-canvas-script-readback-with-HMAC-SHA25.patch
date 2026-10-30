@@ -1,0 +1,661 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Fri, 30 Oct 2026 23:44:07 +0000
+Subject: [PATCH] LibWeb: Farble canvas script readback with HMAC-SHA256
+
+Noise only the copy handed to script (getImageData, toDataURL, toBlob,
+OffscreenCanvas convertToBlob, transferToImageBitmap, createImageBitmap
+from a canvas). Displayed and compositor bitmaps stay untouched.
+---
+ .../Bindings/Rust/src/canvas_2d/canvas.rs     |  10 ++
+ .../Rust/src/html/canvas_image_data.rs        |  56 +++++++--
+ Libraries/LibWeb/CMakeLists.txt               |   1 +
+ Libraries/LibWeb/Farbling/CanvasPerturb.cpp   |  81 +++++++++++++
+ Libraries/LibWeb/Farbling/CanvasPerturb.h     |  27 +++++
+ .../HTML/Canvas/Canvas2DContextBase.cpp       |  18 +++
+ Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp   |  95 ++++++++++++++-
+ Libraries/LibWeb/HTML/Canvas/CanvasHost.h     |  12 +-
+ Libraries/LibWeb/HTML/HTMLCanvasElement.cpp   |   1 +
+ Libraries/LibWeb/HTML/OffscreenCanvas.cpp     |   3 +-
+ .../LibWeb/HTML/WindowOrWorkerGlobalScope.cpp |   2 +-
+ Tests/LibWeb/CMakeLists.txt                   |   1 +
+ Tests/LibWeb/TestCanvasPerturb.cpp            | 109 ++++++++++++++++++
+ 13 files changed, 402 insertions(+), 14 deletions(-)
+ create mode 100644 Libraries/LibWeb/Farbling/CanvasPerturb.cpp
+ create mode 100644 Libraries/LibWeb/Farbling/CanvasPerturb.h
+ create mode 100644 Tests/LibWeb/TestCanvasPerturb.cpp
+
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/canvas_2d/canvas.rs b/Libraries/LibWeb/Bindings/Rust/src/canvas_2d/canvas.rs
+index c28eb774d178e1de806573a6598d0c4b89c5307a..156c0fe64ae38c95cebed26da6809161bd38da72 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/canvas_2d/canvas.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/canvas_2d/canvas.rs
+@@ -30,6 +30,8 @@ use crate::html::predefined_color_space::PredefinedColorSpace;
+ unsafe extern "C" {
+     fn web_canvas_2d_canvas_did_change_content(canvas_host: *mut c_void);
+     fn web_canvas_2d_canvas_did_create_backing_storage(canvas_host: *mut c_void);
++    fn web_canvas_host_perturb_rgba8888(canvas_host: *mut c_void, pixels: *mut u8, nbytes: usize);
++    fn web_canvas_host_script_farbling_enabled(canvas_host: *mut c_void) -> bool;
+     fn web_canvas_2d_canvas_create_transport(canvas_host: *mut c_void) -> *mut c_void;
+     fn web_canvas_2d_canvas_wrapper(canvas: *mut c_void, canvas_is_offscreen: bool, realm: *mut c_void) -> *mut c_void;
+     fn web_canvas_2d_canvas_relevant_realm(canvas_host: *mut c_void) -> *mut c_void;
+@@ -265,6 +267,14 @@ impl Canvas {
+         unsafe { web_canvas_2d_canvas_did_change_content(self.host.as_ptr()) };
+     }
+ 
++    pub(crate) fn script_farbling_enabled(self) -> bool {
++        unsafe { web_canvas_host_script_farbling_enabled(self.host.as_ptr()) }
++    }
++
++    pub(crate) fn perturb_rgba8888(self, pixels: &mut [u8]) {
++        unsafe { web_canvas_host_perturb_rgba8888(self.host.as_ptr(), pixels.as_mut_ptr(), pixels.len()) };
++    }
++
+     pub(crate) fn did_create_backing_storage(self) {
+         unsafe { web_canvas_2d_canvas_did_create_backing_storage(self.host.as_ptr()) };
+     }
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
+index 94d8734923cece5a43cd5c3ba4a6710bc572fd56..d88dd5be2f5e19ca89ec8e42ef6412394ec870b3 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
+@@ -306,8 +306,24 @@ impl<K: CanvasKind> RenderingContext2D<K> {
+         //       conversion might result in a loss of precision, but is according to spec.
+         //       See: https://html.spec.whatwg.org/multipage/canvas.html#premultiplied-alpha-and-the-2d-rendering-context
+         // NB: The readback converts the pixels to the color space of imageData, which step 6 does below.
++        // Farbling HMAC is over the full output bitmap so getImageData matches toDataURL of the same canvas.
++        let farble = self.canvas_handle().script_farbling_enabled();
++        let (read_rect, packed) = if farble {
++            let canvas_size = self.size();
++            (
++                IntRect {
++                    x: 0,
++                    y: 0,
++                    width: canvas_size.width,
++                    height: canvas_size.height,
++                },
++                true,
++            )
++        } else {
++            (readback_rect, false)
++        };
+         let Some(readback) = self.read_pixels(
+-            readback_rect,
++            read_rect,
+             AlphaType::Unpremultiplied,
+             image_data.predefined_color_space().into(),
+         ) else {
+@@ -321,12 +337,37 @@ impl<K: CanvasKind> RenderingContext2D<K> {
+         let Some(readback_pixels) = readback.unpremultiplied_rgba_pixels() else {
+             return Ok(image_data);
+         };
+-        if readback_pixels.width != readback_rect.width || readback_pixels.height != readback_rect.height {
++        if readback_pixels.width != read_rect.width || readback_pixels.height != read_rect.height {
+             return Ok(image_data);
+         }
++
++        let mut farbled_storage = Vec::new();
++        let (source_first_row, source_pitch) = if packed {
++            let packed_width = readback_pixels.width as usize;
++            let packed_height = readback_pixels.height as usize;
++            let packed_row = packed_width * BYTES_PER_PIXEL;
++            farbled_storage.resize(packed_row * packed_height, 0);
++            for row in 0..packed_height {
++                // SAFETY: Each row of the readback is packed_row bytes, and farbled_storage has that many per row.
++                unsafe {
++                    core::ptr::copy_nonoverlapping(
++                        readback_pixels.first_row.as_ptr().add(row * readback_pixels.pitch),
++                        farbled_storage.as_mut_ptr().add(row * packed_row),
++                        packed_row,
++                    );
++                }
++            }
++            self.canvas_handle().perturb_rgba8888(&mut farbled_storage);
++            (farbled_storage.as_ptr(), packed_row)
++        } else {
++            (readback_pixels.first_row.as_ptr().cast_const(), readback_pixels.pitch)
++        };
++
+         let image_data_pixels = image_data.pixels().expect("a new ImageData has room for its pixels");
+ 
+-        // The readback only covers the part of the source rectangle that is inside the output bitmap.
++        // The copy covers the part of the source rectangle that is inside the output bitmap.
++        let packed_origin_x = if packed { to_usize(left) } else { 0 };
++        let packed_origin_y = if packed { to_usize(top) } else { 0 };
+         let destination_x = to_usize(left - source_x);
+         let destination_y = to_usize(top - source_y);
+         let destination_pitch = width as usize * BYTES_PER_PIXEL;
+@@ -334,12 +375,13 @@ impl<K: CanvasKind> RenderingContext2D<K> {
+         let rows = to_usize(i64::from(readback_rect.height));
+         assert!(destination_x * BYTES_PER_PIXEL + row_size <= destination_pitch);
+         assert!(destination_y + rows <= height as usize);
+-        assert!(row_size <= readback_pixels.pitch);
++        assert!(row_size <= source_pitch);
+         for row in 0..rows {
+-            // SAFETY: The row is inside both the readback and the pixels of the new ImageData, as asserted above, and
+-            //         the two do not overlap.
++            // SAFETY: The row is inside both the source pixels and the pixels of the new ImageData, as asserted above,
++            //         and the two do not overlap.
+             unsafe {
+-                let source = readback_pixels.first_row.as_ptr().add(row * readback_pixels.pitch);
++                let source = source_first_row
++                    .add((packed_origin_y + row) * source_pitch + packed_origin_x * BYTES_PER_PIXEL);
+                 let destination = image_data_pixels
+                     .as_ptr()
+                     .add((destination_y + row) * destination_pitch + destination_x * BYTES_PER_PIXEL);
+diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
+index a712535db1241713004ba1fc1f68420b5a182428..c172cf0013bbee71886f51eed3ac020a64f37c1b 100644
+--- a/Libraries/LibWeb/CMakeLists.txt
++++ b/Libraries/LibWeb/CMakeLists.txt
+@@ -349,6 +349,7 @@ set(SOURCES
+     EventTiming/EventCounts.cpp
+     EventTiming/EventTiming.cpp
+     EventTiming/PerformanceEventTiming.cpp
++    Farbling/CanvasPerturb.cpp
+     Farbling/FarblingRNG.cpp
+     Fetch/Body.cpp
+     Fetch/BodyInit.cpp
+diff --git a/Libraries/LibWeb/Farbling/CanvasPerturb.cpp b/Libraries/LibWeb/Farbling/CanvasPerturb.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..0219a55a1b6f9e4bacc1a38c6ec28be3b294a3dc
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/CanvasPerturb.cpp
+@@ -0,0 +1,81 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/Memory.h>
++#include <LibCrypto/Authentication/HMAC.h>
++#include <LibCrypto/Hash/HashManager.h>
++#include <LibWeb/Farbling/CanvasPerturb.h>
++
++namespace Web::Farbling {
++
++static void write_be64(u8* out, u64 value)
++{
++    for (int i = 0; i < 8; ++i)
++        out[i] = static_cast<u8>(value >> (56 - 8 * i));
++}
++
++static u64 fnv1a64(ReadonlyBytes bytes)
++{
++    u64 hash = 14695981039346656037ULL;
++    for (auto byte : bytes) {
++        hash ^= byte;
++        hash *= 1099511628211ULL;
++    }
++    return hash;
++}
++
++static bool buffer_is_blank(ReadonlyBytes pixels)
++{
++    for (auto byte : pixels) {
++        if (byte != 0)
++            return false;
++    }
++    return true;
++}
++
++static void apply_hmac_mask(Bytes pixels, u8 const hmac[32])
++{
++    size_t const pixel_count = pixels.size() / 4;
++    if (pixel_count == 0)
++        return;
++    for (size_t i = 0; i < 16; ++i) {
++        u16 const v = hmac[2 * i] | static_cast<u16>(hmac[2 * i + 1] << 8);
++        size_t const pixel = v % pixel_count;
++        u8 const channel = static_cast<u8>((v >> 8) % 3);
++        pixels[pixel * 4 + channel] ^= 1;
++    }
++}
++
++void perturb_rgba8888(Bytes pixels, Seed const& seed, bool origin_is_opaque, RgbaFarblingCache* cache)
++{
++    if (!seed.enabled() || origin_is_opaque || pixels.size() < 4 || buffer_is_blank(pixels))
++        return;
++
++    u64 const content_fnv = fnv1a64(pixels);
++    if (cache && cache->valid && cache->seed == seed && cache->content_fnv == content_fnv) {
++        apply_hmac_mask(pixels, cache->hmac);
++        return;
++    }
++
++    u8 key[16];
++    write_be64(key, seed.high);
++    write_be64(key + 8, seed.low);
++    Crypto::Authentication::HMAC hmac(Crypto::Hash::HashKind::SHA256, { key, sizeof(key) });
++    auto digest = hmac.process(pixels);
++    VERIFY(digest.size() >= 32);
++
++    if (cache) {
++        cache->seed = seed;
++        cache->content_fnv = content_fnv;
++        memcpy(cache->hmac, digest.data(), 32);
++        cache->valid = true;
++        apply_hmac_mask(pixels, cache->hmac);
++        return;
++    }
++    apply_hmac_mask(pixels, digest.data());
++}
++
++}
+diff --git a/Libraries/LibWeb/Farbling/CanvasPerturb.h b/Libraries/LibWeb/Farbling/CanvasPerturb.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec1aab9a8dd6f9319bf3a409d247cec6863a9a6e
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/CanvasPerturb.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/Span.h>
++#include <AK/Types.h>
++#include <LibWeb/Export.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
++
++namespace Web::Farbling {
++
++struct WEB_API RgbaFarblingCache {
++    Seed seed {};
++    u64 content_fnv { 0 };
++    u8 hmac[32] {};
++    bool valid { false };
++};
++
++// HMAC-SHA256 of (seed, packed unpremultiplied RGBA8888), then XOR the low bit of one RGB channel of one pixel for
++// each 16 bits of the digest. No-op when Off, when the origin is opaque, or when every byte is zero.
++WEB_API void perturb_rgba8888(Bytes pixels, Seed const&, bool origin_is_opaque, RgbaFarblingCache* = nullptr);
++
++}
+diff --git a/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp b/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
+index 0ac0a1a66732fc0b66c80be4050044502c77c963..4bff99b4071b3fcf3454140d5788aa755ba469b9 100644
+--- a/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
++++ b/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
+@@ -48,6 +48,7 @@
+ #include <LibWeb/HTML/EventLoop/EventLoop.h>
+ #include <LibWeb/HTML/EventNames.h>
+ #include <LibWeb/HTML/HTMLCanvasElement.h>
++#include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/HTMLImageElement.h>
+ #include <LibWeb/HTML/HTMLVideoElement.h>
+ #include <LibWeb/HTML/ImageBitmap.h>
+@@ -157,6 +158,8 @@ bool web_canvas_2d_context_draw_image_bitmap(void* context, void* image_bitmap,
+ // What the Rust implementation asks of LibWeb, declared in Bindings/Rust/src/canvas_2d/canvas.rs.
+ void web_canvas_2d_canvas_did_change_content(void* canvas_host);
+ void web_canvas_2d_canvas_did_create_backing_storage(void* canvas_host);
++void web_canvas_host_perturb_rgba8888(void* canvas_host, u8* pixels, size_t nbytes);
++bool web_canvas_host_script_farbling_enabled(void* canvas_host);
+ void* web_canvas_2d_canvas_create_transport(void* canvas_host);
+ void* web_canvas_2d_canvas_wrapper(void* canvas, bool canvas_is_offscreen, void* realm);
+ void* web_canvas_2d_canvas_relevant_realm(void* canvas_host);
+@@ -330,6 +333,21 @@ void web_canvas_2d_canvas_did_change_content(void* canvas_host)
+     host_from(canvas_host).did_change_canvas_content();
+ }
+ 
++void web_canvas_host_perturb_rgba8888(void* canvas_host, u8* pixels, size_t nbytes)
++{
++    if (!canvas_host || !pixels || nbytes == 0)
++        return;
++    host_from(canvas_host).perturb_script_rgba8888({ pixels, nbytes });
++}
++
++bool web_canvas_host_script_farbling_enabled(void* canvas_host)
++{
++    if (!canvas_host)
++        return false;
++    auto& settings = HTML::relevant_settings_object(host_from(canvas_host).canvas_relevant_global_object());
++    return settings.farbling_seed().enabled() && !settings.origin().is_opaque();
++}
++
+ void web_canvas_2d_canvas_did_create_backing_storage(void* canvas_host)
+ {
+     host_from(canvas_host).did_create_canvas_backing_storage();
+diff --git a/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp b/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
+index 1bc3caa30926c96f3efec48b21b975940caede15..0618ea3f7cb3be7c958717e39318f6c9724f4623 100644
+--- a/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
++++ b/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
+@@ -4,7 +4,9 @@
+  * SPDX-License-Identifier: BSD-2-Clause
+  */
+ 
++#include <AK/ByteBuffer.h>
+ #include <AK/Checked.h>
++#include <AK/Memory.h>
+ #include <LibCompositing/CanvasSize.h>
+ #include <LibGfx/Bitmap.h>
+ #include <LibGfx/Rect.h>
+@@ -12,6 +14,7 @@
+ #include <LibWeb/HTML/Canvas/CanvasHost.h>
+ #include <LibWeb/HTML/Canvas/PredefinedColorSpace.h>
+ #include <LibWeb/HTML/Canvas/SerializeBitmap.h>
++#include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/WebGL/WebGLRenderingContextBase.h>
+ 
+ namespace Web::HTML {
+@@ -85,12 +88,96 @@ Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_from_surface()
+ 
+ Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_for_serialization(Utf16View type)
+ {
++    Optional<Gfx::DecodedImageFrame> frame;
+     if (serialization_of_the_bitmap_supports_color_profiles(type))
+-        return get_frame_from_surface();
+-    auto bitmap = get_bitmap_from_surface();
+-    if (!bitmap)
++        frame = get_frame_from_surface();
++    else {
++        auto bitmap = get_bitmap_from_surface();
++        if (!bitmap)
++            return {};
++        frame = Gfx::DecodedImageFrame { *bitmap };
++    }
++    if (!frame.has_value())
+         return {};
+-    return Gfx::DecodedImageFrame { *bitmap };
++    return farbled_script_frame(*frame);
++}
++
++void CanvasHost::perturb_script_rgba8888(Bytes pixels)
++{
++    auto& settings = relevant_settings_object(canvas_relevant_global_object());
++    Farbling::perturb_rgba8888(pixels, settings.farbling_seed(), settings.origin().is_opaque(), &m_script_farbling_cache);
++}
++
++void CanvasHost::apply_script_farbling(Gfx::Bitmap& bitmap)
++{
++    auto& settings = relevant_settings_object(canvas_relevant_global_object());
++    auto seed = settings.farbling_seed();
++    bool const opaque_origin = settings.origin().is_opaque();
++    if (!seed.enabled() || opaque_origin)
++        return;
++
++    int const width = bitmap.width();
++    int const height = bitmap.height();
++    if (width <= 0 || height <= 0)
++        return;
++    size_t const row_bytes = static_cast<size_t>(width) * 4;
++    size_t const nbytes = row_bytes * static_cast<size_t>(height);
++    auto rgba = MUST(ByteBuffer::create_uninitialized(nbytes));
++
++    bool packed_from_readback = false;
++    if (auto* context = canvas_2d_context()) {
++        context->ensure_backing_storage();
++        auto pixels = context->read_pixels({ {}, { width, height } }, Gfx::AlphaType::Unpremultiplied, context->color_space());
++        if (pixels && pixels->size() == bitmap.size() && pixels->format() == Gfx::BitmapFormat::RGBA8888
++            && pixels->alpha_type() == Gfx::AlphaType::Unpremultiplied) {
++            for (int y = 0; y < height; ++y)
++                memcpy(rgba.data() + static_cast<size_t>(y) * row_bytes, pixels->scanline_u8(y), row_bytes);
++            packed_from_readback = true;
++        }
++    }
++    if (!packed_from_readback) {
++        if (bitmap.alpha_type() == Gfx::AlphaType::Premultiplied)
++            bitmap.set_alpha_type_destructive(Gfx::AlphaType::Unpremultiplied);
++        for (int y = 0; y < height; ++y) {
++            for (int x = 0; x < width; ++x) {
++                auto color = bitmap.get_pixel(x, y);
++                size_t const i = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 4;
++                rgba[i] = color.red();
++                rgba[i + 1] = color.green();
++                rgba[i + 2] = color.blue();
++                rgba[i + 3] = color.alpha();
++            }
++        }
++    }
++
++    Farbling::perturb_rgba8888(rgba.bytes(), seed, opaque_origin, &m_script_farbling_cache);
++
++    if (bitmap.alpha_type() == Gfx::AlphaType::Premultiplied)
++        bitmap.set_alpha_type_destructive(Gfx::AlphaType::Unpremultiplied);
++    for (int y = 0; y < height; ++y) {
++        for (int x = 0; x < width; ++x) {
++            size_t const i = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 4;
++            bitmap.set_pixel(x, y, Gfx::Color(rgba[i], rgba[i + 1], rgba[i + 2], rgba[i + 3]));
++        }
++    }
++}
++
++Optional<Gfx::DecodedImageFrame> CanvasHost::farbled_script_frame(Gfx::DecodedImageFrame const& frame)
++{
++    auto clone_or_error = frame.bitmap().clone();
++    if (clone_or_error.is_error())
++        return frame;
++    auto bitmap = clone_or_error.release_value();
++    apply_script_farbling(*bitmap);
++    return Gfx::DecodedImageFrame { *bitmap, frame.color_space() };
++}
++
++Optional<Gfx::DecodedImageFrame> CanvasHost::farbled_script_frame_from_surface()
++{
++    auto frame = get_frame_from_surface();
++    if (!frame.has_value())
++        return {};
++    return farbled_script_frame(*frame);
+ }
+ 
+ // https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-origin-clean
+diff --git a/Libraries/LibWeb/HTML/Canvas/CanvasHost.h b/Libraries/LibWeb/HTML/Canvas/CanvasHost.h
+index 01ea474446b04f3b8c422d4d89a329a93e45f6b8..203024018a527b895680449926f140951694deeb 100644
+--- a/Libraries/LibWeb/HTML/Canvas/CanvasHost.h
++++ b/Libraries/LibWeb/HTML/Canvas/CanvasHost.h
+@@ -7,12 +7,14 @@
+ #pragma once
+ 
+ #include <AK/Optional.h>
++#include <AK/Span.h>
+ #include <AK/Utf16View.h>
+ #include <LibGfx/DecodedImageFrame.h>
+ #include <LibGfx/Forward.h>
+ #include <LibGfx/Size.h>
+ #include <LibJS/Forward.h>
+ #include <LibWeb/Bindings/Wrappable.h>
++#include <LibWeb/Farbling/CanvasPerturb.h>
+ #include <LibWeb/Forward.h>
+ #include <LibWebCommon/PixelUnits.h>
+ 
+@@ -32,7 +34,7 @@ public:
+     virtual JS::Object& canvas_relevant_global_object() const = 0;
+     virtual GC::Ptr<Bindings::Wrappable> canvas_relevant_global_impl() const = 0;
+ 
+-    virtual void did_change_canvas_content() { }
++    virtual void did_change_canvas_content() { m_script_farbling_cache.valid = false; }
+     virtual void did_create_canvas_backing_storage() { }
+ 
+     virtual CSS::FontComputer& canvas_font_computer() = 0;
+@@ -47,10 +49,18 @@ public:
+     // The bitmap of the canvas as a serialization of it as a file of the type takes it: in the color space of its
+     // context if the file can include a color profile, and converted to sRGB otherwise.
+     Optional<Gfx::DecodedImageFrame> get_frame_for_serialization(Utf16View type);
++    Optional<Gfx::DecodedImageFrame> farbled_script_frame_from_surface();
++    Optional<Gfx::DecodedImageFrame> farbled_script_frame(Gfx::DecodedImageFrame const&);
++    void perturb_script_rgba8888(Bytes);
+     virtual bool is_origin_clean() const;
+ 
+ protected:
+     static Gfx::IntSize bitmap_size_for_dimensions(u64 width, u64 height);
++
++private:
++    void apply_script_farbling(Gfx::Bitmap&);
++
++    mutable Farbling::RgbaFarblingCache m_script_farbling_cache;
+ };
+ 
+ }
+diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
+index 9a753a1056b3adb5adf1f54e7b24fb959f431484..056f91902090c2baeb66bd5c003dfdb4aee0bd2d 100644
+--- a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
++++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
+@@ -202,6 +202,7 @@ GC::Ptr<Bindings::Wrappable> HTMLCanvasElement::canvas_relevant_global_impl() co
+ 
+ void HTMLCanvasElement::did_change_canvas_content()
+ {
++    CanvasHost::did_change_canvas_content();
+     set_canvas_content_dirty();
+ 
+     // NB: Don't request a display list recording here: the new content reaches the compositor through the canvas
+diff --git a/Libraries/LibWeb/HTML/OffscreenCanvas.cpp b/Libraries/LibWeb/HTML/OffscreenCanvas.cpp
+index 28affec7dd57e9d504e0f7c3fa4131790f92d5d2..1bec2ee7e54df7974df2b89127f2e448f057aeeb 100644
+--- a/Libraries/LibWeb/HTML/OffscreenCanvas.cpp
++++ b/Libraries/LibWeb/HTML/OffscreenCanvas.cpp
+@@ -217,7 +217,7 @@ WebIDL::ExceptionOr<GC::Ref<ImageBitmap>> OffscreenCanvas::transfer_to_image_bit
+     }
+ 
+     // 3. Let image be a newly created ImageBitmap object that references the same underlying bitmap data as this OffscreenCanvas object's bitmap.
+-    auto image = ImageBitmap::create(get_frame_from_surface());
++    auto image = ImageBitmap::create(farbled_script_frame_from_surface());
+     // NB: The bitmap data that image references keeps the origin-clean flag of this OffscreenCanvas object's bitmap.
+     image->set_origin_clean(is_origin_clean());
+ 
+@@ -316,6 +316,7 @@ void OffscreenCanvas::set_placeholder_link(Compositor::PlaceholderCanvasLink lin
+ 
+ void OffscreenCanvas::did_change_canvas_content()
+ {
++    CanvasHost::did_change_canvas_content();
+     if (!m_placeholder_link.has_value() || m_placeholder_commit_is_pending)
+         return;
+ 
+diff --git a/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp b/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
+index 3f651948cc7029f3aacdb2e499b4a6005c8120af..d91a7be8b4fd84fe6586e45784de5ee09e6e33db 100644
+--- a/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
++++ b/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
+@@ -592,7 +592,7 @@ void WindowOrWorkerGlobalScopeMixin::create_image_bitmap_impl(JS::Realm& realm,
+                 // -> OffscreenCanvas
+                 [&](OneOf<GC::Ref<HTMLCanvasElement>, GC::Ref<OffscreenCanvas>> auto canvas) {
+                     // 1. Set imageBitmap's bitmap data to a copy of image's bitmap data, cropped to the source rectangle with formatting.
+-                    auto canvas_frame = canvas->get_frame_from_surface();
++                    auto canvas_frame = canvas->farbled_script_frame_from_surface();
+                     // AD-HOC: Reject promise with an "InvalidStateError" DOMException on allocation failure
+                     // Spec issue: https://github.com/whatwg/html/issues/3323
+                     if (!canvas_frame.has_value()) {
+diff --git a/Tests/LibWeb/CMakeLists.txt b/Tests/LibWeb/CMakeLists.txt
+index cd23d0b85187547a41b3136065e7e6b3d9b5eb49..4e9e6a6b90f91f752720a645626977b3d4b52f74 100644
+--- a/Tests/LibWeb/CMakeLists.txt
++++ b/Tests/LibWeb/CMakeLists.txt
+@@ -26,6 +26,7 @@ set(TEST_SOURCES
+     TestDump.cpp
+     TestEventLoop.cpp
+     TestFarblingRNG.cpp
++    TestCanvasPerturb.cpp
+     TestFaviconDecoding.cpp
+     TestFetchBodyDeliveryGate.cpp
+     TestFetchByteChannel.cpp
+diff --git a/Tests/LibWeb/TestCanvasPerturb.cpp b/Tests/LibWeb/TestCanvasPerturb.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..64864862274058e3f03ee22f769fb1590785b6da
+--- /dev/null
++++ b/Tests/LibWeb/TestCanvasPerturb.cpp
+@@ -0,0 +1,109 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/ByteBuffer.h>
++#include <LibTest/TestCase.h>
++#include <LibWeb/Farbling/CanvasPerturb.h>
++
++static ByteBuffer make_pixels()
++{
++    auto pixels = MUST(ByteBuffer::create_zeroed(16));
++    pixels[0] = 40;
++    pixels[1] = 80;
++    pixels[2] = 120;
++    pixels[3] = 255;
++    pixels[4] = 10;
++    pixels[5] = 20;
++    pixels[6] = 30;
++    pixels[7] = 255;
++    pixels[8] = 200;
++    pixels[9] = 150;
++    pixels[10] = 100;
++    pixels[11] = 255;
++    pixels[12] = 1;
++    pixels[13] = 2;
++    pixels[14] = 3;
++    pixels[15] = 4;
++    return pixels;
++}
++
++TEST_CASE(same_seed_and_pixels_are_deterministic)
++{
++    auto first = make_pixels();
++    auto second = make_pixels();
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 0x0123456789abcdefULL, .low = 0xfedcba9876543210ULL };
++    Web::Farbling::perturb_rgba8888(first.bytes(), seed, false);
++    Web::Farbling::perturb_rgba8888(second.bytes(), seed, false);
++    EXPECT_EQ(first.bytes(), second.bytes());
++}
++
++TEST_CASE(different_seeds_differ)
++{
++    auto first = make_pixels();
++    auto second = make_pixels();
++    Web::Farbling::perturb_rgba8888(first.bytes(), { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 }, false);
++    Web::Farbling::perturb_rgba8888(second.bytes(), { .level = Web::Farbling::Level::Standard, .high = 3, .low = 4 }, false);
++    EXPECT_NE(first.bytes(), second.bytes());
++}
++
++TEST_CASE(off_is_a_no_op)
++{
++    auto pixels = make_pixels();
++    auto original = MUST(ByteBuffer::copy(pixels));
++    Web::Farbling::perturb_rgba8888(pixels.bytes(), { .level = Web::Farbling::Level::Off, .high = 1, .low = 2 }, false);
++    EXPECT_EQ(pixels.bytes(), original.bytes());
++}
++
++TEST_CASE(blank_stays_blank)
++{
++    auto pixels = MUST(ByteBuffer::create_zeroed(16));
++    Web::Farbling::perturb_rgba8888(pixels.bytes(), { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 }, false);
++    for (auto byte : pixels.bytes())
++        EXPECT_EQ(byte, static_cast<u8>(0));
++}
++
++TEST_CASE(opaque_origin_is_a_no_op)
++{
++    auto pixels = make_pixels();
++    auto original = MUST(ByteBuffer::copy(pixels));
++    Web::Farbling::perturb_rgba8888(pixels.bytes(), { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 }, true);
++    EXPECT_EQ(pixels.bytes(), original.bytes());
++}
++
++TEST_CASE(noise_is_tiny)
++{
++    auto pixels = make_pixels();
++    auto original = MUST(ByteBuffer::copy(pixels));
++    Web::Farbling::perturb_rgba8888(pixels.bytes(), { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 }, false);
++    size_t differing = 0;
++    u8 max_delta = 0;
++    for (size_t i = 0; i < pixels.size(); ++i) {
++        u8 const delta = pixels[i] > original[i] ? pixels[i] - original[i] : original[i] - pixels[i];
++        if (delta != 0) {
++            ++differing;
++            if (delta > max_delta)
++                max_delta = delta;
++        }
++    }
++    EXPECT(differing > 0);
++    EXPECT(differing <= 16);
++    EXPECT_EQ(max_delta, static_cast<u8>(1));
++}
++
++TEST_CASE(cache_reuse_matches_fresh_hmac)
++{
++    auto cached_pixels = make_pixels();
++    auto cached_again = make_pixels();
++    auto fresh_pixels = make_pixels();
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 9, .low = 8 };
++    Web::Farbling::RgbaFarblingCache cache;
++    Web::Farbling::perturb_rgba8888(cached_pixels.bytes(), seed, false, &cache);
++    EXPECT(cache.valid);
++    Web::Farbling::perturb_rgba8888(cached_again.bytes(), seed, false, &cache);
++    Web::Farbling::perturb_rgba8888(fresh_pixels.bytes(), seed, false);
++    EXPECT_EQ(cached_pixels.bytes(), cached_again.bytes());
++    EXPECT_EQ(cached_pixels.bytes(), fresh_pixels.bytes());
++}

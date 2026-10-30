@@ -1,0 +1,126 @@
+{
+  "runId": "site-a",
+  "host": "site-a.test:8080",
+  "samples": [
+    {
+      "origin": "http://site-a.test:8080",
+      "seed": "standard:f513393432666008",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toDataURLSha": "9e0c63779eaf51b9",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "convertToBlobMainSha": "9e0c63779eaf51b9",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      },
+      "sameIframe": {
+        "kind": "same",
+        "origin": "http://site-a.test:8080",
+        "seed": "standard:f513393432666008",
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "pngBytesEqual": true,
+        "blankZero": true
+      },
+      "crossIframe": {
+        "kind": "cross",
+        "origin": "http://site-b.test:8080",
+        "seed": "standard:f513393432666008",
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "pngBytesEqual": true,
+        "blankZero": true
+      },
+      "worker": {
+        "sha": "9e0c63779eaf51b9",
+        "seed": "standard:f513393432666008"
+      }
+    },
+    {
+      "origin": "http://site-a.test:8080",
+      "seed": "standard:f513393432666008",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toDataURLSha": "9e0c63779eaf51b9",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "convertToBlobMainSha": "9e0c63779eaf51b9",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      },
+      "sameIframe": {
+        "kind": "same",
+        "origin": "http://site-a.test:8080",
+        "seed": "standard:f513393432666008",
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "pngBytesEqual": true,
+        "blankZero": true
+      },
+      "crossIframe": {
+        "kind": "cross",
+        "origin": "http://site-b.test:8080",
+        "seed": "standard:f513393432666008",
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "pngBytesEqual": true,
+        "blankZero": true
+      },
+      "worker": {
+        "sha": "9e0c63779eaf51b9",
+        "seed": "standard:f513393432666008"
+      }
+    },
+    {
+      "origin": "http://site-a.test:8080",
+      "seed": "standard:f513393432666008",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toDataURLSha": "9e0c63779eaf51b9",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "convertToBlobMainSha": "9e0c63779eaf51b9",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      },
+      "sameIframe": {
+        "kind": "same",
+        "origin": "http://site-a.test:8080",
+        "seed": "standard:f513393432666008",
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "pngBytesEqual": true,
+        "blankZero": true
+      },
+      "crossIframe": {
+        "kind": "cross",
+        "origin": "http://site-b.test:8080",
+        "seed": "standard:f513393432666008",
+        "getImageDataSha": "dd1edad8f0c5a863",
+        "toBlobSha": "9e0c63779eaf51b9",
+        "pngBytesEqual": true,
+        "blankZero": true
+      },
+      "worker": {
+        "sha": "9e0c63779eaf51b9",
+        "seed": "standard:f513393432666008"
+      }
+    }
+  ]
+}

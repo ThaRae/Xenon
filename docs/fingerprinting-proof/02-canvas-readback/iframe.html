@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>canvas iframe</title>
+<canvas id="c" width="320" height="180"></canvas>
+<script src="scene.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const kind = params.get("kind") || "iframe";
+const canvas = document.getElementById("c");
+drawScene(canvas.getContext("2d"), SCENE_WIDTH, SCENE_HEIGHT);
+measureDrawnCanvas(canvas, false).then(measure => {
+    parent.postMessage({
+        kind,
+        origin: location.origin,
+        seed: seedInfo(),
+        getImageDataSha: measure.getImageDataSha,
+        toBlobSha: measure.toBlobSha,
+        pngBytesEqual: measure.pngBytesEqual,
+        blankZero: measure.blankZero,
+    }, "*");
+}).catch(error => {
+    parent.postMessage({ kind, error: String(error), origin: location.origin }, "*");
+});
+</script>

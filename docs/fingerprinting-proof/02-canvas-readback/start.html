@@ -1,0 +1,39 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>A canvas start</title>
+<canvas id="c" width="320" height="180"></canvas>
+<iframe id="cross" src="http://site-b.test:8080/iframe.html?kind=cross"></iframe>
+<script src="scene.js"></script>
+<script>
+function post(key, value) {
+    return fetch("/report?run=same-process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+
+const canvas = document.getElementById("c");
+drawScene(canvas.getContext("2d"), SCENE_WIDTH, SCENE_HEIGHT);
+
+const state = { seed: seedInfo(), measure: null, crossIframe: null };
+
+function goToB() {
+    location.href = "http://site-b.test:8080/from-b.html";
+}
+
+Promise.all([
+    measureDrawnCanvas(canvas, true).then(measure => {
+        state.measure = measure;
+    }),
+    new Promise(resolve => {
+        window.addEventListener("message", event => {
+            state.crossIframe = event.data;
+            resolve();
+        });
+        setTimeout(resolve, 8000);
+    }),
+]).then(() => {
+    return post("a-direct", state);
+}).then(goToB);
+</script>

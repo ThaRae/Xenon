@@ -1,0 +1,44 @@
+{
+  "ok": true,
+  "a_sha": "8200e031e4fcbfc7",
+  "b_sha": "4d751c3876b93dcf",
+  "a_ne_b": true,
+  "iframe_sha": "8200e031e4fcbfc7",
+  "iframe_matches_a": true,
+  "reload_shas": [
+    "dd1edad8f0c5a863",
+    "dd1edad8f0c5a863",
+    "dd1edad8f0c5a863"
+  ],
+  "reloads_identical": true,
+  "png_bytes_equal": true,
+  "blank_zero": true,
+  "createImageBitmapOk": true,
+  "transferToImageBitmapOk": true,
+  "worker_sha": "9e0c63779eaf51b9",
+  "convertToBlobMainSha": "9e0c63779eaf51b9",
+  "toBlobSha": "9e0c63779eaf51b9",
+  "toDataURLSha": "9e0c63779eaf51b9",
+  "png_vs_getImageData": {
+    "differing_bytes": 0,
+    "max_delta": 0,
+    "length_a": 230400,
+    "length_b": 230400
+  },
+  "off_sha": "2e8c89ea26526f05",
+  "off_vs_standard": {
+    "differing_bytes": 16,
+    "max_delta": 1,
+    "length_a": 230400,
+    "length_b": 230400
+  },
+  "screenshot_diff": {
+    "differing_bytes": 0,
+    "max_delta": 0,
+    "length_a": 230400,
+    "length_b": 230400
+  },
+  "a_seed": "standard:31c5560ca7de504e",
+  "b_seed": "standard:b33d374547e614d3",
+  "off_seed": "off"
+}

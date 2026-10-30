@@ -1,0 +1,117 @@
+{
+  "runId": "same-process",
+  "events": [
+    {
+      "key": "a-direct",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-direct",
+      "value": {
+        "seed": "standard:b33d374547e614d3",
+        "measure": {
+          "width": 320,
+          "height": 180,
+          "getImageDataSha": "4d751c3876b93dcf",
+          "toDataURLSha": "60c5d2c2363b2c52",
+          "toBlobSha": "60c5d2c2363b2c52",
+          "convertToBlobMainSha": "60c5d2c2363b2c52",
+          "offscreenError": null,
+          "pngBytesEqual": true,
+          "blankZero": true,
+          "createImageBitmapOk": true,
+          "transferToImageBitmapOk": true,
+          "pixelCount": 230400
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "value": {
+        "seed": "standard:b33d374547e614d3",
+        "measure": {
+          "width": 320,
+          "height": 180,
+          "getImageDataSha": "4d751c3876b93dcf",
+          "toDataURLSha": "60c5d2c2363b2c52",
+          "toBlobSha": "60c5d2c2363b2c52",
+          "convertToBlobMainSha": "60c5d2c2363b2c52",
+          "offscreenError": null,
+          "pngBytesEqual": true,
+          "blankZero": true,
+          "createImageBitmapOk": true,
+          "transferToImageBitmapOk": true,
+          "pixelCount": 230400
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    }
+  ],
+  "reads": {
+    "a-direct": {
+      "seed": "standard:31c5560ca7de504e",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "8200e031e4fcbfc7",
+        "toDataURLSha": "c9e4d637ebbaf49e",
+        "toBlobSha": "c9e4d637ebbaf49e",
+        "convertToBlobMainSha": "c9e4d637ebbaf49e",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      },
+      "crossIframe": {
+        "kind": "cross",
+        "origin": "http://site-b.test:8080",
+        "seed": "standard:31c5560ca7de504e",
+        "getImageDataSha": "8200e031e4fcbfc7",
+        "toBlobSha": "c9e4d637ebbaf49e",
+        "pngBytesEqual": true,
+        "blankZero": true
+      }
+    },
+    "b-direct": {
+      "seed": "standard:b33d374547e614d3",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "4d751c3876b93dcf",
+        "toDataURLSha": "60c5d2c2363b2c52",
+        "toBlobSha": "60c5d2c2363b2c52",
+        "convertToBlobMainSha": "60c5d2c2363b2c52",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      }
+    },
+    "complete": {
+      "seed": "standard:b33d374547e614d3",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "4d751c3876b93dcf",
+        "toDataURLSha": "60c5d2c2363b2c52",
+        "toBlobSha": "60c5d2c2363b2c52",
+        "convertToBlobMainSha": "60c5d2c2363b2c52",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      }
+    }
+  },
+  "complete": true
+}

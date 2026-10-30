@@ -1,0 +1,21 @@
+[364/383] Building CXX object Services/WebWorker/CMakeFiles/WebWorker.dir/main.cpp.o
+[365/383] Building CXX object Services/WebWorker/CMakeFiles/webworkerservice.dir/ConnectionFromClient.cpp.o
+[366/383] Building CXX object Libraries/LibWeb/CMakeFiles/LibWeb.dir/Bindings/Internals.cpp.o
+[367/383] Building CXX object Services/WebContent/CMakeFiles/webcontentservice.dir/ConnectionFromClient.cpp.o
+[368/383] Building CXX object Services/WebWorker/CMakeFiles/webworkerservice.dir/WorkerHost.cpp.o
+[369/383] Building CXX object Services/WebContent/CMakeFiles/WebContent.dir/main.cpp.o
+[370/383] Building CXX object Services/WebContent/CMakeFiles/webcontentservice.dir/PageClient.cpp.o
+[371/383] Building CXX object Services/WebContent/CMakeFiles/webcontentservice.dir/WebDriverConnection.cpp.o
+[372/383] Building CXX object Libraries/LibWeb/CMakeFiles/LibWeb.dir/Bindings/Window.cpp.o
+[373/383] Linking CXX shared library lib/liblagom-web.so.0.1.0
+[374/383] Creating library symlink lib/liblagom-web.so.0 lib/liblagom-web.so
+[375/383] Linking CXX static library lib/libwebworkerservice.a
+[376/383] Linking CXX executable bin/TestCanvasPerturb
+[377/383] Linking CXX executable bin/TestFarblingRNG
+[378/383] Linking CXX static library lib/libwebcontentservice.a
+[379/383] Linking CXX executable xenon/libexec/WebWorker
+[380/383] Linking CXX executable xenon/libexec/WebContent
+[381/383] Linking CXX executable bin/test-web
+[382/383] Linking CXX executable xenon/bin/Xenon
+NINJA_EXIT:0
+NINJA_EXIT:0
