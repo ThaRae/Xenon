@@ -9,10 +9,11 @@ its own, which costs over 20 MiB even for a page or cross-site frame
 that has no images, and kept it for its whole life.
 
 Install the image codec plugin without a client, and have it ask the
-Browser for a decoder when it first decodes an image. Once the decoder
-has had no decodes in flight and no animations for 15 seconds, drop the
-client, which makes the decoder exit; the next image starts a new one.
-A decoder that crashes is likewise replaced on the next decode, so the
+Browser for a decoder when it first decodes an image, or decodes again
+a frame it discarded to save memory. Once the decoder has had no
+decodes in flight and no animations for 15 seconds, drop the client,
+which makes the decoder exit; the next image starts a new one. A
+decoder that crashes is likewise replaced on the next decode, so the
 Browser no longer needs to watch for that, nor to send each process a
 decoder.
 
@@ -22,37 +23,38 @@ and a session of a decoder that died must not name a new decoder's.
 
 TestImageDecoderIsolation and the ImageDecoder crash report test now
 decode an image before looking for a decoder, and the isolation test
-checks that a crashed decoder is replaced on the next decode.
+checks that a crashed decoder is replaced on the next decode, the
+synchronous one of a discarded frame included.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .../Platform/RemoteImageCodecPlugin.cpp       | 89 ++++++++++++++++---
- .../LibWeb/Platform/RemoteImageCodecPlugin.h  | 19 ++++
- Libraries/LibWebView/Application.cpp          | 10 +--
- Libraries/LibWebView/Application.h            |  3 -
- Libraries/LibWebView/HelperProcess.cpp        | 38 ++++----
- Libraries/LibWebView/HelperProcess.h          | 15 +---
- Libraries/LibWebView/WebContentClient.cpp     | 10 +++
- Libraries/LibWebView/WebContentClient.h       |  1 +
- Libraries/LibWebView/WebWorkerClient.cpp      | 10 +++
- Libraries/LibWebView/WebWorkerClient.h        |  1 +
- Libraries/LibWebView/WorkerProcessManager.cpp |  3 -
- Services/WebContent/ConnectionFromClient.cpp  |  7 +-
- Services/WebContent/ConnectionFromClient.h    |  4 +-
- Services/WebContent/WebContentClient.ipc      |  1 +
- Services/WebContent/WebContentServer.ipc      |  1 -
- Services/WebContent/main.cpp                  |  9 ++
- Services/WebWorker/ConnectionFromClient.cpp   |  7 +-
- Services/WebWorker/ConnectionFromClient.h     |  4 +-
- Services/WebWorker/WebWorkerClient.ipc        |  1 +
- Services/WebWorker/WebWorkerServer.ipc        |  1 -
- Services/WebWorker/main.cpp                   |  7 ++
- .../LibWebView/TestImageDecoderIsolation.cpp  | 82 +++++++++++++----
- .../LibWebView/test-webdriver-crash-report.py | 17 ++++
- 23 files changed, 255 insertions(+), 85 deletions(-)
+ .../Platform/RemoteImageCodecPlugin.cpp       |  93 +++++++++++--
+ .../LibWeb/Platform/RemoteImageCodecPlugin.h  |  19 +++
+ Libraries/LibWebView/Application.cpp          |  10 +-
+ Libraries/LibWebView/Application.h            |   3 -
+ Libraries/LibWebView/HelperProcess.cpp        |  38 ++----
+ Libraries/LibWebView/HelperProcess.h          |  15 +-
+ Libraries/LibWebView/WebContentClient.cpp     |  10 ++
+ Libraries/LibWebView/WebContentClient.h       |   1 +
+ Libraries/LibWebView/WebWorkerClient.cpp      |  10 ++
+ Libraries/LibWebView/WebWorkerClient.h        |   1 +
+ Libraries/LibWebView/WorkerProcessManager.cpp |   3 -
+ Services/WebContent/ConnectionFromClient.cpp  |   7 +-
+ Services/WebContent/ConnectionFromClient.h    |   4 +-
+ Services/WebContent/WebContentClient.ipc      |   1 +
+ Services/WebContent/WebContentServer.ipc      |   1 -
+ Services/WebContent/main.cpp                  |   9 ++
+ Services/WebWorker/ConnectionFromClient.cpp   |   7 +-
+ Services/WebWorker/ConnectionFromClient.h     |   4 +-
+ Services/WebWorker/WebWorkerClient.ipc        |   1 +
+ Services/WebWorker/WebWorkerServer.ipc        |   1 -
+ Services/WebWorker/main.cpp                   |   7 +
+ .../LibWebView/TestImageDecoderIsolation.cpp  | 128 +++++++++++++++---
+ .../LibWebView/test-webdriver-crash-report.py |  17 +++
+ 23 files changed, 304 insertions(+), 86 deletions(-)
 
 diff --git a/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp b/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp
-index adacd0fb3c33832726eafb58e59ba8425e725053..52128591e9c72461910a4c539db55035ba176290 100644
+index adacd0fb3c33832726eafb58e59ba8425e725053..d7033b66aca939aad4a859b22c22f0b29d07fdeb 100644
 --- a/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp
 +++ b/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp
 @@ -11,12 +11,24 @@
@@ -152,7 +154,19 @@ index adacd0fb3c33832726eafb58e59ba8425e725053..52128591e9c72461910a4c539db55035
              promise->reject(Error::copy(error));
          });
  
-@@ -87,14 +117,47 @@ ErrorOr<DecodedFirstFrame> RemoteImageCodecPlugin::decode_first_frame_synchronou
+@@ -79,22 +109,59 @@ NonnullRefPtr<Core::Promise<DecodedImage>> RemoteImageCodecPlugin::decode_image(
+ 
+ ErrorOr<DecodedFirstFrame> RemoteImageCodecPlugin::decode_first_frame_synchronously(ReadonlyBytes bytes)
+ {
++    // NB: The decoder that decoded the frame may have gone idle and closed since.
++    if (!m_client && m_client_needed_handler)
++        m_client_needed_handler();
+     if (!m_client)
+         return Error::from_string_literal("ImageDecoderClient is disconnected");
+     auto result = TRY(m_client->decode_first_frame_synchronously(bytes));
++    maybe_start_idle_timer();
+     return DecodedFirstFrame { move(result.bitmap), move(result.color_space) };
+ }
  
  void RemoteImageCodecPlugin::request_animation_frames(i64 session_id, u32 start_frame_index, u32 count)
  {
@@ -667,7 +681,7 @@ index 0a67011a7a3af1b1a0ac72d205265163066eb67c..b26162a2040be76a4a3dfef7995dd33f
          return client->request_media_server_transport();
      });
 diff --git a/Tests/LibWebView/TestImageDecoderIsolation.cpp b/Tests/LibWebView/TestImageDecoderIsolation.cpp
-index c774f6187321d70e5c6a62cec81922ec7cf80f8b..76aa57f50a6bd56d69c36a063d98efe3cd837359 100644
+index c774f6187321d70e5c6a62cec81922ec7cf80f8b..507eac0c5857cf842859ddacda4be0eee7295bbf 100644
 --- a/Tests/LibWebView/TestImageDecoderIsolation.cpp
 +++ b/Tests/LibWebView/TestImageDecoderIsolation.cpp
 @@ -4,6 +4,7 @@
@@ -711,7 +725,7 @@ index c774f6187321d70e5c6a62cec81922ec7cf80f8b..76aa57f50a6bd56d69c36a063d98efe3
  
  ErrorOr<int> ladybird_main(Main::Arguments arguments)
  {
-@@ -77,26 +99,56 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -77,28 +99,102 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
  
      auto first_view = WebView::HeadlessWebView::create(theme, { 800, 600 });
      auto second_view = WebView::HeadlessWebView::create(theme, { 800, 600 });
@@ -781,7 +795,54 @@ index c774f6187321d70e5c6a62cec81922ec7cf80f8b..76aa57f50a6bd56d69c36a063d98efe3
 +            VERIFY(decoders_after_crash.get(decoder.key).value_or(0) == decoder.value);
      }
  
-     outln("PASS: each renderer has an image decoder of its own, which is replaced alone when it crashes");
+-    outln("PASS: each renderer has an image decoder of its own, which is replaced alone when it crashes");
++    // A frame that was discarded to save memory is decoded again when it is used, by a new decoder if the renderer's
++    // own has gone since, as one that crashed or went idle has.
++    size_t discardable_images_loaded = 0;
++    first_view->on_test_finish = [&](auto const&) { ++discardable_images_loaded; };
++    second_view->on_test_finish = [&](auto const&) { ++discardable_images_loaded; };
++    auto load_a_discardable_image = R"(
++        (async () => {
++            const source = document.createElement("canvas");
++            // NB: Only frames of at least 32 KiB can be discarded.
++            source.width = 128;
++            source.height = 64;
++            source.getContext("2d").fillRect(0, 0, 128, 64);
++            window.discardableImage = new Image();
++            window.discardableImage.src = source.toDataURL("image/png");
++            document.body.appendChild(window.discardableImage);
++            await window.discardableImage.decode();
++            internals.signalTestIsDone("loaded");
++        })();
++    )"_string;
++    first_view->run_javascript(load_a_discardable_image);
++    second_view->run_javascript(load_a_discardable_image);
++    Core::EventLoop::current().spin_until([&] { return discardable_images_loaded == 2; });
++
++    for (auto const& decoder : image_decoders_by_renderer())
++        TRY(Core::System::kill(decoder.value, SIGKILL));
++    Core::EventLoop::current().spin_until([&] { return processes_of_type(WebView::ProcessType::ImageDecoder).is_empty(); });
++
++    // A decode that reaches the dead decoder fails, and is tried again later, until the image gives up on it.
++    auto draw_the_discarded_image = R"(
++        (async () => {
++            for (let attempt = 0; attempt < 100; ++attempt) {
++                internals.discardDecodedImageFrames();
++                const context = document.createElement("canvas").getContext("2d");
++                context.drawImage(window.discardableImage, 0, 0);
++                if (context.getImageData(0, 0, 1, 1).data[3] === 255)
++                    return;
++                await new Promise(resolve => setTimeout(resolve, 100));
++            }
++        })();
++    )"_string;
++    first_view->run_javascript(draw_the_discarded_image);
++    second_view->run_javascript(draw_the_discarded_image);
++    Core::EventLoop::current().spin_until([&] { return image_decoders_by_renderer().size() == 2; });
++
++    outln("PASS: each renderer has an image decoder of its own, which is replaced alone when it is gone");
+     return 0;
+ }
 diff --git a/Tests/LibWebView/test-webdriver-crash-report.py b/Tests/LibWebView/test-webdriver-crash-report.py
 index 0742d08f0851358d491bc0f2eb1658f85ce484df..b692f40196650335da289ad6c81acad7de42d7a2 100755
 --- a/Tests/LibWebView/test-webdriver-crash-report.py

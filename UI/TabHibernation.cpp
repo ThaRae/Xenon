@@ -399,7 +399,7 @@ bool Tab::can_hibernate() const
     // permission prompt, the check before the tab closes, or a popover such as a security key's prompt.
     if (m_javascript_dialog->is_open() || m_color_picker_dialog || m_file_picker_dialog || m_external_url_confirmation_dialog)
         return false;
-    if (!m_pending_permission_requests.is_empty() || m_before_unload_completion || m_already_requested_close || m_window_is_closing)
+    if (!m_permission_dialogs.is_empty() || m_before_unload_completion || m_already_requested_close || m_window_is_closing)
         return false;
     for (auto* child : findChildren<QWidget*>()) {
         if (child->isWindow() && child->isVisible())
