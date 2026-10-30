@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Runs Meta/release.py test against the AppImage in Build/distribution, in a container of a distribution's own image
-# that has only what a desktop system has: the libraries the AppImage leaves to the system (glibc, libstdc++, OpenGL,
-# the core of X11 and Wayland, fontconfig...), fonts, certificates, a D-Bus session, and FUSE, which the AppImage mounts
-# itself with. Nothing of the build is there, so a library the AppImage misses fails the test here rather than on
-# someone's machine.
-#
-#   Meta/ci/test-appimage.sh [image]    an Ubuntu, Debian, Fedora or Arch Linux image; ubuntu:26.04 by default
 set -euo pipefail
 
 if [[ ${1:-} != --in-container ]]; then
@@ -14,7 +7,6 @@ if [[ ${1:-} != --in-container ]]; then
   docker=(docker)
   docker info >/dev/null 2>&1 || docker=(sudo docker)
   echo "image: $image"
-  # The device and the capability let the AppImage mount itself, as it does on a desktop.
   exec "${docker[@]}" run --rm \
     --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor=unconfined \
     --volume "$root:/xenon" --workdir /xenon \
@@ -22,7 +14,6 @@ if [[ ${1:-} != --in-container ]]; then
     "$image" bash Meta/ci/test-appimage.sh --in-container
 fi
 
-# In the container, as root. The engine needs a sans-serif and a monospace font, as a desktop has: here, DejaVu's.
 if command -v apt-get >/dev/null; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -q
@@ -50,8 +41,6 @@ source Meta/ci/start-xvfb.sh
 source /etc/os-release
 echo "system: $PRETTY_NAME, $(ldd --version | head -n 1)"
 
-# Should the container not let the AppImage mount itself, it runs from a copy it extracts instead, which tests all the
-# same but how it's mounted. --appimage-mount prints where it mounted the image, and stays up while it's mounted.
 appimage=Build/distribution/Xenon-$(tr -d '[:space:]' < VERSION.txt)-x86_64.AppImage
 chmod +x "$appimage"
 mount_output=$(mktemp)

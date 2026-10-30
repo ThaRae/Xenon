@@ -1,21 +1,5 @@
 #!/usr/bin/env python3
 
-# Refreshes the filter lists Xenon ships (UI/Resources/filter-lists) from xenon-ublock, which converts uBlock Origin's
-# filter lists into lists Ladybird's content blocker applies correctly.
-#
-#   Meta/update-filter-lists.py                       rebuild the lists in ../xenon-ublock, then copy them here
-#   Meta/update-filter-lists.py --no-build            copy what ../xenon-ublock last built
-#   Meta/update-filter-lists.py --xenon-ublock PATH   use another checkout
-#   Meta/update-filter-lists.py --output DIR          write the bundle elsewhere, as xenon-filter-lists' daily build does
-#
-# Xenon ships the lists Helium's uBlock Origin fork turns on (xenon-ublock's "helium" preset), except the ones in
-# EXCLUDED. Every shipped list's file records its source, its license, and what the conversion kept.
-#
-# The lists are converted for Ladybird with the content blocker patches in Xenon's patch series (Patches/ladybird, from
-# xenon-ublock): they keep uBlock Origin's scriptlets, procedural filters, popup and CNAME filters. uBlock Origin's own
-# lists go in trusted-lists/, which may use the scriptlets uBO reserves for its lists, and uBO's scriptlets and
-# redirect surrogates in resources/.
-
 from __future__ import annotations
 
 import argparse
@@ -31,12 +15,8 @@ OUTPUT_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "filter-lists"
 PRESET = "helium"
 ENGINE = "xenon"
 
-# The bundle's layout, and the engine features its lists rely on, as Xenon reads them (BUNDLE_FORMAT in
-# UI/FilterListBundle.h). Bump both together whenever a Xenon built before the change couldn't use the new output: a new
-# kind of file, or lists that need engine patches it lacks. Xenon only downloads bundles in the format it reads.
 FORMAT = 1
 
-# Lists in the preset that Xenon doesn't ship, and why.
 EXCLUDED = {
     "plowe-0": "Peter Lowe's list states no license, so it needs its author's permission to redistribute",
     "helium-annoyances": "AGPL-3.0, and almost none of it survives conversion for Ladybird",

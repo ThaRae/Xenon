@@ -73,18 +73,13 @@ namespace Ladybird {
 
 static constexpr auto LADYBIRD_TAB_MIME_TYPE = "application/x-ladybird-tab";
 static constexpr int HORIZONTAL_TAB_STRIP_HEIGHT = 39;
-// Horizontal tabs reach the bottom of the strip, where the selected tab flows into the toolbar below it.
 static constexpr int HORIZONTAL_TAB_HEIGHT = 37;
-// Horizontal tabs shrink until only their favicon is left, then overflow the strip and get clipped.
 static constexpr int HORIZONTAL_TAB_MIN_WIDTH = 40;
-// Narrower background tabs drop their close button to keep room for the title.
 static constexpr int HORIZONTAL_TAB_CLOSE_BUTTON_MIN_WIDTH = 96;
-// The active tab keeps its close button for as long as it fits next to the favicon.
 static constexpr int HORIZONTAL_ACTIVE_TAB_CLOSE_BUTTON_MIN_WIDTH = 68;
 // Below this content width, a horizontal tab shows its favicon alone.
 static constexpr int HORIZONTAL_TAB_MIN_CONTENT_WIDTH_FOR_TITLE = 48;
 static constexpr int HORIZONTAL_TAB_MAX_WIDTH = 232;
-// A pinned tab's tile, which shows only its favicon.
 static constexpr int PINNED_TAB_TILE_WIDTH = 40;
 static constexpr int PINNED_TABS_SEPARATOR_HEIGHT = 9;
 static constexpr int VERTICAL_TAB_HEIGHT = 37;
@@ -100,34 +95,18 @@ static constexpr int VERTICAL_TABS_TOGGLE_BUTTON_SIZE = 32;
 // The collapsed sidebar's corner below the toolbar, beside the page, is as round as the page's own corners.
 static constexpr qreal VERTICAL_TABS_COLLAPSED_CORNER_RADIUS = 10.0;
 static constexpr int TAB_CARD_SHAPE_HORIZONTAL_INSET = 5;
-// A vertical tab's card sits a point higher than the middle of its row, so the cards in the sidebar sit close together
-// while they keep an even height.
 static constexpr int TAB_CARD_SHAPE_TOP_INSET = 3;
 static constexpr int TAB_CARD_SHAPE_BOTTOM_INSET = 2;
-// The selected vertical tab reaches across to the page's frame, with its sides flaring out into it above and below. The
-// bar leaves this much room above its first tab and below its last, so the flares there are not cut off.
 static constexpr int VERTICAL_TAB_FLARE_RADIUS = 6;
-// A horizontal tab's card holds its contents, and is what lights up when the tab is hovered. The selected tab is its card
-// extended down to the toolbar. The card sits above the middle of the tab, so its contents line up with the window
-// controls.
 static constexpr qreal HORIZONTAL_TAB_CARD_SHAPE_HORIZONTAL_INSET = 2.5;
 static constexpr int HORIZONTAL_TAB_CARD_SHAPE_TOP_INSET = 4;
 static constexpr int HORIZONTAL_TAB_CARD_SHAPE_BOTTOM_INSET = 5;
 static constexpr qreal HORIZONTAL_TAB_CARD_RADIUS = (HORIZONTAL_TAB_HEIGHT - HORIZONTAL_TAB_CARD_SHAPE_TOP_INSET - HORIZONTAL_TAB_CARD_SHAPE_BOTTOM_INSET) / 2.0;
-// The new tab button's circle is as tall as a tab's card, so its top is level with the top of the selected tab.
 static constexpr qreal HORIZONTAL_NEW_TAB_BUTTON_SHAPE_SIZE = 2 * HORIZONTAL_TAB_CARD_RADIUS;
-// The selected horizontal tab's sides flare out at the bottom into the toolbar. Each flare reaches into the tab beside
-// it, which has no fill of its own, and curves around the end of that tab's card at a constant distance.
-// NB: For that curve to also meet the toolbar in a tangent, the distance from the card's middle to the bottom of the tab
-//     must equal the curve's radius, which the card's insets are chosen for.
 static constexpr qreal HORIZONTAL_TAB_FLARE_RADIUS = HORIZONTAL_TAB_CARD_RADIUS + (2 * HORIZONTAL_TAB_CARD_SHAPE_HORIZONTAL_INSET);
 static_assert(HORIZONTAL_TAB_FLARE_RADIUS == HORIZONTAL_TAB_HEIGHT - HORIZONTAL_TAB_CARD_SHAPE_TOP_INSET - HORIZONTAL_TAB_CARD_RADIUS);
-// The first and last tabs are this much wider, on the outer side, to make room for their flares at the ends of the tab
-// bar.
 static constexpr int HORIZONTAL_TAB_END_ROOM = 17;
 static_assert(HORIZONTAL_TAB_END_ROOM + HORIZONTAL_TAB_CARD_SHAPE_HORIZONTAL_INSET >= HORIZONTAL_TAB_FLARE_RADIUS);
-// The new tab button sits over the last tab's room for its flare, with its circle centered where the flare's curve is, as
-// a tab's card beside the last tab would be. The curve then keeps clear of the circle.
 static constexpr int HORIZONTAL_NEW_TAB_BUTTON_OVERLAP = static_cast<int>(HORIZONTAL_TAB_END_ROOM + HORIZONTAL_TAB_CARD_SHAPE_HORIZONTAL_INSET - HORIZONTAL_TAB_FLARE_RADIUS + (HORIZONTAL_TAB_HEIGHT / 2.0));
 static constexpr qreal HORIZONTAL_TAB_SEPARATOR_WIDTH = 1.5;
 static constexpr qreal HORIZONTAL_TAB_SEPARATOR_HEIGHT = 20.0;
@@ -155,10 +134,8 @@ static constexpr auto VERTICAL_TABS_POSITION_PROPERTY = "verticalTabsPosition";
 static constexpr auto WINDOW_INACTIVE_PROPERTY = "windowInactive";
 static constexpr auto VERTICAL_TABS_RESIZE_HANDLE_HOVERED_PROPERTY = "hovered";
 static constexpr auto VERTICAL_TABS_RESIZE_HANDLE_ACTIVE_PROPERTY = "active";
-// Xenon's tab groups. A horizontal group header leaves this much room on each side of its chip.
 static constexpr int TAB_GROUP_HEADER_MARGIN = 7;
 static constexpr int TAB_GROUP_HEADER_ROW_HEIGHT = 26;
-// In the open sidebar, a group's tabs are indented, with a line in the group's color beside them.
 static constexpr int TAB_GROUP_INDENT = 6;
 static constexpr qreal TAB_GROUP_LINE_WIDTH = 2;
 static constexpr int TAB_GROUP_CHEVRON_SIZE = 16;
@@ -270,12 +247,8 @@ static QRectF horizontal_tab_card_shape_rect(QRectF const& rect, TabBarEdge edge
     return rect.adjusted(left_inset, HORIZONTAL_TAB_CARD_SHAPE_TOP_INSET, -right_inset, -HORIZONTAL_TAB_CARD_SHAPE_BOTTOM_INSET);
 }
 
-// The selected horizontal tab's outline, from the bottom of its left flare, over the top of its body, to the bottom of
-// its right flare. The path is left open, so the loading swirl does not run along the bottom edge, where the tab meets
-// the toolbar. Filling it closes it.
 static QPainterPath horizontal_selected_tab_path(QRectF const& body)
 {
-    // NB: The top corners are as round as a card's ends.
     auto top_radius = HORIZONTAL_TAB_CARD_RADIUS;
     auto flare = HORIZONTAL_TAB_FLARE_RADIUS;
     auto left = body.left();
@@ -293,10 +266,6 @@ static QPainterPath horizontal_selected_tab_path(QRectF const& body)
     return path;
 }
 
-// The selected vertical tab's outline: Its card reaches across to the page's edge of the sidebar at x = page_edge, and
-// flares out above and below into the page's frame there. As with the horizontal tab, the path is left open along the
-// edge it shares with the frame, and runs clockwise, which is the way the loading swirl goes around it. Filling it closes
-// it.
 static QPainterPath vertical_selected_tab_path(QRectF const& card, qreal page_edge)
 {
     auto top = card.top();
@@ -306,7 +275,6 @@ static QPainterPath vertical_selected_tab_path(QRectF const& card, qreal page_ed
 
     QPainterPath path;
     if (page_edge > card.center().x()) {
-        // From the bottom of the page's edge, along the bottom, around the round end, and along the top.
         path.moveTo(page_edge, bottom + flare);
         path.arcTo(QRectF(page_edge - (2 * flare), bottom, 2 * flare, 2 * flare), 0, 90);
         path.lineTo(card.left() + radius, bottom);
@@ -316,7 +284,6 @@ static QPainterPath vertical_selected_tab_path(QRectF const& card, qreal page_ed
         return path;
     }
 
-    // From the top of the page's edge, along the top, around the round end, and along the bottom.
     path.moveTo(page_edge, top - flare);
     path.arcTo(QRectF(page_edge, top - (2 * flare), 2 * flare, 2 * flare), 180, 90);
     path.lineTo(card.right() - radius, top);
@@ -326,7 +293,6 @@ static QPainterPath vertical_selected_tab_path(QRectF const& card, qreal page_ed
     return path;
 }
 
-// The new tab button lines up with the cards of the tabs beside it.
 static QRectF horizontal_new_tab_button_shape_rect(QRectF const& rect)
 {
     auto center = horizontal_tab_card_shape_rect(rect).center();
@@ -339,16 +305,12 @@ static QRect tab_card_shape_rect(QRect const& rect)
     return rect.adjusted(TAB_CARD_SHAPE_HORIZONTAL_INSET, TAB_CARD_SHAPE_TOP_INSET, -TAB_CARD_SHAPE_HORIZONTAL_INSET, -TAB_CARD_SHAPE_BOTTOM_INSET);
 }
 
-// When a tab finishes loading, a soft band of light sweeps across its pill from left to right.
 static void paint_load_sheen(QPainter& painter, QPalette const& palette, QPainterPath const& tab_path, QRectF const& shape_rect, qreal progress)
 {
-    // The bright middle of the band travels from the left edge of the tab to its right edge, so the sweep is seen to
-    // start at the very left. It fades out at the right edge rather than leaving the tab.
     auto band_width = shape_rect.height() * 2.5;
     auto center_x = shape_rect.left() + (shape_rect.width() * progress);
     auto strength = min(1.0, (1.0 - progress) / LOAD_SHEEN_FADE_PROGRESS);
 
-    // NB: The gradient runs from the top left to the bottom right of the band, which slants the band like "/".
     QLinearGradient sheen(QPointF(center_x - (band_width / 2.0), shape_rect.top()), QPointF(center_x + (band_width / 2.0), shape_rect.bottom()));
     auto peak = ChromeStyle::is_dark(palette) ? QColor(255, 255, 255, 46) : QColor(0, 0, 0, 14);
     peak.setAlphaF(peak.alphaF() * strength);
@@ -432,7 +394,6 @@ private:
             : (is_horizontal_new_tab_button
                       ? horizontal_new_tab_button_shape_rect(QRectF(rect()))
                       : QRectF(rect()).adjusted(4.0, TAB_CARD_SHAPE_TOP_INSET, -4.0, -TAB_CARD_SHAPE_BOTTOM_INSET));
-        // NB: The horizontal new tab button's shape is square, so this pill is a circle.
         QPainterPath tab_path;
         tab_path.addRoundedRect(shape_rect, shape_rect.height() / 2.0, shape_rect.height() / 2.0);
         // NB: Hovered and pressed, the button looks like the toolbar's buttons, though in the shape of a tab.
@@ -705,15 +666,12 @@ TabBar::TabBar(TabWidget* tab_widget)
     m_loading_swirl_animation->setStartValue(0.0);
     m_loading_swirl_animation->setEndValue(1.0);
     m_loading_swirl_animation->setLoopCount(-1);
-    // NB: Each frame repaints only the loading tabs, and checks again, so the swirl also stops when the last loading tab
-    //     is closed.
     connect(m_loading_swirl_animation, &QVariantAnimation::valueChanged, this, [this] {
         auto any_tab_loading = false;
         for (int index = 0; index < count(); ++index) {
             if (!is_tab_loading(index))
                 continue;
             any_tab_loading = true;
-            // NB: The selected horizontal tab's flares, which the swirl runs along, reach past its rect.
             auto flare = qCeil(HORIZONTAL_TAB_FLARE_RADIUS);
             update(visual_tab_rect(index).adjusted(-flare, 0, flare, 0));
         }
@@ -873,8 +831,6 @@ QSize TabBar::tabSizeHint(int index) const
 
     if (auto count = this->count(); count > 0) {
         auto pinned_count = pinned_tab_count();
-        // The first and last tabs also take room for their flares at the ends of the tab bar, and a tab takes room for
-        // the headers of the tab groups next to it.
         auto group_room = horizontal_group_room(index);
         auto edges = horizontal_tab_edges(index);
         auto end_room = group_room.leading + group_room.trailing + (has_flag(edges, TabBarEdge::Left) ? HORIZONTAL_TAB_END_ROOM : 0) + (has_flag(edges, TabBarEdge::Right) ? HORIZONTAL_TAB_END_ROOM : 0);
@@ -884,8 +840,6 @@ QSize TabBar::tabSizeHint(int index) const
             return hint;
         }
 
-        // The unpinned tabs that show share whatever width the pinned tiles, the group headers, and the room at the
-        // ends leave.
         auto shown_unpinned_count = 0;
         for (auto unpinned_index = pinned_count; unpinned_index < count; ++unpinned_index)
             shown_unpinned_count += is_tab_hidden(unpinned_index) ? 0 : 1;
@@ -941,7 +895,6 @@ bool TabBar::event(QEvent* event)
     if (event->type() == QEvent::WindowActivate || event->type() == QEvent::WindowDeactivate)
         update();
 
-    // The swirl stops while the tab bar is hidden, so it has to start again for tabs still loading when it is shown.
     if (event->type() == QEvent::Show)
         update_loading_swirl_animation();
 
@@ -997,7 +950,6 @@ void TabBar::paintEvent(QPaintEvent*)
     QHash<QString, QStaticText> title_texts;
     auto title_line_height = QFontMetricsF(title_font).height();
 
-    // The tab groups' headers and lines go below the tabs, so the selected tab covers a group's line.
     paint_tab_groups(painter, unpinned_clip);
 
     auto tab_shape_rect = [&](int index, QRect const& tab_rect) {
@@ -1013,8 +965,6 @@ void TabBar::paintEvent(QPaintEvent*)
         if (index == dragged_index)
             continue;
 
-        // Unpinned tabs scroll under the pinned ones, so they never paint over them. The clips that each tab's sheen
-        // and title set later intersect with this one, rather than replacing it.
         if (is_vertical) {
             if (index >= pinned_count)
                 painter.setClipRect(unpinned_clip);
@@ -1038,7 +988,6 @@ void TabBar::paintEvent(QPaintEvent*)
 
         auto shape_rect = tab_shape_rect(index, tab_rect);
 
-        // Xenon: A split view's two tabs share a frame, under them.
         if (auto* tab = m_tab_widget ? m_tab_widget->tab(index) : nullptr; tab && index + 1 < count() && index + 1 != dragged_index) {
             auto& stack = m_tab_widget->tab_stack();
             if (stack.split_side(*tab) == SplitViewSide::Left && stack.split_partner(*tab) == m_tab_widget->tab(index + 1)) {
@@ -1055,8 +1004,6 @@ void TabBar::paintEvent(QPaintEvent*)
         else
             tab_path.addRoundedRect(shape_rect, shape_rect.height() / 2.0, shape_rect.height() / 2.0);
 
-        // Horizontal tabs are divided by lines, except around the selected tab and the hovered one, and where a tab
-        // group's header divides them.
         if (!is_vertical) {
             auto next_index = index + 1;
             while (is_tab_hidden(next_index))
@@ -1066,9 +1013,6 @@ void TabBar::paintEvent(QPaintEvent*)
             auto separator_opacity = 1.0 - max(hover_progress, hover_progress_of(next_index));
             if (!is_selected && !next_is_selected && !next_to_group_header && separator_opacity > 0.0) {
                 auto separator_center_y = shape_rect.center().y();
-                // NB: The separator sits as far from the card as the edge between two tabs, which is also where it sits after
-                //     the last tab, whose room for its flare lies beyond. This keeps it on whole device pixels at a pixel
-                //     ratio of 2.
                 auto separator_x = shape_rect.right() + HORIZONTAL_TAB_CARD_SHAPE_HORIZONTAL_INSET - 1;
                 QRectF separator_rect { separator_x, separator_center_y - (HORIZONTAL_TAB_SEPARATOR_HEIGHT / 2.0), HORIZONTAL_TAB_SEPARATOR_WIDTH, HORIZONTAL_TAB_SEPARATOR_HEIGHT };
                 painter.save();
@@ -1114,7 +1058,6 @@ void TabBar::paintEvent(QPaintEvent*)
             if (is_pinned_tile && tabButton(index, QTabBar::LeftSide))
                 continue;
 
-            // NB: A QRect's center is rounded down, so add 1 to center the icon in the tab.
             auto icon_center = is_vertical ? QPointF(tab_rect.center() + QPoint(1, 1)) : shape_rect.center();
             QRect icon_rect {
                 qRound(icon_center.x()) - (TAB_ICON_SIZE / 2),
@@ -1245,7 +1188,6 @@ void TabBar::contextMenuEvent(QContextMenuEvent* event)
     if (!m_tab_widget)
         return;
 
-    // A tab group's header opens the group's editor, as in Chromium.
     if (auto* group = tab_group_header_at(event->pos())) {
         m_pressed_tab = nullptr;
         m_pressed_tab_group = nullptr;
@@ -1339,7 +1281,6 @@ void TabBar::mousePressEvent(QMouseEvent* event)
 {
     hide_tab_preview();
 
-    // A click on a tab group's header opens or collapses the group once the button is released, as in Chromium.
     if (auto* group = tab_group_header_at(event->pos())) {
         m_pressed_tab = nullptr;
         m_pressed_tab_group = event->button() == Qt::LeftButton ? group : nullptr;
@@ -1442,7 +1383,6 @@ void TabBar::mouseReleaseEvent(QMouseEvent* event)
 
 void TabBar::mouseDoubleClickEvent(QMouseEvent* event)
 {
-    // A second click on a tab group's header toggles the group again.
     if (tab_group_header_at(event->pos())) {
         mousePressEvent(event);
         return;
@@ -1499,9 +1439,6 @@ bool TabBar::dragging_pinned_tab() const
     return s_active_tab_dragged_tab && s_active_tab_dragged_tab->is_pinned();
 }
 
-// Where a tab sits once a tab dragged in from another window joins the strip at the slot, among the tabs pinned like it,
-// or where that tab itself sits when no index is given. The pinned tiles keep their width, and the unpinned tabs narrow
-// to make room, so the strip keeps its width.
 QRect TabBar::incoming_drop_layout_rect(Optional<int> index, int slot) const
 {
     if (count() == 0)
@@ -1513,7 +1450,6 @@ QRect TabBar::incoming_drop_layout_rect(Optional<int> index, int slot) const
         if (!index.has_value()) {
             if (dragging_pinned_tab())
                 return vertical_tab_rect(slot, region);
-            // The dropped tab goes before the header of a group that starts at its slot.
             auto const* groups = m_tab_widget ? &m_tab_widget->tab_groups() : nullptr;
             auto header_above = groups && groups->group_at(slot) && groups->group_at(slot) != groups->group_at(slot - 1);
             auto top = VERTICAL_TAB_FLARE_RADIUS + region.height + vertical_unpinned_offset(slot) - (header_above ? TAB_GROUP_HEADER_ROW_HEIGHT : 0) - m_vertical_scroll_offset;
@@ -1524,7 +1460,6 @@ QRect TabBar::incoming_drop_layout_rect(Optional<int> index, int slot) const
         return vertical_unpinned_tab_rect(*index, region, !dragging_pinned_tab() && *index >= slot ? VERTICAL_TAB_HEIGHT : 0);
     }
 
-    // The tabs of collapsed groups take no room, and the group headers keep theirs.
     auto first_visible = first_visible_tab_index();
     auto last_visible = last_visible_tab_index();
     if (first_visible < 0)
@@ -1541,11 +1476,9 @@ QRect TabBar::incoming_drop_layout_rect(Optional<int> index, int slot) const
     auto strip_width = tabRect(last_visible).right() + 1 - first_tab_rect.left() - (2 * HORIZONTAL_TAB_END_ROOM) - headers_width;
     auto unpinned_width = unpinned_count > 0 ? max(0.0, static_cast<qreal>(strip_width - (pinned_count * PINNED_TAB_TILE_WIDTH)) / unpinned_count) : 0.0;
 
-    // Walk the strip, with the dropped tab at its slot.
     qreal left = first_tab_rect.left() + HORIZONTAL_TAB_END_ROOM;
     auto rect_at = [&](qreal width, bool is_first, bool is_last) {
         auto rect_left = left;
-        // NB: The first and last places also take room for their flares at the ends of the tab bar.
         if (is_first) {
             rect_left -= HORIZONTAL_TAB_END_ROOM;
             width += HORIZONTAL_TAB_END_ROOM;
@@ -1594,7 +1527,6 @@ int TabBar::drop_slot_at(QPoint const& position) const
         auto best_slot = first_slot;
         auto best_distance = NumericLimits<qreal>::max();
         for (auto slot = first_slot; slot <= last_slot; ++slot) {
-            // NB: A slot inside a collapsed tab group has no place.
             auto rect = rect_for_slot(slot);
             if (rect.isNull())
                 continue;
@@ -1617,7 +1549,6 @@ int TabBar::drop_slot_at(QPoint const& position) const
         auto center = QRectF(QPointF(position - m_position_in_selected_tab_while_dragging), QSizeF(dragged_tab_rect.size())).center();
         auto first_slot = dragging_pinned ? 0 : pinned_count;
         auto last_slot = dragging_pinned ? pinned_count - 1 : count() - 1;
-        // A collapsed tab group is passed over as a whole, once the dragged tab is past the middle of its header.
         return nearest_slot(first_slot, last_slot, center, [&](int slot) {
             if (!is_tab_hidden(slot))
                 return visual_tab_rect(slot);
@@ -1719,8 +1650,6 @@ TabBar::DropPreview TabBar::drop_preview_for_slot(Optional<int> slot) const
             return preview;
         }
 
-        // With tab groups, the unpinned tabs and the group headers between them move over by the dragged tab's size,
-        // and the header of a group that the dragged tab joins at its start stays before it.
         auto stride = static_cast<qreal>(dragged_tab_stride());
         auto shift = [&](qreal amount) { return is_horizontal ? TabShift { .x_offset = amount } : TabShift { .y_offset = amount }; };
         for (int index = *dragged_index + 1; index <= *slot; ++index)
@@ -1745,7 +1674,6 @@ TabBar::DropPreview TabBar::drop_preview_for_slot(Optional<int> slot) const
     for (int index = 0; index < count(); ++index)
         move_to(index, incoming_drop_layout_rect(index, *slot));
     for (auto const& header : tab_group_headers(false)) {
-        // A header moves along with the tab after it, unless the dropped tab joins its group at the start.
         qreal header_shift = 0;
         if (is_horizontal)
             header_shift = preview.tab_shifts[header.owner].x_offset;
@@ -1879,9 +1807,7 @@ void TabBar::start_tab_drag(int index)
     auto was_canceled = cancellation_filter.was_canceled() || (is_wayland && action == Qt::IgnoreAction);
 
     auto drop_target = s_pending_tab_drop_target;
-    // The tab joins the tab group its drop showed it in.
     QPointer<TabGroup> drop_group = drop_target ? drop_target->tab_bar()->m_drop_group.data() : nullptr;
-    // Xenon: A tab dropped on the edge of a page opens beside it, in a split view.
     auto split_view_drop = SplitView::take_pending_drop();
 
     if (auto* source_window = qobject_cast<BrowserWindow*>(window()); source_window && dragged_tab) {
@@ -1963,7 +1889,6 @@ bool TabBar::is_tab_loading(int index) const
     return tab && tab->is_loading();
 }
 
-// The swirl only needs repainting while a tab is loading and the tab bar can be seen.
 void TabBar::update_loading_swirl_animation()
 {
     auto any_tab_loading = false;
@@ -1982,7 +1907,6 @@ Optional<qreal> TabBar::load_sheen_progress(int index) const
 {
     if (m_load_sheens.is_empty() || !m_tab_widget)
         return {};
-    // NB: A sheen whose tab was closed has a null tab, which must not match a missing one here.
     auto* tab = m_tab_widget->tab(index);
     if (!tab)
         return {};
@@ -2029,8 +1953,6 @@ void TabBar::show_tab_preview()
         return;
     }
 
-    // A tab that hasn't loaded has no page to show, and the current tab's page is in view, so their previews are their
-    // title, URL, and memory use.
     if (!tab->is_loaded() || index == currentIndex()) {
         m_tab_preview_popup->set_preview(palette(), tab->title(), qstring_from_ak_string(tab->url().serialize()), TabMemory::description(*tab), {});
         m_tab_preview_popup->move(tab_preview_position_for(index, m_tab_preview_popup->sizeHint()));
@@ -2060,7 +1982,6 @@ void TabBar::show_tab_preview()
 void TabBar::hide_tab_preview()
 {
     disconnect(m_tab_preview_paint_connection);
-    // A tab can hibernate while its preview shows, which takes its view with it.
     if (m_previewed_tab && m_previewed_tab->is_loaded())
         m_previewed_tab->view().set_system_visibility_state(m_previewed_tab->view().isVisible() ? Web::HTML::VisibilityState::Visible : Web::HTML::VisibilityState::Hidden);
     m_previewed_tab = nullptr;
@@ -2175,7 +2096,6 @@ bool TabBar::pinned_tabs_are_tiles() const
 
 QRect TabBar::visual_tab_rect(int index) const
 {
-    // A horizontal tab's place in the strip also holds the headers of the tab groups next to it.
     if (tab_layout() == TabLayout::Horizontal) {
         auto rect = tabRect(index);
         if (auto room = horizontal_group_room(index); rect.isValid() && (room.leading > 0 || room.trailing > 0))
@@ -2204,7 +2124,6 @@ QRect TabBar::vertical_tab_rect(int index, PinnedRegion const& region) const
 int TabBar::tab_index_at(QPoint const& position) const
 {
     if (tab_layout() == TabLayout::Horizontal) {
-        // A tab group's header is in a tab's place in the strip, but isn't part of the tab.
         auto index = tabAt(position);
         return visual_tab_rect(index).contains(position) ? index : -1;
     }
@@ -2336,7 +2255,6 @@ void TabBar::update_tab_button_geometry()
     if (tab_layout() == TabLayout::Horizontal) {
         auto pinned_count = pinned_tab_count();
         for (int index = 0; index < count(); ++index) {
-            // NB: The buttons of a tab in a collapsed group stay hidden, like the tab.
             auto is_dragged = index == dragged_index || is_tab_hidden(index);
             auto tab_rect = shifted_tab_rect(index);
             auto shape_rect = horizontal_tab_card_shape_rect(QRectF(tab_rect), horizontal_tab_edges(index));
@@ -2352,8 +2270,6 @@ void TabBar::update_tab_button_geometry()
                 continue;
             }
 
-            // NB: The style puts a tab's left button 1pt inside the tab's card, where its icon looks flush against the
-            //     card's edge. Give it 3pt.
             if (left_button) {
                 QPoint position { qRound(shape_rect.left()) + 3, button_y_in(left_button, shape_rect) };
                 if (left_button->pos() != position)
@@ -2365,7 +2281,6 @@ void TabBar::update_tab_button_geometry()
             prepare_button(close_button, false);
             if (!close_button)
                 continue;
-            // The close button's circle shares its center with the round end of the card.
             auto close_button_center_x = shape_rect.right() - (shape_rect.height() / 2.0);
             QPoint close_button_position { qRound(close_button_center_x - (close_button->width() / 2.0)), button_y_in(close_button, shape_rect) };
             if (close_button->pos() != close_button_position)
@@ -2393,7 +2308,6 @@ void TabBar::update_tab_button_geometry()
         if (button_size.isEmpty())
             return;
 
-        // A button's circle shares its center with the round end of the card it sits in.
         // NB: A QRect's right() is its last column, one short of its right edge.
         auto end_radius = shape_rect.height() / 2;
         auto x = position == QTabBar::RightSide ? shape_rect.right() + 1 - end_radius - (button_size.width() / 2) : shape_rect.left() + end_radius - (button_size.width() / 2);
@@ -2477,7 +2391,6 @@ void TabBar::update_tab_button_geometry()
     for (int index = 0; index < count(); ++index) {
         auto tab_rect = shifted_tab_rect(index);
         if (!tab_rect.isValid()) {
-            // A tab in a collapsed group has no place, and neither do its buttons.
             for (auto position : { QTabBar::LeftSide, QTabBar::RightSide }) {
                 if (auto* button = tabButton(index, position); button && button->isVisible())
                     button->setVisible(false);
@@ -2534,9 +2447,6 @@ bool TabBar::start_window_move()
     return handle->startSystemMove();
 }
 
-// Xenon's tab groups (UI/TabGroups.h holds the groups themselves). The tab bar lays out and paints their headers, hides
-// the tabs of collapsed groups, and decides which group a dropped tab joins.
-
 bool TabBar::is_tab_hidden(int index) const
 {
     return index >= 0 && index < count() && !isTabVisible(index);
@@ -2570,7 +2480,6 @@ Vector<TabBar::TabGroupHeader> TabBar::tab_group_headers(bool with_rects) const
     auto title_font = tab_group_title_font(font());
     auto last_visible = last_visible_tab_index();
     for (auto const& span : m_tab_widget->tab_groups().spans()) {
-        // NB: While a tab is being taken, the groups can still count it.
         if (span.last >= count())
             continue;
 
@@ -2594,8 +2503,6 @@ Vector<TabBar::TabGroupHeader> TabBar::tab_group_headers(bool with_rects) const
         return headers;
 
     if (is_horizontal) {
-        // The headers before a tab come after the room for the flare at the start of the strip, and the headers after
-        // the last tab come before the room at its end.
         auto first_visible = first_visible_tab_index();
         HashMap<int, int> next_left;
         for (auto& header : headers) {
@@ -2631,7 +2538,6 @@ TabBar::HorizontalGroupRoom TabBar::horizontal_group_room(int index) const
         if (header.owner == index)
             (header.trailing ? room.trailing : room.leading) += header.width;
     }
-    // The room for the flare at an end of the strip goes beyond the headers there.
     if (room.leading > 0 && index == first_visible_tab_index())
         room.leading += HORIZONTAL_TAB_END_ROOM;
     if (room.trailing > 0)
@@ -2650,8 +2556,6 @@ TabBarEdge TabBar::horizontal_tab_edges(int index) const
     return edges;
 }
 
-// Where a tab starts below the pinned tabs: below the tabs before it that show, and below the headers of the groups
-// before it and its own.
 int TabBar::vertical_unpinned_offset(int index) const
 {
     auto unpinned_index = index - pinned_tab_count();
@@ -2686,7 +2590,6 @@ TabGroup* TabBar::tab_group_header_at(QPoint const& position) const
     if (!rect().contains(position))
         return nullptr;
 
-    // Headers scroll under the pinned tabs, like the unpinned tabs.
     if (tab_layout() != TabLayout::Horizontal) {
         auto region = pinned_region();
         if (region.fixed_height() > 0 && position.y() < VERTICAL_TAB_FLARE_RADIUS + region.fixed_height())
@@ -2707,7 +2610,6 @@ QRect TabBar::tab_group_chip_rect(TabGroupHeader const& header, QRect const& hea
 
     switch (tab_layout()) {
     case TabLayout::Horizontal: {
-        // The chip is centered on the tabs' cards.
         auto card_center_y = horizontal_tab_card_shape_rect(QRectF(header_rect)).center().y();
         chip = { static_cast<qreal>(header_rect.left() + TAB_GROUP_HEADER_MARGIN), card_center_y - (chip_size.height() / 2), chip_size.width(), chip_size.height() };
         break;
@@ -2716,7 +2618,6 @@ QRect TabBar::tab_group_chip_rect(TabGroupHeader const& header, QRect const& hea
         chip = { static_cast<qreal>(header_rect.left() + TAB_CARD_SHAPE_HORIZONTAL_INSET + TAB_GROUP_INDENT), header_rect.center().y() + 1 - (chip_size.height() / 2), chip_size.width(), chip_size.height() };
         break;
     case TabLayout::VerticalCollapsed: {
-        // The collapsed sidebar has room for the color alone.
         auto size = tab_group_chip_size({}, {});
         chip = { header_rect.center().x() + 1 - (size.width() / 2), header_rect.center().y() + 1 - (size.height() / 2), size.width(), size.height() };
         break;
@@ -2735,8 +2636,6 @@ void TabBar::set_hovered_tab_group(TabGroup* group)
 
 void TabBar::tab_groups_changed()
 {
-    // NB: The groups change the size of tabs without changing anything Qt knows about, so it lays the tabs out again
-    //     the next time it needs to.
     setIconSize(iconSize());
     hide_tab_preview();
     refresh_tab_layout();
@@ -2792,7 +2691,6 @@ void TabBar::paint_tab_groups(QPainter& painter, QRect const& unpinned_clip)
 
     for (auto const& header : headers) {
         auto* group = header.group;
-        // A group whose only tab is being dragged goes along with it.
         if (dragged_index.has_value() && header.first == *dragged_index && header.last == *dragged_index)
             continue;
 
@@ -2800,8 +2698,6 @@ void TabBar::paint_tab_groups(QPainter& painter, QRect const& unpinned_clip)
         auto header_rect = QRectF(header.rect).translated(is_horizontal ? shift : 0, is_horizontal ? 0 : shift);
         auto color = tab_group_color(group->color(), palette());
 
-        // The line along the group's tabs: below them in the strip, and beside them in the sidebar. A tab being dragged
-        // into the group's end takes the line along to the place it would be dropped.
         if (!group->is_collapsed()) {
             Optional<QRectF> tabs_bounds;
             for (auto index = header.first; index <= header.last; ++index) {
@@ -2831,7 +2727,6 @@ void TabBar::paint_tab_groups(QPainter& painter, QRect const& unpinned_clip)
                     QRectF line { chip.left(), y, card.right() - (card.height() / 2) - chip.left(), TAB_GROUP_LINE_WIDTH };
                     painter.drawRoundedRect(line, TAB_GROUP_LINE_WIDTH / 2, TAB_GROUP_LINE_WIDTH / 2);
                 } else {
-                    // The line runs along the outer edge of the sidebar, from the header's chip to the group's last tab.
                     auto chip = QRectF(tab_group_chip_rect(header, header_rect.toAlignedRect()));
                     auto x = vertical_tabs_are_on_right() ? vertical_tabs_left() + vertical_bar_width() - 1 - TAB_GROUP_LINE_WIDTH : vertical_tabs_left() + 1.0;
                     auto top = tab_layout() == TabLayout::VerticalCollapsed ? chip.bottom() + 3 : tabs_bounds->top() + TAB_CARD_SHAPE_TOP_INSET;
@@ -2841,7 +2736,6 @@ void TabBar::paint_tab_groups(QPainter& painter, QRect const& unpinned_clip)
             }
         }
 
-        // The header lights up on hover, like a tab.
         auto chip = QRectF(tab_group_chip_rect(header, header_rect.toAlignedRect()));
         if (m_hovered_tab_group == group) {
             QRectF hover_rect;
@@ -2859,7 +2753,6 @@ void TabBar::paint_tab_groups(QPainter& painter, QRect const& unpinned_clip)
         auto title = tab_layout() == TabLayout::VerticalCollapsed ? QString {} : group->title();
         paint_tab_group_chip(painter, chip, title, group->color(), palette(), title_font);
 
-        // The open sidebar's header says whether the group is open, as Chromium's does.
         if (tab_layout() == TabLayout::VerticalExpanded) {
             auto icon = create_chrome_icon(group->is_collapsed() ? ChromeIcon::ChevronDown : ChromeIcon::ChevronUp, palette());
             auto end_radius = (header_rect.height() - 2) / 2.0;
@@ -2872,8 +2765,6 @@ void TabBar::paint_tab_groups(QPainter& painter, QRect const& unpinned_clip)
     painter.restore();
 }
 
-// How far the tabs between a dragged tab and its drop slot move to fill its place. A group whose only tab is dragged goes
-// along with it, header and all.
 int TabBar::dragged_tab_stride() const
 {
     auto is_horizontal = tab_layout() == TabLayout::Horizontal;
@@ -2915,9 +2806,6 @@ qreal TabBar::current_group_header_shift(TabGroup const* group) const
     return start + ((target - start) * m_drop_preview_progress);
 }
 
-// Where a dropped tab lands between two tabs of a group, it joins the group. At a group's edge, it joins the group that
-// it's dragged a quarter of its size into, and stays in its own group until it's dragged past the middle, as in Chromium.
-// A collapsed group takes no tabs, and a group's only tab takes the group along, unless it lands inside another group.
 void TabBar::update_drop_group(QPoint const& position)
 {
     TabGroup* group = nullptr;
@@ -2928,7 +2816,6 @@ void TabBar::update_drop_group(QPoint const& position)
         auto slot = *m_drop_slot;
         auto dragged_index = dragged_tab_index();
 
-        // The tabs on either side of the dropped tab, once it's dropped.
         auto left = slot - 1;
         auto right = slot;
         if (dragged_index.has_value() && slot > *dragged_index) {
@@ -2950,7 +2837,6 @@ void TabBar::update_drop_group(QPoint const& position)
         } else if (is_dragging_whole_group()) {
             group = own_group;
         } else if ((left_group || right_group) && !(dragged_index.has_value() && is_tab_hidden(slot))) {
-            // NB: Beside a collapsed group, the slot has no place of its own to measure against.
             auto is_horizontal = tab_layout() == TabLayout::Horizontal;
             QPointF center;
             QRectF gap;
@@ -2978,7 +2864,6 @@ void TabBar::update_drop_group(QPoint const& position)
     m_drop_group = group;
     m_drop_group_at_start = at_start;
 
-    // The headers next to the drop make way for it again.
     m_drop_preview_start = current_drop_preview();
     m_drop_preview_target = drop_preview_for_slot(m_drop_slot);
     m_drop_preview_progress = 0.0;
@@ -3026,7 +2911,6 @@ TabWidget::TabWidget(QWidget* parent)
     m_new_tab_button->installEventFilter(this);
 
     if constexpr (use_native_macos_window_controls()) {
-        // NB: The first tab's room for its flare takes the place of the gap after the window controls.
         m_window_controls = create_window_controls_spacer(*this, "LadybirdTabStripWindowControls", { NATIVE_MACOS_WINDOW_CONTROLS_WIDTH + max(0, NATIVE_MACOS_WINDOW_CONTROLS_GAP - HORIZONTAL_TAB_END_ROOM), HORIZONTAL_TAB_HEIGHT });
     } else {
         auto window_control_buttons = create_window_control_buttons(*this, "LadybirdTabStripWindowControls", { 18, 18 }, { 40, 40 });
@@ -3163,7 +3047,6 @@ TabWidget::TabWidget(QWidget* parent)
         update_tab_layout();
     });
     connect(m_tab_groups, &TabGroups::edit_requested, this, [this](TabGroup* group) {
-        // NB: The group is often made from the tab's context menu, which is still closing.
         QTimer::singleShot(0, m_tab_bar, [tab_bar = m_tab_bar, group = QPointer<TabGroup>(group)] {
             if (group)
                 tab_bar->show_tab_group_editor(*group, true);
@@ -3224,7 +3107,6 @@ void TabWidget::insert_tab(int index, Tab* widget, QString const& label)
             size_page_like(*widget, *current);
         install_event_filters();
     }
-    // A tab that hasn't loaded, or that hibernated, gets the filters for its view and bookmarks bar once it has them.
     connect(widget, &Tab::loaded, this, install_event_filters);
 
     m_stacked_widget->insertWidget(index, widget);
@@ -3259,7 +3141,6 @@ Tab* TabWidget::take_tab(int index)
 
     m_tab_groups->will_remove_tab(index);
 
-    // Xenon: A tab leaving its split view hands its place to the other side.
     if (auto* partner = m_stacked_widget->separate(*as<Tab>(widget)); partner && index == current_index())
         set_current_tab(partner);
 
@@ -3356,7 +3237,6 @@ bool TabWidget::is_compact_toolbar() const
     return m_compact_toolbar && current_tab_layout() == TabLayout::Horizontal;
 }
 
-// The compact toolbar takes a share of the row, like Helium's, and leaves the rest to the tabs.
 int TabWidget::compact_toolbar_width() const
 {
     static constexpr int MIN_COMPACT_TOOLBAR_WIDTH = 380;
@@ -3403,7 +3283,6 @@ bool TabWidget::event(QEvent* event)
     } else if (type == QEvent::WindowStateChange) {
         update_window_button_icons();
     } else if (type == QEvent::WindowActivate || type == QEvent::WindowDeactivate) {
-        // The tab strip and the sidebar are lighter while the window is inactive.
         auto inactive = type == QEvent::WindowDeactivate;
         set_dynamic_property_if_needed(*m_tab_bar_row, WINDOW_INACTIVE_PROPERTY, inactive);
         set_dynamic_property_if_needed(*m_vertical_tab_bar_column, WINDOW_INACTIVE_PROPERTY, inactive);
@@ -3714,7 +3593,6 @@ bool TabWidget::vertical_tabs_hold_window_controls() const
 
 int TabWidget::vertical_tabs_column_top_margin() const
 {
-    // NB: The open sidebar's top row is level with the toolbar, at the top of the window.
     return m_vertical_tabs_expanded ? 0 : VERTICAL_TABS_TOP_MARGIN;
 }
 
@@ -3833,7 +3711,6 @@ void TabWidget::rebuild_layout_for_horizontal_tabs()
 
     m_tab_bar_row->setMinimumHeight(HORIZONTAL_TAB_STRIP_HEIGHT);
     m_tab_bar_row_layout->setSpacing(0);
-    // NB: Without window controls before it, the first tab's room for its flare takes the place of the strip's margin.
     m_tab_bar_row_layout->setContentsMargins(use_native_macos_window_controls() ? 12 : max(0, 12 - HORIZONTAL_TAB_END_ROOM), 2, 4, 0);
 
     m_new_tab_button->setText({});
@@ -3844,8 +3721,6 @@ void TabWidget::rebuild_layout_for_horizontal_tabs()
     m_new_tab_button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
     // NB: The tabs sit on the bottom of the strip, so the selected tab meets the toolbar however tall the strip is.
-    // NB: The new tab button overlaps the tab bar, which a layout cannot do, so the row only leaves room for the rest of
-    //     it, and place_horizontal_new_tab_button() puts it in place.
     m_new_tab_button->setParent(m_tab_bar_row);
     m_new_tab_button->show();
     auto new_tab_button_room = HORIZONTAL_TAB_HEIGHT - HORIZONTAL_NEW_TAB_BUTTON_OVERLAP;
@@ -3863,7 +3738,6 @@ void TabWidget::rebuild_layout_for_horizontal_tabs()
     place_horizontal_new_tab_button();
 }
 
-// The compact layout puts the window controls, the toolbar, and the tabs in one row, in that order.
 void TabWidget::rebuild_layout_for_compact_toolbar()
 {
     auto toolbar_height = Tab::toolbar_height(false);
@@ -3924,7 +3798,6 @@ void TabWidget::rebuild_layout_for_vertical_tabs()
     top_row_layout->setSpacing(0);
     if (m_vertical_tabs_expanded) {
         // The open sidebar runs the full height of the window. Its top row sits beside the toolbar, and holds the window
-        // controls when they are on its side, with the sidebar's toggle at the edge toward the page.
         auto page_side_margin = vertical_tabs_side_margin(true);
         top_row_layout->setContentsMargins(vertical_tabs_are_on_right() ? page_side_margin : 0, 0, vertical_tabs_are_on_right() ? 0 : page_side_margin, 0);
         top_row_layout->addStrut(Tab::toolbar_height(should_show_window_controls_in_tab_toolbar()));
@@ -3936,12 +3809,9 @@ void TabWidget::rebuild_layout_for_vertical_tabs()
         if (vertical_tabs_are_on_right())
             top_row_layout->addStretch(1);
     } else {
-        // The collapsed sidebar's toggle sits above its tabs, centered on the collapsed sidebar, and stays put while
-        // the sidebar opens on hover.
         auto collapsed_tab_width = VERTICAL_TABS_COLLAPSED_WIDTH - vertical_tabs_horizontal_margin_width(TabLayout::VerticalCollapsed);
         auto inset = (collapsed_tab_width - VERTICAL_TABS_TOGGLE_BUTTON_SIZE) / 2;
         top_row_layout->setContentsMargins(vertical_tabs_are_on_right() ? 0 : inset, 0, vertical_tabs_are_on_right() ? inset : 0, 0);
-        // NB: The tab bar below leaves room above its first tab.
         top_row_layout->addStrut(VERTICAL_TAB_HEIGHT - VERTICAL_TAB_FLARE_RADIUS);
         if (vertical_tabs_are_on_right())
             top_row_layout->addStretch(1);
@@ -3958,8 +3828,6 @@ void TabWidget::rebuild_layout_for_vertical_tabs()
     m_vertical_tab_bar_column_layout->addStretch(1);
 }
 
-// The collapsed sidebar sits below the toolbar, which flows around its rounded corner beside the page into the frame
-// around the page.
 void TabWidget::paint_collapsed_vertical_tabs_column()
 {
     QPainter painter(m_vertical_tab_bar_column);
@@ -3982,8 +3850,6 @@ void TabWidget::paint_collapsed_vertical_tabs_column()
 
 void TabWidget::update_vertical_tabs_column_margins()
 {
-    // NB: The tab bar reaches the page's side of the sidebar, where its selected tab joins the page's frame, so the
-    //     column has no margin on that side.
     auto side_margin = vertical_tabs_side_margin(m_tab_bar->tab_layout() != TabLayout::VerticalCollapsed);
     auto left = vertical_tabs_are_on_right() ? 0 : side_margin;
     auto right = vertical_tabs_are_on_right() ? side_margin : 0;
@@ -4161,7 +4027,6 @@ void TabWidget::update_tab_layout()
     auto available_for_tabs = width() - controls_width - 36;
 
     // NB: The tab strip has no minimum width from its contents (see the constructor), so it keeps the window wide enough
-    //     for its controls with a minimum of its own.
     m_tab_bar_row->setMinimumWidth(controls_width + 36);
 
     m_tab_bar->set_available_width(available_for_tabs);
@@ -4205,7 +4070,6 @@ void TabWidget::update_tab_chrome_visibility()
     for (int index = 0; index < m_stacked_widget->count(); ++index)
         update_web_view_frame(*tab(index));
 #endif
-    // Xenon: A split view frames its pages like the web view frames a page alone.
     Optional<WebView::VerticalTabsPosition> sidebar_position;
     if (m_tab_bar_visible && !is_horizontal)
         sidebar_position = m_vertical_tabs_position;

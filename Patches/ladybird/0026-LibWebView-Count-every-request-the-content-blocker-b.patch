@@ -16,20 +16,19 @@ the list does.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibWebView/ContentBlocking.h      |  2 ++
+ Libraries/LibWebView/ContentBlocking.h      |  1 +
  Libraries/LibWebView/ViewImplementation.cpp | 10 +++++-----
  Libraries/LibWebView/ViewImplementation.h   |  1 +
- 3 files changed, 8 insertions(+), 5 deletions(-)
+ 3 files changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/Libraries/LibWebView/ContentBlocking.h b/Libraries/LibWebView/ContentBlocking.h
-index 14b25f7d6c87ca622b382e8ecd3430a813ba6845..453226322131f5347869bb7697e83d5f3d69c15b 100644
+index 14b25f7d6c87ca622b382e8ecd3430a813ba6845..cb45628e636fb83763c54b2ed672eeb81a61e9c9 100644
 --- a/Libraries/LibWebView/ContentBlocking.h
 +++ b/Libraries/LibWebView/ContentBlocking.h
-@@ -32,6 +32,8 @@ struct ContentBlockingSnapshot {
+@@ -32,6 +32,7 @@ struct ContentBlockingSnapshot {
      Optional<String> site;
      ContentBlockingState state { ContentBlockingState::Unavailable };
      Vector<BlockedResource> blocked_resources;
-+    // Every request blocked on the page, including those of a resource listed already and those past the list's limit.
 +    u64 blocked_request_count { 0 };
  
      bool enabled() const { return state == ContentBlockingState::Enabled || state == ContentBlockingState::NoRules; }
@@ -74,10 +73,10 @@ index 3b24bfb839c2b2f808efc930d74b623d5d758afb..ff638fe2de727c403372c804cd934c9d
      if (m_crash_state.has_value() || !traversable().active_document().host())
          return snapshot;
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 2c9166fc4da94ec1eeb58bd7703d7d22773315ca..8baedba9a41d9710cc961a9d39554401ac8b5dc6 100644
+index b52ef02a6f8703113846b1d82fa8c5114f39a8e8..ea33da1134e58816fe288286d48c3d75ec5caaaa 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -1252,6 +1252,7 @@ protected:
+@@ -1239,6 +1239,7 @@ protected:
      u64 m_next_navigation_listener_id { 1 };
  
      Vector<BlockedResource> m_blocked_resources;

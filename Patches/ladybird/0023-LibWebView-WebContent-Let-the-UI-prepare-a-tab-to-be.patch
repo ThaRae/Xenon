@@ -19,15 +19,15 @@ alone. The view also says whether a DevTools client is connected.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibWebView/CanonicalTraversable.h  |  2 +-
- Libraries/LibWebView/ViewImplementation.cpp  | 24 +++++++++++
- Libraries/LibWebView/ViewImplementation.h    | 13 ++++++
+ Libraries/LibWebView/ViewImplementation.cpp  | 24 ++++++++++++
+ Libraries/LibWebView/ViewImplementation.h    | 10 +++++
  Libraries/LibWebView/WebContentPage.cpp      |  6 +++
  Libraries/LibWebView/WebContentPage.h        |  1 +
- Services/WebContent/ConnectionFromClient.cpp | 43 ++++++++++++++++++++
+ Services/WebContent/ConnectionFromClient.cpp | 39 ++++++++++++++++++++
  Services/WebContent/ConnectionFromClient.h   |  1 +
  Services/WebContent/WebContentClient.ipc     |  2 +
  Services/WebContent/WebContentServer.ipc     |  1 +
- 9 files changed, 92 insertions(+), 1 deletion(-)
+ 9 files changed, 85 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/CanonicalTraversable.h b/Libraries/LibWebView/CanonicalTraversable.h
 index 8f6cb69c2a9f3d8c14eb135a168f53c017bf8c52..63b9397dfed855ae193b23eacd9b70cac3336f98 100644
@@ -92,26 +92,23 @@ index b25f9af73c49ff2d10dc74a83479f6baaf2bc303..3b24bfb839c2b2f808efc930d74b623d
  
  SpellChecker::DocumentTag ViewImplementation::spell_document_tag()
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 66a11907cc4321e0852490455e8f7315bcdcb99f..2c9166fc4da94ec1eeb58bd7703d7d22773315ca 100644
+index e6e3e892f8785aa19eb4377e6c4c89b4828afcd1..b52ef02a6f8703113846b1d82fa8c5114f39a8e8 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -255,6 +255,15 @@ public:
+@@ -253,6 +253,12 @@ public:
      [[nodiscard]] SessionHistorySnapshot session_history_snapshot() const;
      [[nodiscard]] ErrorOr<void> restore_session_history_from_snapshot(SessionHistorySnapshot);
  
 +    struct DiscardPreparation {
-+        // Whether a text control of the tab holds input that discarding the tab would lose.
 +        bool has_unsubmitted_input { false };
 +    };
-+    // Before a UI discards the tab, to restore it from a session history snapshot later: saves the scroll position to
-+    // the current session history entry, as leaving the entry would, and says what discarding would lose.
 +    NonnullRefPtr<Core::Promise<DiscardPreparation>> prepare_for_discard();
 +    void did_prepare_for_discard(Badge<WebContentPage>, u64 request_id, Optional<Web::HTML::SessionHistoryEntryPersistedState>, bool has_unsubmitted_input);
 +
      Optional<SessionTabId> session_tab_id() const { return m_session_tab_id; }
      void set_session_tab_id(SessionTabId session_tab_id) { m_session_tab_id = session_tab_id; }
      void clear_session_tab_id() { m_session_tab_id = {}; }
-@@ -431,6 +440,7 @@ public:
+@@ -424,6 +430,7 @@ public:
      void set_listen_for_dom_mutations(bool);
      void did_connect_devtools_client();
      void did_disconnect_devtools_client();
@@ -119,7 +116,7 @@ index 66a11907cc4321e0852490455e8f7315bcdcb99f..2c9166fc4da94ec1eeb58bd7703d7d22
      void get_dom_node_inner_html(Web::UniqueNodeID node_id);
      void get_dom_node_outer_html(Web::UniqueNodeID node_id);
      void set_dom_node_outer_html(Web::UniqueNodeID node_id, String const& html);
-@@ -945,6 +955,9 @@ protected:
+@@ -935,6 +942,9 @@ protected:
      HashMap<u64, NonnullRefPtr<Core::Promise<bool>>> m_pending_select_word_for_dictionary_lookup_requests;
      HashMap<u64, NonnullRefPtr<Core::Promise<ByteString>>> m_pending_cut_selected_text_requests;
  
@@ -130,10 +127,10 @@ index 66a11907cc4321e0852490455e8f7315bcdcb99f..2c9166fc4da94ec1eeb58bd7703d7d22
      RefPtr<Action> m_block_element_action;
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 2cbffb199a4e2e6a4ea4baf4dafea75b94593a3d..c6538e30ebd0133c86d0a4821e6aab5c158fd4ac 100644
+index 9643fd324767b0698d05bf51b4e9d17c048ae13a..5b7748869774db656029a512673f71cf83fb12bf 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1262,6 +1262,12 @@ void WebContentPage::did_take_screenshot(Gfx::ShareableBitmap screenshot)
+@@ -1261,6 +1261,12 @@ void WebContentPage::did_take_screenshot(Gfx::ShareableBitmap screenshot)
          view().did_receive_screenshot({}, screenshot);
  }
  
@@ -147,10 +144,10 @@ index 2cbffb199a4e2e6a4ea4baf4dafea75b94593a3d..c6538e30ebd0133c86d0a4821e6aab5c
  {
      if (displays_tab())
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index a26f3a4060f51dc5b3090a09548772c2b6510aee..2e6c5b60e94341385149eec74a3351fff2df5f57 100644
+index 46583a19be9681996e0f435ef76dbed4f1b7628e..5cb7b8777645aad13fdf26fccfa39778d62daadc 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -253,6 +253,7 @@ private:
+@@ -247,6 +247,7 @@ private:
      virtual void did_resume_debugger() override;
      virtual void did_complete_debugger_breakpoint_operation(u64 request_id, Optional<String> error) override;
      virtual void did_take_screenshot(Gfx::ShareableBitmap screenshot) override;
@@ -159,7 +156,7 @@ index a26f3a4060f51dc5b3090a09548772c2b6510aee..2e6c5b60e94341385149eec74a3351ff
      virtual void did_get_selected_text(u64 request_id, ByteString selection) override;
      virtual void did_get_selected_text_for_lookup(u64 request_id, Optional<DictionaryLookup> lookup) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 247411798d46f28c8d13a20d2b354cd7bac26a49..11bd72ba4bf56f3280eb2183966af5683aadc041 100644
+index 6a14119d2eabada1edf3a6094da8103f1d4233b2..b7401a97329a2903ce5ad2d2f611535f219f8bc6 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -74,6 +74,7 @@
@@ -170,11 +167,10 @@ index 247411798d46f28c8d13a20d2b354cd7bac26a49..11bd72ba4bf56f3280eb2183966af568
  #include <LibWeb/HTML/Storage.h>
  #include <LibWeb/HTML/Window.h>
  #include <LibWeb/HTML/WorkerAgentParent.h>
-@@ -584,6 +585,48 @@ void ConnectionFromClient::stop_loading(Web::PageId page_id)
+@@ -584,6 +585,44 @@ void ConnectionFromClient::stop_loading(Web::PageId page_id)
          page->page().local_traversable()->stop_loading();
  }
  
-+// Whether a text control holds a value the document didn't come with, as one the user typed and hasn't submitted does.
 +static bool has_unsubmitted_input(Web::DOM::Document& document)
 +{
 +    auto has_input = false;
@@ -191,9 +187,6 @@ index 247411798d46f28c8d13a20d2b354cd7bac26a49..11bd72ba4bf56f3280eb2183966af568
 +    return has_input;
 +}
 +
-+// The UI process is about to discard the tab, to restore it from its session history later. The current entry gets the
-+// scroll position that leaving it would have saved, and the UI learns whether the documents this process hosts for the
-+// tab hold input that discarding would lose.
 +void ConnectionFromClient::prepare_for_discard(Web::PageId page_id, u64 request_id)
 +{
 +    Optional<Web::HTML::SessionHistoryEntryPersistedState> persisted_state;
@@ -220,10 +213,10 @@ index 247411798d46f28c8d13a20d2b354cd7bac26a49..11bd72ba4bf56f3280eb2183966af568
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 32a409b2801951bbcfc7b6cd5d66f268d43bb65f..885372dc1385d2938ea3a64d6427b3529915ff80 100644
+index a9d3eed64085710091064a7b3cabc1ed30af9b0d..6fae3aa0de978e3362ba6b2bef6b4949a78a1dfb 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -132,6 +132,7 @@ private:
+@@ -131,6 +131,7 @@ private:
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
      virtual void populate_navigation(Web::PageId page_id, Web::HTML::NavigationPopulationRequest, Web::HTML::NavigationPopulationResult) override;
      virtual void stop_loading(Web::PageId page_id) override;

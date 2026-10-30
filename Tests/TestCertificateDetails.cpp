@@ -15,7 +15,6 @@
 
 using namespace Ladybird;
 
-// Tests/CertificateErrors/make-certificates.py writes these.
 static ByteBuffer certificate(StringView name)
 {
     auto path = ByteString::formatted("{}/Tests/CertificateErrors/{}.der", XENON_SOURCE_DIR, name);
@@ -63,10 +62,8 @@ TEST_CASE(self_signed_certificate_for_the_host)
     EXPECT_EQ(string(description, "issuer"sv), "127.0.0.1"sv);
     EXPECT_EQ(strings(description, "names"sv), (Vector<ByteString> { "127.0.0.1", "::1", "localhost" }));
 
-    // 32 bytes, as two hex digits each, between colons.
     EXPECT_EQ(string(description, "fingerprint"sv).length(), 95u);
 
-    // 2026-01-01 to 2125-12-31 23:59:59, in milliseconds since the epoch.
     EXPECT_EQ(milliseconds(description, "validFrom"sv), 1767225600000);
     EXPECT_EQ(milliseconds(description, "validUntil"sv), 4922899199000);
 }
@@ -83,7 +80,6 @@ TEST_CASE(self_signed_certificate_for_another_host)
     EXPECT_EQ(problems(describe("self-signed"sv, "https://10.0.0.2/"sv)), (Vector<ByteString> { "selfSigned", "host" }));
 }
 
-// Most self-signed server certificates may not sign certificates, which doesn't make them any less self-signed.
 TEST_CASE(self_signed_certificate_for_servers_only)
 {
     EXPECT_EQ(problems(describe("self-signed-server"sv, "https://127.0.0.1/"sv)), (Vector<ByteString> { "selfSigned" }));

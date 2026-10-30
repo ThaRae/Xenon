@@ -6,9 +6,6 @@
 
 "use strict";
 
-// The dashboard talks to Xenon through window.xenonBlocking (UI/BlockingDashboard.cpp), which answers every message
-// with the whole state as a xenonblocking event.
-
 const GROUPS = [
     { id: "default", title: "Built-in", description: "uBlock Origin's own filters." },
     { id: "ads", title: "Ads" },
@@ -113,7 +110,6 @@ function renderLists() {
 
 function renderCustomFilters() {
     const textarea = element("custom-filters");
-    // Keep what's being typed. The text is replaced only when it hasn't been changed since it was last shown or applied.
     if (customFiltersSent === null || textarea.value === customFiltersSent) {
         textarea.value = state.customFilters;
         customFiltersSent = state.customFilters;
@@ -179,7 +175,6 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         const input = element("trusted-site");
         let site = input.value.trim();
-        // A pasted address stands for its host.
         if (site.includes("://")) {
             try {
                 site = new URL(site).hostname;
@@ -193,7 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListener("xenonblocking", event => {
         if (event.detail?.name === "state") render(event.detail);
     });
-    // The state the page was made with fills it in before it has loaded. The load message signs it up for the changes.
     render(window.xenonBlocking.initialState);
     send({ name: "load" });
 });

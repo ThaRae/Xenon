@@ -4,11 +4,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/*
- * Xenon's settings page, shaped like other browsers' settings: a search field across the top, a sidebar of sections,
- * and each section a serif title over boxes of rows with the control on the right. Easy setup's preset keys come first.
- */
-
 html {
     scroll-padding-top: 80px;
 }
@@ -66,8 +61,6 @@ strong {
 .filtered-out {
     display: none !important;
 }
-
-/* Sidebar */
 
 .sidebar {
     position: sticky;
@@ -131,7 +124,6 @@ nav {
     gap: 1px;
 }
 
-/* Xenon's own sections come first, as Helium's do, and Ladybird's after the rule. */
 .nav-divider {
     display: flex;
     align-items: center;
@@ -176,7 +168,6 @@ nav a:hover {
     background-color: var(--xenon-row-hover);
 }
 
-/* The open section: lit with the rose wash and a lamp. */
 nav a.current {
     color: var(--xenon-ink);
     font-weight: 600;
@@ -205,15 +196,11 @@ nav a:focus-visible {
     box-shadow: none;
 }
 
-/* Sections */
-
 main {
     min-width: 0;
     max-width: 960px;
     padding: 22px 0 120px;
 }
-
-/* Easy setup */
 
 .easy-setup {
     margin-bottom: 36px;
@@ -256,7 +243,6 @@ main {
     white-space: nowrap;
 }
 
-/* A preset's choices, in a small menu under it. */
 .preset-menu {
     position: absolute;
     top: calc(100% + 8px);
@@ -357,7 +343,6 @@ main {
     color: var(--xenon-muted);
 }
 
-/* A group's rows sit in a box, the control on the right. */
 .rows {
     overflow: hidden;
     background-color: var(--xenon-card);
@@ -458,8 +443,6 @@ p.note-row {
     color: var(--xenon-muted);
 }
 
-/* Controls */
-
 input[type="number"],
 input[type="search"],
 input[type="text"],
@@ -496,7 +479,6 @@ textarea {
     max-width: 260px;
 }
 
-/* As specific as ladybird.css's focus rings, which the rose border takes the place of. */
 input[type="number"]:focus,
 input[type="search"]:focus,
 input[type="text"]:focus,
@@ -530,7 +512,6 @@ input[type="checkbox"][switch] {
     height: 24px;
 }
 
-/* ladybird.css sizes the knob for its smaller switch. */
 input[type="checkbox"][switch]::before {
     border-width: 9px;
     left: 3px;
@@ -577,13 +558,11 @@ input[type="checkbox"][switch]:focus-visible {
     color: var(--xenon-ink);
 }
 
-/* Ladybird's scripts make some of their buttons link buttons, which look like the rest here. */
 button.link-button {
     font: inherit;
     cursor: pointer;
 }
 
-/* Buttons are keys (xenon.css), the link buttons and links that look like buttons too. */
 button.primary-button,
 button.secondary-button,
 button.link-button,
@@ -614,8 +593,6 @@ button.link-button:hover,
     background-color: var(--xenon-sand);
 }
 
-/* A few choices side by side, like the light or dark sites that Ladybird's appearance.js sets. */
-/* A few choices side by side are a row of keys, the chosen one pressed in and lit. */
 .segmented {
     flex-shrink: 0;
     gap: 6px;
@@ -661,8 +638,6 @@ button.link-button:hover,
     outline-offset: 2px;
 }
 
-/* Layouts */
-
 .layouts {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -670,7 +645,6 @@ button.link-button:hover,
     margin-bottom: 18px;
 }
 
-/* Layouts are keys, as in the welcome flow: the chosen one ringed in rose and pressed in. */
 .layout {
     position: relative;
     display: flex;
@@ -701,7 +675,6 @@ button.link-button:hover,
     outline-offset: 2px;
 }
 
-/* The tile is the control, so the native radio button only takes keyboard focus. */
 .layout input {
     position: absolute;
     opacity: 0;
@@ -771,8 +744,6 @@ button.link-button:hover,
     border: 4px solid var(--xenon-rose);
 }
 
-/* Password managers, a row each, as the welcome flow lists them. */
-
 .choice-row {
     position: relative;
     justify-content: flex-start;
@@ -812,9 +783,6 @@ button.link-button:hover,
     color: var(--xenon-muted);
 }
 
-/* Search engines, as Ladybird's search.js lists them: a box of choices, each with its initial on a tile. */
-
-/* Two to a line, as a choice screen lists them, and as the welcome flow does. */
 .engine-choices {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -857,7 +825,6 @@ button.link-button:hover,
     outline-offset: -2px;
 }
 
-/* The row is the control, so the native radio button only takes keyboard focus. */
 .engine-choice input {
     position: absolute;
     opacity: 0;
@@ -885,7 +852,6 @@ button.link-button:hover,
     visibility: visible;
 }
 
-/* A search engine or a site, pictured by its initial, as the new tab page pictures a site without an icon. */
 .letter-tile,
 .empty-tile {
     flex-shrink: 0;
@@ -908,8 +874,6 @@ button.link-button:hover,
 .engine-choice:has(input:checked) .letter-tile {
     background-color: var(--xenon-rose-hover);
 }
-
-/* Bangs */
 
 .bang-results {
     margin: 0;
@@ -945,8 +909,6 @@ button.link-button:hover,
     display: block;
     color: var(--xenon-muted);
 }
-
-/* Filter lists, as Ladybird's blocking.js lists them */
 
 .list-rows:empty {
     display: none;
@@ -989,7 +951,6 @@ button.link-button:hover,
     font-weight: 500;
 }
 
-/* The sites blocking is turned off on, each with a button to turn it back on. */
 .site-rows > div {
     display: flex;
     align-items: center;
@@ -1043,8 +1004,6 @@ details.disclosure > summary:hover {
     cursor: pointer;
 }
 
-/* Extensions */
-
 .extension {
     justify-content: flex-start;
     gap: 14px;
@@ -1075,15 +1034,11 @@ details.disclosure > summary:hover {
     color: var(--xenon-muted);
 }
 
-/* Profile */
-
 .path {
     font-family: var(--xenon-mono);
     font-size: 12px;
     overflow-wrap: anywhere;
 }
-
-/* Advanced, as Ladybird's advanced.js lists its keys */
 
 #config-filter {
     width: 100%;
@@ -1120,8 +1075,6 @@ footer {
 footer a {
     color: var(--xenon-muted);
 }
-
-/* Dialogs, which Ladybird's scripts open */
 
 dialog {
     width: 90%;

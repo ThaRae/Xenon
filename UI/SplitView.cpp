@@ -38,21 +38,16 @@
 
 namespace Ladybird {
 
-// The frame around a split view's pages matches the one around a page alone (Tab's WEB_VIEW_INSET), and runs along the
-// top as well, so the active page's ring has room all the way around.
 static constexpr int SPLIT_VIEW_INSET = 5;
 static constexpr int SPLIT_VIEW_SIDEBAR_INSET = 4;
-// The divider sits in the gap between the pages, with each page's ring on either side of its grip.
 static constexpr int SPLIT_VIEW_GAP = 12;
 static constexpr qreal SPLIT_VIEW_RING_WIDTH = 2.0;
 static constexpr qreal SPLIT_VIEW_RING_OFFSET = 2.0;
 static constexpr int SPLIT_VIEW_MIN_PAGE_WIDTH = 240;
-// The divider snaps to the middle from this close, like Chromium's.
 static constexpr int SPLIT_VIEW_SNAP_DISTANCE = 15;
 static constexpr int SPLIT_VIEW_GRIP_WIDTH = 4;
 static constexpr int SPLIT_VIEW_GRIP_HEIGHT = 36;
 
-// Helium opens a split view once a dragged tab has rested on a page's edge for half a second.
 static constexpr int SPLIT_VIEW_DROP_DELAY_MS = 500;
 static constexpr qreal SPLIT_VIEW_DROP_EDGE_FRACTION = 0.2;
 static constexpr int SPLIT_VIEW_DROP_EDGE_MIN_WIDTH = 64;
@@ -73,7 +68,6 @@ static BrowserWindow* browser_window_of(QWidget const& widget)
     return qobject_cast<BrowserWindow*>(widget.window());
 }
 
-// Native overlays stay above the web views, which are native themselves on these presentation paths.
 static void make_overlay_native([[maybe_unused]] QWidget& widget)
 {
 #if defined(AK_OS_MACOS) || defined(LADYBIRD_QT_USE_RHI_WIDGET)
@@ -82,8 +76,6 @@ static void make_overlay_native([[maybe_unused]] QWidget& widget)
 #endif
 }
 
-// Qt leaves a widget's native window behind when it lays the widget out while it is hidden, as a page's bookmarks bar is
-// while its page is the inactive one. Lays the page out now, and moves its native windows to where their widgets are.
 static void sync_native_windows(QWidget& page)
 {
     if (auto* layout = page.layout())
@@ -112,7 +104,6 @@ static QIcon create_icon(Function<void(QPainter&)> const& paint)
     return icon;
 }
 
-// Two panes, with the active one filled in the accent color.
 static QIcon create_split_view_icon(QPalette const& palette, SplitViewSide active_side)
 {
     return create_icon([&](QPainter& painter) {
@@ -142,7 +133,6 @@ static QIcon create_more_icon(QPalette const& palette)
     });
 }
 
-// Moves a tab next to another one, on the given side of it, in the same group of pinned or unpinned tabs.
 static void place_beside(BrowserWindow& window, Tab& anchor, Tab& tab, SplitViewSide side)
 {
     if (tab.is_pinned() != anchor.is_pinned()) {
@@ -179,7 +169,6 @@ static void create_split(BrowserWindow& window, Tab& anchor, Tab& other, SplitVi
     window.activate_tab(window.tab_index(&tab_to_activate));
 }
 
-// Chromium's "Add Tab to New Split View": the tab beside a new tab, which waits for an address like a new tab does.
 static void open_new_tab_beside(BrowserWindow& window, Tab& tab, SplitViewSide new_tab_side)
 {
     auto& new_tab = window.new_tab_from_url(WebView::Application::settings().new_tab_page_url(), Web::HTML::ActivateTab::No, BrowserWindow::TabLocation::after_tab(tab));
@@ -196,7 +185,6 @@ static void reverse_split(BrowserWindow& window, Tab& tab)
     if (!left || !right)
         return;
 
-    // Moving the tabs in the strip moves their pages, through keep_split_views_together().
     window.move_tab(window.tab_index(right), window.tab_index(left));
 }
 
@@ -236,8 +224,6 @@ static void add_split_menu_actions(QMenu& menu, Tab& tab)
     }));
 }
 
-// The handle between a split view's pages: Drag it to share the width differently, or double-click it to swap the
-// pages, as in Chromium.
 class SplitViewDivider final : public QWidget {
 public:
     AK_ALLOC_WITH_KMALLOC;
@@ -311,8 +297,6 @@ private:
     qreal m_grab_offset { 0 };
 };
 
-// The inactive page's corner shows which page it is, and holds the split view's menu for it, as Chromium's mini
-// toolbar does. A click on it makes that page the active one.
 class SplitViewMiniToolbar final : public QWidget {
 public:
     AK_ALLOC_WITH_KMALLOC;
@@ -381,7 +365,6 @@ public:
         if (!m_tab)
             return;
 
-        // Like Chromium's, the label names the page's site, or the page itself where it has none.
         auto url = m_tab->url();
         auto host = url.host().has_value() ? url.serialized_host() : StringView {};
         m_label->setText(host.is_empty() ? m_tab->title() : qstring_from_ak_string(host));
@@ -425,7 +408,6 @@ private:
     QToolButton* m_menu_button { nullptr };
 };
 
-// Where a tab dropped on a page's edge would go.
 class SplitViewDropIndicator final : public QWidget {
 public:
     AK_ALLOC_WITH_KMALLOC;
@@ -469,7 +451,6 @@ private:
     }
 };
 
-// A toolbar button in the style of Tab's own.
 class SplitViewButton final : public QToolButton {
 public:
     AK_ALLOC_WITH_KMALLOC;
@@ -516,7 +497,6 @@ private:
     {
         QStyleOptionToolButton option;
         initStyleOption(&option);
-        // The button opens its menu on a click, so it needs no menu arrow.
         option.features &= ~QStyleOptionToolButton::HasMenu;
 
         QStylePainter painter(this);
@@ -551,7 +531,6 @@ TabStack::TabStack(TabWidget& tab_widget)
         update_drop_indicator(m_drop_position);
     });
 
-    // TabWidget reorders the pages after a move, so check the splits once it has.
     QObject::connect(m_tab_widget.tab_bar(), &QTabBar::tabMoved, this, [this] { schedule_split_validation(); }, Qt::QueuedConnection);
 }
 
@@ -677,7 +656,6 @@ TabStack::Split const* TabStack::shown_split() const
     return const_cast<TabStack&>(*this).shown_split();
 }
 
-// A page in fullscreen fills the screen, even from a split view. The window hides its chrome for it.
 bool TabStack::shows_single_page() const
 {
     return !m_chrome_visible && window()->isFullScreen();
@@ -730,7 +708,6 @@ void TabStack::update_split_order(Tab& tab)
     if (indexOf(split->left) <= indexOf(split->right))
         return;
 
-    // The pages swap places, each keeping its width.
     split->left.swap(split->right);
     split->ratio = 1.0 - split->ratio;
     layout_pages();
@@ -742,7 +719,6 @@ void TabStack::set_frame(bool chrome_visible, Optional<WebView::VerticalTabsPosi
     m_chrome_visible = chrome_visible;
     m_sidebar_position = sidebar_position;
     layout_pages();
-    // NB: A page leaving fullscreen is still in it while the window shows its chrome again.
     QTimer::singleShot(0, this, [this] { layout_pages(); });
 }
 
@@ -821,15 +797,12 @@ void TabStack::layout_pages()
     auto* current = currentWidget();
     auto* split = shows_single_page() ? nullptr : shown_split();
 
-    // Show the pages that are shown before hiding the others, so the window is never without a page.
     if (split) {
         split->left->ensure_loaded();
         split->right->ensure_loaded();
         split->left->set_in_split_view(true, current == split->left);
         split->right->set_in_split_view(true, current == split->right);
 
-        // A bookmarks bar at the top of the page (in the compact layout) shows above the active page alone, and the
-        // inactive page starts below it, level with the active one.
         auto* active = current == split->left ? split->left.data() : split->right.data();
         auto bookmarks_bar_height = 0;
         if (active->has_bookmarks_bar_in_page() && WebView::Application::settings().appearance().show_bookmarks_bar == WebView::ShowBookmarksBar::Always)
@@ -906,8 +879,6 @@ void TabStack::schedule_split_validation()
     });
 }
 
-// A split view's tabs stay next to each other in the strip, and in the same group of pinned or unpinned tabs. A split
-// whose tabs no longer are, after a pin or another window took one, comes apart.
 void TabStack::validate_splits()
 {
     auto changed = false;
@@ -935,7 +906,6 @@ void TabStack::validate_splits()
 
 void TabStack::watch_tab(Tab& tab)
 {
-    // A tab that hasn't loaded, or that hibernated, gets a new view and toolbar once it loads.
     QObject::connect(&tab, &Tab::loaded, this, [this, tab = &tab] { watch_view(*tab); });
     if (tab.is_loaded())
         watch_view(tab);
@@ -958,7 +928,6 @@ void TabStack::unwatch_tab(Tab& tab)
 bool TabStack::event(QEvent* event)
 {
     if (event->type() == QEvent::ChildRemoved) {
-        // A page deleted without being removed first leaves its place.
         auto current = currentWidget();
         m_pages.remove_all_matching([](auto const& page) { return !page; });
         if (current)
@@ -1003,7 +972,6 @@ bool TabStack::eventFilter(QObject* watched, QEvent* event)
     switch (event->type()) {
     case QEvent::MouseButtonPress:
     case QEvent::FocusIn:
-        // A click on the inactive page makes it the active one, and still reaches the page. Scrolling it does not.
         if (auto* tab = tab_for_view(watched); tab && tab != currentWidget() && is_shown(*tab))
             activate(*tab);
         break;
@@ -1037,7 +1005,6 @@ void TabStack::paintEvent(QPaintEvent*)
     auto const& palette = window()->palette();
     painter.fillRect(rect(), ChromeStyle::chrome_background(palette));
 
-    // The active page has the accent's ring, as Chromium's has a thicker border, and the inactive page a hairline.
     for (auto* tab : { split->left.data(), split->right.data() }) {
         auto is_active = tab == currentWidget();
         auto offset = is_active ? SPLIT_VIEW_RING_OFFSET : 0.5;
@@ -1093,7 +1060,6 @@ void TabStack::dropEvent(QDropEvent* event)
 
 static Optional<SplitView::PendingDrop> s_pending_drop;
 
-// Whether a tab being dragged can open beside this window's page.
 static bool can_drop_beside_current_tab(TabStack const& stack, Tab& dragged_tab)
 {
     auto* window = browser_window_of(stack);
@@ -1105,7 +1071,6 @@ static bool can_drop_beside_current_tab(TabStack const& stack, Tab& dragged_tab)
     if (!current)
         return false;
 
-    // The page already beside another one only takes the other side of its own split.
     if (stack.split_partner(*current))
         return stack.is_shown(dragged_tab);
     return true;
@@ -1114,7 +1079,6 @@ static bool can_drop_beside_current_tab(TabStack const& stack, Tab& dragged_tab)
 Optional<SplitViewSide> TabStack::drop_side_at(QPoint const& position) const
 {
     auto edge_width = max(SPLIT_VIEW_DROP_EDGE_MIN_WIDTH, qRound(width() * SPLIT_VIEW_DROP_EDGE_FRACTION));
-    // Once the indicator is up, the whole half it covers takes the drop.
     if (m_drop_armed && m_drop_side.has_value())
         edge_width = width() / 2;
 
@@ -1179,7 +1143,6 @@ void TabStack::update_drop_indicator(QPoint const& position)
         return;
     }
 
-    // A page alone joins the toolbar at its top, where a split view's pages have a frame.
     auto area = split_area();
     if (!shown_split() && m_chrome_visible)
         area.setTop(0);
@@ -1253,7 +1216,6 @@ void add_link_context_menu_action(Tab& tab, QMenu& menu)
     if (actions.isEmpty())
         return;
 
-    // The page's own "Open in New Tab" opens the link, with the referrer and the rest of how the page would open it.
     QPointer<QAction> open_in_new_tab = actions.first();
     QPointer<Tab> tab_pointer = &tab;
 
@@ -1289,7 +1251,6 @@ void add_link_context_menu_action(Tab& tab, QMenu& menu)
         if (!opened || !tab_pointer)
             return;
 
-        // In a split view, the link takes the other side's place, and the page there stays open in a tab of its own.
         auto side = window->tab_stack().split_side(*tab_pointer);
         auto new_side = side.has_value() ? opposite(*side) : SplitViewSide::Right;
         create_split(*window, *tab_pointer, *opened, new_side, *tab_pointer);
@@ -1306,7 +1267,6 @@ QToolButton* create_toolbar_button(Tab& tab, QWidget& toolbar, int size)
 QAction* create_new_split_view_action(BrowserWindow& window)
 {
     auto* action = new QAction("New Split &View", &window);
-    // Chromium's shortcut for a new split view on macOS and ChromeOS (Cmd/Ctrl+Option/Alt+N).
     action->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_N));
     action->setToolTip("Open a new tab beside this one");
     window.addAction(action);
@@ -1316,7 +1276,6 @@ QAction* create_new_split_view_action(BrowserWindow& window)
         if (!window_pointer || !window_pointer->current_tab())
             return;
         auto& current = *window_pointer->current_tab();
-        // A tab in a split view goes to the side of a new split view of its own, as a tab dragged out would.
         if (window_pointer->tab_stack().split_partner(current))
             return;
         open_new_tab_beside(*window_pointer, current, SplitViewSide::Right);
@@ -1333,7 +1292,6 @@ void keep_split_views_together(BrowserWindow& window, Tab& tab)
         if (index < 0 || partner_index < 0)
             return;
 
-        // A tab moved past its partner swaps the pages. A tab moved further away takes its partner along.
         if (abs(index - partner_index) == 1)
             stack.update_split_order(tab);
         else
@@ -1341,7 +1299,6 @@ void keep_split_views_together(BrowserWindow& window, Tab& tab)
         return;
     }
 
-    // A tab dropped between a split view's tabs goes after them.
     auto index = window.tab_index(&tab);
     if (index <= 0 || index + 1 >= window.tab_count())
         return;
@@ -1370,15 +1327,12 @@ void complete_drop(PendingDrop const& drop, Tab& tab)
         return;
     auto& stack = window->tab_stack();
 
-    // A tab dropped on its own split view's edge moves to that side.
     if (stack.is_shown(tab) && stack.split_partner(tab)) {
         if (stack.split_side(tab) != drop.side)
             reverse_split(*window, tab);
         return;
     }
 
-    // The page showing is the tab being dragged, which is the current tab of its window. It goes to the side it was
-    // dropped on, beside a new tab.
     if (&tab == current) {
         open_new_tab_beside(*window, tab, opposite(drop.side));
         return;
@@ -1399,8 +1353,6 @@ void paint_tab_frame(QPainter& painter, QPalette const& palette, QRectF const& f
 
     painter.save();
     if (is_shown) {
-        // The tab beside the selected one shows its page too, so it looks half selected. The selected tab paints over its
-        // own half.
         auto surface = ChromeStyle::chrome_active_tab_surface(palette);
         surface.setAlphaF(0.5);
         painter.setPen(Qt::NoPen);

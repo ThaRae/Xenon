@@ -32,7 +32,6 @@ const layoutInfo = {
     vertical: { name: "Vertical", note: "Tabs in a sidebar" },
 };
 
-// Built-in engines, as Xenon sorts them. Anything else (a custom engine) is listed as mainstream, at the end.
 const engineInfo = {
     DuckDuckGo: { group: "private", note: "No tracking", host: "duckduckgo.com/?q=" },
     Brave: { group: "private", note: "Its own index", host: "search.brave.com/search?q=" },
@@ -46,7 +45,6 @@ const engineInfo = {
     Yandex: { group: "mainstream", note: "Russia's own index", host: "yandex.com/search/?text=" },
 };
 
-// The password managers Xenon offers (UI/PasswordManagers.h), and who makes each one.
 const passwordManagerInfo = {
     bitwarden: { note: "Open source, can be self-hosted", developer: "Bitwarden" },
     "proton-pass": { note: "Open source, with email aliases", developer: "Proton" },
@@ -58,7 +56,6 @@ let settings;
 let xenonSettings;
 let engines;
 let passwordManagers;
-// The password manager finishing waits to have installed (or removed, as ""), if it waits for one.
 let awaitedPasswordManager;
 let initialized = false;
 
@@ -78,7 +75,6 @@ function showStep(name, { focus = true } = {}) {
     const current = steps[index].dataset.step;
     document.body.dataset.step = current;
 
-    // The rail counts off the steps after the first screen: the ones before this one are done.
     const railIndex = railSteps.findIndex(step => step.dataset.for === current);
     railSteps.forEach((step, i) => {
         step.classList.toggle("done", i < railIndex);
@@ -108,8 +104,6 @@ function setButtonsDisabled(disabled) {
     for (const button of document.querySelectorAll("button")) button.disabled = disabled;
 }
 
-// Layout
-
 function selectedLayout() {
     return document.querySelector('input[name="tab-layout"]:checked')?.value ?? "classic";
 }
@@ -117,8 +111,6 @@ function selectedLayout() {
 function selectedSidebarSide() {
     return document.querySelector('input[name="sidebar-side"]:checked')?.value ?? "left";
 }
-
-// Search
 
 function selectedEngine() {
     return document.querySelector('input[name="engine"]:checked');
@@ -195,7 +187,6 @@ function populateEngines() {
         (a, b) => rank(a.name) - rank(b.name)
     );
 
-    // Ladybird starts with no search engine at all, which would leave the address bar unable to search.
     const current = settings.searchEngine.engine || DEFAULT_ENGINE;
     for (const engine of available) {
         const info = engineInfo[engine.name];
@@ -206,8 +197,6 @@ function populateEngines() {
     addEngine(mainstreamEngines, "", "Addresses only", false, false);
 }
 
-// Blocking
-
 function blockingEnabled() {
     return document.querySelector('input[name="ad-blocking"]:checked').value === "on";
 }
@@ -216,8 +205,6 @@ function updateBlockingDetails() {
     filterListUpdates.classList.toggle("hidden-updates", !blockingEnabled());
     updateSummaries();
 }
-
-// Password managers
 
 function selectedPasswordManager() {
     return document.querySelector('input[name="password-manager"]:checked')?.value ?? "";
@@ -261,7 +248,6 @@ function populatePasswordManagers() {
         detail.className = "choice-note";
         detail.textContent = id ? (passwordManagerInfo[id]?.note ?? "") : "You can pick one later in Settings.";
 
-        // A manager's lamp sits by its name. None is one long row, so its lamp goes at the far end.
         if (id) {
             label.append(lamp);
             row.append(label, detail);
@@ -297,8 +283,6 @@ function updatePasswordManagerDetails() {
 
     updateSummaries();
 }
-
-// What the first screen and Done show: what's chosen, or kept.
 
 function setSummary(key, text) {
     for (const element of document.querySelectorAll(`[data-summary="${key}"]`)) element.textContent = text;
@@ -350,8 +334,6 @@ function initialize() {
     setButtonsDisabled(false);
 }
 
-// Nothing is saved until the user is done, so the choices shown here only take effect with their go-ahead. A new
-// password manager goes in first, since it's the one choice that can fail, and the rest is saved once it's in.
 function finish() {
     setButtonsDisabled(true);
     showSaveStatus("");
@@ -392,8 +374,6 @@ function saveLayout() {
     const sideChanged = layout === "vertical" && side !== (tabs.verticalTabsPosition ?? "left");
     if (layout === xenonSettings.layout && !sideChanged) return;
 
-    // Ladybird resets whatever tab settings a message leaves out, so the side goes with the rest of them, before the
-    // layout that turns the sidebar on.
     if (sideChanged) ladybird.sendMessage("setTabSettings", { ...tabs, verticalTabsPosition: side });
     ladybird.sendMessage("xenon/setLayout", layout);
 }
@@ -406,9 +386,6 @@ function saveSettings() {
         suggestions: searchSuggestions.checked && !searchSuggestions.disabled,
     });
 
-    // Xenon's own lists (UI/FilterLists.cpp) apply whenever blocking is on. Ladybird's catalog holds the raw upstream
-    // versions of some of them, which would only add duplicates without the fixes for Ladybird, so it stays off. That
-    // leaves Xenon's daily lists (UI/FilterListUpdates.cpp) as all that Ladybird's filter list updates setting fetches.
     for (const list of settings.contentBlockerLists) {
         if (list.enabled)
             ladybird.sendMessage("setContentBlockerListEnabled", { identifier: list.identifier, enabled: false });
@@ -431,7 +408,6 @@ for (const radio of document.querySelectorAll('input[name="ad-blocking"]')) {
     radio.addEventListener("change", updateBlockingDetails);
 }
 
-// Keeping the defaults keeps the layout and the password manager already in place.
 useDefaults.addEventListener("click", () => {
     if (!initialized) return;
 

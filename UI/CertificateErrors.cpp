@@ -30,18 +30,12 @@ namespace Ladybird::CertificateErrors {
 
 static constexpr auto SCHEME = "xenon"sv;
 
-// No page may frame the warning, so none can trick a click on Proceed, and it runs nothing but its own script.
 static constexpr auto CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"sv;
 
-// Has the warning proceed by itself once it has shown, for Meta/xenon.py test, as nothing clicks in a headless browser.
-// Only a headless browser looks at it.
 static constexpr auto PROCEED_BY_ITSELF_VARIABLE = "XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS"sv;
 
-// How many refused certificates Xenon keeps. The oldest goes first.
 static constexpr size_t MAX_REJECTED_CERTIFICATES = 64;
 
-// The warning's line to the UI process: window.xenonCertificateError.send() takes a message. What the warning shows comes
-// along as state (a constant put before the script).
 static constexpr auto BOOTSTRAP_SCRIPT = R"~~~(
 window.xenonCertificateError = Object.freeze({
     state,
@@ -51,7 +45,6 @@ window.xenonCertificateError = Object.freeze({
 });
 )~~~"sv;
 
-// The last certificate RequestServer refused for each session's host and port.
 struct RejectedCertificate {
     WeakPtr<WebView::BrowsingSession> session;
     ByteString host;
@@ -96,9 +89,6 @@ static URL::URL warning_url(URL::URL const& site)
     return URL::Parser::basic_parse(url).release_value();
 }
 
-// A tab whose own page the site is gets the warning in place of the engine's error page. RequestServer reports the
-// certificate before the navigation that failed on it ends, so the warning supersedes that navigation, and the tab's
-// history goes on from the page it was on. A frame keeps the engine's error page, as in Chrome.
 static void show_warning_in_place_of_navigations_to(WebView::BrowsingSession& session, URL::URL const& url)
 {
     Vector<u64> view_ids;
@@ -127,7 +117,6 @@ void initialize()
     };
 }
 
-// The site a warning is about: xenon://certificate-error/?url=<the site's URL, percent-encoded>.
 static Optional<URL::URL> site_url(URL::URL const& page_url)
 {
     auto query = page_url.query();
@@ -139,7 +128,6 @@ static Optional<URL::URL> site_url(URL::URL const& page_url)
     return url;
 }
 
-// The site's host, with its port when it isn't the default one, as the warning names it.
 static String display_host(URL::URL const& url)
 {
     if (auto port = url.port(); port.has_value())
@@ -147,8 +135,6 @@ static String display_host(URL::URL const& url)
     return MUST(String::from_utf8(url.serialized_host()));
 }
 
-// https://www.rfc-editor.org/rfc/rfc6797#section-12.1
-// A known HSTS host's certificate errors are fatal: the user agent must not let the user proceed past them.
 static bool is_known_hsts_host(WebView::BrowsingSession& session, URL::URL const& url)
 {
     if (!session.hsts_store || !url.host()->is_domain())
@@ -228,7 +214,6 @@ static StringView mime_type_for(StringView uri)
 
 ErrorOr<WebView::URLSchemeResponse> respond(WebView::URLSchemeRequest const& request)
 {
-    // Anyone may open the warning, which can't be framed, but only the warning may load its files.
     if (!request.is_navigation && !request.from_same_origin_process)
         return Error::from_errno(EACCES);
 
@@ -253,13 +238,11 @@ Optional<String> bootstrap_script(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     if (!is_page(endpoint))
         return {};
-    // NB: The state is JSON, which is also a JavaScript expression.
     return MUST(String::formatted("const state = {};\n{}", page_state(endpoint), BOOTSTRAP_SCRIPT));
 }
 
 void handle_message(WebView::ScriptBridgeEndpoint const& endpoint, String const& message)
 {
-    // Only the warning itself may proceed, as a tab's page, never in a frame.
     if (!is_page(endpoint) || endpoint.navigable().parent_id.has_value())
         return;
 
@@ -276,7 +259,6 @@ void handle_message(WebView::ScriptBridgeEndpoint const& endpoint, String const&
         return;
 
     if (*name == "proceed"sv) {
-        // What's accepted is the certificate RequestServer refused for the site, never one the page names.
         auto& session = view->session();
         auto const* rejected = rejected_certificate(session, *url);
         if (!rejected || is_known_hsts_host(session, *url))
@@ -284,7 +266,6 @@ void handle_message(WebView::ScriptBridgeEndpoint const& endpoint, String const&
         WebView::RequestServerManager::the().add_certificate_exception(session, *url, rejected->certificate);
         view->load(*url, Web::Bindings::NavigationHistoryBehavior::Replace);
     } else if (*name == "leave"sv) {
-        // Going back to safety from a tab with nowhere to go back to opens the new tab page, as in Chrome.
         view->load(WebView::Application::settings().new_tab_page_url(), Web::Bindings::NavigationHistoryBehavior::Replace);
     }
 }

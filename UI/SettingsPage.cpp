@@ -37,7 +37,6 @@ namespace Ladybird::SettingsPage {
 
 static constexpr size_t MAXIMUM_BANG_RESULTS = 8;
 static constexpr size_t EXTENSION_ICON_PIXELS = 64;
-// Longer than any timeout the menus offer, and short enough that a mistyped one still comes round.
 static constexpr i64 MAXIMUM_TAB_HIBERNATION_TIMEOUT_SECONDS = 7 * 24 * 60 * 60;
 
 static StringView layout_name(XenonSettings::ChromeLayout layout)
@@ -62,7 +61,6 @@ static Optional<XenonSettings::ChromeLayout> layout_from_name(StringView name)
     return {};
 }
 
-// The extension's icon as a data: URL, since the page can't load chrome-extension:// URLs.
 static Optional<String> extension_icon(Extensions::Extension const& extension)
 {
     auto path = Extensions::best_icon(extension.manifest().icons, EXTENSION_ICON_PIXELS);
@@ -103,7 +101,6 @@ static JsonArray extensions()
     return extensions;
 }
 
-// The directories the page can show, by the names it asks for them by. It never names a path itself.
 static Optional<ByteString> location(StringView name)
 {
     auto const& paths = WebView::Application::profile().paths();
@@ -145,7 +142,6 @@ static void show_location(StringView name)
     if (!path.has_value())
         return;
 
-    // Xenon's own settings are a file, which the file manager shows in its folder rather than opening it.
     if (name == "xenonSettings"sv) {
 #if defined(AK_OS_MACOS)
         QProcess::startDetached(QStringLiteral("/usr/bin/open"), { QStringLiteral("-R"), qstring_from_ak_string(*path) });
@@ -200,7 +196,6 @@ static JsonObject bang_object(Bangs::Bang const& bang)
     return object;
 }
 
-// The bangs whose trigger starts with the query, shortest first, then those whose site's name has it in it.
 static JsonArray search_bangs(StringView query)
 {
     JsonArray results;
@@ -235,7 +230,6 @@ static JsonArray search_bangs(StringView query)
     return results;
 }
 
-// One for each about:settings page, for as long as its WebUI lives: the WebUI's interfaces hold it.
 class Bridge final
     : public RefCounted<Bridge>
     , public Weakable<Bridge>
@@ -321,11 +315,8 @@ private:
         return settings;
     }
 
-    // XenonSettings::Observer
     virtual void xenon_settings_changed() override { send_settings(); }
 
-    // WebView::SettingsObserver: the layout follows Ladybird's vertical tabs setting, and the filter lists' status its
-    // blocking settings.
     virtual void tab_settings_changed() override { send_settings(); }
     virtual void content_blocker_settings_changed() override { send_settings(); }
     virtual void background_networking_settings_changed() override { send_settings(); }

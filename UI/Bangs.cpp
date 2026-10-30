@@ -41,7 +41,6 @@ Bang bang_at(size_t index)
     };
 }
 
-// The table's triggers are lowercase and sorted by their bytes, so this compares the trigger as if it were lowercase.
 static int compare_with_entry(StringView trigger, Table::Entry const& entry)
 {
     auto entry_trigger = table_string(entry.trigger_offset, entry.trigger_length);
@@ -78,7 +77,6 @@ Optional<LeadingBang> leading_bang(StringView input)
     while (word_length < input.length() && !is_ascii_space(input[word_length]))
         ++word_length;
 
-    // Without the space after it, the bang may still be being typed, so there is no chip yet.
     if (word_length == input.length())
         return {};
     auto bang = bang_for_word(input.substring_view(0, word_length));
@@ -87,7 +85,6 @@ Optional<LeadingBang> leading_bang(StringView input)
     return LeadingBang { .bang = *bang, .length = word_length + 1 };
 }
 
-// The site's front page, which is the query URL up to the end of its host.
 static StringView front_page_url(StringView query_url)
 {
     auto host_start = query_url.find("://"sv);
@@ -105,8 +102,6 @@ Optional<URL::URL> url_for_query(Bang const& bang, StringView query)
         if (has_flag(bang.format, Format::OpenSnapDomain) && !bang.snap_domain.is_empty())
             return URL::Parser::basic_parse(ByteString::formatted("https://{}", bang.snap_domain));
         if (has_flag(bang.format, Format::OpenBasePath)) {
-            // A placeholder in the host ("https://{s}.example.com/") leaves no front page to open, so the bang alone
-            // doesn't resolve, and the text is searched as typed.
             auto front_page = front_page_url(bang.query_url);
             if (front_page.contains("{{{s}}}"sv))
                 return {};
@@ -117,7 +112,6 @@ Optional<URL::URL> url_for_query(Bang const& bang, StringView query)
     auto space_as_plus = has_flag(bang.format, Format::SpaceToPlus) ? URL::SpaceAsPlus::Yes : URL::SpaceAsPlus::No;
     String encoded_query;
     if (has_flag(bang.format, Format::EncodeQuery)) {
-        // NB: The query is one URL component, so it is encoded as one: "&" or "#" left as they are would end it early.
         encoded_query = URL::percent_encode(query, URL::PercentEncodeSet::Component, space_as_plus);
     } else {
         encoded_query = MUST(String::from_utf8(query));
@@ -135,8 +129,6 @@ Optional<BangNavigation> resolve(StringView input)
     if (words.is_empty())
         return {};
 
-    // NB: Only the first or last word can be a bang, so that a "!" inside a query (as in "what is 5! in binary") stays
-    //     part of the query.
     size_t bang_index = 0;
     auto bang = bang_for_word(words.first());
     if (!bang.has_value() && words.size() > 1) {

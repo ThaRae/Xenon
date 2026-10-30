@@ -23,7 +23,6 @@
 
 namespace Ladybird::TabMemory {
 
-// The hover card asks again each time its thumbnail repaints, which a page with an animation does every frame.
 static constexpr auto USAGE_LIFETIME = AK::Duration::from_seconds(1);
 
 struct SampledUsage {
@@ -35,13 +34,11 @@ static Optional<SampledUsage> s_last_usage;
 
 static u64 tab_view_id(u64 view_id)
 {
-    // A view that shows a page for another view, such as a Picture-in-Picture window, is part of that view's tab.
     if (auto view = WebView::ViewImplementation::find_view_by_id(view_id); view.has_value())
         return view->owner_view_id().value_or(view_id);
     return view_id;
 }
 
-// The tabs each process serves, by the view ID of each tab's view.
 static HashMap<pid_t, HashTable<u64>> tabs_by_process()
 {
     HashMap<pid_t, HashTable<u64>> tabs;
@@ -54,7 +51,6 @@ static HashMap<pid_t, HashTable<u64>> tabs_by_process()
         auto tab = view.owner_view_id().value_or(view.view_id());
         if (auto page = view.traversable().display_page())
             tabs.ensure(page->client().pid()).set(tab);
-        // With site isolation, a cross-site frame's documents live in another process.
         view.traversable().for_each_in_subtree([&](auto const& navigable) {
             if (navigable.has_remote_host())
                 tabs.ensure(navigable.remote_host().client().pid()).set(tab);
@@ -66,14 +62,12 @@ static HashMap<pid_t, HashTable<u64>> tabs_by_process()
     HashMap<u64, pid_t> pids_by_child_id;
     process_manager.for_each_process([&](WebView::Process& process) {
         pids_by_child_id.set(process.child_id(), process.pid());
-        // A worker that several tabs use, as a shared worker can be, belongs to none of them.
         if (process.type() == WebView::ProcessType::WebWorker) {
             if (auto owner = WebView::WorkerProcessManager::the().exclusive_performance_owner(process.pid()); owner.has_value())
                 tabs.ensure(process.pid()).set(tab_view_id(*owner));
         }
     });
 
-    // Each WebContent and worker process has image decoders of its own, which serve the tabs it serves.
     process_manager.for_each_process([&](WebView::Process& process) {
         if (process.type() != WebView::ProcessType::ImageDecoder || !process.owner_child_id().has_value())
             return;

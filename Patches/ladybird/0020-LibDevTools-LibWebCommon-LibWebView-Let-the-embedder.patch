@@ -20,11 +20,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibDevTools/FirefoxClient.cpp      |  3 ++-
  Libraries/LibWebCommon/WebView/Utilities.cpp | 13 +++++++++++
- Libraries/LibWebCommon/WebView/Utilities.h   |  6 +++++
+ Libraries/LibWebCommon/WebView/Utilities.h   |  3 +++
  Libraries/LibWebView/CrashReportStore.cpp    |  3 ++-
  Libraries/LibWebView/Profile.cpp             | 11 +++++-----
  Tests/LibWebView/TestProfile.cpp             | 23 ++++++++++++++++++++
- 6 files changed, 52 insertions(+), 7 deletions(-)
+ 6 files changed, 49 insertions(+), 7 deletions(-)
 
 diff --git a/Libraries/LibDevTools/FirefoxClient.cpp b/Libraries/LibDevTools/FirefoxClient.cpp
 index 8e31417547fa06ab1759fab4c782acee19753f0b..64cf5b83c6b1c83d112e50aa44c9239ece8dfa5d 100644
@@ -72,16 +72,13 @@ index 1afa64a04985104ecc813e514963347c37f93e94..773baeabe348095beb6bfb4f8a1c5ea3
  {
      if (s_ladybird_binary_path.has_value())
 diff --git a/Libraries/LibWebCommon/WebView/Utilities.h b/Libraries/LibWebCommon/WebView/Utilities.h
-index bd493c671915852725945e10d7f303da57dcafb0..d532b1ed5292251633c18bc6877b7e8988f6047c 100644
+index bd493c671915852725945e10d7f303da57dcafb0..b045842b2faa40cfbe02c714065c18c2990edc34 100644
 --- a/Libraries/LibWebCommon/WebView/Utilities.h
 +++ b/Libraries/LibWebCommon/WebView/Utilities.h
-@@ -26,4 +26,10 @@ WEBCOMMON_API ByteString mach_server_name_for_process(StringView process_name, p
+@@ -26,4 +26,7 @@ WEBCOMMON_API ByteString mach_server_name_for_process(StringView process_name, p
  
  WEBCOMMON_API ErrorOr<void> handle_attached_debugger();
  
-+// The name of the directory the browser keeps its profiles and crash reports in, under each of the platform's config,
-+// data, cache, and runtime directories. It defaults to "Ladybird". Other browsers built on LibWebView set their own name
-+// before creating their Application, so that their data stays apart from Ladybird's.
 +WEBCOMMON_API StringView application_name();
 +WEBCOMMON_API void set_application_name(ByteString);
 +

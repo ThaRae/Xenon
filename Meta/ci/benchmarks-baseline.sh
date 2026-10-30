@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Downloads the results of main's last run of a benchmark suite (.github/workflows/benchmarks.yml), for this run's
-# summary to compare with: the newest of main's runs that has the artifact, other than this one. Says which run it was
-# as the step's `run` output, and nothing if there's none yet; that isn't an error.
-#
-#   Meta/ci/benchmarks-baseline.sh benchmarks-linux-web-benchmarks Build/benchmarks/baseline
-#
-# Needs gh with GH_TOKEN (and GH_REPO), and the actions: read permission.
 set -uo pipefail
 
 artifact=$1

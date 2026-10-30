@@ -15,8 +15,8 @@ RequestServer of a site go as soon as it has no clients. A client that
 connects before then keeps it the usual while.
 ---
  Libraries/LibWebView/RequestServerManager.cpp | 15 ++++++++++++++-
- Libraries/LibWebView/RequestServerManager.h   |  6 ++++++
- 2 files changed, 20 insertions(+), 1 deletion(-)
+ Libraries/LibWebView/RequestServerManager.h   |  3 +++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
 index 609545933cce6ee4b6f73bb9cb74a3081b6a2151..a220f48dcfb3bb73a043b5a501d494a67ad4c8dc 100644
@@ -59,7 +59,7 @@ index 609545933cce6ee4b6f73bb9cb74a3081b6a2151..a220f48dcfb3bb73a043b5a501d494a6
  {
      if (Core::EventLoop::current().was_exit_requested())
 diff --git a/Libraries/LibWebView/RequestServerManager.h b/Libraries/LibWebView/RequestServerManager.h
-index 6d253ef5daf16bfd4080dbbcbebccd911f098753..e0dc02102abd28693e3d16d30857684e28115126 100644
+index c6f6485e00e680325c36a133542698448eeb9787..99b65ac62725e98b1d335b1122cca936cece0e35 100644
 --- a/Libraries/LibWebView/RequestServerManager.h
 +++ b/Libraries/LibWebView/RequestServerManager.h
 @@ -63,6 +63,7 @@ private:
@@ -70,13 +70,10 @@ index 6d253ef5daf16bfd4080dbbcbebccd911f098753..e0dc02102abd28693e3d16d30857684e
      bool m_retired { false };
  
      // As last reported by the RequestServer.
-@@ -95,6 +96,11 @@ public:
+@@ -95,6 +96,8 @@ public:
  
      ErrorOr<RequestServerClientConnection> connect_new_client(RequestServerInstance&, BrowsingSession&, RequestServer::SiteBinding);
  
-+    // A site's RequestServer is kept for a while after its last client goes, in case the site is visited again. This
-+    // lets the session's RequestServer of a site go as soon as it has no clients instead, as for a view the embedder
-+    // closes of a site it doesn't expect back soon. A client that connects before then keeps it the usual while.
 +    void retire_when_idle(BrowsingSession&, Utf16String const& top_level_site);
 +
      void disk_cache_settings_changed();

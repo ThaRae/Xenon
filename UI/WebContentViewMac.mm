@@ -24,7 +24,6 @@ static CALayer* as_layer(void* layer)
     return static_cast<CALayer*>(layer);
 }
 
-// The page layer's corner radius stays zero until a tab rounds its view.
 void WebContentView::set_has_rounded_corners(bool has_rounded_corners)
 {
     m_viewport_corner_radius = has_rounded_corners ? WEB_VIEW_CORNER_RADIUS : 0;
@@ -48,7 +47,6 @@ bool WebContentView::ensure_iosurface_layer_attached_to_native_view()
 
     if (!m_iosurface_layer) {
         auto* layer = [[CALayer alloc] init];
-        // NB: The chrome painted behind the rounded corners shows through, so the layer is not opaque.
         layer.opaque = NO;
         layer.masksToBounds = YES;
         layer.cornerRadius = viewport_corner_radius();
@@ -143,8 +141,6 @@ void WebContentView::update_iosurface_layer_background_color()
     CGColorRelease(background_color);
 }
 
-// The rounded page is outlined like the location field, so that it stands apart from chrome of a similar color. In dark
-// mode, the page stands apart from the chrome around it without one, like the location field does.
 void WebContentView::update_iosurface_layer_border()
 {
     if (!m_iosurface_layer)

@@ -1,6 +1,3 @@
-// A content script at document_idle, the default, in the same world as content-start.js. It checks what needs the UI
-// process, then leaves every content script's results on the page for its own script to report.
-// NB: Content scripts share their world's global scope, so each keeps its own names in a function.
 (() => {
     const test = globalThis.xenonContentTest;
     test.order.push("idle");
@@ -42,10 +39,8 @@
         check("storage.local", (await chrome.storage.local.get("fromContentScript")).fromContentScript === 1);
         await expectRejection("storage.session is for trusted contexts", chrome.storage.session.get(null), "not allowed");
 
-        // The background checks chrome.scripting against this page's tab.
         Object.assign(test.results, await chrome.runtime.sendMessage({ toBackground: "scripting" }));
 
-        // A web accessible extension page loads in a frame, though the page's CSP only allows frames of its own.
         const accessibleLoaded = new Promise(resolve => {
             addEventListener("message", event => {
                 if (event.origin === `chrome-extension://${chrome.runtime.id}` && event.data === "accessible-loaded")

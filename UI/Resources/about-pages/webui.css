@@ -1,8 +1,3 @@
-/*
- * Xenon's accent is #ff0050. ladybird.css colors Ladybird's own pages with its blue accent and violet brand, so the
- * colors used for those on these pages are pointed at the matching rose shades rather than overriding every rule that
- * uses them.
- */
 :root {
     --xenon-rose: #ff0050;
     --xenon-rose-light: #ff85aa;
@@ -18,7 +13,6 @@
     --focus-edge: var(--xenon-rose);
     --focus-ring: rgba(255, 0, 80, 0.16);
 
-    /* Xenon's settings page and blocking dashboard still fill their fields with this, which Ladybird's pages dropped. */
     --input-background-color: var(--page);
 
     --card-radius: 12px;

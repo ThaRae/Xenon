@@ -51,7 +51,6 @@ enum class ChromeIcon {
 };
 
 constexpr inline auto ICON_DEVICE_PIXEL_RATIOS = to_array({ 1, 2, 3 });
-// Chrome icons are drawn on a canvas of this size, with room around their shapes.
 constexpr inline int CHROME_ICON_CANVAS_SIZE = 20;
 
 QIcon load_icon_from_uri(StringView);

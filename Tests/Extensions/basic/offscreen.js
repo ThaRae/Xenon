@@ -1,7 +1,3 @@
-// The test extension's offscreen document, which answers tests.js with what it can reach.
-
-// Clears the clipboard as Proton Pass's offscreen document does once its timer runs out, with no user gesture: it pastes
-// to see whether the clipboard still holds what it copied, and if so, copies a space over it.
 function clearClipboard(copied) {
     const text = document.createElement("textarea");
     document.body.append(text);
@@ -32,7 +28,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
             return undefined;
         case "image": {
-            // An image the bundled lists block on web pages.
             const image = new Image();
             image.onload = () => sendResponse({ loaded: true });
             image.onerror = () => sendResponse({ loaded: false });

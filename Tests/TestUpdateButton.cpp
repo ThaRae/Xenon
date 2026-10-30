@@ -23,8 +23,6 @@
 
 using namespace Ladybird;
 
-// The button only asks the updater what's ready, and tells it to install. These stand in for the updater, so that an
-// update can be ready without a release to update to.
 namespace Ladybird::Updater {
 
 static Status s_status;
@@ -76,7 +74,6 @@ static void clear_ready_version()
     set_status({});
 }
 
-// The button is a widget, so it needs an application. A machine with no display gets Qt's offscreen platform.
 static QApplication& application()
 {
     static int argc = 1;
@@ -90,14 +87,12 @@ static QApplication& application()
     return *application;
 }
 
-// A stand-in for a window's toolbar, as wide as a window's.
 struct Toolbar {
     Toolbar()
     {
         resize(1000);
     }
 
-    // NB: A hidden widget is told of a new size only once it's shown, so this tells it at once.
     void resize(int width)
     {
         auto old_size = widget.size();
@@ -128,7 +123,6 @@ static QString popover_text(UpdateButton& button, char const* name)
     return label ? label->text() : QString {};
 }
 
-// With XENON_SCREENSHOT_DIR set, the button and its popover are saved there as they would be drawn, for looking at.
 static void save_screenshot(QWidget& widget, StringView name)
 {
     auto directory = Core::Environment::get("XENON_SCREENSHOT_DIR"sv);
@@ -149,7 +143,6 @@ TEST_CASE(hidden_until_an_update_is_ready)
     EXPECT(!toolbar.button.isHidden());
     EXPECT(toolbar.button.toolTip() == QString("Xenon 0.2.0 is ready to install"));
 
-    // An update that's no longer ready, as after a failed install, takes the button away again.
     clear_ready_version();
     EXPECT(toolbar.button.isHidden());
 }
@@ -175,7 +168,6 @@ TEST_CASE(relaunch_to_update_from_the_popover)
     relaunch->click();
     EXPECT_EQ(Updater::s_installs, installs + 1);
     EXPECT(!popover->isVisible());
-    // Until Xenon quits, the update is still on offer, should a page keep Xenon open.
     EXPECT(!toolbar.button.isHidden());
 }
 
@@ -199,7 +191,6 @@ TEST_CASE(later_hides_every_window_s_button_until_a_newer_update)
     EXPECT(first.button.isHidden());
     EXPECT(second.button.isHidden());
 
-    // The same update stays put off, in the windows that open afterwards too.
     set_ready_version("0.4.0"sv);
     Toolbar third;
     EXPECT(first.button.isHidden());
@@ -253,7 +244,6 @@ TEST_CASE(a_narrow_toolbar_gets_the_icon_alone)
     EXPECT_EQ(toolbar.button.height(), 34);
     save_screenshot(toolbar.button, "update-button"sv);
 
-    // As narrow as the compact layout's toolbar, which shares its row with the tabs.
     toolbar.resize(520);
     EXPECT_EQ(toolbar.button.width(), 34);
     save_screenshot(toolbar.button, "update-button-icon"sv);

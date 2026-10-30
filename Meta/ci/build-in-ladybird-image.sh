@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Runs a command in Ladybird's own Linux CI image, at the version the pinned ladybird submodule names, with the
-# checkout mounted at /xenon. CI uses this so Xenon builds with exactly the compilers, Qt, and system libraries that
-# Ladybird itself is tested with, and bumping the submodule bumps them too.
-#
-#   Meta/ci/build-in-ladybird-image.sh Meta/ci/build-and-test.sh
-#
-# Passes through JOBS and CCACHE_MAXSIZE for Meta/ci/build-and-test.sh.
 set -euo pipefail
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -25,9 +18,7 @@ for attempt in 1 2 3; do
   sleep $((attempt * 10))
 done
 
-# The image's tools (rustup, cargo) want root, so the command runs as root and then hands everything it wrote in the
-# checkout back to the runner's user, who has to be able to clean it up, and cache it, after the job.
-# shellcheck disable=SC2016 # The command line is expanded by the container's shell, not this one.
+# shellcheck disable=SC2016
 exec "${docker[@]}" run --rm \
   --volume "$root:/xenon" --workdir /xenon \
   --env JOBS --env CCACHE_MAXSIZE --env CI=true --env PYTHONDONTWRITEBYTECODE=1 \

@@ -1,13 +1,5 @@
 name: Upstream
 
-# A canary for the next submodule bump: builds Xenon against Ladybird's latest master instead of the pinned commit, so
-# an engine change that breaks Xenon shows up here first, not in the middle of a bump. Xenon's patch series
-# (Patches/ladybird) is applied onto master first, and a patch that no longer applies fails the job by name. It also
-# lists what changed upstream in UI/Qt, which Xenon's UI/ started as a copy of, so those changes can be ported. Nothing
-# is committed.
-#
-# Runs weekly, on demand, and on pull requests that change this workflow. Linux only, in the same image as ci.yml; it
-# starts from main's build caches and doesn't save its own.
 on:
   schedule:
     - cron: "23 5 * * 1"
@@ -54,11 +46,9 @@ jobs:
           git -C ladybird diff --stat "$PINNED" "$MASTER" -- UI/Qt Base/res/ladybird/about-pages | tee upstream-ui-changes.txt
 
       - name: Apply Xenon's patches to master
-        # The pinned commit was fetched above, which lets git am fall back to a three-way merge.
         run: Meta/patches.py apply --base "$MASTER"
 
       - name: Meta/check.py
-        # The submodule is off its pin here on purpose, so skip that one comparison.
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q python3-venv shellcheck

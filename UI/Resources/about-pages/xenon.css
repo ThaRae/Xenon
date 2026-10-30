@@ -4,15 +4,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/*
- * What Xenon's own pages (welcome, new tab, settings) share: a warm page, serif titles over sans-serif text, the orbit
- * mark from the app icon, and the controls the three pages are built from. Choices are keys that stand on a lip and
- * sink when chosen, and a small rose lamp marks whatever is on.
- *
- * Ladybird draws weight 500 as bold, and with antialiased font smoothing it draws 600 as regular inside transformed
- * boxes, so these pages use 400 and 600 and leave the smoothing alone.
- */
-
 :root {
     --xenon-page: #f7f4f1;
     --xenon-card: #fffdfb;
@@ -25,7 +16,6 @@
     --xenon-hairline-soft: rgba(26, 21, 23, 0.07);
     --xenon-row-hover: rgba(26, 21, 23, 0.04);
     --xenon-row-selected: rgba(255, 0, 80, 0.08);
-    /* Rose text on the page, 4.6:1. */
     --xenon-rose-ink: var(--xenon-rose-pressed);
 
     --xenon-key-face: #fffdfb;
@@ -34,16 +24,13 @@
     --xenon-key-down: #f0ebe8;
     --xenon-lamp-off: #cfc7c4;
 
-    /* The app icon's white orbit and nucleus, which turn to ink on a light page. */
     --xenon-orbit: var(--xenon-ink);
 
     --xenon-sans: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-    /* Named first, since Ladybird treats ui-serif as plain serif (Times). */
     --xenon-serif: "Iowan Old Style", Charter, Georgia, ui-serif, serif;
     --xenon-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
-/* In the dark, the pages take the app icon's own background. */
 @media (prefers-color-scheme: dark) {
     :root {
         --xenon-page: #0d0a0c;
@@ -73,7 +60,6 @@ html {
     background-color: var(--xenon-page);
 }
 
-/* Hidden means hidden, whatever display a component's own rule gives it. */
 [hidden] {
     display: none !important;
 }
@@ -90,11 +76,6 @@ body {
     background: var(--xenon-page);
 }
 
-/*
- * The mark is the app icon's artwork (UI/Icons/xenon.svg): two orbits woven around a nucleus. Its paths are the icon's
- * ellipses with the gaps where each passes under the other already cut, so it needs no masks or ids and can be repeated
- * on a page. Below about 32px, use the heavier geometry from xenon-small.svg.
- */
 .mark {
     display: block;
     fill: none;
@@ -114,7 +95,6 @@ body {
     stroke: none;
 }
 
-/* The mark beside the page's name, at the top of each page. */
 .wordmark {
     display: flex;
     align-items: center;
@@ -130,7 +110,6 @@ body {
     height: 22px;
 }
 
-/* A page's title is its only serif. */
 .page-title {
     margin: 0;
     font-family: var(--xenon-serif);
@@ -172,10 +151,6 @@ code {
     font-size: 0.9em;
 }
 
-/*
- * Keys: Xenon's buttons. A key stands on a lip, and one that's chosen (pressed, or holding a checked input) sinks onto
- * it. button.primary-button, which Ladybird's own scripts also use, is the rose key.
- */
 .key,
 button.primary-button,
 button.secondary-button {
@@ -245,7 +220,6 @@ button.primary-button.big {
     box-shadow: 0 3px 0 var(--xenon-key-lip);
 }
 
-/* A shade darker than the accent, so the white label is readable (4.6:1). */
 button.primary-button {
     color: #fff;
     background-color: var(--xenon-rose-hover);
@@ -266,7 +240,6 @@ button.primary-button:disabled {
     box-shadow: none;
 }
 
-/* Keys that do less than a key: Skip, Back to a list. */
 .text-key {
     padding: 0;
     font: inherit;
@@ -281,7 +254,6 @@ button.primary-button:disabled {
     color: var(--xenon-ink);
 }
 
-/* A small lamp: lit means on. */
 .lamp {
     display: inline-block;
     flex: none;
@@ -299,7 +271,6 @@ button.primary-button:disabled {
         0 0 6px rgba(255, 0, 80, 0.55);
 }
 
-/* A site's initial in a rounded square, where the site has no favicon. */
 .monogram {
     display: inline-flex;
     flex: none;
@@ -328,7 +299,6 @@ button.primary-button:disabled {
     height: 18px;
 }
 
-/* A box of rows, each with its control on the right. */
 .box {
     overflow: hidden;
     background-color: var(--xenon-card);
@@ -343,7 +313,6 @@ button.primary-button:disabled {
     color: var(--xenon-ink-soft);
 }
 
-/* Presets: a setting as one key that shows its value. Settings opens with them, and the welcome lists its defaults so. */
 .presets {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -421,7 +390,6 @@ button.preset[aria-expanded="true"] {
     color: var(--xenon-muted);
 }
 
-/* Picture choices: a key with a picture of the result, ringed in rose and sunk when chosen. */
 .choice {
     position: relative;
     display: flex;
@@ -456,7 +424,6 @@ button.preset[aria-expanded="true"] {
     pointer-events: none;
 }
 
-/* A choice with a control of its own below it is a box, and the part that chooses it is this label. */
 .choice-main {
     display: flex;
     flex-direction: column;
@@ -503,10 +470,6 @@ button.preset[aria-expanded="true"] {
         0 0 6px rgba(255, 0, 80, 0.55);
 }
 
-/*
- * The window drawn in a layout choice. Its parts take their colours from these classes, so the drawing follows the
- * page into the dark.
- */
 .window .frame {
     fill: var(--xenon-stone);
     stroke: var(--xenon-hairline);
@@ -546,7 +509,6 @@ button.preset[aria-expanded="true"] {
     fill: var(--xenon-rose);
 }
 
-/* List choices, as a choice screen lists search engines: rows with a monogram, a note and a radio, two to a line. */
 .picks {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -620,7 +582,6 @@ button.preset[aria-expanded="true"] {
     color: var(--xenon-muted);
 }
 
-/* The radio a pick shows, since the real one only takes keyboard focus. */
 .dot {
     flex: none;
     width: 16px;

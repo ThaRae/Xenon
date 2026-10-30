@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
 
-# Runs test262, the ECMAScript conformance suite, with Xenon's build of test262-runner (LibJS with Xenon's patches), as
-# Ladybird's CI runs it on every change (ladybird/.github/workflows/libjs-test262.yml), and compares each test's result
-# with Ladybird's own run of the commit the patches apply to.
-#
-#   ./Meta/xenon.py build test262-runner
-#   ./Meta/test262.py
-#
-# Ladybird's CI publishes each run to LadybirdBrowser/libjs-data: every test's result, and the revisions of test262 and
-# of its runner scripts (LadybirdBrowser/libjs-test262) that it used. This runs those same revisions, so a test whose
-# result differs differs because of the patches. Everything goes in Build/test262: the checkouts, Xenon's results
-# (xenon.json), Ladybird's (ladybird.json), the full difference (diff.txt), and summary.md, which CI shows.
-#
-# Exits non-zero if a test that passes upstream doesn't pass here. A timeout doesn't count: the time limit is three times
-# Ladybird's, for a slower machine, but a timeout says more about the machine than the patches.
-
 from __future__ import annotations
 
 import argparse
@@ -35,9 +20,7 @@ LIBJS_DATA = "https://github.com/LadybirdBrowser/libjs-data.git"
 LIBJS_TEST262 = "https://github.com/LadybirdBrowser/libjs-test262.git"
 TEST262 = "https://github.com/tc39/test262.git"
 
-# Ladybird's CI gives each test 10 seconds, on bigger machines than GitHub's.
 TIMEOUT_SECONDS = 30
-# How many of the tests that changed summary.md names, for each kind of change.
 LISTED_TESTS = 50
 
 RESULT_NAMES = {
@@ -109,7 +92,6 @@ def main() -> int:
     else:
         theirs_path = WORK_DIR / "ladybird.json"
         theirs_path.write_text(json.dumps(upstream["per_file"]))
-        # Ladybird's own report of what changed, test by test, for the log and the artifact.
         diff = subprocess.run(
             [python, scripts / "per_file_result_diff.py", "--old", theirs_path, "--new", ours_path],
             cwd=scripts,
@@ -124,16 +106,13 @@ def main() -> int:
     return 1 if regressions else 0
 
 
-# Ladybird's CI run of the given commit, from libjs-data: each test's result, and the revisions it ran.
 def ladybird_run(commit: str) -> dict | None:
     data = WORK_DIR / "libjs-data"
-    # Only the history: each commit's files are fetched when read, and only two are.
     if not (data / ".git").exists():
         subprocess.run(["git", "clone", "--quiet", "--filter=blob:none", "--no-checkout", LIBJS_DATA, data], check=True)
     else:
         subprocess.run(["git", "fetch", "--quiet", "origin"], cwd=data, check=True)
 
-    # Each of its commits is one run, "Deploying to master from @ LadybirdBrowser/ladybird@<commit>".
     found = git(data, "log", "-1", "--format=%H", "--fixed-strings", f"--grep=ladybird@{commit}", "origin/HEAD")
     if not found:
         return None
@@ -162,7 +141,6 @@ def git(directory: Path, *args: str) -> str:
 
 
 def describe(base: str, versions: dict, ours: dict, upstream: dict | None) -> tuple[str, list[str]]:
-    """summary.md, and the tests that pass upstream but not here (timeouts aside)."""
     our_results = ours["results"]
     patch_count = len(patches.patch_files())
     lines = ["### test262", ""]

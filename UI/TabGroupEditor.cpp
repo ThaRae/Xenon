@@ -52,7 +52,6 @@ private:
         auto color = tab_group_color(m_color, palette());
         QRectF bounds = rect();
 
-        // The chosen color has a ring around it.
         if (isChecked() || hasFocus()) {
             painter.setPen(QPen(color, 2));
             painter.setBrush(Qt::NoBrush);
@@ -181,7 +180,6 @@ TabGroupEditor::TabGroupEditor(QWidget* parent)
         layout->addWidget(separator);
     };
 
-    // Each action closes the editor first, since some of them end the group.
     auto add_action = [&](char const* text, auto action) {
         auto* button = new QPushButton(text, &card());
         button->setObjectName("XenonTabGroupEditorAction");
@@ -198,7 +196,6 @@ TabGroupEditor::TabGroupEditor(QWidget* parent)
         return button;
     };
 
-    // The actions are in Chromium's order.
     add_separator();
     layout->setSpacing(2);
     add_action("New Tab in Group", [](TabGroups& groups, TabGroup& group) { groups.open_new_tab_in_group(group); });
@@ -254,8 +251,6 @@ void TabGroupEditor::update_from_group()
     m_move_to_new_window_button->setVisible(m_groups && !m_groups->holds_every_tab(*m_group));
 }
 
-// The card goes below its anchor with their left edges aligned, or beside it, and stays on the anchor's screen. Only the
-// shadow around the card may reach past the edge of the screen.
 void TabGroupEditor::place(QRect const& anchor, Placement placement)
 {
     auto margins = layout()->contentsMargins();

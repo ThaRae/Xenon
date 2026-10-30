@@ -32,7 +32,6 @@ main {
     margin: 2px 0 0;
 }
 
-/* The popover's power button, small. */
 .power-mark {
     flex: none;
     width: 48px;
@@ -174,7 +173,6 @@ textarea#custom-filters:focus {
 
 .add-trusted input {
     flex: 1;
-    /* ladybird.css sizes fields for its own pages, and draws a focus ring of its own. */
     height: auto;
     box-shadow: none;
     padding: 8px 12px;

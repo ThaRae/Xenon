@@ -1,14 +1,5 @@
 name: test262
 
-# test262, the ECMAScript conformance suite, against Xenon's LibJS (the engine with Xenon's patches), as Ladybird's CI
-# runs it on every change (ladybird/.github/workflows/libjs-test262.yml). Meta/test262.py compares each test's result
-# with Ladybird's own run of the pinned commit, which LadybirdBrowser/libjs-data publishes, at the same test262
-# revision, so whatever differs comes from the patches. A test that passes upstream and fails here fails the job; a
-# timeout only shows in the summary, since GitHub's runners are slower than Ladybird's.
-#
-# Runs when the engine changes: on pull requests and pushes to main that change the patches or move the submodule, and
-# by hand. Linux, in Ladybird's CI image, from the caches main's builds saved (ci.yml), which have LibJS compiled
-# already; it builds only test262-runner, and doesn't save caches of its own.
 on:
   push:
     branches: [main]
@@ -34,7 +25,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      # As in ci.yml: the runner starts with about 20 GB free, and vcpkg's packages alone take much of it.
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
@@ -57,7 +47,6 @@ jobs:
             ladybird/Build/caches
           key: linux-${{ env.IMAGE_VERSION }}-${{ github.sha }}
           restore-keys: linux-${{ env.IMAGE_VERSION }}-
-          # Without them, configuring alone builds every dependency from source, for hours.
           fail-on-cache-miss: true
 
       - name: Build test262-runner and run test262

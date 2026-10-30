@@ -21,7 +21,6 @@
 
 using namespace Ladybird::Extensions;
 
-// A directory that's deleted again at the end of the test.
 class TemporaryDirectory {
 public:
     TemporaryDirectory()
@@ -70,7 +69,6 @@ static URL::URL url(StringView text)
 
 TEST_CASE(extension_ids_match_chrome)
 {
-    // From Chromium's crx_file/id_util_unittest.cc.
     EXPECT_EQ(extension_id_from_bytes("test"sv.bytes()), "jpignaibiiemhngfjkcpokkamffknabf"sv);
     EXPECT_EQ(extension_id_from_bytes("_"sv.bytes()), "ncocknphbhhlhkikpnnlmbcnbgdempcd"sv);
     EXPECT_EQ(extension_id_from_bytes("this_string_is_longer_than_a_single_sha256_hash_digest"sv.bytes()), "jimneklojkjdibfkgiiophfhjhbdgcfi"sv);
@@ -209,7 +207,6 @@ TEST_CASE(match_patterns)
     EXPECT(MatchPattern::parse("https://foo.com"sv).is_error());
     EXPECT(MatchPattern::parse("chrome://settings/*"sv).is_error());
 
-    // What permissions.contains() asks: whether granted host permissions cover a pattern.
     auto contains = [](StringView granted, StringView asked) {
         return MUST(MatchPattern::parse(granted)).contains(MUST(MatchPattern::parse(asked)));
     };
@@ -231,7 +228,6 @@ TEST_CASE(match_patterns)
 
 TEST_CASE(content_script_matching)
 {
-    // Bitwarden's, and one with Chrome's other ways of narrowing them down.
     auto manifest = MUST(parse(R"({
         "manifest_version": 3, "name": "Test", "version": "1",
         "content_scripts": [
@@ -269,7 +265,6 @@ TEST_CASE(content_script_matching)
 
 TEST_CASE(externally_connectable)
 {
-    // Proton Pass's, and patterns Chrome ignores, for every site.
     auto manifest = MUST(parse(R"({
         "manifest_version": 3, "name": "Test", "version": "1",
         "externally_connectable": {
@@ -293,7 +288,6 @@ TEST_CASE(externally_connectable)
 
 TEST_CASE(registered_content_scripts)
 {
-    // Bitwarden's passkey scripts, as it registers them.
     auto registered = MUST(RegisteredContentScript::from_json(json(R"({
         "id": "fido2-page-script-registration",
         "js": ["/content/fido2-page-script.js"],
@@ -312,7 +306,6 @@ TEST_CASE(registered_content_scripts)
     EXPECT(registered.script.matches_document(url("https://example.com/"sv), false));
     EXPECT(!registered.script.matches_document(url("https://example.com/feed.xml"sv), true));
 
-    // What getRegisteredContentScripts() gives back reads in again as the same script.
     auto json_again = registered.to_json();
     EXPECT_EQ(json_again.get_string("world"sv), "MAIN"sv);
     EXPECT_EQ(json_again.get_string("runAt"sv), "document_start"sv);
@@ -393,7 +386,6 @@ TEST_CASE(granted_optional_permissions)
     EXPECT(extension->has_permission("storage"sv));
     EXPECT(!extension->has_permission("privacy"sv));
 
-    // Only what the manifest lists as optional can be granted, so a permission an update dropped goes.
     extension->set_granted_optional_permissions({ "privacy"_string, "tabs"_string });
     EXPECT(extension->has_permission("privacy"sv));
     EXPECT(!extension->has_permission("tabs"sv));
@@ -456,7 +448,6 @@ TEST_CASE(resolving_urls_stays_inside_the_extension)
     EXPECT(resolve("/..%5c..%5csecret.txt"sv).is_error());
     EXPECT(resolve("/popup/index.html%00"sv).is_error());
 
-    // Another extension's URL, even for a file that exists here.
     EXPECT(extension->resolve(url("chrome-extension://jpignaibiiemhngfjkcpokkamffknabf/popup/index.html"sv)).is_error());
 }
 

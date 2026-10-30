@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// The new tab page has no channel to the browser of its own, so once it has loaded, Xenon's UI calls show() with what
-// to display (UI/NewTabPage.cpp): the most visited sites, the bookmarks bar's links and the tabs closed last, or only
-// that the window is private. Site titles come from the pages themselves, so everything goes in as text.
-
 const DIAL_SIZE = 8;
 
 const dialGroups = {
@@ -52,7 +48,6 @@ function shortHost(host) {
     return host.replace(/^www\./, "");
 }
 
-// The site's own name in its host, for a monogram: "ycombinator" in news.ycombinator.com, "bbc" in www.bbc.co.uk.
 function siteName(host) {
     const labels = host.split(".");
     if (labels.length < 2) return host;
@@ -126,14 +121,12 @@ function renderDial() {
     dial.setAttribute("aria-label", group.label);
     document.querySelector("#dial-note").textContent = sites.length ? group.note : "";
 
-    // A profile with no history yet gets empty keys, so the page shows what will fill it.
     const empty = sites.length === 0 && currentGroup === "sites";
     dial.classList.toggle("empty", empty);
     dial.replaceChildren(...(empty ? [...Array(DIAL_SIZE).keys()].map(emptyTile) : sites.map(siteTile)));
     document.querySelector("#no-sites").hidden = !empty;
 }
 
-// "4 min ago", from the time a tab was closed.
 function closedWhen(closedAt) {
     const minutes = Math.max(0, Math.round((Date.now() - closedAt) / 60000));
     if (minutes < 1) return "Just now";
@@ -187,8 +180,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // The page waits for the browser's call so it doesn't show empty keys first. Should the call never come (the page
-    // opened some other way), it shows the page with nothing on it rather than nothing at all.
     setTimeout(() => {
         if (!shown) window.xenonNewTab.show({});
     }, 1500);

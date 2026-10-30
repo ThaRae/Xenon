@@ -47,7 +47,6 @@ TEST_CASE(manifest_without_a_format_is_a_bundled_one)
     EXPECT(!manifest.format.has_value());
 }
 
-// Nothing a manifest says can put a file outside the bundle, or let a list run trusted scriptlets it isn't trusted with.
 TEST_CASE(manifest_files_stay_in_their_directories)
 {
     EXPECT(parse_bundle_manifest(manifest_with(list("lists/../../evil.txt"sv))).is_error());
@@ -96,7 +95,6 @@ TEST_CASE(signature_is_checked_against_the_key)
     auto signature = MUST(encode_base64(signature_bytes));
 
     EXPECT(bundle_signature_is_valid(manifest.bytes(), signature, public_key));
-    // manifest.json.sig may end with a newline.
     EXPECT(bundle_signature_is_valid(manifest.bytes(), ByteString::formatted("{}\n", signature), public_key));
 
     auto tampered = manifest_with(list("lists/b.txt"sv));
@@ -121,7 +119,6 @@ TEST_CASE(files_are_checked_by_size_and_hash)
     EXPECT(!file_matches(file, "abcd"sv.bytes()));
 }
 
-// The manifest Xenon ships, which Meta/update-filter-lists.py writes, reads as a bundle.
 TEST_CASE(bundled_manifest_reads)
 {
     auto file = MUST(Core::File::open(XENON_SOURCE_DIR "/UI/Resources/filter-lists/manifest.json"sv, Core::File::OpenMode::Read));

@@ -1,15 +1,3 @@
-// chrome.runtime in a web page that an extension's externally_connectable matches, as Chrome gives one: sendMessage()
-// and connect() to an extension by its ID, and lastError.
-//
-// This runs in the page's own world before the page's scripts, as the body of a function given `config`: the IDs of
-// the extensions the page may message, and the name of the DOM events that carry its messages. The page's world has no
-// bridge to the UI process, so each of those extensions has a relay in an isolated world of its own in the page
-// (externally-connectable-relay.js), which hears `${config.eventName}-request` events on the document and answers with
-// `${config.eventName}-reply` events. The page could send those events itself, as it could call chrome.runtime: the UI
-// process knows which document each relay is in, names the sender itself, and only lets a relay message its extension.
-//
-// https://developer.chrome.com/docs/extensions/develop/concepts/messaging#external-webpage
-
 "use strict";
 
 const NO_RECEIVER = "Could not establish connection. Receiving end does not exist.";
@@ -23,18 +11,15 @@ function post(extensionId, message) {
     document.dispatchEvent(new CustomEvent(`${config.eventName}-request`, { detail }));
 }
 
-// Messages travel as JSON, as Chrome sends them.
 function toJSON(value) {
     const json = JSON.stringify(value);
     return json === undefined ? null : JSON.parse(json);
 }
 
-// Port IDs only have to be unique. crypto.randomUUID() is only there in secure contexts, and these pages may not be.
 function randomID() {
     return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
-// chrome.runtime.lastError is set only while a callback runs, as in Chrome.
 let lastError;
 let lastErrorChecked = false;
 
@@ -115,7 +100,6 @@ class Port {
         post(this.#extensionId, { type: "port-disconnect", port: this.#id });
     }
 
-    // The extension's end went away, or never came.
     closeFromUIProcess(error) {
         if (this.#disconnected) return;
         this.#disconnected = true;

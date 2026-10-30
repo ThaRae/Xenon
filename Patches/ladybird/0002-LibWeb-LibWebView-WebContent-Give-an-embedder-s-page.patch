@@ -24,56 +24,53 @@ host.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibWeb/DOM/Document.cpp            |  4 +
- Libraries/LibWeb/Page/Page.h                 |  3 +
+ Libraries/LibWeb/DOM/Document.cpp            |  2 +
+ Libraries/LibWeb/Page/Page.h                 |  2 +
  Libraries/LibWebView/URLSchemeHandler.cpp    | 50 +++++++++-
- Libraries/LibWebView/URLSchemeHandler.h      | 39 +++++++-
+ Libraries/LibWebView/URLSchemeHandler.h      | 32 ++++++-
  Libraries/LibWebView/WebContentClient.cpp    |  8 ++
  Libraries/LibWebView/WebContentClient.h      |  1 +
- Libraries/LibWebView/WebContentPage.cpp      | 38 ++++++++
- Libraries/LibWebView/WebContentPage.h        |  7 ++
+ Libraries/LibWebView/WebContentPage.cpp      | 34 +++++++
+ Libraries/LibWebView/WebContentPage.h        |  6 ++
  Services/WebContent/CMakeLists.txt           |  1 +
  Services/WebContent/ConnectionFromClient.cpp |  6 ++
  Services/WebContent/ConnectionFromClient.h   |  1 +
- Services/WebContent/EmbedderBridge.cpp       | 99 ++++++++++++++++++++
- Services/WebContent/EmbedderBridge.h         | 37 ++++++++
+ Services/WebContent/EmbedderBridge.cpp       | 98 ++++++++++++++++++++
+ Services/WebContent/EmbedderBridge.h         | 33 +++++++
  Services/WebContent/PageClient.cpp           |  5 +
  Services/WebContent/PageClient.h             |  5 +
  Services/WebContent/WebContentClient.ipc     |  2 +
  Services/WebContent/WebContentServer.ipc     |  1 +
- 17 files changed, 304 insertions(+), 3 deletions(-)
+ 17 files changed, 284 insertions(+), 3 deletions(-)
  create mode 100644 Services/WebContent/EmbedderBridge.cpp
  create mode 100644 Services/WebContent/EmbedderBridge.h
 
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index 087631d86c9e4bd9e89b032435ae7f9d013bd788..2255ec812889c5947e833f5214706dd949794543 100644
+index 087631d86c9e4bd9e89b032435ae7f9d013bd788..61ef86d8e4ca6aa52dc9d5cc15ea23571574bb13 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -8067,6 +8067,10 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+@@ -8067,6 +8067,8 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
  
  void Document::set_ready_to_run_scripts()
  {
-+    // AD-HOC: The embedder may prepare the document's realm before its scripts run, as for the pages of a scheme it
-+    //         serves itself.
 +    page().client().page_document_is_ready_to_run_scripts(*this);
 +
      m_ready_to_run_scripts = true;
      if (auto callback = m_deferred_parser_start) {
          m_deferred_parser_start = nullptr;
 diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
-index acdfdae6ad8a0c8597cf4dfcc5196d0acd537b7a..a02a105e5dac169caeb2823b0653aaf328adc46a 100644
+index 6c231c09a8c359bae7c9ce0a8fc05b55569c2a53..4306eb60ebb7719c93239ed1472c8afe4f9d9958 100644
 --- a/Libraries/LibWeb/Page/Page.h
 +++ b/Libraries/LibWeb/Page/Page.h
-@@ -872,6 +872,9 @@ public:
+@@ -872,6 +872,8 @@ public:
      virtual void page_did_consume_user_activation([[maybe_unused]] HTML::UserActivationConsumption consumption) { }
  
      virtual void request_file(FileRequest) = 0;
-+    // Called before any script of the document's own may run, for the embedder to prepare the document's realm.
 +    virtual void page_document_is_ready_to_run_scripts(DOM::Document&) { }
 +
-     // A URL of a scheme the embedder serves itself, which only the UI process can answer.
      virtual void request_embedder_resource(EmbedderResourceRequest request) { request.on_complete(Error::from_errno(ENOTSUP)); }
  
+     // https://html.spec.whatwg.org/multipage/input.html#show-the-picker,-if-applicable
 diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
 index fd107545c9fefd072f77296494bcc78c77a4bebe..43a6678142343d70e85fa46ab3b5c1bd7e47cce8 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.cpp
@@ -157,7 +154,7 @@ index fd107545c9fefd072f77296494bcc78c77a4bebe..43a6678142343d70e85fa46ab3b5c1bd
 +
  }
 diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
-index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..7916cd15b545b7407dd048b6fe1193ec4601ac29 100644
+index f338c72c97c9db466576fa64ef9075b7a44f91cc..407d54bee25998b091232c655ecce76f3a9cfb04 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.h
 +++ b/Libraries/LibWebView/URLSchemeHandler.h
 @@ -11,11 +11,14 @@
@@ -175,12 +172,11 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..7916cd15b545b7407dd048b6fe1193ec
  
  namespace WebView {
  
-@@ -41,10 +44,44 @@ struct URLSchemeResponse {
+@@ -35,7 +38,34 @@ struct URLSchemeResponse {
  
  using URLSchemeHandler = Function<ErrorOr<URLSchemeResponse>(URLSchemeRequest const&)>;
  
-+// A document with a script bridge to the UI process, as the UI process knows it: its URL and origin come from the UI
-+// process's own records, never from the renderer.
+-WEBVIEW_API void register_url_scheme(String scheme, URLSchemeHandler);
 +class WEBVIEW_API ScriptBridgeEndpoint {
 +public:
 +    ScriptBridgeEndpoint(WebContentPage&, Web::HTML::CrossProcessId document_id, URL::URL, URL::Origin);
@@ -189,9 +185,7 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..7916cd15b545b7407dd048b6fe1193ec
 +    URL::URL const& url() const { return m_url; }
 +    URL::Origin const& origin() const { return m_origin; }
 +
-+    // Whether the document is still around. Messages to a document that's gone are dropped.
 +    bool is_open() const;
-+    // The view showing the document, which is the top-level traversable's.
 +    Optional<u64> view_id() const;
 +    void post_message(String) const;
 +
@@ -204,18 +198,11 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..7916cd15b545b7407dd048b6fe1193ec
 +    URL::Origin m_origin;
 +};
 +
-+// A script bridge between the UI process and the scheme's documents. Before a document's own scripts run, its bootstrap
-+// script runs as the body of a function given the bridge: an object whose postMessage(string) calls on_message, and
-+// whose onmessage, if the script sets it, receives what ScriptBridgeEndpoint::post_message() sends.
 +struct URLSchemeBridge {
 +    Function<Optional<String>(ScriptBridgeEndpoint const&)> bootstrap_script;
 +    Function<void(ScriptBridgeEndpoint const&, String message)> on_message;
 +};
 +
- // Serves a URL scheme from the UI process, as a browser serves its extension pages. The scheme's URLs get tuple origins
- // and are potentially trustworthy (see URL::register_embedder_scheme()). Register every scheme before the first
- // renderer starts, since renderers learn the schemes when they launch. A handler that fails makes a network error.
--WEBVIEW_API void register_url_scheme(String scheme, URLSchemeHandler);
 +WEBVIEW_API void register_url_scheme(String scheme, URLSchemeHandler, Optional<URLSchemeBridge> = {});
  URLSchemeHandler* url_scheme_handler(StringView scheme);
 +URLSchemeBridge* url_scheme_bridge(StringView scheme);
@@ -253,17 +240,15 @@ index 6d4516b806b9cd86eea0a86542c5079c29dd6a0c..e12c565eef40d7c2bd837aeca2a21569
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index e4c4c74742506ecdcac03564db9daf6fb04c7dc8..8d3ce597f918f350f6e6bdc5c7ab34e123646ce3 100644
+index e4c4c74742506ecdcac03564db9daf6fb04c7dc8..b0d82d78053929507395e8e169cdbdbedfa26cec 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1623,6 +1623,44 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1623,6 +1623,40 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
      async_handle_embedder_resource_return(0, move(response.value().file), move(response.value().headers), request_id);
  }
  
-+// A document of this page whose scheme has a script bridge, which the page hosts or is creating.
 +Optional<ScriptBridgeEndpoint> WebContentPage::embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id)
 +{
-+    // NB: A page that has closed, or whose traversable has gone, hosts nothing, though it may live on a little longer.
 +    if (!m_is_open || !m_traversable)
 +        return {};
 +
@@ -290,8 +275,6 @@ index e4c4c74742506ecdcac03564db9daf6fb04c7dc8..8d3ce597f918f350f6e6bdc5c7ab34e1
 +
 +void WebContentPage::did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message)
 +{
-+    // NB: A document may post a message as it goes away, so one this page no longer hosts is dropped rather than taken
-+    //     for misbehavior. Who sent the message comes from the UI process's records, never from the message.
 +    auto endpoint = embedder_bridge_endpoint(document_id);
 +    if (!endpoint.has_value())
 +        return;
@@ -302,7 +285,7 @@ index e4c4c74742506ecdcac03564db9daf6fb04c7dc8..8d3ce597f918f350f6e6bdc5c7ab34e1
  {
      view().did_request_color_picker({}, *this, current_color);
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 1389eea2373e2d688bebafd57fff0490eae5fa62..fbd9e947859e4123e7be54e20019d595d841d7d1 100644
+index 1389eea2373e2d688bebafd57fff0490eae5fa62..60469b4cdf7c299eea7bd766cbc4f1f48f5a8d3a 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
 @@ -26,6 +26,7 @@
@@ -321,17 +304,16 @@ index 1389eea2373e2d688bebafd57fff0490eae5fa62..fbd9e947859e4123e7be54e20019d595
      , public WebContentClientPageStub
      , public WebContentTestClientPageStub
      , public WebContentServerPageProxy {
-@@ -173,6 +175,9 @@ public:
+@@ -173,6 +175,8 @@ public:
      void fail_renderer_owned_downloads();
      void reset_state_for_testing();
  
-+    // A document of this page whose scheme has a script bridge, which the page hosts or is creating.
 +    Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
 +
  private:
      void relay_finished_input_event(WebContentPage const& reporting_page, u64 event_id, Web::EventResult);
      Optional<CanonicalNavigable&> population_worker_navigable(Web::HTML::CrossProcessId navigable_id) const;
-@@ -273,6 +278,7 @@ private:
+@@ -273,6 +277,7 @@ private:
      virtual void did_change_picture_in_picture_player_controls_visibility(bool shown) override;
      virtual void did_request_file(ByteString path, i32 request_id) override;
      virtual void did_request_embedder_resource(URL::URL url, i32 request_id) override;
@@ -339,7 +321,7 @@ index 1389eea2373e2d688bebafd57fff0490eae5fa62..fbd9e947859e4123e7be54e20019d595
      virtual void did_request_color_picker(Color current_color) override;
      virtual void did_request_geolocation_position(u64 request_id, Web::HTML::CrossProcessId document_id) override;
      virtual void did_cancel_geolocation_position_request(u64 request_id) override;
-@@ -376,6 +382,7 @@ private:
+@@ -376,6 +381,7 @@ private:
      Messages::WebContentClient::DidRequestCookieResponse did_request_cookie(Optional<Web::HTML::EnvironmentId> const&, URL::URL, HTTP::Cookie::Source);
      Messages::WebContentClient::DidRequestAllCookiesCookiestoreResponse did_request_all_cookies_cookiestore(Web::HTML::EnvironmentId const&, URL::URL);
      Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry);
@@ -390,10 +372,10 @@ index dd610dd20edea9dedee19ddc3f1dbdce9b836ef9..8557a745eea087b4cbf491160b49b431
      virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
 diff --git a/Services/WebContent/EmbedderBridge.cpp b/Services/WebContent/EmbedderBridge.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..04a5e694251252b985ead1e3b65d5e301a63371d
+index 0000000000000000000000000000000000000000..17c9bd35d25e6dfc0a8bd3633e559f6f7d8b222c
 --- /dev/null
 +++ b/Services/WebContent/EmbedderBridge.cpp
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,98 @@
 +/*
 + * Copyright (c) 2026, the Xenon developers.
 + *
@@ -454,7 +436,6 @@ index 0000000000000000000000000000000000000000..04a5e694251252b985ead1e3b65d5e30
 +        client.async_did_post_embedder_message(page_id, document_id, move(message));
 +        return JS::js_undefined(); }, 1, JS::default_attributes);
 +
-+    // NB: The bootstrap is a function body, so that the bridge is a parameter rather than something on the global object.
 +    auto source = Utf16String::formatted("(function (bridge) {{\n{}\n}})", *bootstrap);
 +    auto script = Web::HTML::ClassicScript::create("embedder bootstrap", source.utf16_view(), settings, settings.api_base_url());
 +    auto function = script->run(Web::HTML::ClassicScript::RethrowErrors::Yes);
@@ -495,10 +476,10 @@ index 0000000000000000000000000000000000000000..04a5e694251252b985ead1e3b65d5e30
 +}
 diff --git a/Services/WebContent/EmbedderBridge.h b/Services/WebContent/EmbedderBridge.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..821ebf0605e312a654000324200d7cbf2a94dc21
+index 0000000000000000000000000000000000000000..b92c91969e5c84a2927e06c1b69cc8e8f4b4fadb
 --- /dev/null
 +++ b/Services/WebContent/EmbedderBridge.h
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,33 @@
 +/*
 + * Copyright (c) 2026, the Xenon developers.
 + *
@@ -518,10 +499,6 @@ index 0000000000000000000000000000000000000000..821ebf0605e312a654000324200d7cbf
 +
 +namespace WebContent {
 +
-+// The script bridge between the UI process and the documents of the schemes it serves itself (see
-+// WebView::register_url_scheme()). Before a document's own scripts run, the UI process may give it a bootstrap script,
-+// which runs as the body of a function given the bridge: an object whose postMessage(string) sends a message to the UI
-+// process, and whose onmessage, if the script sets it, receives the UI process's messages.
 +class EmbedderBridges {
 +public:
 +    void install(ConnectionFromClient&, Web::PageId, Web::DOM::Document&);

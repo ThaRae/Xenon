@@ -14,7 +14,6 @@ static constexpr auto PATTERN_SCHEMES = to_array<StringView>({ "*"sv, "http"sv, 
 
 bool glob_matches(StringView glob, StringView text, bool question_mark_is_wildcard)
 {
-    // Iterative wildcard matching, backtracking to the last star.
     size_t g = 0;
     size_t t = 0;
     Optional<size_t> star;
@@ -76,7 +75,6 @@ ErrorOr<MatchPattern, String> MatchPattern::parse(StringView pattern)
     if (host.is_empty())
         return invalid("Empty host"sv);
 
-    // A port, or ":*" for any. Hosts that are IPv6 addresses keep their colons inside brackets.
     if (auto colon = host.find_last(':'); colon.has_value() && !host.ends_with(']')) {
         auto port = host.substring_view(*colon + 1);
         host = host.substring_view(0, *colon);
@@ -136,7 +134,6 @@ bool MatchPattern::matches(URL::URL const& url) const
             return false;
     }
 
-    // The path pattern covers the query too.
     StringBuilder path;
     path.append(url.serialize_path());
     if (auto query = url.query(); query.has_value()) {
@@ -146,7 +143,6 @@ bool MatchPattern::matches(URL::URL const& url) const
     return glob_matches(m_path, path.string_view());
 }
 
-// https://source.chromium.org/chromium/chromium/src/+/main:extensions/common/url_pattern.cc (URLPattern::Contains)
 bool MatchPattern::contains(MatchPattern const& other) const
 {
     if (m_all_urls)
@@ -165,7 +161,6 @@ bool MatchPattern::contains(MatchPattern const& other) const
     if (!m_any_port && (other.m_any_port || other.m_port != m_port))
         return false;
 
-    // Chrome drops the other path's trailing wildcard and matches what's left against this path.
     auto other_path = other.m_path.bytes_as_string_view();
     if (other_path.ends_with('*'))
         other_path = other_path.substring_view(0, other_path.length() - 1);

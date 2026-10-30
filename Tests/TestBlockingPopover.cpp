@@ -20,7 +20,6 @@
 
 using namespace Ladybird;
 
-// The popover is a widget, so it needs an application. A machine with no display gets Qt's offscreen platform.
 static QApplication& application()
 {
     static int argc = 1;
@@ -71,7 +70,6 @@ static Vector<QString> labels_named(BlockingPopover& popover, char const* name)
     return texts;
 }
 
-// With XENON_SCREENSHOT_DIR set, the popover's card is saved there as it would be drawn, for looking at.
 static void save_screenshot(BlockingPopover& popover, StringView name)
 {
     auto directory = Core::Environment::get("XENON_SCREENSHOT_DIR"sv);
@@ -107,10 +105,8 @@ TEST_CASE(shows_what_was_blocked_and_where_the_page_connected)
     EXPECT_EQ(values.size(), 3u);
     EXPECT(values[0] == QString("12"));
     EXPECT(values[2] == QString("4"));
-    // 12 blocked out of 12 + 38 requests.
     EXPECT(labels_named(popover, "XenonBlockingStatCaption").first().contains("(24%)"));
 
-    // The site's own hosts come first, the busiest first.
     auto first_party = labels_named(popover, "XenonBlockingFirstPartyDomain");
     EXPECT_EQ(first_party.size(), 2u);
     EXPECT(first_party[0] == QString("news.example.com"));
@@ -145,7 +141,6 @@ TEST_CASE(a_site_with_blocking_off)
     EXPECT(!power->isChecked());
     EXPECT(power->isEnabled());
     EXPECT(child<QLabel>(popover, "XenonBlockingPowerCaption")->text() == QString("Not blocking on this site"));
-    // Nothing blocked, so no share of the requests.
     EXPECT(labels_named(popover, "XenonBlockingStatCaption").first() == QString("blocked on this page"));
 
     save_screenshot(popover, "blocking-popover-site-off"sv);
@@ -158,7 +153,6 @@ TEST_CASE(blocking_off_everywhere_disables_the_power_button)
     use_color_scheme(popover, Qt::ColorScheme::Light);
     popover.set_snapshot(snapshot(WebView::ContentBlockingState::Disabled, 0));
     EXPECT(!child<QAbstractButton>(popover, "XenonBlockingPower")->isEnabled());
-    // Without domains yet, the domain count waits for them.
     EXPECT(stat_values(popover)[2] == QString("–"));
 }
 
@@ -199,7 +193,6 @@ TEST_CASE(controls_report_to_their_callbacks)
     EXPECT(switched[0] == BlockingSiteSwitch::Popups);
     EXPECT(switched[1] == BlockingSiteSwitch::RemoteFonts);
 
-    // Switches that change because the page did don't report back.
     switched.clear();
     popover.set_site_switch(BlockingSiteSwitch::Popups, false);
     EXPECT(switched.is_empty());

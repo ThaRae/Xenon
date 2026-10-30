@@ -38,7 +38,6 @@ static constexpr u32 TOOLBAR_ICON_PIXELS = 32;
 
 namespace {
 
-// What action.set*() changed, for every tab or for one.
 struct ActionProperties {
     Optional<String> badge_text;
     Optional<QColor> badge_background_color;
@@ -54,7 +53,6 @@ struct ActionState {
     HashMap<i64, ActionProperties> tabs;
 };
 
-// An extension's popup, and the window of the tab its button is in.
 struct PopupView {
     QPointer<BrowserWindow> window;
     QPointer<QWidget> popup;
@@ -84,8 +82,6 @@ static State& state()
     static NeverDestroyed<State> state;
     return *state;
 }
-
-// --- Windows and tabs --------------------------------------------------------------------------------------------------
 
 static Vector<BrowserWindow*> all_windows()
 {
@@ -214,8 +210,6 @@ static BrowserWindow* find_window(i64 id)
     return nullptr;
 }
 
-// The window chrome.tabs and chrome.windows mean by "current": the caller's own, if it's in a tab or a popup, and the
-// last focused one otherwise.
 static BrowserWindow* current_window(Optional<u64> caller_view_id)
 {
     if (caller_view_id.has_value()) {
@@ -229,7 +223,6 @@ static BrowserWindow* current_window(Optional<u64> caller_view_id)
     return Application::the().active_window_if_any();
 }
 
-// Chrome shows an extension a tab's URL and title only with the "tabs" permission, or host permission for the URL.
 static bool may_see_details(Extension const& extension, URL::URL const& url)
 {
     auto const& manifest = extension.manifest();
@@ -315,8 +308,6 @@ static JsonObject window_to_json(BrowserWindow& window, Extension const& extensi
     return json;
 }
 
-// A headless browser, as Meta/xenon.py test runs, has no tabs. The view it loads its page in stands for tab 1 of window
-// 1, so that what extensions do with tabs can be tested there too.
 static constexpr i64 HEADLESS_TAB_ID = 1;
 static constexpr i64 HEADLESS_WINDOW_ID = 1;
 
@@ -397,9 +388,6 @@ bool is_popup_view(u64 view_id)
     return state().popup_views.contains(view_id);
 }
 
-// --- Events ------------------------------------------------------------------------------------------------------------
-
-// Each extension sees the tab as its permissions let it.
 static void dispatch_tab_event(StringView name, Tab& tab, BrowserWindow& window, Function<JsonArray(JsonObject tab)> const& make_args)
 {
     for (auto const& extension : Registry::the().extensions())
@@ -415,7 +403,6 @@ static void dispatch_tab_updated(Tab& tab, JsonObject const& change)
     for (auto const& extension : Registry::the().extensions()) {
         auto tab_json = tab_to_json(tab, *window, extension);
 
-        // The change includes only what the extension may see.
         JsonObject visible_change;
         change.for_each_member([&](String const& key, JsonValue const& value) {
             if (!key.is_one_of("url"sv, "title"sv) || tab_json.has(key))
@@ -432,10 +419,6 @@ static void dispatch_tab_updated(Tab& tab, JsonObject const& change)
     }
 }
 
-// --- chrome.commands ---------------------------------------------------------------------------------------------------
-
-// Chrome's shortcut names ("Ctrl+Shift+Y", "MacCtrl+Comma") in Qt's terms. As in Chrome, Ctrl means Command on macOS,
-// which is what Qt means by it there too.
 static QKeySequence key_sequence_for_shortcut(StringView shortcut)
 {
     QStringList keys;
@@ -519,7 +502,6 @@ void did_create_window(BrowserWindow& window)
 
 void did_create_tab(BrowserWindow& window, Tab& tab)
 {
-    // A tab moving to another window is set up again there; it's the same tab, which Chrome reports as attached.
     if (state().tab_ids.contains(&tab)) {
         JsonObject attach_info;
         attach_info.set("newWindowId"sv, window_id(window));
@@ -567,11 +549,8 @@ void did_activate_tab(BrowserWindow& window, Tab& tab)
     args.must_append(move(info));
     Router::the().dispatch_event_to_all("tabs.onActivated"sv, move(args));
 
-    // The toolbar shows the new tab's badges and titles.
     notify_action_listeners();
 }
-
-// --- chrome.tabs and chrome.windows ------------------------------------------------------------------------------------
 
 static JsonObject object_argument(JsonArray const& args, size_t index)
 {
@@ -595,14 +574,12 @@ static ErrorOr<TabInWindow, String> tab_argument(JsonArray const& args, size_t i
         return MUST(String::formatted("No tab with id: {}.", *id));
     }
 
-    // No tab means the current window's active tab.
     auto* window = current_window(caller_view_id);
     if (!window || !window->current_tab())
         return "No current tab."_string;
     return TabInWindow { window->current_tab(), window };
 }
 
-// A URL from an extension, which may be relative to the extension's base URL.
 static Optional<URL::URL> extension_relative_url(Extension const& extension, StringView url)
 {
     return URL::Parser::basic_parse(url, extension.base_url());
@@ -643,7 +620,6 @@ static bool tab_matches_query(Tab& tab, BrowserWindow& window, JsonObject const&
             return false;
     }
 
-    // URL and title queries match only what the extension may see.
     auto url = tab.url();
     auto sees_details = may_see_details(extension, url);
     if (auto title = query.get_string("title"sv); title.has_value()) {
@@ -664,7 +640,6 @@ static bool tab_matches_query(Tab& tab, BrowserWindow& window, JsonObject const&
         }
         if (!any_of(patterns, [&](auto const& pattern) {
                 auto parsed = MatchPattern::parse(pattern);
-                // Chrome matches tabs' own extension pages, which no match pattern scheme covers, by their URL.
                 if (parsed.is_error())
                     return glob_matches(pattern, url.serialize());
                 return parsed.value().matches(url);
@@ -679,7 +654,6 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
     if (name == "tabs.query"sv) {
         auto query = object_argument(args, 0);
         JsonArray tabs;
-        // The headless browser's one tab is the answer to any query.
         if (auto tab = headless_tab_json(extension); tab.has_value())
             tabs.must_append(tab.release_value());
         for (auto* window : all_windows()) {
@@ -911,14 +885,10 @@ static ErrorOr<JsonValue, String> handle_windows_call(Extension const& extension
     return MUST(String::formatted("{} isn't supported yet.", name));
 }
 
-// --- chrome.action -----------------------------------------------------------------------------------------------------
-
-// Chrome's badge colors are CSS colors or [r, g, b, a] arrays.
 static Optional<QColor> color_from_json(JsonValue const& value)
 {
     if (value.is_string()) {
         auto string = value.as_string().bytes_as_string_view();
-        // #rrggbbaa, which QColor reads as #aarrggbb.
         if (string.length() == 9 && string.starts_with('#')) {
             auto rgba = string.substring_view(1).to_number<u32>(TrimWhitespace::No, 16);
             if (!rgba.has_value())
@@ -1002,13 +972,10 @@ Function<void(Extension const&)>& open_popup_handler()
     return state().open_popup;
 }
 
-// --- chrome.permissions ------------------------------------------------------------------------------------------------
-
 static constexpr int PERMISSION_PROMPT_WIDTH = 300;
 
 namespace {
 
-// Answers once, with whichever answer comes first.
 class PromptAnswer : public RefCounted<PromptAnswer> {
 public:
     explicit PromptAnswer(Function<void(bool)> callback)
@@ -1031,21 +998,18 @@ private:
 void prompt_for_permissions(Extension const& extension, Optional<u64> caller_view_id, Vector<String> const& warnings, Function<void(bool granted)> on_answer)
 {
     auto answer = adopt_ref(*new PromptAnswer(move(on_answer)));
-    // NB: Not qformatted(), whose format string has to be ASCII.
     auto question = QObject::tr("Allow \u201C%1\u201D to:").arg(qstring_from_ak_string(extension.manifest().name));
     QStringList lines;
     for (auto const& warning : warnings)
         lines.append(QString::fromUtf8("\u2022 ") + qstring_from_ak_string(warning));
     auto details = lines.join('\n');
 
-    // A headless browser, as Meta/xenon.py test runs, has no one to ask. It says what it would have asked, and denies.
     if (Application::browser_options().headless_mode.has_value()) {
         warnln("{}\n{}", ak_string_from_qstring(question), ak_string_from_qstring(details));
         answer->answer(false);
         return;
     }
 
-    // A popup asking stays open for the answer: the prompt is a popover of its own, over the popup.
     QPointer<QWidget> popup;
     if (caller_view_id.has_value()) {
         if (auto view = state().popup_views.get(*caller_view_id); view.has_value())
@@ -1054,7 +1018,6 @@ void prompt_for_permissions(Extension const& extension, Optional<u64> caller_vie
     if (popup) {
         auto* prompt = new MessagePopover(popup, PERMISSION_PROMPT_WIDTH, question, details, "Deny", "Allow");
         prompt->setAttribute(Qt::WA_DeleteOnClose);
-        // The extension's name and the warnings are text, never markup.
         for (auto* label : prompt->findChildren<QLabel*>())
             label->setTextFormat(Qt::PlainText);
         prompt->on_accept = [answer] { answer->answer(true); };
@@ -1092,7 +1055,6 @@ static ErrorOr<JsonValue, String> handle_action_call(Extension const& extension,
     if (!extension.manifest().action.has_value())
         return "The extension has no action."_string;
 
-    // Most calls take {tabId?, value}; enable(), disable(), and isEnabled() take the tab ID itself.
     auto details = object_argument(args, 0);
     Optional<i64> tab = details.get_i64("tabId"sv);
     if (name.is_one_of("action.enable"sv, "action.disable"sv, "action.isEnabled"sv))
@@ -1103,7 +1065,6 @@ static ErrorOr<JsonValue, String> handle_action_call(Extension const& extension,
     auto& action = state().actions.ensure(extension.id());
     auto& properties = tab.has_value() ? action.tabs.ensure(*tab) : action.all_tabs;
 
-    // Without a tab ID, a getter answers what all tabs show.
     auto appearance = action_appearance(extension, tab.has_value() ? find_tab(*tab)->tab : nullptr);
 
     auto changed = [&] {

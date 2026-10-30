@@ -24,20 +24,20 @@ Internals exposes the filter generator for tests.
  Libraries/LibWeb/Internals/Internals.cpp     |  5 +
  Libraries/LibWeb/Internals/Internals.h       |  1 +
  Libraries/LibWeb/Internals/Internals.idl     |  1 +
- Libraries/LibWeb/Loader/ContentBlocker.cpp   | 98 ++++++++++++++++++++
- Libraries/LibWeb/Loader/ContentBlocker.h     |  4 +
+ Libraries/LibWeb/Loader/ContentBlocker.cpp   | 97 ++++++++++++++++++++
+ Libraries/LibWeb/Loader/ContentBlocker.h     |  2 +
  Libraries/LibWebView/Menu.h                  |  1 +
  Libraries/LibWebView/Settings.cpp            | 24 +++++
- Libraries/LibWebView/Settings.h              |  2 +
+ Libraries/LibWebView/Settings.h              |  1 +
  Libraries/LibWebView/ViewImplementation.cpp  | 52 +++++++++++
- Libraries/LibWebView/ViewImplementation.h    | 14 +++
+ Libraries/LibWebView/ViewImplementation.h    |  9 ++
  Libraries/LibWebView/WebContentPage.cpp      |  6 ++
  Libraries/LibWebView/WebContentPage.h        |  1 +
- Services/WebContent/ConnectionFromClient.cpp | 14 +++
+ Services/WebContent/ConnectionFromClient.cpp | 13 +++
  Services/WebContent/ConnectionFromClient.h   |  1 +
  Services/WebContent/WebContentClient.ipc     |  1 +
  Services/WebContent/WebContentServer.ipc     |  1 +
- 16 files changed, 226 insertions(+)
+ 16 files changed, 216 insertions(+)
 
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
 index bf6cc93d91d8811fe925715daab9b9bcc44bbba9..03017c4758f6bc44bcc96c36f44308fc06b3b2be 100644
@@ -80,7 +80,7 @@ index 47e03e9e3e31d9fb40787d38ab1cd83aa81747df..e231640c62700b06206bd79164f690cb
      unsigned long long fullLayoutCount();
      undefined beginLayoutTrace();
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index 5c3be7593acaeb49d8f60c7c1cf9f80782ead3fa..e47f89f14314d6e9bfa0377002bde8db65151e1c 100644
+index 370b739b1fdbadb4793206fed2463c025bdd9f13..3ccf5375460ff6946d97b81a59b84cdcc314717a 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
 @@ -8,12 +8,17 @@
@@ -101,7 +101,7 @@ index 5c3be7593acaeb49d8f60c7c1cf9f80782ead3fa..e47f89f14314d6e9bfa0377002bde8db
  
  namespace Web {
  
-@@ -278,6 +283,99 @@ bool ContentBlocker::is_uncloaked_request_filtered(URL::URL const& url, StringVi
+@@ -277,6 +282,98 @@ bool ContentBlocker::is_uncloaked_request_filtered(URL::URL const& url, StringVi
      return ContentBlocking::FFI::rust_content_blocker_matches_uncloaked(m_engine, url_string.bytes(), alias_target.bytes(), source_url_string.bytes(), request_type.bytes());
  }
  
@@ -163,7 +163,6 @@ index 5c3be7593acaeb49d8f60c7c1cf9f80782ead3fa..e47f89f14314d6e9bfa0377002bde8db
 +            return filter_for(selector);
 +    }
 +
-+    // Walk up, one child combinator at a time, until the selector picks out only the element.
 +    Vector<Utf16String> parts;
 +    for (DOM::Element* current = &element; current; current = current->parent_element().ptr()) {
 +        if (current != &element) {
@@ -200,22 +199,20 @@ index 5c3be7593acaeb49d8f60c7c1cf9f80782ead3fa..e47f89f14314d6e9bfa0377002bde8db
 +
  void ContentBlocker::run_page_script(DOM::Document& document) const
  {
-     // Scriptlets and procedural filters are cosmetic filters (##+js(), ##...:has-text()).
+     if (!m_engine || !m_has_cosmetic_rules || document.is_decoded_svg() || !document.content_blocking_enabled())
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.h b/Libraries/LibWeb/Loader/ContentBlocker.h
-index f8eb77c9d68e5336ed2da73d01fe929a59ee1c06..8ab045ece224d7e15b0c9a583fcaf9dd798fc04d 100644
+index aaffcfaf871e2a1cfd9d18b9d815f94cac573ab2..9058e97bd9fd1cbee0318e39fbd21d9789edbcb4 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.h
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.h
-@@ -79,6 +79,10 @@ public:
-     // CNAME uncloaking).
+@@ -71,6 +71,8 @@ public:
+ 
      bool is_uncloaked_request_filtered(URL::URL const&, StringView alias_target, URL::URL const& source_url, ResourceType) const;
  
-+    // A filter that hides the element on its site, like `example.com###banner`, for the element picker: the element's id
-+    // or tag and classes when they pick out only it, otherwise its path from the nearest ancestor with an id.
 +    static Optional<String> cosmetic_filter_for_element(DOM::Element&);
 +
-     // Runs the document's scriptlets and procedural cosmetic filters. Called before any of the document's own
-     // scripts can run, once per Window.
      void run_page_script(DOM::Document&) const;
+ 
+     Utf16String cosmetic_style_sheet_for_url(URL::URL const&) const;
 diff --git a/Libraries/LibWebView/Menu.h b/Libraries/LibWebView/Menu.h
 index d17e3471c88e186a365e342d35cc212add1d06cb..18790cae6a7b44301983db84bc2e45b39eada94d 100644
 --- a/Libraries/LibWebView/Menu.h
@@ -264,14 +261,13 @@ index 53d2a6711a0f6750d75548943e6734c8a9dd2a9e..d46c0c8d5840d2af16f321d73c2a2ec6
  {
      if (m_custom_content_blocker_filters == filters)
 diff --git a/Libraries/LibWebView/Settings.h b/Libraries/LibWebView/Settings.h
-index 8fe950e6cb87a9da0c516aa87cc1adac4d6061be..5d8bb3a7a8ec16a343b383bd465a28eeafcc18c4 100644
+index 8fe950e6cb87a9da0c516aa87cc1adac4d6061be..a50d4ee9b872e663b520b0cf2d2c47a399ae9f4c 100644
 --- a/Libraries/LibWebView/Settings.h
 +++ b/Libraries/LibWebView/Settings.h
-@@ -255,6 +255,8 @@ public:
+@@ -255,6 +255,7 @@ public:
      bool remove_content_blocker_list(StringView identifier);
      String const& custom_content_blocker_filters() const { return m_custom_content_blocker_filters; }
      void set_custom_content_blocker_filters(String);
-+    // Adds one filter (such as one from the element picker) to the custom filters, unless it is there already.
 +    void add_custom_content_blocker_filter(StringView);
  
      static DNSSettings parse_dns_settings(JsonValue const&);
@@ -361,26 +357,21 @@ index a43ca394fe1e4f8a87b3a0f0fa531d1615fa5d59..6fd2d6c3b924dcd6b9b42f6792093e37
  
      m_media_context_menu = Menu::create("Media Context Menu"sv);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index e2ef10618064e7baa66da222390b34383d9e90cb..f633f3ef4618ba16c9a865766972ee6916d31c45 100644
+index e2ef10618064e7baa66da222390b34383d9e90cb..e9f1aa9627f82f054716c878f2f42fa621dbd867 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -378,6 +378,15 @@ public:
+@@ -378,6 +378,10 @@ public:
      void node_picker_preview(Web::DevicePixelPoint);
      void node_picker_cancel();
  
-+    // Lets the user pick an element on the page (with the node picker), then calls back with a cosmetic filter that
-+    // hides it on its site, or with none if the user canceled. Add the filter with
-+    // Settings::add_custom_content_blocker_filter().
 +    void start_element_picker(Function<void(Optional<String> filter)>);
 +
-+    // Called with the filter the context menu's Block Element... action made, for the user to see and confirm. Unset,
-+    // the filter is added to the custom filters as it is.
 +    Function<void(String const& filter)> on_element_picker_filter;
 +
      void inspect_dom_node(Web::UniqueNodeID node_id, DOMNodeProperties::Type, Optional<Web::CSS::PseudoElement> pseudo_element, JsonValue options = {});
      void inspect_grid_layouts(Web::UniqueNodeID root_node_id);
      void inspect_current_grid(Web::UniqueNodeID node_id);
-@@ -922,6 +931,7 @@ protected:
+@@ -922,6 +926,7 @@ protected:
      HashMap<u64, NonnullRefPtr<Core::Promise<ByteString>>> m_pending_cut_selected_text_requests;
  
      RefPtr<Action> m_take_screenshot_action;
@@ -388,7 +379,7 @@ index e2ef10618064e7baa66da222390b34383d9e90cb..f633f3ef4618ba16c9a865766972ee69
  
      void prepare_inspect_element_action(Gfx::IntPoint content_position);
      RefPtr<Action> m_inspect_element_action;
-@@ -1223,6 +1233,7 @@ protected:
+@@ -1223,6 +1228,7 @@ protected:
      void request_node_picker_hit_test(NodePickerRequestType, Web::DevicePixelPoint);
      void did_receive_node_hit_test(u64 request_id, Web::UniqueNodeID);
      void did_receive_node_picker_hit_test(u64 request_id, Web::UniqueNodeID);
@@ -396,7 +387,7 @@ index e2ef10618064e7baa66da222390b34383d9e90cb..f633f3ef4618ba16c9a865766972ee69
      void did_receive_indexed_database_inspection(u64 request_id, JsonObject);
  
      bool m_node_picker_active { false };
-@@ -1231,6 +1242,9 @@ protected:
+@@ -1231,6 +1237,9 @@ protected:
      HashMap<u64, NodePickerRequestType> m_pending_node_picker_requests;
      DevTools::DevToolsDelegate::OnNodePickerEvent m_on_node_picker_event;
  
@@ -407,7 +398,7 @@ index e2ef10618064e7baa66da222390b34383d9e90cb..f633f3ef4618ba16c9a865766972ee69
  };
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 8d3ce597f918f350f6e6bdc5c7ab34e123646ce3..b3bc4999f66b0b58c15d44f56c54f66c503b333e 100644
+index b0d82d78053929507395e8e169cdbdbedfa26cec..85d107a07b0226d92650e751c4fa84dea4d3f0a9 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -1167,6 +1167,12 @@ void WebContentPage::did_get_hovered_node_id(Web::UniqueNodeID node_id)
@@ -424,10 +415,10 @@ index 8d3ce597f918f350f6e6bdc5c7ab34e123646ce3..b3bc4999f66b0b58c15d44f56c54f66c
  {
      if (displays_tab()) {
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index fbd9e947859e4123e7be54e20019d595d841d7d1..31592d52112ba3d605f5b7f8967d4e63d63ee9fb 100644
+index 60469b4cdf7c299eea7bd766cbc4f1f48f5a8d3a..8d3bca55fd0c48fa3a99f221504f70515aa829c5 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -231,6 +231,7 @@ private:
+@@ -230,6 +230,7 @@ private:
      virtual void did_accessibility_focus_change(i64 focused_node_id) override;
      virtual void did_get_hovered_node_id(Web::UniqueNodeID node_id) override;
      virtual void did_get_node_id_at_position(u64 request_id, Web::UniqueNodeID node_id) override;
@@ -436,10 +427,10 @@ index fbd9e947859e4123e7be54e20019d595d841d7d1..31592d52112ba3d605f5b7f8967d4e63
      virtual void did_get_style_sheet_source(Web::CSS::StyleSheetIdentifier identifier, URL::URL base_url, Utf16String source) override;
      virtual void did_list_devtools_sources(u64 request_id, Vector<Web::HTML::ScriptRegistryDescription> sources) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 1fd44615f3ffc93fa95d54a49dc164b79c19591a..4d70cff21dc89a6437073ccdb1fc95313289eb9a 100644
+index 1fd44615f3ffc93fa95d54a49dc164b79c19591a..8a1bb0f6fc12fc99f3618ec1220cbed3b4f5db51 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -2076,6 +2076,20 @@ void ConnectionFromClient::get_node_id_at_position(Web::PageId page_id, u64 requ
+@@ -2076,6 +2076,19 @@ void ConnectionFromClient::get_node_id_at_position(Web::PageId page_id, u64 requ
      async_did_get_node_id_at_position(page_id, request_id, page->page().node_id_at_position(position));
  }
  
@@ -447,7 +438,6 @@ index 1fd44615f3ffc93fa95d54a49dc164b79c19591a..4d70cff21dc89a6437073ccdb1fc9531
 +{
 +    Optional<String> filter;
 +    if (auto* node = Web::DOM::Node::from_unique_id(node_id)) {
-+        // The picker can land on a text node; hide the element that holds it.
 +        auto* element = as_if<Web::DOM::Element>(*node);
 +        if (!element)
 +            element = node->parent_element().ptr();

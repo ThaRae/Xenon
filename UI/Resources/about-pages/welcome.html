@@ -37,7 +37,6 @@ SPDX-License-Identifier: BSD-2-Clause
             <span class="come-back">You can come back to this any time at <code>about:welcome</code></span>
         </header>
 
-        <!-- The steps after the first, as a rail across the top: done steps are ticked, the current one is lit. -->
         <ol id="rail" class="rail" aria-label="Setup steps">
             <li data-for="layout"><span class="bar"></span><span class="rail-step">1 Layout</span></li>
             <li data-for="search"><span class="bar"></span><span class="rail-step">2 Search</span></li>
@@ -172,8 +171,6 @@ SPDX-License-Identifier: BSD-2-Clause
                     Pick where tabs go. To switch later, right-click an empty part of the tab bar and choose Layout.
                 </p>
 
-                <!-- The radios aren't named "layout": loading about:welcome#layout would take one for the fragment's target
-                     and focus it. -->
                 <div class="choices three" role="radiogroup" aria-labelledby="layout-title">
                     <label class="choice">
                         <input class="choice-input" type="radio" name="tab-layout" value="classic" checked />

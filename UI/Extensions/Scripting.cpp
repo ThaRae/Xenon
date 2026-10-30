@@ -19,10 +19,6 @@
 #include <UI/Extensions/Registry.h>
 #include <UI/Extensions/Router.h>
 
-// chrome.scripting: running an extension's scripts and stylesheets in a tab's frames when it asks, the content scripts
-// it registers, and chrome.webNavigation's view of a tab's frames, by Chrome's frame IDs.
-// https://developer.chrome.com/docs/extensions/reference/api/scripting
-
 namespace Ladybird::Extensions {
 
 static constexpr auto NO_HOST_ACCESS = "Cannot access contents of the page. Extension manifest must request permission to access the respective host."sv;
@@ -50,8 +46,6 @@ Optional<Vector<Router::Frame>> Router::frames_of_tab(i64 tab_id)
     return frames;
 }
 
-// What an extension may run scripts in: the hosts it has permission for, and those its manifest's content scripts
-// match, which Chrome grants it along with them.
 static bool may_access(Extension const& extension, URL::URL const& url)
 {
     auto matches_any = [&](Vector<String> const& patterns) {
@@ -67,9 +61,6 @@ static bool may_access(Extension const& extension, URL::URL const& url)
     });
 }
 
-// https://developer.chrome.com/docs/extensions/reference/api/scripting#type-InjectionTarget
-// The frames a target names: the top-level frame, some frames by ID or by document, or every frame the extension may
-// access. A frame it names that the extension may not access is an error, as in Chrome.
 ErrorOr<Vector<Router::Frame>, String> Router::injection_frames(Extension const& extension, Optional<JsonObject const&> target)
 {
     if (!target.has_value())
@@ -148,7 +139,6 @@ void Router::handle_scripting_call(Context& context, u64 call_id, String const& 
         reply(context.endpoint, call_id, result.release_value());
 }
 
-// Runs scripts one after another in a document, and gives back the last one's result, or that one didn't run.
 class ScriptSequence : public RefCounted<ScriptSequence> {
 public:
     static void run(WebView::ScriptBridgeEndpoint document, Vector<Web::HTML::UserScript> scripts, Function<void(WebView::UserScriptResult)> on_done)
@@ -182,7 +172,6 @@ private:
     size_t m_next { 0 };
 };
 
-// Answers once every frame has.
 class FrameResults : public RefCounted<FrameResults> {
 public:
     FrameResults(size_t count, Function<void(Vector<Optional<JsonObject>>)> on_done)
@@ -205,7 +194,6 @@ private:
     Function<void(Vector<Optional<JsonObject>>)> m_on_done;
 };
 
-// https://developer.chrome.com/docs/extensions/reference/api/scripting#method-executeScript
 void Router::execute_script(Context& context, u64 call_id, JsonObject const& injection)
 {
     auto extension = context.extension;
@@ -217,7 +205,6 @@ void Router::execute_script(Context& context, u64 call_id, JsonObject const& inj
         return;
     }
 
-    // A function comes as its source, which runs with its arguments as JSON, as Chrome serializes both.
     auto files = injection.get_array("files"sv);
     auto function_source = injection.get_string("funcSource"sv);
     if (files.has_value() == function_source.has_value()) {
@@ -248,7 +235,6 @@ void Router::execute_script(Context& context, u64 call_id, JsonObject const& inj
 
     auto is_main_world = injection.get_string("world"sv) == "MAIN"sv;
     auto world = is_main_world ? String {} : extension->id();
-    // Chrome waits for document idle unless the extension asks it not to.
     auto injection_time = injection.get_bool("injectImmediately"sv).value_or(false) ? Web::HTML::UserScriptInjectionTime::DocumentStart : Web::HTML::UserScriptInjectionTime::DocumentIdle;
 
     auto results = make_ref_counted<FrameResults>(frames.value().size(), [caller, call_id](Vector<Optional<JsonObject>> results) {
@@ -263,7 +249,6 @@ void Router::execute_script(Context& context, u64 call_id, JsonObject const& inj
     for (auto const& [index, frame] : enumerate(frames.value())) {
         Vector<Web::HTML::UserScript> scripts;
 
-        // An isolated world that doesn't have chrome.* yet gets it first, as content scripts' worlds do.
         if (!is_main_world) {
             auto world_endpoint = frame.document.in_world(world);
             if (!context_for(world_endpoint).has_value()) {
@@ -303,9 +288,6 @@ void Router::execute_script(Context& context, u64 call_id, JsonObject const& inj
     }
 }
 
-// https://developer.chrome.com/docs/extensions/reference/api/scripting#method-insertCSS
-// Stylesheets go into the extension's isolated world in each frame, as stylesheets the document adopts, as a content
-// script's do. The world keeps them by their text, so that removeCSS() can take one out again.
 void Router::change_css(Context& context, u64 call_id, JsonObject const& injection, bool insert)
 {
     auto extension = context.extension;
@@ -387,7 +369,6 @@ static Optional<Vector<String>> ids_filter(JsonArray const& args)
     return list;
 }
 
-// https://developer.chrome.com/docs/extensions/reference/api/scripting#method-registerContentScripts
 ErrorOr<JsonValue, String> Router::handle_registered_content_scripts_call(Context& context, String const& name, JsonArray const& args)
 {
     auto const& extension = *context.extension;
@@ -396,7 +377,6 @@ ErrorOr<JsonValue, String> Router::handle_registered_content_scripts_call(Contex
         return scripts.find_if([&](auto const& script) { return script.id == id; });
     };
 
-    // Chrome refuses a script whose files are missing when it's registered, rather than when it would run.
     auto check_files = [&](Vector<String> const& paths, StringView what) -> ErrorOr<void, String> {
         for (auto const& path : paths) {
             auto file = extension.resolve(extension.url_for(path));
@@ -445,7 +425,6 @@ ErrorOr<JsonValue, String> Router::handle_registered_content_scripts_call(Contex
             return MUST(String::formatted("Duplicate script ID '{}'", id));
         seen.append(id);
 
-        // An update changes only the members it gives.
         auto json = value.as_object();
         auto existing = find(id);
         if (is_update) {
@@ -470,9 +449,6 @@ ErrorOr<JsonValue, String> Router::handle_registered_content_scripts_call(Contex
     return JsonValue {};
 }
 
-// --- chrome.webNavigation ---------------------------------------------------------------------------------------------
-
-// FIXME: A frame's URL is the one its document was created with; Chrome follows same-document navigations too.
 ErrorOr<JsonValue, String> Router::handle_web_navigation_call(Context& context, String const& name, JsonArray const& args)
 {
     if (!context.extension->has_permission("webNavigation"sv))
@@ -483,7 +459,6 @@ ErrorOr<JsonValue, String> Router::handle_web_navigation_call(Context& context, 
     if (!tab_id.has_value())
         return "tabId is required."_string;
 
-    // As in Chrome, a tab or frame that doesn't exist gives null.
     auto frames = frames_of_tab(*tab_id);
     if (!frames.has_value())
         return JsonValue {};
@@ -543,8 +518,6 @@ void Router::update_navigation_events()
     });
 }
 
-// The webNavigation events of a tab's frames, from the navigation events WebDriver BiDi has.
-// https://developer.chrome.com/docs/extensions/reference/api/webNavigation#event-order
 void Router::did_navigate(WebView::CanonicalNavigable const& navigable, StringView webdriver_bidi_event, URL::URL const& url)
 {
     struct EventName {
@@ -569,7 +542,6 @@ void Router::did_navigate(WebView::CanonicalNavigable const& navigable, StringVi
     if (event.is_empty())
         return;
 
-    // Only tabs' navigations, not those of extensions' hidden views or popups.
     auto view = navigable.top_level_traversable().view();
     if (!view.has_value())
         return;
@@ -591,7 +563,6 @@ void Router::did_navigate(WebView::CanonicalNavigable const& navigable, StringVi
     details.set("documentLifecycle"sv, "active"sv);
     if (parent)
         details.set("parentDocumentId"sv, document_id_string(parent->active_document().id()));
-    // Before a navigation, the document is the one it navigates away from, which Chrome leaves out.
     if (event != "webNavigation.onBeforeNavigate"sv)
         details.set("documentId"sv, document_id_string(navigable.active_document().id()));
     if (event == "webNavigation.onCommitted"sv) {

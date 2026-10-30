@@ -339,7 +339,6 @@ public:
             tab->request_close();
         });
 
-        // Ctrl+Tab and Ctrl+Shift+Tab go through the window's tabs in the order they were last used (UI/TabCycler.cpp).
         m_open_next_tab_action = make_action("Open &Next Tab");
         m_open_next_tab_action->setShortcuts({
             QKeySequence(Qt::CTRL | Qt::Key_PageDown),
@@ -411,7 +410,6 @@ public:
         m_help_menu->addAction(create_application_action(*m_application_widget, application.report_website_issue_action(), IncludeActionIcon::No));
         m_help_menu->addSeparator();
         m_help_menu->addAction(create_application_action(*m_application_widget, application.open_about_page_action(), IncludeActionIcon::No));
-        // Xenon: macOS shows Check for Updates… in the application menu.
         if (auto* check_for_updates_action = Updater::create_check_for_updates_action(*m_application_widget))
             m_help_menu->addAction(check_for_updates_action);
     }
@@ -614,13 +612,8 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
     });
 }
 
-// Xenon presents itself as the platform's Chrome, so its User-Agent and client hints blend in with the largest crowd
-// of browsers. The preset matches the default User-Agent's shape; selecting it keeps the Spoof User Agent menu honest.
 void Application::create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions&, WebView::WebContentOptions& web_content_options)
 {
-    // A spare WebContent process costs tens of MiB for as long as Xenon runs, waiting for a tab that may never come, and
-    // saves a new tab only the process's launch: it builds the content blocker when a tab takes it anyway (engine patch
-    // 0039). So Xenon launches each tab's process when the tab opens instead.
     browser_options.prewarm_spare_web_content_process = WebView::PrewarmSpareWebContentProcess::No;
 
     if (web_content_options.user_agent_preset.has_value() || web_content_options.is_test_mode == WebView::IsTestMode::Yes)
@@ -631,7 +624,6 @@ void Application::create_platform_options(WebView::BrowserOptions& browser_optio
 #elif defined(AK_OS_LINUX) && !defined(AK_OS_ANDROID)
     static constexpr auto chrome_preset = "Chrome Linux Desktop"sv;
 #else
-    // No preset for this platform; the default User-Agent is already Chrome's for it.
     static constexpr StringView chrome_preset {};
 #endif
     if (!chrome_preset.is_empty() && WebView::user_agents.contains(chrome_preset))
@@ -742,8 +734,6 @@ Vector<String> Application::platform_preferred_languages() const
     // The system's UI languages, most preferred first, as BCP 47 tags ("en-US", then "en").
     Vector<String> languages;
     for (auto const& language : QLocale::system().uiLanguages()) {
-        // With no locale set (LANG unset, as in a container), Qt reports the C locale, which names no language. Leaving
-        // it out lets the defaults apply instead, as Chromium falls back to en-US.
         if (language == QLatin1StringView("C") || language == QLatin1StringView("POSIX"))
             continue;
         languages.append(ak_string_from_qstring(language));
@@ -833,7 +823,6 @@ void Application::present_window(BrowserWindow& window, WindowConfiguration cons
 WebView::SessionLaunchPolicy Application::launch_restore_policy() const
 {
     // Without the setting, only pinned tabs come back; with it, every window and tab does.
-    // Xenon: Every window and tab comes back after Relaunch to update too, as in Chrome.
     if (WebView::Application::settings().restore_previous_session() || Updater::relaunched_to_update())
         return WebView::SessionLaunchPolicy::Everything;
     return WebView::SessionLaunchPolicy::PinnedOnly;

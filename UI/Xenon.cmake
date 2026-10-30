@@ -1,14 +1,5 @@
-# The Xenon frontend. Meta/CMake/XenonHook.cmake includes this at the end of Ladybird's top-level CMakeLists.txt, once
-# every engine library and helper process exists. CMake doesn't allow add_subdirectory() at that point, so this file is
-# include()d into Ladybird's top-level directory instead: relative paths would resolve against Ladybird's tree, so every
-# path here is absolute.
-#
-# This started as a copy of ladybird/UI/Qt and keeps its file layout and the `Ladybird` C++ namespace, so upstream
-# fixes can still be diffed and merged in.
-
 set(XENON_UI_DIR "${XENON_SOURCE_DIR}/UI")
 
-# Xenon's version, which Meta/release.py releases it as, and which the updater compares (UI/Updater.h).
 file(STRINGS "${XENON_SOURCE_DIR}/VERSION.txt" XENON_VERSION LIMIT_COUNT 1)
 if (NOT XENON_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
     message(FATAL_ERROR "VERSION.txt must be major.minor.patch: ${XENON_VERSION}")
@@ -162,9 +153,6 @@ if (HAS_DIRECTX)
     list(APPEND XENON_SOURCES WebContentViewWindows.cpp)
 endif()
 
-# Linux presents the page through Vulkan with DMA-BUF images when glslang is around to compile its shaders (see
-# Ladybird's check_for_dependencies.cmake), as upstream's UI/Qt does. The generated headers get their own directory and
-# target name, as upstream's ladybird target generates the same ones.
 if (NOT APPLE AND USE_VULKAN_DMABUF_IMAGES)
     set(XENON_SHADER_DIR "${CMAKE_BINARY_DIR}/Xenon/Shaders")
     set(xenon_vert_shader_header "${XENON_SHADER_DIR}/WebContentViewLinuxVertShader.h")
@@ -195,8 +183,6 @@ endif()
 list(TRANSFORM XENON_SOURCES PREPEND "${XENON_UI_DIR}/")
 list(TRANSFORM XENON_ARC_SOURCES PREPEND "${XENON_UI_DIR}/")
 
-# The chrome.* API that extension contexts get, and the scripts that run the background worker (see
-# UI/Extensions/Router.cpp), built into the browser.
 set(XENON_GENERATED_DIR "${CMAKE_BINARY_DIR}/Xenon")
 embed_as_string(xenon_chrome_api "${XENON_UI_DIR}/Resources/extensions/chrome-api.js" "${XENON_GENERATED_DIR}/ChromeAPI.cpp" chrome_api_source NAMESPACE "Ladybird::Extensions")
 embed_as_string(xenon_background_page "${XENON_UI_DIR}/Resources/extensions/background-page.js" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" background_page_source NAMESPACE "Ladybird::Extensions")
@@ -206,7 +192,6 @@ embed_as_string(xenon_externally_connectable_relay "${XENON_UI_DIR}/Resources/ex
 list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" "${XENON_GENERATED_DIR}/WorkerBridge.cpp")
 list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ExternallyConnectable.cpp" "${XENON_GENERATED_DIR}/ExternallyConnectableRelay.cpp")
 
-# The !bangs (Meta/update-bangs.py refreshes the list), built into the browser as a table that UI/Bangs.cpp searches.
 set(XENON_BANG_TABLE "${XENON_GENERATED_DIR}/UI/BangTable.h")
 add_custom_command(
     OUTPUT "${XENON_BANG_TABLE}"
@@ -216,15 +201,12 @@ add_custom_command(
 )
 add_custom_target(xenon_generate_bang_table DEPENDS "${XENON_BANG_TABLE}")
 
-# NB: Qt finalizes executables in a deferred call by default, and we are already running deferred, so finalize by hand.
 qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
 target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibRequests LibWebView LibURL LibWakeLock LibXML)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL ZLIB::ZLIB)
-# NB: Sources include each other as <UI/Foo.h>, which must resolve to Xenon's copies rather than anything in Ladybird's
-#     tree, so Xenon's root comes first.
 target_include_directories(xenon BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_include_directories(xenon PRIVATE ${LADYBIRD_SOURCE_DIR} ${LADYBIRD_SOURCE_DIR}/Services/ ${XENON_GENERATED_DIR})
 target_compile_definitions(xenon PRIVATE XENON_VERSION="${XENON_VERSION}")
@@ -250,8 +232,6 @@ if (APPLE)
     target_link_libraries(xenon PRIVATE Qt::GuiPrivate "-framework ApplicationServices" "-framework Cocoa" "-framework IOSurface" "-framework QuartzCore")
     set_source_files_properties(${XENON_ARC_SOURCES} PROPERTIES COMPILE_FLAGS "-fobjc-arc")
 
-    # Sparkle, which Xenon updates itself with (UI/Updater.mm), as Helium does: its release, pinned by hash. The bundle
-    # carries the framework in Contents/Frameworks.
     set(XENON_SPARKLE_VERSION 2.10.1)
     set(XENON_SPARKLE_SHA256 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27)
     set(XENON_SPARKLE_DIR "${CMAKE_BINARY_DIR}/Xenon/Sparkle-${XENON_SPARKLE_VERSION}")
@@ -285,14 +265,9 @@ set_target_properties(xenon PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-# The engine's helper processes (WebContent, RequestServer, ...) live next to the browser executable.
 if (APPLE OR WIN32)
     set_target_properties(${ladybird_helper_processes} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:xenon>")
 else()
-    # Elsewhere, Ladybird's own ladybird target puts its resources and helpers in the build directory's share/Lagom and
-    # libexec, and Xenon's would be the same files, which ninja refuses. So Xenon gets an install prefix of its own,
-    # which is where the engine looks for them, relative to the executable (see WebView::platform_init()). Its lib links
-    # back to the build's libraries, as the binaries' rpath is $ORIGIN/../lib.
     set(XENON_PREFIX_DIR "${CMAKE_BINARY_DIR}/xenon")
     set_target_properties(xenon PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_BINDIR}")
     set_target_properties(${ladybird_helper_processes} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/${CMAKE_INSTALL_LIBEXECDIR}")
@@ -303,9 +278,6 @@ else()
 endif()
 add_dependencies(xenon ${ladybird_helper_processes})
 
-# Ladybird's own browser and tests, which Meta/xenon.py ladybird-test builds, look for the helper processes where
-# Ladybird's build puts them: in its bundle on macOS, in the build directory's libexec elsewhere. With tests on, they get
-# copies there too, before the bundle is signed for the last time.
 if (BUILD_TESTING)
     if (APPLE OR WIN32)
         set(ladybird_helper_process_dir "$<TARGET_FILE_DIR:ladybird>")
@@ -327,11 +299,8 @@ if (BUILD_TESTING)
     endif()
 endif()
 
-# NB: Ladybird's resource lists are variables of its UI directory, which don't reach this one.
 include("${LADYBIRD_SOURCE_DIR}/UI/cmake/ResourceFiles.cmake")
 
-# Xenon ships its own versions of some of Ladybird's internal pages, which take the place of upstream's in the bundle,
-# and adds a few files of its own beside them.
 set(XENON_ABOUT_PAGE_OVERRIDES
     newtab.html
     settings.html
@@ -360,8 +329,6 @@ foreach (page IN LISTS XENON_ABOUT_PAGE_ADDITIONS)
     list(APPEND ABOUT_PAGES "${XENON_UI_DIR}/Resources/about-pages/${page}")
 endforeach()
 
-# Ladybird's internal pages show its logo as their favicon and on an empty history or bookmarks page, and so does the
-# task manager. Xenon's versions (rendered by Meta/generate-app-icon.py) take their place.
 set(XENON_ICON_OVERRIDES
     48x48/app-browser.png
     128x128/app-browser.png
@@ -378,7 +345,6 @@ foreach (icon IN LISTS XENON_ICON_OVERRIDES)
 endforeach()
 
 if (APPLE)
-    # NB: Ladybird sets this in its UI/CMakeLists.txt, whose variables don't reach this directory either.
     if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
         set(XENON_ENTITLEMENTS_FILE "${LADYBIRD_SOURCE_DIR}/Meta/DebugEntitlements.plist")
     else()
@@ -391,13 +357,9 @@ if (APPLE)
     add_custom_command(TARGET xenon POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${xenon_bundle_dir}/Contents/Resources"
         COMMAND iconutil --convert icns "${XENON_UI_DIR}/Icons/macos/app_icon.iconset" --output "${xenon_bundle_dir}/Contents/Resources/app_icon.icns"
-        # Not relocatable: the bundle links against libraries in the build directory, like Ladybird's dev bundle.
-        # Meta/release.py makes a copy that is.
         COMMAND "${CMAKE_COMMAND}" -E create_symlink "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}" "${xenon_bundle_dir}/Contents/lib"
-        # NB: ditto keeps the framework's symlinks, which its signature covers.
         COMMAND "${CMAKE_COMMAND}" -E rm -rf "${xenon_bundle_dir}/Contents/Frameworks/Sparkle.framework"
         COMMAND ditto "${XENON_SPARKLE_DIR}/Sparkle.framework" "${xenon_bundle_dir}/Contents/Frameworks/Sparkle.framework"
-        # Sign last, after the helper processes (a dependency of this target) have been linked into the bundle.
         COMMAND codesign -s - -v -f --entitlements "${XENON_ENTITLEMENTS_FILE}" "${xenon_bundle_dir}"
         VERBATIM
     )
@@ -407,11 +369,8 @@ endif()
 
 copy_resources_to_build("${xenon_resource_dir}" xenon)
 
-# uBlock Origin's filter lists, converted for Ladybird by xenon-ublock (Meta/update-filter-lists.py refreshes them).
-# UI/FilterLists.cpp hands the lists to the browser at startup; the notice and license travel with them.
 file(GLOB XENON_FILTER_LISTS CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/lists/*.txt")
 copy_resource_set(xenon/filter-lists/lists RESOURCES ${XENON_FILTER_LISTS} DESTINATION "${xenon_resource_dir}" TARGET xenon)
-# uBlock Origin's own lists, which Xenon passes as trusted, and uBlock Origin's scriptlets and redirect surrogates.
 file(GLOB XENON_TRUSTED_FILTER_LISTS CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/trusted-lists/*.txt")
 copy_resource_set(xenon/filter-lists/trusted-lists RESOURCES ${XENON_TRUSTED_FILTER_LISTS} DESTINATION "${xenon_resource_dir}" TARGET xenon)
 file(GLOB XENON_FILTER_LIST_RESOURCES CONFIGURE_DEPENDS "${XENON_UI_DIR}/Resources/filter-lists/resources/*")
@@ -425,7 +384,6 @@ copy_resource_set(xenon/filter-lists
     TARGET xenon
 )
 
-# The blocking dashboard's pages (UI/BlockingDashboard.cpp serves them at xenon://blocking/).
 copy_resource_set(xenon/blocking
     RESOURCES
         "${XENON_UI_DIR}/Resources/blocking/dashboard.css"
@@ -435,7 +393,6 @@ copy_resource_set(xenon/blocking
     TARGET xenon
 )
 
-# The certificate warning's page (UI/CertificateErrors.cpp serves it at xenon://certificate-error/).
 copy_resource_set(xenon/certificate-error
     RESOURCES
         "${XENON_UI_DIR}/Resources/certificate-error/certificate-error.css"
@@ -447,7 +404,6 @@ copy_resource_set(xenon/certificate-error
 
 qt_finalize_target(xenon)
 
-# Xenon's unit tests, which Meta/xenon.py test builds and runs. Each is named TestXenon* to stay clear of Ladybird's.
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBangs.cpp" Xenon NAME TestXenonBangs LIBS LibURL)
 target_sources(TestXenonBangs PRIVATE "${XENON_UI_DIR}/Bangs.cpp")
 target_include_directories(TestXenonBangs BEFORE PRIVATE ${XENON_SOURCE_DIR})
@@ -494,7 +450,6 @@ target_sources(TestXenonNativeMessaging PRIVATE "${XENON_UI_DIR}/Extensions/Nati
 target_include_directories(TestXenonNativeMessaging BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_compile_definitions(TestXenonNativeMessaging PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
 
-# The rule for which pages the address bar leaves the URL out for. The address bar itself needs a running browser.
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestNewTabPage.cpp" Xenon NAME TestXenonNewTabPage LIBS LibURL LibWebView)
 target_sources(TestXenonNewTabPage PRIVATE "${XENON_UI_DIR}/NewTabPage.cpp")
 target_include_directories(TestXenonNewTabPage BEFORE PRIVATE ${XENON_SOURCE_DIR})
@@ -515,7 +470,6 @@ target_include_directories(TestXenonUserAgent BEFORE PRIVATE ${XENON_SOURCE_DIR}
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestContentBlockerMemory.cpp" Xenon NAME TestXenonContentBlockerMemory LIBS LibWebView LibWeb LibURL)
 target_include_directories(TestXenonContentBlockerMemory BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-# The blocking popover, drawn without a window. With XENON_SCREENSHOT_DIR set, it saves how it looks there.
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBlockingPopover.cpp" Xenon NAME TestXenonBlockingPopover LIBS LibCore LibURL)
 target_sources(TestXenonBlockingPopover PRIVATE
     "${XENON_UI_DIR}/BlockingPopover.cpp"
@@ -526,8 +480,6 @@ target_sources(TestXenonBlockingPopover PRIVATE
 target_include_directories(TestXenonBlockingPopover BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonBlockingPopover PRIVATE Qt::Core Qt::Gui Qt::Widgets)
 
-# The toolbar's Update button and its popover, with a stand-in for the updater. With XENON_SCREENSHOT_DIR set, it saves
-# how they look there.
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestUpdateButton.cpp" Xenon NAME TestXenonUpdateButton LIBS LibCore LibURL)
 target_sources(TestXenonUpdateButton PRIVATE
     "${XENON_UI_DIR}/ChromeStyle.cpp"
