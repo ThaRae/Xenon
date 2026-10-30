@@ -12,7 +12,8 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden, Proton Pass,
   1Password, iCloud Passwords, security keys
 - [Security](#security): certificate warnings
-- [Installing and updates](#installing-and-updates): the installer, Xenon updating itself, and the Update button
+- [Installing and updates](#installing-and-updates): the installer, the AppImage and the AUR packages, Xenon updating
+  itself, and the Update button
 - [Look](#look): palette and icon
 - [Not done yet](#not-done-yet)
 
@@ -410,6 +411,12 @@ on distributions at least as new as Ubuntu 26.04. It carries update information,
 [AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate) and the AppImage managers that use it update it
 from the next release, downloading only what changed. `Meta/release.py` packages it with linuxdeploy and appimagetool;
 see [Updates.md](Updates.md#the-appimage).
+
+On Arch Linux, Xenon installs from the AUR: `xenon-bin` installs the release's AppImage, and `xenon` builds the release
+from source, which takes hours. Both put the AppImage's files in `/usr/lib/xenon`, with `xenon` on the `PATH` and Xenon
+in the desktop's applications, so they behave alike, and an AUR helper updates them with each release. The packages are in
+`Packaging/aur`, and `Meta/aur.py` moves them to each release and pushes them to the AUR; see
+[Updates.md](Updates.md#the-aur-packages).
 
 Xenon then checks for a new version when it starts and once a day, downloads it in the background, and installs it
 when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch

@@ -45,6 +45,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 - A new tab page with your most visited sites, your bookmarks bar, and the tabs you closed last
 - A settings page with the most-changed settings up top, and Xenon's own settings first
 - Updates itself on macOS, from signed releases, when you quit, or sooner from the toolbar's Update button
+- Installs on Arch Linux from the AUR, as the AppImage or built from source
 
 [Documentation/Features.md](Documentation/Features.md) describes each feature: how to use it, what it does in edge
 cases, and where it lives in the code.
@@ -69,6 +70,14 @@ chmod +x Xenon-*-x86_64.AppImage
 It needs a recent distribution: Ubuntu 26.04 or later, Fedora 44 or later, or Arch Linux. It doesn't update itself;
 [AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate), or an AppImage manager like Gear Lever, updates
 it from the next release.
+
+On Arch Linux, install [`xenon-bin`](https://aur.archlinux.org/packages/xenon-bin) from the AUR, or
+[`xenon`](https://aur.archlinux.org/packages/xenon) to build it from source. An AUR helper like yay installs it, and
+updates it with each release:
+
+```bash
+yay -S xenon-bin
+```
 
 ## Building it
 

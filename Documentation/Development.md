@@ -23,11 +23,13 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 | `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon's artwork. |
 | `UI/Linux/` | The Linux AppImage's desktop file and entry point. |
+| `Packaging/aur/` | The packages that install Xenon on Arch Linux from the AUR: `xenon-bin`, the AppImage, and `xenon`, built from source. |
 | `Tests/` | Unit tests, built as `TestXenon*` targets. |
 | `Meta/xenon.py` | Builds, runs, and tests Xenon. |
 | `Meta/check.py` | Fast checks: formatting, and the mistakes that break Xenon quietly. |
 | `Meta/patches.py` | Applies and exports the engine patch series. |
 | `Meta/release.py` | Packages, publishes and tests releases: the macOS app on a Mac, the AppImage on Linux. |
+| `Meta/aur.py` | Moves the AUR packages to a release, and pushes them to the AUR. |
 | `VERSION.txt` | Xenon's version. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 | `Documentation/` | This file, the [feature notes](Features.md), and the deeper write-ups on extensions, WebAuthn, filter list updates, and releases. |
@@ -124,6 +126,7 @@ prettier needs `npx`. It also checks for the things that break Xenon quietly:
 - an engine patch whose commit message Ladybird's commit lint (`ladybird/Meta/lint-commit.sh`) would reject
 - engine changes in `ladybird/` that aren't exported to `Patches/ladybird`, or a pinned commit that doesn't exist
   upstream
+- an AUR package whose `.SRCINFO` doesn't have its PKGBUILD's version, or a PKGBUILD shellcheck finds a problem in
 
 `Meta/xenon.py test` runs the unit tests in `Tests/`, then runs Xenon headless: it renders `about:welcome`, checks that
 a fresh start writes only to Xenon's directories, and checks content blocking, daily filter list updates, when the
@@ -158,7 +161,8 @@ CI runs on GitHub Actions, on GitHub's own runners:
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test`, with the welcome page's render and the unit tests' renders as an artifact |
 | `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
-| `.github/workflows/release.yml` | by hand, pull requests that change it or how releases are packaged | `Meta/release.py test` and `package` on macOS, and `package` on Linux in Ladybird's CI image, from `main`'s build caches, with the installer, archive and appcast, and the AppImage, as artifacts; `Meta/release.py test` against the AppImage on Ubuntu 26.04, Fedora 44 and Arch Linux; and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases once all of that passed |
+| `.github/workflows/release.yml` | by hand, pull requests that change it or how releases are packaged | `Meta/release.py test` and `package` on macOS, and `package` on Linux in Ladybird's CI image, from `main`'s build caches, with the installer, archive and appcast, and the AppImage, as artifacts; `Meta/release.py test` against the AppImage on Ubuntu 26.04, Fedora 44 and Arch Linux; and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases once all of that passed, then the AUR packages moved to the release, `xenon-bin` tested, and both pushed to the AUR with the `AUR_SSH_PRIVATE_KEY` secret |
+| `.github/workflows/aur.yml` | pull requests that change the AUR packages, by hand | `xenon-bin` built with makepkg in Arch Linux's image, checked with namcap, installed, and run through `Meta/release.py test`'s checks (`Meta/ci/test-aur-package.sh`); and the same for `xenon`, built from source, by hand with **xenon** ticked or when a pull request changes its PKGBUILD, from a cache of its own |
 | `.github/workflows/test262.yml` | pull requests and pushes to `main` that change the patches or move the submodule, by hand | `Meta/test262.py` on Linux in Ladybird's CI image, from `main`'s build caches, building only `test262-runner`; the summary has the counts beside Ladybird's and every test whose result differs |
 | `.github/workflows/sanitizer.yml` | nightly on `main` when it changed since the last run that passed, by hand, pull requests that change it | Xenon built with Ladybird's Sanitizer preset (AddressSanitizer and UndefinedBehaviorSanitizer) on Linux in Ladybird's CI image, running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test` with the options Ladybird's Sanitizer test preset sets (`Meta/ci/sanitizer.sh`); it fails if either does, or on any error the sanitizers report in Xenon's tests, and the reports are an artifact |
 | `.github/workflows/benchmarks.yml` | weekly on `main`, by hand, pull requests that change it | Ladybird's web-benchmarks in headless Xenon and its js-benchmarks in the `js` and `wasm` REPLs, on Linux and macOS, from `main`'s build caches, and BrowserBench on the weekly run (`Meta/ci/benchmarks.sh`); each job's summary compares with `main`'s last run, and the results are kept for 90 days ([Memory.md](Memory.md#benchmarks)) |
@@ -300,8 +304,12 @@ keychain of the Mac they're made on. [Updates.md](Updates.md) covers setting tho
 and how the AppImage is put together and where it runs. The build fetches Sparkle's release (`UI/Xenon.cmake`) by
 itself, on macOS, and `package` fetches the AppImage tools, on Linux, each pinned by its SHA-256.
 
+On Arch Linux, two packages on the AUR install it, kept in `Packaging/aur`: `xenon-bin`, the AppImage, and `xenon`,
+which builds the release from source. `Meta/aur.py update` moves them to a release, and `push` pushes them to the AUR
+([Updates.md](Updates.md#the-aur-packages)).
+
 `.github/workflows/release.yml` does all of it on GitHub's runners instead, by hand: `test` and `package` on macOS, with
 the certificate and the update key as the repository's secrets, and `package` on Linux in Ladybird's CI image, then
 `test` against the AppImage in clean Ubuntu, Fedora and Arch Linux containers. It keeps each platform's files as an
 artifact of the run. With **publish** ticked, on `main`, it runs `publish` once both platforms passed, with a token for
-ThaRae/xenon-releases.
+ThaRae/xenon-releases, and then moves the AUR packages to the release, and pushes them with `AUR_SSH_PRIVATE_KEY`.

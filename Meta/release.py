@@ -10,7 +10,8 @@
 #                              release, with the AppImage if Build/distribution has it
 #   Meta/release.py test       on macOS, check that a release finds, checks and installs the next one from a local
 #                              server, and turns down ones that were tampered with. On Linux, run Meta/xenon.py test's
-#                              checks against the AppImage
+#                              checks against the AppImage, or with --installed, against Xenon as the AUR packages
+#                              install it (Packaging/aur)
 #
 # The version is VERSION.txt's. Xenon updates itself on macOS with Sparkle (UI/Updater.h), which finds the appcast's URL
 # and the update key's public half in the Info.plist this writes. Documentation/Updates.md describes the whole process,
@@ -188,6 +189,9 @@ def main():
         "--sign", default="-", help='the signing identity, or "-" for ad hoc (the default) (macOS)'
     )
     test_parser.add_argument("--appimage", type=Path, help="the AppImage to test, rather than package's (Linux)")
+    test_parser.add_argument(
+        "--installed", type=Path, help="an installed Xenon to test, such as the AUR packages' xenon (Linux)"
+    )
 
     args = parser.parse_args()
     if sys.platform not in ("darwin", "linux"):
@@ -864,33 +868,30 @@ def package_linux_main(args):
     print("Check it with Meta/release.py test, then publish it with the macOS release.")
 
 
-def check_system_libraries(appimage: Path) -> bool:
-    """Whether this system has every library the AppImage leaves to systems (linuxdeploy's excludelist), with every
-    function the AppImage uses from them. ldd -r resolves each binary's symbols as the dynamic linker would."""
+def check_system_libraries(app_dir: Path) -> bool:
+    """Whether this system has every library the AppDir leaves to systems (linuxdeploy's excludelist), with every
+    function the AppDir uses from them. ldd -r resolves each binary's symbols as the dynamic linker would."""
     missing: dict[str, Path] = {}
-    with tempfile.TemporaryDirectory() as directory:
-        run(appimage, "--appimage-extract", cwd=directory)
-        root = Path(directory) / "squashfs-root"
-        for binary in elf_files(root / "usr"):
-            output = subprocess.run(["ldd", "-r", str(binary)], capture_output=True, text=True)
-            for line in (output.stdout + output.stderr).splitlines():
-                if match := re.match(r"\s*(\S+) => not found", line):
-                    missing.setdefault(match[1], binary.relative_to(root))
-                elif match := re.match(r"\s*undefined symbol: (\S+)", line):
-                    missing.setdefault(match[1], binary.relative_to(root))
+    for binary in elf_files(app_dir / "usr"):
+        output = subprocess.run(["ldd", "-r", str(binary)], capture_output=True, text=True)
+        for line in (output.stdout + output.stderr).splitlines():
+            if match := re.match(r"\s*(\S+) => not found", line):
+                missing.setdefault(match[1], binary.relative_to(app_dir))
+            elif match := re.match(r"\s*undefined symbol: (\S+)", line):
+                missing.setdefault(match[1], binary.relative_to(app_dir))
     for name, binary in sorted(missing.items()):
         print(f"    missing {name}, which {binary} uses", file=sys.stderr)
     if not missing:
-        print("    all there, with every function the AppImage uses")
+        print("    all there, with every function Xenon uses")
     return not missing
 
 
-def check_https(appimage: Path, xenon) -> bool:
+def check_https(executable: Path, xenon) -> bool:
     env = dict(os.environ)
     with tempfile.TemporaryDirectory() as profile:
 
         def loads(url: str) -> tuple[bool, str]:
-            _, output = xenon.run_headless(appimage, env, ["--headless=text", "--profile-path", profile, url])
+            _, output = xenon.run_headless(executable, env, ["--headless=text", "--profile-path", profile, url])
             return HTTPS_TEST_TEXT in output, output
 
         # The site is on the internet, so it gets a few tries.
@@ -917,25 +918,37 @@ def check_https(appimage: Path, xenon) -> bool:
 def test_linux_main(args):
     """Runs Meta/xenon.py test's checks of a running Xenon against the AppImage, as installed: they load local pages,
     render one, block what the bundled filter lists block, run extensions, and open Xenon's windows. Then a page over
-    HTTPS. Run on a system that has nothing of the build, it shows what the AppImage misses."""
-    appimage = (args.appimage or DISTRIBUTION_DIR / appimage_name(read_version())).resolve()
-    if not appimage.is_file():
-        sys.exit(f"No {appimage}. Package it first.")
-    # Downloads lose the executable bit, the release workflow's artifacts among them.
-    appimage.chmod(0o755)
-
+    HTTPS. Run on a system that has nothing of the build, it shows what the AppImage misses. With --installed, it tests
+    Xenon as the AUR packages install it (Packaging/aur) instead: the AppDir, where the executable's link leads."""
     xenon = load_module("xenon", XENON_SOURCE_DIR / "Meta" / "xenon.py")
-    print(f"==> Testing {appimage.name}", flush=True)
     failures = []
-    print("==> the system has every library the AppImage leaves to it", flush=True)
-    if not check_system_libraries(appimage):
-        failures.append("system libraries")
+    if args.installed:
+        executable = args.installed.absolute()
+        app_dir = executable.resolve().parent
+        if not (app_dir / "usr" / "bin" / "Xenon").is_file():
+            sys.exit(f"{executable} doesn't lead to an AppDir's AppRun")
+        print(f"==> Testing {executable}, which runs {app_dir}", flush=True)
+        print("==> the system has every library Xenon leaves to it", flush=True)
+        if not check_system_libraries(app_dir):
+            failures.append("system libraries")
+    else:
+        executable = (args.appimage or DISTRIBUTION_DIR / appimage_name(read_version())).resolve()
+        if not executable.is_file():
+            sys.exit(f"No {executable}. Package it first.")
+        # Downloads lose the executable bit, the release workflow's artifacts among them.
+        executable.chmod(0o755)
+        print(f"==> Testing {executable.name}", flush=True)
+        print("==> the system has every library the AppImage leaves to it", flush=True)
+        with tempfile.TemporaryDirectory() as directory:
+            run(executable, "--appimage-extract", cwd=directory)
+            if not check_system_libraries(Path(directory) / "squashfs-root"):
+                failures.append("system libraries")
 
-    failures += xenon.check_app(xenon.Platform(), appimage, DISTRIBUTION_DIR / "smoke")
+    failures += xenon.check_app(xenon.Platform(), executable, DISTRIBUTION_DIR / "smoke")
 
     if xenon.SKIPPED_CHECKS not in failures:
         print("==> a page over HTTPS, with the system's certificates", flush=True)
-        if not check_https(appimage, xenon):
+        if not check_https(executable, xenon):
             failures.append("HTTPS")
 
     if failures:

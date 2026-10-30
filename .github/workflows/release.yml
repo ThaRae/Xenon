@@ -8,7 +8,8 @@ name: Release
 # are done: the GitHub release on ThaRae/xenon-releases with the installer, the archive and the AppImage, the appcast
 # there that installed Xenons update from, and the v<version> tag here. Only from main, and once per version. git and gh
 # push with the XENON_RELEASES_TOKEN secret, a token that can write to both repositories; the run's own token stays
-# read-only.
+# read-only. Then the AUR packages in Packaging/aur move to the release, and with the AUR_SSH_PRIVATE_KEY secret set,
+# they're pushed to the AUR.
 #
 # It builds as ci.yml's macos and linux jobs do, from the build caches main's builds saved, and doesn't save its own. A
 # cold build doesn't fit in one run, so with no caches to start from, it stops at once.
@@ -435,4 +436,73 @@ jobs:
         run: |
           if [ "$PUBLISHED" = success ]; then
             echo "Published: https://github.com/ThaRae/xenon-releases/releases/tag/v$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Once the release is up, the AUR packages (Packaging/aur) move to it: Meta/aur.py update bumps them, with xenon-bin's
+  # checksum of the published AppImage, and xenon-bin is built, installed and tested as aur.yml does. With the
+  # AUR_SSH_PRIVATE_KEY secret set, both are pushed to the AUR. The bump goes to the branch aur-<version> here, for a pull
+  # request.
+  aur:
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: |
+          git submodule update --init --depth 1 ladybird
+          echo "VERSION=$(cat VERSION.txt)" >> "$GITHUB_ENV"
+
+      - name: Update the packages, and test xenon-bin
+        id: update
+        run: Meta/ci/test-aur-package.sh --update xenon-bin
+
+      - name: Push the packages to the AUR
+        if: env.AUR_SSH_PRIVATE_KEY != ''
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          (umask 077 && printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/aur-key")
+          status=0
+          ./Meta/aur.py push --ssh-key "$RUNNER_TEMP/aur-key" || status=$?
+          rm -f "$RUNNER_TEMP/aur-key"
+          exit $status
+
+      # With the same token publish pushes the tag with, whether or not the AUR took the packages. Opening the pull request
+      # needs the token to be allowed to write pull requests too; otherwise the summary links the branch.
+      - name: Push the bump to a branch
+        if: ${{ !cancelled() && steps.update.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ secrets.XENON_RELEASES_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          branch=aur-$VERSION
+          git switch --create "$branch"
+          git add Packaging/aur
+          if git diff --cached --quiet; then
+            echo "The AUR packages were at $VERSION already." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git commit --quiet --message "Update the AUR packages to $VERSION"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            push --quiet https://github.com/ThaRae/Xenon.git "HEAD:refs/heads/$branch"
+          body="Meta/aur.py update, after Xenon $VERSION was published. The release workflow tested xenon-bin."
+          if url=$(gh pr create --repo ThaRae/Xenon --base main --head "$branch" \
+            --title "Update the AUR packages to $VERSION" --body "$body" 2>&1); then
+            echo "Pull request: $url" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Couldn't open a pull request ($url)"
+            echo "Open a pull request from \`$branch\`: https://github.com/ThaRae/Xenon/compare/main...$branch" >> "$GITHUB_STEP_SUMMARY"
           fi

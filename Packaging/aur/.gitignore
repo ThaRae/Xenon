@@ -1,0 +1,8 @@
+# What makepkg leaves in a package's directory when it's built there. Meta/aur.py push only takes what git has.
+*/src/
+*/pkg/
+*/xenon/
+*/ladybird/
+*/*.AppImage
+*/*.pkg.tar.*
+*/*.log
