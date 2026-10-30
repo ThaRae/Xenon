@@ -127,19 +127,21 @@ def appimage_sha256(version: str, appimage: Path | None) -> str:
 def makepkg(package: Path, *arguments: str) -> str:
     """Runs makepkg in a package's directory, and returns what it printed. Outside Arch Linux, it runs in Arch Linux's
     image, as this user rather than the container's root, which makepkg refuses to run as. makepkg wants to be able to
-    write where it would build and put what it built, even when it won't, so that's the container's /tmp."""
+    write where it would build and put what it built, even when it only reads the PKGBUILD, and the package's directory
+    may not be this user's (a checkout in a container), so those are a directory of its own."""
+    destinations = ("BUILDDIR", "PKGDEST", "SRCDEST", "SRCPKGDEST", "LOGDEST")
     if shutil.which("makepkg"):
-        command = ["makepkg", *arguments]
-    elif shutil.which("docker"):
-        destinations = ["BUILDDIR", "PKGDEST", "SRCDEST", "SRCPKGDEST", "LOGDEST"]
-        command = [
-            "docker", "run", "--rm", "--platform", "linux/amd64", "--user", f"{os.getuid()}:{os.getgid()}",
-            "--volume", f"{package}:/package:ro", "--workdir", "/package",
-            *(argument for name in destinations for argument in ("--env", f"{name}=/tmp")),
-            ARCH_IMAGE, "makepkg", *arguments,
-        ]  # fmt: skip
-    else:
+        with tempfile.TemporaryDirectory() as directory:
+            environment = dict(os.environ, **dict.fromkeys(destinations, directory))
+            return run("makepkg", *arguments, cwd=package, env=environment)
+    if not shutil.which("docker"):
         sys.exit("makepkg isn't installed, and neither is docker, to run it in Arch Linux's image")
+    command = [
+        "docker", "run", "--rm", "--platform", "linux/amd64", "--user", f"{os.getuid()}:{os.getgid()}",
+        "--volume", f"{package}:/package:ro", "--workdir", "/package",
+        *(argument for name in destinations for argument in ("--env", f"{name}=/tmp")),
+        ARCH_IMAGE, "makepkg", *arguments,
+    ]  # fmt: skip
     return run(*command, cwd=package)
 
 
