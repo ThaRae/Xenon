@@ -159,26 +159,63 @@ change (#34), and dropping scriptlets would stop blocking YouTube ads. Sending a
 text was measured (65 ms vs 501 ms to load, 33 vs 35 MiB kept) and skipped: it does not cut retained memory, and
 adblock-rust still copies the blob.
 
+## Measurements from the Linux build
+
+Xenon was built in Ladybird's CI image (`ghcr.io/ladybirdbrowser/ladybird-ci:2026.10.16`) on 4 cores / 9 GiB, under
+Xvfb with `QT_QPA_PLATFORM=xcb`. The tree was `main` with the keeper patches from #53, #57 and #59 (49 patches); the
+launcher was `bin/Xenon` `8e880c64…` and `WebContent` `485c05b5…`, unchanged across the runs below.
+
+PSS in MiB from `./Meta/measure.py browsers --settle 40`, two runs per arm, content blocking on/off:
+
+| page | on | off |
+| --- | ---: | ---: |
+| local page with cross-site frames | 406.1 | 364.7 |
+| github.com/LadybirdBrowser/ladybird | 1166.1 | 1122.7 |
+| youtube.com | 2327.0 | 2178.4 |
+| x.com | 1197.1 | 1145.3 |
+
+github holds the only ImageDecoder at 40 s (42.4 MiB). youtube carries its media stack (MediaServer 80, AudioServer
+when playing) and the page's WebContent is 1947 MiB, of which a forced full collection leaves 75.2 MiB of live cells:
+the rest is allocator heap for YouTube's own JS, not documents or images.
+
+Scores from `./Meta/measure.py bench`, 600 s dumps (JetStream 2400 s):
+
+| suite | score | notes |
+| --- | ---: | --- |
+| Speedometer 3.1 | **7.29** ±0.21 | 10 iterations, one run |
+| MotionMark 1.3.1 | **359–414** | Bimodal on this box: 359.52, 359.33, 408.10, then an A/B of 414.58 / 376.56 / 347.13 / 363.17 (mean 375.4, CV 7.6%). Design and Leaves carry the spread; disabling the compositor idle release does not change it (it never fires during MotionMark) |
+| JetStream 2.2 | **67.360** (combined) | 63 of 64 tests: 53 finished in a 2400 s run (geomean 62.085), the 10 after `bomb-workers` in a filtered 600 s run (subset total 103.775), combined with the suite's geomean formula. `bomb-workers` hangs on its own too, so the suite never prints an official total |
+
+These numbers are single-machine and use the software rasterizer (Vulkan is unavailable under Xvfb), and remote pages
+are live, so they are for comparing Xenon builds on this box, not absolute claims.
+
+### What each keeper costs and buys
+
+The speed axis was profiled end to end on this tree; each of these had a measured ceiling below the 0.3-point keeper
+gate:
+
+- **Style matching and invalidation** was 15.6% of WebContent samples spread over 1,437 functions (largest 0.66%);
+  withholding class invalidation entirely bought only +0.2.
+- **JS heap growth** was 3.1% of the active phase (1.05% stop-the-world); halving collections with a growth factor of 8
+  cost +2.05 GB RSS and moved the score by +0.02.
+- **Forced layout** was 756 ms per iteration, dominated by the suite's own `getBoundingClientRect()` reads; 360 of 369
+  reads commit real geometry, so there is no safe skip.
+- **Paint and raster** were 449–476 ms per iteration, but a 6× artificial raster delay still scored 7.577: the
+  compositor runs behind the suite's vsync waits and never gates it.
+- **HTTP cache and classic-script bytecode cache** are already warm: loads 2–10 of Speedometer download nothing, and
+  after iteration 1 every classic script is served from `.jsbc` (82 hits, 0 compiles).
+
+The keepers that do pay are the ones above: lazy ImageDecoder, media-server retirement, compositor idle release,
+decommit after load, no spare WebContent, and sampled farbling.
+
 ## What this environment could not measure
 
-This cloud checkout has no Qt, no vcpkg tree, no Docker, and no Ladybird CI image, so it cannot configure or build
-Xenon or Ladybird. A cold Xenon build is hours. There is no Chrome binary.
+- A head-to-head with Chrome (there is no Chrome binary in the CI image).
+- macOS footprint: the numbers above are Linux PSS under Xvfb.
+- Absolute scores on a quiet reference machine: the CI image has 4 shared cores and no GPU, and MotionMark's Design
+  and Leaves tests vary more between runs than the differences between nearby builds.
 
-What ran here:
-
-- `Meta/measure.py self-test` (Linux RSS/PSS parsing; this process was RSS 14.8 MiB / PSS 10.3 MiB)
-- The content-blocker crate (`Meta/ci/memory-measurement`, log in `Meta/measure-results/20261028T234253Z-content-blocker.txt`):
-  - Xenon's full lists: 26.1 MiB of text, 501 ms to build, peak 116.3 MiB while building, **35.3 MiB kept** (RSS after `mi_collect`)
-  - Deserializing a pre-built adblock engine: 65 ms, 33.3 MiB kept (faster, not smaller)
-  - YouTube still injects ~97 KB of scriptlets; GitHub ~11 KB; X ~47 KB
-  - 1,818,984 request checks against `$document` hashes: 0 mismatches vs stock adblock-rust
-- Unit tests for memory-pressure thresholds, which compile only once Xenon itself does
-
-What did not:
-
-- A live Xenon vs Ladybird vs Chrome footprint on youtube.com / x.com / github.com
-- Speedometer, JetStream, MotionMark scores (the pages need a Start click and minutes of runtime in a built browser)
-- Re-measuring experiments 1–3 in a running browser
-
-Rerun `Meta/measure.py browsers` and `bench` on a machine that has a built Xenon (CI's macOS job, or a local
-`./Meta/xenon.py build`) to fill those in. The JSON log format is stable so later runs can be appended.
+Rerun `Meta/measure.py browsers` and `bench` with the same bundle for a comparison; the JSON log format is stable so
+later runs can be appended. The content-blocker crate figures from the earlier cloud-only checkout are kept in
+`Meta/measure-results/` and still match: 35.3 MiB kept after building Xenon's 26.1 MiB of filter text, and 0 mismatches
+over 1,818,984 request checks.
