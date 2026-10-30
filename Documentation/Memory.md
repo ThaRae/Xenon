@@ -28,6 +28,12 @@ From a Xenon checkout with the `ladybird` submodule initialized:
 ./Meta/measure.py bench --xenon Build/release/xenon/bin/Xenon --seconds 900
 ./Meta/measure.py bench --xenon Build/release/xenon/bin/Xenon --suite motionmark --seconds 600
 
+# Ladybird's own benchmark suites (see Benchmarks below). web-benchmarks runs in headless Xenon; js-benchmarks in the
+# js and wasm REPLs, which Xenon's build makes from the same patched engine (./Meta/xenon.py build js, then wasm).
+./Meta/measure.py web-benchmarks --xenon Build/release/bin/Xenon.app --benchmarks Speedometer3,WebKitDOM
+./Meta/measure.py js-benchmarks --suites SunSpider,Octane --iterations 3
+./Meta/measure.py report Meta/measure-results/<stamp>-js-benchmarks.json --baseline <an earlier log>
+
 # Linux smaps parsing, no Xenon needed:
 ./Meta/measure.py self-test
 ```
@@ -38,6 +44,45 @@ patches.
 
 On Linux the sum is RSS and PSS from `/proc`. PSS is the one that does not double-count shared mappings. On macOS it
 is `footprint(1)`'s physical footprint, Activity Monitor's Memory column.
+
+## Benchmarks
+
+Ladybird's CI runs two suites of its own on every push to master, and posts the results to its dashboard.
+`Meta/measure.py` runs the same ones against Xenon:
+
+- [web-benchmarks](https://github.com/LadybirdBrowser/web-benchmarks): Speedometer 2 and 3, StyleBench, about 230
+  micro-benchmarks of the web platform (MicroWeb), and WebKit's DOM, CSS, bindings, parser and SVG suites. Its runner
+  serves them locally and drives the browser headless, with a fresh profile, so Xenon runs as a new install does,
+  content blocking included. `web-benchmarks --xenon` takes the app (or the Linux build's `Build/release/xenon`).
+- [js-benchmarks](https://github.com/LadybirdBrowser/js-benchmarks): SunSpider, Kraken, Octane, JetStream, ARES-6 and
+  others, and WebAssembly suites, each test a fresh `js` or `wasm` process. `js-benchmarks` finds the REPLs in
+  `Build/release/bin`; they come from the engine with Xenon's patches, so only those patches that touch LibJS, LibWasm
+  or AK show here.
+
+Each command checks out the suite's `master` (`--ref` for another revision) in `Build/benchmarks`, with a venv for its
+runner, runs every test `--iterations` times (5 by default, as Ladybird's CI does), and logs the runner's results with
+the suite's, Xenon's and Ladybird's commits and the machine's CPU. `--benchmarks` / `--suites` take run.py's names,
+comma-separated. As in Ladybird's CI, a benchmark with a test that fails, or that doesn't finish in 30 s, is left out
+of the results and named in the log and the job's summary; the command fails only when nothing was measured. On
+GitHub's runners, WebKitDOM's `textarea-edit` sometimes doesn't finish (so far on every macOS run, and on some Linux
+ones), which leaves WebKitDOM out of that run. `report` prints a log as markdown: each suite's total, every test, and
+with `--baseline`, how each compares with the earlier log. A difference counts as a change only when it's more than 3% and more than two standard
+errors of the difference; anything less is labelled noise.
+
+[`.github/workflows/benchmarks.yml`](../.github/workflows/benchmarks.yml) runs both suites on Linux (in Ladybird's CI
+image) and macOS, every Sunday on `main` with BrowserBench as well, and by hand:
+
+```bash
+gh workflow run benchmarks.yml --ref <branch>                          # Ladybird's two suites, 3 runs of each test
+gh workflow run benchmarks.yml -f suites=all -f platforms=macos        # BrowserBench too, macOS only
+gh workflow run benchmarks.yml -f suites=web-benchmarks -f web-benchmarks=Speedometer3 -f iterations=5
+```
+
+Each job's summary is its suite's report, compared with `main`'s last run of that suite on that platform, whose results
+it downloads. Every job keeps its log as an artifact for 90 days (`benchmarks-<platform>-<suite>`), which
+`Meta/measure.py report` reads. GitHub's runners are shared virtual machines: a few percent between two runs is
+usually the machine, and a change of CPU model between runs (the summary says so) can move everything. Changes that
+hold across several weekly runs, or that are well past the noise, are the ones to look into.
 
 ## Xenon versus upstream
 

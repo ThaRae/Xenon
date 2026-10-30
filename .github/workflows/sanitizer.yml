@@ -1,0 +1,141 @@
+name: Sanitizer
+
+# Ladybird's Sanitizer configuration, AddressSanitizer and UndefinedBehaviorSanitizer with its CMake preset and vcpkg
+# triplet, which Ladybird's CI builds and tests every change in (ladybird/.github/workflows/ci.yml and nightly-lagom.yml),
+# applied to Xenon: Meta/ci/sanitizer.sh builds Xenon with it, runs Xenon's tests and then Ladybird's own against the
+# patched engine (Meta/xenon.py ladybird-test), and fails if either fails or the sanitizers find errors in Xenon's.
+#
+# Nightly on main, when main has changed since the last run that passed, by hand on any branch, and on pull requests that
+# change it. Linux only, in Ladybird's CI image, with build caches of its own: the Sanitizer preset builds every
+# dependency again, with its own vcpkg triplet, and compiles everything differently. A cold build takes longer than a
+# job may run, so, as in ci.yml, the build step stops itself in time for the caches to be saved, and the next run carries
+# on from there. Every run saves them, under a key of its own, so a rerun of the same commit carries on too: on main for
+# the nights after, and elsewhere for that branch's or pull request's next run.
+on:
+  schedule:
+    - cron: "41 2 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/sanitizer.yml
+      - Meta/ci/sanitizer.sh
+
+concurrency:
+  group: sanitizer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  # To find the last run that passed.
+  actions: read
+
+jobs:
+  changed:
+    runs-on: ubuntu-24.04
+    outputs:
+      skip: ${{ steps.last.outputs.skip }}
+    steps:
+      - name: Find the commit the last run passed on
+        id: last
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          last=$(gh run list --workflow sanitizer.yml --branch main --status success --limit 1 --json headSha --jq '.[0].headSha // ""')
+          if [ "$last" = "$GITHUB_SHA" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "main is still at ${GITHUB_SHA:0:10}, which the last run passed on." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  linux:
+    needs: changed
+    if: needs.changed.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      # As in ci.yml: the runner starts with about 20 GB free, and a cold build needs more.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: |
+          git submodule update --init --depth 1 ladybird
+          echo "IMAGE_VERSION=$(cat ladybird/Meta/Docker/ci/VERSION)" >> "$GITHUB_ENV"
+
+      - name: Restore the build caches
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: sanitizer-linux-${{ env.IMAGE_VERSION }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: sanitizer-linux-${{ env.IMAGE_VERSION }}-
+
+      - name: Build Xenon with the sanitizers and run the tests
+        timeout-minutes: 320
+        run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/sanitizer.sh
+
+      - name: Save the build caches
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: sanitizer-linux-${{ env.IMAGE_VERSION }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Linux, Sanitizer"
+            echo
+            echo "Ladybird \`$(git -C ladybird rev-parse --short HEAD)\`, CI image \`$IMAGE_VERSION\`"
+            echo
+            for tests in xenon ladybird; do
+              reports=$(find "Build/sanitizer/sanitizer-logs/$tests" -type f 2> /dev/null | wc -l)
+              echo "- Sanitizer reports from ${tests^}'s tests: $reports"
+            done
+            echo
+            echo "The reports are in the \`sanitizer-logs\` artifact."
+            if [ -f Build/sanitizer/ccache-stats.txt ]; then
+              echo
+              echo '```'
+              cat Build/sanitizer/ccache-stats.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the sanitizer reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sanitizer-logs
+          path: Build/sanitizer/sanitizer-logs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload the failed web tests' output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sanitizer-test-dumps
+          path: Build/sanitizer/Tests/LibWeb/test-web/test-dumps/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the dependency build logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vcpkg-build-logs-sanitizer
+          path: Build/vcpkg-sanitizer/buildtrees/*/*.log
+          if-no-files-found: ignore
+          retention-days: 7

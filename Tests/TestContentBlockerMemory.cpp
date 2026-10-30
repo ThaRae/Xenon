@@ -65,8 +65,11 @@ TEST_CASE(building_the_content_blocker_gives_back_what_building_it_used)
         return;
 
     // The engine for these lists keeps a few MiB. If building it is still resident beyond that, the pages it used were
-    // only reset, not decommitted, which mimalloc's Linux default does not return to the system.
+    // only reset, not decommitted, which mimalloc's Linux default does not return to the system. Sanitizer builds use the
+    // system allocator in place of mimalloc (AK/kmalloc.cpp), so there is nothing of it to measure there.
+#    if !defined(HAS_ADDRESS_SANITIZER)
     EXPECT(*rss_after < *rss_before + 24 * 1024 * 1024);
+#    endif
 
     // The engine the test measured is the one that matches requests, not a throwaway.
     auto source_url = URL::Parser::basic_parse("https://example.com/"sv);
