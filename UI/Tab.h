@@ -13,8 +13,8 @@
 #include <AK/String.h>
 #include <AK/Vector.h>
 #include <AK/kmalloc.h>
+#include <LibAudio/Audibility.h>
 #include <LibWakeLock/DisplaySleepInhibitor.h>
-#include <LibWebCommon/HTML/AudioPlayState.h>
 #include <LibWebCommon/Page/PageId.h>
 #include <LibWebCommon/Page/ScreenWakeLockState.h>
 #include <LibWebView/FileDownloader.h>
@@ -198,7 +198,7 @@ public slots:
 signals:
     void title_changed(int id, QString const&);
     void favicon_changed(int id, QIcon const&);
-    void audio_play_state_changed(int id, Web::HTML::AudioPlayState);
+    void audibility_changed(int id, Audio::Audibility);
     void loading_changed();
     void loading_finished();
     void loaded();
@@ -331,12 +331,13 @@ private:
     QPointer<QColorDialog> m_color_picker_dialog;
     QPointer<QFileDialog> m_file_picker_dialog;
     QPointer<QMessageBox> m_external_url_confirmation_dialog;
-    // Requests the same dialog would answer wait on the one open, so a page cannot stack dialogs by asking again.
-    struct PendingPermissionRequests {
+    // The view asks once for requests the same dialog would answer, so a page cannot stack dialogs by asking again.
+    struct PermissionDialog {
+        WebView::PermissionPromptRequest request;
         QPointer<QMessageBox> dialog;
-        Vector<Function<void(bool granted)>> on_decided;
+        WebView::PermissionPromptCallback on_outcome;
     };
-    HashMap<String, PendingPermissionRequests> m_pending_permission_requests;
+    Vector<PermissionDialog> m_permission_dialogs;
 
     bool m_suppress_javascript_dialogs_until_navigation { false };
     bool m_already_requested_close { false };

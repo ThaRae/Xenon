@@ -755,7 +755,7 @@ void BrowserWindow::initialize_tab(Tab* tab)
 
     QObject::connect(tab, &Tab::title_changed, this, &BrowserWindow::tab_title_changed);
     QObject::connect(tab, &Tab::favicon_changed, this, &BrowserWindow::tab_favicon_changed);
-    QObject::connect(tab, &Tab::audio_play_state_changed, this, &BrowserWindow::tab_audio_play_state_changed);
+    QObject::connect(tab, &Tab::audibility_changed, this, &BrowserWindow::tab_audibility_changed);
     QObject::connect(tab, &Tab::loading_changed, this, [this] {
         m_tabs_container->tab_bar()->update_loading_swirl_animation();
     });
@@ -1158,10 +1158,10 @@ void BrowserWindow::initialize_tab_buttons(Tab* tab)
     auto index = m_tabs_container->index_of(tab);
     m_tabs_container->set_tab_icon(index, tab->tab_icon());
 
-    m_tabs_container->tab_bar()->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, nullptr);
     // A pinned tab has no close button.
     m_tabs_container->tab_bar()->setTabButton(index, TAB_CLOSE_BUTTON_POSITION, tab->is_pinned() ? nullptr : create_tab_close_button(*tab));
     m_tabs_container->update_tab_button_visibility();
+    update_tab_audio_button(*tab);
 }
 
 void BrowserWindow::update_tab_close_button(Tab& tab)
@@ -1302,46 +1302,44 @@ void BrowserWindow::set_always_on_top(bool always_on_top)
         handle->setFlags(flags);
 }
 
-void BrowserWindow::tab_audio_play_state_changed(int index, Web::HTML::AudioPlayState play_state)
+void BrowserWindow::tab_audibility_changed(int index, Audio::Audibility)
 {
-    auto* tab = m_tabs_container->tab(index);
+    if (index < 0)
+        return;
+    update_tab_audio_button(*m_tabs_container->tab(index));
+}
 
-    switch (play_state) {
-    case Web::HTML::AudioPlayState::Paused:
-        if (tab->view().page_mute_state() == Web::HTML::MuteState::Unmuted) {
-            m_tabs_container->tab_bar()->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, nullptr);
-            m_tabs_container->update_tab_button_visibility();
-        }
-        break;
+// The tab is shown playing audio, muted or not, while the AudioServer recently heard it. A muted tab keeps its button,
+// as that is the only way to unmute it.
+void BrowserWindow::update_tab_audio_button(Tab& tab)
+{
+    auto index = tab_index(&tab);
+    auto* tab_bar = m_tabs_container->tab_bar();
 
-    case Web::HTML::AudioPlayState::Playing:
-        auto* button = new TabBarButton(icon_for_page_mute_state(*tab));
-        button->setToolTip(tool_tip_for_page_mute_state(*tab));
+    if (!tab.is_loaded() || (tab.view().audibility() == Audio::Audibility::Inaudible && tab.view().page_mute_state() == Web::HTML::MuteState::Unmuted)) {
+        // The tab bar only hides the button it lets go of.
+        if (auto* button = tab_bar->tabButton(index, AUDIO_STATE_BUTTON_POSITION))
+            button->deleteLater();
+        tab_bar->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, nullptr);
+        m_tabs_container->update_tab_button_visibility();
+        return;
+    }
+
+    auto* button = qobject_cast<TabBarButton*>(tab_bar->tabButton(index, AUDIO_STATE_BUTTON_POSITION));
+    if (!button) {
+        button = new TabBarButton(icon_for_page_mute_state(tab));
         button->setObjectName("LadybirdAudioState");
         // NB: The speaker fills more of its icon than the close button's cross does, so it is drawn a little smaller.
         button->set_icon_inset(2);
-
-        connect(button, &QPushButton::clicked, this, [this, tab]() {
-            tab->view().toggle_page_mute_state();
-            auto index = tab_index(tab);
-
-            switch (tab->view().audio_play_state()) {
-            case Web::HTML::AudioPlayState::Paused:
-                m_tabs_container->tab_bar()->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, nullptr);
-                m_tabs_container->update_tab_button_visibility();
-                break;
-            case Web::HTML::AudioPlayState::Playing:
-                auto* button = m_tabs_container->tab_bar()->tabButton(index, AUDIO_STATE_BUTTON_POSITION);
-                as<TabBarButton>(button)->setIcon(icon_for_page_mute_state(*tab));
-                button->setToolTip(tool_tip_for_page_mute_state(*tab));
-                break;
-            }
+        connect(button, &QPushButton::clicked, this, [this, &tab]() {
+            tab.view().toggle_page_mute_state();
+            update_tab_audio_button(tab);
         });
-
-        m_tabs_container->tab_bar()->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, button);
+        tab_bar->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, button);
         m_tabs_container->update_tab_button_visibility();
-        break;
     }
+    button->setIcon(icon_for_page_mute_state(tab));
+    button->setToolTip(tool_tip_for_page_mute_state(tab));
 }
 
 QIcon BrowserWindow::icon_for_page_mute_state(Tab& tab) const

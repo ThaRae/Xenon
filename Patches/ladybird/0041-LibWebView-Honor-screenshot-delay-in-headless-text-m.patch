@@ -20,10 +20,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 39 insertions(+), 14 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 7125e06b82ffc334cb6a7ef38f7ffdcc2855907b..75c2ea530cde6fd62f57339fa7ca4b5814f7fc3b 100644
+index a1606e9d0138ce5f2dcfd51e0b4537107354994e..591433226bd0c8c8e82da04dd843326e17f7ab52 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -404,7 +404,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -419,7 +419,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          },
      });
  
@@ -32,7 +32,7 @@ index 7125e06b82ffc334cb6a7ef38f7ffdcc2855907b..75c2ea530cde6fd62f57339fa7ca4b58
      args_parser.add_option(screenshot_path, "Save screenshots to the given location (only supported for headless screenshot mode)", "screenshot-path", 0, "path");
      args_parser.add_option(window_width, "Set viewport width in pixels (default: 800) (currently only supported for headless mode)", "window-width", 0, "pixels");
      args_parser.add_option(window_height, "Set viewport height in pixels (default: 600) (currently only supported for headless mode)", "window-height", 0, "pixels");
-@@ -2324,26 +2324,48 @@ static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventL
+@@ -2360,26 +2360,48 @@ static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventL
      return timer;
  }
  
@@ -91,7 +91,7 @@ index 7125e06b82ffc334cb6a7ef38f7ffdcc2855907b..75c2ea530cde6fd62f57339fa7ca4b58
  static void load_page_and_exit_on_close(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url)
  {
      view.on_close = [&event_loop]() {
-@@ -2370,13 +2392,16 @@ ErrorOr<int> Application::execute()
+@@ -2406,13 +2428,16 @@ ErrorOr<int> Application::execute()
  
              switch (*m_browser_options.headless_mode) {
              case HeadlessMode::Screenshot:

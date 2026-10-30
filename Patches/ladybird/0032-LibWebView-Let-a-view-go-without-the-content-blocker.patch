@@ -25,10 +25,10 @@ other processes, such as cross-site frames, still get them.
  7 files changed, 31 insertions(+), 16 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index f0f8112d75330b97abcb2ad18b218f2c753e0bb2..15495dfe44e68c3e5e4eb72fd675b63eb245be4d 100644
+index 68dd9f6ea46ecc03d431c73240c2646e4c22c1ab..237f39e321f151440d696a4029fa297408aa6729 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -899,8 +899,9 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -914,8 +914,9 @@ void Application::send_content_blockers(WebContentClient& client) const
  {
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
@@ -40,7 +40,7 @@ index f0f8112d75330b97abcb2ad18b218f2c753e0bb2..15495dfe44e68c3e5e4eb72fd675b63e
          client.async_set_content_blockers(Core::AnonymousBuffer {}, Core::AnonymousBuffer {}, Core::AnonymousBuffer {});
          return;
      }
-@@ -1233,7 +1234,7 @@ void Application::open_bookmark_in_new_window(String const& bookmark_id, IsPriva
+@@ -1248,7 +1249,7 @@ void Application::open_bookmark_in_new_window(String const& bookmark_id, IsPriva
          open_url_in_new_window(bookmark->bookmark().url, is_private);
  }
  
@@ -49,7 +49,7 @@ index f0f8112d75330b97abcb2ad18b218f2c753e0bb2..15495dfe44e68c3e5e4eb72fd675b63e
  {
      // The client's WebContentClient picks up this same session when it is created.
      auto session = session_for_new_view(is_private);
-@@ -1278,6 +1279,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1295,6 +1296,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
      if (auto* webdriver_bidi = WebDriverBiDi::the(); webdriver_bidi && webdriver_bidi->session_state().is_active)
          webdriver_bidi->push_session_state_for_client(*client);
  
@@ -57,7 +57,7 @@ index f0f8112d75330b97abcb2ad18b218f2c753e0bb2..15495dfe44e68c3e5e4eb72fd675b63e
      send_content_blockers(*client);
  
      m_web_content_clients.set(client);
-@@ -1712,10 +1714,13 @@ void Application::crash_compositor_process()
+@@ -1741,10 +1743,13 @@ void Application::crash_compositor_process()
      m_compositor_client->async_crash();
  }
  
@@ -74,10 +74,10 @@ index f0f8112d75330b97abcb2ad18b218f2c753e0bb2..15495dfe44e68c3e5e4eb72fd675b63e
      } else if (m_spare_web_content_process) {
          web_content_client = m_spare_web_content_process.release_nonnull();
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 8a297a4bb602eb3505c21bc0c4533ce404fff71f..2fd9493ee2768862864cb3644dea51b78a352cf6 100644
+index 194718728ed81e2adec749213a70b5b502a81cbc..dfe5fa7d7e7e2f5bca05e0394fc4b943ffad9273 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -255,7 +255,7 @@ public:
+@@ -268,7 +268,7 @@ public:
      ErrorOr<Core::GeolocationProvider::WatchId, Core::GeolocationError> start_watching_geolocation_position(Core::GeolocationProvider::SuccessCallback on_success, Core::GeolocationProvider::ErrorCallback on_error);
      void stop_watching_geolocation_position(Core::GeolocationProvider::WatchId);
  
@@ -86,7 +86,7 @@ index 8a297a4bb602eb3505c21bc0c4533ce404fff71f..2fd9493ee2768862864cb3644dea51b7
      struct ChildFrameWebContentProcess {
          NonnullRefPtr<WebContentClient> client;
          Web::PageId page_id { 0 };
-@@ -473,7 +473,7 @@ private:
+@@ -490,7 +490,7 @@ private:
      ErrorOr<void> create_profile(Optional<StringView> profile_name, Optional<StringView> profile_path, bool force_new_process, bool temporary_profile);
      void create_mach_port_server(ByteString const& profile_identity);
      void update_website_color_scheme();
@@ -145,10 +145,10 @@ index e9f41fc35af7c37920090293b650d3dc2e9de060..3f2ed2d02fc0002218ba9a64a2110985
      void propagate_web_content_crash(WebContentCrashReason);
      HeadlessWebView& adopt_child_web_view(NonnullOwnPtr<HeadlessWebView>);
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index c465cdae5e56b5bac18fa8f5a56a565b020b3c3a..501cef2ade8dc6e0634455ceab438588d626d5d0 100644
+index ff638fe2de727c403372c804cd934c9d1b3bf287..5647a88d08726c5beb78e1ffc2563cc89acf75c1 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -83,8 +83,9 @@ Optional<ViewImplementation&> ViewImplementation::find_view_by_id(u64 id)
+@@ -84,8 +84,9 @@ Optional<ViewImplementation&> ViewImplementation::find_view_by_id(u64 id)
      return {};
  }
  
@@ -159,7 +159,7 @@ index c465cdae5e56b5bac18fa8f5a56a565b020b3c3a..501cef2ade8dc6e0634455ceab438588
      , m_session(Application::session_for_new_view(is_private))
      , m_document_cookie_version_buffer(Core::create_shared_version_buffer())
      , m_view_id(s_view_count++)
-@@ -2909,7 +2910,7 @@ void ViewImplementation::initialize_tab(Web::HTML::VisibilityState system_visibi
+@@ -3129,7 +3130,7 @@ void ViewImplementation::initialize_tab(Web::HTML::VisibilityState system_visibi
  {
      if (!traversable.has_value()) {
          // FIXME: Fail to open the tab, rather than crashing the whole application if this fails.
@@ -169,18 +169,18 @@ index c465cdae5e56b5bac18fa8f5a56a565b020b3c3a..501cef2ade8dc6e0634455ceab438588
      }
      display_traversable(*traversable, system_visibility_state);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 7d145052c90f1316572dcc6363abf0089a8a19c7..ecbd43e640ad30a5338695178cdbb065755019f5 100644
+index 8baedba9a41d9710cc961a9d39554401ac8b5dc6..39748df57afe8e72eceef67393bf96b9c06cec1d 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -73,6 +73,7 @@
+@@ -76,6 +76,7 @@
  #include <LibWebView/ExternalURLHandler.h>
  #include <LibWebView/Forward.h>
  #include <LibWebView/HistoryVisitTransition.h>
 +#include <LibWebView/Options.h>
+ #include <LibWebView/PermissionManager.h>
  #include <LibWebView/SessionHistory.h>
  #include <LibWebView/SessionStore.h>
- #include <LibWebView/Settings.h>
-@@ -675,7 +676,9 @@ protected:
+@@ -742,7 +743,9 @@ protected:
      virtual Optional<ScreenRects> screen_rects() const { return {}; }
      void update_compositor_display_metadata(WebContentPage&);
  
@@ -191,7 +191,7 @@ index 7d145052c90f1316572dcc6363abf0089a8a19c7..ecbd43e640ad30a5338695178cdbb065
  
      void set_owner_view(ViewImplementation const& owner_view) { m_owner_view_id = owner_view.view_id(); }
  
-@@ -815,6 +818,7 @@ protected:
+@@ -889,6 +892,7 @@ protected:
      bool m_accessibility_tree_requested { false };
  
      IsPrivate m_is_private { IsPrivate::No };
@@ -200,10 +200,10 @@ index 7d145052c90f1316572dcc6363abf0089a8a19c7..ecbd43e640ad30a5338695178cdbb065
  
      // A load the browser's UI started, whose URL the address bar shows while it is the ongoing navigation.
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index ff1ba33a72573567167d31b42dadcea89e76a288..556b4539705039c59910350607f60fb49b7e4532 100644
+index 104996b8f0258e1d95b2e49790e700e1be1aaca6..f2e5a63595841934ecefa40452b2e9689d015be7 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
-@@ -58,6 +58,7 @@
+@@ -62,6 +62,7 @@
  #include <LibWebView/BrowsingSession.h>
  #include <LibWebView/ChildIdentity.h>
  #include <LibWebView/Forward.h>
@@ -211,7 +211,7 @@ index ff1ba33a72573567167d31b42dadcea89e76a288..556b4539705039c59910350607f60fb4
  #include <LibWebView/RequestServerSiteBindings.h>
  #include <LibWebView/StorageAreaRegistry.h>
  #include <LibWebView/WebContentPage.h>
-@@ -129,6 +130,9 @@ public:
+@@ -133,6 +134,9 @@ public:
      // documents processes of their own, which host nothing else.
      Optional<String> const& hosted_web_ui() const { return m_hosted_web_ui; }
      void set_hosted_web_ui(String host) { m_hosted_web_ui = move(host); }
@@ -221,7 +221,7 @@ index ff1ba33a72573567167d31b42dadcea89e76a288..556b4539705039c59910350607f60fb4
      void register_embedded_page(Web::PageId page_id, CanonicalTraversable&);
      void unregister_embedded_page(Web::PageId page_id);
      Optional<Web::PageId> page_id_for_traversable(CanonicalTraversable const&) const;
-@@ -229,6 +233,7 @@ private:
+@@ -247,6 +251,7 @@ private:
      bool m_rejected_ipc { false };
      bool m_has_hosted_local_file_content { false };
      Optional<String> m_hosted_web_ui;

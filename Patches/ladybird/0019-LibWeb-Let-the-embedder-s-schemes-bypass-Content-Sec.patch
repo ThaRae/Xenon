@@ -24,20 +24,20 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 26 insertions(+)
 
 diff --git a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
-index e412cefd3e3f31f9c5dc6ad5e02bfec5a660e3e0..92d28a2c02f99651a9e89feca2560f2192da49ce 100644
+index 58db5dacdc61cf0a2105b946bc3a286e8c4884e8..0bdae516e1d38d5ad9338c2db5579929acbd27d9 100644
 --- a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 +++ b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
-@@ -7,6 +7,7 @@
+@@ -6,6 +6,7 @@
+  */
  
  #include <AK/AnyOf.h>
- #include <LibGC/Heap.h>
 +#include <LibURL/EmbedderSchemes.h>
  #include <LibWeb/Bindings/PrincipalHostDefined.h>
  #include <LibWeb/ContentSecurityPolicy/BlockingAlgorithms.h>
  #include <LibWeb/ContentSecurityPolicy/Directives/DirectiveOperations.h>
-@@ -73,6 +74,12 @@ ViolationReporter violation_reporter_for_request(JS::Realm& realm, NonnullRefPtr
+@@ -124,6 +125,12 @@ void report_a_violation_found_in_another_process(HTML::EnvironmentSettingsObject
  // https://w3c.github.io/webappsec-csp/#should-block-navigation-request
- Directives::Directive::Result should_navigation_request_of_type_be_blocked_by_content_security_policy(NonnullRefPtr<Fetch::Infrastructure::Request> navigation_request, Directives::Directive::NavigationType navigation_type)
+ Directives::Directive::Result should_navigation_request_of_type_be_blocked_by_content_security_policy(NonnullRefPtr<Fetch::Infrastructure::Request> navigation_request, Directives::Directive::NavigationType navigation_type, Page& page)
  {
 +    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
 +    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages

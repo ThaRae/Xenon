@@ -46,10 +46,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Services/WebContent/EmbedderBridge.h
 
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index 801568c3c9ec7d6fad4cf596abaf27ed994ab227..790ab8a16078a2456bfef364640be936069799b3 100644
+index 087631d86c9e4bd9e89b032435ae7f9d013bd788..2255ec812889c5947e833f5214706dd949794543 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -8028,6 +8028,10 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+@@ -8067,6 +8067,10 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
  
  void Document::set_ready_to_run_scripts()
  {
@@ -61,10 +61,10 @@ index 801568c3c9ec7d6fad4cf596abaf27ed994ab227..790ab8a16078a2456bfef364640be936
      if (auto callback = m_deferred_parser_start) {
          m_deferred_parser_start = nullptr;
 diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
-index b875b2119a73f464eaef367902005670eb5ac03e..8a89040a0757a51406883e792074531a502722ee 100644
+index acdfdae6ad8a0c8597cf4dfcc5196d0acd537b7a..a02a105e5dac169caeb2823b0653aaf328adc46a 100644
 --- a/Libraries/LibWeb/Page/Page.h
 +++ b/Libraries/LibWeb/Page/Page.h
-@@ -867,6 +867,9 @@ public:
+@@ -872,6 +872,9 @@ public:
      virtual void page_did_consume_user_activation([[maybe_unused]] HTML::UserActivationConsumption consumption) { }
  
      virtual void request_file(FileRequest) = 0;
@@ -222,10 +222,10 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..7916cd15b545b7407dd048b6fe1193ec
  
  }
 diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
-index 930ef4114c45228e5e86eb268c8c96681f80593c..1e4120f5ce19337953b655c2d52675415913bf2a 100644
+index 5919a3e7345df6f74d8a84e215d80a32dafd1b27..27c594be60cdbc09118d35cfec61285c9a172dac 100644
 --- a/Libraries/LibWebView/WebContentClient.cpp
 +++ b/Libraries/LibWebView/WebContentClient.cpp
-@@ -57,6 +57,14 @@ Messages::WebContentClient::DidAddBlobUrlEntryResponse WebContentClient::did_add
+@@ -58,6 +58,14 @@ Messages::WebContentClient::DidAddBlobUrlEntryResponse WebContentClient::did_add
      return URL::BlobURLEntry::Token { 0 };
  }
  
@@ -241,10 +241,10 @@ index 930ef4114c45228e5e86eb268c8c96681f80593c..1e4120f5ce19337953b655c2d5267541
  {
      bool hosts_one = false;
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index 055582d426cb118cfc42584b1625304ef2c47a25..78445ece1c369c08c9dbd21201458501057337f2 100644
+index 6d4516b806b9cd86eea0a86542c5079c29dd6a0c..e12c565eef40d7c2bd837aeca2a215698ef0f839 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
-@@ -84,6 +84,7 @@ public:
+@@ -88,6 +88,7 @@ public:
      static Optional<WebContentClient&> client_for_compositor_context_id(Web::CompositorContextId);
  
      virtual Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::PageId page_id, Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry entry) override;
@@ -253,10 +253,10 @@ index 055582d426cb118cfc42584b1625304ef2c47a25..78445ece1c369c08c9dbd21201458501
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 6949587c911a6480380e66f681fdaac495c6c656..2e32f97694d62f72cde5d25fbcdb9f469b81531f 100644
+index e4c4c74742506ecdcac03564db9daf6fb04c7dc8..8d3ce597f918f350f6e6bdc5c7ab34e123646ce3 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1566,6 +1566,44 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1623,6 +1623,44 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
      async_handle_embedder_resource_return(0, move(response.value().file), move(response.value().headers), request_id);
  }
  
@@ -302,10 +302,10 @@ index 6949587c911a6480380e66f681fdaac495c6c656..2e32f97694d62f72cde5d25fbcdb9f46
  {
      view().did_request_color_picker({}, *this, current_color);
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 0bb730572461a8dedfda8b4f18155f9fc2dd2059..f16e19ea31e186edf4ceb9dd962abb61d9d75ecf 100644
+index 1389eea2373e2d688bebafd57fff0490eae5fa62..fbd9e947859e4123e7be54e20019d595d841d7d1 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -25,6 +25,7 @@
+@@ -26,6 +26,7 @@
  #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
  #include <LibWebView/Export.h>
  #include <LibWebView/Forward.h>
@@ -313,7 +313,7 @@ index 0bb730572461a8dedfda8b4f18155f9fc2dd2059..f16e19ea31e186edf4ceb9dd962abb61
  #include <WebContent/WebContentClientEndpoint.h>
  #include <WebContent/WebContentServerEndpoint.h>
  #include <WebContent/WebContentTestClientEndpoint.h>
-@@ -62,6 +63,7 @@ namespace WebView {
+@@ -63,6 +64,7 @@ namespace WebView {
  
  class WEBVIEW_API WebContentPage final
      : public RefCounted<WebContentPage>
@@ -321,7 +321,7 @@ index 0bb730572461a8dedfda8b4f18155f9fc2dd2059..f16e19ea31e186edf4ceb9dd962abb61
      , public WebContentClientPageStub
      , public WebContentTestClientPageStub
      , public WebContentServerPageProxy {
-@@ -161,6 +163,9 @@ public:
+@@ -173,6 +175,9 @@ public:
      void fail_renderer_owned_downloads();
      void reset_state_for_testing();
  
@@ -331,15 +331,15 @@ index 0bb730572461a8dedfda8b4f18155f9fc2dd2059..f16e19ea31e186edf4ceb9dd962abb61
  private:
      void relay_finished_input_event(WebContentPage const& reporting_page, u64 event_id, Web::EventResult);
      Optional<CanonicalNavigable&> population_worker_navigable(Web::HTML::CrossProcessId navigable_id) const;
-@@ -260,6 +265,7 @@ private:
+@@ -273,6 +278,7 @@ private:
      virtual void did_change_picture_in_picture_player_controls_visibility(bool shown) override;
      virtual void did_request_file(ByteString path, i32 request_id) override;
      virtual void did_request_embedder_resource(URL::URL url, i32 request_id) override;
 +    virtual void did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message) override;
      virtual void did_request_color_picker(Color current_color) override;
-     virtual void did_request_geolocation_position(u64 request_id) override;
+     virtual void did_request_geolocation_position(u64 request_id, Web::HTML::CrossProcessId document_id) override;
      virtual void did_cancel_geolocation_position_request(u64 request_id) override;
-@@ -362,6 +368,7 @@ private:
+@@ -376,6 +382,7 @@ private:
      Messages::WebContentClient::DidRequestCookieResponse did_request_cookie(Optional<Web::HTML::EnvironmentId> const&, URL::URL, HTTP::Cookie::Source);
      Messages::WebContentClient::DidRequestAllCookiesCookiestoreResponse did_request_all_cookies_cookiestore(Web::HTML::EnvironmentId const&, URL::URL);
      Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry);
@@ -360,10 +360,10 @@ index f3b98190f612a0f813de644bccd8e7c8343266ab..4458f1ff70ea56e2fa4ca1a587c729fe
      PageHost.cpp
      TestConnection.cpp
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index ee019d9c7fb4a124c5feee172775afb658f12bff..37ace966e10ae02d18cc4967b89248cc63c66694 100644
+index 65c7b0ff20b39aef3056e9ee697bb80b124ea94d..7cdd6b50b202c22a5be4e1888d045d5b800b764b 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3329,6 +3329,12 @@ void ConnectionFromClient::handle_embedder_resource_return(Web::PageId, i32 erro
+@@ -3361,6 +3361,12 @@ void ConnectionFromClient::handle_embedder_resource_return(Web::PageId, i32 erro
      request->on_complete(Web::EmbedderResource { .fd = file->take_fd(), .headers = move(headers) });
  }
  
@@ -377,10 +377,10 @@ index ee019d9c7fb4a124c5feee172775afb658f12bff..37ace966e10ae02d18cc4967b89248cc
  {
      if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index afed849c0df81a04b0bd2b27b39357d69d8e1969..9d628a2841689eb922f874af6c10f958783b5c3c 100644
+index dd610dd20edea9dedee19ddc3f1dbdce9b836ef9..8557a745eea087b4cbf491160b49b43174bc1bb6 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -269,6 +269,7 @@ private:
+@@ -273,6 +273,7 @@ private:
      virtual void did_complete_window_rect_request(Web::PageId page_id, u64 completion_id) override;
      virtual void handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) override;
      virtual void handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) override;
@@ -537,10 +537,10 @@ index 0000000000000000000000000000000000000000..821ebf0605e312a654000324200d7cbf
 +
 +}
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index f32f83e1b4c235d29af4963f9d44457460cc7a47..3e1153781f3b5ab79a4baeee19d9823f34e61010 100644
+index 2ac1de74b61ddf31469112d58d8c113660372dc1..39b1122bd84c05d98fa4dbb176742bbf0dbe66ea 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -1876,6 +1876,11 @@ void PageClient::request_embedder_resource(Web::EmbedderResourceRequest request)
+@@ -1957,6 +1957,11 @@ void PageClient::request_embedder_resource(Web::EmbedderResourceRequest request)
      client().request_embedder_resource(m_id, move(request));
  }
  
@@ -553,7 +553,7 @@ index f32f83e1b4c235d29af4963f9d44457460cc7a47..3e1153781f3b5ab79a4baeee19d9823f
  {
      auto response = client().send_sync_but_allow_failure<Messages::WebContentClient::DidAddBlobUrlEntry>(m_id, environment.id, url, entry);
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index 4a559889e414b9125e2694d697d62f11c0b2aa66..59382daee81badbd9027277b717bb12c1531d006 100644
+index b97ee3b8f47626bcc4e62637059a16977275bd83..51f73a864e333c96e189fa2eaa3464e65998a359 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
 @@ -36,6 +36,7 @@
@@ -573,7 +573,7 @@ index 4a559889e414b9125e2694d697d62f11c0b2aa66..59382daee81badbd9027277b717bb12c
      void webdriver_did_set_current_browsing_context(u64 command_id, Web::HTML::CrossProcessId navigable_id);
      void did_handle_webdriver_mouse_event(u64 request_id);
      bool prepare_webdriver_input_command(u64, Optional<Web::HTML::CrossProcessId>, JsonValue&);
-@@ -381,6 +384,7 @@ private:
+@@ -394,6 +397,7 @@ private:
      virtual void page_did_change_accessibility_tree() override;
      virtual void page_did_take_screenshot(Gfx::ShareableBitmap const& screenshot) override;
      virtual void received_message_from_web_ui(Utf16String const& name, JS::Value data) override;
@@ -581,7 +581,7 @@ index 4a559889e414b9125e2694d697d62f11c0b2aa66..59382daee81badbd9027277b717bb12c
      virtual void page_did_block_resource(URL::URL const&, StringView kind) override;
      virtual void page_did_start_network_request(u64 request_id, URL::URL const&, ByteString const&, Vector<HTTP::Header> const&, ReadonlyBytes, Optional<String>, String const& referrer_policy, bool is_navigation_request, Web::Fetch::Infrastructure::Request::Priority) override;
      virtual void page_did_receive_network_response_headers(u64 request_id, u32 status_code, Optional<String>, Vector<HTTP::Header> const&, Requests::CacheState) override;
-@@ -430,6 +434,7 @@ private:
+@@ -444,6 +448,7 @@ private:
      HashMap<u64, GC::Ref<GC::Function<void()>>> m_pending_webdriver_mouse_events;
      u64 m_next_webdriver_mouse_event_request_id { 0 };
      RefPtr<WebUIConnection> m_web_ui;
@@ -590,23 +590,23 @@ index 4a559889e414b9125e2694d697d62f11c0b2aa66..59382daee81badbd9027277b717bb12c
      GC::Ptr<WebContentConsoleClient> m_top_level_document_console_client;
  
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index a16939cc722bfeb5dc24fe5c8a220230100afd2a..ac9ead45830830f2e7b58ba52dc14a31d1d0d8a4 100644
+index 5f154ebbe348ca9387f78d13ab4655d1d7b647ae..8a2eccdca7180f14423c46d0deedd466960a2de7 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
-@@ -230,6 +230,8 @@ endpoint WebContentClient routed by Web::PageId page_id
+@@ -234,6 +234,8 @@ endpoint WebContentClient routed by Web::PageId page_id
      did_change_picture_in_picture_player_controls_visibility(Web::PageId page_id, bool shown) =|
      did_request_file(Web::PageId page_id, ByteString path, i32 request_id) =|
      did_request_embedder_resource(Web::PageId page_id, URL::URL url, i32 request_id) =|
 +    [NotRouted] did_request_embedder_bootstrap(Web::PageId page_id, Web::HTML::CrossProcessId document_id) => (Optional<String> script)
 +    did_post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) =|
      did_request_color_picker(Web::PageId page_id, Color current_color) =|
-     did_request_geolocation_position(Web::PageId page_id, u64 request_id) =|
+     did_request_geolocation_position(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId document_id) =|
      did_cancel_geolocation_position_request(Web::PageId page_id, u64 request_id) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 656f3d05794b2e4d92529bce9441c2b6364ab4c1..6917594a59d890d5350110199f1c8e7c843ec421 100644
+index 88867f48078a269dd311c2af12a0eba9a0a0b5c8..29f48b8b80e0850f6833ad9857f425bac95cf595 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -277,6 +277,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -282,6 +282,7 @@ endpoint WebContentServer routed by Web::PageId page_id
  
      handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) =|
      handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) =|

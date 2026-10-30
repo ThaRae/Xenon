@@ -32,10 +32,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Libraries/LibWebView/WebAuthn/HIDAuthenticator.h
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 334a46f452f91f1a0cafc0342a72b9cef6c470fb..7776be6cad4cb4abbe55d1ffc834ed94c87b5232 100644
+index c3c38408ae94d75cf4adff0bd65807c45aa5bcf7..51d7e72a6480b57d0a203246b4426a4fd4beed92 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -73,6 +73,9 @@
+@@ -74,6 +74,9 @@
  #include <LibWebView/UserAgent.h>
  #include <LibWebView/Utilities.h>
  #include <LibWebView/WebAuthn/Coordinator.h>
@@ -45,7 +45,7 @@ index 334a46f452f91f1a0cafc0342a72b9cef6c470fb..7776be6cad4cb4abbe55d1ffc834ed94
  #include <LibWebView/WebAuthn/VirtualAuthenticator.h>
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
-@@ -1777,6 +1780,9 @@ ErrorOr<void> Application::launch_services()
+@@ -1806,6 +1809,9 @@ ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
      WebAuthnCoordinator::the().add_authenticator_source(VirtualAuthenticators::the());
@@ -56,10 +56,10 @@ index 334a46f452f91f1a0cafc0342a72b9cef6c470fb..7776be6cad4cb4abbe55d1ffc834ed94
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index d1f721766c410c70008a096e847dc54e91622c3f..81a87e4cdba59878a2f7e83035afd6ade81ba4b7 100644
+index 2c49e252edccd6ecf3bb002b940fe5e49af80d59..3eea271c93c5e01cc27fd62c31536372c0c2ed96 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -102,6 +102,9 @@ if (APPLE)
+@@ -105,6 +105,9 @@ if (APPLE)
          PlatformColorsMacOS.cpp
          ProcessReaper.cpp
      )
@@ -69,7 +69,7 @@ index d1f721766c410c70008a096e847dc54e91622c3f..81a87e4cdba59878a2f7e83035afd6ad
  elseif (LINUX)
      list(APPEND SOURCES AudioDaemonSocket.cpp CrashReportPOSIX.cpp)
  endif()
-@@ -168,6 +171,13 @@ if (APPLE)
+@@ -171,6 +174,13 @@ if (APPLE)
      target_link_libraries(LibWebView PRIVATE "-framework Carbon")
  endif()
  

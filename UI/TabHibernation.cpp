@@ -83,7 +83,7 @@ public:
             return false;
 
         auto& view = tab.view();
-        if (view.audio_play_state() == Web::HTML::AudioPlayState::Playing || view.has_devtools_client() || has_picture_in_picture_window(view))
+        if (view.audibility() == Audio::Audibility::Audible || view.has_devtools_client() || has_picture_in_picture_window(view))
             return false;
         if (auto state = m_tabs.get(&tab); state.has_value() && state->last_audible.has_value() && MonotonicTime::now() - *state->last_audible < AUDIO_PROTECTION_TIME)
             return false;
@@ -201,7 +201,7 @@ private:
                     state.last_used = now;
                     continue;
                 }
-                if (tab.view().audio_play_state() == Web::HTML::AudioPlayState::Playing)
+                if (tab.view().audibility() == Audio::Audibility::Audible)
                     state.last_audible = now;
 
                 if (now - state.last_used >= timeout && may_hibernate(tab))

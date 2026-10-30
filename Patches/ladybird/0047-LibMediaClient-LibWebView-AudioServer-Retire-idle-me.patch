@@ -12,18 +12,18 @@ requests; a playing or paused media element keeps its session.
 The AudioServer only ever exited when the Browser dropped its control
 connection, which the Browser held for the renderer's whole life, so a
 page that had finished playing kept one for good. Have it exit 15
-seconds after its last client goes. The Browser already launches a new
-one when a renderer next asks for a client, and now also does so when
-that request finds the server gone just before it arrived.
+seconds after its last client goes. The Browser already launches and
+initializes a new one when a page next asks for a client, retrying
+once when the request finds the server gone just before it arrived.
+Have a worker's request retry the same way.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibMediaClient/Client.cpp       |  4 +++-
- Libraries/LibWebView/WebContentClient.cpp | 10 +++++++++-
- Libraries/LibWebView/WebWorkerClient.cpp  |  7 ++++++-
- Services/AudioServer/Tabs.cpp             | 21 +++++++++++++++++++++
- Services/AudioServer/Tabs.h               |  5 +++++
- 5 files changed, 44 insertions(+), 3 deletions(-)
+ Libraries/LibMediaClient/Client.cpp      |  4 +++-
+ Libraries/LibWebView/WebWorkerClient.cpp | 12 ++++++++++--
+ Services/AudioServer/Tabs.cpp            | 21 +++++++++++++++++++++
+ Services/AudioServer/Tabs.h              |  5 +++++
+ 4 files changed, 39 insertions(+), 3 deletions(-)
 
 diff --git a/Libraries/LibMediaClient/Client.cpp b/Libraries/LibMediaClient/Client.cpp
 index e57a7113283fed6a2ddcc292671031f7f854772e..47d69519229e8741c89b7d969e53d2a608dcf84b 100644
@@ -40,47 +40,31 @@ index e57a7113283fed6a2ddcc292671031f7f854772e..47d69519229e8741c89b7d969e53d2a6
  
  static NeverDestroyed<Client::TransportFactory> s_transport_factory;
  static NeverDestroyed<RefPtr<Client>> s_client;
-diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
-index 713bf8413d4f48f7bde67b11a662c8b55ad119ef..005cec787a38a984dd00908792bf8544fef52a2c 100644
---- a/Libraries/LibWebView/WebContentClient.cpp
-+++ b/Libraries/LibWebView/WebContentClient.cpp
-@@ -910,7 +910,15 @@ ErrorOr<IPC::TransportHandle> WebContentClient::connect_audio_server_client()
- {
-     // The server must know of the permission before any client gets its connection.
-     TRY(ensure_audio_server_controller());
--    return connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
-+    auto handle = connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
-+
-+    // An idle AudioServer exits by itself, so it may have gone just before this request reached it, while its
-+    // connection still looked open. The failed request closes that connection, and a second try launches a new server.
-+    if (handle.is_error() && !m_audio_server_client->is_open()) {
-+        TRY(ensure_audio_server_controller());
-+        handle = connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
-+    }
-+    return handle;
- }
- 
- ErrorOr<void> WebContentClient::ensure_audio_server_controller()
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index 4961614f17103e7d863e1759619aa24688b2d3b2..2a2a4cc554ab2bbbc35a59ad74cddd555d7ec958 100644
+index a9e7a856132464e102899af3a4fee2310e74ff2c..0db7ccf18e32d996ceeaa778f859bf7991b8fc3d 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
-@@ -179,7 +179,12 @@ Messages::WebWorkerClient::RequestImageDecoderConnectionResponse WebWorkerClient
- Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient::request_media_server_connection()
- {
-     auto connection = connect_new_media_server_client(m_media_server_client, child_id(), [this] {
--        return connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
-+        auto handle = connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
+@@ -197,8 +197,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
+         auto self = weak_self.strong_ref();
+         if (!self)
+             return Error::from_string_literal("The worker process is gone");
+-        TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id()));
+-        return connect_new_audio_server_client(*self->m_audio_server_client, self->m_audio_tab_id);
 +        // An idle AudioServer exits by itself, so it may have gone just before this request reached it. The failed
 +        // request closes its connection, and a second try launches a new server.
-+        if (handle.is_error() && m_audio_server_client && !m_audio_server_client->is_open())
-+            handle = connect_new_audio_server_client(m_audio_server_client, child_id(), m_audio_tab_id);
++        auto connect = [&]() -> ErrorOr<IPC::TransportHandle> {
++            TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id()));
++            return connect_new_audio_server_client(*self->m_audio_server_client, self->m_audio_tab_id);
++        };
++        auto handle = connect();
++        if (handle.is_error())
++            handle = connect();
 +        return handle;
      });
      if (connection.is_error()) {
          warnln("Unable to connect a MediaServer client: {}", connection.error());
 diff --git a/Services/AudioServer/Tabs.cpp b/Services/AudioServer/Tabs.cpp
-index 97b05ff0bc14059e384bcdf5d12f59e476889d14..8051f401b3f985ccc05516820e366472177e74d5 100644
+index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3929ccf08 100644
 --- a/Services/AudioServer/Tabs.cpp
 +++ b/Services/AudioServer/Tabs.cpp
 @@ -13,6 +13,8 @@
@@ -101,7 +85,7 @@ index 97b05ff0bc14059e384bcdf5d12f59e476889d14..8051f401b3f985ccc05516820e366472
  
  Tabs& Tabs::the()
  {
-@@ -93,6 +97,9 @@ Audio::CaptureDevices& Tabs::capture_devices()
+@@ -105,6 +109,9 @@ Audio::CaptureDevices& Tabs::capture_devices()
  
  ErrorOr<IPC::TransportHandle> Tabs::connect_client(u64 tab_id)
  {
@@ -111,10 +95,10 @@ index 97b05ff0bc14059e384bcdf5d12f59e476889d14..8051f401b3f985ccc05516820e366472
      auto paired_transports = TRY(IPC::Transport::create_paired());
      auto handle = move(paired_transports.remote_handle);
  
-@@ -151,6 +158,20 @@ void Tabs::connection_died(u64 tab_id, int client_id)
-     tab->connections.remove(client_id);
-     if (tab->connections.is_empty())
-         m_tabs.remove(tab_id);
+@@ -203,6 +210,20 @@ void Tabs::connection_died(u64 tab_id, int client_id)
+         return;
+     tab->mixer->report_every_group_inaudible();
+     m_tabs.remove(tab_id);
 +    if (m_tabs.is_empty())
 +        schedule_idle_exit();
 +}
@@ -133,18 +117,18 @@ index 97b05ff0bc14059e384bcdf5d12f59e476889d14..8051f401b3f985ccc05516820e366472
  
  }
 diff --git a/Services/AudioServer/Tabs.h b/Services/AudioServer/Tabs.h
-index 6b6b45370b5b482eb33ac70e5cfdbe26b3e85fa3..7a935a73c1016ceea5fd15138f1b3b219c0a1c7d 100644
+index d84cb55afb02ff09a904e6fae553d5687be65419..1665860f776477bda74f243422aa45543fae694b 100644
 --- a/Services/AudioServer/Tabs.h
 +++ b/Services/AudioServer/Tabs.h
-@@ -17,6 +17,7 @@
- #include <AudioServer/PlaybackStreamMixer.h>
+@@ -18,6 +18,7 @@
  #include <AudioServer/ServerConnection.h>
  #include <LibAudio/AudioOutput.h>
+ #include <LibAudio/PlaybackGroupId.h>
 +#include <LibCore/Forward.h>
  #include <LibIPC/TransportHandle.h>
  
  namespace AudioServer {
-@@ -48,6 +49,9 @@ private:
+@@ -53,6 +54,9 @@ private:
      };
  
      Tab& tab_for(u64 tab_id);
@@ -154,7 +138,7 @@ index 6b6b45370b5b482eb33ac70e5cfdbe26b3e85fa3..7a935a73c1016ceea5fd15138f1b3b21
      Audio::CaptureDevices& capture_devices();
      void connection_died(u64 tab_id, int client_id);
      void request_capture_permission(u64 tab_id, ByteString const& device_id, Function<void(bool)> on_decided);
-@@ -58,6 +62,7 @@ private:
+@@ -65,6 +69,7 @@ private:
      int m_next_client_id { 1 };
      Audio::AudioOutput m_audio_output { Audio::AudioOutput::Platform };
  

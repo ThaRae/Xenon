@@ -52,7 +52,7 @@ index 5eaf310ad9e330b21473f210a8011e0b23a84268..8d46089c601d873a58564140559f94d9
  if (HAS_VULKAN)
      target_sources(compositorservice PRIVATE SkiaVulkanMemoryAllocator.cpp)
 diff --git a/Services/Compositor/CompositorState.cpp b/Services/Compositor/CompositorState.cpp
-index 6acec986ed036cd08e5b00bfde2eec65793cc44c..c1fcf8e7625f1dce1ec91069f7ff035ee084dc90 100644
+index 08abca7fa2b155aec4de3c371db91e97989fcb1d..51db731227be682c2f3aab65529aa6cab91bf089 100644
 --- a/Services/Compositor/CompositorState.cpp
 +++ b/Services/Compositor/CompositorState.cpp
 @@ -7,17 +7,51 @@
@@ -242,7 +242,7 @@ index 6acec986ed036cd08e5b00bfde2eec65793cc44c..c1fcf8e7625f1dce1ec91069f7ff035e
  void CompositorState::register_presentation(CompositorStateClient& presentation, PresentationCapabilities capabilities)
  {
      m_presentations.set(&presentation, capabilities);
-@@ -1001,6 +1157,8 @@ void CompositorState::set_context_visibility(Web::CompositorContextId context_id
+@@ -1016,6 +1172,8 @@ void CompositorState::set_context_visibility(Web::CompositorContextId context_id
  
      if (visibility == Compositing::ContextVisibility::Visible)
          resume_presentation_after_becoming_visible(context_id, *context);
@@ -250,8 +250,8 @@ index 6acec986ed036cd08e5b00bfde2eec65793cc44c..c1fcf8e7625f1dce1ec91069f7ff035e
 +        schedule_idle_memory_release_for(*context);
  }
  
- void CompositorState::resume_presentation_after_becoming_visible(Web::CompositorContextId root_context_id, ContextState& root_context)
-@@ -1078,7 +1236,10 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Gfx::In
+ void CompositorState::set_context_presents_from_cpu_memory(Web::CompositorContextId context_id, bool presents_from_cpu_memory)
+@@ -1109,7 +1267,10 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Gfx::In
  void CompositorState::present_frame(Web::CompositorContextId context_id, ContextState& context, PendingFrame pending_frame)
  {
      auto composited_context_resolver = resolver_for(context_id);
@@ -262,7 +262,7 @@ index 6acec986ed036cd08e5b00bfde2eec65793cc44c..c1fcf8e7625f1dce1ec91069f7ff035e
      if (!prepared_frame.has_value())
          return;
  
-@@ -1094,6 +1255,9 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Context
+@@ -1125,6 +1286,9 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Context
          });
      });
      context.presenter().did_submit_prepared_frame(pending_frame.viewport_rect);
@@ -272,7 +272,7 @@ index 6acec986ed036cd08e5b00bfde2eec65793cc44c..c1fcf8e7625f1dce1ec91069f7ff035e
  #ifdef AK_OS_MACOS
      // The window server's reads of an IOSurface wait for GPU work that is already scheduled to write it. Handing the
      // frame to the client before that work finishes keeps it ahead of the window server's deadline for the next refresh.
-@@ -1295,8 +1459,12 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
+@@ -1326,8 +1490,12 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
          return false;
  
      auto composited_context_resolver = resolver_for(context_id);
@@ -286,7 +286,7 @@ index 6acec986ed036cd08e5b00bfde2eec65793cc44c..c1fcf8e7625f1dce1ec91069f7ff035e
  }
  
 diff --git a/Services/Compositor/CompositorState.h b/Services/Compositor/CompositorState.h
-index 838cdf5ca86eb0cdb54c5dfeba59b58f4d795929..475c1b9278c9a892c61c39afcbb323af78f81313 100644
+index a45b87f4ff55052e67286b4a6a590e466787d1f1..398e70f2c618e59a68b872aa6e95f999e2c83b04 100644
 --- a/Services/Compositor/CompositorState.h
 +++ b/Services/Compositor/CompositorState.h
 @@ -33,6 +33,7 @@
@@ -297,7 +297,7 @@ index 838cdf5ca86eb0cdb54c5dfeba59b58f4d795929..475c1b9278c9a892c61c39afcbb323af
  
  namespace Compositor {
  
-@@ -279,6 +280,10 @@ private:
+@@ -283,6 +284,10 @@ private:
      void cancel_pending_async_presents_for_context(Web::CompositorContextId);
      void schedule_gpu_completion_check();
      void check_gpu_completions();
@@ -308,7 +308,7 @@ index 838cdf5ca86eb0cdb54c5dfeba59b58f4d795929..475c1b9278c9a892c61c39afcbb323af
  
      HashMap<Web::CompositorContextId, OwnPtr<ContextState>> m_contexts;
  
-@@ -288,6 +293,11 @@ private:
+@@ -292,6 +297,11 @@ private:
      OwnPtr<DisplayListPlayerSkia> m_display_list_player;
      HashMap<Optional<u64>, OwnPtr<VSyncScheduler>> m_vsync_schedulers_by_display;
      RefPtr<Core::Timer> m_gpu_completion_timer;
@@ -321,7 +321,7 @@ index 838cdf5ca86eb0cdb54c5dfeba59b58f4d795929..475c1b9278c9a892c61c39afcbb323af
      HashMap<CompositorStateClient*, PresentationCapabilities> m_presentations;
      HashMap<Web::CompositorContextId, CompositorStateClient*> m_context_presentations;
 diff --git a/Services/Compositor/ContextState.h b/Services/Compositor/ContextState.h
-index ce65b46ea8808a23481ef567d6b6532d7e7290c1..fab518be6a62121ba08aebbfb224446feb90820e 100644
+index 7d4f4e08819a35f6cb34cebd7aedeaa11dbce388..d365f82d9edd4080968e564250a239747cdda653 100644
 --- a/Services/Compositor/ContextState.h
 +++ b/Services/Compositor/ContextState.h
 @@ -145,6 +145,7 @@ public:
@@ -345,10 +345,10 @@ index f36dc7a8901e662b30cf99d4db594ea3fb3fc10a..c32410784afd9a6f602a506664e2b6d6
      DisplayListPlayer::execute(
          display_list,
 diff --git a/Services/Compositor/DisplayListRasterCache.cpp b/Services/Compositor/DisplayListRasterCache.cpp
-index f7413350983bf1c68ff0adb4d8f9f5e2d608a05b..7746e61f8f4efe45c3764c62d83491e8f7b77ecd 100644
+index 2948ebce231bcb3742bbf99cb25fa605f5ea6437..5f41562de1bd7f1457a8b2a119be7ba515704780 100644
 --- a/Services/Compositor/DisplayListRasterCache.cpp
 +++ b/Services/Compositor/DisplayListRasterCache.cpp
-@@ -165,6 +165,39 @@ struct DisplayListRasterCache::ClipPath {
+@@ -162,6 +162,39 @@ struct DisplayListRasterCache::ClipPath {
  DisplayListRasterCache::DisplayListRasterCache() = default;
  DisplayListRasterCache::~DisplayListRasterCache() = default;
  
@@ -431,7 +431,7 @@ index 9a3d7984ddde357f36eba2b449534639b09a143d..c2e14b5c96c6b25e5fed953a218ed8c6
  
  }
 diff --git a/Services/Compositor/SkiaBackendContext.cpp b/Services/Compositor/SkiaBackendContext.cpp
-index 428973bdd8b197c622d9455f32db5f00a23edfcb..d00edbc0397905ea333bd659504b4b59f1b2729c 100644
+index 199a5c35b3391c25fcf1d1949bb5d02654527613..05b10c4b8dcf9c58a705bde1b4d822447fee303e 100644
 --- a/Services/Compositor/SkiaBackendContext.cpp
 +++ b/Services/Compositor/SkiaBackendContext.cpp
 @@ -139,6 +139,14 @@ size_t SkiaBackendContext::resource_cache_bytes() const
@@ -446,14 +446,14 @@ index 428973bdd8b197c622d9455f32db5f00a23edfcb..d00edbc0397905ea333bd659504b4b59
 +        context->purgeUnlockedResources(GrPurgeResourceOptions::kScratchResourcesOnly);
 +}
 +
- void SkiaBackendContext::initialize_gpu_backend()
+ void SkiaBackendContext::initialize_gpu_backend(Optional<GpuDeviceIdentity> const& preferred_device)
  {
      VERIFY(!main_thread_context());
 diff --git a/Services/Compositor/SkiaBackendContext.h b/Services/Compositor/SkiaBackendContext.h
-index 806529ba1dadf8357234820f1a999c56739fc45a..95814ffb162ae4efe6db837f3d88b40f1fd5f95c 100644
+index 8a93975a4a718c4fc3fc796a1f59e2a1dad42923..00a673e77849643ef8143c96da382d2958d97f92 100644
 --- a/Services/Compositor/SkiaBackendContext.h
 +++ b/Services/Compositor/SkiaBackendContext.h
-@@ -60,6 +60,7 @@ public:
+@@ -63,6 +63,7 @@ public:
      void flush_and_submit_async(PaintingSurface&, Function<void()>&&);
      void check_async_work_completion();
      size_t resource_cache_bytes() const;

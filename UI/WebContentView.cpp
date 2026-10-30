@@ -47,6 +47,9 @@
 #include <UI/SelectDropdown.h>
 #include <UI/StringUtils.h>
 #include <UI/WebContentView.h>
+#ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+#    include <UI/WaylandPageSurface.h>
+#endif
 
 #if defined(Q_OS_MACOS)
 #    include "WebContentViewAccessibility.h"
@@ -134,7 +137,10 @@ WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTrave
     setFocusPolicy(Qt::FocusPolicy::StrongFocus);
 
 #ifdef LADYBIRD_QT_USE_VULKAN_WINDOW
-    create_vulkan_window();
+#    ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+    if (!create_page_surface())
+#    endif
+        create_vulkan_window();
 #endif
 
     m_device_pixel_ratio = devicePixelRatio();
@@ -399,7 +405,15 @@ WebContentView::~WebContentView()
 #ifdef LADYBIRD_QT_USE_IOSURFACE_LAYER
     destroy_iosurface_layer();
 #elif defined(LADYBIRD_QT_USE_VULKAN_WINDOW)
+#    ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+    // NB: The page can outlive the view, and must get back the backing stores the compositor of the desktop held.
+    if (m_page_surface)
+        destroy_page_surface();
+#    endif
     destroy_vulkan_window();
+#    ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+    release_all_retired_backing_stores();
+#    endif
 #endif
 
 #if !defined(Q_OS_WIN)
@@ -1046,11 +1060,15 @@ Optional<WebContentView::Paintable> WebContentView::current_paintable() const
 {
     Gfx::SharedImageBuffer const* shared_image_buffer = nullptr;
     Gfx::IntSize bitmap_size;
+    i32 bitmap_id = -1;
+    u64 page_id = 0;
 
     if (m_has_usable_bitmap) {
         VERIFY(m_front_bitmap.shared_image_buffer);
         shared_image_buffer = m_front_bitmap.shared_image_buffer.ptr();
         bitmap_size = m_front_bitmap.last_painted_size.to_type<int>();
+        bitmap_id = m_front_bitmap.id;
+        page_id = page().id().value();
     } else if (m_backup_shared_image_buffer) {
         shared_image_buffer = m_backup_shared_image_buffer.ptr();
         bitmap_size = m_backup_bitmap_size.to_type<int>();
@@ -1058,12 +1076,17 @@ Optional<WebContentView::Paintable> WebContentView::current_paintable() const
 
     if (!shared_image_buffer)
         return {};
-    return Paintable { shared_image_buffer, bitmap_size };
+    return Paintable { shared_image_buffer, bitmap_size, bitmap_id, page_id };
 }
 
 void WebContentView::schedule_repaint()
 {
 #if defined(LADYBIRD_QT_USE_VULKAN_WINDOW)
+#    ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+    release_retired_backing_stores_no_longer_painted();
+#    endif
+    m_frame_read_from_gpu = {};
+    ++m_page_window_content_serial;
     schedule_vulkan_window_update();
 #elif defined(LADYBIRD_QT_USE_IOSURFACE_LAYER)
     present_current_paintable_as_layer_contents();
@@ -1113,14 +1136,26 @@ void WebContentView::did_accept_presented_backing_store(i32, Gfx::IntRect damage
 #if !defined(LADYBIRD_QT_USE_RHI_WIDGET) && !defined(LADYBIRD_QT_USE_IOSURFACE_LAYER)
 void WebContentView::paintEvent(QPaintEvent*)
 {
+#    ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+    // NB: Qt commits the browser window right after it paints it, which shows what the page surface committed while
+    //     synchronized. After that, the page surface can show each frame at once again, unless it committed more in
+    //     the meantime, which only the browser window's next commit may show.
+    if (m_page_surface && m_page_surface->is_synchronized()) {
+        QTimer::singleShot(0, this, [this, commit_count = m_page_surface->commit_count()] {
+            if (m_page_surface && m_page_surface->commit_count() == commit_count)
+                m_page_surface->set_synchronized(false);
+        });
+    }
+#    endif
+
     QPainter painter(this);
     painter.scale(1 / m_device_pixel_ratio, 1 / m_device_pixel_ratio);
 
     auto paintable = current_paintable();
-    Gfx::Bitmap const* bitmap = nullptr;
+    RefPtr<Gfx::Bitmap const> bitmap;
     Gfx::IntSize bitmap_size;
     if (paintable.has_value()) {
-        bitmap = paintable->shared_image_buffer->bitmap().ptr();
+        bitmap = cpu_bitmap_to_paint(*paintable);
         bitmap_size = paintable->bitmap_size;
     }
 
@@ -1152,7 +1187,14 @@ void WebContentView::paintEvent(QPaintEvent*)
     }
 
     auto background_color = page_background_color();
-    painter.fillRect(QRect(0, 0, m_viewport_size.width(), m_viewport_size.height()), QColor(background_color.red(), background_color.green(), background_color.blue()));
+    QRegion background { QRect(0, 0, m_viewport_size.width(), m_viewport_size.height()) };
+#    ifdef LADYBIRD_QT_USE_VULKAN_WINDOW
+    // NB: Filling the part of the widget under the page's window would only touch memory that nobody sees. During a
+    //     resize, that is most of a window-sized buffer at every step.
+    background -= rect_covered_by_page_window();
+#    endif
+    for (auto const& rect : background)
+        painter.fillRect(rect, QColor(background_color.red(), background_color.green(), background_color.blue()));
 }
 #endif
 
@@ -1165,6 +1207,18 @@ void WebContentView::paintEvent(QPaintEvent*)
 }
 #endif
 
+#if !defined(LADYBIRD_QT_USE_VULKAN_WINDOW)
+RefPtr<Gfx::Bitmap const> WebContentView::cpu_bitmap_of(Paintable const& paintable) const
+{
+    return paintable.shared_image_buffer->bitmap_if_present();
+}
+
+RefPtr<Gfx::Bitmap const> WebContentView::cpu_bitmap_to_paint(Paintable const& paintable) const
+{
+    return cpu_bitmap_of(paintable);
+}
+#endif
+
 // The page as the view currently shows it, in device pixels.
 QImage WebContentView::visible_snapshot() const
 {
@@ -1172,7 +1226,7 @@ QImage WebContentView::visible_snapshot() const
     if (!paintable.has_value())
         return {};
 
-    if (auto bitmap = paintable->shared_image_buffer->bitmap_if_present()) {
+    if (auto bitmap = cpu_bitmap_of(*paintable)) {
         auto width = min(bitmap->width(), paintable->bitmap_size.width());
         auto height = min(bitmap->height(), paintable->bitmap_size.height());
         if (width <= 0 || height <= 0)
@@ -1736,6 +1790,14 @@ void WebContentView::resizeEvent(QResizeEvent* event)
 #ifdef LADYBIRD_QT_USE_VULKAN_WINDOW
     update_vulkan_window_geometry();
 #endif
+#ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+    // NB: The page surface would stick out of a browser window that shrinks, so it is cropped to the view, and shows
+    //     that only together with the browser window's next commit at its new size.
+    if (m_page_surface && !QRect { QPoint { 0, 0 }, size() * m_device_pixel_ratio }.contains(m_page_surface_rect)) {
+        m_page_surface->set_synchronized(true);
+        update_page_surface();
+    }
+#endif
     // One window resize reaches the view as several resize events in one turn of the event loop
     // (the chrome around it settles after it). The page gets one viewport size per turn: the size
     // the view has when the turn ends, pushed once.
@@ -1791,6 +1853,17 @@ void WebContentView::set_vertical_tab_overlay_insets([[maybe_unused]] int left, 
 #endif
 }
 
+#ifndef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+bool WebContentView::show_image_over_page(QImage const&, QPoint)
+{
+    return false;
+}
+
+void WebContentView::hide_image_over_page()
+{
+}
+#endif
+
 void WebContentView::set_bookmarks_bar_overlay_height([[maybe_unused]] int height)
 {
 #ifdef LADYBIRD_QT_USE_VULKAN_WINDOW
@@ -1833,6 +1906,10 @@ void WebContentView::showEvent(QShowEvent* event)
     // A frame may have arrived before this view had a native view to attach its layer to.
     present_current_paintable_as_layer_contents();
 #endif
+#ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+    if (m_page_surface)
+        schedule_vulkan_window_update();
+#endif
 }
 
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
@@ -1850,6 +1927,10 @@ void WebContentView::hideEvent(QHideEvent* event)
 {
     WebContentViewBase::hideEvent(event);
     set_system_visibility_state(Web::HTML::VisibilityState::Hidden);
+#ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
+    if (m_page_surface)
+        hide_page_surface();
+#endif
 
     // Qt sends no Leave to a view hidden under the pointer (a tab switched away from with the keyboard, e.g.). So, tell
     // WebContent the pointer left. Otherwise, it keeps hovering the link under the pointer — and won't report the hover

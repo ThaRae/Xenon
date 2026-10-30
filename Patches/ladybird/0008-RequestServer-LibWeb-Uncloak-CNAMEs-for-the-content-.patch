@@ -202,7 +202,7 @@ index ddeb9b60bef425613e4c653f970bb3d7cbe0d0f7..e9e3ca3d1cbcd3a3cb91f7f1ec3dd8bf
          return "An unexpected network error occurred"sv;
      }
 diff --git a/Libraries/LibRequests/Request.cpp b/Libraries/LibRequests/Request.cpp
-index 7ee16b363e45d1a1f1eba0a703672741ee7da3e5..bb4913b1896117c48abe43fbadc1cf82baee68c7 100644
+index 6042c88fbc200b4ec83c8dda25c6f2272ee3fcc6..6bd8fa6170c69a9b339081bac87874f687c452c0 100644
 --- a/Libraries/LibRequests/Request.cpp
 +++ b/Libraries/LibRequests/Request.cpp
 @@ -67,6 +67,12 @@ int Request::request_server_client_id() const
@@ -219,10 +219,10 @@ index 7ee16b363e45d1a1f1eba0a703672741ee7da3e5..bb4913b1896117c48abe43fbadc1cf82
  {
      RefPtr keep_alive = *this;
 diff --git a/Libraries/LibRequests/Request.h b/Libraries/LibRequests/Request.h
-index 478ea3c368e88231b7b661b32c5e3c3bfb67587d..a63d122e16da58fb646d5aa81feb14ebf4736523 100644
+index 05d75d51064a6bade238d7c09e268f88f4493e52..c199e9385ddc3f452a90a74a0b5db89ff7afe5fd 100644
 --- a/Libraries/LibRequests/Request.h
 +++ b/Libraries/LibRequests/Request.h
-@@ -125,6 +125,10 @@ public:
+@@ -126,6 +126,10 @@ public:
  
      Function<void()> on_requires_network;
  
@@ -230,9 +230,9 @@ index 478ea3c368e88231b7b661b32c5e3c3bfb67587d..a63d122e16da58fb646d5aa81feb14eb
 +    Function<void(Request&, ByteString const& alias_target)> on_resolved_alias;
 +    void continue_after_alias_check(bool block);
 +
-     // Invoked at most once, when the request drops its delivery callbacks without a finish: a stop() or a transfer.
-     Function<void()> on_teardown;
- 
+     enum class TeardownReason : u8 {
+         Stopped,
+         Transferred,
 diff --git a/Libraries/LibRequests/RequestClient.cpp b/Libraries/LibRequests/RequestClient.cpp
 index 338247d43d60c500a3f01986c825652b684c91be..34bf14aecde21743cccfd1f38ca9c377d5954b25 100644
 --- a/Libraries/LibRequests/RequestClient.cpp
@@ -350,10 +350,10 @@ index 4ea71815c02582f91e20cb52b19bcb2bb43b811a..f8eb77c9d68e5336ed2da73d01fe929a
      // scripts can run, once per Window.
      void run_page_script(DOM::Document&) const;
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index 5a961abfed86dc17ff931d9614aceb24929ffde9..a8e92e848039602efc82434901b79032f1837f1f 100644
+index 6fea96b3034f8884f04b83bab441a078308cddbb..28b7b78c6a07194dcf20aef0ace985b0e5174d02 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-@@ -662,8 +662,11 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+@@ -658,8 +658,11 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
      auto protocol_complete = [this, on_complete = move(on_complete), request, &protocol_request = *protocol_request](u64 total_size, Requests::RequestTimingInfo const& timing_info, Optional<Requests::NetworkError> const& network_error) {
          finish_network_request(protocol_request);
  
@@ -366,7 +366,7 @@ index 5a961abfed86dc17ff931d9614aceb24929ffde9..a8e92e848039602efc82434901b79032
  
          if (!network_error.has_value()) {
              log_success(request);
-@@ -715,12 +718,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
+@@ -711,12 +714,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
      //     requests are attributed through the worker process's browser-level owners.
      auto originating_page_id = request.page() && request.page()->has_top_level_traversable() ? request.page()->client().id().value() : 0;
      auto headers = headers_with_normalized_values(request.headers());
@@ -447,10 +447,10 @@ index 675be55f1a3d74b84ca9d6e412fa9768662e7163..fde1688c4baed69c89157c02f44fb338
      virtual void release_request_transfer_lease(int source_client_id, u64 source_request_id) override;
      virtual Messages::RequestServer::StopRequestResponse stop_request(u64 request_id) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index 652ab84078962a68a2e19d1f4e0de0ca74b855c0..316fe74ae7bed7b4b4a60ca1e60b05d389209565 100644
+index 2c92b8270941f760d6f8dd2e54d78b2f2af6c28d..844e362207cfdcd818b36edac49db3cd737fc770 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
-@@ -464,11 +464,13 @@ NonnullOwnPtr<Request> Request::fetch(
+@@ -465,11 +465,13 @@ NonnullOwnPtr<Request> Request::fetch(
      HTTP::Cookie::IncludeCredentials include_credentials,
      Optional<Requests::RequestTransferLeaseKey> transfer_lease,
      Optional<u32> address_selection_hint,
@@ -465,7 +465,7 @@ index 652ab84078962a68a2e19d1f4e0de0ca74b855c0..316fe74ae7bed7b4b4a60ca1e60b05d3
      request->process();
  
      return request;
-@@ -1331,10 +1333,59 @@ void Request::handle_dns_lookup_state()
+@@ -1342,10 +1344,59 @@ void Request::handle_dns_lookup_state()
                  return;
              }
              self.m_dns_result = move(dns_result);

@@ -30,10 +30,10 @@ Ladybird token set a User-Agent that has one.
  10 files changed, 35 insertions(+), 10 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 8f16e0969d1f5fd8cfe5e4eea807e6f6d25247e2..fcad3ab337c1b5d9779c92eede21db44f7b24709 100644
+index c7d2b339361445dd0f6dcc90923cb4a79b04e300..cba8522a0c0f891267fa8b9bbd0319704b0da73a 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -3355,6 +3355,10 @@ void append_user_agent_client_hints_for_request(Infrastructure::Request& request
+@@ -3493,6 +3493,10 @@ void append_user_agent_client_hints_for_request(Infrastructure::Request& request
      brand_list.append(ByteString::formatted("\"Chromium\";v=\"{}\"", *chrome_version));
      if (auto version = product_major_version(*user_agent, BROWSER_NAME "/"sv); version.has_value())
          brand_list.append(ByteString::formatted("\"{}\";v=\"{}\"", BROWSER_NAME, *version));
@@ -45,10 +45,10 @@ index 8f16e0969d1f5fd8cfe5e4eea807e6f6d25247e2..fcad3ab337c1b5d9779c92eede21db44
      StringBuilder brands;
      bool first = true;
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 4b53524203119e3b413cd2ed91cd5eba217f9205..84f34902548257496fd3d0f79dc005f11026a50a 100644
+index 2dd252e00705c64f54e53d920723d0b254e7b90c..f03ae20e8d3925abba13dd496023492daab95348 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1395,6 +1395,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
+@@ -1446,6 +1446,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
      return {};
  }
  
@@ -62,10 +62,10 @@ index 4b53524203119e3b413cd2ed91cd5eba217f9205..84f34902548257496fd3d0f79dc005f1
  {
      page().set_content_blocking_policy(enabled, {});
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index f7de6b8876f10b6ce314080077ead0abb69bd108..8d9df67e6fa8473fb3247f38870a7d8c38e0972a 100644
+index bdf45065978eebbf483614ddc88c3ed436f9e62e..bf716e627ffc47dd526a6c52ec1cc2077934451a 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -170,6 +170,7 @@ public:
+@@ -175,6 +175,7 @@ public:
      WebIDL::ExceptionOr<void> send_bad_ipc_message_for_testing(Utf16String const& kind);
      WebIDL::ExceptionOr<void> set_content_blockers(Utf16String const& patterns);
      WebIDL::ExceptionOr<void> set_site_compatibility_data(Utf16String const& source);
@@ -74,10 +74,10 @@ index f7de6b8876f10b6ce314080077ead0abb69bd108..8d9df67e6fa8473fb3247f38870a7d8c
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
      WebIDL::UnsignedLongLong partial_layout_count();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 9e2d05f2d650a846c222c18fca1f89cbc6687641..089003b4e1b46ce50ed357a39d37c360607a090a 100644
+index 21a155296c65c72cef999ef5fdccf6e2619f5578..a6e04d4c454052a3ba8f3ef0d302de183d9025d9 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -168,6 +168,7 @@ interface Internals {
+@@ -173,6 +173,7 @@ interface Internals {
      undefined sendBadIpcMessageForTesting(DOMString kind);
      undefined setContentBlockers(DOMString patterns);
      undefined setSiteCompatibilityData(DOMString source);
