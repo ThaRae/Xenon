@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 14:29:18 -0400
-Subject: [PATCH] LibWeb: Run content blocker scriptlets and procedural filters
- at document start
+Subject: [PATCH] LibWeb: Run the content blocker's page script at document
+ start
 
 uBlock Origin's scriptlets (##+js) must run before a page's own scripts,
 and its procedural cosmetic filters (##...:has-text(), :remove(), ...)

@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 22:40:26 -0400
-Subject: [PATCH] LibWebView: Tell an embedder's scheme handler who may ask for
- a subresource
+Subject: [PATCH] LibWebView: Tell the scheme handler who may ask for a
+ subresource
 
 A browser lets web pages load some of an extension's files, those the
 extension lists as web accessible for the page's origin, as images,

@@ -5,9 +5,9 @@ Subject: [PATCH] LibWebView: Let the embedder add interfaces to its WebUI
  pages
 
 An embedder with internal pages of its own, or with features the engine
-doesn't have, can now give WebUI pages more interfaces to talk to it. Its
-callback runs as each page is created, after the page has registered the
-engine's interfaces.
+doesn't have, can now give WebUI pages more interfaces to talk to it.
+Its callback runs as each page is created, after the page has registered
+the engine's interfaces.
 ---
  Libraries/LibWebView/WebUI.cpp | 14 ++++++++++++++
  Libraries/LibWebView/WebUI.h   | 11 ++++++++---

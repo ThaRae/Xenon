@@ -271,10 +271,10 @@ none depends on those.
 3. **LibWeb+LibWebCommon: Add PublicKeyCredential and the WebAuthn API.** The bindings, the shared request and result
    types, and the renderer's half of the algorithms, ending in `PageClient::page_did_request_web_authn_*()`. With no
    embedder support, requests reject with `NotAllowedError`, which is what a browser with no authenticators does.
-4. **LibURL+LibWeb+LibWebView+WebContent: Run WebAuthn ceremonies in the UI process.** The IPC, the checks against
+4. **LibURL+LibWeb+LibWebView+WebContent: Run WebAuthn in the UI process.** The IPC, the checks against
    canonical documents, client data, `Coordinator`, `Authenticator`, and the `ViewImplementation` callbacks. Moves
    `is_a_registrable_domain_suffix_of_or_is_equal_to()` into LibURL.
-5. **LibWeb+LibWebCommon+LibWebView+WebDriver: Add WebAuthn virtual authenticators.** Software CTAP1/U2F and CTAP2
+5. **LibWeb+LibWebView+WebDriver: Add WebAuthn virtual authenticators.** Software CTAP1/U2F and CTAP2
    authenticators (ES256, discoverable credentials, UV on demand), WebAuthn's WebDriver extension (§11: add and remove
    authenticators, credentials, user verification, credential properties), the `testdriver-vendor.js` and `Internals`
    hookup, and the tests. A tab with virtual authenticators uses only those, and runs its ceremonies without a

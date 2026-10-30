@@ -8,7 +8,8 @@ A browser's extensions put frames of their own pages into the pages they
 work on, such as a password manager's autofill menu and its bar that
 offers to save a login. Sites with a strict policy, like frame-src
 'self', would block them. Blink lets extension resources bypass a page's
-policy (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy),
+policy
+(WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy),
 which is why these frames work on such sites in Chrome.
 
 Requests, responses, and navigations to URLs of the embedder's own

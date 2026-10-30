@@ -4,9 +4,9 @@ Date: Wed, 28 Oct 2026 23:41:44 +0000
 Subject: [PATCH] WebContent: Collect the JS heap when a page is hidden
 
 A background tab's heap and mimalloc pages otherwise sit until the next
-opportunistic GC. Collect once when the UI hides the page, and give unused
-allocator pages back, the way we already do after building the content
-blocker.
+opportunistic GC. Collect once when the UI hides the page, and give
+unused allocator pages back, the way we already do after building the
+content blocker.
 ---
  Services/WebContent/ConnectionFromClient.cpp | 11 +++++++++++
  1 file changed, 11 insertions(+)

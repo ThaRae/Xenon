@@ -7,13 +7,13 @@ Subject: [PATCH] LibWeb: Answer $redirect filters with surrogates, and apply
 A request that a $redirect filter blocks is now answered with the
 filter's surrogate (a no-op script, an empty frame, a 1x1 GIF, a stub of
 an ad library), the way uBlock Origin does, instead of failing. Pages
-that depend on the blocked resource keep working. The surrogate gets CORS
-headers for the requesting origin, as the resource it replaces would have
-had.
+that depend on the blocked resource keep working. The surrogate gets
+CORS headers for the requesting origin, as the resource it replaces
+would have had.
 
 $removeparam filters take tracking parameters out of a request's URL in
-main fetch, next to the HSTS upgrade. Like that upgrade, this changes the
-request's URL in place, so a navigation's document ends up at the
+main fetch, next to the HSTS upgrade. Like that upgrade, this changes
+the request's URL in place, so a navigation's document ends up at the
 cleaned URL.
 
 The blocker now also gets the request method, so $method filters match.

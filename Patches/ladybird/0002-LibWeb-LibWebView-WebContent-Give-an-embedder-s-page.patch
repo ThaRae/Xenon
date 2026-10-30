@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 14:40:46 -0400
-Subject: [PATCH] LibWeb+LibWebView+WebContent: Give an embedder's own pages a
+Subject: [PATCH] LibWeb+LibWebView+WebContent: Give an embedder's pages a
  script bridge
 
 A browser that serves pages of its own scheme, like extension pages, has
@@ -17,9 +17,10 @@ The bridge is a parameter, so nothing new appears on the global object
 unless the bootstrap puts it there.
 
 The UI process answers only for documents it knows the asking page hosts
-or is creating, and only if their origin is of a bridged scheme. It takes
-a message's sender from its own records of the document, never from the
-renderer, so a renderer can't speak for a document it doesn't host.
+or is creating, and only if their origin is of a bridged scheme. It
+takes a message's sender from its own records of the document, never
+from the renderer, so a renderer can't speak for a document it doesn't
+host.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---

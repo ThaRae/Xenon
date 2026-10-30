@@ -4,11 +4,11 @@ Date: Mon, 26 Oct 2026 22:01:02 -0400
 Subject: [PATCH] LibWeb+LibWebView+WebContent: Tell the embedder about
  navigations
 
-A browser's extensions follow the navigations of a tab's frames: when one
-starts, commits, fires DOMContentLoaded, loads, or fails, as Chrome's
-webNavigation API reports them. WebDriver BiDi learns of exactly these,
-but processes hosting web content only report them during a BiDi
-session.
+A browser's extensions follow the navigations of a tab's frames: when
+one starts, commits, fires DOMContentLoaded, loads, or fails, as
+Chrome's webNavigation API reports them. WebDriver BiDi learns of
+exactly these, but processes hosting web content only report them during
+a BiDi session.
 
 Application::set_navigation_event_handler() gives the embedder each
 navigation event as BiDi gets it, named as BiDi names it, with the

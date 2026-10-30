@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Wed, 28 Oct 2026 14:50:34 -0400
-Subject: [PATCH] RequestServer+LibWebView: Let the user accept a certificate
- that fails verification
+Subject: [PATCH] RequestServer+LibWebView: Let the user accept a rejected
+ certificate
 
 Browsers let their users past a certificate error for a site they know,
 like a server of their own with a self-signed certificate. RequestServer
@@ -14,13 +14,13 @@ more with CURLOPT_CERTINFO. Its handshake failed before anything was
 sent, so nothing is sent twice.
 
 RequestServerManager::add_certificate_exception() accepts a certificate
-for a host and port. The session keeps it, and each of its RequestServers
-takes it, those launched later too. Requests to the host and port,
-WebSockets included, stop verifying the server's certificate and have
-curl pin the accepted certificate's public key instead, so no other
-certificate is accepted in its place. A request that meets another key
-is verified as usual. A response over such a connection doesn't make its
-host a known HSTS host, as it came with a certificate error.
+for a host and port. The session keeps it, and each of its
+RequestServers takes it, those launched later too. Requests to the host
+and port, WebSockets included, stop verifying the server's certificate
+and have curl pin the accepted certificate's public key instead, so no
+other certificate is accepted in its place. A request that meets another
+key is verified as usual. A response over such a connection doesn't make
+its host a known HSTS host, as it came with a certificate error.
 
 RequestServerManager::on_server_certificate_rejected tells the embedder
 of each rejection.

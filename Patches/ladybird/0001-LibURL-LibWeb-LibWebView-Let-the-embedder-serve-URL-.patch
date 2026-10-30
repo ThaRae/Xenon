@@ -14,7 +14,8 @@ http(s) URLs do, so that each host is an origin with storage of its own.
 They are potentially trustworthy, like a packaged application's, so
 their documents are secure contexts. They are fetch schemes, so
 navigations, subresources, fetch() and workers fetch them, and CORS
-requests to them are allowed, with the handler deciding the CORS headers.
+requests to them are allowed, with the handler deciding the CORS
+headers.
 
 WebContent asks the UI process for each such URL, as it does for a local
 file, since its sandbox keeps it from reading anything itself. The

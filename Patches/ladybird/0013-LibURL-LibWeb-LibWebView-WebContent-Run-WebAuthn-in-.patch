@@ -1,18 +1,19 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Ryan <ryan@esterlines.com>
 Date: Mon, 26 Oct 2026 19:46:25 -0400
-Subject: [PATCH] LibURL+LibWeb+LibWebView+WebContent: Run WebAuthn ceremonies
- in the UI process
+Subject: [PATCH] LibURL+LibWeb+LibWebView+WebContent: Run WebAuthn in the UI
+ process
 
 WebContent now sends WebAuthn requests to the UI process, which owns the
 authenticator part of every ceremony. Before starting one, it checks the
 request against its own records of the documents a page hosts: the
 document must be the active document of its navigable and hosted by the
-asking page, have a non-opaque origin in a secure context, and be allowed
-the feature by its permissions policy, and the RP ID must be its host or
-a registrable domain suffix of it. It works out sameOriginWithAncestors
-and the top-level origin itself, and builds the client data from them,
-so a renderer can only ever ask for credentials for its own site.
+asking page, have a non-opaque origin in a secure context, and be
+allowed the feature by its permissions policy, and the RP ID must be its
+host or a registrable domain suffix of it. It works out
+sameOriginWithAncestors and the top-level origin itself, and builds the
+client data from them, so a renderer can only ever ask for credentials
+for its own site.
 
 WebAuthnCoordinator runs one ceremony at a time, in a view that is
 visible and focused. It hands the request to every authenticator an
@@ -24,9 +25,9 @@ Errors that would tell a page whether a credential exists go to the user
 rather than the page. Ceremonies end on their timeout, when the page
 aborts them, or when their document goes away or their view is hidden.
 
-The UI process also needs a little CBOR, to build attestation objects and
-read credential public keys for getPublicKey(), and the HTML check for a
-registrable domain suffix, which moves from LibWeb to URL::Host.
+The UI process also needs a little CBOR, to build attestation objects
+and read credential public keys for getPublicKey(), and the HTML check
+for a registrable domain suffix, which moves from LibWeb to URL::Host.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
