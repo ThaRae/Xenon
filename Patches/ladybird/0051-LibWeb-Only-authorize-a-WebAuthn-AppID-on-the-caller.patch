@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 31 Oct 2026 00:38:21 -0400
+Subject: [PATCH] LibWeb: Only authorize a WebAuthn AppID on the caller's own
+ host
+
+The FIDO algorithm for determining if a caller's FacetID is
+authorized for an AppID authorizes the caller only when the AppID's
+trusted facet list names the caller's facet. The shortcut here let a
+caller pass without any list at all when its host merely shares the
+AppID host's registrable domain, so https://evil.example.com could
+run an assertion ceremony with the AppID of
+https://login.example.com: it could probe whether the user holds the
+U2F credential that RP associated with login.example.com's AppID,
+and collect signatures over challenges of its choosing (the
+assertion still names the attacker's origin in clientDataJSON, so it
+doesn't impersonate the victim host). On user-content subdomains,
+one origin under a site can do this against every other.
+
+Until the trusted facet list is fetched and checked, the same-origin
+shortcut other browsers use is the only safe one: the caller's host
+must equal the AppID's host.
+---
+ Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
+
+diff --git a/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp b/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
+index 09cbe7c8d8cce45499ba13d989f1bb361a7a8a35..6b5c49f2bb0d90c496e3210b776691917f1a19e5 100644
+--- a/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
++++ b/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
+@@ -622,14 +622,7 @@ static bool is_a_caller_s_facet_id_authorized_for_an_app_id(URL::Origin const& c
+     if (caller_origin.is_opaque() || caller_origin.scheme().value_or({}) != "https"sv)
+         return false;
+ 
+-    auto const& caller_host = caller_origin.host();
+-    auto const& app_id_host = *app_id_url->host();
+-    if (caller_host == app_id_host)
+-        return true;
+-
+-    auto caller_registrable_domain = caller_host.registrable_domain();
+-    auto app_id_registrable_domain = app_id_host.registrable_domain();
+-    return caller_registrable_domain.has_value() && caller_registrable_domain == app_id_registrable_domain;
++    return caller_origin.host() == *app_id_url->host();
+ }
+ 
+ // https://w3c.github.io/webauthn/#sctn-discover-from-external-source

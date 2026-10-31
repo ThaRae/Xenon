@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 31 Oct 2026 00:44:07 -0400
+Subject: [PATCH] LibWeb: Keep an isolated world's thrown primitives to itself
+
+An exception of an embedder's isolated world only goes to the
+console -- but the check looked at the thrown value's realm, so a
+listener of the world's that threw a primitive ("throw \"...\"")
+had no realm to look at, and the value went on to the document's
+global error handlers: the page could read what the world's scripts
+threw, and that they threw. Objects were kept out, values weren't.
+
+The global an exception is reported on is the throwing callback's
+realm's global, so check that realm too: an isolated world reporting
+on its own global goes to the console whatever it threw.
+---
+ Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp b/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
+index 70d46f25c8fafae57a36fdbeed9bc11a33c31879..8beab34678b0a53b6904489c4d448d42cdbbe56a 100644
+--- a/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
++++ b/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
+@@ -76,12 +76,15 @@ void report_an_exception(JS::Object& global, JS::Value exception, OmitError omit
+ 
+ void report_an_exception(JS::Object& global, JS::Value exception, Optional<ErrorInformation> precomputed_error_info, OmitError omit_error, GC::Ptr<Script> script)
+ {
+-    if (exception.is_object() && IsolatedWorld::is_isolated_world_realm(exception.as_object().shape().realm())) {
+-        report_exception_to_console(exception, exception.as_object().shape().realm(), ErrorInPromise::No);
++    auto& reporting_realm = relevant_realm(global);
++    if (
++        IsolatedWorld::is_isolated_world_realm(reporting_realm)
++        || (exception.is_object() && IsolatedWorld::is_isolated_world_realm(exception.as_object().shape().realm()))) {
++        report_exception_to_console(exception, reporting_realm, ErrorInPromise::No);
+         return;
+     }
+ 
+-    auto& realm = relevant_realm(global);
++    auto& realm = reporting_realm;
+     auto& vm = realm.vm();
+ 
+     // 1. Let notHandled be true.

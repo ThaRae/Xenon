@@ -14,19 +14,17 @@ about 65 MiB more than the engine itself for as long as it lived.
 
 Collect the heap once the engine is built or dropped.
 ---
- Libraries/LibWeb/Loader/ContentBlocker.cpp | 4 ++++
- 1 file changed, 4 insertions(+)
+ Libraries/LibWeb/Loader/ContentBlocker.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index e47f89f14314d6e9bfa0377002bde8db65151e1c..ba8a962a5e630f20240caa4cb9b0f782b5390ddb 100644
+index 3ccf5375460ff6946d97b81a59b84cdcc314717a..42bea0ef552dacd8a8f72399260a0f824579ab88 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-@@ -160,6 +160,10 @@ ErrorOr<void> ContentBlocker::set_patterns(ReadonlySpan<String> patterns)
+@@ -160,6 +160,8 @@ ErrorOr<void> ContentBlocker::set_patterns(ReadonlySpan<String> patterns)
  
  ErrorOr<void> ContentBlocker::set_rules_from_bytes(ReadonlyBytes rules_bytes, ReadonlyBytes trusted_rules_bytes, ReadonlyBytes resources_bytes)
  {
-+    // NB: Building an engine allocates several times what the engine keeps, on this thread, whose heap nothing else
-+    //     collects. Give that memory back, and an old engine's, rather than keeping it for the life of the process.
 +    ScopeGuard collect_memory = [] { ak_kmalloc_collect(); };
 +
      // OPTIMIZATION: Building an engine costs the same tokenizing and flatbuffer work whether or not there are any

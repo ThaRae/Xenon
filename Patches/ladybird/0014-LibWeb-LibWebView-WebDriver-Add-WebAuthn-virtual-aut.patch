@@ -28,23 +28,23 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibWeb/Internals/Internals.cpp      |  18 +
  Libraries/LibWeb/Internals/Internals.h        |   2 +
- Libraries/LibWeb/Internals/Internals.idl      |   4 +
+ Libraries/LibWeb/Internals/Internals.idl      |   2 +
  Libraries/LibWeb/Page/Page.h                  |   3 +
  Libraries/LibWebCommon/WebDriver/Client.cpp   |   8 +
  Libraries/LibWebCommon/WebDriver/Client.h     |  10 +
  Libraries/LibWebView/Application.cpp          |   3 +
  Libraries/LibWebView/CMakeLists.txt           |   1 +
- Libraries/LibWebView/WebAuthn/Coordinator.cpp |  70 +-
- .../WebAuthn/VirtualAuthenticator.cpp         | 603 ++++++++++++++++
- .../WebAuthn/VirtualAuthenticator.h           | 120 ++++
- Libraries/LibWebView/WebContentTestClient.cpp |  11 +
+ Libraries/LibWebView/WebAuthn/Coordinator.cpp |  65 +-
+ .../WebAuthn/VirtualAuthenticator.cpp         | 585 +++++++++++++++
+ .../WebAuthn/VirtualAuthenticator.h           | 114 +++
+ Libraries/LibWebView/WebContentTestClient.cpp |  10 +
  Libraries/LibWebView/WebContentTestClient.h   |   1 +
  .../LibWebView/WebDriverBrowserConnection.cpp |   6 +
  .../LibWebView/WebDriverBrowserConnection.h   |   1 +
  Services/WebContent/PageClient.cpp            |  12 +
  Services/WebContent/PageClient.h              |   1 +
  Services/WebContent/WebContentTestClient.ipc  |   4 +
- Services/WebDriver/Client.cpp                 |  76 ++
+ Services/WebDriver/Client.cpp                 |  74 ++
  Services/WebDriver/Client.h                   |   8 +
  Services/WebDriver/Session.cpp                |   7 +
  Services/WebDriver/Session.h                  |   1 +
@@ -63,8 +63,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  .../getcredential-badargs-rpid.https.txt      |  12 +
  .../webauthn/getcredential-passing.https.txt  |  20 +
  .../Text/input/WebAuthn/argument-checks.html  |  40 ++
- .../Text/input/WebAuthn/create-and-get.html   | 116 +++
- .../input/WebAuthn/cross-origin-iframe.html   |  56 ++
+ .../Text/input/WebAuthn/create-and-get.html   | 114 +++
+ .../input/WebAuthn/cross-origin-iframe.html   |  55 ++
  .../wpt-import/resources/testdriver-vendor.js |  33 +
  ...atecredential-badargs-challenge.https.html |  27 +
  .../createcredential-badargs-rp.https.html    |  42 ++
@@ -76,8 +76,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  .../webauthn/getcredential-passing.https.html |  74 ++
  .../Text/input/wpt-import/webauthn/helpers.js | 679 ++++++++++++++++++
  Tests/LibWebView/CMakeLists.txt               |   6 +
- Tests/LibWebView/test-webdriver-webauthn.py   | 140 ++++
- 51 files changed, 2795 insertions(+), 9 deletions(-)
+ Tests/LibWebView/test-webdriver-webauthn.py   | 134 ++++
+ 51 files changed, 2752 insertions(+), 9 deletions(-)
  create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
  create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
  create mode 100644 Tests/LibWeb/Text/data/webauthn-get-in-frame.html
@@ -107,10 +107,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Tests/LibWebView/test-webdriver-webauthn.py
 
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 30177ec9a070a89c2cb7486fc8a9c3ba697e95d9..4b53524203119e3b413cd2ed91cd5eba217f9205 100644
+index 216bfb94adbee78773659240bff45af452857418..5813f7cce38a1566a3213e2fb13562f8e3a95707 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -2040,6 +2040,24 @@ void Internals::pump_gamepad_events()
+@@ -2092,6 +2092,24 @@ void Internals::pump_gamepad_events()
      page().client().pump_gamepad_events();
  }
  
@@ -136,10 +136,10 @@ index 30177ec9a070a89c2cb7486fc8a9c3ba697e95d9..4b53524203119e3b413cd2ed91cd5eba
  {
      auto virtual_gamepad = page().client().create_virtual_gamepad();
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index 86d992e7fe85fb2416bb29949ec17c1e0ad65a1d..f7de6b8876f10b6ce314080077ead0abb69bd108 100644
+index 67432ee81dd98db5d7ea644cc7884bab5cf07c32..bdf45065978eebbf483614ddc88c3ed436f9e62e 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -246,6 +246,8 @@ public:
+@@ -251,6 +251,8 @@ public:
      void pump_gamepad_events();
  
      GC::Ref<InternalGamepad> connect_virtual_gamepad();
@@ -149,25 +149,23 @@ index 86d992e7fe85fb2416bb29949ec17c1e0ad65a1d..f7de6b8876f10b6ce314080077ead0ab
  
      void perform_per_test_cleanup();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 7e78ed1676fd6033b7dfabc688d835565193a5f4..9e2d05f2d650a846c222c18fca1f89cbc6687641 100644
+index e231640c62700b06206bd79164f690cbdf618ca5..3a73bf279e318ec3e5caa80c8416e3c560ae8ec5 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -259,6 +259,10 @@ interface Internals {
+@@ -272,6 +272,8 @@ interface Internals {
  
      InternalGamepad connectVirtualGamepad();
  
-+    // Runs one of WebAuthn's WebDriver extension commands, such as "add-virtual-authenticator", with a JSON payload,
-+    // and returns the result as JSON. https://w3c.github.io/webauthn/#sctn-automation
 +    DOMString runWebAuthnCommand(DOMString name, optional DOMString payload = "null", optional sequence<DOMString> arguments = []);
 +
      undefined setHighlightedNode(Node? node);
  
      undefined clearElement(HTMLElement element);
 diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
-index 1530b0466d12690a8c8ac99444d97970fb29c2f6..c8355fd3582c7f62a0e62285d89f1e55f6fbdab2 100644
+index 0c0efd9e9122ef164f06f89ed565ebb1cd7b764a..7e75fa0b2e08501c0a957493b74631c48595cb05 100644
 --- a/Libraries/LibWeb/Page/Page.h
 +++ b/Libraries/LibWeb/Page/Page.h
-@@ -99,6 +99,7 @@
+@@ -103,6 +103,7 @@
  #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
  #include <LibWebCommon/UIEvents/KeyCode.h>
  #include <LibWebCommon/WebAuthn/WebAuthn.h>
@@ -175,7 +173,7 @@ index 1530b0466d12690a8c8ac99444d97970fb29c2f6..c8355fd3582c7f62a0e62285d89f1e55
  #include <LibWebCommon/WebView/StorageSetResult.h>
  
  namespace Web {
-@@ -926,6 +927,8 @@ public:
+@@ -937,6 +938,8 @@ public:
      virtual void page_did_request_stop_gamepad_effects([[maybe_unused]] Gamepad::GamepadHandle handle) { }
  
      virtual Optional<Gamepad::VirtualGamepad> create_virtual_gamepad() { return {}; }
@@ -185,13 +183,13 @@ index 1530b0466d12690a8c8ac99444d97970fb29c2f6..c8355fd3582c7f62a0e62285d89f1e55
      virtual void set_virtual_gamepad_axis([[maybe_unused]] Gamepad::GamepadHandle handle, [[maybe_unused]] i32 axis, [[maybe_unused]] i16 value) { }
      virtual void disconnect_virtual_gamepad([[maybe_unused]] Gamepad::GamepadHandle handle) { }
 diff --git a/Libraries/LibWebCommon/WebDriver/Client.cpp b/Libraries/LibWebCommon/WebDriver/Client.cpp
-index 9bb4d31ebd7b353a9361e0daf39366d6a79fc57d..ff77de64f2432d98e35a5699549dd2a2debfb061 100644
+index ec57b988118215cf4b15afee783e524fb94aa0d2..47f4a1680981f0d664e3e2a3b927ad4f4a0136a2 100644
 --- a/Libraries/LibWebCommon/WebDriver/Client.cpp
 +++ b/Libraries/LibWebCommon/WebDriver/Client.cpp
-@@ -115,6 +115,14 @@ static constexpr auto s_webdriver_endpoints = Array {
-     ROUTE(GET, "/session/:session_id/screenshot"sv, take_screenshot),
+@@ -116,6 +116,14 @@ static constexpr auto s_webdriver_endpoints = Array {
      ROUTE(GET, "/session/:session_id/element/:element_id/screenshot"sv, take_element_screenshot),
      ROUTE(POST, "/session/:session_id/print"sv, print_page),
+     ROUTE(POST, "/session/:session_id/permissions"sv, set_permission),
 +    ROUTE(POST, "/session/:session_id/webauthn/authenticator"sv, add_virtual_authenticator),
 +    ROUTE(DELETE, "/session/:session_id/webauthn/authenticator/:authenticator_id"sv, remove_virtual_authenticator),
 +    ROUTE(POST, "/session/:session_id/webauthn/authenticator/:authenticator_id/credential"sv, add_credential),
@@ -204,12 +202,12 @@ index 9bb4d31ebd7b353a9361e0daf39366d6a79fc57d..ff77de64f2432d98e35a5699549dd2a2
  
  // https://w3c.github.io/webdriver/#dfn-match-a-request
 diff --git a/Libraries/LibWebCommon/WebDriver/Client.h b/Libraries/LibWebCommon/WebDriver/Client.h
-index 6dab74e76e969c7e0f789f1897d12a63b85f8d1d..388ee119916dead4409d840c86f52a5f98c5db6e 100644
+index d9d788a56d36e61e240738ad99addc9cace4fc4d..578349bd0bf380dce72b520effdcd61e30bc1cb4 100644
 --- a/Libraries/LibWebCommon/WebDriver/Client.h
 +++ b/Libraries/LibWebCommon/WebDriver/Client.h
-@@ -130,6 +130,16 @@ public:
-     // 18. Print, https://w3c.github.io/webdriver/#print
-     virtual ResponsePromise print_page(Parameters parameters, JsonValue payload) = 0;
+@@ -133,6 +133,16 @@ public:
+     // Permissions, https://w3c.github.io/permissions/#automation
+     virtual ResponsePromise set_permission(Parameters parameters, JsonValue payload) = 0;
  
 +    // https://w3c.github.io/webauthn/#sctn-automation
 +    virtual ResponsePromise add_virtual_authenticator(Parameters parameters, JsonValue payload) = 0;
@@ -225,10 +223,10 @@ index 6dab74e76e969c7e0f789f1897d12a63b85f8d1d..388ee119916dead4409d840c86f52a5f
  
  protected:
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 3b25cd243a7d1df3116274749fcebb09511a9d8c..334a46f452f91f1a0cafc0342a72b9cef6c470fb 100644
+index 95c75dd93259e7372f790c35e1945560486ccd9f..c3c38408ae94d75cf4adff0bd65807c45aa5bcf7 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -72,6 +72,8 @@
+@@ -73,6 +73,8 @@
  #include <LibWebView/URL.h>
  #include <LibWebView/UserAgent.h>
  #include <LibWebView/Utilities.h>
@@ -237,7 +235,7 @@ index 3b25cd243a7d1df3116274749fcebb09511a9d8c..334a46f452f91f1a0cafc0342a72b9ce
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
  #include <LibWebView/WebDriverBrowserConnection.h>
-@@ -1774,6 +1776,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
+@@ -1803,6 +1805,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
  ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
@@ -246,10 +244,10 @@ index 3b25cd243a7d1df3116274749fcebb09511a9d8c..334a46f452f91f1a0cafc0342a72b9ce
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index efb2f13fa880479cb95ac8a81d604fb94c0f37eb..d1f721766c410c70008a096e847dc54e91622c3f 100644
+index 9b5ea44154450e2f248d0be2d06f55f875a9ae89..2c49e252edccd6ecf3bb002b940fe5e49af80d59 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -77,6 +77,7 @@ set(SOURCES
+@@ -80,6 +80,7 @@ set(SOURCES
      WebAuthn/CBOR.cpp
      WebAuthn/ClientData.cpp
      WebAuthn/Coordinator.cpp
@@ -258,7 +256,7 @@ index efb2f13fa880479cb95ac8a81d604fb94c0f37eb..d1f721766c410c70008a096e847dc54e
      WebContentClient.cpp
      WebContentPage.cpp
 diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.cpp b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
-index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e048ce014 100644
+index 6d5d6007f36ef415013d3e2e3f4cf4360dc6284d..6b70cf717f0d632dd1b4789003f660a4c1bc7c0f 100644
 --- a/Libraries/LibWebView/WebAuthn/Coordinator.cpp
 +++ b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
 @@ -15,6 +15,7 @@
@@ -269,7 +267,7 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e
  #include <LibWebView/WebContentPage.h>
  
  namespace WebView {
-@@ -120,6 +121,7 @@ private:
+@@ -110,6 +111,7 @@ private:
      void finish_registration(bool share_attestation);
      void finish_assertion(Authenticator::Assertion const&);
      void show_prompt(WebAuthnPrompt::State);
@@ -277,7 +275,7 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e
      void close_prompt();
      void check_liveness();
  
-@@ -221,7 +223,7 @@ void WebAuthnCoordinator::Ceremony::check_liveness()
+@@ -198,7 +200,7 @@ void WebAuthnCoordinator::Ceremony::check_liveness()
          return;
      }
  
@@ -285,8 +283,8 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e
 +    if (m_phase == Phase::Answered || VirtualAuthenticators::the().is_enabled_for(m_page->traversable()))
          return;
  
-     // A ceremony continues only while the user can see the view that started it. It may lose focus to its prompt.
-@@ -779,6 +781,10 @@ void WebAuthnCoordinator::Ceremony::show_prompt(WebAuthnPrompt::State state)
+     if (m_page->traversable().system_visibility_state() != Web::HTML::VisibilityState::Visible)
+@@ -720,6 +722,10 @@ void WebAuthnCoordinator::Ceremony::show_prompt(WebAuthnPrompt::State state)
  {
      m_prompt.state = state;
  
@@ -297,12 +295,10 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e
      auto* view = this->view();
      if (!view || !view->on_web_authn_prompt)
          return;
-@@ -786,6 +792,43 @@ void WebAuthnCoordinator::Ceremony::show_prompt(WebAuthnPrompt::State state)
+@@ -727,6 +733,41 @@ void WebAuthnCoordinator::Ceremony::show_prompt(WebAuthnPrompt::State state)
      view->on_web_authn_prompt(m_prompt);
  }
  
-+// NB: With virtual authenticators, as under automation, nobody is there to answer a prompt. The ceremony goes on as if
-+//     the user took the default, or gave up when there is nothing left to wait for.
 +void WebAuthnCoordinator::Ceremony::answer_prompt_without_a_user()
 +{
 +    Core::deferred_invoke([weak_self = make_weak_ptr()] {
@@ -341,11 +337,8 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e
  void WebAuthnCoordinator::Ceremony::close_prompt()
  {
      if (!m_prompt_is_shown)
-@@ -821,15 +864,18 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
+@@ -762,13 +803,15 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
  {
-     // A ceremony may only start in a view that can ask the user, and that the user is looking at: as in other browsers,
-     // a page in the background can't ask for a credential.
-+    // NB: With virtual authenticators, as under automation and in tests, nobody is there to look at a prompt.
      auto& traversable = page.traversable();
      auto view = traversable.view();
 -    if (!view.has_value() || !view->on_web_authn_prompt) {
@@ -367,14 +360,12 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e
      }
  
      if (any_of(m_ceremonies, [&](auto const& ceremony) { return ceremony->page() && &ceremony->page()->traversable() == &traversable; })) {
-@@ -839,7 +885,13 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
+@@ -778,7 +821,11 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
  
      auto ceremony = adopt_ref(*new Ceremony(page, request_id, move(context), move(request)));
      m_ceremonies.append(ceremony);
 -    ceremony->start(m_sources);
 +
-+    // NB: As in other browsers, a tab with virtual authenticators uses only those, so that the authenticators plugged
-+    //     into the machine running the tests can't change what the tests see.
 +    if (VirtualAuthenticators::the().is_enabled_for(traversable))
 +        ceremony->start({ &VirtualAuthenticators::the() });
 +    else
@@ -384,10 +375,10 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e
  void WebAuthnCoordinator::ceremony_ended(Ceremony& ceremony)
 diff --git a/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd283f54b1
+index 0000000000000000000000000000000000000000..7851189cb5969c9421194e289d18d7d8e2e416d1
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
-@@ -0,0 +1,603 @@
+@@ -0,0 +1,585 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -453,12 +444,10 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +Optional<Authenticator::Failure> VirtualAuthenticator::check_user(bool user_verification) const
 +{
 +    // https://w3c.github.io/webauthn/#dom-virtualauthenticatorconfiguration-isuserconsenting
-+    // Determines the result of all user consent authorization gestures, and by extension, any test of user presence.
 +    if (!m_configuration.is_user_consenting)
 +        return Failure { Error::OperationDenied, {} };
 +
 +    // https://w3c.github.io/webauthn/#dom-virtualauthenticatorconfiguration-isuserverified
-+    // Determines the result of user verification performed on the virtual authenticator.
 +    if (user_verification) {
 +        if (!m_configuration.has_user_verification)
 +            return Failure { Error::NotSupported, {} };
@@ -483,8 +472,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +// https://w3c.github.io/webauthn/#sctn-op-make-cred
 +ErrorOr<Authenticator::MakeCredentialResult> VirtualAuthenticator::make_credential_impl(MakeCredentialRequest const& request)
 +{
-+    // If the excludeCredentialDescriptorList names a credential on this authenticator for the RP, and the user
-+    // consents, return an error code equivalent to "InvalidStateError".
 +    for (auto const& excluded : request.exclude_list) {
 +        auto is_excluded = any_of(m_credentials, [&](auto const& credential) { return credential.rp_id == request.rp_id && credential.id == excluded.id; });
 +        if (!is_excluded)
@@ -518,7 +505,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +    credential.backup_eligibility = m_configuration.default_backup_eligibility;
 +    credential.backup_state = m_configuration.default_backup_state;
 +
-+    // A new discoverable credential replaces one the authenticator holds for the same RP and user.
 +    if (credential.is_resident_credential) {
 +        m_credentials.remove_all_matching([&](auto const& existing) {
 +            return existing.is_resident_credential && existing.rp_id == credential.rp_id && existing.user_handle == credential.user_handle;
@@ -552,9 +538,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +// https://w3c.github.io/webauthn/#sctn-op-get-assertion
 +ErrorOr<Authenticator::GetAssertionResult> VirtualAuthenticator::get_assertion_impl(GetAssertionRequest const& request)
 +{
-+    // Let credentialOptions be the public key credential sources for the RP: those in the allow list if there is one,
-+    // and the discoverable ones otherwise. If credentialOptions is empty, return an error code equivalent to
-+    // "NotAllowedError".
 +    Vector<Credential&> credential_options;
 +    for (auto& credential : m_credentials) {
 +        if (credential.rp_id != request.rp_id)
@@ -571,7 +554,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +
 +    Vector<Assertion> assertions;
 +    for (auto& credential : credential_options) {
-+        // Increment the credential's signature counter.
 +        ++credential.sign_count;
 +
 +        AuthenticatorData authenticator_data;
@@ -580,7 +562,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +        authenticator_data.sign_count = credential.sign_count;
 +        auto serialized_authenticator_data = authenticator_data.serialize();
 +
-+        // Let signature be the assertion signature of the concatenation authenticatorData || hash.
 +        ByteBuffer signed_data;
 +        signed_data.append(serialized_authenticator_data);
 +        signed_data.append(request.client_data_hash);
@@ -593,7 +574,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +        assertion.authenticator_data = move(serialized_authenticator_data);
 +        assertion.signature = TRY(signature.to_asn());
 +
-+        // The user handle is returned for discoverable credentials.
 +        if (credential.is_resident_credential && credential.user_handle.has_value())
 +            assertion.user = UserEntity { *credential.user_handle, credential.user_name, credential.user_display_name };
 +
@@ -699,8 +679,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +    if (name == "remove-virtual-authenticator"sv)
 +        return remove_virtual_authenticator(arguments[0]);
 +
-+    // If authenticatorId does not match any Virtual Authenticator in the Virtual Authenticator Database, return a
-+    // WebDriver error with WebDriver error code invalid argument.
 +    auto authenticator = m_authenticators.first_matching([&](auto const& authenticator) { return authenticator->id() == arguments[0]; });
 +    if (!authenticator.has_value())
 +        return invalid_argument("No such virtual authenticator"sv);
@@ -781,11 +759,9 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +
 +    // 5. For each extension in configuration's extensions, if the endpoint node does not support the extension,
 +    //    return a WebDriver error with WebDriver error code unsupported operation.
-+    // NB: The extensions Ladybird supports so far are client extensions, which need nothing of authenticators.
 +    if (auto extensions = object.get_array("extensions"sv); extensions.has_value() && !extensions->is_empty())
 +        return Error::from_code(ErrorCode::UnsupportedOperation, "Virtual authenticators support no extensions"sv);
 +
-+    // NB: A CTAP1/U2F authenticator has neither discoverable credentials nor user verification.
 +    if (configuration.protocol == VirtualAuthenticator::Protocol::CTAP1U2F && (configuration.has_resident_key || configuration.has_user_verification))
 +        return invalid_argument("A ctap1/u2f authenticator can't have resident keys or user verification"sv);
 +
@@ -941,8 +917,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +    if (id.is_error())
 +        return invalid_argument("The credential ID must be base64url encoded"sv);
 +
-+    // If credentialId does not match any Public Key Credential Source managed by authenticator, return invalid
-+    // argument. Otherwise, remove it.
 +    if (!authenticator.credentials().remove_first_matching([&](auto const& credential) { return credential.id == id.value(); }))
 +        return invalid_argument("No such credential"sv);
 +    return JsonValue {};
@@ -958,7 +932,6 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +// https://w3c.github.io/webauthn/#sctn-automation-set-user-verified
 +Web::WebDriver::Response VirtualAuthenticators::set_user_verified(VirtualAuthenticator& authenticator, JsonValue const& parameters)
 +{
-+    // If parameters is not a JSON Object, or its isUserVerified property is not a boolean, return invalid argument.
 +    if (!parameters.is_object())
 +        return invalid_argument("The parameters must be an object"sv);
 +    auto is_user_verified = parameters.as_object().get_bool("isUserVerified"sv);
@@ -993,10 +966,10 @@ index 0000000000000000000000000000000000000000..c1f42e3ab4fa975f0ee16d716cf1fafd
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..b6729cfb3c9b09a30c0e6e4861e8d0a9148e45d6
+index 0000000000000000000000000000000000000000..a6211d9ab9c4b34703ecdad5264d0f58405d827f
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,114 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -1016,7 +989,6 @@ index 0000000000000000000000000000000000000000..b6729cfb3c9b09a30c0e6e4861e8d0a9
 +namespace WebView {
 +
 +// https://w3c.github.io/webauthn/#sctn-automation-virtual-authenticators
-+// A software authenticator for automation and tests, which behaves as WebDriver's virtual authenticators do.
 +class WEBVIEW_API VirtualAuthenticator final : public Authenticator {
 +public:
 +    // https://w3c.github.io/webauthn/#virtual-authenticators-properties
@@ -1051,7 +1023,6 @@ index 0000000000000000000000000000000000000000..b6729cfb3c9b09a30c0e6e4861e8d0a9
 +        bool backup_state { false };
 +    };
 +
-+    // An authenticator a test adds for itself is only for its own tab. One that WebDriver adds is for every tab.
 +    static NonnullRefPtr<VirtualAuthenticator> create(String id, Configuration, Optional<Web::HTML::CrossProcessId> traversable_id);
 +
 +    String const& id() const { return m_id; }
@@ -1082,19 +1053,15 @@ index 0000000000000000000000000000000000000000..b6729cfb3c9b09a30c0e6e4861e8d0a9
 +    Vector<Credential> m_credentials;
 +};
 +
-+// The virtual authenticators WebDriver and tests have added, which ceremonies find as they would security keys.
 +class WEBVIEW_API VirtualAuthenticators final : public AuthenticatorSource {
 +public:
 +    static VirtualAuthenticators& the();
 +
-+    // Whether a tab has virtual authenticators, which make its ceremonies run without asking the user anything.
 +    bool is_enabled_for(CanonicalTraversable const&) const;
 +
 +    virtual NonnullOwnPtr<Discovery> discover(CanonicalTraversable const&, Function<void(NonnullRefPtr<Authenticator>)> on_authenticator) override;
 +
 +    // https://w3c.github.io/webauthn/#sctn-automation
-+    // Runs one of WebAuthn's WebDriver extension commands. The arguments are the URL's variables after the session
-+    // ID, and the payload is the request's body. A test runs them for its own tab only.
 +    Web::WebDriver::Response run_command(StringView name, JsonValue const& payload, Vector<String> const& arguments, Optional<Web::HTML::CrossProcessId> traversable_id = {});
 +
 +private:
@@ -1118,7 +1085,7 @@ index 0000000000000000000000000000000000000000..b6729cfb3c9b09a30c0e6e4861e8d0a9
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentTestClient.cpp b/Libraries/LibWebView/WebContentTestClient.cpp
-index 5f9034e9d3ed6df4294ade5c179a9ab1d9064026..908be237dcd746716e4a8914c8f73623f44721f5 100644
+index bd972c6120cc5bc7a62ea736eb2b3df093db7941..61a8652b5252f313b3e64496e3b1c577f8000fcb 100644
 --- a/Libraries/LibWebView/WebContentTestClient.cpp
 +++ b/Libraries/LibWebView/WebContentTestClient.cpp
 @@ -4,9 +4,11 @@
@@ -1133,13 +1100,12 @@ index 5f9034e9d3ed6df4294ade5c179a9ab1d9064026..908be237dcd746716e4a8914c8f73623
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebContentPage.h>
  #include <LibWebView/WebContentTestClient.h>
-@@ -121,6 +123,15 @@ Messages::WebContentTestClient::CreateVirtualGamepadResponse WebContentTestClien
+@@ -163,6 +165,14 @@ Messages::WebContentTestClient::CreateVirtualGamepadResponse WebContentTestClien
      return GamepadManager::the().create_virtual_gamepad(m_client);
  }
  
 +Messages::WebContentTestClient::RunWebAuthnCommandResponse WebContentTestClient::run_web_authn_command(Web::PageId page_id, String name, JsonValue payload, Vector<String> arguments)
 +{
-+    // NB: Tests run side by side, so a test's virtual authenticators are only for its own tab.
 +    auto* page = m_client.page(page_id);
 +    if (!page)
 +        return Web::WebDriver::Error::from_code(Web::WebDriver::ErrorCode::NoSuchWindow, "The page is gone"sv);
@@ -1150,30 +1116,30 @@ index 5f9034e9d3ed6df4294ade5c179a9ab1d9064026..908be237dcd746716e4a8914c8f73623
  {
      GamepadManager::the().set_virtual_gamepad_button(m_client, handle, button, down);
 diff --git a/Libraries/LibWebView/WebContentTestClient.h b/Libraries/LibWebView/WebContentTestClient.h
-index 7026f180b93138df31b821a398c61adaf45ffb09..ed505aa7336a4efb41bdb6ce645ac6569d061545 100644
+index 653c175c558cf01cb1c459f6e15663f2f1f6661d..61c1a074167f24f417653d9ac45e698e9afe6218 100644
 --- a/Libraries/LibWebView/WebContentTestClient.h
 +++ b/Libraries/LibWebView/WebContentTestClient.h
-@@ -43,6 +43,7 @@ private:
-     virtual Messages::WebContentTestClient::DidRequestRegisterSessionStoreTabForTestingResponse did_request_register_session_store_tab_for_testing(Web::PageId page_id) override;
-     virtual Messages::WebContentTestClient::DidRequestSessionStoreTabStateForTestingResponse did_request_session_store_tab_state_for_testing(Web::PageId page_id) override;
+@@ -49,6 +49,7 @@ private:
+     virtual void release_held_permission_prompt_for_testing(Web::PageId, u32 waiters) override;
+     virtual Messages::WebContentTestClient::AdvancePermissionClockForTestingResponse advance_permission_clock_for_testing(Web::PageId, u64 milliseconds) override;
      virtual Messages::WebContentTestClient::CreateVirtualGamepadResponse create_virtual_gamepad() override;
 +    virtual Messages::WebContentTestClient::RunWebAuthnCommandResponse run_web_authn_command(Web::PageId page_id, String name, JsonValue payload, Vector<String> arguments) override;
      virtual void set_virtual_gamepad_button(Web::Gamepad::GamepadHandle handle, i32 button, bool down) override;
      virtual void set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle handle, i32 axis, i16 value) override;
      virtual void disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle handle) override;
 diff --git a/Libraries/LibWebView/WebDriverBrowserConnection.cpp b/Libraries/LibWebView/WebDriverBrowserConnection.cpp
-index d4a7bc8cb80f599b8e7efe4cbe16d0e4521231f8..45b5f0a54cf7a6bc58d32975edfbe5df02ddf3e2 100644
+index db55331aa803538329a4ef6ee9f2a2a2f205a049..c9c0341438bc8228a1689dbc2869b5f56b5655d8 100644
 --- a/Libraries/LibWebView/WebDriverBrowserConnection.cpp
 +++ b/Libraries/LibWebView/WebDriverBrowserConnection.cpp
-@@ -8,6 +8,7 @@
- #include <LibCore/EventLoop.h>
+@@ -9,6 +9,7 @@
  #include <LibWebView/Application.h>
+ #include <LibWebView/PermissionManager.h>
  #include <LibWebView/ViewImplementation.h>
 +#include <LibWebView/WebAuthn/VirtualAuthenticator.h>
  #include <LibWebView/WebDriverBrowserConnection.h>
  #if defined(AK_OS_MACOS)
  #    include <LibIPC/TransportBootstrapMach.h>
-@@ -297,6 +298,11 @@ void WebDriverBrowserConnection::traverse_history(u64 command_id, String window_
+@@ -298,6 +299,11 @@ void WebDriverBrowserConnection::traverse_history(u64 command_id, String window_
      });
  }
  
@@ -1186,22 +1152,22 @@ index d4a7bc8cb80f599b8e7efe4cbe16d0e4521231f8..45b5f0a54cf7a6bc58d32975edfbe5df
  {
      auto view = ViewImplementation::find_view_by_handle(window_handle);
 diff --git a/Libraries/LibWebView/WebDriverBrowserConnection.h b/Libraries/LibWebView/WebDriverBrowserConnection.h
-index 656d0d809643efef31d7951efccc020bd1a5cbf4..3143151f4f65c9a24cc5745e4bb3a51bcddc15b0 100644
+index 848f7f1518f493c3607ff86dbb2c40d47585ddf4..9ed424bff482335c0b679a4e031868c687a6886d 100644
 --- a/Libraries/LibWebView/WebDriverBrowserConnection.h
 +++ b/Libraries/LibWebView/WebDriverBrowserConnection.h
-@@ -33,6 +33,7 @@ private:
-     virtual void traverse_history(u64 command_id, String window_handle, i32 delta, bool handle_user_prompts) override;
+@@ -34,6 +34,7 @@ private:
      virtual void get_session_history(u64 command_id, String window_handle) override;
+     virtual void set_permission(u64 command_id, String window_handle, JsonValue parameters) override;
      virtual void load_url(u64 command_id, String window_handle, URL::URL url) override;
 +    virtual void web_authn_command(u64 command_id, String name, JsonValue payload, Vector<String> arguments) override;
      virtual void run_content_command(u64 command_id, String window_handle, Web::WebDriver::SessionBrowsingContext browsing_context, String name, JsonValue payload, Vector<String> arguments) override;
      virtual void switch_to_window(u64 command_id, String window_handle) override;
      virtual void switch_to_parent_frame(u64 command_id, String window_handle) override;
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index ed8cad0edbdc6d4387941abcf239fd9d1250b8e5..d1ae7d0035f6153b9a44527d8cf8690f76a60b24 100644
+index 1158ed8d330891bd05eb55e4706c4f1861ee95bc..4278ffdd0f06edd6ef8b1a1af35c5cd91121c006 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -2019,6 +2019,18 @@ void PageClient::page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHand
+@@ -2117,6 +2117,18 @@ void PageClient::page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHand
      client().async_gamepad_stop_effects(handle);
  }
  
@@ -1221,10 +1187,10 @@ index ed8cad0edbdc6d4387941abcf239fd9d1250b8e5..d1ae7d0035f6153b9a44527d8cf8690f
  {
      auto* test_connection = client().test_connection();
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index e47544a31057e4ebd57113d680d2bda3acbd87d3..c31e2cb179257b337500e3e767f5af04b918d555 100644
+index f0f52761ac3b5586aaf1147af4164bd4230665d7..f795cc5c7afa0fdb0847cae04ebcfd3ee53667da 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
-@@ -376,6 +376,7 @@ private:
+@@ -389,6 +389,7 @@ private:
      virtual void page_did_play_gamepad_effect(Web::Gamepad::GamepadHandle, Web::Gamepad::GamepadEffect const&) override;
      virtual void page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHandle) override;
      virtual Optional<Web::Gamepad::VirtualGamepad> create_virtual_gamepad() override;
@@ -1233,37 +1199,35 @@ index e47544a31057e4ebd57113d680d2bda3acbd87d3..c31e2cb179257b337500e3e767f5af04
      virtual void set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle, i32 axis, i16 value) override;
      virtual void disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle) override;
 diff --git a/Services/WebContent/WebContentTestClient.ipc b/Services/WebContent/WebContentTestClient.ipc
-index 5ad724373c34c8647e3111e25c7b72f800f2d506..7b4bc1c1bebe152d9e79c8eec02c572bf6dfa042 100644
+index 3a3b750c2c905f446f4314ab5bee74478c1dab47..57198d084e0edfcdaf2275a2efa811072a09fcb0 100644
 --- a/Services/WebContent/WebContentTestClient.ipc
 +++ b/Services/WebContent/WebContentTestClient.ipc
-@@ -6,6 +6,7 @@
- #include <LibWebCommon/HTML/SessionHistoryEntryDescriptor.h>
+@@ -7,6 +7,7 @@
  #include <LibWebCommon/Page/PageId.h>
+ #include <LibWebCommon/Permissions/Permissions.h>
  #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
 +#include <LibWebCommon/WebDriver/Response.h>
  
  endpoint WebContentTestClient routed by Web::PageId page_id
  {
-@@ -38,5 +39,8 @@ endpoint WebContentTestClient routed by Web::PageId page_id
-     set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle handle, i32 axis, i16 value) =|
+@@ -47,5 +48,8 @@ endpoint WebContentTestClient routed by Web::PageId page_id
      disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle handle) =|
      pump_gamepad_events() => (Vector<Web::Gamepad::GamepadChangeEvent> events)
+     reset_gamepad_access_for_testing(Web::PageId page_id) =|
 +    // https://w3c.github.io/webauthn/#sctn-automation
 +    [NotRouted] run_web_authn_command(Web::PageId page_id, String name, JsonValue payload, Vector<String> arguments) => (Web::WebDriver::Response response)
 +
      get_virtual_gamepad_received_rumble_effects(Web::Gamepad::GamepadHandle handle) => (Vector<Web::Gamepad::ReceivedDualRumbleEffect> dual_rumble_effects, Vector<Web::Gamepad::ReceivedTriggerRumbleEffect> trigger_rumble_effects)
  }
 diff --git a/Services/WebDriver/Client.cpp b/Services/WebDriver/Client.cpp
-index 00bffcadbce1f71ea40288bec3a2f5ef7af54e91..91b2a3ca64451b5ed0c6baffc4f610cb0e5b8eaf 100644
+index 78bf6f17cec5a6172d9c1fcd1e4e443d5cfb648a..05254fe820f530192fb37a275cafe55335a21ceb 100644
 --- a/Services/WebDriver/Client.cpp
 +++ b/Services/WebDriver/Client.cpp
-@@ -962,4 +962,80 @@ ResponsePromise Client::print_page(Web::WebDriver::Parameters parameters, JsonVa
-     return session->run_top_level_content_command("print_page"sv, move(payload));
+@@ -972,4 +972,78 @@ ResponsePromise Client::set_permission(Web::WebDriver::Parameters parameters, Js
+     return session->set_permission(move(payload));
  }
  
 +// https://w3c.github.io/webauthn/#sctn-automation
-+// The virtual authenticators belong to the browser, which runs every WebAuthn command. Its arguments are the URL's
-+// variables after the session ID.
 +static ResponsePromise run_web_authn_command(Web::WebDriver::Parameters const& parameters, JsonValue payload, StringView name)
 +{
 +    auto session = WEBDRIVER_TRY(Session::find_session(parameters[0]));
@@ -1339,13 +1303,13 @@ index 00bffcadbce1f71ea40288bec3a2f5ef7af54e91..91b2a3ca64451b5ed0c6baffc4f610cb
 +
  }
 diff --git a/Services/WebDriver/Client.h b/Services/WebDriver/Client.h
-index aab0773b5089552d4e432a84decc0b2aa41249d9..a770c371e435d8ccd343a6920427b902d07de5d6 100644
+index 7607a950f4d875bd2378d78969abfacef2cf0714..59470421a470633e6c8736c3cd161c33bcc4b042 100644
 --- a/Services/WebDriver/Client.h
 +++ b/Services/WebDriver/Client.h
-@@ -98,6 +98,14 @@ private:
-     virtual ResponsePromise take_screenshot(Web::WebDriver::Parameters parameters, JsonValue payload) override;
+@@ -99,6 +99,14 @@ private:
      virtual ResponsePromise take_element_screenshot(Web::WebDriver::Parameters parameters, JsonValue payload) override;
      virtual ResponsePromise print_page(Web::WebDriver::Parameters parameters, JsonValue payload) override;
+     virtual ResponsePromise set_permission(Web::WebDriver::Parameters parameters, JsonValue payload) override;
 +    virtual ResponsePromise add_virtual_authenticator(Web::WebDriver::Parameters parameters, JsonValue payload) override;
 +    virtual ResponsePromise remove_virtual_authenticator(Web::WebDriver::Parameters parameters, JsonValue payload) override;
 +    virtual ResponsePromise add_credential(Web::WebDriver::Parameters parameters, JsonValue payload) override;
@@ -1358,10 +1322,10 @@ index aab0773b5089552d4e432a84decc0b2aa41249d9..a770c371e435d8ccd343a6920427b902
      LaunchBrowserCallback m_launch_browser_callback;
  };
 diff --git a/Services/WebDriver/Session.cpp b/Services/WebDriver/Session.cpp
-index 981907316a982a4ab407c72ead4790cf5a6b983d..eee2ab2966b413d8c5716ba0ba8e9eb8afb578b2 100644
+index 93a55dbc7938050114138737bfc78453af8c499b..feebda4f75cdc066fc082a48de35a4e4c4cfa9d8 100644
 --- a/Services/WebDriver/Session.cpp
 +++ b/Services/WebDriver/Session.cpp
-@@ -614,6 +614,13 @@ NonnullRefPtr<Session::WebDriverPromise> Session::load_url(URL::URL url)
+@@ -621,6 +621,13 @@ NonnullRefPtr<Session::WebDriverPromise> Session::load_url(URL::URL url)
      });
  }
  
@@ -1376,22 +1340,22 @@ index 981907316a982a4ab407c72ead4790cf5a6b983d..eee2ab2966b413d8c5716ba0ba8e9eb8
  {
      return run_content_command(Web::WebDriver::SessionBrowsingContext::Current, name, move(payload), move(arguments));
 diff --git a/Services/WebDriver/Session.h b/Services/WebDriver/Session.h
-index 1d3e87dc961b55b74f6642db97508009e5dec302..09d00ed2d173e46ddfced6a38dbb1868b215b01c 100644
+index 4889dda84e1748ad4d1a4d6086634e20bec158f4..46b3e9e5b8dd2ff2c9f3226e285aa8eb3c3fe568 100644
 --- a/Services/WebDriver/Session.h
 +++ b/Services/WebDriver/Session.h
-@@ -97,6 +97,7 @@ public:
-     NonnullRefPtr<WebDriverPromise> traverse_history(i32 delta, HandleUserPrompts);
+@@ -98,6 +98,7 @@ public:
      NonnullRefPtr<WebDriverPromise> session_history();
+     NonnullRefPtr<WebDriverPromise> set_permission(JsonValue parameters);
      NonnullRefPtr<WebDriverPromise> load_url(URL::URL);
 +    NonnullRefPtr<WebDriverPromise> run_web_authn_command(StringView name, JsonValue payload, Vector<String> arguments);
      NonnullRefPtr<WebDriverPromise> switch_to_parent_frame();
      NonnullRefPtr<WebDriverPromise> run_content_command(StringView name, JsonValue payload = {}, Vector<String> arguments = {});
      NonnullRefPtr<WebDriverPromise> run_top_level_content_command(StringView name, JsonValue payload = {}, Vector<String> arguments = {});
 diff --git a/Services/WebDriver/WebDriverBrowserClient.ipc b/Services/WebDriver/WebDriverBrowserClient.ipc
-index 8641ba7e36798d5293186fafa5717f28dc077327..da54f57d4fab15b83c5e18ba67ddd705d50c63ad 100644
+index 34a9bb1b110dcfe696d6402f5f8e91f1ec6a7437..5405b21062fea77b0367bb73f16beffb140dab77 100644
 --- a/Services/WebDriver/WebDriverBrowserClient.ipc
 +++ b/Services/WebDriver/WebDriverBrowserClient.ipc
-@@ -21,6 +21,9 @@ endpoint WebDriverBrowserClient {
+@@ -22,6 +22,9 @@ endpoint WebDriverBrowserClient {
      set_strict_file_interactability(bool strict_file_interactability) =|
      set_timeouts_configuration(JsonValue timeouts) =|
  
@@ -1402,11 +1366,13 @@ index 8641ba7e36798d5293186fafa5717f28dc077327..da54f57d4fab15b83c5e18ba67ddd705
      bidi_command(u64 command_id, String method, JsonValue params) =|
      bidi_get_top_level_traversables(u64 command_id, Vector<String> navigable_ids) =|
 diff --git a/Tests/LibWeb/TestConfig.ini b/Tests/LibWeb/TestConfig.ini
-index 722bfd5087e7a4b3bd257b656179802092ad3673..67cf37110667fdc405574807d7de3294097d76f3 100644
+index e81abb8003adc26d51db95b12d6b5dfb29d50aef..278d337a7534d272d24b4b06999bf816ebbf61b4 100644
 --- a/Tests/LibWeb/TestConfig.ini
 +++ b/Tests/LibWeb/TestConfig.ini
-@@ -1,4 +1,15 @@
- [LoadFromHttpServer]
+@@ -27,6 +27,17 @@ Text/input/wpt-import/html/dom/render-blocking/remove-attr-script-keeps-blocking
+ Text/input/wpt-import/html/dom/render-blocking/parser-inserted-inline-module-with-import.html
+ Text/input/wpt-import/html/dom/render-blocking/stylesheet-link-href-change-keeps-blocking.html
+ Text/input/wpt-import/html/dom/render-blocking/script-inserted-script.html
 +Text/input/wpt-import/webauthn/getcredential-passing.https.html
 +Text/input/wpt-import/webauthn/getcredential-badargs-rpid.https.html
 +Text/input/wpt-import/webauthn/createcredential-pubkeycredparams.https.html
@@ -1761,10 +1727,10 @@ index 0000000000000000000000000000000000000000..678feab887175166cc6ecad0a96b916e
 +</script>
 diff --git a/Tests/LibWeb/Text/input/WebAuthn/create-and-get.html b/Tests/LibWeb/Text/input/WebAuthn/create-and-get.html
 new file mode 100644
-index 0000000000000000000000000000000000000000..ea85668930df5b64225f8b5b8865ed258e665889
+index 0000000000000000000000000000000000000000..b33f3aea78c679af418eae504c3a813865f97f52
 --- /dev/null
 +++ b/Tests/LibWeb/Text/input/WebAuthn/create-and-get.html
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,114 @@
 +<!DOCTYPE html>
 +<script src="../include.js"></script>
 +<script>
@@ -1780,7 +1746,6 @@ index 0000000000000000000000000000000000000000..ea85668930df5b64225f8b5b8865ed25
 +    return btoa(String.fromCharCode(...new Uint8Array(buffer))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 +}
 +
-+// WebAuthn signatures are DER, and WebCrypto's ECDSA wants r and s side by side.
 +function rawSignatureFromDer(der) {
 +    const bytes = new Uint8Array(der);
 +    let offset = 2;
@@ -1863,7 +1828,6 @@ index 0000000000000000000000000000000000000000..ea85668930df5b64225f8b5b8865ed25
 +    const signCount = new DataView(assertion.response.authenticatorData).getUint32(33);
 +    println(`assertion flags: user present ${!!(assertionFlags & 0x01)}, user verified ${!!(assertionFlags & 0x04)}, sign count ${signCount}`);
 +
-+    // The signature is over the authenticator data and the hash of the client data.
 +    const publicKey = await crypto.subtle.importKey("spki", credential.response.getPublicKey(), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
 +    const clientDataHash = await crypto.subtle.digest("SHA-256", assertion.response.clientDataJSON);
 +    const signedData = new Uint8Array([...new Uint8Array(assertion.response.authenticatorData), ...new Uint8Array(clientDataHash)]);
@@ -1883,10 +1847,10 @@ index 0000000000000000000000000000000000000000..ea85668930df5b64225f8b5b8865ed25
 +</script>
 diff --git a/Tests/LibWeb/Text/input/WebAuthn/cross-origin-iframe.html b/Tests/LibWeb/Text/input/WebAuthn/cross-origin-iframe.html
 new file mode 100644
-index 0000000000000000000000000000000000000000..a95963ff324c1ef3682406d4efe2452f2e538782
+index 0000000000000000000000000000000000000000..427697d3d03dce2b7e1ddf6f519633330d33918e
 --- /dev/null
 +++ b/Tests/LibWeb/Text/input/WebAuthn/cross-origin-iframe.html
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,55 @@
 +<!DOCTYPE html>
 +<script src="../include.js"></script>
 +<script>
@@ -1915,7 +1879,6 @@ index 0000000000000000000000000000000000000000..a95963ff324c1ef3682406d4efe2452f
 +asyncTest(async done => {
 +    const authenticator = JSON.parse(internals.runWebAuthnCommand("add-virtual-authenticator", JSON.stringify({ protocol: "ctap2", transport: "usb" })));
 +
-+    // A credential for the frame's site, as if it had registered earlier.
 +    const keyPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
 +    const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey));
 +    const base64url = bytes => btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
@@ -1944,12 +1907,12 @@ index 0000000000000000000000000000000000000000..a95963ff324c1ef3682406d4efe2452f
 +});
 +</script>
 diff --git a/Tests/LibWeb/Text/input/wpt-import/resources/testdriver-vendor.js b/Tests/LibWeb/Text/input/wpt-import/resources/testdriver-vendor.js
-index f6e6b0e44b0b86f602c7fe16fc1535717d6e21ed..89fa47a1445b9e984fd53f1683a8a65668817eaf 100644
+index e3cbfcd59d2c29877d42ce987dc0c2f45e2816c6..43a4b93be4d9561562419d0e2f4cb6105913cf49 100644
 --- a/Tests/LibWeb/Text/input/wpt-import/resources/testdriver-vendor.js
 +++ b/Tests/LibWeb/Text/input/wpt-import/resources/testdriver-vendor.js
-@@ -151,3 +151,36 @@ window.test_driver_internal.action_sequence = async function(actions, context) {
-         }
-     }
+@@ -180,3 +180,36 @@ window.test_driver_internal.bidi.emulation.set_geolocation_override = function(p
+     );
+     return Promise.resolve();
  };
 +
 +// https://w3c.github.io/webauthn/#sctn-automation
@@ -3256,10 +3219,10 @@ index 0000000000000000000000000000000000000000..a45b686ca775c94dc015d6d59a4a6d0b
 +    JSON.stringify(deepSortKeys(expected)), optMsg);
 +}
 diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
-index 8ad4cbc0e3627264dfe19e26cf28bc39e957d27c..6503f27aced46e849634fe6f64e6e5f502c30424 100644
+index 8c2164c378ffc34171479a8ded8aaf6abcb2d0bf..a6ef037507c1c74609e31a188e4c99de27709791 100644
 --- a/Tests/LibWebView/CMakeLists.txt
 +++ b/Tests/LibWebView/CMakeLists.txt
-@@ -120,6 +120,12 @@ if (BUILD_TESTING AND NOT WIN32)
+@@ -138,6 +138,12 @@ if (BUILD_TESTING AND NOT WIN32)
      )
      set_tests_properties(TestWebDriverForceDark PROPERTIES TIMEOUT 120)
  
@@ -3274,18 +3237,16 @@ index 8ad4cbc0e3627264dfe19e26cf28bc39e957d27c..6503f27aced46e849634fe6f64e6e5f5
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test-webdriver-bidi.py $<TARGET_FILE:WebDriver>
 diff --git a/Tests/LibWebView/test-webdriver-webauthn.py b/Tests/LibWebView/test-webdriver-webauthn.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2d1008ad015e12f26bf2aa4d5f4d858afd77d839
+index 0000000000000000000000000000000000000000..57f5e66d2dcfed8a3b2ef1d1d87b7a98e42acc78
 --- /dev/null
 +++ b/Tests/LibWebView/test-webdriver-webauthn.py
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,134 @@
 +#!/usr/bin/env python3
 +#
 +# Copyright (c) 2026-present, the Ladybird developers.
 +#
 +# SPDX-License-Identifier: BSD-2-Clause
 +
-+# WebAuthn's WebDriver extension: a virtual authenticator that WebDriver adds registers a credential and signs in with
-+# it, as a security key would, and WebDriver can then list, add and remove its credentials.
 +# https://w3c.github.io/webauthn/#sctn-automation
 +
 +import http.server
@@ -3355,7 +3316,6 @@ index 0000000000000000000000000000000000000000..2d1008ad015e12f26bf2aa4d5f4d858a
 +    def run(script):
 +        return command("POST", "execute/async", {"script": f"{script}.then(arguments[0], e => arguments[0](e.name))", "args": []})
 +
-+    # localhost is a secure context with a domain, so it may use WebAuthn.
 +    command("POST", "url", {"url": f"http://localhost:{server.server_port}/"})
 +
 +    authenticator = command(
@@ -3371,14 +3331,12 @@ index 0000000000000000000000000000000000000000..2d1008ad015e12f26bf2aa4d5f4d858a
 +    assert credentials[0]["rpId"] == "localhost", credentials[0]
 +    assert credentials[0]["isResidentCredential"] is True, credentials[0]
 +
-+    # A discoverable credential signs in without an allow list, and says whose it is.
 +    signed_in = run("signIn()")
 +    assert signed_in["id"] == credential_id, signed_in
 +    assert signed_in["userHandle"] == "BwcH", signed_in
 +    credentials = command("GET", f"webauthn/authenticator/{authenticator}/credentials")
 +    assert credentials[0]["signCount"] == 1, credentials[0]
 +
-+    # A credential added through WebDriver, with its private key, signs in as well.
 +    command("DELETE", f"webauthn/authenticator/{authenticator}/credentials")
 +    command(
 +        "POST",
@@ -3395,7 +3353,6 @@ index 0000000000000000000000000000000000000000..2d1008ad015e12f26bf2aa4d5f4d858a
 +    signed_in = run("signIn()")
 +    assert signed_in == {"id": "AQID", "userHandle": "CAgI"}, signed_in
 +
-+    # Without user verification, a ceremony that requires it fails.
 +    command("POST", f"webauthn/authenticator/{authenticator}/uv", {"isUserVerified": False})
 +    result = run("navigator.credentials.get({ publicKey: { challenge: new Uint8Array(32), userVerification: 'required' } })")
 +    assert result == "NotAllowedError", result

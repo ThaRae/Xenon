@@ -36,23 +36,23 @@ not express:
 The following commits put these to use.
 ---
  Cargo.lock                                    | 168 +++++++++
- .../LibWeb/ContentBlocker/Rust/Cargo.toml     |   4 +-
- .../LibWeb/ContentBlocker/Rust/src/lib.rs     | 354 +++++++++++++++++-
- .../ContentBlocker/Rust/src/procedural.js     | 226 +++++++++++
- Libraries/LibWeb/HTML/Window.h                |   7 +
- Libraries/LibWeb/Loader/ContentBlocker.cpp    |  94 ++++-
- Libraries/LibWeb/Loader/ContentBlocker.h      |  29 +-
- Libraries/LibWebView/Application.cpp          |  83 +++-
+ .../LibWeb/ContentBlocker/Rust/Cargo.toml     |   2 +-
+ .../LibWeb/ContentBlocker/Rust/src/lib.rs     | 318 +++++++++++++++++-
+ .../ContentBlocker/Rust/src/procedural.js     | 217 ++++++++++++
+ Libraries/LibWeb/HTML/Window.h                |   5 +
+ Libraries/LibWeb/Loader/ContentBlocker.cpp    |  91 ++++-
+ Libraries/LibWeb/Loader/ContentBlocker.h      |  21 +-
+ Libraries/LibWebView/Application.cpp          |  83 ++++-
  Libraries/LibWebView/Application.h            |   6 +
  Services/WebContent/ConnectionFromClient.cpp  |   4 +-
  Services/WebContent/ConnectionFromClient.h    |   2 +-
  Services/WebContent/WebContentServer.ipc      |   2 +-
  Tests/LibWeb/test-web/TestWebView.cpp         |   3 +-
- 13 files changed, 959 insertions(+), 23 deletions(-)
+ 13 files changed, 899 insertions(+), 23 deletions(-)
  create mode 100644 Libraries/LibWeb/ContentBlocker/Rust/src/procedural.js
 
 diff --git a/Cargo.lock b/Cargo.lock
-index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b3ed1d424 100644
+index 2024b9457b55361ca8a45f9fb030a1a142158487..1cffb5a8dd27cb908002a1f98dd3d76a0f650665 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -12,6 +12,7 @@ dependencies = [
@@ -144,7 +144,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "either"
  version = "1.16.0"
-@@ -1010,6 +1071,12 @@ version = "1.0.0"
+@@ -1011,6 +1072,12 @@ version = "1.0.0"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
  
@@ -157,7 +157,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "num-bigint"
  version = "0.5.1"
-@@ -1067,6 +1134,58 @@ version = "2.3.2"
+@@ -1068,6 +1135,58 @@ version = "2.3.2"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
  
@@ -216,7 +216,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "potential_utf"
  version = "0.1.5"
-@@ -1133,6 +1252,21 @@ version = "6.0.0"
+@@ -1134,6 +1253,21 @@ version = "6.0.0"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
  
@@ -238,7 +238,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "regex"
  version = "1.12.3"
-@@ -1223,6 +1357,25 @@ version = "4.1.0"
+@@ -1224,6 +1358,25 @@ version = "4.1.0"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
  
@@ -264,7 +264,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "semver"
  version = "1.0.28"
-@@ -1282,6 +1435,15 @@ dependencies = [
+@@ -1283,6 +1436,15 @@ dependencies = [
   "serde_core",
  ]
  
@@ -280,7 +280,7 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  [[package]]
  name = "shlex"
  version = "2.0.1"
-@@ -1294,6 +1456,12 @@ version = "0.1.5"
+@@ -1295,6 +1457,12 @@ version = "0.1.5"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
  
@@ -294,36 +294,31 @@ index 3f520e0dbfaaf0f3f8efc610178d64e50581eb21..2a1f9aa5a9d633391a442e461da4ee2b
  name = "smallvec"
  version = "1.16.3"
 diff --git a/Libraries/LibWeb/ContentBlocker/Rust/Cargo.toml b/Libraries/LibWeb/ContentBlocker/Rust/Cargo.toml
-index c47ff4295f616ec908d6d6667942e51c717dc975..4e59b4e16f06656ff8f6c79cee3e52adc4d52bcf 100644
+index c47ff4295f616ec908d6d6667942e51c717dc975..e6cdd3f558e40c37a208a74d82b2388d659ce26b 100644
 --- a/Libraries/LibWeb/ContentBlocker/Rust/Cargo.toml
 +++ b/Libraries/LibWeb/ContentBlocker/Rust/Cargo.toml
-@@ -10,7 +10,9 @@ crate-type = ["staticlib"]
+@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
  #   python3 Meta/CMake/flatpak/generate-cargo-sources.py
  [dependencies]
  ak = { path = "../../../../AK/Rust" }
 -adblock = "0.13.3"
-+# css-validation parses procedural cosmetic filters (`:has-text()` and friends) into operators, and rejects invalid
-+# selectors and styles before they reach the cosmetic style sheet.
 +adblock = { version = "0.13.3", features = ["css-validation"] }
  ladybird_allocator = { path = "../../../RustAllocator", optional = true }
  rustc-demangle = "0.1"
  serde_json = "1.0"
 diff --git a/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs b/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
-index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd680b9dde3 100644
+index 289f087beb3d69524058b8333d78edf91bce7ed9..0e50f50763b891e17a714d1bfa3c1f5ca41ad56b 100644
 --- a/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
 +++ b/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
-@@ -23,9 +23,122 @@ pub struct ContentBlockerString {
+@@ -23,9 +23,108 @@ pub struct ContentBlockerString {
      length: usize,
  }
  
-+/// What to do with a request.
 +#[repr(u8)]
 +pub enum ContentBlockerAction {
 +    Allow = 0,
 +    Block = 1,
-+    /// Answer the request with `url`, a data: URL holding a surrogate resource (a `$redirect` filter).
 +    Redirect = 2,
-+    /// Send the request to `url` instead, which has tracking parameters removed (a `$removeparam` filter).
 +    Rewrite = 3,
 +}
 +
@@ -336,20 +331,14 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
  pub struct ContentBlockerEngine {
      engine: adblock::engine::Engine,
      generic_selector_list_rules: GenericSelectorListRules,
-+    /// Filters with `$popup`, without that option: they decide whether a page may open a new window to a URL.
 +    popup_engine: Option<adblock::engine::Engine>,
-+    /// Exception filters with `$cname`, as blocking filters: a match means a request must not be uncloaked.
 +    cname_exception_engine: Option<adblock::engine::Engine>,
 +}
 +
-+/// The permission bit of the scriptlets that uBlock Origin only lets trusted lists use (`requiresTrust`), as the
-+/// resources built from uBlock Origin's source mark them.
 +const TRUSTED_LIST_PERMISSION: u8 = 0x01;
 +
-+/// Applies procedural and action cosmetic filters in the page (see `page_script_for_url`).
 +const PROCEDURAL_FILTERING_SCRIPT: &str = include_str!("procedural.js");
 +
-+/// The filter lines that need their own engine, split out of a list.
 +#[derive(Default)]
 +struct SplitRules {
 +    rules: String,
@@ -357,7 +346,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +    cname_exception_rules: String,
 +}
 +
-+/// The option part of a network filter, as the engine finds it (after the last `$`), or none for cosmetic filters.
 +fn network_filter_options(line: &str) -> Option<(&str, &str)> {
 +    if line.starts_with('!') || ["##", "#@#", "#?#", "#$#", "#%#"].iter().any(|marker| line.contains(marker)) {
 +        return None;
@@ -367,7 +355,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +}
 +
 +impl SplitRules {
-+    /// Moves `$popup` filters and `$cname` exceptions out of `text`. The engine does not know either option.
 +    fn from_text(text: &str) -> Self {
 +        let mut split = Self::default();
 +        for line in text.lines() {
@@ -403,8 +390,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +                split.popup_rules.push_str(&rebuilt(pattern));
 +                split.popup_rules.push('\n');
 +            } else if let Some(exception_pattern) = pattern.strip_prefix("@@") {
-+                // A `$cname` exception keeps a request from being uncloaked. Store it as a blocking filter, so a
-+                // match is a plain "matched".
 +                split.cname_exception_rules.push_str(&rebuilt(exception_pattern));
 +                split.cname_exception_rules.push('\n');
 +            }
@@ -413,7 +398,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +    }
 +}
 +
-+/// An engine for the given lists, or none when both are empty.
 +fn engine_from_lists(untrusted: &str, trusted: &str) -> Option<adblock::engine::Engine> {
 +    if untrusted.trim().is_empty() && trusted.trim().is_empty() {
 +        return None;
@@ -435,17 +419,11 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
  }
  
  #[derive(Default)]
-@@ -339,21 +452,45 @@ fn has_generic_cosmetic_selectors_for_url(
+@@ -339,21 +438,39 @@ fn has_generic_cosmetic_selectors_for_url(
          )
  }
  
 -/// An engine for `rules`, which C++ frees with `rust_content_blocker_free`, or null where the rules are not UTF-8.
-+/// An engine for `rules` and `trusted_rules`, which C++ frees with `rust_content_blocker_free`, or null where the
-+/// rules are not UTF-8.
-+///
-+/// Only `trusted_rules` may use the scriptlets that uBlock Origin reserves for trusted lists. `resources` is a JSON
-+/// array of adblock resources (scriptlets and redirect surrogates); invalid or empty JSON means no resources, which
-+/// leaves scriptlet filters without effect and makes `$redirect` filters block.
  #[unsafe(no_mangle)]
 -pub extern "C" fn rust_content_blocker_create(rules: ak::Span<'_, u8>) -> *mut ContentBlockerEngine {
 +pub extern "C" fn rust_content_blocker_create(
@@ -487,16 +465,15 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
          };
          Box::into_raw(Box::new(engine))
      })
-@@ -391,7 +528,7 @@ pub extern "C" fn rust_content_blocker_matches(
+@@ -391,7 +508,6 @@ pub extern "C" fn rust_content_blocker_matches(
              return false;
          };
  
 -        // The content blocker interface does not currently provide the request method.
-+        // DNS prefetch and preconnect have no request method.
          let Ok(request) = adblock::request::Request::new(url, source_url, request_type, "") else {
              return false;
          };
-@@ -400,6 +537,209 @@ pub extern "C" fn rust_content_blocker_matches(
+@@ -400,6 +516,194 @@ pub extern "C" fn rust_content_blocker_matches(
      })
  }
  
@@ -507,8 +484,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +    }
 +}
 +
-+/// Decides what happens to a request: allowed, blocked, answered with a surrogate (`$redirect`), or sent to a URL
-+/// with tracking parameters removed (`$removeparam`). C++ frees `url` with `rust_content_blocker_free_string`.
 +#[unsafe(no_mangle)]
 +pub extern "C" fn rust_content_blocker_check_request(
 +    engine: Option<&ContentBlockerEngine>,
@@ -533,7 +508,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +
 +        let result = engine.engine.check_network_request(&request);
 +        if result.should_block() {
-+            // A redirect only applies to a blocked request: `$redirect-rule` alone never blocks.
 +            return match result.redirect {
 +                Some(data_url) => request_result(ContentBlockerAction::Redirect, data_url),
 +                None => request_result(ContentBlockerAction::Block, String::new()),
@@ -546,7 +520,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +    })
 +}
 +
-+/// Whether a page at `opener_url` may not open a new window or tab at `url` (a `$popup` filter matches).
 +#[unsafe(no_mangle)]
 +pub extern "C" fn rust_content_blocker_matches_popup(
 +    engine: Option<&ContentBlockerEngine>,
@@ -560,7 +533,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +        let (Some(url), Some(opener_url)) = (as_str(url), as_str(opener_url)) else {
 +            return false;
 +        };
-+        // `$popup` filters have no other request type once the option is removed, so they match "other".
 +        let Ok(request) = adblock::request::Request::new(url, opener_url, "other", "") else {
 +            return false;
 +        };
@@ -568,8 +540,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +    })
 +}
 +
-+/// `url` with its hostname replaced by `canonical_hostname`, cut after the first `/` of the path, as uBlock Origin
-+/// replays an uncloaked request (cnameReplayFullURL is off by default).
 +fn uncloaked_url(url: &str, hostname: &str, canonical_hostname: &str) -> Option<String> {
 +    let hostname_start = url.find(hostname)?;
 +    let hostname_end = hostname_start + hostname.len();
@@ -583,9 +553,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +    Some(uncloaked)
 +}
 +
-+/// Whether a request that DNS showed to be an alias (CNAME) of `canonical_hostname` must be blocked, following
-+/// uBlock Origin's defaults: requests that matched any filter before are left alone, as are aliases within the same
-+/// site and requests to the page's own host, and `$cname` exceptions apply.
 +#[unsafe(no_mangle)]
 +pub extern "C" fn rust_content_blocker_matches_uncloaked(
 +    engine: Option<&ContentBlockerEngine>,
@@ -651,20 +618,16 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +    })
 +}
 +
-+/// The script to run in a document at `url` before its own scripts: the page's scriptlets, and the runtime for its
-+/// procedural and action cosmetic filters. Empty when there are none.
 +fn page_script_for_url(engine: &ContentBlockerEngine, url: &str) -> String {
 +    let resources = engine.engine.url_cosmetic_resources(url);
 +    let mut script = String::new();
 +
 +    if !resources.injected_script.is_empty() {
-+        // uBlock Origin's scriptlets share state through `scriptletGlobals` and must not leak names into the page.
 +        script.push_str("(function() {\nconst scriptletGlobals = {};\n");
 +        script.push_str(&resources.injected_script);
 +        script.push_str("\n})();\n");
 +    }
 +
-+    // Filters that plain CSS expresses are in the cosmetic style sheet already (see cosmetic_css_for_url).
 +    let mut procedural_filters: Vec<&String> = resources
 +        .procedural_actions
 +        .iter()
@@ -689,7 +652,6 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
 +    script
 +}
 +
-+/// C++ frees the returned string with `rust_content_blocker_free_string`.
 +#[unsafe(no_mangle)]
 +pub extern "C" fn rust_content_blocker_page_script(
 +    engine: Option<&ContentBlockerEngine>,
@@ -708,24 +670,19 @@ index 289f087beb3d69524058b8333d78edf91bce7ed9..f2ae52c1215e0ced5babdcb5bf694cd6
  pub extern "C" fn rust_content_blocker_cosmetic_css(
 diff --git a/Libraries/LibWeb/ContentBlocker/Rust/src/procedural.js b/Libraries/LibWeb/ContentBlocker/Rust/src/procedural.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..c5c7af90b0effdd29d2ca7a3b146a8f710c6e3bc
+index 0000000000000000000000000000000000000000..7d1c8afbaaa579ab08d24edcdb34764d8a4c73ad
 --- /dev/null
 +++ b/Libraries/LibWeb/ContentBlocker/Rust/src/procedural.js
-@@ -0,0 +1,226 @@
+@@ -0,0 +1,217 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
 + * SPDX-License-Identifier: BSD-2-Clause
 + */
 +
-+// Applies the procedural and action cosmetic filters the content blocker found for this page, such as
-+// `example.com##.post:has-text(Sponsored)` or `example.com##.overlay:remove()`, which plain CSS cannot express.
-+// The blocker runs this at document start with the filters as `filters`, each one the JSON form of adblock's
-+// ProceduralOrActionFilter: { selector: [{ type, arg }...], action?: { type, arg } }.
 +(function (filters) {
 +    "use strict";
 +
-+    // Taken before page scripts run, so later changes to these built-ins by the page do not affect us.
 +    const apply = Reflect.apply;
 +    const documentQuerySelectorAll = Document.prototype.querySelectorAll;
 +    const elementClosest = Element.prototype.closest;
@@ -741,7 +698,6 @@ index 0000000000000000000000000000000000000000..c5c7af90b0effdd29d2ca7a3b146a8f7
 +
 +    const marker = "data-cb-" + Math.random().toString(36).slice(2, 10);
 +
-+    // uBO's needle syntax: /regex/flags, or a literal string.
 +    const toRegExp = (needle, flags = "") => {
 +        const match = /^\/(.+)\/([imsu]*)$/.exec(needle);
 +        if (match !== null) {
@@ -771,8 +727,6 @@ index 0000000000000000000000000000000000000000..c5c7af90b0effdd29d2ca7a3b146a8f7
 +        }
 +    };
 +
-+    // A CSS step after the first one continues from the elements found so far: a combinator (" .b", " > .b",
-+    // " + .b", " ~ .b") or more compound selectors (".b"). Mark the current elements and query relative to the mark.
 +    const continueWithSelector = (elements, selector) => {
 +        for (const element of elements)
 +            apply(elementSetAttribute, element, [marker, ""]);
@@ -866,7 +820,6 @@ index 0000000000000000000000000000000000000000..c5c7af90b0effdd29d2ca7a3b146a8f7
 +            const operator = operators[type];
 +            if (operator === undefined)
 +                return [];
-+            // Procedural operators other than these need elements to work on; start from every element.
 +            if (elements === null && type !== "css-selector" && type !== "xpath" && type !== "matches-path")
 +                elements = querySelectorAll("*");
 +            elements = operator(elements, arg);
@@ -939,22 +892,20 @@ index 0000000000000000000000000000000000000000..c5c7af90b0effdd29d2ca7a3b146a8f7
 +    schedule();
 +})
 diff --git a/Libraries/LibWeb/HTML/Window.h b/Libraries/LibWeb/HTML/Window.h
-index 601c78b2d6082ab46fe04bee3657699688e17c20..4e67bd0d510c475c037de87c8c636bcd0c950603 100644
+index 6ce69f476d3d5350916145ceda7e9f028ff0afac..173fb2ab1a82f184c6a63f862f7de65067d75e7b 100644
 --- a/Libraries/LibWeb/HTML/Window.h
 +++ b/Libraries/LibWeb/HTML/Window.h
-@@ -175,6 +175,11 @@ public:
+@@ -175,6 +175,9 @@ public:
      // https://html.spec.whatwg.org/multipage/interaction.html#history-action-activation
      bool has_history_action_activation() const;
  
-+    // A Window can outlive its initial about:blank document (on a same-origin navigation), so the content blocker
-+    // records here that it already ran its page script in this global.
 +    bool content_blocker_page_script_ran() const { return m_content_blocker_page_script_ran; }
 +    void set_content_blocker_page_script_ran() { m_content_blocker_page_script_ran = true; }
 +
      ReadonlySpan<GC::Ref<Plugin>> pdf_viewer_plugin_objects();
      ReadonlySpan<GC::Ref<MimeType>> pdf_viewer_mime_type_objects();
  
-@@ -416,6 +421,8 @@ private:
+@@ -418,6 +421,8 @@ private:
      // https://w3c.github.io/largest-contentful-paint/#has-dispatched-scroll-event
      // Each Window has has dispatched scroll event, a boolean which is initially set to false.
      bool m_has_dispatched_scroll_event { false };
@@ -964,7 +915,7 @@ index 601c78b2d6082ab46fe04bee3657699688e17c20..4e67bd0d510c475c037de87c8c636bcd
  
  void run_animation_frame_callbacks(DOM::Document&, double now);
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index bccd55ddf642a97bf939d30e40ed42ec40507e2a..3961e0b793727137e175ea8eb041742231afb5ba 100644
+index bccd55ddf642a97bf939d30e40ed42ec40507e2a..e0255df53a08f0f3995c4359a8e9cc66f62ce75e 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
 @@ -9,6 +9,10 @@
@@ -1006,7 +957,7 @@ index bccd55ddf642a97bf939d30e40ed42ec40507e2a..3961e0b793727137e175ea8eb0417422
  
      ContentBlocking::FFI::rust_content_blocker_free(m_engine);
      m_engine = engine;
-@@ -203,6 +207,88 @@ bool ContentBlocker::is_filtered(URL::URL const& url, URL::URL const& source_url
+@@ -203,6 +207,85 @@ bool ContentBlocker::is_filtered(URL::URL const& url, URL::URL const& source_url
          request_type.bytes());
  }
  
@@ -1050,7 +1001,6 @@ index bccd55ddf642a97bf939d30e40ed42ec40507e2a..3961e0b793727137e175ea8eb0417422
 +            return { RequestDecision::Action::Redirect, surrogate.release_value() };
 +        return { RequestDecision::Action::Block, {} };
 +    case ContentBlocking::FFI::ContentBlockerAction::Rewrite:
-+        // A file: URL is matched as http://local-file.invalid/..., so its rewrite would point elsewhere.
 +        if (url.scheme() == "file"sv)
 +            return {};
 +        if (auto rewritten_url = result_url(); rewritten_url.has_value())
@@ -1072,7 +1022,6 @@ index bccd55ddf642a97bf939d30e40ed42ec40507e2a..3961e0b793727137e175ea8eb0417422
 +
 +void ContentBlocker::run_page_script(DOM::Document& document) const
 +{
-+    // Scriptlets and procedural filters are cosmetic filters (##+js(), ##...:has-text()).
 +    if (!m_engine || !m_has_cosmetic_rules || document.is_decoded_svg() || !document.content_blocking_enabled())
 +        return;
 +
@@ -1088,7 +1037,6 @@ index bccd55ddf642a97bf939d30e40ed42ec40507e2a..3961e0b793727137e175ea8eb0417422
 +
 +    auto& settings = document.relevant_settings_object();
 +    auto script = HTML::ClassicScript::create("(content blocker)"sv, source.utf16_view(), settings, settings.api_base_url());
-+    // The scriptlets catch their own errors; an error here should not reach the page's error handlers.
 +    (void)script->run(HTML::ClassicScript::RethrowErrors::Yes);
 +}
 +
@@ -1096,7 +1044,7 @@ index bccd55ddf642a97bf939d30e40ed42ec40507e2a..3961e0b793727137e175ea8eb0417422
  {
      return cosmetic_style_sheet_for_url(url, {}, {});
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.h b/Libraries/LibWeb/Loader/ContentBlocker.h
-index be3aa176401dc3cf61c7200da417fc6e0b89b5cc..4ea71815c02582f91e20cb52b19bcb2bb43b811a 100644
+index be3aa176401dc3cf61c7200da417fc6e0b89b5cc..c12e97663c50f42f549442736f41c1ed8614262d 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.h
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.h
 @@ -16,6 +16,7 @@
@@ -1107,18 +1055,15 @@ index be3aa176401dc3cf61c7200da417fc6e0b89b5cc..4ea71815c02582f91e20cb52b19bcb2b
  
  namespace Web {
  
-@@ -41,6 +42,20 @@ public:
+@@ -41,6 +42,17 @@ public:
          XMLHttpRequest,
      };
  
-+    // What happens to a request (see check_request()).
 +    struct RequestDecision {
 +        enum class Action : u8 {
 +            Allow,
 +            Block,
-+            // Answer the request with a surrogate resource, held in a data: URL (a $redirect filter).
 +            Redirect,
-+            // Send the request to another URL, with tracking parameters removed (a $removeparam filter).
 +            Rewrite,
 +        };
 +        Action action { Action::Allow };
@@ -1128,32 +1073,27 @@ index be3aa176401dc3cf61c7200da417fc6e0b89b5cc..4ea71815c02582f91e20cb52b19bcb2b
      static ContentBlocker& the();
  
      bool has_rules() const { return m_engine != nullptr; }
-@@ -50,7 +65,19 @@ public:
+@@ -50,7 +62,14 @@ public:
      bool is_filtered(URL::URL const&, URL::URL const& source_url, ResourceType) const;
      bool is_filtered(URL::URL const&, URL::URL const& source_url, Optional<Fetch::Infrastructure::Request::Destination> const&, Optional<Fetch::Infrastructure::Request::InitiatorType> const&, Fetch::Infrastructure::Request::Mode) const;
      ErrorOr<void> set_patterns(ReadonlySpan<String>);
 -    ErrorOr<void> set_rules_from_bytes(ReadonlyBytes);
-+    // Only the trusted rules may use the scriptlets that uBlock Origin reserves for trusted lists. The resources are a
-+    // JSON array of adblock resources: the scriptlets for ##+js() filters and the surrogates for $redirect filters.
 +    ErrorOr<void> set_rules_from_bytes(ReadonlyBytes rules, ReadonlyBytes trusted_rules = {}, ReadonlyBytes resources = {});
 +
 +    RequestDecision check_request(URL::URL const&, URL::URL const& source_url, ResourceType, StringView method) const;
 +    RequestDecision check_request(URL::URL const&, URL::URL const& source_url, Optional<Fetch::Infrastructure::Request::Destination> const&, Optional<Fetch::Infrastructure::Request::InitiatorType> const&, Fetch::Infrastructure::Request::Mode, StringView method) const;
 +
-+    // Whether a $popup filter keeps a page at the opener URL from opening a new window at the URL.
 +    bool is_popup_filtered(URL::URL const&, URL::URL const& opener_url) const;
 +
-+    // Runs the document's scriptlets and procedural cosmetic filters. Called before any of the document's own
-+    // scripts can run, once per Window.
 +    void run_page_script(DOM::Document&) const;
  
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&) const;
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&, ReadonlySpan<Utf16FlyString> classes, ReadonlySpan<Utf16FlyString> ids) const;
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09511a9d8c 100644
+index aaa42160e6d85b246926d1ce7cab9d3a7e640bc1..95c75dd93259e7372f790c35e1945560486ccd9f 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -355,6 +355,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -370,6 +370,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
      bool disable_sandbox = false;
      bool force_video_decoder_server = false;
      Vector<ByteString> content_blocker_list_paths;
@@ -1162,7 +1102,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
      Optional<StringView> resource_substitution_map_path;
      bool enable_autoplay = false;
      bool expose_experimental_interfaces = false;
-@@ -476,6 +478,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -491,6 +493,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
              return true;
          },
      });
@@ -1183,7 +1123,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
      args_parser.add_option(enable_autoplay, "Enable multimedia autoplay", "enable-autoplay");
      args_parser.add_option(expose_experimental_interfaces, "Expose experimental IDL interfaces", "expose-experimental-interfaces");
      args_parser.add_option(expose_internals_object, "Expose internals object", "expose-internals-object");
-@@ -547,6 +563,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -562,6 +578,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          return Error::from_string_literal("--profile-output requires --profile-tool cpu");
  
      m_explicit_content_blocker_list_paths = move(content_blocker_list_paths);
@@ -1193,7 +1133,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
  
      // Disable site isolation when debugging WebContent. Otherwise, the process swap may interfere with the gdb session.
      if (debug_process_types.contains_slow(ProcessType::WebContent))
-@@ -816,12 +835,67 @@ void Application::rebuild_content_blocker_list_paths()
+@@ -831,12 +850,67 @@ void Application::rebuild_content_blocker_list_paths()
      }
  }
  
@@ -1262,7 +1202,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
          m_content_blocker_list_buffer = TRY(Core::AnonymousBuffer::create_with_size(0));
          return true;
      }
-@@ -855,7 +929,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
+@@ -870,7 +944,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
      VERIFY(offset == bytes.size());
  
      if (m_content_blocker_list_buffer.has_value() && m_content_blocker_list_buffer->bytes() == blocker_list_buffer.bytes())
@@ -1271,7 +1211,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
  
      m_content_blocker_list_buffer = move(blocker_list_buffer);
      return true;
-@@ -1181,8 +1255,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1198,8 +1272,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
      if (auto* webdriver_bidi = WebDriverBiDi::the(); webdriver_bidi && webdriver_bidi->session_state().is_active)
          webdriver_bidi->push_session_state_for_client(*client);
  
@@ -1281,7 +1221,7 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
  
      m_web_content_clients.set(client);
      return client;
-@@ -3075,7 +3148,7 @@ void Application::apply_content_blocker_settings()
+@@ -3199,7 +3272,7 @@ void Application::apply_content_blocker_settings()
              return IterationDecision::Continue;
          });
          if (rules_changed)
@@ -1291,10 +1231,10 @@ index b36215738e408a43884b8d86eb18b914e37a6f09..3b25cd243a7d1df3116274749fcebb09
      });
      ViewImplementation::for_each_view([](ViewImplementation& view) {
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 038d04c2d009256f68246be0ee2f506f21cbc8ed..63660fd16d3c4501809ce641e6dd2b75fd2dfa82 100644
+index ae8b933b795a0ce2eb9dd1ff8f7368f47ac3f2a8..556ce0f75be3f53bedfd303e99c5ddad3b8a817c 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -469,6 +469,8 @@ private:
+@@ -484,6 +484,8 @@ private:
      ErrorOr<void> launch_devtools_server();
      // Returns whether the combined rules changed.
      ErrorOr<bool> load_content_blocker_lists();
@@ -1303,7 +1243,7 @@ index 038d04c2d009256f68246be0ee2f506f21cbc8ed..63660fd16d3c4501809ce641e6dd2b75
      void apply_content_blocker_settings();
      void rebuild_content_blocker_list_paths();
      ByteString content_blocker_list_path(StringView identifier) const;
-@@ -612,6 +614,8 @@ private:
+@@ -635,6 +637,8 @@ private:
      JsonValue m_site_compatibility_data;
      Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> m_origin_access_allow_list;
      Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
@@ -1312,7 +1252,7 @@ index 038d04c2d009256f68246be0ee2f506f21cbc8ed..63660fd16d3c4501809ce641e6dd2b75
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
          String identifier;
-@@ -622,6 +626,8 @@ private:
+@@ -645,6 +649,8 @@ private:
          u8 redirect_count { 0 };
      };
      Vector<ByteString> m_explicit_content_blocker_list_paths;
@@ -1322,10 +1262,10 @@ index 038d04c2d009256f68246be0ee2f506f21cbc8ed..63660fd16d3c4501809ce641e6dd2b75
      Vector<PendingContentBlockerListUpdate> m_pending_content_blocker_list_updates;
      Optional<PendingContentBlockerListUpdate> m_active_content_blocker_list_update;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index e85da3260db1b1084b7db2fdccef279e3b0ff33c..46986a2423c084c38b89014b66877d45dafaace6 100644
+index bce72f92805afc3500f2e51927ac09846f0359a8..1f6ac84670b62f935fd26d86ea35f08e5f2c34ce 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3155,11 +3155,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
+@@ -3187,11 +3187,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
          page->page().set_content_blocking_policy(enabled, disabled_sites);
  }
  
@@ -1340,10 +1280,10 @@ index e85da3260db1b1084b7db2fdccef279e3b0ff33c..46986a2423c084c38b89014b66877d45
          dbgln("Failed to set content blockers: {}", result.error());
          return;
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 18d3d5ddce0d51962e2a09f094f28dd11094ab97..440589b383922651be36d6730376f4dfb958e1a7 100644
+index a64ce98086a2edf3c14abff6a5777518d5ff609a..95810f36e7e1dd6b95dcbe40a706418d45071ba1 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -244,7 +244,7 @@ private:
+@@ -247,7 +247,7 @@ private:
      virtual void remove_dom_node(Web::PageId page_id, Web::UniqueNodeID node_id) override;
  
      virtual void set_content_blocking_policy(Web::PageId page_id, bool enabled, Vector<String> disabled_sites) override;
@@ -1353,10 +1293,10 @@ index 18d3d5ddce0d51962e2a09f094f28dd11094ab97..440589b383922651be36d6730376f4df
      virtual void set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, Vector<Utf16String> allowlist) override;
      virtual void set_preferred_color_scheme(Web::PageId page_id, Web::CSS::PreferredColorScheme) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index e45c2d2daa1e322d6f1bd2fef952643a78e925d2..30a839f47ba98d4043392aab92b3d7dabef72d3e 100644
+index bcc5ae62d91baf9f2e6f33a71aebba217ca1e4d7..23e27c496ddad8c0ba88bab55df30fc2f42e2bad 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -250,7 +250,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -255,7 +255,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      find_in_page_end(Web::PageId page_id) =|
  
      set_content_blocking_policy(Web::PageId page_id, bool enabled, Vector<String> disabled_sites) =|
@@ -1366,10 +1306,10 @@ index e45c2d2daa1e322d6f1bd2fef952643a78e925d2..30a839f47ba98d4043392aab92b3d7da
      set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, Vector<Utf16String> allowlist) =|
      set_preferred_color_scheme(Web::PageId page_id, Web::CSS::PreferredColorScheme color_scheme) =|
 diff --git a/Tests/LibWeb/test-web/TestWebView.cpp b/Tests/LibWeb/test-web/TestWebView.cpp
-index a9a8bc8f5c4cc92641f04c96a8657270a794ab07..7b5288f2aafbf39366e19a1e274ebf7fc887b9ea 100644
+index a406f0afc9469d14f5b75e543687f8c2afe2c89c..ae023228e5b543c73a2f24766310194950742b8b 100644
 --- a/Tests/LibWeb/test-web/TestWebView.cpp
 +++ b/Tests/LibWeb/test-web/TestWebView.cpp
-@@ -30,7 +30,8 @@ TestWebView::TestWebView(Core::AnonymousBuffer theme, Web::DevicePixelSize viewp
+@@ -31,7 +31,8 @@ TestWebView::TestWebView(Core::AnonymousBuffer theme, Web::DevicePixelSize viewp
  
  void TestWebView::clear_content_blockers()
  {

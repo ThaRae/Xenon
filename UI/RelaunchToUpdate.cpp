@@ -34,7 +34,6 @@ void relaunch(QWidget* parent)
         return;
     }
 
-    // NB: Settings asks from inside a page's message, so the question doesn't run an event loop of its own.
     auto* dialog = new QMessageBox(parent ? parent : Application::the().active_window_if_any());
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowTitle("Xenon");

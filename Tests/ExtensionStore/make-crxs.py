@@ -1,21 +1,5 @@
 #!/usr/bin/env python3
 
-# Writes the CRX files that Meta/xenon.py test serves from a local stand-in for the Chrome Web Store to check Xenon's
-# password manager installs (UI/PasswordManagers.h), and that TestXenonCRX checks verify_crx() and unpack_zip() with.
-# Each run makes new test keys: two developers' and a store's, whose IDs and hash go in keys.json.
-#
-#   bitwarden-1.0.crx       a stand-in for Bitwarden, signed by its developer and the store
-#   bitwarden-2.0.crx       its next version
-#   bitwarden-3.0-tampered.crx
-#                           a newer version still, whose archive was changed after it was signed
-#   bitwarden-3.0-unpublished.crx
-#                           a newer version signed by its developer only
-#   proton-pass-1.0.crx     a stand-in for Proton Pass, from the other developer
-#   escape.crx              correctly signed for the first developer, with an archive entry named ../escape.txt
-#
-# The stand-ins' content script marks every page with the extension's name and version. Needs the openssl command:
-# Tests/ExtensionStore/make-crxs.py [--openssl PATH]
-
 from __future__ import annotations
 
 import argparse
@@ -64,7 +48,6 @@ def main():
             header = b"".join(field(2, field(1, public_key) + field(2, sign(key, message))) for key, public_key in signers)
             header += field(10000, signed_header_data)
             if tamper:
-                # The first file's modification time, which leaves the archive itself intact.
                 archive = archive[:10] + bytes([archive[10] ^ 1]) + archive[11:]
             (DIRECTORY / name).write_bytes(b"Cr24" + (3).to_bytes(4, "little") + len(header).to_bytes(4, "little") + header + archive)
 
@@ -94,7 +77,6 @@ def extension_zip(name: str, version: str, extra_files: dict | None = None) -> b
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip:
         for path, text in files.items():
-            # A fixed date keeps the files the same from one run to the next, but for their keys.
             zip.writestr(zipfile.ZipInfo(path, date_time=(2026, 1, 1, 0, 0, 0)), text, zipfile.ZIP_DEFLATED)
     return archive.getvalue()
 
@@ -115,7 +97,6 @@ def varint(value: int) -> bytes:
             return bytes(encoded)
 
 
-# A length-delimited protocol buffer field.
 def field(number: int, value: bytes) -> bytes:
     return varint(number << 3 | 2) + varint(len(value)) + value
 

@@ -118,7 +118,6 @@ private:
     bool m_should_show_full_url_on_mouse_release { false };
     int m_text_leading_margin { 0 };
     bool m_has_bang_chip { false };
-    // Backspace at the start of the text took the chip away, so the bang is plain text until the user edits it.
     bool m_is_bang_chip_dismissed { false };
     int m_bang_chip_prefix_length { 0 };
     int m_bang_chip_text_margin { 0 };

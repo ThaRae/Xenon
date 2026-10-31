@@ -18,15 +18,15 @@ cleaned URL.
 
 The blocker now also gets the request method, so $method filters match.
 ---
- Libraries/LibWeb/Fetch/Fetching/Fetching.cpp | 26 +++++++++++
- Libraries/LibWeb/Loader/ResourceLoader.cpp   | 46 +++++++++++++++++---
- 2 files changed, 66 insertions(+), 6 deletions(-)
+ Libraries/LibWeb/Fetch/Fetching/Fetching.cpp | 23 ++++++++++++
+ Libraries/LibWeb/Loader/ResourceLoader.cpp   | 39 +++++++++++++++++---
+ 2 files changed, 56 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 8138f3b6374263fd084b59fc028689d47ee1ef7d..8f16e0969d1f5fd8cfe5e4eea807e6f6d25247e2 100644
+index f7268b04b0b8ed64640a857963d3431d59e75a7f..7f7fb637b9d026c5aa7f76bbe30a9df51c0fc30c 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -63,6 +63,7 @@
+@@ -66,6 +66,7 @@
  #include <LibWeb/HTML/WorkerGlobalScope.h>
  #include <LibWeb/HighResolutionTime/TimeOrigin.h>
  #include <LibWeb/Infra/SerializedURL.h>
@@ -34,15 +34,12 @@ index 8138f3b6374263fd084b59fc028689d47ee1ef7d..8f16e0969d1f5fd8cfe5e4eea807e6f6
  #include <LibWeb/Loader/LoadRequest.h>
  #include <LibWeb/Loader/LoaderConfig.h>
  #include <LibWeb/Loader/ResourceLoader.h>
-@@ -539,6 +540,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
+@@ -560,6 +561,26 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
          request.set_client_snapshot(client->visit([](auto const& client) { return snapshot_client_context(*client); }));
  }
  
 +static URL::URL content_blocker_source_url_for_request(Infrastructure::Request&);
 +
-+// Non-standard: Removes tracking parameters that the content blocker's $removeparam filters name from the request's URL,
-+// before the request leaves. Like an HSTS upgrade, this changes the URL in place, so a navigation's document ends up
-+// at the cleaned URL.
 +static void remove_tracking_parameters(JS::Realm& realm, Infrastructure::Request& request)
 +{
 +    if (!request.current_url().scheme().is_one_of("http"sv, "https"sv))
@@ -64,20 +61,20 @@ index 8138f3b6374263fd084b59fc028689d47ee1ef7d..8f16e0969d1f5fd8cfe5e4eea807e6f6
  // https://fetch.spec.whatwg.org/#concept-main-fetch
  GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParams const& fetch_params, Recursive recursive)
  {
-@@ -613,6 +637,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -634,6 +655,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
          request->current_url().set_scheme("https"sv);
      }
  
 +    remove_tracking_parameters(realm, *request);
 +
-     auto get_response = GC::create_function(GC::Heap::the(), [&realm, &fetch_params, request]() -> GC::Ref<PendingResponse> {
+     auto get_response = GC::create_function(GC::Heap::the(), [&realm, fetch_params = NonnullRefPtr { fetch_params }, controller = fetch_params.controller(), request]() -> GC::Ref<PendingResponse> {
          dbgln_if(WEB_FETCH_DEBUG, "Fetch: Running 'main fetch' get_response() function");
          auto const* origin = request->origin().get_pointer<URL::Origin>();
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24929ffde9 100644
+index 39747b0204ccc11af1ad334d33785879c3b25893..d13600c3a818b3c7c4e856520c6dbdcec7af242e 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-@@ -29,6 +29,7 @@
+@@ -30,6 +30,7 @@
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
  #include <LibWeb/Platform/Timer.h>
@@ -85,13 +82,12 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
  #include <LibWebCommon/Loader/UserAgent.h>
  
  namespace Web {
-@@ -297,7 +298,12 @@ static StringView blocked_resource_kind(LoadRequest const& request)
+@@ -292,7 +293,11 @@ static StringView blocked_resource_kind(LoadRequest const& request)
      VERIFY_NOT_REACHED();
  }
  
 -static bool should_block_request(LoadRequest const& request)
 +struct BlockedRequest {
-+    // A content blocker surrogate to answer the request with, as a data: URL ($redirect filters).
 +    Optional<URL::URL> surrogate;
 +};
 +
@@ -99,7 +95,7 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
  {
      auto const& url = request.url().value();
  
-@@ -312,20 +318,46 @@ static bool should_block_request(LoadRequest const& request)
+@@ -307,19 +312,39 @@ static bool should_block_request(LoadRequest const& request)
  
      if (is_port_blocked(url.port_or_default())) {
          log_failure(request, ByteString::formatted("Port #{} is blocked", url.port_or_default()));
@@ -111,9 +107,7 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
          auto source_url = request.source_url().value_or(url);
 -        if (ContentBlocker::the().is_filtered(url, source_url, request.destination(), request.initiator_type(), request.request_mode())) {
 +        auto decision = ContentBlocker::the().check_request(url, source_url, request.destination(), request.initiator_type(), request.request_mode(), request.method());
-+        // NB: Rewrites ($removeparam) happen in main fetch, before the request gets here.
 +        if (decision.action == ContentBlocker::RequestDecision::Action::Block || decision.action == ContentBlocker::RequestDecision::Action::Redirect) {
-             log_filtered_request(request);
              if (page)
                  page->client().page_did_block_resource(url, blocked_resource_kind(request));
 -            return true;
@@ -125,8 +119,6 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
 +    return {};
 +}
 +
-+// Answers a blocked request with a content blocker surrogate, such as a no-op script, so pages that depend on the
-+// blocked resource keep working. Returns false if the surrogate cannot be decoded.
 +static bool respond_with_surrogate(LoadRequest const& request, URL::URL const& surrogate, ResourceLoader::OnHeadersReceived& on_headers_received, ResourceLoader::OnDataReceived& on_data_received, ResourceLoader::OnComplete& on_complete)
 +{
 +    auto data_url = Fetch::Infrastructure::process_data_url(surrogate);
@@ -135,22 +127,19 @@ index 0cf778512404f9c80cdf6c29d1781c20c26474c2..5a961abfed86dc17ff931d9614aceb24
 +
 +    auto headers = HTTP::HeaderList::create();
 +    headers->append(HTTP::Header::isomorphic_encode("Content-Type"sv, data_url.value().mime_type.serialized()));
-+    // The surrogate stands in for a resource that may be cross-origin. Let the request's CORS check pass, as the
-+    // resource it replaces would have for this page.
 +    if (auto origin = request.headers().get("Origin"sv); origin.has_value()) {
 +        headers->append(HTTP::Header::isomorphic_encode("Access-Control-Allow-Origin"sv, *origin));
 +        headers->append(HTTP::Header::isomorphic_encode("Access-Control-Allow-Credentials"sv, "true"sv));
 +    }
 +
 +    on_headers_received.function()(nullptr, headers, 200, {}, {}, {}, Requests::CacheState::NotCached);
-+    // NB: Fetch only delivers the response once it has seen a body, so send one even if it is empty.
 +    on_data_received.function()(Requests::ResponseData::from_bytes(data_url.value().body.bytes()));
 +    on_complete.function()(true, {}, {});
 +    return true;
  }
  
  template<typename FileHandler, typename ErrorHandler>
-@@ -520,7 +552,9 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+@@ -512,7 +537,9 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
      log_request_start(request);
      request.start_timer();
  

@@ -19,11 +19,8 @@
 #    include <mach/mach.h>
 #endif
 
-// The tests below measure mimalloc, which sanitizer builds replace with the system allocator (AK/kmalloc.cpp).
 #if defined(AK_OS_LINUX) && !defined(HAS_ADDRESS_SANITIZER)
 
-// The resident set the kernel reports for this process. PSS is what the browser measurements use, but a test process
-// has no shared pages that matter, so RSS says the same thing here.
 static Optional<size_t> current_rss_bytes()
 {
     auto* file = fopen("/proc/self/statm", "r");
@@ -42,8 +39,6 @@ static Optional<size_t> current_rss_bytes()
 
 #if defined(AK_OS_MACOS) && !defined(HAS_ADDRESS_SANITIZER)
 
-// The physical footprint the kernel keeps for this process, which is Activity Monitor's Memory column and what the
-// macOS browser measurements use.
 static Optional<size_t> current_footprint_bytes()
 {
     task_vm_info_data_t info {};
@@ -55,9 +50,6 @@ static Optional<size_t> current_footprint_bytes()
 
 #endif
 
-// On macOS, mimalloc purges by decommitting, which takes freed pages out of the footprint at once. A decommitting
-// collect has to leave it that way: if it left purges resetting pages instead (MADV_FREE), they would stay in the
-// footprint, and no later collect in the process would give memory back.
 TEST_CASE(collects_after_a_decommitting_collect_still_return_freed_pages)
 {
 #if defined(AK_OS_MACOS) && !defined(HAS_ADDRESS_SANITIZER)
@@ -124,8 +116,6 @@ TEST_CASE(decommitting_collect_returns_freed_pages_to_the_os)
     if (!rss_allocated.has_value() || !rss_released.has_value())
         return;
 
-    // A collect that only resets pages leaves them in RSS (mimalloc's default on Linux is MADV_FREE), so this only
-    // passes when the freed pages were decommitted.
     EXPECT(*rss_released + 64 * 1024 * 1024 <= *rss_allocated);
     EXPECT(*rss_allocated > *rss_before);
 #endif

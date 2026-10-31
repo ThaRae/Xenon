@@ -1,16 +1,5 @@
 name: Sanitizer
 
-# Ladybird's Sanitizer configuration, AddressSanitizer and UndefinedBehaviorSanitizer with its CMake preset and vcpkg
-# triplet, which Ladybird's CI builds and tests every change in (ladybird/.github/workflows/ci.yml and nightly-lagom.yml),
-# applied to Xenon: Meta/ci/sanitizer.sh builds Xenon with it, runs Xenon's tests and then Ladybird's own against the
-# patched engine (Meta/xenon.py ladybird-test), and fails if either fails or the sanitizers find errors in Xenon's.
-#
-# Nightly on main, when main has changed since the last run that passed, by hand on any branch, and on pull requests that
-# change it. Linux only, in Ladybird's CI image, with build caches of its own: the Sanitizer preset builds every
-# dependency again, with its own vcpkg triplet, and compiles everything differently. A cold build takes longer than a
-# job may run, so, as in ci.yml, the build step stops itself in time for the caches to be saved, and the next run carries
-# on from there. Every run saves them, under a key of its own, so a rerun of the same commit carries on too: on main for
-# the nights after, and elsewhere for that branch's or pull request's next run.
 on:
   schedule:
     - cron: "41 2 * * *"
@@ -26,7 +15,6 @@ concurrency:
 
 permissions:
   contents: read
-  # To find the last run that passed.
   actions: read
 
 jobs:
@@ -51,10 +39,9 @@ jobs:
   linux:
     needs: changed
     if: needs.changed.outputs.skip != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-24.04' || vars.LINUX_RUNNER || 'slab-xenon' }}
     timeout-minutes: 360
     steps:
-      # As in ci.yml: the runner starts with about 20 GB free, and a cold build needs more.
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
@@ -81,6 +68,8 @@ jobs:
       - name: Build Xenon with the sanitizers and run the tests
         timeout-minutes: 320
         run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/sanitizer.sh
+        env:
+          CCACHE_TOKEN: ${{ runner.environment == 'self-hosted' && secrets.CCACHE_TOKEN || '' }}
 
       - name: Save the build caches
         if: always()

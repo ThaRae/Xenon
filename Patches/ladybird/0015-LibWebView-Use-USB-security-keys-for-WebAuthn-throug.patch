@@ -23,19 +23,19 @@ headers there, which the CI image doesn't have.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibWebView/Application.cpp          |   6 +
- Libraries/LibWebView/CMakeLists.txt           |  10 +
- .../LibWebView/WebAuthn/HIDAuthenticator.cpp  | 404 ++++++++++++++++++
- .../LibWebView/WebAuthn/HIDAuthenticator.h    |  69 +++
+ Libraries/LibWebView/CMakeLists.txt           |   9 +
+ .../LibWebView/WebAuthn/HIDAuthenticator.cpp  | 394 ++++++++++++++++++
+ .../LibWebView/WebAuthn/HIDAuthenticator.h    |  62 +++
  vcpkg.json                                    |  12 +
- 5 files changed, 501 insertions(+)
+ 5 files changed, 483 insertions(+)
  create mode 100644 Libraries/LibWebView/WebAuthn/HIDAuthenticator.cpp
  create mode 100644 Libraries/LibWebView/WebAuthn/HIDAuthenticator.h
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 334a46f452f91f1a0cafc0342a72b9cef6c470fb..7776be6cad4cb4abbe55d1ffc834ed94c87b5232 100644
+index c3c38408ae94d75cf4adff0bd65807c45aa5bcf7..51d7e72a6480b57d0a203246b4426a4fd4beed92 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -73,6 +73,9 @@
+@@ -74,6 +74,9 @@
  #include <LibWebView/UserAgent.h>
  #include <LibWebView/Utilities.h>
  #include <LibWebView/WebAuthn/Coordinator.h>
@@ -45,7 +45,7 @@ index 334a46f452f91f1a0cafc0342a72b9cef6c470fb..7776be6cad4cb4abbe55d1ffc834ed94
  #include <LibWebView/WebAuthn/VirtualAuthenticator.h>
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
-@@ -1777,6 +1780,9 @@ ErrorOr<void> Application::launch_services()
+@@ -1806,6 +1809,9 @@ ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
      WebAuthnCoordinator::the().add_authenticator_source(VirtualAuthenticators::the());
@@ -56,10 +56,10 @@ index 334a46f452f91f1a0cafc0342a72b9cef6c470fb..7776be6cad4cb4abbe55d1ffc834ed94
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index d1f721766c410c70008a096e847dc54e91622c3f..81a87e4cdba59878a2f7e83035afd6ade81ba4b7 100644
+index 2c49e252edccd6ecf3bb002b940fe5e49af80d59..421b27dbc17fdf862bd8f099f993804931b0b1d2 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -102,6 +102,9 @@ if (APPLE)
+@@ -105,6 +105,9 @@ if (APPLE)
          PlatformColorsMacOS.cpp
          ProcessReaper.cpp
      )
@@ -69,12 +69,11 @@ index d1f721766c410c70008a096e847dc54e91622c3f..81a87e4cdba59878a2f7e83035afd6ad
  elseif (LINUX)
      list(APPEND SOURCES AudioDaemonSocket.cpp CrashReportPOSIX.cpp)
  endif()
-@@ -168,6 +171,13 @@ if (APPLE)
+@@ -171,6 +174,12 @@ if (APPLE)
      target_link_libraries(LibWebView PRIVATE "-framework Carbon")
  endif()
  
 +if (APPLE AND NOT IOS)
-+    # Security keys on USB, for WebAuthn.
 +    find_package(PkgConfig REQUIRED)
 +    pkg_check_modules(LIBFIDO2 REQUIRED IMPORTED_TARGET libfido2)
 +    target_link_libraries(LibWebView PRIVATE PkgConfig::LIBFIDO2)
@@ -85,10 +84,10 @@ index d1f721766c410c70008a096e847dc54e91622c3f..81a87e4cdba59878a2f7e83035afd6ad
      target_link_libraries(LibWebView PRIVATE Fontconfig::Fontconfig)
 diff --git a/Libraries/LibWebView/WebAuthn/HIDAuthenticator.cpp b/Libraries/LibWebView/WebAuthn/HIDAuthenticator.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447b27d2853
+index 0000000000000000000000000000000000000000..4e2a371a0084239cccf4adad517c8b11a98530a1
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/HIDAuthenticator.cpp
-@@ -0,0 +1,404 @@
+@@ -0,0 +1,394 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -108,10 +107,8 @@ index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447
 +
 +namespace WebView {
 +
-+// How often discovery looks for security keys that have been plugged in or taken out.
 +static constexpr auto DISCOVERY_INTERVAL = AK::Duration::from_milliseconds(500);
 +
-+// Enough for every key a person has plugged in at once.
 +static constexpr size_t MAXIMUM_DEVICE_COUNT = 64;
 +
 +static Authenticator::Error error_for_fido_result(int result)
@@ -238,7 +235,6 @@ index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447
 +                    self->m_open_device = device;
 +                }
 +
-+                // NB: A cancel() that came before the key was open is honored here.
 +                auto result = self->m_cancelled ? operation(nullptr) : operation(device);
 +
 +                {
@@ -299,7 +295,6 @@ index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447
 +        }
 +        if (result == FIDO_OK)
 +            result = fido_cred_set_rk(credential, request.resident_key ? FIDO_OPT_TRUE : FIDO_OPT_OMIT);
-+        // NB: With a PIN, user verification comes from the PIN, and the uv option must not be set as well.
 +        if (result == FIDO_OK && !request.pin.has_value())
 +            result = fido_cred_set_uv(credential, request.user_verification ? FIDO_OPT_TRUE : FIDO_OPT_OMIT);
 +        if (result != FIDO_OK)
@@ -395,8 +390,6 @@ index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447
 +        return static_cast<u32>(retries); }, move(on_complete));
 +}
 +
-+// Polls for FIDO HID devices on a thread of its own, and reports each new one, once it has asked it what it supports,
-+// to the event loop that started the discovery.
 +class HIDAuthenticators::HIDDiscovery final : public AuthenticatorSource::Discovery {
 +public:
 +    explicit HIDDiscovery(Function<void(NonnullRefPtr<Authenticator>)> on_authenticator)
@@ -424,8 +417,6 @@ index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447
 +                            continue;
 +                        }
 +
-+                        // NB: A key that can't be opened yet, being busy with another program, is tried again on the
-+                        //     next poll.
 +                        auto product = string_or_empty(fido_dev_info_product_string(device_info));
 +                        if (product.is_empty())
 +                            product = "Security key"_string;
@@ -437,7 +428,6 @@ index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447
 +                }
 +                fido_dev_info_free(&device_list, MAXIMUM_DEVICE_COUNT);
 +
-+                // A key that was taken out is new again when it comes back.
 +                present_paths = move(paths);
 +
 +                if (!new_authenticators.is_empty()) {
@@ -467,7 +457,6 @@ index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447
 +    }
 +
 +private:
-+    // Shared with the discovery thread, which may outlive the discovery for up to one poll.
 +    struct State : public AtomicRefCounted<State> {
 +        Atomic<bool> is_stopped { false };
 +        Function<void(NonnullRefPtr<Authenticator>)> on_authenticator;
@@ -495,10 +484,10 @@ index 0000000000000000000000000000000000000000..9afeb452c95121410374f874fb4be447
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/HIDAuthenticator.h b/Libraries/LibWebView/WebAuthn/HIDAuthenticator.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..06dcf962df7c7f177e476c1293e6d4a710f55247
+index 0000000000000000000000000000000000000000..71a20caab9e1ce0cd6c24fde0879f791e7fc0198
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/HIDAuthenticator.h
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,62 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -517,12 +506,8 @@ index 0000000000000000000000000000000000000000..06dcf962df7c7f177e476c1293e6d4a7
 +
 +namespace WebView {
 +
-+// A security key on USB, which speaks CTAP2 or CTAP1/U2F over HID, through libfido2. libfido2 blocks while the key
-+// waits for a touch, so each operation runs on a thread of its own, which opens the key, makes its request, and closes
-+// it again. The key is closed in between, for other programs to use.
 +class WEBVIEW_API HIDAuthenticator final : public Authenticator {
 +public:
-+    // Opens the key at a HID path and asks what it supports. Blocks; it runs on a discovery thread.
 +    static RefPtr<HIDAuthenticator> probe(ByteString path, String name);
 +
 +    virtual ~HIDAuthenticator() override;
@@ -540,7 +525,6 @@ index 0000000000000000000000000000000000000000..06dcf962df7c7f177e476c1293e6d4a7
 +private:
 +    HIDAuthenticator(ByteString path, String name, Info);
 +
-+    // Runs an operation on its own thread, with the key open, and hands its result to the calling thread's event loop.
 +    template<typename Result>
 +    void run_operation(StringView thread_name, Function<Result(fido_dev*)> operation, Function<void(Result)> on_complete);
 +
@@ -548,13 +532,11 @@ index 0000000000000000000000000000000000000000..06dcf962df7c7f177e476c1293e6d4a7
 +    String m_name;
 +    Info m_info;
 +
-+    // The key an operation has open, for cancel() to reach from the main thread.
 +    Mutex m_device_lock;
 +    fido_dev* m_open_device { nullptr };
 +    Atomic<bool> m_cancelled { false };
 +};
 +
-+// Finds security keys on USB, by polling for HID devices that speak FIDO while a ceremony waits.
 +class WEBVIEW_API HIDAuthenticators final : public AuthenticatorSource {
 +public:
 +    static HIDAuthenticators& the();

@@ -1,5 +1,3 @@
-// Runs in Meta/xenon.py test: checks the chrome.* APIs of an extension page, prints one line of results, and closes the
-// page, which ends the headless browser.
 const results = {};
 
 function check(name, condition) {
@@ -94,7 +92,6 @@ async function run() {
         })
     );
 
-    // The background service worker starts with the browser, so it may still be starting.
     let pong;
     for (let attempt = 0; attempt < 50 && !pong; ++attempt) {
         pong = await chrome.runtime.sendMessage({ toBackground: "ping" }).catch(() => undefined);
@@ -102,7 +99,6 @@ async function run() {
     }
     check("background worker answers", pong?.pong === true && pong.senderUrl === location.href.split("#")[0]);
     check("background is a worker", pong?.isWorker === true);
-    // Meta/xenon.py runs this page twice in one profile, and checks the first run installs and the second starts up.
     const backgroundEvents = await chrome.runtime.sendMessage({ toBackground: "events" });
     results["info: background events"] = backgroundEvents;
     check("background gets onInstalled or onStartup", backgroundEvents?.includes("installed:install") || backgroundEvents?.includes("startup"));
@@ -146,7 +142,6 @@ async function run() {
     check("tabs.connect disconnects without content scripts", tabPortError?.includes("Receiving end does not exist"));
     check("windows.getAll", Array.isArray(await chrome.windows.getAll({ populate: true })));
 
-    // clipboardWrite and clipboardRead let an extension's pages copy and paste from script, with no user gesture.
     const clipboardText = "Xenon clipboard test";
     const textarea = document.createElement("textarea");
     document.body.append(textarea);
@@ -158,8 +153,6 @@ async function run() {
     check("execCommand paste", document.execCommand("paste") && textarea.value === clipboardText);
     textarea.remove();
 
-    // Optional permissions need the user. Meta/xenon.py exposes internals, which stands in for the user's gesture, but a
-    // headless browser has no one to ask, so it denies.
     check("permissions.contains an optional one", (await chrome.permissions.contains({ permissions: ["bookmarks"] })) === false);
     check("permissions.request needs a user gesture", await chrome.permissions.request({ permissions: ["bookmarks"] }).then(() => false, error => /user gesture/.test(error.message)));
     internals.grantTransientActivation();
@@ -168,7 +161,6 @@ async function run() {
     check("permissions.remove of a required one", await chrome.permissions.remove({ permissions: ["storage"] }).then(() => false, () => true));
     check("permissions.getAll", (await chrome.permissions.getAll()).permissions.includes("privacy"));
 
-    // An earlier run may have left the setting controlled.
     const passwordSaving = chrome.privacy.services.passwordSavingEnabled;
     await passwordSaving.clear({});
     check("privacy setting starts controllable", (await passwordSaving.get({})).levelOfControl === "controllable_by_this_extension");
@@ -200,8 +192,6 @@ async function run() {
         .then(() => "", error => String(error.message));
     check("forbidden native host", forbidden.includes("forbidden"));
 
-    // Meta/xenon.py serves JSON with no CORS headers from a host the extension has permission for, which its pages and
-    // its background reach as Chrome lets them: without CORS. The header would otherwise need a preflight.
     const dataURL = new URLSearchParams(location.search).get("data");
     if (dataURL) {
         const fetched = await fetch(dataURL, { headers: { "X-Xenon-Test": "1" } })
@@ -212,7 +202,6 @@ async function run() {
         check("the background fetches from a permitted host", fetchedInBackground?.ok === true);
     }
 
-    // Headless runs have no windows, and so no tabs. A tab that doesn't exist has no frames.
     check("webNavigation.getFrame of no tab", (await chrome.webNavigation.getFrame({ tabId: 987654, frameId: 0 })) === null);
     check("webNavigation.getAllFrames of no tab", (await chrome.webNavigation.getAllFrames({ tabId: 987654 })) === null);
     check("webNavigation events", typeof chrome.webNavigation.onCommitted.addListener === "function");
@@ -236,8 +225,6 @@ async function run() {
         "offscreen in getContexts",
         (await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] })).length === 1
     );
-    // Meta/xenon.py turns content blocking on, and serves an image the bundled lists block on web pages. Extensions'
-    // hidden pages go without the content blocker, as uBlock Origin doesn't see other extensions' requests in Chrome.
     if (dataURL) {
         const image = await chrome.runtime.sendMessage({
             toOffscreen: "image",

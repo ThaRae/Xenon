@@ -32,10 +32,8 @@ namespace Ladybird {
 
 namespace TabHibernation {
 
-// Like Chromium, a tab that was playing audio a minute ago is still in use, as between two tracks.
 static constexpr auto AUDIO_PROTECTION_TIME = AK::Duration::from_seconds(60);
 
-// The timeouts the menu offers: Chromium's Memory Saver discards after 2, 4, or 6 hours, and shorter ones save more.
 static constexpr i64 TIMEOUT_CHOICES_IN_MINUTES[] = { 15, 30, 60, 2 * 60, 4 * 60, 6 * 60 };
 
 ReadonlySpan<i64> timeout_choices_in_minutes()
@@ -53,7 +51,6 @@ public:
         return *hibernator;
     }
 
-    // XenonSettings::Observer
     virtual void xenon_settings_changed() override { settings_changed(); }
 
     void settings_changed()
@@ -63,8 +60,6 @@ public:
             return;
         }
 
-        // Often enough that a tab hibernates close to its time, and no more than twice a minute. Memory pressure
-        // needs a quicker look, so that a machine that's swapping doesn't wait the timeout's quarter.
         auto timeout = XenonSettings::tab_hibernation_timeout().to_milliseconds();
         auto interval = clamp<i64>(timeout / 4, 1000, 30 * 1000);
         if (XenonSettings::hibernate_on_memory_pressure())
@@ -78,12 +73,11 @@ public:
         if (!window || !tab.is_loaded() || is_in_use(*window, tab))
             return false;
 
-        // Chromium keeps pinned tabs too.
         if (tab.is_pinned() || tab.is_loading())
             return false;
 
         auto& view = tab.view();
-        if (view.audio_play_state() == Web::HTML::AudioPlayState::Playing || view.has_devtools_client() || has_picture_in_picture_window(view))
+        if (view.audibility() == Audio::Audibility::Audible || view.has_devtools_client() || has_picture_in_picture_window(view))
             return false;
         if (auto state = m_tabs.get(&tab); state.has_value() && state->last_audible.has_value() && MonotonicTime::now() - *state->last_audible < AUDIO_PROTECTION_TIME)
             return false;
@@ -112,17 +106,13 @@ public:
         state.is_preparing = true;
         state.request = request;
 
-        // The page saves its scroll position to its session history entry first, and says whether it holds input that
-        // hibernating would lose.
         auto preparation = tab.view().prepare_for_discard();
         preparation->when_resolved([this, tab = QPointer { &tab }](auto& result) {
-            // The view is in the middle of handling its page's reply here, so it goes once that's done.
             QTimer::singleShot(0, tab, [this, tab, has_unsubmitted_input = result.has_unsubmitted_input] {
                 finish_hibernating(*tab, has_unsubmitted_input);
             });
         });
         preparation->when_rejected([this, tab = QPointer { &tab }](auto&) {
-            // The page went away first, as it does when it crashes. The tab is checked again later.
             if (auto tab_state = m_tabs.get(tab.data()); tab_state.has_value())
                 tab_state->is_preparing = false;
         });
@@ -136,12 +126,10 @@ private:
     }
 
     struct TabState {
-        // When the tab was last current or shown.
         MonotonicTime last_used;
         Optional<MonotonicTime> last_audible {};
         bool is_preparing { false };
         Request request { Request::Timeout };
-        // What the tab's processes used when it last hibernated.
         Optional<u64> memory_freed {};
     };
 
@@ -156,7 +144,6 @@ private:
 
     virtual bool eventFilter(QObject* watched, QEvent* event) override
     {
-        // A tab is shown when it becomes current, and hidden when another tab does.
         if (event->type() == QEvent::Show || event->type() == QEvent::Hide) {
             if (auto state = m_tabs.get(static_cast<Tab*>(watched)); state.has_value())
                 state->last_used = MonotonicTime::now();
@@ -164,8 +151,6 @@ private:
         return QObject::eventFilter(watched, event);
     }
 
-    // Like Chromium, Xenon keeps the current tab of every window, even one that's minimized, and any tab shown beside
-    // it.
     static bool is_in_use(BrowserWindow& window, Tab& tab)
     {
         return window.current_tab() == &tab || tab.isVisible();
@@ -201,7 +186,7 @@ private:
                     state.last_used = now;
                     continue;
                 }
-                if (tab.view().audio_play_state() == Web::HTML::AudioPlayState::Playing)
+                if (tab.view().audibility() == Audio::Audibility::Audible)
                     state.last_audible = now;
 
                 if (now - state.last_used >= timeout && may_hibernate(tab))
@@ -248,14 +233,11 @@ private:
             return;
         state->is_preparing = false;
 
-        // A tab holding input the user hasn't sent stays awake, and is asked again after another timeout.
         if (has_unsubmitted_input) {
             state->last_used = MonotonicTime::now();
             return;
         }
 
-        // The tab may have been used while its page answered. A timeout only hibernates if the tab has still been
-        // unused for the whole timeout; memory pressure and an explicit Hibernate Tab don't wait.
         if (state->request == Request::Timeout) {
             if (!XenonSettings::tab_hibernation_enabled() || MonotonicTime::now() - state->last_used < XenonSettings::tab_hibernation_timeout())
                 return;
@@ -266,7 +248,6 @@ private:
         if (!may_hibernate(tab))
             return;
 
-        // Hibernating frees what the tab's processes use, unless it shares one with another tab, which keeps running.
         auto usage = TabMemory::usage(tab);
         state->memory_freed = usage.has_value() && !usage->is_estimate ? Optional<u64> { usage->bytes } : Optional<u64> {};
         tab.hibernate();
@@ -326,7 +307,6 @@ QMenu* create_settings_menu(QWidget& parent)
     for (auto minutes : TIMEOUT_CHOICES_IN_MINUTES)
         timeout_actions.append(add_timeout_action(AK::Duration::from_seconds(minutes * 60)));
 
-    // A timeout set outside this menu, as a short one for testing, shows as an entry of its own.
     auto* other_timeout_action = menu->addAction(QString {});
     other_timeout_action->setCheckable(true);
     other_timeout_action->setEnabled(false);
@@ -391,15 +371,12 @@ bool Tab::can_hibernate() const
     if (!is_loaded())
         return false;
 
-    // A review shows what it was handed, which a reload wouldn't bring back.
     if (m_fixed_title.has_value() || m_report_review_navigation_listener.has_value())
         return false;
 
-    // Nor would it bring back whatever the tab is waiting on the user for: a dialog the page opened, a picker, a
-    // permission prompt, the check before the tab closes, or a popover such as a security key's prompt.
     if (m_javascript_dialog->is_open() || m_color_picker_dialog || m_file_picker_dialog || m_external_url_confirmation_dialog)
         return false;
-    if (!m_pending_permission_requests.is_empty() || m_before_unload_completion || m_already_requested_close || m_window_is_closing)
+    if (!m_permission_dialogs.is_empty() || m_before_unload_completion || m_already_requested_close || m_window_is_closing)
         return false;
     for (auto* child : findChildren<QWidget*>()) {
         if (child->isWindow() && child->isVisible())
@@ -412,8 +389,6 @@ void Tab::hibernate()
 {
     VERIFY(is_loaded());
 
-    // The tab strip goes on showing the tab's title and favicon, and the tab restores its history, scroll position
-    // included, when it loads again.
     m_session_tab_id = view().session_tab_id();
     m_deferred_tab = DeferredTab {
         .url = url(),
@@ -422,7 +397,6 @@ void Tab::hibernate()
         .history = view().session_history_snapshot(),
     };
 
-    // Everything else initialize() built goes, in the order a closing tab destroys it in, which is the view first.
     Vector<QPointer<QObject>> built;
     for (auto* child : children()) {
         if (!m_tab_shell_children.contains(child))
@@ -485,7 +459,6 @@ void Tab::hibernate()
     m_suppress_javascript_dialogs_until_navigation = false;
     m_preserve_close_retry_state_on_dialog_dismissal = false;
 
-    // The title loses the WebContent process ID it may have shown, and the favicon turns grey.
     update_tab_title();
     update_tab_icon();
 }

@@ -1,10 +1,4 @@
 # Maintainer: ThaRae <https://github.com/ThaRae>
-#
-# Kept in ThaRae/Xenon's Packaging/aur and updated from there with each release (Meta/aur.py): change it there, not on
-# the AUR. It builds the release's tag the way the release workflow builds the AppImage: Meta/xenon.py build applies
-# Xenon's patches to the pinned Ladybird and builds it, fetching the dependencies Ladybird takes from vcpkg as it goes,
-# and Meta/release.py package puts together the AppImage's AppDir. That's installed in /usr/lib/xenon, as xenon-bin
-# installs the published one. From a cold start, the build takes hours and tens of gigabytes.
 
 pkgname=xenon
 pkgver=0.1.2
@@ -13,31 +7,23 @@ pkgdesc='Web browser built on the Ladybird engine, with the features of Helium'
 arch=(x86_64)
 url='https://github.com/ThaRae/Xenon'
 license=(BSD-2-Clause GPL-3.0-only MIT CC0-1.0)
-# What the AppDir leaves to the system (Documentation/Updates.md), and a font.
 depends=(expat fontconfig freetype2 glibc harfbuzz hicolor-icon-theme libdrm libgcc libglvnd libice libsm libstdc++
          libx11 libxcb ttf-font wayland zlib)
 optdepends=('pulse-native-provider: audio'
             'geoclue: geolocation')
-# What Ladybird's build instructions list for Arch Linux; clang, which Xenon is built with, as Ladybird's CI builds it;
-# rustup, for the Rust Ladybird pins; and Qt's Wayland platform, which the AppDir carries.
 makedepends=(autoconf-archive clang cmake curl git libpulse lld nasm ninja python qt6-base qt6-positioning qt6-tools
              qt6-wayland rustup tar unzip xcb-util-wm zip)
 conflicts=(xenon-bin)
-# Ladybird's build sets its own flags, and its link-time optimization. The binaries keep their symbols, so that crash
-# reports name every function.
 options=(!buildflags !lto !strip !debug !emptydirs)
 source=("xenon::git+https://github.com/ThaRae/Xenon.git#tag=v$pkgver"
         "ladybird::git+https://github.com/LadybirdBrowser/ladybird.git")
 sha256sums=('SKIP'
             'SKIP')
 
-# Ladybird builds its Rust with warnings as errors, so with the Rust it pins, rather than a newer one that may deprecate
-# what it uses.
 _rust_toolchain() {
   sed -n 's/^channel = "\(.*\)"/\1/p' "$srcdir/xenon/ladybird/rust-toolchain.toml"
 }
 
-# The ladybird submodule, at the commit Xenon pins, from the clone makepkg keeps rather than GitHub.
 prepare() {
   cd xenon
   git submodule init ladybird
@@ -59,7 +45,6 @@ build() {
 package() {
   local app_dir=xenon/Build/distribution/Xenon.AppDir
 
-  # AppRun is the entry point, which finds Xenon beside it; xenon is a link to it.
   install -d "$pkgdir/usr/lib/xenon" "$pkgdir/usr/bin"
   cp -a "$app_dir/AppRun" "$app_dir/usr" "$pkgdir/usr/lib/xenon/"
   ln -s /usr/lib/xenon/AppRun "$pkgdir/usr/bin/xenon"

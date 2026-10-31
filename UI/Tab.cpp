@@ -116,10 +116,6 @@ protected:
 };
 
 // The reload button becomes a stop button while the page loads. So that one click does not do what the user did not aim
-// at, the button does not change at the wrong moment while under the pointer: a stop button stays until the pointer
-// leaves or a short delay passes, and a reload click does not become a stop button until the double-click interval
-// passes, so a double-click does not stop the reload it started. The reload action stays attached to the button while
-// it shows stop, so its shortcuts still work during a load.
 class ReloadButton final : public ToolbarButton {
 public:
     AK_ALLOC_WITH_KMALLOC;
@@ -171,7 +167,6 @@ protected:
     }
 
     // A Shift-click on the reload button reloads bypassing the HTTP cache, and one on the stop button stops the load as
-    // any other click there does. QToolButton triggers its default action from here, once a click has completed.
     virtual void nextCheckState() override
     {
         if (m_visible_mode == Mode::Reload && QApplication::keyboardModifiers().testFlag(Qt::ShiftModifier)) {
@@ -373,11 +368,9 @@ static constexpr int TAB_FAVICON_SIZE = 16;
 static constexpr int TOOLBAR_HORIZONTAL_MARGIN = 12;
 #ifdef AK_OS_MACOS
 static constexpr int WEB_VIEW_INSET = 5;
-// The sidebar has its own padding, so a narrower frame of the toolbar's color sets the page apart from it.
 static constexpr int WEB_VIEW_SIDEBAR_INSET = 4;
 #endif
 static constexpr int TOOLBAR_VERTICAL_MARGIN = 2;
-// NB: The location field gets a point more room below it than above it, where the page begins.
 static constexpr int TOOLBAR_BOTTOM_MARGIN = TOOLBAR_VERTICAL_MARGIN + 1;
 static constexpr int TOOLBAR_WINDOW_CONTROLS_RIGHT_MARGIN = 4;
 static constexpr int DOWNLOADS_POPOVER_WIDTH = 380;
@@ -1036,8 +1029,6 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
             NewTabPage::populate(view(), m_window->session(), show_recently_closed);
         }
 
-        // Only mark the end of loads that finished, rather than being stopped, which don't end here. The browser's own
-        // about: pages are not marked.
         if (!view().is_loading() && url.scheme() != "about"sv)
             emit loading_finished();
     };
@@ -1053,7 +1044,6 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
             }
         }
         m_suppress_javascript_dialogs_until_navigation = false;
-        // Xenon: The session saves the tab's new page within a second, rather than in up to 30.
         SessionSaving::save_soon();
     };
 
@@ -1063,7 +1053,6 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     view().on_url_change = [this](auto const& url) {
         m_location_edit->set_url(url);
-        // Xenon: As do a navigation within the page, and a restored tab's page.
         SessionSaving::save_soon();
     };
 
@@ -1076,7 +1065,6 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     view().on_title_change = [this](auto const& title) {
         m_title = qstring_from_utf16_string(title);
-        // Xenon: Nor does a new tab page's title show its URL, which is a page's title until it has one of its own.
         if (auto url = view().url(); NewTabPage::should_hide_url(url) && m_title == qstring_from_ak_string(url.serialize()))
             m_title = "New Tab";
         update_tab_title();
@@ -1203,10 +1191,11 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         }
         if (m_external_url_confirmation_dialog)
             m_external_url_confirmation_dialog->close();
-        auto pending_permission_requests = AK::move(m_pending_permission_requests);
-        for (auto& it : pending_permission_requests) {
-            if (it.value.dialog)
-                it.value.dialog->close();
+        auto permission_dialogs = AK::move(m_permission_dialogs);
+        for (auto& it : permission_dialogs) {
+            if (it.dialog)
+                it.dialog->close();
+            it.on_outcome(Web::Permissions::PromptOutcome::Ignored);
         }
     };
 
@@ -1249,13 +1238,11 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     WebAuthnPopover::attach(view());
 
-    view().on_request_permission = [this](auto const& name, auto const& origin, auto on_decided) {
-        auto requester = origin.is_opaque() ? "this page"_string : origin.serialize();
-        auto question = MUST(String::formatted("Allow {} to use your {}?", requester, name));
-        if (auto pending = m_pending_permission_requests.get(question); pending.has_value()) {
-            pending.value().on_decided.append(AK::move(on_decided));
-            return;
-        }
+    view().on_request_permission = [this](WebView::PermissionPromptRequest const& request, WebView::PermissionPromptCallback on_outcome) {
+        auto requester = request.top_level_origin.is_opaque() ? "this page"_string : request.top_level_origin.serialize();
+        if (request.is_file)
+            requester = "this file"_string;
+        auto question = MUST(String::formatted("Allow {} to use your {}?", requester, Web::Permissions::to_string(request.name)));
 
         auto* dialog = new QMessageBox(&view());
         dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -1264,23 +1251,37 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         dialog->setTextFormat(Qt::PlainText);
         dialog->setText(qstring_from_ak_string(question));
         auto* allow_button = dialog->addButton("Allow", QMessageBox::ButtonRole::AcceptRole);
+        auto* allow_once_button = dialog->addButton("Allow This Time", QMessageBox::ButtonRole::AcceptRole);
         auto* block_button = dialog->addButton("Block", QMessageBox::ButtonRole::RejectRole);
         dialog->setDefaultButton(block_button);
+        m_permission_dialogs.append({ request, dialog, AK::move(on_outcome) });
 
-        PendingPermissionRequests pending { .dialog = dialog, .on_decided = {} };
-        pending.on_decided.append(AK::move(on_decided));
-        m_pending_permission_requests.set(question, AK::move(pending));
-
-        QObject::connect(dialog, &QDialog::finished, this, [this, dialog = QPointer<QMessageBox> { dialog }, allow_button, question](auto) {
-            auto pending = m_pending_permission_requests.take(question);
-            if (!pending.has_value())
+        QObject::connect(dialog, &QDialog::finished, this, [this, dialog = QPointer<QMessageBox> { dialog }, allow_button, allow_once_button, block_button](auto) {
+            auto index = m_permission_dialogs.find_first_index_if([&](auto const& it) { return it.dialog == dialog; });
+            if (!index.has_value())
                 return;
-            auto granted = dialog && dialog->clickedButton() == allow_button;
-            for (auto& on_decided : pending.value().on_decided)
-                on_decided(granted);
+            auto pending = m_permission_dialogs.take(*index);
+
+            auto* clicked_button = dialog ? dialog->clickedButton() : nullptr;
+            auto outcome = Web::Permissions::PromptOutcome::Dismissed;
+            if (clicked_button == allow_button)
+                outcome = Web::Permissions::PromptOutcome::AllowAlways;
+            else if (clicked_button == allow_once_button)
+                outcome = Web::Permissions::PromptOutcome::AllowOnce;
+            else if (clicked_button == block_button)
+                outcome = Web::Permissions::PromptOutcome::Block;
+            pending.on_outcome(outcome);
         });
 
         dialog->open();
+    };
+
+    view().on_cancel_permission_prompt = [this](WebView::PermissionPromptRequest const& request) {
+        auto index = m_permission_dialogs.find_first_index_if([&](auto const& it) { return it.request.is_same_request_as(request); });
+        if (!index.has_value())
+            return;
+        if (auto dialog = m_permission_dialogs.take(*index).dialog)
+            dialog->close();
     };
 
     view().on_request_accept_dialog = [this]() {
@@ -1423,8 +1424,8 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         m_window->fullscreen_mode().exit(FullscreenMode::ExitInitiatedBy::WebContent);
     };
 
-    view().on_audio_play_state_changed = [this](auto play_state) {
-        emit audio_play_state_changed(tab_index(), play_state);
+    view().on_audibility_changed = [this](auto audibility) {
+        emit audibility_changed(tab_index(), audibility);
     };
 
     view().on_screen_wake_lock_state_changed = [this](auto wake_lock_state) {
@@ -1538,7 +1539,6 @@ void Tab::ensure_loaded()
     auto toolbar_window_controls_visible = m_toolbar_window_controls_visible;
     initialize({});
     m_deferred_tab.clear();
-    // Xenon: A new tab page's address bar is empty from the start, and takes focus as the tab is selected.
     if (NewTabPage::should_hide_url(deferred_url))
         set_url_is_hidden(true);
 
@@ -1657,14 +1657,12 @@ void Tab::update_web_view_frame(bool chrome_visible, Optional<WebView::VerticalT
     if (!is_loaded())
         return;
 
-    // With the browser chrome hidden, the page fills the window edge to edge. In a split view, the split view frames it.
     if (!chrome_visible || m_in_split_view) {
         m_view_layout->setContentsMargins(0, 0, 0, 0);
         m_view->set_has_rounded_corners(m_in_split_view);
         return;
     }
 
-    // Keep the web view's rounded corners clear of the window edges.
     auto left = sidebar_position == WebView::VerticalTabsPosition::Left ? WEB_VIEW_SIDEBAR_INSET : WEB_VIEW_INSET;
     auto right = sidebar_position == WebView::VerticalTabsPosition::Right ? WEB_VIEW_SIDEBAR_INSET : WEB_VIEW_INSET;
     m_view_layout->setContentsMargins(left, 0, right, WEB_VIEW_INSET);
@@ -1706,8 +1704,6 @@ void Tab::set_toolbar_container_in_tab_layout(bool in_tab_layout)
     }
 }
 
-// NB: The location field gets a point more room above it below the horizontal tab strip, where the selected tab flows
-//     into the toolbar, and at the top of a macOS window, whose outline covers the toolbar's first point.
 static int toolbar_extra_top_margin(bool window_controls_visible)
 {
     return use_native_macos_window_controls() || !window_controls_visible ? 1 : 0;
@@ -1937,7 +1933,6 @@ void Tab::set_screen_wake_lock_state(Web::ScreenWakeLockState wake_lock_state)
 #ifdef AK_OS_MACOS
 void Tab::paintEvent(QPaintEvent*)
 {
-    // The inset around the web view should match the chrome surrounding it.
     QPainter painter(this);
     auto const& palette = window()->palette();
     painter.fillRect(rect(), ChromeStyle::chrome_background(palette));
@@ -1945,10 +1940,6 @@ void Tab::paintEvent(QPaintEvent*)
     if (!m_web_view_chrome_visible || !m_web_view_sidebar_position.has_value() || !is_loaded() || m_in_split_view)
         return;
 
-    // At the bottom of the window, the sidebar's color reaches around the web view's rounded corner beside it, so the
-    // inset bends around that corner rather than meeting the sidebar in a square corner. At the top, the inset joins
-    // the toolbar instead.
-    // NB: The curve meets the sidebar's edge and the window's bottom edge in a tangent.
     auto radius = m_view->viewport_corner_radius() + WEB_VIEW_SIDEBAR_INSET;
     auto left = *m_web_view_sidebar_position == WebView::VerticalTabsPosition::Right ? width() - radius : 0.0;
     auto curve_left = *m_web_view_sidebar_position == WebView::VerticalTabsPosition::Right ? width() - (2 * radius) : 0.0;
@@ -2013,7 +2004,6 @@ void Tab::hide_hover_label()
 
 bool Tab::event(QEvent* event)
 {
-    // The sidebar's color, which the frame around the page bends around, follows the window's activity.
     if (event->type() == QEvent::WindowActivate || event->type() == QEvent::WindowDeactivate)
         update();
 
@@ -2359,13 +2349,11 @@ void Tab::update_bookmarks_bar_visibility()
         if (m_bookmarks_bar_container->parentWidget() != this)
             m_bookmarks_bar_container->setParent(this);
     } else if (m_compact_toolbar) {
-        // The compact toolbar shares its row with the tabs, so an always-visible bar spans the top of the page instead.
         if (tab_layout->indexOf(m_bookmarks_bar_container) == -1) {
             toolbar_layout->removeWidget(m_bookmarks_bar_container);
             tab_layout->insertWidget(tab_layout->indexOf(m_toolbar_container) + 1, m_bookmarks_bar_container);
         }
     } else if (toolbar_layout->indexOf(m_bookmarks_bar_container) == -1) {
-        // An always-visible bar remains in the full-width toolbar above the vertical tabs.
         tab_layout->removeWidget(m_bookmarks_bar_container);
         toolbar_layout->addWidget(m_bookmarks_bar_container);
     }

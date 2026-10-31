@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-# A Chrome native messaging host for Meta/xenon.py test: each message comes back as {echo, origin}.
-
 from __future__ import annotations
 
 import json

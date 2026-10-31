@@ -18,9 +18,6 @@
 
 namespace Ladybird {
 
-// Fetches a file Xenon needs for itself, such as filter lists or an extension, through RequestServer: up to the size it
-// should be, without cookies or the HTTP cache, and following redirects only to https. Calls back once, with the body
-// of a successful response or an error.
 class Download final : public RefCounted<Download> {
 public:
     using Callback = Function<void(ErrorOr<ByteBuffer>)>;

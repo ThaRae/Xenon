@@ -1,9 +1,4 @@
 # shellcheck shell=bash
-# Sourced by the scripts that run Xenon's tests in a container (Meta/ci/build-and-test.sh, Meta/ci/test-appimage.sh).
-#
-# The tests open Xenon's windows too (the session restore check: a headless run never saves its session), so they get a
-# real X server, as on a desktop, rather than Qt's offscreen platform. Xvfb picks a free display and reports it through
-# -displayfd once it's ready. This exports DISPLAY, and stops Xvfb when the script exits.
 
 x_server_log=$(mktemp)
 display_file=$(mktemp)

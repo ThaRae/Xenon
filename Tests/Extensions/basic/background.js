@@ -1,11 +1,8 @@
-// The test extension's background service worker, which tests.js and idle.js talk to.
 const events = [];
-// Which run of the worker this is: idle.js checks that it starts again once it has stopped.
 const instance = crypto.randomUUID();
 
 chrome.runtime.onInstalled.addListener(details => events.push(`installed:${details.reason}`));
 
-// A service worker's lifecycle events, before onInstalled and onStartup. Proton Pass imports its chunks from oninstall.
 self.oninstall = () => {
     importScripts("installed-chunk.js");
     events.push(`install:${self.xenonInstalledChunk === true}`);
@@ -15,11 +12,9 @@ self.addEventListener("activate", event => events.push(`activate:${typeof event.
 chrome.runtime.onStartup.addListener(() => events.push("startup"));
 chrome.alarms.onAlarm.addListener(alarm => {
     events.push(`alarm:${alarm.name}`);
-    // idle.js sets this one once the worker has stopped, and hears of it from storage.onChanged.
     if (alarm.name === "wake") chrome.storage.session.set({ wokenByAlarm: instance });
 });
 
-// What runScriptingTests() checks of webNavigation's events.
 const navigationEvents = [];
 for (const name of ["onBeforeNavigate", "onCommitted", "onDOMContentLoaded", "onCompleted", "onErrorOccurred"])
     chrome.webNavigation[name].addListener(details => navigationEvents.push({ name, ...details }));
@@ -65,7 +60,6 @@ chrome.runtime.onConnect.addListener(port => {
     port.onMessage.addListener(message => port.postMessage({ echo: message, name: port.name }));
 });
 
-// Meta/xenon.py's externally connectable page (externally-connectable.html), a web page that messages the extension.
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
     switch (message?.toBackground) {
         case "ping": {
@@ -90,8 +84,6 @@ chrome.runtime.onConnectExternal.addListener(port => {
     );
 });
 
-// chrome.scripting and chrome.webNavigation, run against the tab of the content script that asks (content-idle.js), on
-// Meta/xenon.py's content script page, which has a frame at /frame.
 let registeredScriptRan;
 
 async function runScriptingTests(sender) {
@@ -209,7 +201,6 @@ async function runScriptingTests(sender) {
         "Duplicate script ID"
     );
 
-    // A registered script runs in the documents that load after it, such as the frame's once it reloads.
     const ran = new Promise(resolve => (registeredScriptRan = resolve));
     await chrome.scripting.executeScript({ target: { tabId, frameIds: [child?.frameId] }, func: () => location.reload() });
     const timedOut = new Promise(resolve => setTimeout(() => resolve(undefined), 5000));
@@ -218,7 +209,6 @@ async function runScriptingTests(sender) {
     await chrome.scripting.unregisterContentScripts({ ids: ["registered"] });
     check("unregisterContentScripts", (await chrome.scripting.getRegisteredContentScripts()).length === 0);
 
-    // webNavigation's events follow the frame as it navigates, and when a navigation fails.
     const waitFor = async condition => {
         for (let tries = 0; tries < 100 && !condition(); ++tries) await new Promise(resolve => setTimeout(resolve, 50));
         return condition();

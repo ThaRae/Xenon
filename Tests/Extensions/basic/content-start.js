@@ -1,7 +1,3 @@
-// A content script at document_start, in the test extension's isolated world on Meta/xenon.py's content script page
-// (Tests/Extensions/content-scripts.html). It runs before the page's own scripts, and leaves what it found for
-// content-end.js and content-idle.js, which share its world.
-// NB: Content scripts share their world's global scope, so each keeps its own names in a function.
 (() => {
     const test = (globalThis.xenonContentTest = { order: ["start"], results: {} });
 
@@ -21,11 +17,8 @@
     );
     check("i18n", chrome.i18n.getMessage("name") === "Xenon test extension");
 
-    // Sent as the browser starts, before the background may have run its script. It waits for the background, as in
-    // Chrome, rather than finding no receiver.
     test.earlyReply = chrome.runtime.sendMessage({ toBackground: "ping" }).catch(error => ({ error: error.message }));
 
-    // What the page's own scripts look for: a global, which they mustn't see, and storage, which they share.
     window.xenonContentSecret = "content";
     sessionStorage.setItem("xenonContentStart", "ran");
 })();

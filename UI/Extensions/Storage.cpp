@@ -52,7 +52,6 @@ ErrorOr<NonnullOwnPtr<StorageArea>> StorageArea::create(Kind kind, Quota quota, 
     if (file.has_value() && FileSystem::exists(*file)) {
         auto contents = TRY(TRY(Core::File::open(*file, Core::File::OpenMode::Read))->read_until_eof());
         auto json = JsonValue::from_string(contents);
-        // A file that doesn't parse is a crash mid-write from before saves were atomic; start over rather than fail.
         if (!json.is_error() && json.value().is_object())
             items = json.release_value().as_object();
         else
@@ -89,7 +88,6 @@ Vector<String> StorageArea::keys() const
     return keys;
 }
 
-// As Chrome counts it: each key's length plus its value's JSON serialization.
 static size_t item_size(String const& key, JsonValue const& value)
 {
     auto serialized = value.serialized();
@@ -111,7 +109,6 @@ ErrorOr<JsonObject, String> StorageArea::set(JsonObject const& items)
     if (m_kind == Kind::Managed)
         return "This is a read-only store."_string;
 
-    // Check every quota before changing anything, so that a write either happens entirely or not at all.
     size_t new_total = bytes_in_use({});
     size_t new_count = m_items.size();
     Optional<String> error;
@@ -180,7 +177,6 @@ void StorageArea::save() const
     if (!m_file.has_value())
         return;
 
-    // Write a new file and move it over the old one, so that a crash leaves one or the other, never half of each.
     auto write = [&]() -> ErrorOr<void> {
         TRY(Core::Directory::create(LexicalPath { *m_file }.parent(), Core::Directory::CreateDirectories::Yes));
         auto temporary = ByteString::formatted("{}.tmp", *m_file);

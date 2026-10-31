@@ -4,15 +4,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/*
- * What Xenon's own pages (welcome, new tab, settings) share: a warm page, serif titles over sans-serif text, the orbit
- * mark from the app icon, and the controls the three pages are built from. Choices are keys that stand on a lip and
- * sink when chosen, and a small rose lamp marks whatever is on.
- *
- * Ladybird draws weight 500 as bold, and with antialiased font smoothing it draws 600 as regular inside transformed
- * boxes, so these pages use 400 and 600 and leave the smoothing alone.
- */
-
 :root {
     --xenon-page: #f7f4f1;
     --xenon-card: #fffdfb;
@@ -24,8 +15,7 @@
     --xenon-hairline: rgba(26, 21, 23, 0.12);
     --xenon-hairline-soft: rgba(26, 21, 23, 0.07);
     --xenon-row-hover: rgba(26, 21, 23, 0.04);
-    --xenon-row-selected: rgba(255, 0, 80, 0.08);
-    /* Rose text on the page, 4.6:1. */
+    --xenon-row-selected: rgba(26, 21, 23, 0.07);
     --xenon-rose-ink: var(--xenon-rose-pressed);
 
     --xenon-key-face: #fffdfb;
@@ -34,16 +24,13 @@
     --xenon-key-down: #f0ebe8;
     --xenon-lamp-off: #cfc7c4;
 
-    /* The app icon's white orbit and nucleus, which turn to ink on a light page. */
     --xenon-orbit: var(--xenon-ink);
 
     --xenon-sans: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-    /* Named first, since Ladybird treats ui-serif as plain serif (Times). */
     --xenon-serif: "Iowan Old Style", Charter, Georgia, ui-serif, serif;
     --xenon-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
-/* In the dark, the pages take the app icon's own background. */
 @media (prefers-color-scheme: dark) {
     :root {
         --xenon-page: #0d0a0c;
@@ -56,7 +43,7 @@
         --xenon-hairline: rgba(244, 239, 241, 0.13);
         --xenon-hairline-soft: rgba(244, 239, 241, 0.07);
         --xenon-row-hover: rgba(244, 239, 241, 0.06);
-        --xenon-row-selected: rgba(255, 0, 80, 0.15);
+        --xenon-row-selected: rgba(244, 239, 241, 0.1);
         --xenon-rose-ink: var(--xenon-rose-light);
 
         --xenon-key-face: #1e181a;
@@ -73,7 +60,6 @@ html {
     background-color: var(--xenon-page);
 }
 
-/* Hidden means hidden, whatever display a component's own rule gives it. */
 [hidden] {
     display: none !important;
 }
@@ -90,11 +76,6 @@ body {
     background: var(--xenon-page);
 }
 
-/*
- * The mark is the app icon's artwork (UI/Icons/xenon.svg): two orbits woven around a nucleus. Its paths are the icon's
- * ellipses with the gaps where each passes under the other already cut, so it needs no masks or ids and can be repeated
- * on a page. Below about 32px, use the heavier geometry from xenon-small.svg.
- */
 .mark {
     display: block;
     fill: none;
@@ -114,11 +95,10 @@ body {
     stroke: none;
 }
 
-/* The mark beside the page's name, at the top of each page. */
 .wordmark {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 8px;
     font-size: 15px;
     font-weight: 600;
     color: var(--xenon-ink);
@@ -126,11 +106,10 @@ body {
 }
 
 .wordmark .mark {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
 }
 
-/* A page's title is its only serif. */
 .page-title {
     margin: 0;
     font-family: var(--xenon-serif);
@@ -152,10 +131,10 @@ body {
 
 kbd {
     display: inline-block;
-    min-width: 18px;
-    padding: 0 5px;
+    min-width: 20px;
+    padding: 0 4px;
     font-family: var(--xenon-sans);
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 600;
     line-height: 17px;
     text-align: center;
@@ -172,10 +151,6 @@ code {
     font-size: 0.9em;
 }
 
-/*
- * Keys: Xenon's buttons. A key stands on a lip, and one that's chosen (pressed, or holding a checked input) sinks onto
- * it. button.primary-button, which Ladybird's own scripts also use, is the rose key.
- */
 .key,
 button.primary-button,
 button.secondary-button {
@@ -183,9 +158,9 @@ button.secondary-button {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 34px;
-    padding: 0 14px;
-    font: 600 13.5px/1 var(--xenon-sans);
+    height: 32px;
+    padding: 0 16px;
+    font: 600 14px/1 var(--xenon-sans);
     color: var(--xenon-ink);
     white-space: nowrap;
     text-decoration: none;
@@ -198,8 +173,8 @@ button.secondary-button {
 
 .key svg {
     flex: none;
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
 }
 
 .key:hover:not(:disabled),
@@ -238,21 +213,18 @@ button.secondary-button:disabled {
 
 .key.big,
 button.primary-button.big {
-    height: 42px;
+    height: 40px;
     padding: 0 20px;
-    font-size: 14.5px;
+    font-size: 15px;
     border-radius: 10px;
     box-shadow: 0 3px 0 var(--xenon-key-lip);
 }
 
-/* A shade darker than the accent, so the white label is readable (4.6:1). */
 button.primary-button {
     color: #fff;
     background-color: var(--xenon-rose-hover);
     border-color: var(--xenon-rose-pressed);
-    box-shadow:
-        0 3px 0 var(--xenon-rose-pressed),
-        0 5px 12px rgba(204, 0, 66, 0.18);
+    box-shadow: 0 3px 0 var(--xenon-rose-pressed);
 }
 
 button.primary-button:hover:not(:disabled) {
@@ -266,7 +238,6 @@ button.primary-button:disabled {
     box-shadow: none;
 }
 
-/* Keys that do less than a key: Skip, Back to a list. */
 .text-key {
     padding: 0;
     font: inherit;
@@ -281,25 +252,22 @@ button.primary-button:disabled {
     color: var(--xenon-ink);
 }
 
-/* A small lamp: lit means on. */
 .lamp {
     display: inline-block;
     flex: none;
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background-color: var(--xenon-lamp-off);
     box-shadow: inset 0 1px 1px rgba(26, 21, 23, 0.25);
 }
 
-.lamp.on {
+.lamp.on,
+.choice:has(.choice-input:checked) .lamp {
     background-color: var(--xenon-rose);
-    box-shadow:
-        0 0 0 2px rgba(255, 0, 80, 0.16),
-        0 0 6px rgba(255, 0, 80, 0.55);
+    box-shadow: none;
 }
 
-/* A site's initial in a rounded square, where the site has no favicon. */
 .monogram {
     display: inline-flex;
     flex: none;
@@ -324,11 +292,10 @@ button.primary-button:disabled {
 }
 
 .monogram img {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
 }
 
-/* A box of rows, each with its control on the right. */
 .box {
     overflow: hidden;
     background-color: var(--xenon-card);
@@ -337,16 +304,15 @@ button.primary-button:disabled {
 }
 
 .box-title {
-    margin: 22px 0 7px 2px;
+    margin: 24px 0 8px 2px;
     font-size: 13px;
     font-weight: 600;
     color: var(--xenon-ink-soft);
 }
 
-/* Presets: a setting as one key that shows its value. Settings opens with them, and the welcome lists its defaults so. */
 .presets {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(152px, 1fr));
     gap: 12px;
 }
 
@@ -357,7 +323,7 @@ button.primary-button:disabled {
     align-items: stretch;
     gap: 2px;
     min-height: 104px;
-    padding: 14px 14px 13px;
+    padding: 16px 16px 12px;
     font: inherit;
     color: var(--xenon-ink);
     text-align: left;
@@ -388,20 +354,20 @@ button.preset[aria-expanded="true"] {
 }
 
 .preset > svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     margin-bottom: auto;
     color: var(--xenon-ink-soft);
 }
 
 .preset .lamp {
     position: absolute;
-    top: 14px;
-    right: 14px;
+    top: 16px;
+    right: 16px;
 }
 
 .preset-name {
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--xenon-muted);
 }
 
@@ -421,7 +387,6 @@ button.preset[aria-expanded="true"] {
     color: var(--xenon-muted);
 }
 
-/* Picture choices: a key with a picture of the result, ringed in rose and sunk when chosen. */
 .choice {
     position: relative;
     display: flex;
@@ -437,12 +402,12 @@ button.preset[aria-expanded="true"] {
 }
 
 .choice:has(.choice-input:checked) {
-    padding: 11px 11px 15px;
-    border: 2px solid var(--xenon-rose);
+    background-color: var(--xenon-key-down);
+    border-color: var(--xenon-ink-soft);
     transform: translateY(3px);
     box-shadow:
-        0 2px 0 var(--xenon-rose-pressed),
-        0 4px 10px rgba(204, 0, 66, 0.12);
+        0 2px 0 var(--xenon-key-lip),
+        inset 0 1px 2px rgba(26, 21, 23, 0.14);
 }
 
 .choice:has(.choice-input:focus-visible) {
@@ -456,7 +421,6 @@ button.preset[aria-expanded="true"] {
     pointer-events: none;
 }
 
-/* A choice with a control of its own below it is a box, and the part that chooses it is this label. */
 .choice-main {
     display: flex;
     flex-direction: column;
@@ -465,14 +429,10 @@ button.preset[aria-expanded="true"] {
 
 .choice-picture {
     display: block;
-    padding: 18px 18px 0;
+    padding: 16px 16px 0;
     overflow: hidden;
     background-color: var(--xenon-stone);
     border-radius: 7px;
-}
-
-.choice:has(.choice-input:checked) .choice-picture {
-    background-color: var(--xenon-row-selected);
 }
 
 .choice-picture svg {
@@ -491,22 +451,11 @@ button.preset[aria-expanded="true"] {
 }
 
 .choice-note {
-    margin: 3px 4px 0;
-    font-size: 13.5px;
+    margin: 4px 4px 0;
+    font-size: 14px;
     color: var(--xenon-muted);
 }
 
-.choice:has(.choice-input:checked) .lamp {
-    background-color: var(--xenon-rose);
-    box-shadow:
-        0 0 0 2px rgba(255, 0, 80, 0.16),
-        0 0 6px rgba(255, 0, 80, 0.55);
-}
-
-/*
- * The window drawn in a layout choice. Its parts take their colours from these classes, so the drawing follows the
- * page into the dark.
- */
 .window .frame {
     fill: var(--xenon-stone);
     stroke: var(--xenon-hairline);
@@ -546,7 +495,6 @@ button.preset[aria-expanded="true"] {
     fill: var(--xenon-rose);
 }
 
-/* List choices, as a choice screen lists search engines: rows with a monogram, a note and a radio, two to a line. */
 .picks {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -562,7 +510,7 @@ button.preset[aria-expanded="true"] {
     align-items: center;
     gap: 12px;
     min-height: 52px;
-    padding: 10px 14px;
+    padding: 10px 16px;
     border-top: 1px solid var(--xenon-hairline-soft);
     cursor: pointer;
 }
@@ -581,10 +529,6 @@ button.preset[aria-expanded="true"] {
 
 .pick:has(input:checked) {
     background-color: var(--xenon-row-selected);
-}
-
-.pick:has(input:checked) .monogram:not(.soft) {
-    background-color: var(--xenon-rose-hover);
 }
 
 .pick:has(input:focus-visible) {
@@ -616,11 +560,10 @@ button.preset[aria-expanded="true"] {
 
 .pick-note {
     display: block;
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--xenon-muted);
 }
 
-/* The radio a pick shows, since the real one only takes keyboard focus. */
 .dot {
     flex: none;
     width: 16px;

@@ -12,15 +12,15 @@ being built, for nothing when content blocking is turned off.
 Send each process empty rules while blocking is off, which drops the
 engine it has, and send the rules again when blocking is turned back on.
 ---
- Libraries/LibWebView/Application.cpp | 10 ++++++++++
- Libraries/LibWebView/Application.h   |  2 ++
- 2 files changed, 12 insertions(+)
+ Libraries/LibWebView/Application.cpp | 8 ++++++++
+ Libraries/LibWebView/Application.h   | 1 +
+ 2 files changed, 9 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 8f310ec7639cc829a9eacda1ae11513b2ff0d323..f0f8112d75330b97abcb2ad18b218f2c753e0bb2 100644
+index 5daa7f3e4b62cbcf03356e7f373c9b724c3659a1..e394b28f1819e74348a034491b46be2f57060bb8 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -710,6 +710,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -725,6 +725,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          warnln("\033[31;1mUnable to load all content blocker lists:\033[0m {}", result.error());
          warnln("    Configured lists: {}", m_browser_options.content_blocker_list_paths);
      }
@@ -28,11 +28,10 @@ index 8f310ec7639cc829a9eacda1ae11513b2ff0d323..f0f8112d75330b97abcb2ad18b218f2c
  
      if (!m_event_loop)
          m_event_loop = &create_platform_event_loop();
-@@ -898,6 +899,11 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -913,6 +914,10 @@ void Application::send_content_blockers(WebContentClient& client) const
  {
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
-+    // Each process builds an engine from the rules, which can take tens of MiB, so while blocking is off it gets none.
 +    if (!content_blocking_enabled()) {
 +        client.async_set_content_blockers(Core::AnonymousBuffer {}, Core::AnonymousBuffer {}, Core::AnonymousBuffer {});
 +        return;
@@ -40,11 +39,9 @@ index 8f310ec7639cc829a9eacda1ae11513b2ff0d323..f0f8112d75330b97abcb2ad18b218f2c
      client.async_set_content_blockers(*m_content_blocker_list_buffer, *m_trusted_content_blocker_list_buffer, *m_content_blocker_resources_buffer);
  }
  
-@@ -3192,7 +3198,11 @@ void Application::apply_content_blocker_settings()
-     else
+@@ -3317,6 +3322,9 @@ void Application::apply_content_blocker_settings()
          rules_changed = result.release_value();
  
-+    // Turning blocking on or off gives or takes the rules (see send_content_blockers()).
      auto enabled = content_blocking_enabled();
 +    if (exchange(m_content_blocking_was_enabled, enabled) != enabled)
 +        rules_changed = true;
@@ -53,14 +50,13 @@ index 8f310ec7639cc829a9eacda1ae11513b2ff0d323..f0f8112d75330b97abcb2ad18b218f2c
  
      WebContentClient::for_each_client([&](WebContentClient& client) {
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index d3a73370adde6f99893ab871edde3662a4beb6c4..8a297a4bb602eb3505c21bc0c4533ce404fff71f 100644
+index a3ac4dffdafd9da5775c1fa854e8f6a8012910b2..be829d3af4f50e578915c21b815f4dcdb291fe4a 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -636,6 +636,8 @@ private:
+@@ -651,6 +651,7 @@ private:
      Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
      Optional<Core::AnonymousBuffer> m_trusted_content_blocker_list_buffer;
      Optional<Core::AnonymousBuffer> m_content_blocker_resources_buffer;
-+    // Whether content blocking was on when every process last got the rules, which it only has while it is.
 +    bool m_content_blocking_was_enabled { false };
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {

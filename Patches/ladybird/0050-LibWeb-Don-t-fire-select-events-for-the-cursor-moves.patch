@@ -24,21 +24,21 @@ loop longer than the benchmark itself.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .../LibWeb/HTML/FormAssociatedElement.cpp     | 13 ++++---
- Libraries/LibWeb/HTML/FormAssociatedElement.h |  4 +-
- Libraries/LibWeb/HTML/HTMLTextAreaElement.cpp | 13 +++++--
+ .../LibWeb/HTML/FormAssociatedElement.cpp     | 10 ++---
+ Libraries/LibWeb/HTML/FormAssociatedElement.h |  3 +-
+ Libraries/LibWeb/HTML/HTMLTextAreaElement.cpp | 10 +++--
  Libraries/LibWeb/HTML/HTMLTextAreaElement.h   |  6 ++-
  .../select-event-text-control-edits.txt       | 14 +++++++
- .../select-event-text-control-edits.html      | 39 +++++++++++++++++++
- 6 files changed, 77 insertions(+), 12 deletions(-)
+ .../select-event-text-control-edits.html      | 37 +++++++++++++++++++
+ 6 files changed, 68 insertions(+), 12 deletions(-)
  create mode 100644 Tests/LibWeb/Text/expected/Editing/select-event-text-control-edits.txt
  create mode 100644 Tests/LibWeb/Text/input/Editing/select-event-text-control-edits.html
 
 diff --git a/Libraries/LibWeb/HTML/FormAssociatedElement.cpp b/Libraries/LibWeb/HTML/FormAssociatedElement.cpp
-index 9eaf9960da9bfa9d92b26f1784b90fe8b032d0f4..5dd43453b74af0c88a16d22042523a7c5ce47c91 100644
+index a64eaacccf0407a76711b5fcf723b69f3356177f..95708fe579c122a853ec7f027196dd8f74d43249 100644
 --- a/Libraries/LibWeb/HTML/FormAssociatedElement.cpp
 +++ b/Libraries/LibWeb/HTML/FormAssociatedElement.cpp
-@@ -1073,7 +1073,7 @@ WebIDL::ExceptionOr<void> FormAssociatedTextControlElement::set_range_text_bindi
+@@ -1082,7 +1082,7 @@ WebIDL::ExceptionOr<void> FormAssociatedTextControlElement::set_range_text_bindi
  }
  
  // https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#dom-textarea/input-setrangetext
@@ -47,7 +47,7 @@ index 9eaf9960da9bfa9d92b26f1784b90fe8b032d0f4..5dd43453b74af0c88a16d22042523a7c
  {
      // 2. Set this element's dirty value flag to true.
      set_dirty_value_flag(true);
-@@ -1179,7 +1179,7 @@ WebIDL::ExceptionOr<void> FormAssociatedTextControlElement::set_range_text(Utf16
+@@ -1188,7 +1188,7 @@ WebIDL::ExceptionOr<void> FormAssociatedTextControlElement::set_range_text(Utf16
      }
  
      // 14. Set the selection range with selection start and selection end.
@@ -56,19 +56,16 @@ index 9eaf9960da9bfa9d92b26f1784b90fe8b032d0f4..5dd43453b74af0c88a16d22042523a7c
  
      return {};
  }
-@@ -1255,8 +1255,9 @@ void FormAssociatedTextControlElement::set_the_selection_range(Optional<WebIDL::
+@@ -1264,8 +1264,6 @@ void FormAssociatedTextControlElement::set_the_selection_range(Optional<WebIDL::
      if (was_modified) {
          auto& html_element = text_control_to_html_element();
  
 -        // AD-HOC: We don't fire the event if the user moves the cursor without selecting any text.
 -        //         This is not in the spec but matches how other browsers behave.
-+        // AD-HOC: We don't fire the event if the user moves the cursor without selecting any text, or if an edit
-+        //         (typing or execCommand(), say) leaves the cursor somewhere else. This is not in the spec but
-+        //         matches how other browsers behave.
          if (source == SelectionSource::DOM || m_selection_start != m_selection_end) {
              html_element.queue_an_element_task(Task::Source::UserInteraction, [&html_element] {
                  auto select_event = DOM::Event::create(
-@@ -1311,7 +1312,7 @@ void FormAssociatedTextControlElement::handle_insert(Utf16FlyString const& input
+@@ -1320,7 +1318,7 @@ void FormAssociatedTextControlElement::handle_insert(Utf16FlyString const& input
  
      {
          Editing::EditingHistory::ProxyMutationScope proxy_scope { html_element };
@@ -77,7 +74,7 @@ index 9eaf9960da9bfa9d92b26f1784b90fe8b032d0f4..5dd43453b74af0c88a16d22042523a7c
      }
  
      if (auto step = history->undo_step_being_recorded(); step) {
-@@ -1411,7 +1412,7 @@ void FormAssociatedTextControlElement::handle_delete(Utf16FlyString const& input
+@@ -1420,7 +1418,7 @@ void FormAssociatedTextControlElement::handle_delete(Utf16FlyString const& input
  
      {
          Editing::EditingHistory::ProxyMutationScope proxy_scope { html_element };
@@ -87,19 +84,18 @@ index 9eaf9960da9bfa9d92b26f1784b90fe8b032d0f4..5dd43453b74af0c88a16d22042523a7c
  
      if (auto step = history->undo_step_being_recorded(); step && !removed_data.is_empty()) {
 diff --git a/Libraries/LibWeb/HTML/FormAssociatedElement.h b/Libraries/LibWeb/HTML/FormAssociatedElement.h
-index 3e6a32926adcde41fb6d9ee6d9e2bf6d15742dfa..473f2d0b43196bd8c4de4350efbb54c11f3b839b 100644
+index d96a45c75b8ef30afe5b8f7e463e43b5a6d7daa2..626fa2f2452ed860a913691200e83aa7d16e642b 100644
 --- a/Libraries/LibWeb/HTML/FormAssociatedElement.h
 +++ b/Libraries/LibWeb/HTML/FormAssociatedElement.h
-@@ -227,6 +227,8 @@ private:
+@@ -227,6 +227,7 @@ private:
  enum class SelectionSource {
      UI,
      DOM,
-+    // The selection an edit of the text control's value leaves behind.
 +    Edit,
  };
  
  class WEB_API FormAssociatedTextControlElement
-@@ -263,7 +265,7 @@ public:
+@@ -263,7 +264,7 @@ public:
      WebIDL::ExceptionOr<void> set_range_text_binding(Utf16View replacement);
      WebIDL::ExceptionOr<void> set_range_text_binding(Utf16View replacement, WebIDL::UnsignedLong start, WebIDL::UnsignedLong end, Bindings::SelectionMode = Bindings::SelectionMode::Preserve);
      WebIDL::ExceptionOr<void> set_range_text(Utf16String const& replacement);
@@ -109,10 +105,10 @@ index 3e6a32926adcde41fb6d9ee6d9e2bf6d15742dfa..473f2d0b43196bd8c4de4350efbb54c1
      // https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#dom-textarea/input-setselectionrange
      void set_the_selection_range(Optional<WebIDL::UnsignedLong> start, Optional<WebIDL::UnsignedLong> end, SelectionDirection direction = SelectionDirection::None, SelectionSource source = SelectionSource::DOM);
 diff --git a/Libraries/LibWeb/HTML/HTMLTextAreaElement.cpp b/Libraries/LibWeb/HTML/HTMLTextAreaElement.cpp
-index d6947823c3b03d6e44cc0c72ae02cce59af56cc6..a9afbd899d823c328c3d2177602b80247b3011dc 100644
+index ff6b154ecccca79c597beb63a353a411b5d64d43..53cf59eb7d206061c7fe8c5ac150d67d9aaebcb0 100644
 --- a/Libraries/LibWeb/HTML/HTMLTextAreaElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLTextAreaElement.cpp
-@@ -183,7 +183,7 @@ void HTMLTextAreaElement::set_value_binding(Utf16View value)
+@@ -195,7 +195,7 @@ void HTMLTextAreaElement::set_value_binding(Utf16View value)
  }
  
  // https://html.spec.whatwg.org/multipage/form-elements.html#dom-textarea-value
@@ -121,7 +117,7 @@ index d6947823c3b03d6e44cc0c72ae02cce59af56cc6..a9afbd899d823c328c3d2177602b8024
  {
      // 1. Let oldAPIValue be this element's API value.
      auto old_api_value = api_value();
-@@ -206,8 +206,10 @@ void HTMLTextAreaElement::set_value(Utf16View value)
+@@ -218,8 +218,10 @@ void HTMLTextAreaElement::set_value(Utf16View value)
          }
  
          // NB: A textarea without a text node still has a selection, so this also applies to it.
@@ -134,20 +130,17 @@ index d6947823c3b03d6e44cc0c72ae02cce59af56cc6..a9afbd899d823c328c3d2177602b8024
  
          CSS::Invalidation::invalidate_style_after_placeholder_shown_change(*this);
      }
-@@ -233,7 +235,10 @@ Utf16String HTMLTextAreaElement::api_value() const
+@@ -245,7 +247,7 @@ Utf16String HTMLTextAreaElement::api_value() const
  // https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#concept-textarea/input-relevant-value
  WebIDL::ExceptionOr<void> HTMLTextAreaElement::set_relevant_value(Utf16View value)
  {
 -    set_value(value);
-+    // NB: setRangeText(), which the edits of the value go through too, sets the selection itself once the value has
-+    //     changed. Moving the cursor to the end first, as setting the value does, would queue a select event of its
-+    //     own, one for every character typed.
 +    set_value(value, MoveTextEntryCursor::No);
      return {};
  }
  
 diff --git a/Libraries/LibWeb/HTML/HTMLTextAreaElement.h b/Libraries/LibWeb/HTML/HTMLTextAreaElement.h
-index 41b06ec9e2079c377e02ad4527575afc0df5baf1..d405ce3c47c5511479b6a0eb5b053455c6796882 100644
+index cd37b388309f9e3583999b9caab608b8b0e6f2c6..dfe9d5e319c2c2012511e62739c92512c3e8cd8a 100644
 --- a/Libraries/LibWeb/HTML/HTMLTextAreaElement.h
 +++ b/Libraries/LibWeb/HTML/HTMLTextAreaElement.h
 @@ -84,7 +84,11 @@ public:
@@ -185,17 +178,15 @@ index 0000000000000000000000000000000000000000..93c0b215015ac7159c913d4a531ac900
 +input setRangeText: value="Yabac", select events: 1
 diff --git a/Tests/LibWeb/Text/input/Editing/select-event-text-control-edits.html b/Tests/LibWeb/Text/input/Editing/select-event-text-control-edits.html
 new file mode 100644
-index 0000000000000000000000000000000000000000..64914c4325a7422c6bfc81e8d452f3b304952b10
+index 0000000000000000000000000000000000000000..80b1ec242026a8029ded745bab7bf97598048c11
 --- /dev/null
 +++ b/Tests/LibWeb/Text/input/Editing/select-event-text-control-edits.html
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,37 @@
 +<!DOCTYPE html>
 +<script src="../include.js"></script>
 +<textarea id="textarea"></textarea>
 +<input id="input" type="text">
 +<script>
-+    // Moving the cursor by editing the value doesn't select anything, so it fires no select event, as in other
-+    // browsers. Changing the selection through the DOM still fires one.
 +    function waitForEvents() {
 +        return new Promise(resolve => {
 +            requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve)));

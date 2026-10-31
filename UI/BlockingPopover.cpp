@@ -41,7 +41,6 @@ enum class BlockingIcon {
     Font,
 };
 
-// Draws an icon on a 20×20 canvas.
 static void paint_icon(QPainter& painter, BlockingIcon icon, QColor const& color)
 {
     painter.setRenderHint(QPainter::Antialiasing);
@@ -51,7 +50,6 @@ static void paint_icon(QPainter& painter, BlockingIcon icon, QColor const& color
 
     switch (icon) {
     case BlockingIcon::Power:
-        // The gap is at the top, where the stroke goes in.
         painter.drawArc(QRectF(3.5, 4, 13, 13), 120 * 16, 300 * 16);
         painter.drawLine(QPointF(10, 2.5), QPointF(10, 9.5));
         break;
@@ -103,7 +101,6 @@ static void paint_icon(QPainter& painter, BlockingIcon icon, QColor const& color
     }
 }
 
-// An icon in the given color, and in the accent color when its button is checked.
 static QIcon blocking_icon(BlockingIcon icon, QColor const& color, QColor const& checked_color)
 {
     QIcon result;
@@ -123,7 +120,6 @@ static QIcon blocking_icon(BlockingIcon icon, QColor const& color, QColor const&
     return result;
 }
 
-// uBlock Origin's big power button: filled with the accent while the site is blocked, hollow while it isn't.
 class BlockingPowerButton final : public QAbstractButton {
     AK_ALLOC_WITH_KMALLOC;
 
@@ -168,7 +164,6 @@ private:
         painter.setBrush(fill);
         painter.drawEllipse(circle);
 
-        // The power symbol, twice the size of the other icons.
         painter.save();
         painter.translate(circle.center() - QPointF(20, 20));
         painter.scale(2, 2);
@@ -233,7 +228,6 @@ BlockingPopover::BlockingPopover(QWidget* parent)
     layout->setSpacing(12);
     card_layout->addLayout(layout);
 
-    // The site, and the way to the dashboard.
     auto* heading = new QHBoxLayout;
     heading->setSpacing(8);
     m_favicon = new QLabel(&card());
@@ -258,7 +252,6 @@ BlockingPopover::BlockingPopover(QWidget* parent)
     heading->addWidget(m_dashboard_button, 0, Qt::AlignVCenter);
     layout->addLayout(heading);
 
-    // The power switch for the site.
     m_power = new BlockingPowerButton(&card());
     m_power->setObjectName("XenonBlockingPower");
     QObject::connect(m_power, &QAbstractButton::toggled, this, [this](bool enabled) {
@@ -270,7 +263,6 @@ BlockingPopover::BlockingPopover(QWidget* parent)
     m_power_caption->setWordWrap(true);
     layout->addWidget(m_power_caption);
 
-    // What was blocked, and where the page connected.
     auto* stats = new QFrame(&card());
     stats->setObjectName("XenonBlockingStats");
     auto* stats_layout = new QHBoxLayout(stats);
@@ -294,7 +286,6 @@ BlockingPopover::BlockingPopover(QWidget* parent)
     add_stat(m_domain_count, nullptr, "domains connected");
     layout->addWidget(stats);
 
-    // The element picker and zapper, and the site's switches.
     auto* tools = new QHBoxLayout;
     tools->setSpacing(6);
     m_pick_button = make_tool(&card(), "Pick", "Pick an element to hide on this site from now on", false);
@@ -325,7 +316,6 @@ BlockingPopover::BlockingPopover(QWidget* parent)
     tools->addWidget(m_fonts_switch);
     layout->addLayout(tools);
 
-    // The domains the page connected to.
     m_domains_heading = make_label(&card(), "XenonBlockingSectionHeading");
     layout->addWidget(m_domains_heading);
     auto* domain_list = new QWidget;
@@ -424,7 +414,6 @@ void BlockingPopover::set_domains(Optional<Vector<BlockingDomain>> domains)
 {
     m_domains = AK::move(domains);
     if (m_domains.has_value()) {
-        // The page's own hosts first, then the busiest.
         quick_sort(*m_domains, [](auto const& a, auto const& b) {
             if (a.first_party != b.first_party)
                 return a.first_party;
@@ -450,8 +439,6 @@ void BlockingPopover::update_counts()
     m_blocked_on_page->setText(formatted_count(m_snapshot.blocked_request_count));
     m_blocked_in_total->setText(formatted_count(m_blocked_request_total));
 
-    // As uBlock Origin does, the share of the page's requests that were blocked. Only the requests that went ahead reach
-    // the page's performance timeline, which is where the domains come from, so the two add up to everything it asked for.
     auto caption = QString("blocked on this page");
     if (m_domains.has_value()) {
         size_t allowed = 0;
@@ -517,7 +504,6 @@ void BlockingPopover::update_chrome_style(QPalette const& palette)
     auto accent = ChromeStyle::chrome_accent();
     auto dark = ChromeStyle::is_dark(active_palette);
     auto text = ChromeStyle::style_sheet_color(text_color);
-    // Opaque, unlike the palette's placeholder text, since style sheets drop a color's alpha.
     auto muted = ChromeStyle::style_sheet_color(ChromeStyle::mix(text_color, ChromeStyle::chrome_surface(active_palette), 0.45));
     auto surface = ChromeStyle::style_sheet_color(ChromeStyle::chrome_surface(active_palette));
     auto recessed = ChromeStyle::style_sheet_color(ChromeStyle::mix(ChromeStyle::chrome_surface(active_palette), text_color, dark ? 0.08 : 0.05));
@@ -652,7 +638,6 @@ void BlockingPopover::hideEvent(QHideEvent* event)
 
 void BlockingPopover::mousePressEvent(QMouseEvent* event)
 {
-    // The transparent shadow margin can overlap the toolbar button. Treat it as outside the card.
     if (!card().geometry().contains(event->position().toPoint())) {
         close();
         event->accept();

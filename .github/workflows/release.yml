@@ -1,26 +1,5 @@
 name: Release
 
-# Packages a release on GitHub's runners, as Meta/release.py package does: for macOS on a macOS runner, the installer
-# disk image, the archive and the appcast; for Linux in Ladybird's CI image, the AppImage and its .zsync file, which is
-# then tested on a few distributions. Each platform's files are an artifact of the run (Documentation/Updates.md).
-#
-# Run by hand with publish ticked, it then publishes the release as Meta/release.py publish does, once both platforms
-# are done: the GitHub release on ThaRae/xenon-releases with the installer, the archive and the AppImage, the appcast
-# there that installed Xenons update from, and the v<version> tag here. Only from main, and once per version. git and gh
-# push with the XENON_RELEASES_TOKEN secret, a token that can write to both repositories; the run's own token stays
-# read-only. Then the AUR packages in Packaging/aur move to the release, and with the AUR_SSH_PRIVATE_KEY secret set,
-# they're pushed to the AUR.
-#
-# It builds as ci.yml's macos and linux jobs do, from the build caches main's builds saved, and doesn't save its own. A
-# cold build doesn't fit in one run, so with no caches to start from, it stops at once.
-#
-# The release certificate and the update key come from the repository's secrets: XENON_RELEASE_P12 (the certificate
-# and its private key, a .p12 in base64) with XENON_RELEASE_P12_PASSWORD, and XENON_UPDATE_KEY (the key, as
-# generate_keys -x writes it). The certificate goes into a keychain of the run's own, and both are deleted at the end.
-# Only macOS uses them: the AppImage isn't signed.
-#
-# Runs by hand, and on pull requests that change this workflow or how releases are packaged. GitHub only lets a workflow
-# be run by hand on a branch once it's on main or has run some other way, which the pull request that adds it does.
 on:
   workflow_dispatch:
     inputs:
@@ -55,13 +34,9 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/Build/caches/ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
       CCACHE_MAXSIZE: 3G
-      # The keys installed Xenons know (Documentation/Updates.md). A secret that holds another key stops the run before
-      # the build, rather than making a release that Xenon turns down, or that macOS takes for another app.
       UPDATE_PUBLIC_KEY: o7cmjh8R2wfWfRfJOTcyLisyoRVEEQIxi7L+SFWXUNI=
       CERTIFICATE_SHA1: EB4C4127CEA7DA5990952E139293BA15C0BA1D37
     steps:
-      # Before the build, so that a run without them stops at once, and the release isn't published. Pull requests from
-      # forks don't get them.
       - name: Check the secrets
         env:
           XENON_RELEASE_P12: ${{ secrets.XENON_RELEASE_P12 }}
@@ -85,7 +60,6 @@ jobs:
           fi
           exit $status
 
-      # Nothing in the run needs the checkout's own credentials, and publishing pushes with XENON_RELEASES_TOKEN instead.
       - name: Check out the repository
         uses: actions/checkout@v7
         with:
@@ -96,8 +70,6 @@ jobs:
           git submodule update --init --depth 1 ladybird
           echo "VERSION=$(cat VERSION.txt)" >> "$GITHUB_ENV"
 
-      # Before the build too: each version is published once, so releasing again means bumping VERSION.txt. This also
-      # finds out whether the token can read ThaRae/xenon-releases. A failure here stops the publish job too.
       - name: Check that the version isn't published yet
         if: github.event_name == 'workflow_dispatch' && inputs.publish
         env:
@@ -111,8 +83,6 @@ jobs:
             exit 1
           fi
 
-      # A keychain of the run's own, on the search list, where codesign finds the certificate. The partition list lets
-      # Apple's tools use its key without asking.
       - name: Import the release certificate
         env:
           XENON_RELEASE_P12: ${{ secrets.XENON_RELEASE_P12 }}
@@ -137,7 +107,6 @@ jobs:
             exit 1
           fi
 
-      # The key's public half, from its seed (as Meta/release.py does), must be the one installed Xenons know.
       - name: Check the update key
         env:
           XENON_UPDATE_KEY: ${{ secrets.XENON_UPDATE_KEY }}
@@ -150,7 +119,6 @@ jobs:
             exit 1
           fi
 
-      # The Xcode and the packages ci.yml's macos job uses, so that the caches it saved fit.
       - name: Select Xcode
         run: |
           version=$(sed -n "s/.*xcode-version: *'\{0,1\}\([0-9.]*\)'\{0,1\}.*/\1/p" ladybird/.github/actions/setup/action.yml)
@@ -197,8 +165,6 @@ jobs:
           (umask 077 && printf '%s\n' "$XENON_UPDATE_KEY" > "$RUNNER_TEMP/update-key.txt")
           ./Meta/release.py package --no-build --update-key "$RUNNER_TEMP/update-key.txt"
 
-      # The archive's and the appcast's signatures, against the key the app was given, which must be the one installed
-      # Xenons know; and the app's and the installer's code signatures, with the release certificate.
       - name: Verify the release
         run: |
           app=Build/distribution/Xenon.app
@@ -265,7 +231,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
-      # The runner starts with about 20 GB free, and the build needs more. These are toolchains Xenon doesn't use.
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
@@ -293,7 +258,6 @@ jobs:
           restore-keys: linux-${{ env.IMAGE_VERSION }}-
           fail-on-cache-miss: true
 
-      # In Ladybird's CI image, as ci.yml's linux job builds, so the AppImage holds the libraries Xenon is tested with.
       - name: Build Xenon, and Meta/release.py package
         timeout-minutes: 320
         run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/package-appimage.sh
@@ -310,7 +274,6 @@ jobs:
           compression-level: 0
           retention-days: 30
 
-      # What linuxdeploy copied in, and what it left to the system.
       - name: Upload linuxdeploy's log
         if: always()
         uses: actions/upload-artifact@v7
@@ -338,8 +301,6 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # The AppImage on distributions that have nothing of the build: Meta/release.py test runs Meta/xenon.py test's checks
-  # against it, and loads a page over HTTPS (Meta/ci/test-appimage.sh).
   linux-test:
     needs: linux
     runs-on: ubuntu-24.04
@@ -386,9 +347,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Once both platforms are packaged, and the AppImage passed its tests. publish checks that the commit is on main and the
-  # tree has no changes, then puts up the release, then the appcast, then the tag. The appcast's commit on
-  # ThaRae/xenon-releases is the Actions bot's.
   publish:
     needs: [macos, linux, linux-test]
     if: github.event_name == 'workflow_dispatch' && inputs.publish
@@ -438,10 +396,6 @@ jobs:
             echo "Published: https://github.com/ThaRae/xenon-releases/releases/tag/v$VERSION" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  # Once the release is up, the AUR packages (Packaging/aur) move to it: Meta/aur.py update bumps them, with xenon-bin's
-  # checksum of the published AppImage, and xenon-bin is built, installed and tested as aur.yml does. With the
-  # AUR_SSH_PRIVATE_KEY secret set, both are pushed to the AUR. The bump goes to the branch aur-<version> here, for a pull
-  # request.
   aur:
     needs: publish
     runs-on: ubuntu-24.04
@@ -477,8 +431,6 @@ jobs:
           rm -f "$RUNNER_TEMP/aur-key"
           exit $status
 
-      # With the same token publish pushes the tag with, whether or not the AUR took the packages. Opening the pull request
-      # needs the token to be allowed to write pull requests too; otherwise the summary links the branch.
       - name: Push the bump to a branch
         if: ${{ !cancelled() && steps.update.outcome == 'success' }}
         env:

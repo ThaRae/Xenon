@@ -1,24 +1,5 @@
 #!/usr/bin/env python3
 
-# Xenon's changes to the Ladybird engine, carried as a patch series in Patches/ladybird and applied to the pinned
-# submodule commit at build time (as Helium patches Chromium). The submodule itself always points at upstream.
-#
-#   Meta/patches.py apply           check out the pinned commit in ladybird/ and apply the series on a local
-#                                   xenon-patches branch, one commit per patch
-#   Meta/patches.py apply --base REV
-#                                   apply onto another commit instead (the weekly build against upstream master)
-#   Meta/patches.py export          write the commits on xenon-patches back out to Patches/ladybird
-#   Meta/patches.py pin             make the commit the series was last applied onto the pinned commit
-#   Meta/patches.py status          say whether ladybird/ is the pinned commit, the series, or something else
-#
-# To change the engine: apply, then edit, amend, or add commits in ladybird/ (git rebase -i works as usual), then
-# export and commit the patch files. Meta/xenon.py build applies the series by itself when ladybird/ is still at the
-# pinned commit, and leaves ladybird/ alone otherwise, so a build mid-edit builds the edit.
-#
-# To move to a newer Ladybird: fetch it in ladybird/, `apply --base FETCH_HEAD`, fix whichever patch stops applying,
-# then export and pin, and commit both. .gitmodules sets the submodule to ignore=all, so that the patched checkout never
-# shows as a change in Xenon and `git commit -a` can't pin a commit that only exists locally; pin is how it moves.
-
 from __future__ import annotations
 
 import argparse
@@ -33,11 +14,8 @@ XENON_SOURCE_DIR = Path(__file__).resolve().parent.parent
 LADYBIRD_SOURCE_DIR = XENON_SOURCE_DIR / "ladybird"
 PATCHES_DIR = XENON_SOURCE_DIR / "Patches" / "ladybird"
 BRANCH = "xenon-patches"
-# Where apply records the commit it applied the series onto, in ladybird/'s repository.
 BASE_REF = "refs/xenon-patches/base"
 
-# Applied commits get a fixed committer and the author's date, so the same series on the same base always gives the
-# same commits, on any machine and without a git identity configured (as in CI).
 COMMITTER_ENV = {
     "GIT_COMMITTER_NAME": "Xenon",
     "GIT_COMMITTER_EMAIL": "xenon@localhost",
@@ -94,7 +72,6 @@ def git(*args: str, cwd: Path = LADYBIRD_SOURCE_DIR, input: str | None = None, e
 
 
 def pinned_commit() -> str:
-    # The index rather than HEAD, so that a pin that's staged but not yet committed counts.
     return git("ls-files", "--stage", "ladybird", cwd=XENON_SOURCE_DIR).split()[1]
 
 
@@ -110,8 +87,6 @@ def patch_files() -> list[Path]:
 
 
 def patch_ids(patches: str) -> list[str]:
-    # A patch-id is a hash of a diff with whitespace and line numbers left out, so it identifies a change whatever
-    # commit it sits on and however its file was written.
     output = git("patch-id", "--stable", input=patches)
     return [line.split()[0] for line in output.splitlines()]
 
@@ -177,7 +152,6 @@ def apply_series(base: str, force: bool = False):
 
 
 def ensure_applied():
-    # Called by Meta/xenon.py before a build. Anything other than a fresh checkout is someone's work in progress.
     current = state()
     if current == State.PINNED:
         apply_series(pinned_commit())
@@ -205,8 +179,6 @@ def export_series():
         path.unlink()
     PATCHES_DIR.mkdir(parents=True, exist_ok=True)
 
-    # The options keep the files stable from one export to the next: no commit hashes, no patch count in the subject,
-    # no git version in the signature. Full blob ids let `git am --3way` fall back to a merge when the base moves.
     git(
         "format-patch",
         "--quiet",

@@ -232,8 +232,11 @@ Both install the AppImage's AppDir in `/usr/lib/xenon`, with `/usr/bin/xenon` a 
 file (its `Exec` pointed at `xenon`) and the icons where desktops look for them. The AppDir is the same either way, so
 Xenon runs with the libraries it brings, as from the AppImage, and the packages depend on what it leaves to the system
 ([Where it runs](#where-it-runs)) and a font. The two conflict, and `xenon-bin` provides `xenon`. Nothing is stripped,
-as in the AppImage. `xenon-bin` unpacks the AppImage with `unsquashfs` from where its runtime ends, which it reads from
-the runtime's ELF header, rather than running anything it downloaded.
+as in the AppImage, so that crash reports name every function. `xenon-bin` unpacks the AppImage with `unsquashfs` from
+where its runtime ends: the runtime is an ELF executable whose section headers come last in it, so the image starts at
+`e_shoff + e_shentsize × e_shnum`, read from its ELF header. That way nothing it downloaded runs while it builds. `xenon`
+turns off makepkg's compiler flags and link-time optimization (`!buildflags`, `!lto`), as Ladybird's build sets its
+own.
 
 `xenon` has makepkg clone the tag and Ladybird, and points the `ladybird` submodule at that clone. `Meta/xenon.py build`
 then applies the patch series and builds, with vcpkg fetching and building Ladybird's dependencies as it goes, and
@@ -258,15 +261,17 @@ or by building the new PKGBUILD.
 `update` sets `pkgver`, puts `pkgrel` back to 1 for a new version, and sets `xenon-bin`'s checksum from the published
 AppImage, which it downloads, so it runs once the release is up (`--appimage <file>` takes a file's checksum instead).
 Then it writes each `.SRCINFO`, the AUR's summary of a PKGBUILD, which makepkg writes: pacman's own, on Arch Linux, and
-elsewhere one in Arch Linux's container image, with docker. To change a PKGBUILD between releases, bump its `pkgrel`,
+elsewhere one in Arch Linux's container image, with docker. makepkg won't print a `.SRCINFO` from a directory it can't
+write to, even though it writes nothing there, and in a container the checkout may not be the build user's, so it runs
+with a temporary directory for everything it would write. To change a PKGBUILD between releases, bump its `pkgrel`,
 and run `update` for the `.SRCINFO`. `Meta/check.py` checks that each `.SRCINFO` has its PKGBUILD's version, and the
 AUR workflow that makepkg writes the same one.
 
 `push` clones each package's repository on the AUR, replaces what's there with the package's files as git has them, and
 commits and pushes them, as whichever AUR account ssh is set up for. With `--ssh-key <file>`, it uses that key, and
-trusts only the AUR's own host key, whose fingerprint is on [aur.archlinux.org](https://aur.archlinux.org). A package
-that isn't on the AUR yet is created by its first push. The release workflow does all three once a release is up
-([On GitHub's runners](#on-githubs-runners)).
+trusts only the AUR's own ED25519 host key, `SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4`, as
+[aur.archlinux.org](https://aur.archlinux.org) lists it. A package that isn't on the AUR yet is created by its first
+push. The release workflow does all three once a release is up ([On GitHub's runners](#on-githubs-runners)).
 
 ### Testing them
 

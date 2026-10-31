@@ -281,7 +281,6 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
         fullscreen_mode().exit(FullscreenMode::ExitInitiatedBy::UI);
     });
     QObject::connect(m_tabs_container, &TabWidget::tab_close_requested, this, &BrowserWindow::request_to_close_tab);
-    // Ctrl+Tab, in the order the tabs were last used. The window owns it.
     new TabCycler(*this, *m_tabs_container);
     QObject::connect(m_tabs_container->tab_bar(), &QTabBar::tabMoved, this, [this](int, int) {
         sync_session_tab_order();
@@ -373,7 +372,6 @@ void BrowserWindow::initialize_application_actions()
             m_tabs_container->set_current_index(m_tabs_container->count() - 1);
     });
 
-    // Like Helium, copy the current page's link without a trip through the location bar.
     new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C), this, [this]() {
         copy_current_url();
     });
@@ -494,7 +492,6 @@ void BrowserWindow::initialize_window_context_menu()
 
     m_window_context_menu->addSeparator();
 
-    // Like Helium, the window frame's context menu switches between the browser's layouts.
     auto* layout_menu = m_window_context_menu->addMenu("&Layout");
     auto* layout_group = new QActionGroup(layout_menu);
     auto add_layout_action = [&](char const* text, XenonSettings::ChromeLayout layout) {
@@ -729,7 +726,6 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
 
     initialize_tab(tab);
 
-    // A tab opened beside another, such as its duplicate, joins its tab group.
     if (location.kind() == TabLocation::Kind::AfterTab && location.tab())
         tab_groups().add_opened_tab(*location.tab(), *tab);
 
@@ -755,7 +751,7 @@ void BrowserWindow::initialize_tab(Tab* tab)
 
     QObject::connect(tab, &Tab::title_changed, this, &BrowserWindow::tab_title_changed);
     QObject::connect(tab, &Tab::favicon_changed, this, &BrowserWindow::tab_favicon_changed);
-    QObject::connect(tab, &Tab::audio_play_state_changed, this, &BrowserWindow::tab_audio_play_state_changed);
+    QObject::connect(tab, &Tab::audibility_changed, this, &BrowserWindow::tab_audibility_changed);
     QObject::connect(tab, &Tab::loading_changed, this, [this] {
         m_tabs_container->tab_bar()->update_loading_swirl_animation();
     });
@@ -765,7 +761,6 @@ void BrowserWindow::initialize_tab(Tab* tab)
 
     if (tab->is_loaded())
         initialize_tab_view(tab);
-    // A tab loads again after it hibernates, with a new view.
     QObject::connect(tab, &Tab::loaded, this, [this, tab] { initialize_tab_view(tab); });
 
     initialize_tab_buttons(tab);
@@ -922,7 +917,6 @@ void BrowserWindow::set_current_tab(Tab* tab)
     if (tab)
         tab->ensure_loaded();
 
-    // Xenon: The other side of a split view stays in view.
     if (m_current_tab && m_current_tab->isHidden())
         m_current_tab->view().set_system_visibility_state(Web::HTML::VisibilityState::Hidden);
 
@@ -933,7 +927,6 @@ void BrowserWindow::set_current_tab(Tab* tab)
 
         if (auto session_tab_id = m_current_tab->session_tab_id(); session_tab_id.has_value()) {
             m_session->session_store->active_tab_changed(*session_tab_id);
-            // Xenon: The session saves the window's active tab within a second, rather than in up to 30.
             SessionSaving::save_soon();
         }
 
@@ -1001,7 +994,6 @@ void BrowserWindow::move_tab(int old_index, int new_index)
         new_index = clamp(new_index, pinned_count, m_tabs_container->count() - 1);
     if (new_index != old_index)
         m_tabs_container->tab_bar()->moveTab(old_index, new_index);
-    // Xenon: A split view's tabs move together.
     SplitView::keep_split_views_together(*this, *tab);
 }
 
@@ -1088,7 +1080,6 @@ void BrowserWindow::sync_session_tab_order()
         .ordered_tabs = AK::move(tab_order),
     };
     m_session->session_store->tab_order_changed(AK::move(changed));
-    // Xenon: As it does the order of its tabs.
     SessionSaving::save_soon();
 }
 
@@ -1158,10 +1149,10 @@ void BrowserWindow::initialize_tab_buttons(Tab* tab)
     auto index = m_tabs_container->index_of(tab);
     m_tabs_container->set_tab_icon(index, tab->tab_icon());
 
-    m_tabs_container->tab_bar()->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, nullptr);
     // A pinned tab has no close button.
     m_tabs_container->tab_bar()->setTabButton(index, TAB_CLOSE_BUTTON_POSITION, tab->is_pinned() ? nullptr : create_tab_close_button(*tab));
     m_tabs_container->update_tab_button_visibility();
+    update_tab_audio_button(*tab);
 }
 
 void BrowserWindow::update_tab_close_button(Tab& tab)
@@ -1302,46 +1293,43 @@ void BrowserWindow::set_always_on_top(bool always_on_top)
         handle->setFlags(flags);
 }
 
-void BrowserWindow::tab_audio_play_state_changed(int index, Web::HTML::AudioPlayState play_state)
+void BrowserWindow::tab_audibility_changed(int index, Audio::Audibility)
 {
-    auto* tab = m_tabs_container->tab(index);
+    if (index < 0)
+        return;
+    update_tab_audio_button(*m_tabs_container->tab(index));
+}
 
-    switch (play_state) {
-    case Web::HTML::AudioPlayState::Paused:
-        if (tab->view().page_mute_state() == Web::HTML::MuteState::Unmuted) {
-            m_tabs_container->tab_bar()->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, nullptr);
-            m_tabs_container->update_tab_button_visibility();
-        }
-        break;
+// The tab is shown playing audio, muted or not, while the AudioServer recently heard it. A muted tab keeps its button,
+// as that is the only way to unmute it.
+void BrowserWindow::update_tab_audio_button(Tab& tab)
+{
+    auto index = tab_index(&tab);
+    auto* tab_bar = m_tabs_container->tab_bar();
 
-    case Web::HTML::AudioPlayState::Playing:
-        auto* button = new TabBarButton(icon_for_page_mute_state(*tab));
-        button->setToolTip(tool_tip_for_page_mute_state(*tab));
-        button->setObjectName("LadybirdAudioState");
-        // NB: The speaker fills more of its icon than the close button's cross does, so it is drawn a little smaller.
-        button->set_icon_inset(2);
-
-        connect(button, &QPushButton::clicked, this, [this, tab]() {
-            tab->view().toggle_page_mute_state();
-            auto index = tab_index(tab);
-
-            switch (tab->view().audio_play_state()) {
-            case Web::HTML::AudioPlayState::Paused:
-                m_tabs_container->tab_bar()->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, nullptr);
-                m_tabs_container->update_tab_button_visibility();
-                break;
-            case Web::HTML::AudioPlayState::Playing:
-                auto* button = m_tabs_container->tab_bar()->tabButton(index, AUDIO_STATE_BUTTON_POSITION);
-                as<TabBarButton>(button)->setIcon(icon_for_page_mute_state(*tab));
-                button->setToolTip(tool_tip_for_page_mute_state(*tab));
-                break;
-            }
-        });
-
-        m_tabs_container->tab_bar()->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, button);
+    if (!tab.is_loaded() || (tab.view().audibility() == Audio::Audibility::Inaudible && tab.view().page_mute_state() == Web::HTML::MuteState::Unmuted)) {
+        // The tab bar only hides the button it lets go of.
+        if (auto* button = tab_bar->tabButton(index, AUDIO_STATE_BUTTON_POSITION))
+            button->deleteLater();
+        tab_bar->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, nullptr);
         m_tabs_container->update_tab_button_visibility();
-        break;
+        return;
     }
+
+    auto* button = qobject_cast<TabBarButton*>(tab_bar->tabButton(index, AUDIO_STATE_BUTTON_POSITION));
+    if (!button) {
+        button = new TabBarButton(icon_for_page_mute_state(tab));
+        button->setObjectName("LadybirdAudioState");
+        button->set_icon_inset(2);
+        connect(button, &QPushButton::clicked, this, [this, &tab]() {
+            tab.view().toggle_page_mute_state();
+            update_tab_audio_button(tab);
+        });
+        tab_bar->setTabButton(index, AUDIO_STATE_BUTTON_POSITION, button);
+        m_tabs_container->update_tab_button_visibility();
+    }
+    button->setIcon(icon_for_page_mute_state(tab));
+    button->setToolTip(tool_tip_for_page_mute_state(tab));
 }
 
 QIcon BrowserWindow::icon_for_page_mute_state(Tab& tab) const
@@ -1373,7 +1361,6 @@ void BrowserWindow::open_next_tab()
     if (m_tabs_container->count() <= 1)
         return;
 
-    // Tabs in collapsed tab groups are passed over.
     auto next_index = m_tabs_container->current_index();
     do {
         next_index = (next_index + 1) % m_tabs_container->count();

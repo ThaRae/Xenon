@@ -28,36 +28,36 @@ getaddrinfo for the canonical name (AI_CANONNAME), and LibDNS records
 it as a one-step CNAME.
 ---
  Libraries/LibCore/Socket.cpp                  | 22 ++++++--
- Libraries/LibCore/Socket.h                    |  7 +++
- Libraries/LibCore/SocketWindows.cpp           |  6 +++
- Libraries/LibDNS/Resolver.h                   | 14 +++--
+ Libraries/LibCore/Socket.h                    |  6 +++
+ Libraries/LibCore/SocketWindows.cpp           |  5 ++
+ Libraries/LibDNS/Resolver.h                   | 14 ++++--
  Libraries/LibRequests/NetworkError.h          |  3 ++
  Libraries/LibRequests/Request.cpp             |  6 +++
- Libraries/LibRequests/Request.h               |  4 ++
+ Libraries/LibRequests/Request.h               |  3 ++
  Libraries/LibRequests/RequestClient.cpp       | 18 ++++++-
- Libraries/LibRequests/RequestClient.h         | 11 +++-
+ Libraries/LibRequests/RequestClient.h         |  9 +++-
  Libraries/LibWeb/Loader/ContentBlocker.cpp    | 11 ++++
- Libraries/LibWeb/Loader/ContentBlocker.h      |  4 ++
- Libraries/LibWeb/Loader/ResourceLoader.cpp    | 24 ++++++++-
+ Libraries/LibWeb/Loader/ContentBlocker.h      |  2 +
+ Libraries/LibWeb/Loader/ResourceLoader.cpp    | 23 ++++++++-
  .../RequestServer/ConnectionFromClient.cpp    | 10 +++-
  Services/RequestServer/ConnectionFromClient.h |  3 +-
- Services/RequestServer/Request.cpp            | 53 ++++++++++++++++++-
- Services/RequestServer/Request.h              | 10 +++-
- Services/RequestServer/RequestClient.ipc      |  3 ++
- Services/RequestServer/RequestServer.ipc      |  4 +-
+ Services/RequestServer/Request.cpp            | 50 ++++++++++++++++++-
+ Services/RequestServer/Request.h              |  9 +++-
+ Services/RequestServer/RequestClient.ipc      |  1 +
+ Services/RequestServer/RequestServer.ipc      |  3 +-
  .../RequestServer/TestContentCodingRetry.cpp  |  2 +-
  Tests/RequestServer/TestCookieResponses.cpp   |  2 +-
  Tests/RequestServer/TestDiskCacheWaiters.cpp  |  2 +-
  Tests/RequestServer/TestExportImport.cpp      |  2 +-
  Tests/RequestServer/TestRequestTimingInfo.cpp |  2 +-
  Tests/RequestServer/TestSiteBinding.cpp       |  2 +-
- 24 files changed, 202 insertions(+), 23 deletions(-)
+ 24 files changed, 186 insertions(+), 24 deletions(-)
 
 diff --git a/Libraries/LibCore/Socket.cpp b/Libraries/LibCore/Socket.cpp
-index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc94603440 100644
+index 2e4df5a825fd66226293a12c127b5a8f794e2f36..6e5068a518938487d42243a657fb5e2c04460086 100644
 --- a/Libraries/LibCore/Socket.cpp
 +++ b/Libraries/LibCore/Socket.cpp
-@@ -49,8 +49,11 @@ ErrorOr<int> Socket::create_fd(SocketDomain domain, SocketType type)
+@@ -51,8 +51,11 @@ ErrorOr<int> Socket::create_fd(SocketDomain domain, SocketType type)
  #endif
  }
  
@@ -70,7 +70,7 @@ index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc
      int socket_type;
      switch (type) {
      case SocketType::Stream:
-@@ -81,12 +84,15 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
+@@ -83,12 +86,15 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
      struct addrinfo hints = {};
      hints.ai_family = ai_family;
      hints.ai_socktype = socket_type;
@@ -87,7 +87,7 @@ index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc
  
      for (auto const& result : results.addresses()) {
          if (result.ai_family == AF_INET6) {
-@@ -105,7 +111,17 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
+@@ -107,7 +113,17 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
      if (addresses.is_empty())
          return Error::from_string_literal("Could not resolve to IPv4 or IPv6 address");
  
@@ -105,18 +105,17 @@ index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc
 +    return resolve_host_with_flags(host, type, address_family, AI_CANONNAME);
  }
  
- ErrorOr<void> Socket::connect_local(int fd, ByteString const& path)
+ // Connecting a datagram socket sends nothing, but has the system choose the local address it would send from.
 diff --git a/Libraries/LibCore/Socket.h b/Libraries/LibCore/Socket.h
-index c73a4204239a4cfafdc19e686eb4ac7f42863f24..816676aca6dee3a14ef39d5bd4e143edf0a745e8 100644
+index 7e4f4a38477e3efaea6c93f5870247357a145837..c383b89d937d8cb7f6cca0d931eb4c8e4c781617 100644
 --- a/Libraries/LibCore/Socket.h
 +++ b/Libraries/LibCore/Socket.h
-@@ -71,6 +71,13 @@ public:
-     //        base class for all address types is appropriate.
-     static ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> resolve_host(ByteString const&, SocketType, AddressFamily = AddressFamily::Unspecified);
+@@ -74,6 +74,12 @@ public:
+     // Whether this host has a route to the IPv6 internet, from an address that can reach it.
+     static bool is_ipv6_globally_reachable();
  
 +    struct ResolvedHost {
 +        Vector<Variant<IPv4Address, IPv6Address>> addresses;
-+        // The name the host's aliases (CNAME records) lead to, as the system resolver reports it.
 +        Optional<ByteString> canonical_name;
 +    };
 +    static ErrorOr<ResolvedHost> resolve_host_and_canonical_name(ByteString const&, SocketType, AddressFamily = AddressFamily::Unspecified);
@@ -125,16 +124,15 @@ index c73a4204239a4cfafdc19e686eb4ac7f42863f24..816676aca6dee3a14ef39d5bd4e143ed
  
  protected:
 diff --git a/Libraries/LibCore/SocketWindows.cpp b/Libraries/LibCore/SocketWindows.cpp
-index 31181bccc5f53bdd24aa3b94ac2db3560e8311b5..2a8b8c92fc2475f75058a9324ba1e8187b7976f1 100644
+index 4e555fb82dbd07e1143f0bc9d7b0b2a1df3bc4b9..4f87328541e270b30e8f6d961a1458b6d822864e 100644
 --- a/Libraries/LibCore/SocketWindows.cpp
 +++ b/Libraries/LibCore/SocketWindows.cpp
-@@ -286,6 +286,12 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
-     return addresses;
+@@ -318,6 +318,11 @@ bool Socket::is_ipv6_globally_reachable()
+     return true;
  }
  
 +ErrorOr<Socket::ResolvedHost> Socket::resolve_host_and_canonical_name(ByteString const& host, SocketType type, AddressFamily address_family)
 +{
-+    // FIXME: Ask for the canonical name (AI_CANONNAME) here too.
 +    return ResolvedHost { TRY(resolve_host(host, type, address_family)), {} };
 +}
 +
@@ -142,20 +140,22 @@ index 31181bccc5f53bdd24aa3b94ac2db3560e8311b5..2a8b8c92fc2475f75058a9324ba1e818
  {
      if (address.type() == SocketAddress::Type::IPv6) {
 diff --git a/Libraries/LibDNS/Resolver.h b/Libraries/LibDNS/Resolver.h
-index 54bdf6f4937456985133bef8c26a0fab6028e5ba..7614c1eca86931bf7d23db62dc0385b1b5167658 100644
+index 846438f25eb9375a56f1e3cd7d87a67bd7c03abd..04e45dfd5b0eed98d483b19ef1b6cf2bfa2ccaa3 100644
 --- a/Libraries/LibDNS/Resolver.h
 +++ b/Libraries/LibDNS/Resolver.h
-@@ -490,7 +490,7 @@ public:
-                     [this, name, state = our_state, family,
+@@ -525,8 +525,8 @@ public:
                          &main_thread_event_loop]() mutable {
                          auto worker_started_at = MonotonicTime::now();
--                        auto record_or_error = Core::Socket::resolve_host(name, Core::Socket::SocketType::Stream, family);
-+                        auto record_or_error = Core::Socket::resolve_host_and_canonical_name(name, Core::Socket::SocketType::Stream, family);
+                         auto record_or_error = m_system_resolver_for_testing.resolve_host
+-                            ? m_system_resolver_for_testing.resolve_host(name, family)
+-                            : Core::Socket::resolve_host(name, Core::Socket::SocketType::Stream, family);
++                            ? [&]() -> ErrorOr<Core::Socket::ResolvedHost> { return Core::Socket::ResolvedHost { TRY(m_system_resolver_for_testing.resolve_host(name, family)), {} }; }()
++                            : Core::Socket::resolve_host_and_canonical_name(name, Core::Socket::SocketType::Stream, family);
                          auto worker_finished_at = MonotonicTime::now();
                          PendingSystemResolution::SideTiming timing {
                              .queue_ms = (worker_started_at - state->dispatched_at).to_milliseconds(),
-@@ -877,7 +877,7 @@ private:
-         ByteString const& name,
+@@ -937,7 +937,7 @@ private:
+         ByteString const& pending_key,
          PendingSystemResolution& state,
          Core::Socket::AddressFamily family,
 -        ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> record_or_error,
@@ -163,13 +163,11 @@ index 54bdf6f4937456985133bef8c26a0fab6028e5ba..7614c1eca86931bf7d23db62dc0385b1
          PendingSystemResolution::SideTiming timing)
      {
          (family == Core::Socket::AddressFamily::IPv4Only ? state.a : state.aaaa) = timing;
-@@ -887,7 +887,15 @@ private:
+@@ -947,7 +947,13 @@ private:
          bool got_records_this_side = false;
          if (!record_or_error.is_error()) {
              constexpr u32 SYSTEM_RESOLVER_SYNTHETIC_TTL_SECONDS = 60;
 -            for (auto const& record : record_or_error.value()) {
-+            // The system resolver does not hand out the CNAME chain, only where it ends. Record that as one alias, so
-+            // callers (content blocking's CNAME uncloaking) can see it as they would a configured server's answer.
 +            if (auto const& canonical_name = record_or_error.value().canonical_name; canonical_name.has_value()) {
 +                auto canonical = Messages::DomainName::from_string(*canonical_name);
 +                auto queried = Messages::DomainName::from_string(name);
@@ -202,7 +200,7 @@ index ddeb9b60bef425613e4c653f970bb3d7cbe0d0f7..e9e3ca3d1cbcd3a3cb91f7f1ec3dd8bf
          return "An unexpected network error occurred"sv;
      }
 diff --git a/Libraries/LibRequests/Request.cpp b/Libraries/LibRequests/Request.cpp
-index 7ee16b363e45d1a1f1eba0a703672741ee7da3e5..bb4913b1896117c48abe43fbadc1cf82baee68c7 100644
+index 6042c88fbc200b4ec83c8dda25c6f2272ee3fcc6..6bd8fa6170c69a9b339081bac87874f687c452c0 100644
 --- a/Libraries/LibRequests/Request.cpp
 +++ b/Libraries/LibRequests/Request.cpp
 @@ -67,6 +67,12 @@ int Request::request_server_client_id() const
@@ -219,20 +217,19 @@ index 7ee16b363e45d1a1f1eba0a703672741ee7da3e5..bb4913b1896117c48abe43fbadc1cf82
  {
      RefPtr keep_alive = *this;
 diff --git a/Libraries/LibRequests/Request.h b/Libraries/LibRequests/Request.h
-index 478ea3c368e88231b7b661b32c5e3c3bfb67587d..a63d122e16da58fb646d5aa81feb14ebf4736523 100644
+index fb50da3b57bb8e7c7dcad70ff7e6283d0593008c..a91b69e015ead0052fda3b1350cba7b563624cd4 100644
 --- a/Libraries/LibRequests/Request.h
 +++ b/Libraries/LibRequests/Request.h
-@@ -125,6 +125,10 @@ public:
+@@ -126,6 +126,9 @@ public:
  
      Function<void()> on_requires_network;
  
-+    // See RequestClient::CheckResolvedAlias. The handler must answer with continue_after_alias_check().
 +    Function<void(Request&, ByteString const& alias_target)> on_resolved_alias;
 +    void continue_after_alias_check(bool block);
 +
-     // Invoked at most once, when the request drops its delivery callbacks without a finish: a stop() or a transfer.
-     Function<void()> on_teardown;
- 
+     enum class TeardownReason : u8 {
+         Stopped,
+         Transferred,
 diff --git a/Libraries/LibRequests/RequestClient.cpp b/Libraries/LibRequests/RequestClient.cpp
 index 338247d43d60c500a3f01986c825652b684c91be..34bf14aecde21743cccfd1f38ca9c377d5954b25 100644
 --- a/Libraries/LibRequests/RequestClient.cpp
@@ -277,10 +274,10 @@ index 338247d43d60c500a3f01986c825652b684c91be..34bf14aecde21743cccfd1f38ca9c377
  {
      if (auto request = m_requests.get(request_id); request.has_value()) {
 diff --git a/Libraries/LibRequests/RequestClient.h b/Libraries/LibRequests/RequestClient.h
-index 3c8217040df8066515288ba945f07ea6d523c843..ff025eaf220b97cb5363154b4148c2de58a24c66 100644
+index 3c8217040df8066515288ba945f07ea6d523c843..8ab583fa6876e1d44bf079ca1c09b626d7563bb8 100644
 --- a/Libraries/LibRequests/RequestClient.h
 +++ b/Libraries/LibRequests/RequestClient.h
-@@ -51,7 +51,14 @@ public:
+@@ -51,7 +51,12 @@ public:
      virtual ~RequestClient() override;
  
      // Best-effort index into the resolved address pool.
@@ -290,13 +287,11 @@ index 3c8217040df8066515288ba945f07ea6d523c843..ff025eaf220b97cb5363154b4148c2de
 +        Yes,
 +    };
 +
-+    // With CheckResolvedAlias::Yes, a request whose host DNS shows to be an alias calls its on_resolved_alias, and waits
-+    // for continue_after_alias_check() before it connects.
 +    RefPtr<Request> start_request(ByteString const& method, URL::URL const&, Optional<HTTP::HeaderList const&> request_headers = {}, ReadonlyBytes request_body = {}, HTTP::CacheMode = HTTP::CacheMode::Default, HTTP::Cookie::IncludeCredentials = HTTP::Cookie::IncludeCredentials::Yes, TransferLease = TransferLease::No, Optional<u32> address_selection_hint = {}, CacheMissNotification = CacheMissNotification::No, u64 originating_page_id = 0, Optional<HTTP::NetworkIsolationKey> = {}, CheckResolvedAlias = CheckResolvedAlias::No);
      RefPtr<Request> adopt_request(int source_client_id, u64 source_request_id, TransferLease = TransferLease::No);
  
      // Moves a response between RequestServers. The request leaves this client on export; the imported one is a new
-@@ -59,6 +66,7 @@ public:
+@@ -59,6 +64,7 @@ public:
      ErrorOr<ExportedRequest> export_request(Request&);
      RefPtr<Request> import_request(ExportedRequest, TransferLease = TransferLease::No);
      bool stop_request(Badge<Request>, Request&);
@@ -304,7 +299,7 @@ index 3c8217040df8066515288ba945f07ea6d523c843..ff025eaf220b97cb5363154b4148c2de
      void release_request_transfer_lease(Badge<Request>, Request&, RequestTransferLeaseKey);
      void release_request_transfer_lease(RequestTransferLeaseKey);
      void ensure_connection(URL::URL const&, RequestServer::CacheLevel);
-@@ -77,6 +85,7 @@ private:
+@@ -77,6 +83,7 @@ private:
      virtual void die() override;
  
      virtual void request_requires_network(u64 request_id) override;
@@ -313,10 +308,10 @@ index 3c8217040df8066515288ba945f07ea6d523c843..ff025eaf220b97cb5363154b4148c2de
      virtual void request_body_file_available(u64 request_id, IPC::File, u64 offset, u64 size) override;
      virtual void request_cached_body_file_available(u64 request_id, IPC::File, u64 offset, u64 size) override;
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index 3961e0b793727137e175ea8eb041742231afb5ba..5c3be7593acaeb49d8f60c7c1cf9f80782ead3fa 100644
+index e0255df53a08f0f3995c4359a8e9cc66f62ce75e..370b739b1fdbadb4793206fed2463c025bdd9f13 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-@@ -267,6 +267,17 @@ bool ContentBlocker::is_popup_filtered(URL::URL const& url, URL::URL const& open
+@@ -266,6 +266,17 @@ bool ContentBlocker::is_popup_filtered(URL::URL const& url, URL::URL const& open
      return ContentBlocking::FFI::rust_content_blocker_matches_popup(m_engine, url_string.bytes(), opener_url_string.bytes());
  }
  
@@ -333,27 +328,25 @@ index 3961e0b793727137e175ea8eb041742231afb5ba..5c3be7593acaeb49d8f60c7c1cf9f807
 +
  void ContentBlocker::run_page_script(DOM::Document& document) const
  {
-     // Scriptlets and procedural filters are cosmetic filters (##+js(), ##...:has-text()).
+     if (!m_engine || !m_has_cosmetic_rules || document.is_decoded_svg() || !document.content_blocking_enabled())
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.h b/Libraries/LibWeb/Loader/ContentBlocker.h
-index 4ea71815c02582f91e20cb52b19bcb2bb43b811a..f8eb77c9d68e5336ed2da73d01fe929a59ee1c06 100644
+index c12e97663c50f42f549442736f41c1ed8614262d..aaffcfaf871e2a1cfd9d18b9d815f94cac573ab2 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.h
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.h
-@@ -75,6 +75,10 @@ public:
-     // Whether a $popup filter keeps a page at the opener URL from opening a new window at the URL.
+@@ -69,6 +69,8 @@ public:
+ 
      bool is_popup_filtered(URL::URL const&, URL::URL const& opener_url) const;
  
-+    // Whether a request whose host DNS showed to be an alias (CNAME) of alias_target must be blocked (uBlock Origin's
-+    // CNAME uncloaking).
 +    bool is_uncloaked_request_filtered(URL::URL const&, StringView alias_target, URL::URL const& source_url, ResourceType) const;
 +
-     // Runs the document's scriptlets and procedural cosmetic filters. Called before any of the document's own
-     // scripts can run, once per Window.
      void run_page_script(DOM::Document&) const;
+ 
+     Utf16String cosmetic_style_sheet_for_url(URL::URL const&) const;
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index 5a961abfed86dc17ff931d9614aceb24929ffde9..a8e92e848039602efc82434901b79032f1837f1f 100644
+index d13600c3a818b3c7c4e856520c6dbdcec7af242e..d3c611df7e309f1d5ea76b9affd440a10665b3ec 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-@@ -662,8 +662,11 @@ RefPtr<Requests::Request> ResourceLoader::load(LoadRequest& request, GC::Root<On
+@@ -649,8 +649,11 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
      auto protocol_complete = [this, on_complete = move(on_complete), request, &protocol_request = *protocol_request](u64 total_size, Requests::RequestTimingInfo const& timing_info, Optional<Requests::NetworkError> const& network_error) {
          finish_network_request(protocol_request);
  
@@ -366,13 +359,12 @@ index 5a961abfed86dc17ff931d9614aceb24929ffde9..a8e92e848039602efc82434901b79032
  
          if (!network_error.has_value()) {
              log_success(request);
-@@ -715,12 +718,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
+@@ -702,12 +705,28 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
      //     requests are attributed through the worker process's browser-level owners.
      auto originating_page_id = request.page() && request.page()->has_top_level_traversable() ? request.page()->client().id().value() : 0;
      auto headers = headers_with_normalized_values(request.headers());
 -    auto protocol_request = request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key());
 +
-+    // Content blocking uncloaks CNAMEs: if DNS shows the host to be an alias, the filters also see where it leads.
 +    auto check_resolved_alias = Requests::RequestClient::CheckResolvedAlias::No;
 +    if (ContentBlocker::the().has_rules() && (!request.page() || request.page()->content_blocking_enabled_for_url(request.top_level_creation_url())))
 +        check_resolved_alias = Requests::RequestClient::CheckResolvedAlias::Yes;
@@ -447,10 +439,10 @@ index 675be55f1a3d74b84ca9d6e412fa9768662e7163..fde1688c4baed69c89157c02f44fb338
      virtual void release_request_transfer_lease(int source_client_id, u64 source_request_id) override;
      virtual Messages::RequestServer::StopRequestResponse stop_request(u64 request_id) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index 652ab84078962a68a2e19d1f4e0de0ca74b855c0..316fe74ae7bed7b4b4a60ca1e60b05d389209565 100644
+index 2c92b8270941f760d6f8dd2e54d78b2f2af6c28d..de58fdb5694c1f9a46935e7bcfc909e3b353ab85 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
-@@ -464,11 +464,13 @@ NonnullOwnPtr<Request> Request::fetch(
+@@ -465,11 +465,13 @@ NonnullOwnPtr<Request> Request::fetch(
      HTTP::Cookie::IncludeCredentials include_credentials,
      Optional<Requests::RequestTransferLeaseKey> transfer_lease,
      Optional<u32> address_selection_hint,
@@ -465,12 +457,11 @@ index 652ab84078962a68a2e19d1f4e0de0ca74b855c0..316fe74ae7bed7b4b4a60ca1e60b05d3
      request->process();
  
      return request;
-@@ -1331,10 +1333,59 @@ void Request::handle_dns_lookup_state()
+@@ -1342,10 +1344,56 @@ void Request::handle_dns_lookup_state()
                  return;
              }
              self.m_dns_result = move(dns_result);
 +
-+            // The client's content blocker checks where the host's aliases lead before the request goes out.
 +            if (auto alias_target = self.resolved_alias_target(); alias_target.has_value()) {
 +                self.m_waiting_for_alias_check = true;
 +                self.m_client->async_request_resolved_alias(self.m_request_id, alias_target.release_value());
@@ -480,7 +471,6 @@ index 652ab84078962a68a2e19d1f4e0de0ca74b855c0..316fe74ae7bed7b4b4a60ca1e60b05d3
          }));
  }
  
-+// The name the request's host is an alias (CNAME) of, if the client asked to check it and DNS showed one.
 +Optional<ByteString> Request::resolved_alias_target() const
 +{
 +    if (!m_check_resolved_alias || !m_dns_result || connect_host() != m_url.serialized_host())
@@ -492,7 +482,6 @@ index 652ab84078962a68a2e19d1f4e0de0ca74b855c0..316fe74ae7bed7b4b4a60ca1e60b05d3
 +
 +    auto host = DNS::Messages::DomainName::from_string(connect_host()).to_canonical_string();
 +    auto name = host;
-+    // Follow the chain from the host to its end, staying clear of loops.
 +    for (size_t i = 0; i < cname_records.size(); ++i) {
 +        auto next = cname_records.first_matching([&](auto const& record) {
 +            return record.name.to_canonical_string() == name;
@@ -526,10 +515,10 @@ index 652ab84078962a68a2e19d1f4e0de0ca74b855c0..316fe74ae7bed7b4b4a60ca1e60b05d3
  {
      if (m_alternative_service.has_value() && !m_alternative_service->host.is_empty())
 diff --git a/Services/RequestServer/Request.h b/Services/RequestServer/Request.h
-index b6bedba0d3654ce589a4d22b9a500667e14c7032..f88a4b08123ded49b3f5fcfc5a0a515ab484c315 100644
+index b6bedba0d3654ce589a4d22b9a500667e14c7032..a49ac3433175a28cfc7fff3c19189511c30e6232 100644
 --- a/Services/RequestServer/Request.h
 +++ b/Services/RequestServer/Request.h
-@@ -64,7 +64,11 @@ public:
+@@ -64,7 +64,10 @@ public:
          HTTP::Cookie::IncludeCredentials include_credentials,
          Optional<Requests::RequestTransferLeaseKey>,
          Optional<u32> address_selection_hint,
@@ -537,12 +526,11 @@ index b6bedba0d3654ce589a4d22b9a500667e14c7032..f88a4b08123ded49b3f5fcfc5a0a515a
 +        bool notify_on_cache_miss,
 +        bool check_resolved_alias = false);
 +
-+    // Answers ConnectionFromClient's request_resolved_alias (content blocking's CNAME uncloaking).
 +    void continue_after_alias_check(bool block);
  
      static NonnullOwnPtr<Request> connect(
          u64 request_id,
-@@ -371,6 +375,10 @@ private:
+@@ -371,6 +374,10 @@ private:
  
      Optional<u32> m_address_selection_hint;
  
@@ -554,39 +542,36 @@ index b6bedba0d3654ce589a4d22b9a500667e14c7032..f88a4b08123ded49b3f5fcfc5a0a515a
      RefPtr<ConnectionFromClient> m_network_connection_keep_alive;
  
 diff --git a/Services/RequestServer/RequestClient.ipc b/Services/RequestServer/RequestClient.ipc
-index 088004dcd2e175b43f5fdaf70557ae0c16162482..b1f5033b99347f10bee0edea7eb959df2e3fce89 100644
+index 088004dcd2e175b43f5fdaf70557ae0c16162482..bfd7b3642f3fd1bad0e2e7e977d59303dd5d53ae 100644
 --- a/Services/RequestServer/RequestClient.ipc
 +++ b/Services/RequestServer/RequestClient.ipc
-@@ -9,6 +9,9 @@
+@@ -9,6 +9,7 @@
  endpoint RequestClient
  {
      request_requires_network(u64 request_id) =|
-+    // DNS showed the host of a request started with check_resolved_alias to be an alias (CNAME) of alias_target. The
-+    // request waits for continue_request_after_alias_check, so the client's content blocker can uncloak it.
 +    request_resolved_alias(u64 request_id, ByteString alias_target) =|
      request_started(u64 request_id, IPC::File fd) =|
      request_body_file_available(u64 request_id, IPC::File fd, u64 offset, u64 size) =|
      request_cached_body_file_available(u64 request_id, IPC::File fd, u64 offset, u64 size) =|
 diff --git a/Services/RequestServer/RequestServer.ipc b/Services/RequestServer/RequestServer.ipc
-index b7e3d7825a577799e8dfc9ac41a3eafb8565370e..9b860509edac80dedd96ef2c5c5c73ef54df8684 100644
+index b7e3d7825a577799e8dfc9ac41a3eafb8565370e..937b7fbf13ab89467451ee131a2c921638cccf48 100644
 --- a/Services/RequestServer/RequestServer.ipc
 +++ b/Services/RequestServer/RequestServer.ipc
-@@ -17,7 +17,9 @@ endpoint RequestServer
+@@ -17,7 +17,8 @@ endpoint RequestServer
      is_supported_protocol(ByteString protocol) => (bool supported)
      get_client_id() => (int client_id)
  
 -    start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id) =|
 +    start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, bool check_resolved_alias) =|
-+    // Answers request_resolved_alias: whether the content blocker blocks the request now that DNS showed its host to be an alias.
 +    continue_request_after_alias_check(u64 request_id, bool block) =|
      adopt_request(int source_client_id, u64 source_request_id, u64 target_request_id, bool preserve_transfer_lease) =|
      release_request_transfer_lease(int source_client_id, u64 source_request_id) =|
      stop_request(u64 request_id) => (bool success)
 diff --git a/Tests/RequestServer/TestContentCodingRetry.cpp b/Tests/RequestServer/TestContentCodingRetry.cpp
-index 87161679684ae7f3a72ed6916e85274354507c3e..76e760eba1173a03f2d17ef9ad2223bd605e155a 100644
+index f6258da81a7f45a3e9927f31af8533543b7b309c..e7d5d0f116086bc59c16fb96aeb5f544d8c6ad45 100644
 --- a/Tests/RequestServer/TestContentCodingRetry.cpp
 +++ b/Tests/RequestServer/TestContentCodingRetry.cpp
-@@ -111,7 +111,7 @@ TEST_CASE(content_coding_retry_keeps_client_supplied_cookie_header)
+@@ -105,7 +105,7 @@ TEST_CASE(content_coding_retry_keeps_client_supplied_cookie_header)
      UnsupportedCodingServer server;
      auto message = make<Messages::RequestServer::StartRequest>(
          0, ByteString { "GET" }, server.url(), Vector<HTTP::Header> { { "Cookie", "supplied=by-the-client" } }, ByteBuffer {},
@@ -596,10 +581,10 @@ index 87161679684ae7f3a72ed6916e85274354507c3e..76e760eba1173a03f2d17ef9ad2223bd
  
      event_loop.spin_until([&] { return server.request_heads().size() >= 2; });
 diff --git a/Tests/RequestServer/TestCookieResponses.cpp b/Tests/RequestServer/TestCookieResponses.cpp
-index 119426c92c3973f48471254c08de34e3c48eaf74..47871805eb1eb6ba4567bddf940ecf7a51d865ba 100644
+index b155b4d173be1dcd7228237913aeee261175316c..3e57aedea3384c0a5a279eee64918d1bc943273f 100644
 --- a/Tests/RequestServer/TestCookieResponses.cpp
 +++ b/Tests/RequestServer/TestCookieResponses.cpp
-@@ -175,7 +175,7 @@ public:
+@@ -169,7 +169,7 @@ public:
      void start_request(u64 request_id, Optional<URL::URL> target_url = {}, ByteString method = "GET"sv, Vector<HTTP::Header> headers = {}, Optional<HTTP::NetworkIsolationKey> network_isolation_key = {})
      {
          auto url = target_url.value_or(URL::Parser::basic_parse("http://localhost"sv).release_value());
@@ -609,10 +594,10 @@ index 119426c92c3973f48471254c08de34e3c48eaf74..47871805eb1eb6ba4567bddf940ecf7a
          VERIFY(!response);
      }
 diff --git a/Tests/RequestServer/TestDiskCacheWaiters.cpp b/Tests/RequestServer/TestDiskCacheWaiters.cpp
-index 28115795e7d355ee766eed49642ece75949de110..0a1ffdabfed54ea7dc793336ae3e1eb4d75fb48e 100644
+index b31a9256ef2c44459ab89b64d58f4e0440c91227..bb302fc50c5e1cd5eee856ef25d302603ff76377 100644
 --- a/Tests/RequestServer/TestDiskCacheWaiters.cpp
 +++ b/Tests/RequestServer/TestDiskCacheWaiters.cpp
-@@ -254,7 +254,7 @@ public:
+@@ -248,7 +248,7 @@ public:
              { ByteString { HTTP::TEST_CACHE_ENABLED_HEADER }, "1"sv },
          };
  
@@ -622,10 +607,10 @@ index 28115795e7d355ee766eed49642ece75949de110..0a1ffdabfed54ea7dc793336ae3e1eb4
          VERIFY(!response);
      }
 diff --git a/Tests/RequestServer/TestExportImport.cpp b/Tests/RequestServer/TestExportImport.cpp
-index fe1bd1c317c743d2bd74a100aad2b36b4a76c076..5dead3a4ebbf5e9e82fbbf4a0eb8b85f139bbb80 100644
+index fbfb44e9937d305d5f1e616c367c816136ba87ab..ae6a9088adb411ff4d31cfd12f1ecfca79d46244 100644
 --- a/Tests/RequestServer/TestExportImport.cpp
 +++ b/Tests/RequestServer/TestExportImport.cpp
-@@ -98,7 +98,7 @@ public:
+@@ -92,7 +92,7 @@ public:
  
      void start_request(u64 request_id, URL::URL url, HTTP::NetworkIsolationKey network_isolation_key, bool create_transfer_lease)
      {
@@ -635,10 +620,10 @@ index fe1bd1c317c743d2bd74a100aad2b36b4a76c076..5dead3a4ebbf5e9e82fbbf4a0eb8b85f
      }
  
 diff --git a/Tests/RequestServer/TestRequestTimingInfo.cpp b/Tests/RequestServer/TestRequestTimingInfo.cpp
-index 3610ac83f15ab207f8b35300dab3c50673cd65df..41752c5e75afeff8e7ce229e2fcb5d76ba2dfdf2 100644
+index 6dc9f407a5013489538186d04344cb804cd2fc0c..2e3029442dc6afc86f0b1fc3e3672bd75832ae33 100644
 --- a/Tests/RequestServer/TestRequestTimingInfo.cpp
 +++ b/Tests/RequestServer/TestRequestTimingInfo.cpp
-@@ -145,7 +145,7 @@ public:
+@@ -139,7 +139,7 @@ public:
          auto started_at = MonotonicTime::now();
          m_started_at.set(request_id, started_at);
  
@@ -648,10 +633,10 @@ index 3610ac83f15ab207f8b35300dab3c50673cd65df..41752c5e75afeff8e7ce229e2fcb5d76
          VERIFY(!response);
  
 diff --git a/Tests/RequestServer/TestSiteBinding.cpp b/Tests/RequestServer/TestSiteBinding.cpp
-index 1849e806c44f5b4146ad1284e84f31962d114f89..0fa017924e0cde4699723d2e42b4fb08799cace4 100644
+index 613bdecaab2dad37fe5c60c3a980dbbdd85e37b0..7b0dd45f4c9daf41b9f24393851248b446e64954 100644
 --- a/Tests/RequestServer/TestSiteBinding.cpp
 +++ b/Tests/RequestServer/TestSiteBinding.cpp
-@@ -103,7 +103,7 @@ struct TestServer {
+@@ -97,7 +97,7 @@ struct TestServer {
      {
          auto message = make<Messages::RequestServer::StartRequest>(
              request_id, ByteString { "GET" }, URL::Parser::basic_parse(url).release_value(), Vector<HTTP::Header> {}, ByteBuffer {},

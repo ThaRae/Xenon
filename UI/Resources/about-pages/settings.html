@@ -4,10 +4,6 @@ Copyright (c) 2026-present, the Ladybird developers.
 Copyright (c) 2026, the Xenon developers.
 
 SPDX-License-Identifier: BSD-2-Clause
-
-Xenon's settings page. Xenon's own settings come first, from UI/SettingsPage.cpp ("xenon/..." messages, settings.js).
-Ladybird's settings below them keep the element ids of Ladybird's page, so Ladybird's own scripts in about-pages/settings
-run them unchanged, except for tabs.js, whose vertical tabs switch is the layout picker here.
 -->
 <html lang="en">
     <head>
@@ -137,7 +133,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
             <main>
                 <p id="no-matches" class="no-matches" hidden>No settings match “<span></span>”.</p>
 
-                <!-- The settings people change most, as preset keys. Each drives the control for it further down. -->
                 <section id="easy-setup" class="easy-setup" aria-labelledby="easy-setup-title">
                     <div class="easy-setup-head">
                         <h2 id="easy-setup-title">Easy setup</h2>
@@ -453,8 +448,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                     </label>
                                 </div>
                             </div>
-                            <!-- Ladybird's theme for its own interface, which appearance.js sets. Xenon's chrome
-                                 doesn't follow it, so it isn't offered. -->
                             <div id="interface-theme" class="segmented hidden" role="radiogroup" aria-label="Theme">
                                 <label><input type="radio" name="interface-theme" value="system" />System</label>
                                 <label><input type="radio" name="interface-theme" value="light" />Light</label>
@@ -564,7 +557,7 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                             </div>
                             <div class="row">
                                 <label for="search-suggestions-enabled">
-                                    Suggest searches while I type
+                                    Suggest searches as you type
                                     <p id="search-suggestions-description" class="description"></p>
                                 </label>
                                 <input
@@ -1022,6 +1015,24 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                 </label>
                                 <input id="enable-geolocation" type="checkbox" switch />
                             </div>
+                            <div class="row">
+                                <label for="location-permissions-settings">
+                                    Location by site
+                                    <p class="description">
+                                        The sites you allowed or blocked from knowing where you are.
+                                    </p>
+                                </label>
+                                <button id="location-permissions-settings" class="secondary-button">Edit…</button>
+                            </div>
+                            <div class="row">
+                                <label for="microphone-permissions-settings">
+                                    Microphone by site
+                                    <p class="description">
+                                        The sites you allowed or blocked from using your microphone.
+                                    </p>
+                                </label>
+                                <button id="microphone-permissions-settings" class="secondary-button">Edit…</button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -1210,6 +1221,26 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
             </div>
         </dialog>
 
+        <dialog id="site-permissions-geolocation" class="site-permissions" closedby="any">
+            <div class="dialog-header">
+                <h3 class="dialog-title">Location</h3>
+                <button class="close-button dialog-button" aria-label="Close">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <div class="site-permissions-list dialog-list"></div>
+            </div>
+        </dialog>
+
+        <dialog id="site-permissions-microphone" class="site-permissions" closedby="any">
+            <div class="dialog-header">
+                <h3 class="dialog-title">Microphone</h3>
+                <button class="close-button dialog-button" aria-label="Close">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <div class="site-permissions-list dialog-list"></div>
+            </div>
+        </dialog>
+
         <dialog id="browsing-data-settings-dialog" closedby="any">
             <div class="dialog-header">
                 <h3 class="dialog-title">Clear browsing data</h3>
@@ -1262,7 +1293,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
         </dialog>
 
         <script>
-            // Ladybird's settings scripts use these globals of its page.
             // FIXME: When we support per-glyph font fallbacks, replace these SVGs with analogous code points.
             //        https://github.com/LadybirdBrowser/ladybird/issues/864
             const upwardArrowSVG =
@@ -1284,6 +1314,7 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
         <script src="resource://ladybird/about-pages/settings/languages.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/network.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/permissions.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/site-permissions.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/privacy.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/search.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/services.js" type="module"></script>

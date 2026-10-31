@@ -1,7 +1,4 @@
 <!doctype html>
-<!-- Meta/xenon.py test serves this from a local web server, where the test extension's content scripts run in it. It
-     prints one line of results, theirs and its own, and closes, which ends the headless browser. -->
-<!-- Frames of the page's own only, which an extension's web accessible pages bypass, as in Chrome. -->
 <meta http-equiv="Content-Security-Policy" content="frame-src 'self'" />
 <div id="marker">marker</div>
 <iframe src="/frame"></iframe>

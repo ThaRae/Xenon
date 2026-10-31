@@ -6,8 +6,6 @@
 
 "use strict";
 
-// What the UI process knows about the site (UI/CertificateErrors.cpp): its url and host, the certificate it refused
-// (what's wrong with it, who it's for and from, and when it's valid), and whether the user may proceed to the site.
 const { state } = window.xenonCertificateError;
 const certificate = state.certificate;
 const problems = certificate?.problems ?? [];
@@ -36,7 +34,6 @@ function formatList(items) {
     return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-// The sentence that leads the page, about the most serious thing wrong with the certificate.
 function reasonText() {
     switch (problems[0]) {
         case "selfSigned":
@@ -134,7 +131,6 @@ if (certificate) {
         proceed.remove();
     }
 } else {
-    // Nothing to show or accept: the certificate may have been fixed since, so loading the site again is the way on.
     advanced.classList.add("hidden");
     details.remove();
     if (state.url) retry.classList.remove("hidden");
@@ -159,7 +155,6 @@ document.getElementById("back").addEventListener("click", () => {
     else window.xenonCertificateError.send({ name: "leave" });
 });
 
-// Meta/xenon.py test runs Xenon headless, where nothing can click: the warning says what it shows, then proceeds.
 if (state.proceedsByItself) {
     console.log(
         TEST_MARKER +

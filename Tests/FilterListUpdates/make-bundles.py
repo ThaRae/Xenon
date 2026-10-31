@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
 
-# Writes the bundles Meta/xenon.py test publishes from a local server to check Xenon's filter list updates
-# (UI/FilterListUpdates.h), each signed with a new test key whose public half goes in public-key.b64:
-#
-#   v1/  a first update: its list blocks /xenon-update-test.js, which Xenon's bundled lists don't
-#   v2/  a newer one, in which only lists/xenon-test.txt changed: it also blocks /xenon-update-test-2.gif
-#   v3/  a newer one still, correctly signed, but whose list isn't the one its manifest describes
-#
-# They're generated in 2099, so that they're newer than any lists Xenon ships. Needs OpenSSL 3 or later for Ed25519 (not
-# macOS's LibreSSL): Tests/FilterListUpdates/make-bundles.py [--openssl PATH]
-
 from __future__ import annotations
 
 import argparse

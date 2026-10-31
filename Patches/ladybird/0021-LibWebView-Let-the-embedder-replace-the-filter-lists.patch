@@ -17,14 +17,14 @@ a settings change does. Pages get the new rules only if they changed.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibWebView/Application.cpp | 8 ++++++++
- Libraries/LibWebView/Application.h   | 4 ++++
- 2 files changed, 12 insertions(+)
+ Libraries/LibWebView/Application.h   | 2 ++
+ 2 files changed, 10 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 768f933d089daf882a2a2d6c1bdf68a394e6fa3e..8f310ec7639cc829a9eacda1ae11513b2ff0d323 100644
+index 542d7460f436241435c645bfedbb761ca4d74b86..5daa7f3e4b62cbcf03356e7f373c9b724c3659a1 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -829,6 +829,14 @@ Optional<UnixDateTime> Application::content_blocker_list_last_updated_at(StringV
+@@ -844,6 +844,14 @@ Optional<UnixDateTime> Application::content_blocker_list_last_updated_at(StringV
      return {};
  }
  
@@ -40,15 +40,13 @@ index 768f933d089daf882a2a2d6c1bdf68a394e6fa3e..8f310ec7639cc829a9eacda1ae11513b
  {
      m_browser_options.content_blocker_list_paths = m_explicit_content_blocker_list_paths;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 67c655fa5bdc003c6303bd996a721695dc3da75f..d3a73370adde6f99893ab871edde3662a4beb6c4 100644
+index cb2b43e5c9faad61c74ab57e0faee767880d3a13..a3ac4dffdafd9da5775c1fa854e8f6a8012910b2 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -196,6 +196,10 @@ public:
+@@ -201,6 +201,8 @@ public:
      void remove_content_blocker_list(Badge<SettingsUI>, StringView identifier);
      Optional<UnixDateTime> content_blocker_list_last_updated_at(StringView identifier) const;
  
-+    // Replaces the lists and resources the browser was started with (--content-blocker-list,
-+    // --trusted-content-blocker-list, and --content-blocker-resources), and applies them to every page.
 +    void set_explicit_content_blockers(Vector<ByteString> list_paths, Vector<ByteString> trusted_list_paths, Optional<ByteString> resources_path);
 +
      struct BookmarkID {

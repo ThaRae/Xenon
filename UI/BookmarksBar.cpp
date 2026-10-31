@@ -195,7 +195,6 @@ BookmarksBar::BookmarksBar(Tab* parent)
 
 void BookmarksBar::update_chrome_style()
 {
-    // Bookmark items are pills, like the tabs.
     auto corner_radius = bookmark_button_height(fontMetrics(), iconSize().height()) / 2;
     setStyleSheet(ChromeStyle::bookmarks_bar_style_sheet(m_tab->palette(), corner_radius));
 }

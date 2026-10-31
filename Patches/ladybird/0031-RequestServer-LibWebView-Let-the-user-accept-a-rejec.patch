@@ -27,22 +27,22 @@ of each rejection.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .../LibRequests/RequestControlClient.cpp      |   6 ++
- Libraries/LibRequests/RequestControlClient.h  |   2 +
- Libraries/LibWebView/BrowsingSession.h        |  12 +++
- Libraries/LibWebView/RequestServerManager.cpp |  23 ++++
- Libraries/LibWebView/RequestServerManager.h   |  11 ++
- Services/RequestServer/CMakeLists.txt         |   1 +
- .../RequestServer/CertificateExceptions.cpp   | 100 ++++++++++++++++++
- .../RequestServer/CertificateExceptions.h     |  28 +++++
- .../ControlConnectionFromClient.cpp           |   6 ++
- .../ControlConnectionFromClient.h             |   2 +
- Services/RequestServer/Request.cpp            |  71 ++++++++++++-
- Services/RequestServer/Request.h              |   8 ++
- .../RequestServer/RequestServerControl.ipc    |   5 +
- .../RequestServerControlClient.ipc            |   4 +
- Services/RequestServer/WebSocketImplCurl.cpp  |  10 ++
- 15 files changed, 288 insertions(+), 1 deletion(-)
+ .../LibRequests/RequestControlClient.cpp      |  6 ++
+ Libraries/LibRequests/RequestControlClient.h  |  2 +
+ Libraries/LibWebView/BrowsingSession.h        | 10 ++
+ Libraries/LibWebView/RequestServerManager.cpp | 23 +++++
+ Libraries/LibWebView/RequestServerManager.h   |  7 ++
+ Services/RequestServer/CMakeLists.txt         |  1 +
+ .../RequestServer/CertificateExceptions.cpp   | 97 +++++++++++++++++++
+ .../RequestServer/CertificateExceptions.h     | 24 +++++
+ .../ControlConnectionFromClient.cpp           |  6 ++
+ .../ControlConnectionFromClient.h             |  2 +
+ Services/RequestServer/Request.cpp            | 62 +++++++++++-
+ Services/RequestServer/Request.h              |  7 ++
+ .../RequestServer/RequestServerControl.ipc    |  2 +
+ .../RequestServerControlClient.ipc            |  2 +
+ Services/RequestServer/WebSocketImplCurl.cpp  |  9 ++
+ 15 files changed, 259 insertions(+), 1 deletion(-)
  create mode 100644 Services/RequestServer/CertificateExceptions.cpp
  create mode 100644 Services/RequestServer/CertificateExceptions.h
 
@@ -84,7 +84,7 @@ index a0072fecf657d8013977ca3fba6f03c90659e28a..7aebcc49098299cc9a15cfb7819fcc62
      virtual void client_disconnected(int client_id) override;
      virtual void retrieve_http_cookie(int client_id, u64 request_id, RequestServer::RequestType request_type, u64 cookie_request_id, URL::URL url, Optional<HTTP::Cookie::PartitionContext> partition_context) override;
 diff --git a/Libraries/LibWebView/BrowsingSession.h b/Libraries/LibWebView/BrowsingSession.h
-index 785f3b73fae734e6a0a09386e7af03e5cbc99444..7244351f3f8eb41cc975f1cef9ca553c98056530 100644
+index 0e3a3b149460e48c0514b55e92cafb11d463ab3f..456dabe04633d320af49d5fc1917d7180a5e1189 100644
 --- a/Libraries/LibWebView/BrowsingSession.h
 +++ b/Libraries/LibWebView/BrowsingSession.h
 @@ -6,10 +6,13 @@
@@ -101,12 +101,10 @@ index 785f3b73fae734e6a0a09386e7af03e5cbc99444..7244351f3f8eb41cc975f1cef9ca553c
  #include <AK/Weakable.h>
  #include <LibWebView/Export.h>
  #include <LibWebView/Forward.h>
-@@ -41,6 +44,15 @@ public:
-     OwnPtr<HistoryStore> history_store;
+@@ -42,6 +45,13 @@ public:
      OwnPtr<SessionStore> session_store;
+     OwnPtr<PermissionManager> permission_manager;
  
-+    // Server certificates the user accepted for a host and port although they failed verification. They last as long
-+    // as the session, and its RequestServers take them as they launch (see RequestServerManager).
 +    struct CertificateException {
 +        ByteString host;
 +        u16 port { 0 };
@@ -159,7 +157,7 @@ index eb32abc331e8da16800d455a553f3b46b7494653..609545933cce6ee4b6f73bb9cb74a308
  {
      for (auto& instance : m_instances)
 diff --git a/Libraries/LibWebView/RequestServerManager.h b/Libraries/LibWebView/RequestServerManager.h
-index b7134c33cf8d6bedcde3302140a4cdd87d396d60..6d253ef5daf16bfd4080dbbcbebccd911f098753 100644
+index b7134c33cf8d6bedcde3302140a4cdd87d396d60..c6f6485e00e680325c36a133542698448eeb9787 100644
 --- a/Libraries/LibWebView/RequestServerManager.h
 +++ b/Libraries/LibWebView/RequestServerManager.h
 @@ -6,6 +6,8 @@
@@ -179,16 +177,12 @@ index b7134c33cf8d6bedcde3302140a4cdd87d396d60..6d253ef5daf16bfd4080dbbcbebccd91
  #include <LibWebView/BrowsingSession.h>
  #include <LibWebView/Forward.h>
  #include <RequestServer/SiteBinding.h>
-@@ -100,6 +103,14 @@ public:
+@@ -100,6 +103,10 @@ public:
  
      bool uses_site_request_servers() const { return m_maximum_site_instances > 0; }
  
-+    // A RequestServer of the session refused the certificate a server presented to a request for the URL. The embedder
-+    // may let the user accept it anyway, as browsers' certificate error pages do. The certificate is DER-encoded.
 +    Function<void(BrowsingSession&, URL::URL const&, ByteBuffer const& certificate)> on_server_certificate_rejected;
 +
-+    // Has the session's RequestServers accept the certificate from the URL's host and port, whatever else is wrong with
-+    // it, for as long as the session lasts. Only that certificate's key is accepted in place of a valid certificate.
 +    void add_certificate_exception(BrowsingSession&, URL::URL const&, ByteBuffer certificate);
 +
  private:
@@ -208,10 +202,10 @@ index c206faca3e5e25e6ed1a815fadc4e45f39b7de93..202b3fd36808f40dcf2bf35aa3c28d48
      CURL.cpp
 diff --git a/Services/RequestServer/CertificateExceptions.cpp b/Services/RequestServer/CertificateExceptions.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..c18e49e788a410d8890daeca99d5dcc17943c8a1
+index 0000000000000000000000000000000000000000..5c69987ecf01f570c7bbaf82a9d16a1a84a6d350
 --- /dev/null
 +++ b/Services/RequestServer/CertificateExceptions.cpp
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,97 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -230,7 +224,6 @@ index 0000000000000000000000000000000000000000..c18e49e788a410d8890daeca99d5dcc1
 +
 +namespace RequestServer {
 +
-+// The curl public key pins of the accepted certificates, by host and port.
 +static HashMap<ByteString, ByteString>& public_key_pins()
 +{
 +    static HashMap<ByteString, ByteString> pins;
@@ -250,7 +243,6 @@ index 0000000000000000000000000000000000000000..c18e49e788a410d8890daeca99d5dcc1
 +        return;
 +    ScopeGuard free_certificate = [&] { X509_free(x509); };
 +
-+    // curl pins a key by the SHA-256 digest of its DER-encoded SubjectPublicKeyInfo, in base64.
 +    unsigned char* public_key = nullptr;
 +    auto public_key_size = i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509), &public_key);
 +    if (public_key_size <= 0)
@@ -281,7 +273,6 @@ index 0000000000000000000000000000000000000000..c18e49e788a410d8890daeca99d5dcc1
 +    if (certificate_info.num_of_certs < 1 || !certificate_info.certinfo)
 +        return {};
 +
-+    // The server's own certificate comes first, and curl gives its PEM encoding as the field named "Cert".
 +    for (curl_slist const* field = certificate_info.certinfo[0]; field; field = field->next) {
 +        StringView text { field->data, strlen(field->data) };
 +        if (!text.starts_with("Cert:"sv))
@@ -314,10 +305,10 @@ index 0000000000000000000000000000000000000000..c18e49e788a410d8890daeca99d5dcc1
 +}
 diff --git a/Services/RequestServer/CertificateExceptions.h b/Services/RequestServer/CertificateExceptions.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..90db3bd6b855076ec3f543fc7477b41d4a291456
+index 0000000000000000000000000000000000000000..453487b4bed58a462ab9f6d20ee370df4ee36bed
 --- /dev/null
 +++ b/Services/RequestServer/CertificateExceptions.h
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,24 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -336,13 +327,9 @@ index 0000000000000000000000000000000000000000..90db3bd6b855076ec3f543fc7477b41d
 +
 +namespace RequestServer {
 +
-+// Server certificates that the user accepted for a host and port although they failed verification, as browsers let
-+// their users do from a certificate error page. Requests there skip verifying the server's certificate, and curl pins
-+// the accepted certificate's public key instead, so that no other certificate is accepted in its place.
 +void add_certificate_exception(StringView host, u16 port, ReadonlyBytes certificate);
 +Optional<ByteString> certificate_exception_public_key_pin(StringView host, u16 port);
 +
-+// The server's own certificate among those curl collected with CURLOPT_CERTINFO, DER-encoded.
 +Optional<ByteBuffer> server_certificate_from_certinfo(curl_certinfo const&);
 +
 +}
@@ -384,7 +371,7 @@ index f56316405830e2b7c61db7d39cd878415047c221..a9b941df418e3083a77f389bbe4fb7b6
      virtual void remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) override;
      virtual void retrieve_cache_access_profile(u64 access_profile_request_id, AK::Duration granularity) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..f83b57ebf08282efc48cf628d27f40376f92db24 100644
+index de58fdb5694c1f9a46935e7bcfc909e3b353ab85..f2e3963b88db36d326e5082d876c5a1f788e4dc2 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -21,6 +21,7 @@
@@ -395,18 +382,16 @@ index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..f83b57ebf08282efc48cf628d27f4037
  #include <RequestServer/ConnectionFromClient.h>
  #include <RequestServer/ControlConnectionFromClient.h>
  #include <RequestServer/Request.h>
-@@ -701,8 +702,9 @@ bool Request::defer_until_response_cookies_and_hsts_policy_are_stored(Function<v
-     // If an HTTP response, received over a secure transport, includes an STS header field, conforming to the grammar
+@@ -703,7 +704,7 @@ bool Request::defer_until_response_cookies_and_hsts_policy_are_stored(Function<v
      // specified in Section 6.1, and there are no underlying secure transport errors or warnings, the UA MUST either
      // note the host as a Known HSTS Host or update the UA's cached information for the Known HSTS Host.
-+    // NB: A certificate the user accepted although it failed verification is such an error.
      Optional<HTTP::HSTS::ParsedHSTSPolicy> hsts_policy;
 -    if (m_url.scheme() == "https"sv && m_url.host().has_value() && m_url.host()->is_domain()) {
 +    if (m_url.scheme() == "https"sv && m_url.host().has_value() && m_url.host()->is_domain() && !m_uses_certificate_exception) {
          // If a UA receives more than one STS header field in an HTTP response message over secure transport, then the
          // UA MUST process only the first such header field.
          for (auto const& [name, value] : *m_response_headers) {
-@@ -959,6 +961,41 @@ void Request::retry_after_aia(Badge<ConnectionFromClient>)
+@@ -970,6 +971,37 @@ void Request::retry_after_aia(Badge<ConnectionFromClient>)
      transition_to_state(State::Fetch);
  }
  
@@ -415,10 +400,6 @@ index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..f83b57ebf08282efc48cf628d27f4037
 +    return m_type == RequestType::Fetch && curl_result_code == CURLE_SSL_PINNEDPUBKEYNOTMATCH && m_uses_certificate_exception;
 +}
 +
-+// curl only collects the server's certificates when asked to before it connects, which every connection would pay for.
-+// So a request whose server's certificate fails verification is made once more, asking for them, to learn which
-+// certificate the UI process may show the user. The handshake failed before the request was sent, so nothing is sent
-+// twice.
 +bool Request::should_retry_to_collect_server_certificate(int curl_result_code) const
 +{
 +    return m_type == RequestType::Fetch && curl_result_code == CURLE_PEER_FAILED_VERIFICATION && !m_collects_server_certificate;
@@ -448,12 +429,10 @@ index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..f83b57ebf08282efc48cf628d27f4037
  void Request::transition_to_state(State state)
  {
      // Let clients stop waiting for a cache-only result before DNS or a stalled cache writer can delay the response.
-@@ -1510,6 +1547,21 @@ void Request::handle_fetch_state()
+@@ -1518,6 +1550,19 @@ void Request::handle_fetch_state()
      set_option(CURLOPT_SSL_CTX_DATA, m_aia_collector.ptr());
  #endif
  
-+    // A certificate the user accepted for this host and port stands in for verifying the server's certificate. curl pins
-+    // its public key, so the server must still present that key.
 +    m_uses_certificate_exception = false;
 +    if (m_url.scheme() == "https"sv && !m_certificate_exception_disabled) {
 +        if (auto pin = certificate_exception_public_key_pin(m_url.serialized_host(), m_url.port_or_default()); pin.has_value()) {
@@ -470,13 +449,11 @@ index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..f83b57ebf08282efc48cf628d27f4037
      if (m_content_decoding_disabled) {
          set_option(CURLOPT_ACCEPT_ENCODING, "identity");
          set_option(CURLOPT_HTTP_CONTENT_DECODING, 0L);
-@@ -1682,7 +1734,24 @@ void Request::handle_complete_state()
+@@ -1695,7 +1740,22 @@ void Request::handle_complete_state()
              return;
          }
  
 +        if (should_retry_without_certificate_exception(*m_curl_result_code)) {
-+            // The server no longer presents the certificate the user accepted. Its new one may well be valid, so it is
-+            // verified as usual, and rejected and reported as any other if it isn't.
 +            m_certificate_exception_disabled = true;
 +            retry_after_certificate_failure();
 +            return;
@@ -496,10 +473,10 @@ index 316fe74ae7bed7b4b4a60ca1e60b05d389209565..f83b57ebf08282efc48cf628d27f4037
  
              if (m_network_error == Requests::NetworkError::Unknown) {
 diff --git a/Services/RequestServer/Request.h b/Services/RequestServer/Request.h
-index f88a4b08123ded49b3f5fcfc5a0a515ab484c315..b70668a7bb2df26546bedecff473e8808e186844 100644
+index a49ac3433175a28cfc7fff3c19189511c30e6232..7a11f2951334d02da543db211fdf8e93a7f06f7e 100644
 --- a/Services/RequestServer/Request.h
 +++ b/Services/RequestServer/Request.h
-@@ -259,6 +259,10 @@ private:
+@@ -258,6 +258,10 @@ private:
      ErrorOr<void> inform_client_request_started();
      bool should_retry_after_fetching_aia_intermediate(int curl_result_code) const;
      void start_aia_fetch_and_retry();
@@ -510,11 +487,10 @@ index f88a4b08123ded49b3f5fcfc5a0a515ab484c315..b70668a7bb2df26546bedecff473e880
      ErrorOr<void> send_request_pipe_to_client();
      ErrorOr<void> send_transferred_body_file_to_client();
      void transfer_headers_to_client_if_needed();
-@@ -329,6 +333,10 @@ private:
+@@ -328,6 +332,9 @@ private:
  
      RefPtr<AIACollector> m_aia_collector;
      size_t m_aia_fetch_count { 0 };
-+    // A certificate the user accepted for the host and port stands in for verification (see CertificateExceptions.h).
 +    bool m_uses_certificate_exception { false };
 +    bool m_certificate_exception_disabled { false };
 +    bool m_collects_server_certificate { false };
@@ -522,38 +498,33 @@ index f88a4b08123ded49b3f5fcfc5a0a515ab484c315..b70668a7bb2df26546bedecff473e880
      bool m_informed_client_requires_network { false };
      bool m_informed_client_request_started { false };
 diff --git a/Services/RequestServer/RequestServerControl.ipc b/Services/RequestServer/RequestServerControl.ipc
-index 9c7964e169917d1aa592c3b16a369ea43a6b900f..fd79fa2320d110e2db6564018fdb71f5de503789 100644
+index 9c7964e169917d1aa592c3b16a369ea43a6b900f..4fb5f0be1cf1dffad905889f40ead4811f8f5ee5 100644
 --- a/Services/RequestServer/RequestServerControl.ipc
 +++ b/Services/RequestServer/RequestServerControl.ipc
-@@ -27,6 +27,11 @@ endpoint RequestServerControl
+@@ -27,6 +27,8 @@ endpoint RequestServerControl
  
      set_performance_monitor_enabled(bool enabled) =|
  
-+    // The user accepted a server's certificate for a host and port although it failed verification. Requests there
-+    // take the certificate's key in place of verifying the server's certificate (see CertificateExceptions.h). This is
-+    // synchronous, so the exception is in place before the UI process loads the page again.
 +    add_certificate_exception(ByteString host, u16 port, ByteBuffer certificate) => ()
 +
      estimate_cache_size_accessed_since(u64 cache_size_estimation_id, UnixDateTime since) =|
      remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) =|
  
 diff --git a/Services/RequestServer/RequestServerControlClient.ipc b/Services/RequestServer/RequestServerControlClient.ipc
-index 2a5798b21b3d6c8e1f0ab354337c9d051d4ddf1b..1837a8c10b5ebc5084671bcbfa5d2271207dba4b 100644
+index 2a5798b21b3d6c8e1f0ab354337c9d051d4ddf1b..9d84a7f9c861f1733e619046dea204d3c633c6ee 100644
 --- a/Services/RequestServer/RequestServerControlClient.ipc
 +++ b/Services/RequestServer/RequestServerControlClient.ipc
-@@ -16,6 +16,10 @@ endpoint RequestServerControlClient
+@@ -16,6 +16,8 @@ endpoint RequestServerControlClient
      retrieve_http_cookie(int client_id, u64 request_id, ::RequestServer::RequestType request_type, u64 cookie_request_id, URL::URL url, Optional<HTTP::Cookie::PartitionContext> partition_context) =|
      store_response_cookies_and_hsts_policy(int client_id, u64 request_id, u64 store_request_id, URL::URL url, Optional<HTTP::Cookie::PartitionContext> partition_context, Vector<HTTP::Cookie::ParsedCookie> cookies, Optional<HTTP::HSTS::ParsedHSTSPolicy> hsts_policy) =|
  
-+    // A server presented a certificate that failed verification, to a request for the URL. The certificate is
-+    // DER-encoded, for the UI process to show the user, who may accept it with add_certificate_exception().
 +    server_certificate_rejected(URL::URL url, ByteBuffer certificate) =|
 +
      network_usage(Vector<Requests::NetworkUsage> usage, u64 interval_microseconds) =|
  
      estimated_cache_size(u64 cache_size_estimation_id, Requests::CacheSizes sizes) =|
 diff --git a/Services/RequestServer/WebSocketImplCurl.cpp b/Services/RequestServer/WebSocketImplCurl.cpp
-index cd87053b5801006e78c18e7f88bfd0dd714816c5..9ea1c72c1ef58d6ff3f8bae28417f1f50d7a8ec3 100644
+index cd87053b5801006e78c18e7f88bfd0dd714816c5..c500aaf8e9eb22a52562a8dfb768ff676ba5afb6 100644
 --- a/Services/RequestServer/WebSocketImplCurl.cpp
 +++ b/Services/RequestServer/WebSocketImplCurl.cpp
 @@ -6,6 +6,7 @@
@@ -564,11 +535,10 @@ index cd87053b5801006e78c18e7f88bfd0dd714816c5..9ea1c72c1ef58d6ff3f8bae28417f1f5
  #include <RequestServer/ConnectionFromClient.h>
  #include <RequestServer/WebSocketImplCurl.h>
  
-@@ -82,6 +83,15 @@ void WebSocketImplCurl::connect(WebSocket::ConnectionInfo const& info)
+@@ -82,6 +83,14 @@ void WebSocketImplCurl::connect(WebSocket::ConnectionInfo const& info)
      if (auto root_certs = info.root_certificates_path(); root_certs.has_value())
          set_option(CURLOPT_CAINFO, root_certs->characters());
  
-+    // A certificate the user accepted for the host and port stands in for verification, as for other requests there.
 +    if (url.scheme() == "wss"sv) {
 +        if (auto pin = certificate_exception_public_key_pin(url.serialized_host(), url.port_or_default()); pin.has_value()) {
 +            set_option(CURLOPT_SSL_VERIFYPEER, 0L);

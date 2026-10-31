@@ -53,7 +53,6 @@ ErrorOr<void, String> Alarms::create(String const& name, JsonObject const& info)
             period = max(*period, MINIMUM_PACKED_DELAY_IN_MINUTES);
     }
 
-    // An alarm with neither fires after its period, or at once.
     double scheduled_time = now_in_milliseconds();
     if (when.has_value())
         scheduled_time = *when;
@@ -90,7 +89,6 @@ void Alarms::fire(String const& name)
 
     auto json = to_json(name, *alarm);
     if (alarm->period_in_minutes.has_value()) {
-        // NB: A periodic alarm keeps its timer, which this runs in.
         alarm->scheduled_time = now_in_milliseconds() + *alarm->period_in_minutes * MILLISECONDS_PER_MINUTE;
         schedule(name);
     } else {
@@ -115,7 +113,6 @@ Vector<JsonObject> Alarms::all() const
     return alarms;
 }
 
-// NB: An alarm may be cleared from its own timer's callback, so its timer goes only once that has returned.
 static void release_timer(RefPtr<Core::Timer> timer)
 {
     if (!timer)

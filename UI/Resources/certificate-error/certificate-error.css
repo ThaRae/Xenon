@@ -59,7 +59,6 @@ strong {
     margin-top: 12px;
 }
 
-/* Advanced on the left, the way back to safety on the right, as in Chrome. */
 .actions #advanced,
 .actions #retry {
     margin-right: auto;

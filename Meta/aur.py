@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
 
-# Keeps Xenon's packages for the Arch User Repository (AUR), in Packaging/aur, current with its releases, and pushes them
-# to the AUR.
-#
-#   Meta/aur.py update      bump every package to VERSION.txt's release: pkgver, pkgrel back to 1, xenon-bin's checksum
-#                           of the published AppImage, and each .SRCINFO, which makepkg writes
-#   Meta/aur.py check       check that each .SRCINFO is what makepkg makes of its PKGBUILD
-#   Meta/aur.py push        commit each package to its repository on the AUR and push it, over SSH as whichever AUR
-#                           account ssh is set up for, or with --ssh-key (the release workflow's AUR_SSH_PRIVATE_KEY)
-#
-# xenon-bin installs the release's AppImage, and xenon builds the release's tag from source. makepkg comes with pacman,
-# on Arch Linux; elsewhere, update and check run it in Arch Linux's container image, with docker.
-# Documentation/Updates.md describes the packages and their part in a release.
-
 from __future__ import annotations
 
 import argparse
@@ -31,16 +18,12 @@ from pathlib import Path
 XENON_SOURCE_DIR = Path(__file__).resolve().parent.parent
 PACKAGES_DIR = XENON_SOURCE_DIR / "Packaging" / "aur"
 
-# The package that installs the AppImage, whose checksum changes with every release, and where the AppImage comes from.
 APPIMAGE_PACKAGE = "xenon-bin"
 APPIMAGE_URL = "https://github.com/ThaRae/xenon-releases/releases/download/v{0}/Xenon-{0}-x86_64.AppImage"
 
 AUR_REPOSITORY = "ssh://aur@aur.archlinux.org/{}.git"
-# The AUR's host key, whose fingerprint (SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4) is on aur.archlinux.org's
-# home page. --ssh-key trusts this one only.
 AUR_HOST_KEY = "aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN"
 
-# makepkg, outside Arch Linux.
 ARCH_IMAGE = "archlinux:latest"
 
 
@@ -92,7 +75,6 @@ def packages(names: list[str]) -> list[Path]:
 
 
 def variable(pkgbuild: str, name: str) -> str:
-    """A variable that a PKGBUILD sets on a line of its own, as it does pkgver and pkgrel."""
     match = re.search(rf"^{name}=(\S+)$", pkgbuild, re.MULTILINE)
     if not match:
         sys.exit(f"A PKGBUILD doesn't set {name}")
@@ -105,7 +87,6 @@ def set_variable(pkgbuild: str, name: str, value: str) -> str:
 
 
 def appimage_sha256(version: str, appimage: Path | None) -> str:
-    """The SHA-256 of a release's AppImage: of a file, or of the published one, which this downloads."""
     digest = hashlib.sha256()
     if appimage:
         with appimage.open("rb") as file:
@@ -125,10 +106,6 @@ def appimage_sha256(version: str, appimage: Path | None) -> str:
 
 
 def makepkg(package: Path, *arguments: str) -> str:
-    """Runs makepkg in a package's directory, and returns what it printed. Outside Arch Linux, it runs in Arch Linux's
-    image, as this user rather than the container's root, which makepkg refuses to run as. makepkg wants to be able to
-    write where it would build and put what it built, even when it only reads the PKGBUILD, and the package's directory
-    may not be this user's (a checkout in a container), so those are a directory of its own."""
     destinations = ("BUILDDIR", "PKGDEST", "SRCDEST", "SRCPKGDEST", "LOGDEST")
     if shutil.which("makepkg"):
         with tempfile.TemporaryDirectory() as directory:
@@ -196,7 +173,6 @@ def push_main(args):
         for package in packages(args.packages):
             pkgbuild = (package / "PKGBUILD").read_text()
             release = f"{variable(pkgbuild, 'pkgver')}-{variable(pkgbuild, 'pkgrel')}"
-            # What git has of the package, not what makepkg left beside it.
             files = run("git", "-C", XENON_SOURCE_DIR, "ls-files", "--", relative(package)).splitlines()
             if not any(Path(file).name == ".SRCINFO" for file in files):
                 sys.exit(f"{relative(package)} has no .SRCINFO in git, which the AUR needs")
@@ -205,7 +181,6 @@ def push_main(args):
             run("git", "clone", "--quiet", AUR_REPOSITORY.format(package.name), clone, env=environment)
             head = subprocess.run(["git", "-C", clone, "rev-parse", "--verify", "--quiet", "HEAD"], capture_output=True)
             new = head.returncode != 0
-            # The AUR's repository holds the package's files and nothing else.
             for path in clone.iterdir():
                 if path.name != ".git":
                     shutil.rmtree(path) if path.is_dir() else path.unlink()

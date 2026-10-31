@@ -47,7 +47,6 @@ TEST_CASE(resolution_names_the_site)
     EXPECT_EQ(navigation->bang.name, "YouTube"sv);
 }
 
-// The query is a URL component, so characters that would end it early or start another parameter must be escaped.
 TEST_CASE(query_is_percent_encoded_as_a_component)
 {
     EXPECT_EQ(resolved_url("!w salt & pepper"sv), "https://wikipedia.org/w/index.php?search=salt+%26+pepper"sv);
@@ -63,13 +62,11 @@ TEST_CASE(input_without_a_known_bang_is_left_alone)
     EXPECT(!Bangs::resolve("   "sv).has_value());
 }
 
-// Only the first or last word is a bang, so a "!" in the middle of a query stays part of it.
 TEST_CASE(bang_in_the_middle_is_part_of_the_query)
 {
     EXPECT(!Bangs::resolve("what does !w mean"sv).has_value());
 }
 
-// Kagi's list has DuckDuckGo's bangs, far beyond the few Xenon used to pick by hand.
 TEST_CASE(bangs_from_the_full_list)
 {
     EXPECT_EQ(resolved_url("!bsky ladybird"sv), "https://bsky.app/search?q=ladybird"sv);
@@ -77,7 +74,6 @@ TEST_CASE(bangs_from_the_full_list)
     EXPECT_EQ(resolved_url("!c++ vector"sv), "https://www.cplusplus.com/search.do?q=vector"sv);
     EXPECT_EQ(resolved_url("!wayback ladybird.org"sv), "https://web.archive.org/web/*/ladybird.org"sv);
 
-    // A site's other triggers are the same bang.
     EXPECT_EQ(resolved_url("!wikipedia ladybird"sv), resolved_url("!w ladybird"sv));
     EXPECT_EQ(resolved_url("!github xenon"sv), resolved_url("!gh xenon"sv));
 }
@@ -90,27 +86,21 @@ TEST_CASE(non_ascii_triggers)
     EXPECT_EQ(resolved_url("!авито велосипед"sv), "https://www.avito.ru/?q=%D0%B2%D0%B5%D0%BB%D0%BE%D1%81%D0%B8%D0%BF%D0%B5%D0%B4"sv);
 }
 
-// Kagi's list doesn't have Kagi itself, so Xenon adds it.
 TEST_CASE(xenon_adds_kagi)
 {
     EXPECT_EQ(resolved_url("!k ladybird"sv), "https://kagi.com/search?q=ladybird"sv);
     EXPECT_EQ(resolved_url("!kagi"sv), "https://kagi.com/"sv);
 }
 
-// Kagi's format flags (fmt) change how some bangs take their query, for sites that need it.
 TEST_CASE(format_flags)
 {
-    // Without SpaceToPlus, a space is %20.
     EXPECT_EQ(resolved_url("!caniuse css grid"sv), "https://caniuse.com/?search=css%20grid"sv);
 
-    // Without EncodeQuery, the query goes in as it is, so a path stays a path.
     EXPECT_EQ(resolved_url("!ghrepo LadybirdBrowser/ladybird"sv), "https://github.com/LadybirdBrowser/ladybird"sv);
 
-    // With OpenSnapDomain, the bang alone opens the site the query URL searches.
     EXPECT_EQ(resolved_url("!hn"sv), "https://news.ycombinator.com/"sv);
     EXPECT_EQ(resolved_url("!hn ladybird"sv), "https://hn.algolia.com/?q=ladybird"sv);
 
-    // Without OpenBasePath, the bang alone opens the query URL with nothing in it.
     EXPECT_EQ(resolved_url("!oxlint"sv), "https://oxc.rs/docs/guide/usage/linter/rules/"sv);
 }
 
@@ -119,7 +109,6 @@ TEST_CASE(every_placeholder_gets_the_query)
     EXPECT_EQ(resolved_url("!pagesjaunes plombier"sv), "https://www.pagesjaunes.fr/annuaire/chercherlespros?quoiqui=plombier&monochamp=plombier"sv);
 }
 
-// The chip shows once the space after a leading bang has been typed, so that a bang still being typed has none.
 TEST_CASE(leading_bang_has_a_chip_once_the_query_starts)
 {
     auto chip = Bangs::leading_bang("!w "sv);
@@ -135,7 +124,6 @@ TEST_CASE(leading_bang_has_a_chip_once_the_query_starts)
     EXPECT(!Bangs::leading_bang(" !w ladybird"sv).has_value());
 }
 
-// A trailing bang resolves on Enter, but it has no chip: the chip sits where the query starts.
 TEST_CASE(trailing_bang_has_no_chip)
 {
     EXPECT(!Bangs::leading_bang("ladybird browser !w"sv).has_value());
@@ -172,14 +160,12 @@ TEST_CASE(every_bang_resolves)
         EXPECT(with_query->url.serialize().contains("xenon"sv));
         EXPECT_EQ(with_query->url.scheme(), "https"sv);
 
-        // A bang whose placeholder is in its host has no front page, so the bang alone doesn't resolve.
         auto front_page = Bangs::resolve(ByteString::formatted("!{}", bang.trigger));
         if (front_page.has_value())
             EXPECT(!front_page->url.serialize().contains("{{{s}}}"sv));
     }
 }
 
-// The placeholder can be in the host, as in "https://{s}.deviantart.com/": the query then names the host.
 TEST_CASE(placeholder_in_the_host)
 {
     EXPECT(!Bangs::resolve("!dauser"sv).has_value());

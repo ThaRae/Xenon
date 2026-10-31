@@ -22,7 +22,6 @@
 
 namespace Ladybird::Extensions {
 
-// Every toolbar, so that action.openPopup() and the action's shortcut reach the one in the window in front.
 static Vector<QPointer<ActionToolbar>>& toolbars()
 {
     static Vector<QPointer<ActionToolbar>> toolbars;
@@ -65,12 +64,13 @@ void ActionButton::update_appearance()
 {
     auto appearance = Browser::action_appearance(*m_extension, &m_tab);
 
-    if (appearance.icon_path.has_value()) {
-        auto file = LexicalPath::join(m_extension->root(), appearance.icon_path->bytes_as_string_view()).string();
-        setIcon(QIcon(qstring_from_ak_string(file)));
-    } else {
+    auto icon_file = appearance.icon_path.has_value()
+        ? Extension::confined_file(m_extension->root(), appearance.icon_path->bytes_as_string_view())
+        : ErrorOr<ByteString> { Error::from_errno(ENOENT) };
+    if (!icon_file.is_error())
+        setIcon(QIcon(qstring_from_ak_string(icon_file.value())));
+    else
         setIcon(QIcon::fromTheme("application-x-addon"));
-    }
 
     auto title = qstring_from_ak_string(appearance.title);
     setToolTip(title);
@@ -90,7 +90,6 @@ void ActionButton::clicked()
         return;
     }
 
-    // Without a popup, a click goes to the extension, as action.onClicked.
     auto appearance = Browser::action_appearance(*m_extension, &m_tab);
     if (!appearance.popup.has_value()) {
         Browser::action_clicked(*m_extension, &m_tab);
@@ -113,7 +112,6 @@ void ActionButton::open_popup()
     m_popup->show_popup();
 }
 
-// The badge sits on the icon's lower right, as in Chrome.
 void ActionButton::paintEvent(QPaintEvent* event)
 {
     QToolButton::paintEvent(event);
@@ -128,7 +126,6 @@ void ActionButton::paintEvent(QPaintEvent* event)
     font.setBold(true);
     painter.setFont(font);
 
-    // Chrome shows four characters at most.
     auto text = m_badge_text.left(4);
     QFontMetrics metrics(font);
     auto width = max(metrics.horizontalAdvance(text) + 6, 14);

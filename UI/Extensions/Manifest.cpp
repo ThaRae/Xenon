@@ -16,7 +16,6 @@
 
 namespace Ladybird::Extensions {
 
-// The top-level keys Chrome knows. Any other gets a warning, as in Chrome, and is otherwise ignored.
 static constexpr auto KNOWN_KEYS = to_array<StringView>({
     "action"sv,
     "author"sv,
@@ -78,7 +77,6 @@ static ParseError error(CheckedFormatString<Parameters...>&& format, Parameters 
     return MUST(String::formatted(move(format), parameters...));
 }
 
-// Manifest paths are relative to the extension's directory, whether or not they start with a slash.
 static String normalized_path(String const& path)
 {
     auto view = path.bytes_as_string_view();
@@ -126,7 +124,6 @@ static ErrorOr<Vector<Icon>, ParseError> parse_icons(JsonValue const& value, Str
 {
     Vector<Icon> icons;
 
-    // action.default_icon may be one path for every size.
     if (value.is_string()) {
         icons.append({ .size = 0, .path = normalized_path(value.as_string()) });
         return icons;
@@ -146,7 +143,6 @@ static ErrorOr<Vector<Icon>, ParseError> parse_icons(JsonValue const& value, Str
     return icons;
 }
 
-// https://developer.chrome.com/docs/extensions/reference/manifest/version
 static bool is_valid_version(StringView version)
 {
     auto parts = version.split_view('.', SplitBehavior::KeepEmpty);
@@ -164,8 +160,6 @@ static bool is_valid_version(StringView version)
     return true;
 }
 
-// MV3 doesn't let an extension page run remote code or eval(): its script sources may only be the extension itself,
-// WebAssembly, and local development servers.
 static ErrorOr<void, ParseError> validate_extension_pages_csp(StringView policy)
 {
     for (auto directive : policy.split_view(';')) {
@@ -344,8 +338,6 @@ ErrorOr<Manifest, String> Manifest::parse(JsonObject json)
             auto parsed_pattern = MatchPattern::parse(pattern);
             if (parsed_pattern.is_error())
                 return error("Invalid value for 'externally_connectable.matches[{}]': {}", index, parsed_pattern.error());
-            // As in Chrome, a page has to be of a site the extension names, so a pattern for every host is ignored.
-            // FIXME: Chrome ignores patterns for every host under a public suffix, like "https://*.com/*", too.
             if (parsed_pattern.value().matches_all_urls() || parsed_pattern.value().host().is_empty()) {
                 manifest.warnings.append(error("Wildcard domain patterns such as \"<all_urls>\" are not allowed in 'externally_connectable.matches[{}]'.", index));
                 continue;
@@ -401,7 +393,6 @@ ErrorOr<Manifest, String> Manifest::parse(JsonObject json)
         manifest.sandbox_pages = TRY(path_list(*sandbox, "pages"sv, "sandbox."sv));
 
     json.for_each_member([&](String const& key, JsonValue const&) {
-        // Chrome ignores keys that start with an underscore, which tools use for their own notes.
         if (!key.starts_with('_') && !KNOWN_KEYS.contains_slow(key.bytes_as_string_view()))
             manifest.warnings.append(error("Unrecognized manifest key '{}'.", key));
     });
@@ -426,15 +417,11 @@ Optional<String> best_icon(Vector<Icon> const& icons, u32 size)
     return icons.last().path;
 }
 
-// https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts#matchAndGlob
 bool ContentScript::matches_document(URL::URL const& url, bool is_top_level_frame) const
 {
     if (!all_frames && !is_top_level_frame)
         return false;
 
-    // FIXME: Chrome runs content scripts in file: documents once the user allows the extension to, and in about:blank
-    //        and other documents without a URL of their own when the extension asks for it (match_about_blank,
-    //        match_origin_as_fallback).
     if (url.scheme() == "file"sv)
         return false;
 
@@ -462,7 +449,6 @@ bool ExternallyConnectable::matches_document(URL::URL const& url) const
     });
 }
 
-// https://developer.chrome.com/docs/extensions/reference/api/scripting#type-RegisteredContentScript
 ErrorOr<RegisteredContentScript, String> RegisteredContentScript::from_json(JsonObject const& object)
 {
     RegisteredContentScript registered;

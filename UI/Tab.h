@@ -13,8 +13,8 @@
 #include <AK/String.h>
 #include <AK/Vector.h>
 #include <AK/kmalloc.h>
+#include <LibAudio/Audibility.h>
 #include <LibWakeLock/DisplaySleepInhibitor.h>
-#include <LibWebCommon/HTML/AudioPlayState.h>
 #include <LibWebCommon/Page/PageId.h>
 #include <LibWebCommon/Page/ScreenWakeLockState.h>
 #include <LibWebView/FileDownloader.h>
@@ -86,7 +86,6 @@ struct DeferredTab {
     URL::URL url;
     QString title;
     QIcon favicon;
-    // A tab that hibernated keeps its history here rather than in the session store, which a private window has none of.
     Optional<WebView::SessionHistorySnapshot> history {};
 };
 
@@ -119,10 +118,7 @@ public:
     // Builds the tab's view and toolbar, and restores its history, if it hasn't loaded yet.
     void ensure_loaded();
     bool is_hibernated() const { return m_deferred_tab.has_value() && m_deferred_tab->history.has_value(); }
-    // Whether the tab holds nothing that hibernating would lose, like a dialog the page opened (TabHibernation.cpp).
     bool can_hibernate() const;
-    // Gives up the tab's view and toolbar, and with them its WebContent process, which leaves the tab as a restored tab
-    // is until it's selected and loads again (TabHibernation.cpp).
     void hibernate();
 
     URL::URL url() const;
@@ -170,8 +166,6 @@ public:
     void update_web_view_frame(bool chrome_visible, Optional<WebView::VerticalTabsPosition> sidebar_position);
 #endif
     void set_window(BrowserWindow&);
-    // Xenon: In a split view, the split view frames the page itself, and only the active page has a bookmarks bar at
-    //        its top.
     void set_in_split_view(bool in_split_view, bool is_active_side = true);
     void set_toolbar_container_in_tab_layout(bool);
     void set_toolbar_window_controls_visible(bool);
@@ -192,13 +186,12 @@ public slots:
     void focus_location_editor();
     void park_location_editing();
     LocationEdit* location_edit_with_parked_editing() const { return is_loaded() && m_location_edit->has_parked_editing_session() ? m_location_edit : nullptr; }
-    // Xenon: A new tab page's address bar, which takes focus when the tab is selected, as it did when the tab opened.
     LocationEdit* location_edit_with_hidden_url() const { return is_loaded() && m_location_edit->url_is_hidden() ? m_location_edit : nullptr; }
 
 signals:
     void title_changed(int id, QString const&);
     void favicon_changed(int id, QIcon const&);
-    void audio_play_state_changed(int id, Web::HTML::AudioPlayState);
+    void audibility_changed(int id, Audio::Audibility);
     void loading_changed();
     void loading_finished();
     void loaded();
@@ -220,7 +213,6 @@ private:
     virtual void tab_settings_changed() override;
     virtual void config_variable_changed(WebView::ConfigVariableID) override;
 
-    // XenonSettings::Observer
     virtual void xenon_settings_changed() override;
 
     void recreate_toolbar_icons();
@@ -301,7 +293,6 @@ private:
     bool m_hides_page_bookmarks_bar { false };
 #ifdef AK_OS_MACOS
     QHBoxLayout* m_view_layout { nullptr };
-    // The web view's frame as TabWidget last asked for it, which a tab that hasn't loaded gets once it loads.
     bool m_web_view_chrome_visible { true };
     Optional<WebView::VerticalTabsPosition> m_web_view_sidebar_position;
 #endif
@@ -331,12 +322,12 @@ private:
     QPointer<QColorDialog> m_color_picker_dialog;
     QPointer<QFileDialog> m_file_picker_dialog;
     QPointer<QMessageBox> m_external_url_confirmation_dialog;
-    // Requests the same dialog would answer wait on the one open, so a page cannot stack dialogs by asking again.
-    struct PendingPermissionRequests {
+    struct PermissionDialog {
+        WebView::PermissionPromptRequest request;
         QPointer<QMessageBox> dialog;
-        Vector<Function<void(bool granted)>> on_decided;
+        WebView::PermissionPromptCallback on_outcome;
     };
-    HashMap<String, PendingPermissionRequests> m_pending_permission_requests;
+    Vector<PermissionDialog> m_permission_dialogs;
 
     bool m_suppress_javascript_dialogs_until_navigation { false };
     bool m_already_requested_close { false };
@@ -347,7 +338,6 @@ private:
     bool m_toolbar_window_controls_visible { false };
     Optional<WebView::SessionTabId> m_session_tab_id;
     Optional<DeferredTab> m_deferred_tab;
-    // What create_tab_shell() made, which a tab keeps when it hibernates.
     QObjectList m_tab_shell_children;
 };
 

@@ -16,7 +16,6 @@
 
 namespace Ladybird::Extensions {
 
-// UI/Resources/extensions/*.js, which the build embeds.
 extern String const& chrome_api_source;
 extern String const& background_page_source;
 extern String const& worker_bridge_source;
@@ -24,9 +23,7 @@ extern String const& externally_connectable_relay_source;
 
 static constexpr auto NO_RECEIVER = "Could not establish connection. Receiving end does not exist."sv;
 static constexpr auto PRUNE_INTERVAL = AK::Duration::from_seconds(5);
-// How long messages wait for a background that has started to run its script, in case it never does.
 static constexpr auto BACKGROUND_START_TIMEOUT = AK::Duration::from_seconds(10);
-// How long a background with nothing to do keeps running, as in Chrome.
 static constexpr auto BACKGROUND_IDLE_TIMEOUT = AK::Duration::from_seconds(30);
 
 StringView context_kind_name(ContextKind kind)
@@ -117,7 +114,6 @@ JsonObject Router::config_for(Extension const& extension, ContextKind kind, URL:
     config.set("isBackground"sv, kind == ContextKind::Background);
     config.set("url"sv, url.serialize());
 
-    // NB: A tab can show the popup's page too, as Bitwarden's popout does; only the popup itself reports its size.
     config.set("isPopup"sv, kind == ContextKind::Popup);
     return config;
 }
@@ -133,7 +129,6 @@ Optional<String> Router::bootstrap_script(WebView::ScriptBridgeEndpoint const& e
     auto path = URL::percent_decode(endpoint.url().serialize_path());
     auto view_id = endpoint.view_id();
 
-    // The background page only relays between its worker and the UI process.
     if (path == BACKGROUND_PAGE_PATH && extension->manifest().background_service_worker.has_value()) {
         m_contexts.append({ *extension, endpoint, ContextKind::Background });
 
@@ -159,7 +154,6 @@ String Router::background_worker_script(Extension const& extension)
 {
     auto worker_url = extension.url_for(*extension.manifest().background_service_worker);
 
-    // NB: One function holds everything, so that nothing but chrome reaches the worker's global scope.
     StringBuilder script;
     script.append("(() => {\n\"use strict\";\n"sv);
     script.append(worker_bridge_source);
@@ -201,8 +195,6 @@ Optional<Router::Context&> Router::context_for(WebView::ScriptBridgeEndpoint con
     return {};
 }
 
-// What a context's messages say about where they came from. The background's are from its worker's script, as in
-// Chrome.
 URL::URL Router::context_url(Context const& context) const
 {
     if (context.kind == ContextKind::Background)
@@ -213,7 +205,6 @@ URL::URL Router::context_url(Context const& context) const
 JsonObject Router::sender_for(Context const& context)
 {
     JsonObject sender;
-    // A web page's messages have no extension ID, which is how extensions tell them apart.
     if (context.kind != ContextKind::ExternalPage)
         sender.set("id"sv, context.extension->id());
     sender.set("url"sv, context_url(context).serialize());
@@ -259,7 +250,6 @@ void Router::prune_closed_contexts()
         forget_endpoint(endpoint);
 }
 
-// A context that went away answers no runtime messages, and its ports close.
 void Router::forget_endpoint(WebView::ScriptBridgeEndpoint const& endpoint)
 {
     Vector<u64> finished;
@@ -317,7 +307,6 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
     if (!type.has_value())
         return;
 
-    // A web page may only message the extension, and use the ports it opened.
     if (context->kind == ContextKind::ExternalPage && !type->is_one_of("call"sv, "connect"sv, "port-message"sv, "port-disconnect"sv, "closing"sv))
         return;
 
@@ -333,8 +322,6 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
         if (auto id = message.get_u64("id"sv); id.has_value())
             handle_response(*context, *id, message.get_bool("handled"sv).value_or(false), message.get_bool("listening"sv).value_or(true), message.get("response"sv).value_or(JsonValue {}));
     } else if (*type == "connect"sv && port_id.has_value()) {
-        // A port to a tab (tabs.connect()) goes to the extension's content scripts there; any other port goes to its
-        // pages and background (runtime.connect()).
         auto name = message.get_string("name"sv).value_or({});
         auto may_connect_to_tabs = context->kind != ContextKind::ContentScript && context->kind != ContextKind::ExternalPage;
         if (auto tab_id = message.get_integer<i64>("tabId"sv); tab_id.has_value() && may_connect_to_tabs) {
@@ -369,7 +356,6 @@ void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String co
         else
             listeners.remove(*name);
     } else if (*type == "closing"sv) {
-        // NB: The page is still there for a moment, so it's forgotten once it has gone.
         Core::deferred_invoke([this] { prune_closed_contexts(); });
     } else if (*type == "popup-size"sv) {
         auto width = message.get_i32("width"sv);
@@ -397,7 +383,6 @@ void Router::reply_with_error(WebView::ScriptBridgeEndpoint const& endpoint, u64
     the().post(endpoint, message.serialized());
 }
 
-// What Chrome gives content scripts of chrome.*, besides i18n, which needs no calls.
 static bool is_available_to_content_scripts(StringView name)
 {
     return name == "runtime.sendMessage"sv || name.starts_with("storage."sv);
@@ -405,8 +390,6 @@ static bool is_available_to_content_scripts(StringView name)
 
 void Router::handle_call(Context& context, u64 id, String const& name, JsonArray const& args)
 {
-    // NB: A content script's renderer is a web page's, so what it may ask for is checked here, not just left out of
-    //     its chrome.*.
     if (context.kind == ContextKind::ContentScript && !is_available_to_content_scripts(name)) {
         reply_with_error(context.endpoint, id, MUST(String::formatted("{} isn't available to content scripts.", name)));
         return;
@@ -483,7 +466,6 @@ ErrorOr<JsonValue, String> Router::handle_storage_call(Context& context, String 
     if (!extension.has_permission("storage"sv))
         return "The 'storage' permission is required."_string;
 
-    // Content scripts may use storage.session only once the extension lets them, as in Chrome.
     if (name == "storage.setAccessLevel"sv) {
         auto options = !args.is_empty() && args.at(0).is_object() ? args.at(0).as_object() : JsonObject {};
         auto level = options.get_string("accessLevel"sv);
@@ -603,8 +585,6 @@ struct PermissionWarning {
     StringView warning;
 };
 
-// What Chrome's prompt says a permission lets an extension do. It doesn't ask about those it says nothing about, and
-// Xenon asks about any it doesn't know by name.
 static Optional<String> permission_warning(StringView permission)
 {
     static constexpr Array without_warnings = {
@@ -648,8 +628,6 @@ static Optional<String> permission_warning(StringView permission)
     return MUST(String::formatted("Use the \"{}\" permission", permission));
 }
 
-// Unpacked extensions get every permission they ask for when they load, as in Chrome, and optional permissions when the
-// user grants them.
 ErrorOr<JsonValue, String> Router::handle_permissions_call(Context& context, String const& name, JsonArray const& args)
 {
     auto& extension = *context.extension;
@@ -671,7 +649,6 @@ ErrorOr<JsonValue, String> Router::handle_permissions_call(Context& context, Str
             if (!extension.has_permission(permission))
                 return JsonValue { false };
         }
-        // A pattern is granted when a host permission covers it, as https://*/* covers https://example.com/*.
         for (auto const& origin : origins) {
             auto pattern = MatchPattern::parse(origin);
             if (pattern.is_error())
@@ -711,8 +688,6 @@ ErrorOr<JsonValue, String> Router::handle_permissions_call(Context& context, Str
     return MUST(String::formatted("{} isn't supported.", name));
 }
 
-// Asks the user for optional permissions, as Chrome's prompt does, unless the extension has them already or they're
-// ones Chrome doesn't ask about. The extension's open contexts get the permissions' APIs before the call returns.
 void Router::request_permissions(Context& context, u64 call_id, JsonArray const& args)
 {
     auto const& extension = *context.extension;
@@ -726,7 +701,6 @@ void Router::request_permissions(Context& context, u64 call_id, JsonArray const&
             return;
         }
     }
-    // FIXME: Optional host permissions.
     for (auto const& origin : string_list(request, "origins"sv)) {
         if (!manifest.host_permissions.contains_slow(origin) && !manifest.host_permissions.contains_slow("<all_urls>"_string)) {
             reply_with_error(context.endpoint, call_id, "Optional host permissions aren't supported yet."sv);
@@ -772,10 +746,6 @@ void Router::dispatch_permissions_change(StringView extension_id, StringView eve
     dispatch_event(*extension, event_name, move(args));
 }
 
-// --- chrome.privacy ----------------------------------------------------------------------------------------------------
-
-// The settings Xenon lets extensions control. It has no password manager or autofill of its own, so they're off, and an
-// extension that sets one only becomes the one controlling it, which is what password managers check for.
 static constexpr Array PRIVACY_SETTINGS = {
     "privacy.services.passwordSavingEnabled"sv,
     "privacy.services.autofillEnabled"sv,
@@ -824,7 +794,6 @@ ErrorOr<JsonValue, String> Router::handle_privacy_call(Context& context, String 
         return MUST(String::formatted("{} isn't supported.", name));
     }
 
-    // Every extension that can see the setting hears it changed, with its own level of control.
     auto event_name = MUST(String::formatted("{}.onChange", setting));
     for (auto const& other : Registry::the().extensions()) {
         if (!other->has_permission("privacy"sv))
@@ -877,8 +846,6 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
         auto is_restart = starting.has_value() && starting->is_restart;
         Core::deferred_invoke([this, id = extension->id()] { background_did_run(id); });
 
-        // NB: These come before what waited for the background to run its script. A background that started again for
-        //     an event is in the same session, and gets no runtime.onStartup.
         JsonObject details;
         if (auto reason = Registry::the().take_install_reason(extension->id()); reason.has_value()) {
             details.set("reason"sv, reason->reason);
@@ -914,7 +881,6 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
     }
 
     if (name == "runtime.reload"sv) {
-        // NB: The extension's pages and background go with it, the calling context among them.
         Core::deferred_invoke([id = extension->id()] {
             if (auto result = Registry::the().reload(id); result.is_error())
                 warnln("Extensions: unable to reload {}: {}", id, result.error());
@@ -955,7 +921,6 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
         return JsonValue { move(info) };
     }
 
-    // FIXME: Report the system's idle and locked states.
     if (name == "idle.queryState"sv)
         return JsonValue { "active"sv };
     if (name == "idle.setDetectionInterval"sv)
@@ -1025,7 +990,6 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
 
     auto serialized = event_message(name, move(args));
 
-    // The background gets the event once it has run its script, starting again for it if it stopped when idle.
     if (!kind.has_value() || *kind == ContextKind::Background) {
         wake_background(extension, name);
         if (auto starting = m_starting_backgrounds.get(extension.id()); starting.has_value()) {
@@ -1046,7 +1010,6 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
             continue;
         if (context.kind == ContextKind::ExternalPage || (context.kind == ContextKind::Background && background_is_starting))
             continue;
-        // Content scripts have chrome.storage's events alone, and learn of changed permissions for chrome.storage's sake.
         if (context.kind == ContextKind::ContentScript && !name.starts_with("storage."sv) && !name.starts_with("permissions."sv))
             continue;
         post(context.endpoint, serialized);
@@ -1059,10 +1022,6 @@ void Router::dispatch_event_to_all(StringView name, JsonArray args)
         dispatch_event(extension, name, args);
 }
 
-// --- runtime.sendMessage -----------------------------------------------------------------------------------------------
-
-// runtime.sendMessage() and runtime.connect() reach the extension's pages and background, but not its content scripts
-// or the web pages that message it, and never the sender itself.
 Vector<WebView::ScriptBridgeEndpoint> Router::extension_receivers(Context const& sender) const
 {
     Vector<WebView::ScriptBridgeEndpoint> receivers;
@@ -1076,7 +1035,6 @@ Vector<WebView::ScriptBridgeEndpoint> Router::extension_receivers(Context const&
     return receivers;
 }
 
-// tabs.sendMessage() and tabs.connect() reach the extension's content scripts in the tab's frames, or in one of them.
 Vector<WebView::ScriptBridgeEndpoint> Router::content_script_receivers(Extension const& extension, i64 tab_id, Optional<i64> wanted_frame_id, Optional<String const&> wanted_document_id)
 {
     prune_closed_contexts();
@@ -1101,7 +1059,6 @@ Vector<WebView::ScriptBridgeEndpoint> Router::content_script_receivers(Extension
 
 void Router::background_will_start(Extension const& extension)
 {
-    // NB: Its script registers its listeners again as it runs.
     m_background_listeners.remove(extension.id());
     start_background(extension, false);
 }
@@ -1141,9 +1098,6 @@ void Router::background_did_run(String const& extension_id)
         action();
 }
 
-// https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle#idle-shutdown
-// Chrome starts a stopped service worker for the events it registered listeners for, and runtime messages and ports
-// are events too.
 void Router::wake_background(Extension const& extension, StringView event_name)
 {
     if (m_starting_backgrounds.contains(extension.id()) || m_running_backgrounds.contains(extension.id()))
@@ -1159,14 +1113,12 @@ void Router::wake_background(Extension const& extension, StringView event_name)
     }
 }
 
-// Each event, message, and call of a background's keeps it running for another while.
 void Router::background_was_active(String const& extension_id)
 {
     if (auto idle = m_running_backgrounds.get(extension_id); idle.has_value())
         (*idle)->restart();
 }
 
-// A background that owes a runtime message its response, or waits for one, isn't idle.
 bool Router::background_is_busy(String const& extension_id) const
 {
     auto is_background = [&](WebView::ScriptBridgeEndpoint const& endpoint) {
@@ -1178,7 +1130,6 @@ bool Router::background_is_busy(String const& extension_id) const
         if (is_background(pending.sender) || any_of(pending.awaiting, is_background))
             return true;
     }
-    // An open native messaging port keeps the background running, as Chrome keeps a service worker with one.
     for (auto const& [id, port] : m_ports) {
         if (port.native && is_background(port.opener))
             return true;
@@ -1186,8 +1137,6 @@ bool Router::background_is_busy(String const& extension_id) const
     return false;
 }
 
-// A background that stopped takes its page's processes with it. Its ports close, as they do when Chrome stops a service
-// worker, and its offscreen document stays open.
 void Router::stop_idle_background(String const& extension_id)
 {
     auto idle = m_running_backgrounds.get(extension_id);
@@ -1224,8 +1173,6 @@ void Router::post(WebView::ScriptBridgeEndpoint const& endpoint, String const& m
     }
 }
 
-// https://developer.chrome.com/docs/extensions/reference/api/runtime#method-sendMessage
-// The message goes to each receiver, and the first answer is the response.
 void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue message, Vector<WebView::ScriptBridgeEndpoint> receivers)
 {
     prune_closed_contexts();
@@ -1238,7 +1185,6 @@ void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue messag
     delivery.set("id"sv, id);
     delivery.set("message"sv, move(message));
     delivery.set("sender"sv, sender_for(sender));
-    // A web page's messages go to runtime.onMessageExternal.
     delivery.set("external"sv, sender.kind == ContextKind::ExternalPage);
     auto serialized = delivery.serialized();
 
@@ -1256,7 +1202,6 @@ void Router::send_runtime_message(Context& sender, u64 call_id, JsonValue messag
     m_pending_messages.set(id, move(pending));
 }
 
-// https://developer.chrome.com/docs/extensions/reference/api/tabs#method-sendMessage
 void Router::send_tab_message(Context& sender, u64 call_id, JsonArray const& args)
 {
     if (args.is_empty() || !args.at(0).is_integer<i64>()) {
@@ -1294,7 +1239,6 @@ void Router::finish_pending_message(u64 id, Optional<JsonValue> response)
     if (!pending.has_value())
         return;
 
-    // As in Chrome, a message that no context had a listener for never connected.
     if (!response.has_value() && !pending->any_listening) {
         reply_with_error(pending->sender, pending->call_id, NO_RECEIVER);
         return;
@@ -1306,10 +1250,6 @@ void Router::finish_pending_message(u64 id, Optional<JsonValue> response)
     reply(pending->sender, pending->call_id, move(result));
 }
 
-// --- runtime.connect ---------------------------------------------------------------------------------------------------
-
-// https://developer.chrome.com/docs/extensions/develop/concepts/messaging#connect
-// A port reaches each receiver with a runtime.onConnect listener.
 void Router::open_port(Context& opener, String const& port_id, String const& name, Vector<WebView::ScriptBridgeEndpoint> receivers)
 {
     prune_closed_contexts();
@@ -1323,7 +1263,6 @@ void Router::open_port(Context& opener, String const& port_id, String const& nam
     connect.set("port"sv, port_id);
     connect.set("name"sv, name);
     connect.set("sender"sv, sender_for(opener));
-    // A web page's ports go to runtime.onConnectExternal.
     connect.set("external"sv, opener.kind == ContextKind::ExternalPage);
     auto serialized = connect.serialized();
 
@@ -1359,7 +1298,6 @@ void Router::handle_port_accepted(Context& receiver, String const& port_id, bool
     if (port->awaiting.is_empty())
         port->early_messages.clear();
 
-    // A port nothing accepted closes, as one to an extension with no listeners does in Chrome.
     if (port->awaiting.is_empty() && port->receivers.is_empty()) {
         auto opener = port->opener;
         m_ports.remove(port_id);
@@ -1470,8 +1408,6 @@ void Router::handle_port_disconnect(Context& context, String const& port_id)
     close_port_end(context.endpoint, port_id);
 }
 
-// One end of a port closed, or went away. The opener closing closes it for everyone; a receiver closing closes it for
-// the opener once no receiver is left.
 void Router::close_port_end(WebView::ScriptBridgeEndpoint const& endpoint, String const& port_id, Optional<StringView> error)
 {
     auto port = m_ports.get(port_id);

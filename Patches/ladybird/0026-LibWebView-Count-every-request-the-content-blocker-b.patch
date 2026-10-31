@@ -16,29 +16,28 @@ the list does.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibWebView/ContentBlocking.h      |  2 ++
+ Libraries/LibWebView/ContentBlocking.h      |  1 +
  Libraries/LibWebView/ViewImplementation.cpp | 10 +++++-----
  Libraries/LibWebView/ViewImplementation.h   |  1 +
- 3 files changed, 8 insertions(+), 5 deletions(-)
+ 3 files changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/Libraries/LibWebView/ContentBlocking.h b/Libraries/LibWebView/ContentBlocking.h
-index 14b25f7d6c87ca622b382e8ecd3430a813ba6845..453226322131f5347869bb7697e83d5f3d69c15b 100644
+index 14b25f7d6c87ca622b382e8ecd3430a813ba6845..cb45628e636fb83763c54b2ed672eeb81a61e9c9 100644
 --- a/Libraries/LibWebView/ContentBlocking.h
 +++ b/Libraries/LibWebView/ContentBlocking.h
-@@ -32,6 +32,8 @@ struct ContentBlockingSnapshot {
+@@ -32,6 +32,7 @@ struct ContentBlockingSnapshot {
      Optional<String> site;
      ContentBlockingState state { ContentBlockingState::Unavailable };
      Vector<BlockedResource> blocked_resources;
-+    // Every request blocked on the page, including those of a resource listed already and those past the list's limit.
 +    u64 blocked_request_count { 0 };
  
      bool enabled() const { return state == ContentBlockingState::Enabled || state == ContentBlockingState::NoRules; }
      bool can_toggle() const { return site.has_value() && (enabled() || state == ContentBlockingState::SiteDisabled); }
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index c5600f4f5630e1c6331423af91d92b745f42ad4a..c465cdae5e56b5bac18fa8f5a56a565b020b3c3a 100644
+index 3b24bfb839c2b2f808efc930d74b623d5d758afb..ff638fe2de727c403372c804cd934c9d1b3bf287 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -2468,22 +2468,21 @@ static StringView known_blocked_resource_kind(StringView kind)
+@@ -2691,22 +2691,21 @@ static StringView known_blocked_resource_kind(StringView kind)
  
  void ViewImplementation::did_block_resource(Badge<WebContentPage>, URL::URL const& url, StringView kind)
  {
@@ -65,7 +64,7 @@ index c5600f4f5630e1c6331423af91d92b745f42ad4a..c465cdae5e56b5bac18fa8f5a56a565b
      notify_content_blocking_changed();
  }
  
-@@ -2497,6 +2496,7 @@ ContentBlockingSnapshot ViewImplementation::content_blocking_snapshot() const
+@@ -2720,6 +2719,7 @@ ContentBlockingSnapshot ViewImplementation::content_blocking_snapshot() const
  {
      ContentBlockingSnapshot snapshot;
      snapshot.blocked_resources = m_blocked_resources;
@@ -74,10 +73,10 @@ index c5600f4f5630e1c6331423af91d92b745f42ad4a..c465cdae5e56b5bac18fa8f5a56a565b
      if (m_crash_state.has_value() || !traversable().active_document().host())
          return snapshot;
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 7aa4246f7ef6b1c5015dd5ca1f9e9417f0edd005..7d145052c90f1316572dcc6363abf0089a8a19c7 100644
+index b52ef02a6f8703113846b1d82fa8c5114f39a8e8..ea33da1134e58816fe288286d48c3d75ec5caaaa 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -1146,6 +1146,7 @@ protected:
+@@ -1239,6 +1239,7 @@ protected:
      u64 m_next_navigation_listener_id { 1 };
  
      Vector<BlockedResource> m_blocked_resources;

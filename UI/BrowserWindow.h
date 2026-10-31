@@ -9,9 +9,9 @@
 
 #include <AK/Optional.h>
 #include <AK/kmalloc.h>
+#include <LibAudio/Audibility.h>
 #include <LibURL/URL.h>
 #include <LibWebCommon/HTML/ActivateTab.h>
-#include <LibWebCommon/HTML/AudioPlayState.h>
 #include <LibWebCommon/Page/PageId.h>
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/Forward.h>
@@ -164,6 +164,7 @@ public:
     Tab& create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocation);
     void duplicate_tab(Tab&);
     void open_history_entry_in_new_tab(Tab&, int delta);
+    void update_tab_audio_button(Tab&);
     // Opens a window's restored tabs, keeping the session rows the store re-adopted for them.
     void restore_tabs(Vector<WebView::RestoredSessionTab> const&, i64 active_tab_index);
     Tab* current_tab() const { return m_current_tab; }
@@ -174,7 +175,6 @@ public:
     // Brings the window forward for a page's beforeunload prompt during an application-wide close check.
     void raise_for_close_prompt();
     bool is_window_close_approved() const { return m_window_close_approved; }
-    // While the window checks whether its pages let it close, it shows each of them in turn.
     bool is_checking_whether_to_close() const { return m_window_close_coordinator.is_running(); }
     void report_activation_to_session_store();
     void cancel_window_close_preflight();
@@ -216,7 +216,7 @@ public:
 public slots:
     void tab_title_changed(int index, QString const&);
     void tab_favicon_changed(int index, QIcon const& icon);
-    void tab_audio_play_state_changed(int index, Web::HTML::AudioPlayState);
+    void tab_audibility_changed(int index, Audio::Audibility);
     Tab& new_tab_from_url(URL::URL const&, Web::HTML::ActivateTab, TabLocation);
     void open_new_tab();
     void activate_tab(int index);

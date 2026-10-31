@@ -13,49 +13,45 @@ the session as soon as the image is decoded.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibWeb/HTML/HTMLLinkElement.cpp           | 3 +++
- Libraries/LibWeb/HTML/HTMLVideoElement.cpp          | 4 ++++
- Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp | 3 +++
- 3 files changed, 10 insertions(+)
+ Libraries/LibWeb/HTML/HTMLLinkElement.cpp           | 2 ++
+ Libraries/LibWeb/HTML/HTMLVideoElement.cpp          | 2 ++
+ Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp | 2 ++
+ 3 files changed, 6 insertions(+)
 
 diff --git a/Libraries/LibWeb/HTML/HTMLLinkElement.cpp b/Libraries/LibWeb/HTML/HTMLLinkElement.cpp
-index a5aebd478b27b9c5dd89c57affa8c3461b1a0313..7dfefed68584b8bd6dc4b4e43959a09ffb388fa9 100644
+index 35b5624fbe1cd419ff88aae39fedce227b349f8c..568e7165c108bdcf9a2aef54c4fbf3ecd3ee2222 100644
 --- a/Libraries/LibWeb/HTML/HTMLLinkElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLLinkElement.cpp
-@@ -1371,6 +1371,9 @@ static NonnullRefPtr<Core::Promise<NonnullRefPtr<Gfx::Bitmap const>>> decode_fav
+@@ -1398,6 +1398,8 @@ static NonnullRefPtr<Core::Promise<NonnullRefPtr<Gfx::Bitmap const>>> decode_fav
      };
  
      auto on_successful_decode = [document = GC::Root(document), promise](Web::Platform::DecodedImage& decoded_image) -> ErrorOr<void> {
-+        // A favicon is its first frame only, so the decoder can drop an animated one's other frames.
 +        if (decoded_image.session_id != 0)
 +            Platform::ImageCodecPlugin::the().stop_animation_decode(decoded_image.session_id);
          auto favicon_bitmap = decoded_image.frames[0].bitmap;
          dbgln_if(IMAGE_DECODER_DEBUG, "Decoded favicon, {}", favicon_bitmap->size());
  
 diff --git a/Libraries/LibWeb/HTML/HTMLVideoElement.cpp b/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
-index 8e49a8774b8fde6aa008177ea743c3e7f05d1e4e..755aa80944f0ebc6a30dea1cb85224fe8e95537b 100644
+index 31ca229b5fe7f4e404e5f7a651596cade24e8bf9..86657bfa1b4094efc94b99878d81774856585f36 100644
 --- a/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
-@@ -340,6 +340,10 @@ WebIDL::ExceptionOr<void> HTMLVideoElement::determine_element_poster_frame(Optio
+@@ -338,6 +338,8 @@ WebIDL::ExceptionOr<void> HTMLVideoElement::determine_element_poster_frame(Optio
              (void)Platform::ImageCodecPlugin::the().decode_image(
                  image_data,
                  [weak_self, poster_url](Web::Platform::DecodedImage& image) -> ErrorOr<void> {
-+                    // A poster frame is the image's first frame only, so the decoder can drop an animated one's other
-+                    // frames.
 +                    if (image.session_id != 0)
 +                        Platform::ImageCodecPlugin::the().stop_animation_decode(image.session_id);
                      if (!weak_self)
                          return {};
                      RefPtr<Gfx::Bitmap> poster_frame;
 diff --git a/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp b/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
-index 3f651948cc7029f3aacdb2e499b4a6005c8120af..b3aee92dd92e4c8efd66f149f682f529fb2afe0a 100644
+index de65cdeb8c13aafb5a9564e6d392f2413ac62e9b..ba2b6ef9fa37a7724d76a1b68c36ec1a7e3718b5 100644
 --- a/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
 +++ b/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
-@@ -514,6 +514,9 @@ void WindowOrWorkerGlobalScopeMixin::create_image_bitmap_impl(JS::Realm& realm,
+@@ -537,6 +537,8 @@ void WindowOrWorkerGlobalScopeMixin::create_image_bitmap_impl(JS::Realm& realm,
                  };
  
                  auto on_successful_decode = [p = GC::Root(*p), sx, sy, sw, sh, options](Web::Platform::DecodedImage& result) -> ErrorOr<void> {
-+                    // An ImageBitmap holds one frame only (step 4), so the decoder can drop an animated image's others.
 +                    if (result.session_id != 0)
 +                        Web::Platform::ImageCodecPlugin::the().stop_animation_decode(result.session_id);
                      if (Core::StatsLog::the())

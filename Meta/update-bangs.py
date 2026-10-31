@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
 
-# Refreshes the !bangs Xenon ships (UI/Resources/bangs) from Kagi's community-maintained bang list, which Helium's own
-# list is generated from. It has most of DuckDuckGo's bangs under the same triggers, and it's MIT-licensed. DuckDuckGo
-# publishes its bang.js without a license, so Xenon doesn't ship that.
-#
-#   Meta/update-bangs.py                    use Kagi's latest release
-#   Meta/update-bangs.py --tag 202610261529 use that release
-#   Meta/update-bangs.py --kagi-bangs PATH  use a local checkout of https://github.com/kagisearch/bangs
-#
-# It writes bangs.json, one bang per line, sorted by trigger, in Kagi's format (s: the site's name, t and ts: its
-# triggers, u: the query URL with {{{s}}} for the query, ad: the site's own domain when u searches it through another
-# site, fmt: format flags, all on when it's absent), and NOTICE.txt, which credits the source. The build turns
-# bangs.json into a lookup table (Meta/generate-bang-table.py). Meta/check.py checks it.
-
 from __future__ import annotations
 
 import argparse
@@ -29,8 +16,6 @@ XENON_SOURCE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "bangs"
 REPOSITORY = "kagisearch/bangs"
 
-# Bangs Xenon adds to Kagi's list, as Helium adds the same bang in its own extras. Kagi's list has no bang for these
-# triggers.
 XENON_BANGS = [
     {"s": "Kagi", "t": "k", "ts": ["kagi"], "u": "https://kagi.com/search?q={{{s}}}"},
 ]

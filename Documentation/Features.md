@@ -42,7 +42,7 @@ Nothing is saved until you press **Start browsing**. A new password manager inst
 
 ### New tab page
 
-A greeting for the time of day, then a speed dial of eight keys:
+The day's date as its title, then a speed dial of eight keys:
 
 - **Most visited**: your eight most visited sites, one per site with its favicon, ranked by Ladybird's decaying visit
   score. A new profile shows eight empty keys until there are some.
@@ -89,8 +89,8 @@ drive the controls for those settings further down the page, so they follow ever
   - **Updates**: the version, whether a new one is ready, automatic updates, and **Check now** or **Relaunch to
     update**.
 - Browsing: startup and the new tab page (and whether it lists recently closed tabs), languages, privacy and browsing
-  data, background connections, site permissions, DNS, where the profile keeps its files (each with **Show**), and
-  Ladybird's configuration keys.
+  data, background connections, site permissions (autoplay, and the sites allowed or blocked from your location and
+  microphone), DNS, where the profile keeps its files (each with **Show**), and Ladybird's configuration keys.
 - A sidebar of sections that follows the scroll, and **Find a setting** across the top, which hides everything that
   doesn't match, Easy setup included.
 
@@ -454,8 +454,9 @@ publishes the releases; see [Updates.md](Updates.md).
   `UI/Resources/about-pages/webui.css` for the internal pages.
 - The internal pages are shaped like other browsers' (a speed dial, a setup flow of pictures, settings in boxes of
   rows) and share their parts in `UI/Resources/about-pages/xenon.css`: a warm page with serif titles, choices as keys
-  that sink when chosen, and a small rose lamp for whatever is on. Ladybird draws weight 500 as bold, and 600 as regular
-  inside transformed boxes when text is antialiased, so the pages use 400 and 600 and leave font smoothing alone.
+  that sink when chosen, and a small rose lamp for whatever is on. A choice gets one mark of the rose (its lamp, radio
+  or check) and nothing glows; spacing sits on a 4px grid. Ladybird draws weight 500 as bold, and 600 as regular inside
+  transformed boxes when text is antialiased, so the pages use 400 and 600 and leave font smoothing alone.
 - Xenon's own app icon: two orbits woven around a nucleus, in white and rose. Internal pages and the Task Manager show
   it in place of Ladybird's logo.
 
