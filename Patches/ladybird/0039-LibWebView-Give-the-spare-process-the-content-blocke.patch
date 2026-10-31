@@ -104,7 +104,7 @@ index be5d20dce7768c596fe862944905e1b523b5c037..5951a003c89fa2e6e4cd58fbd78ea46b
      No,
      Yes,
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index f2e5a63595841934ecefa40452b2e9689d015be7..f74542fa8f3116667539843c8ad2496055116cee 100644
+index c2e71d898fcf24bbe2d7cd733af7825f19a1359e..7ebdbdb725bf81a935b076866aff4700e8fd4019 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
 @@ -137,6 +137,9 @@ public:
@@ -117,7 +117,7 @@ index f2e5a63595841934ecefa40452b2e9689d015be7..f74542fa8f3116667539843c8ad24960
      void register_embedded_page(Web::PageId page_id, CanonicalTraversable&);
      void unregister_embedded_page(Web::PageId page_id);
      Optional<Web::PageId> page_id_for_traversable(CanonicalTraversable const&) const;
-@@ -252,6 +255,7 @@ private:
+@@ -251,6 +254,7 @@ private:
      bool m_has_hosted_local_file_content { false };
      Optional<String> m_hosted_web_ui;
      EnableContentBlocker m_enable_content_blocker { EnableContentBlocker::Yes };

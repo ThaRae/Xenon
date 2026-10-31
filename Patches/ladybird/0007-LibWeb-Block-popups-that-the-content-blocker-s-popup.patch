@@ -23,7 +23,7 @@ navigates, and closed if a filter matches.
  6 files changed, 28 insertions(+), 5 deletions(-)
 
 diff --git a/Libraries/LibWeb/DOM/Element.cpp b/Libraries/LibWeb/DOM/Element.cpp
-index 05495f767b4392759299576d42577d4cf015b232..0e15df83fe672624e04657d1330752d3d43abfc8 100644
+index 975550e2245166b5f2604786759c075fa3ec5ba8..9ef21ba2faec9764b125c06324327bfa2e1c46d4 100644
 --- a/Libraries/LibWeb/DOM/Element.cpp
 +++ b/Libraries/LibWeb/DOM/Element.cpp
 @@ -657,7 +657,7 @@ void Element::follow_the_hyperlink(Optional<Utf16String> hyperlink_suffix, HTML:
@@ -49,7 +49,7 @@ index 39d695b80bf647cacde3254484065a3e64d13848..bc35bbf3f9fdeb20f1b7e0719a4adf37
      // 23. If targetNavigable is null, then return.
      if (!target_navigable) {
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index f159d89d1838d18c9c2fb1ce7ef5c5aa0b75ae9c..f07750fd4b23fd02be56e343d2b7c944ca2935ad 100644
+index 05368d5cc31fd18f1ebd01911a2cb014374be160..ccf70720c98c596cd6a4e3f24aa6f3bb4c964889 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
 @@ -1800,7 +1800,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav

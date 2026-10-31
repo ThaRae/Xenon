@@ -219,7 +219,7 @@ index 6042c88fbc200b4ec83c8dda25c6f2272ee3fcc6..6bd8fa6170c69a9b339081bac87874f6
  {
      RefPtr keep_alive = *this;
 diff --git a/Libraries/LibRequests/Request.h b/Libraries/LibRequests/Request.h
-index 05d75d51064a6bade238d7c09e268f88f4493e52..c199e9385ddc3f452a90a74a0b5db89ff7afe5fd 100644
+index fb50da3b57bb8e7c7dcad70ff7e6283d0593008c..711ae1b410af039625ecd1f62f448934a122a189 100644
 --- a/Libraries/LibRequests/Request.h
 +++ b/Libraries/LibRequests/Request.h
 @@ -126,6 +126,10 @@ public:
@@ -583,10 +583,10 @@ index b7e3d7825a577799e8dfc9ac41a3eafb8565370e..9b860509edac80dedd96ef2c5c5c73ef
      release_request_transfer_lease(int source_client_id, u64 source_request_id) =|
      stop_request(u64 request_id) => (bool success)
 diff --git a/Tests/RequestServer/TestContentCodingRetry.cpp b/Tests/RequestServer/TestContentCodingRetry.cpp
-index 87161679684ae7f3a72ed6916e85274354507c3e..76e760eba1173a03f2d17ef9ad2223bd605e155a 100644
+index f6258da81a7f45a3e9927f31af8533543b7b309c..e7d5d0f116086bc59c16fb96aeb5f544d8c6ad45 100644
 --- a/Tests/RequestServer/TestContentCodingRetry.cpp
 +++ b/Tests/RequestServer/TestContentCodingRetry.cpp
-@@ -111,7 +111,7 @@ TEST_CASE(content_coding_retry_keeps_client_supplied_cookie_header)
+@@ -105,7 +105,7 @@ TEST_CASE(content_coding_retry_keeps_client_supplied_cookie_header)
      UnsupportedCodingServer server;
      auto message = make<Messages::RequestServer::StartRequest>(
          0, ByteString { "GET" }, server.url(), Vector<HTTP::Header> { { "Cookie", "supplied=by-the-client" } }, ByteBuffer {},
@@ -596,10 +596,10 @@ index 87161679684ae7f3a72ed6916e85274354507c3e..76e760eba1173a03f2d17ef9ad2223bd
  
      event_loop.spin_until([&] { return server.request_heads().size() >= 2; });
 diff --git a/Tests/RequestServer/TestCookieResponses.cpp b/Tests/RequestServer/TestCookieResponses.cpp
-index 119426c92c3973f48471254c08de34e3c48eaf74..47871805eb1eb6ba4567bddf940ecf7a51d865ba 100644
+index b155b4d173be1dcd7228237913aeee261175316c..3e57aedea3384c0a5a279eee64918d1bc943273f 100644
 --- a/Tests/RequestServer/TestCookieResponses.cpp
 +++ b/Tests/RequestServer/TestCookieResponses.cpp
-@@ -175,7 +175,7 @@ public:
+@@ -169,7 +169,7 @@ public:
      void start_request(u64 request_id, Optional<URL::URL> target_url = {}, ByteString method = "GET"sv, Vector<HTTP::Header> headers = {}, Optional<HTTP::NetworkIsolationKey> network_isolation_key = {})
      {
          auto url = target_url.value_or(URL::Parser::basic_parse("http://localhost"sv).release_value());
@@ -609,10 +609,10 @@ index 119426c92c3973f48471254c08de34e3c48eaf74..47871805eb1eb6ba4567bddf940ecf7a
          VERIFY(!response);
      }
 diff --git a/Tests/RequestServer/TestDiskCacheWaiters.cpp b/Tests/RequestServer/TestDiskCacheWaiters.cpp
-index 28115795e7d355ee766eed49642ece75949de110..0a1ffdabfed54ea7dc793336ae3e1eb4d75fb48e 100644
+index b31a9256ef2c44459ab89b64d58f4e0440c91227..bb302fc50c5e1cd5eee856ef25d302603ff76377 100644
 --- a/Tests/RequestServer/TestDiskCacheWaiters.cpp
 +++ b/Tests/RequestServer/TestDiskCacheWaiters.cpp
-@@ -254,7 +254,7 @@ public:
+@@ -248,7 +248,7 @@ public:
              { ByteString { HTTP::TEST_CACHE_ENABLED_HEADER }, "1"sv },
          };
  
@@ -622,10 +622,10 @@ index 28115795e7d355ee766eed49642ece75949de110..0a1ffdabfed54ea7dc793336ae3e1eb4
          VERIFY(!response);
      }
 diff --git a/Tests/RequestServer/TestExportImport.cpp b/Tests/RequestServer/TestExportImport.cpp
-index fe1bd1c317c743d2bd74a100aad2b36b4a76c076..5dead3a4ebbf5e9e82fbbf4a0eb8b85f139bbb80 100644
+index fbfb44e9937d305d5f1e616c367c816136ba87ab..ae6a9088adb411ff4d31cfd12f1ecfca79d46244 100644
 --- a/Tests/RequestServer/TestExportImport.cpp
 +++ b/Tests/RequestServer/TestExportImport.cpp
-@@ -98,7 +98,7 @@ public:
+@@ -92,7 +92,7 @@ public:
  
      void start_request(u64 request_id, URL::URL url, HTTP::NetworkIsolationKey network_isolation_key, bool create_transfer_lease)
      {
@@ -635,10 +635,10 @@ index fe1bd1c317c743d2bd74a100aad2b36b4a76c076..5dead3a4ebbf5e9e82fbbf4a0eb8b85f
      }
  
 diff --git a/Tests/RequestServer/TestRequestTimingInfo.cpp b/Tests/RequestServer/TestRequestTimingInfo.cpp
-index 3610ac83f15ab207f8b35300dab3c50673cd65df..41752c5e75afeff8e7ce229e2fcb5d76ba2dfdf2 100644
+index 6dc9f407a5013489538186d04344cb804cd2fc0c..2e3029442dc6afc86f0b1fc3e3672bd75832ae33 100644
 --- a/Tests/RequestServer/TestRequestTimingInfo.cpp
 +++ b/Tests/RequestServer/TestRequestTimingInfo.cpp
-@@ -145,7 +145,7 @@ public:
+@@ -139,7 +139,7 @@ public:
          auto started_at = MonotonicTime::now();
          m_started_at.set(request_id, started_at);
  
@@ -648,10 +648,10 @@ index 3610ac83f15ab207f8b35300dab3c50673cd65df..41752c5e75afeff8e7ce229e2fcb5d76
          VERIFY(!response);
  
 diff --git a/Tests/RequestServer/TestSiteBinding.cpp b/Tests/RequestServer/TestSiteBinding.cpp
-index 1849e806c44f5b4146ad1284e84f31962d114f89..0fa017924e0cde4699723d2e42b4fb08799cace4 100644
+index 613bdecaab2dad37fe5c60c3a980dbbdd85e37b0..7b0dd45f4c9daf41b9f24393851248b446e64954 100644
 --- a/Tests/RequestServer/TestSiteBinding.cpp
 +++ b/Tests/RequestServer/TestSiteBinding.cpp
-@@ -103,7 +103,7 @@ struct TestServer {
+@@ -97,7 +97,7 @@ struct TestServer {
      {
          auto message = make<Messages::RequestServer::StartRequest>(
              request_id, ByteString { "GET" }, URL::Parser::basic_parse(url).release_value(), Vector<HTTP::Header> {}, ByteBuffer {},
