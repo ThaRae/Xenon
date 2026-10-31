@@ -50,6 +50,7 @@ jobs:
           echo "IMAGE_VERSION=$(cat ladybird/Meta/Docker/ci/VERSION)" >> "$GITHUB_ENV"
 
       - name: Restore main's build caches
+        id: restore
         uses: actions/cache/restore@v6
         with:
           path: |
@@ -57,8 +58,20 @@ jobs:
             ladybird/Build/caches
           key: linux-${{ env.IMAGE_VERSION }}-${{ github.sha }}
           restore-keys: linux-${{ env.IMAGE_VERSION }}-
-          # Without them, configuring alone builds every dependency from source, for hours.
-          fail-on-cache-miss: true
+
+      # fail-on-cache-miss ignores restore-keys and insists on this exact
+      # commit's cache, which only the linux job started alongside this run can
+      # save, an hour or more out — so a fresh commit's run here raced that save
+      # and passed only when the runner queue happened to hold it long enough.
+      # Restore as ci.yml does (exact key, falling back to the newest cache from
+      # the same image) and fail loudly when nothing matched at all, as right
+      # after an image bump: without a cache, configuring alone builds every
+      # dependency from source, for hours.
+      - name: Fail when no cache was restored at all
+        if: steps.restore.outputs.cache-matched-key == ''
+        run: |
+          echo "::error::No build cache matched linux-${{ env.IMAGE_VERSION }}-<sha> (neither this commit's nor an earlier one's from the same image). Once the CI linux job on this commit has saved one, rerun this workflow."
+          exit 1
 
       - name: Build test262-runner and run test262
         run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/test262.sh
