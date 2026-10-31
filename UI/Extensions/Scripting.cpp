@@ -54,6 +54,12 @@ Optional<Vector<Router::Frame>> Router::frames_of_tab(i64 tab_id)
 // match, which Chrome grants it along with them.
 static bool may_access(Extension const& extension, URL::URL const& url)
 {
+    // FIXME: Chrome runs scripts in file: documents once the user allows the extension to. Xenon has no such toggle,
+    //        so no extension may run scripts in them, as its content scripts don't (ContentScript::matches_document).
+    //        MatchPattern treats file as * otherwise, and a host permission would read the user's files.
+    if (url.scheme() == "file"sv)
+        return false;
+
     auto matches_any = [&](Vector<String> const& patterns) {
         return any_of(patterns, [&](auto const& pattern) {
             auto parsed = MatchPattern::parse(pattern);
