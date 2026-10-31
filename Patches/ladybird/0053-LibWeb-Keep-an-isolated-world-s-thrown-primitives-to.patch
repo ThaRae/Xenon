@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 31 Oct 2026 00:44:07 -0400
+Subject: [PATCH] LibWeb: Keep an isolated world's thrown primitives to itself
+
+An exception of an embedder's isolated world only goes to the
+console -- but the check looked at the thrown value's realm, so a
+listener of the world's that threw a primitive ("throw \"...\"")
+had no realm to look at, and the value went on to the document's
+global error handlers: the page could read what the world's scripts
+threw, and that they threw. Objects were kept out, values weren't.
+
+The global an exception is reported on is the throwing callback's
+realm's global, so check that realm too: an isolated world reporting
+on its own global goes to the console whatever it threw.
+---
+ .../LibWeb/HTML/Scripting/ExceptionReporter.cpp     | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp b/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
+index 19232f0839ac0e013e27e4f5339ab83e06129e76..49f25e34ed3d3f9820cf441ea1bb33dad07d9582 100644
+--- a/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
++++ b/Libraries/LibWeb/HTML/Scripting/ExceptionReporter.cpp
+@@ -78,13 +78,18 @@ void report_an_exception(JS::Object& global, JS::Value exception, Optional<Error
+ {
+     // AD-HOC: An exception of an embedder's isolated world, as from an event listener of its own, only goes to the
+     //         console. The global's error handlers belong to the document's own scripts, and would get the world's
+-    //         objects.
+-    if (exception.is_object() && IsolatedWorld::is_isolated_world_realm(exception.as_object().shape().realm())) {
+-        report_exception_to_console(exception, exception.as_object().shape().realm(), ErrorInPromise::No);
++    //         objects, and the values it throws. The global the exception is reported on is the throwing callback's
++    //         realm's global (report_exception_for_callback), so its realm tells the world even when the thrown value
++    //         is a primitive with no realm of its own.
++    auto& reporting_realm = relevant_realm(global);
++    if (
++        IsolatedWorld::is_isolated_world_realm(reporting_realm)
++        || (exception.is_object() && IsolatedWorld::is_isolated_world_realm(exception.as_object().shape().realm()))) {
++        report_exception_to_console(exception, reporting_realm, ErrorInPromise::No);
+         return;
+     }
+ 
+-    auto& realm = relevant_realm(global);
++    auto& realm = reporting_realm;
+     auto& vm = realm.vm();
+ 
+     // 1. Let notHandled be true.
