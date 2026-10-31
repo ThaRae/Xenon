@@ -1,18 +1,7 @@
-[472/495] Building CXX object Tests/LibWeb/CMakeFiles/TestAudioFudge.dir/TestAudioFudge.cpp.o
-[473/495] Linking CXX shared library lib/liblagom-web.so.0.1.0
-[474/495] Creating library symlink lib/liblagom-web.so.0 lib/liblagom-web.so
-[475/495] Linking CXX executable bin/TestAudioFudge
-[476/495] Linking CXX executable bin/TestCanvasPerturb
-[477/495] Linking CXX executable bin/TestWebGLFarbling
-[478/495] Linking CXX executable bin/TestFarblingRNG
-[492/495] Linking CXX executable xenon/libexec/WebContent
-[493/495] Linking CXX executable bin/test-web
-[494/495] Linking CXX executable xenon/bin/Xenon
-NINJA_EXIT:0
-
-# after OfflineAudioContext fill fix
-[2/9] Building CXX object Libraries/LibWeb/CMakeFiles/LibWeb.dir/WebAudio/OfflineAudioContext.cpp.o
-[3/9] Linking CXX shared library lib/liblagom-web.so.0.1.0
-[7/9] Linking CXX executable xenon/libexec/WebContent
-[8/9] Linking CXX executable bin/test-web
+[16/22] Linking CXX executable bin/TestAudioFudge
+[17/22] Linking CXX executable bin/TestCanvasPerturb
+[18/22] Linking CXX executable xenon/libexec/WebWorker
+[19/22] Linking CXX executable xenon/libexec/WebContent
+[20/22] Linking CXX executable bin/test-web
+[21/22] Linking CXX executable xenon/bin/Xenon
 NINJA_EXIT:0

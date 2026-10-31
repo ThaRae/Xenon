@@ -22,6 +22,15 @@ function bytesOf(arr) {
     return new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
 }
 
+function float32ToB64(arr) {
+    const bytes = bytesOf(arr);
+    const chunk = 0x8000;
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += chunk)
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    return btoa(binary);
+}
+
 async function digestHex(bytes) {
     if (globalThis.crypto && crypto.subtle) {
         try {
@@ -114,6 +123,7 @@ async function measureAnalyser() {
             byteFreqHash: await digestHex(byteFreq),
             floatTimeHash: await digestHex(bytesOf(floatTime)),
             byteTimeHash: await digestHex(byteTime),
+            floatFreqB64: float32ToB64(floatFreq),
             floatTimeAbs,
             byteTimeChanged,
             byteFreqChanged,
@@ -152,6 +162,7 @@ async function measureAudio() {
         const firstCopy = Float32Array.from(first);
         result.sum = fingerprintSum(first);
         result.probes = probes(first);
+        result.samplesB64 = float32ToB64(firstCopy);
         result.getChannelDataHash = await hashFloat32(firstCopy);
         result.getChannelDataHashAgain = await hashFloat32(second);
         result.copyFromChannelHash = await hashFloat32(copy);

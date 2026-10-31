@@ -1,0 +1,178 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 01:16:05 +0000
+Subject: [PATCH] LibWeb: Farble analyser frequency data in the linear domain
+
+Add 20*log10(fudge) to each dB bin instead of multiplying dB values, so
+getFloatFrequencyData matches an FFT of the farbled time-domain samples.
+Byte frequency conversion uses those corrected dB values.
+---
+ Libraries/LibWeb/Farbling/AudioFudge.cpp      | 17 ++++++++++++
+ Libraries/LibWeb/Farbling/AudioFudge.h        |  6 +++++
+ Libraries/LibWeb/WebAudio/AnalyserNode.cpp    |  4 +--
+ Tests/LibWeb/TestAudioFudge.cpp               | 24 +++++++++++++++++
+ .../farbling-offline-fingerprint-hash.txt     |  1 +
+ .../farbling-offline-fingerprint-hash.html    | 27 +++++++++++++++++++
+ 6 files changed, 77 insertions(+), 2 deletions(-)
+ create mode 100644 Tests/LibWeb/Text/expected/WebAudio/farbling-offline-fingerprint-hash.txt
+ create mode 100644 Tests/LibWeb/Text/input/WebAudio/farbling-offline-fingerprint-hash.html
+
+diff --git a/Libraries/LibWeb/Farbling/AudioFudge.cpp b/Libraries/LibWeb/Farbling/AudioFudge.cpp
+index 538066fc4d3135deb76ba5232df34e5e5d82517a..ecf4ed5558d4669bf727ca0945166e8c306a22a7 100644
+--- a/Libraries/LibWeb/Farbling/AudioFudge.cpp
++++ b/Libraries/LibWeb/Farbling/AudioFudge.cpp
+@@ -4,6 +4,7 @@
+  * SPDX-License-Identifier: BSD-2-Clause
+  */
+ 
++#include <AK/Math.h>
+ #include <LibWeb/Farbling/AudioFudge.h>
+ #include <LibWeb/Farbling/FarblingRNG.h>
+ 
+@@ -23,6 +24,13 @@ float audio_fudge_factor(Seed const& seed)
+     return factor;
+ }
+ 
++float audio_fudge_db_offset(float fudge)
++{
++    if (fudge == 1.0f)
++        return 0.0f;
++    return 20.0f * AK::log10(fudge);
++}
++
+ void apply_audio_fudge(Span<float> samples, float fudge)
+ {
+     if (fudge == 1.0f)
+@@ -31,4 +39,13 @@ void apply_audio_fudge(Span<float> samples, float fudge)
+         sample *= fudge;
+ }
+ 
++void apply_audio_fudge_to_db(Span<float> db_bins, float fudge)
++{
++    float const offset = audio_fudge_db_offset(fudge);
++    if (offset == 0.0f)
++        return;
++    for (auto& bin : db_bins)
++        bin += offset;
++}
++
+ }
+diff --git a/Libraries/LibWeb/Farbling/AudioFudge.h b/Libraries/LibWeb/Farbling/AudioFudge.h
+index 02567df73a2a61d8db5f29db17a0828da2b13062..bf54316cf5b8372920f982d93a90728fda1e983a 100644
+--- a/Libraries/LibWeb/Farbling/AudioFudge.h
++++ b/Libraries/LibWeb/Farbling/AudioFudge.h
+@@ -15,7 +15,13 @@ namespace Web::Farbling {
+ // One page-wide factor in [0.999, 1.000) from the ESO seed, or 1.0 when Off. Strict uses the same range.
+ WEB_API float audio_fudge_factor(Seed const&);
+ 
++// 20 * log10(fudge), or 0 when fudge is 1. Linear gain g becomes this constant in dB.
++WEB_API float audio_fudge_db_offset(float fudge);
++
+ // Multiply samples in place. No-op when fudge is 1.
+ WEB_API void apply_audio_fudge(Span<float> samples, float fudge);
+ 
++// Add 20*log10(fudge) to each dB bin so a linear fudge stays a constant in the log domain.
++WEB_API void apply_audio_fudge_to_db(Span<float> db_bins, float fudge);
++
+ }
+diff --git a/Libraries/LibWeb/WebAudio/AnalyserNode.cpp b/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
+index d548a13ab27fee924e7c0dfd626f937e7364fae8..73de62e9556f7d055de23245ec3d54e224f6074c 100644
+--- a/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
++++ b/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
+@@ -249,7 +249,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_frequency_data(GC::Ref<JS::Flo
+     // the excess elements will be dropped. If array has more elements than the frequencyBinCount, the
+     // excess elements will be ignored. The most recent fftSize frames are used in computing the frequency data.
+     auto frequency_data = current_frequency_data();
+-    Farbling::apply_audio_fudge({ frequency_data.data(), frequency_data.size() }, script_audio_fudge(context()));
++    Farbling::apply_audio_fudge_to_db({ frequency_data.data(), frequency_data.size() }, script_audio_fudge(context()));
+ 
+     auto record = JS::make_typed_array_with_buffer_witness_record(*array, JS::ArrayBuffer::Order::SeqCst);
+     if (JS::is_typed_array_out_of_bounds(record))
+@@ -264,7 +264,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_frequency_data(GC::Ref<JS::Flo
+ WebIDL::ExceptionOr<void> AnalyserNode::get_byte_frequency_data(GC::Ref<JS::Uint8Array> array)
+ {
+     Vector<f32> dB_data = current_frequency_data();
+-    Farbling::apply_audio_fudge({ dB_data.data(), dB_data.size() }, script_audio_fudge(context()));
++    Farbling::apply_audio_fudge_to_db({ dB_data.data(), dB_data.size() }, script_audio_fudge(context()));
+     Vector<u8> byte_data;
+     byte_data.ensure_capacity(dB_data.size());
+ 
+diff --git a/Tests/LibWeb/TestAudioFudge.cpp b/Tests/LibWeb/TestAudioFudge.cpp
+index 4563a43317aba7e6442762ff304dbf1226328187..79ac5c69a2d0c579f74b1df2bc01edfdf93133e3 100644
+--- a/Tests/LibWeb/TestAudioFudge.cpp
++++ b/Tests/LibWeb/TestAudioFudge.cpp
+@@ -4,6 +4,7 @@
+  * SPDX-License-Identifier: BSD-2-Clause
+  */
+ 
++#include <AK/Math.h>
+ #include <LibTest/TestCase.h>
+ #include <LibWeb/Farbling/AudioFudge.h>
+ 
+@@ -68,3 +69,26 @@ TEST_CASE(apply_multiplies_exactly_once)
+     EXPECT_EQ(samples[1], -0.25f * fudge);
+     EXPECT_EQ(samples[2], 0.125f * fudge);
+ }
++
++TEST_CASE(db_offset_is_twenty_log10)
++{
++    float const fudge = 0.9995f;
++    float const offset = Web::Farbling::audio_fudge_db_offset(fudge);
++    EXPECT_EQ(offset, 20.0f * AK::log10(fudge));
++    EXPECT(offset < 0.0f);
++
++    float bins[3] = { -80.0f, -20.0f, 0.0f };
++    Web::Farbling::apply_audio_fudge_to_db({ bins, 3 }, fudge);
++    EXPECT_EQ(bins[0], -80.0f + offset);
++    EXPECT_EQ(bins[1], -20.0f + offset);
++    EXPECT_EQ(bins[2], offset);
++}
++
++TEST_CASE(db_offset_is_zero_when_off)
++{
++    EXPECT_EQ(Web::Farbling::audio_fudge_db_offset(1.0f), 0.0f);
++    float bins[2] = { -100.0f, -10.0f };
++    Web::Farbling::apply_audio_fudge_to_db({ bins, 2 }, 1.0f);
++    EXPECT_EQ(bins[0], -100.0f);
++    EXPECT_EQ(bins[1], -10.0f);
++}
+diff --git a/Tests/LibWeb/Text/expected/WebAudio/farbling-offline-fingerprint-hash.txt b/Tests/LibWeb/Text/expected/WebAudio/farbling-offline-fingerprint-hash.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c361c87a8b51aa57b9d8bb21aa4c49336c11705
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/WebAudio/farbling-offline-fingerprint-hash.txt
+@@ -0,0 +1 @@
++fnv1a64:641ed91ed5e6a17d
+diff --git a/Tests/LibWeb/Text/input/WebAudio/farbling-offline-fingerprint-hash.html b/Tests/LibWeb/Text/input/WebAudio/farbling-offline-fingerprint-hash.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..f25e84731a8f5a7706e22ad5f32cd01f159401e4
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/WebAudio/farbling-offline-fingerprint-hash.html
+@@ -0,0 +1,27 @@
++<!DOCTYPE html>
++<script src="../include.js"></script>
++<script>
++    function fnv1a64(bytes) {
++        let hash = 14695981039346656037n;
++        for (let i = 0; i < bytes.length; i++) {
++            hash ^= BigInt(bytes[i]);
++            hash = (hash * 1099511628211n) & 0xffffffffffffffffn;
++        }
++        return hash.toString(16).padStart(16, "0");
++    }
++
++    promiseTest(async () => {
++        const ctx = new OfflineAudioContext(1, 44100, 44100);
++        const osc = ctx.createOscillator();
++        osc.type = "triangle";
++        osc.frequency.value = 10000;
++        const comp = ctx.createDynamicsCompressor();
++        osc.connect(comp);
++        comp.connect(ctx.destination);
++        osc.start(0);
++        const buffer = await ctx.startRendering();
++        const data = buffer.getChannelData(0);
++        const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
++        println("fnv1a64:" + fnv1a64(bytes));
++    });
++</script>

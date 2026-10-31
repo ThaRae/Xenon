@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import math
 import os
+import struct
 import subprocess
 import sys
 import tempfile
@@ -53,21 +56,27 @@ def write_off_profile(path: Path, sites: list[str]) -> None:
     (config / "FarblingSeeds.json").write_text(json.dumps({"tokens": {}, "offSites": sites}))
 
 
-def ratio_stats(farbled_probes, off_probes):
-    if not farbled_probes or not off_probes:
+def floats_from_b64(payload: str | None) -> list[float]:
+    if not payload:
+        return []
+    raw = base64.b64decode(payload)
+    count = len(raw) // 4
+    return list(struct.unpack("<" + "f" * count, raw[: count * 4]))
+
+
+def ratio_stats_from_samples(farbled: list[float], off: list[float]):
+    if not farbled or not off or len(farbled) != len(off):
         return None
     ratios = []
     max_rel = 0.0
-    for a, b in zip(farbled_probes, off_probes):
-        fv = a.get("v")
-        ov = b.get("v")
-        if fv is None or ov is None or ov == 0:
+    for fv, ov in zip(farbled, off):
+        if ov == 0:
             continue
         rel = abs(fv - ov) / abs(ov)
         max_rel = max(max_rel, rel)
         ratios.append(fv / ov)
     if not ratios:
-        return {"max_rel_diff": None, "under_0_1_percent": False, "constant": False, "error": "no-nonzero-probes"}
+        return {"max_rel_diff": None, "under_0_1_percent": False, "constant": False, "error": "no-nonzero-samples"}
     return {
         "max_rel_diff": max_rel,
         "min_ratio": min(ratios),
@@ -76,6 +85,28 @@ def ratio_stats(farbled_probes, off_probes):
         "under_0_1_percent": max_rel <= 0.0010001,
         "constant": (max(ratios) - min(ratios)) < 1e-5,
         "n": len(ratios),
+        "length": len(farbled),
+    }
+
+
+def freq_db_offset_stats(farbled: list[float], off: list[float], fudge: float | None):
+    if not farbled or not off or len(farbled) != len(off) or not fudge or fudge <= 0:
+        return None
+    expected = 20.0 * math.log10(fudge)
+    deltas = []
+    for av, ov in zip(farbled, off):
+        if not math.isfinite(av) or not math.isfinite(ov):
+            continue
+        deltas.append(av - ov)
+    if not deltas:
+        return {"error": "no-finite-bins", "expected": expected}
+    return {
+        "n_finite": len(deltas),
+        "min": min(deltas),
+        "max": max(deltas),
+        "expected": expected,
+        "span": max(deltas) - min(deltas),
+        "matches_constant": abs(min(deltas) - expected) < 1e-4 and abs(max(deltas) - expected) < 1e-4,
     }
 
 
@@ -101,7 +132,21 @@ def analyze() -> dict:
     a_worker = worker_audio(a.get("worker"))
     b_worker = worker_audio(b.get("worker"))
     write = a_m.get("writeNoDrift") or {}
-    ratios = ratio_stats(a_m.get("probes") or [], off_a.get("probes") or [])
+    a_samples = floats_from_b64(a_m.get("samplesB64"))
+    off_samples = floats_from_b64(off_a.get("samplesB64"))
+    ratios = ratio_stats_from_samples(a_samples, off_samples)
+    fudge = None
+    if ratios and ratios.get("n"):
+        fudge = (ratios["min_ratio"] + ratios["max_ratio"]) / 2.0
+    analyser_a = a_m.get("analyser") or {}
+    analyser_off = off_a.get("analyser") or {}
+    freq_offset = freq_db_offset_stats(
+        floats_from_b64(analyser_a.get("floatFreqB64")),
+        floats_from_b64(analyser_off.get("floatFreqB64")),
+        fudge,
+    )
+    unpatched_path = CAPTURED / "unpatched-test-web.txt"
+    unpatched_hash = unpatched_path.read_text().strip() if unpatched_path.exists() else None
     strict = {}
     strict_path = CAPTURED / "strict.json"
     if strict_path.exists():
@@ -111,9 +156,7 @@ def analyze() -> dict:
     worker_a_matches = bool(a_worker and a_worker.get("ok") and a_worker.get("getChannelDataHash") == a_m.get("getChannelDataHash"))
     worker_b_matches = bool(b_worker and b_worker.get("ok") and b_worker.get("getChannelDataHash") == b_m.get("getChannelDataHash"))
 
-    analyser_a = a_m.get("analyser") or {}
     analyser_b = b_m.get("analyser") or {}
-    analyser_off = off_a.get("analyser") or {}
 
     summary = {
         "offline_ok": a_m.get("ok") is True and b_m.get("ok") is True,
@@ -133,7 +176,10 @@ def analyze() -> dict:
         "off_b_hash": off_b.get("getChannelDataHash"),
         "off_a_equals_off_b": off_a.get("getChannelDataHash") == off_b.get("getChannelDataHash") and off_a.get("ok") is True,
         "off_differs_from_standard": off_a.get("getChannelDataHash") != a_m.get("getChannelDataHash"),
+        "unpatched_test_web_hash": unpatched_hash,
+        "off_equals_unpatched": off_a.get("getChannelDataHash") == unpatched_hash == off_b.get("getChannelDataHash"),
         "ratio": ratios,
+        "freq_db_offset": freq_offset,
         "write_no_drift": write.get("equal") is True,
         "write_matches_source": write.get("matchesWrite") is True,
         "worker_unsupported": worker_unsupported,
@@ -141,7 +187,7 @@ def analyze() -> dict:
         "worker_b_hash": (b_worker or {}).get("getChannelDataHash"),
         "worker_a_equals_main_a": worker_a_matches,
         "worker_b_equals_main_b": worker_b_matches,
-        "analyser_a": analyser_a,
+        "analyser_a": {key: value for key, value in analyser_a.items() if key != "floatFreqB64"},
         "analyser_b_float_time_hash": analyser_b.get("floatTimeHash"),
         "analyser_off_float_time_hash": analyser_off.get("floatTimeHash"),
         "analyser_ok": analyser_a.get("ok") is True,
@@ -169,6 +215,9 @@ def analyze() -> dict:
         and bool(ratios)
         and ratios.get("under_0_1_percent") is True
         and ratios.get("constant") is True
+        and summary["off_equals_unpatched"]
+        and bool(freq_offset)
+        and freq_offset.get("matches_constant") is True
         and summary["write_no_drift"]
         and summary["write_matches_source"]
         and (summary["worker_unsupported"] or (summary["worker_a_equals_main_a"] and summary["worker_b_equals_main_b"]))
