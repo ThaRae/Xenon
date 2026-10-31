@@ -262,6 +262,7 @@ void WebAuthnPopover::hideEvent(QHideEvent* event)
     Popover::hideEvent(event);
     if (!m_is_closing_without_cancelling)
         m_view.web_authn_cancel();
+    setObjectName({});
     deleteLater();
 }
 
