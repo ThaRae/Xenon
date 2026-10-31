@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 31 Oct 2026 00:41:22 -0400
+Subject: [PATCH] LibWeb+Farbling: Give an opaque origin's farbling its own
+ seed
+
+An opaque origin's seed was derived from the session secret alone,
+so every opaque origin in the session shared one seed. A script
+running as a first-party on many sites can open a sandboxed frame on
+each (its origin is opaque everywhere), read a farbled value out of
+it -- canvas pixels, hardwareConcurrency, deviceMemory -- and get
+the same answer on every site for the whole session: a stable
+cross-site identifier, exactly what the farbling promises to
+prevent.
+
+Opaque origins carry a nonce of their own, so key the seed on that
+(with the session secret mixed in, as for hosts): the same origin
+still sees the same values everywhere it runs, and two different
+opaque origins see unrelated ones.
+---
+ Libraries/LibWeb/Fingerprinting/Farbling.cpp | 15 +++++++++++++--
+ Libraries/LibWeb/Fingerprinting/Farbling.h   |  2 +-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/Libraries/LibWeb/Fingerprinting/Farbling.cpp b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
+index 175334e7065b89902297758b59af35a712454fc6..b586f195a48b45fbeb18ada2d28b85e7d8374198 100644
+--- a/Libraries/LibWeb/Fingerprinting/Farbling.cpp
++++ b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
+@@ -61,8 +61,19 @@ u64 seed_for_host(StringView host)
+ 
+ static u64 seed_for_origin(URL::Origin const& origin)
+ {
+-    if (origin.is_opaque())
+-        return seed_for_host({});
++    if (origin.is_opaque()) {
++        // An opaque origin has a nonce of its own, so its seed mustn't collapse onto one value: seeds derived from the
++        // session secret alone would come out the same in a sandboxed frame on every site, and a script reading those
++        // values could tie the sites together for the whole session.
++        auto const& nonce = origin.opaque_data().nonce;
++        u64 state = mix64(session_secret());
++        u64 hash = 0xCBF29CE484222325ull ^ state;
++        for (auto byte : nonce) {
++            hash ^= byte;
++            hash *= 0x100000001B3ull;
++        }
++        return nonzero(mix64(hash ^ mix64(state ^ nonce.size())));
++    }
+     auto host = origin.host().serialize();
+     return seed_for_host(host);
+ }
+diff --git a/Libraries/LibWeb/Fingerprinting/Farbling.h b/Libraries/LibWeb/Fingerprinting/Farbling.h
+index a6b190a362366a4954e65f6bc5ac07fdb07b018a..18a046ec63d3f2713e1de15cd648ec369927f02c 100644
+--- a/Libraries/LibWeb/Fingerprinting/Farbling.h
++++ b/Libraries/LibWeb/Fingerprinting/Farbling.h
+@@ -33,7 +33,7 @@ u64 session_secret();
+ // Mixes the session secret with the given host. An empty host yields a seed derived from the session secret alone.
+ u64 seed_for_host(StringView host);
+ 
+-// Seed for the host of the relevant settings object's origin of the given object (empty host if opaque).
++// Seed for the host of the relevant settings object's origin of the given object (the origin's own nonce if opaque).
+ u64 seed_for_relevant_global(JS::Object const&);
+ 
+ // Seed for the host of the current settings object's origin, for getters with no object of their own.
