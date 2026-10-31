@@ -368,10 +368,10 @@ index a50e6e04231a5ca7b6d872487d1ad16ee6d1f549..152b8734713637359ac48786f27eb6e0
      void close_worker_agent(WebContentClient&, Web::HTML::WorkerAgentId, Web::HTML::WorkerAgentOwnerToken);
      void close_worker_agent(WebWorkerClient&, Web::HTML::WorkerAgentId, Web::HTML::WorkerAgentOwnerToken);
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 11bd72ba4bf56f3280eb2183966af5683aadc041..c7ab553f8bed55dcb73c3e24689f806fcfa236bb 100644
+index 781fa2f6bd1c067f5e8862ff54f86f97b9385b7f..34fb48b10e086d78e32033deb48758ea57ef1ccc 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3319,6 +3319,14 @@ void ConnectionFromClient::set_enable_global_privacy_control(Web::PageId, bool e
+@@ -3325,6 +3325,14 @@ void ConnectionFromClient::set_enable_global_privacy_control(Web::PageId, bool e
      Web::update_loader_config([&](auto& config) { config.enable_global_privacy_control = enable; });
  }
  
@@ -387,10 +387,10 @@ index 11bd72ba4bf56f3280eb2183966af5683aadc041..c7ab553f8bed55dcb73c3e24689f806f
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 885372dc1385d2938ea3a64d6427b3529915ff80..af595422a12ff4990d7490329a66285a0f1c61a5 100644
+index 19748c8d2494e08a6d81e6f70823dbde7a975463..98e620a8d194763d3582c1a4cf1147cba3e0cffa 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -264,6 +264,7 @@ private:
+@@ -263,6 +263,7 @@ private:
      virtual void set_preferred_languages(Web::PageId page_id, Vector<String>) override;
      virtual void set_browsing_behavior(Web::PageId page_id, WebView::BrowsingBehavior) override;
      virtual void set_enable_global_privacy_control(Web::PageId page_id, bool) override;
@@ -399,7 +399,7 @@ index 885372dc1385d2938ea3a64d6427b3529915ff80..af595422a12ff4990d7490329a66285a
      virtual void set_writing_suggestions_available(Web::PageId page_id, bool available) override;
      virtual void set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData, Optional<u16> error_code) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 61b4106ff7368ed5a772f1414ad04d8d02005a6f..b52833c5e114460eb6312c2ddb4b7f1de88c019f 100644
+index 99a69eb433d196655d32197d8c06d1baf62fae51..4233363d73ee774c717ef01d96297b0fc873e787 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -270,6 +270,7 @@ endpoint WebContentServer routed by Web::PageId page_id

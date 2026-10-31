@@ -19,10 +19,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 21 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 77fc268927f2204898fc0bf14e7140abd10f6604..d25e5c7e44dccbe8e40dbe005d1d3f823712fd0d 100644
+index 602535cc6068d84e836a7faf3b69fdb5e8cc8cee..922ba7de530173dc32ccf6042285e86d14a6dbbd 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3474,6 +3474,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+@@ -3480,6 +3480,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
          Web::FileAPI::remove_entry_from_blob_url_store(*url_record);
  }
  
@@ -44,7 +44,7 @@ index 77fc268927f2204898fc0bf14e7140abd10f6604..d25e5c7e44dccbe8e40dbe005d1d3f82
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index af595422a12ff4990d7490329a66285a0f1c61a5..b194c691bb011f5a7d63a2beb6447b06fb5840e8 100644
+index 98e620a8d194763d3582c1a4cf1147cba3e0cffa..ba81c2f2e20bce229a858c372ef55bbf8f8ae17b 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -16,6 +16,7 @@
@@ -55,8 +55,8 @@ index af595422a12ff4990d7490329a66285a0f1c61a5..b194c691bb011f5a7d63a2beb6447b06
  #include <LibGC/Root.h>
  #include <LibIPC/ConnectionFromClient.h>
  #include <LibJS/Forward.h>
-@@ -89,6 +90,10 @@ public:
-     void notify_started_using_gamepads();
+@@ -88,6 +89,10 @@ public:
+ 
      void pump_and_dispatch_gamepad_events();
  
 +    // Called when a page in this process finishes loading: collects once the page has settled, and gives the freed
@@ -75,10 +75,10 @@ index af595422a12ff4990d7490329a66285a0f1c61a5..b194c691bb011f5a7d63a2beb6447b06
      OwnPtr<DevToolsDebugger> m_devtools_debugger;
  
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 69df8327844e1d27adb9af267108ca37a5cc9dbd..3a1d25aef62958fc15e9ed123b7dbd9fccd8531e 100644
+index 123a6abf091970a2af8d15416b8976250041782c..ddb314dab5165e9cabe2cd5eff680ad4229605b4 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -1050,6 +1050,7 @@ void PageClient::page_did_change_active_document_in_top_level_browsing_context(W
+@@ -1046,6 +1046,7 @@ void PageClient::page_did_change_active_document_in_top_level_browsing_context(W
  void PageClient::page_did_finish_loading(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id)
  {
      client().async_did_finish_loading(m_id, navigable_id, document_id);

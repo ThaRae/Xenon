@@ -1322,7 +1322,7 @@ index 5b695af6a780427e61fb3b32241a5cb0c816cee3..3e3e7ec0d3632f3fbaa473c9c526f112
      Vector<PendingContentBlockerListUpdate> m_pending_content_blocker_list_updates;
      Optional<PendingContentBlockerListUpdate> m_active_content_blocker_list_update;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index ffd87681afc3e85e788d9c8c5651c9296ad79504..1fd44615f3ffc93fa95d54a49dc164b79c19591a 100644
+index bce72f92805afc3500f2e51927ac09846f0359a8..1f6ac84670b62f935fd26d86ea35f08e5f2c34ce 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3187,11 +3187,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
@@ -1340,10 +1340,10 @@ index ffd87681afc3e85e788d9c8c5651c9296ad79504..1fd44615f3ffc93fa95d54a49dc164b7
          dbgln("Failed to set content blockers: {}", result.error());
          return;
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index ea8af49f78567b77510a11af29a9ff97519a5fb8..befd1bfd84d15acd7927098f8c35168cbaa3bd68 100644
+index a64ce98086a2edf3c14abff6a5777518d5ff609a..95810f36e7e1dd6b95dcbe40a706418d45071ba1 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -248,7 +248,7 @@ private:
+@@ -247,7 +247,7 @@ private:
      virtual void remove_dom_node(Web::PageId page_id, Web::UniqueNodeID node_id) override;
  
      virtual void set_content_blocking_policy(Web::PageId page_id, bool enabled, Vector<String> disabled_sites) override;
@@ -1353,7 +1353,7 @@ index ea8af49f78567b77510a11af29a9ff97519a5fb8..befd1bfd84d15acd7927098f8c35168c
      virtual void set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, Vector<Utf16String> allowlist) override;
      virtual void set_preferred_color_scheme(Web::PageId page_id, Web::CSS::PreferredColorScheme) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 2ff6fd47303a0d470636a60174dc71f7f31c2ed9..9f442d07cf1658d523fa354d3ee1107eb304fefa 100644
+index bcc5ae62d91baf9f2e6f33a71aebba217ca1e4d7..23e27c496ddad8c0ba88bab55df30fc2f42e2bad 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -255,7 +255,7 @@ endpoint WebContentServer routed by Web::PageId page_id

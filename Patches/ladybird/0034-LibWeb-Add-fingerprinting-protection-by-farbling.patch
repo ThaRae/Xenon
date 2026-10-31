@@ -124,7 +124,7 @@ index 2ed81a7b7e55babee24f8364b95678fac00a6fdd..be8578d40623792d197eb03e2ec10df1
  {
      HTML::TemporaryExecutionContext execution_context { *static_cast<JS::Realm*>(realm), callbacks_enabled ? HTML::TemporaryExecutionContext::CallbacksEnabled::Yes : HTML::TemporaryExecutionContext::CallbacksEnabled::No };
 diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
-index 5b749dd1271494f1bef5b4e17578b086107ee768..2116de7a0ee29e6d5ec8fa4349583ade3d0c756a 100644
+index 75c1f6caad0bd2618232798a3287e74651954a3a..766d0af6ccc4cc1902745bddc54d008659b5d257 100644
 --- a/Libraries/LibWeb/CMakeLists.txt
 +++ b/Libraries/LibWeb/CMakeLists.txt
 @@ -395,6 +395,7 @@ set(SOURCES

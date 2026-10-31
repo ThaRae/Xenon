@@ -54,8 +54,11 @@ jobs:
           git -C ladybird diff --stat "$PINNED" "$MASTER" -- UI/Qt Base/res/ladybird/about-pages | tee upstream-ui-changes.txt
 
       - name: Apply Xenon's patches to master
-        # The pinned commit was fetched above, which lets git am fall back to a three-way merge.
-        run: Meta/patches.py apply --base "$MASTER"
+        # A patch's blob ids are those of the files after the patches before it, applied to the pinned commit. Applying
+        # the series there first puts those blobs in the shallow clone, which lets git am fall back to a three-way merge.
+        run: |
+          Meta/patches.py apply
+          Meta/patches.py apply --base "$MASTER"
 
       - name: Meta/check.py
         # The submodule is off its pin here on purpose, so skip that one comparison.

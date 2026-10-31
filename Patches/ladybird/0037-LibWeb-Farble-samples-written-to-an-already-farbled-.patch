@@ -51,7 +51,7 @@ index be8578d40623792d197eb03e2ec10df185ccb9e6..f6e7f67a3066f14678f93fc1eae9ac64
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index f03ae20e8d3925abba13dd496023492daab95348..db6b7b472054717f616ddf48cb3d2cc7627f0f36 100644
+index 544e0447d57d6504459847fb03e878bf9b64f588..ab3571c131333fb0d74b55c1fe80e5894c032ae3 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
 @@ -1452,6 +1452,12 @@ void Internals::set_user_agent(Utf16String const& user_agent)

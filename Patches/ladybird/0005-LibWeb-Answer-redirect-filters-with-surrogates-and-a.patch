@@ -23,7 +23,7 @@ The blocker now also gets the request method, so $method filters match.
  2 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 7106daaefea36d36147af7c0d234730239b2e8f4..c7d2b339361445dd0f6dcc90923cb4a79b04e300 100644
+index 0b9163d55deab38de6a9f14f6fe478fea8841c72..608ec4ba6829e987e4e98fd8cbad2a48848a197b 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 @@ -66,6 +66,7 @@
@@ -34,7 +34,7 @@ index 7106daaefea36d36147af7c0d234730239b2e8f4..c7d2b339361445dd0f6dcc90923cb4a7
  #include <LibWeb/Loader/LoadRequest.h>
  #include <LibWeb/Loader/LoaderConfig.h>
  #include <LibWeb/Loader/ResourceLoader.h>
-@@ -559,6 +560,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
+@@ -560,6 +561,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
          request.set_client_snapshot(client->visit([](auto const& client) { return snapshot_client_context(*client); }));
  }
  
@@ -64,7 +64,7 @@ index 7106daaefea36d36147af7c0d234730239b2e8f4..c7d2b339361445dd0f6dcc90923cb4a7
  // https://fetch.spec.whatwg.org/#concept-main-fetch
  GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParams const& fetch_params, Recursive recursive)
  {
-@@ -633,6 +657,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -634,6 +658,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
          request->current_url().set_scheme("https"sv);
      }
  
