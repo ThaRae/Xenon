@@ -1,0 +1,82 @@
+{
+  "webgl_ok": true,
+  "webgl2_ok": true,
+  "a_webgl2_hash": "d93a8b5e58021755",
+  "b_webgl2_hash": "5fbdf4ab1da773c0",
+  "differing_maxes": [
+    "MAX_VERTEX_UNIFORM_BLOCKS",
+    "MAX_VERTEX_OUTPUT_COMPONENTS",
+    "MAX_VARYING_COMPONENTS",
+    "MAX_FRAGMENT_UNIFORM_COMPONENTS",
+    "MAX_FRAGMENT_UNIFORM_BLOCKS",
+    "MAX_UNIFORM_BUFFER_BINDINGS",
+    "MAX_COMBINED_UNIFORM_BLOCKS"
+  ],
+  "a_ne_b": true,
+  "same_process_reloads": [
+    "d93a8b5e58021755",
+    "d93a8b5e58021755",
+    "d93a8b5e58021755"
+  ],
+  "reloads_match_a": true,
+  "iframe_webgl2_hash": "d93a8b5e58021755",
+  "iframe_matches_a": true,
+  "values_real_or_minus_one": true,
+  "alloc_ok": true,
+  "a_vendor": "Xenon",
+  "a_renderer": "Xenon Generic Renderer",
+  "off_vendor": "Google Inc. (Mesa)",
+  "off_renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+  "generic_on_standard": true,
+  "real_on_off": true,
+  "extensions_a": [
+    "EXT_texture_norm16",
+    "EXT_float_blend",
+    "WEBGL_compressed_texture_s3tc_srgb",
+    "EXT_texture_filter_anisotropic",
+    "OES_texture_float_linear",
+    "WEBGL_debug_renderer_info",
+    "EXT_color_buffer_float",
+    "EXT_render_snorm",
+    "WEBGL_compressed_texture_s3tc"
+  ],
+  "extensions_off": [
+    "EXT_texture_norm16",
+    "EXT_float_blend",
+    "WEBGL_compressed_texture_s3tc_srgb",
+    "EXT_texture_filter_anisotropic",
+    "OES_texture_float_linear",
+    "WEBGL_debug_renderer_info",
+    "EXT_color_buffer_float",
+    "EXT_render_snorm",
+    "WEBGL_compressed_texture_s3tc"
+  ],
+  "extensions_match_off": true,
+  "extension_ok": true,
+  "worker_webgl2_hash": "fe8aaf3fda2608a7",
+  "worker_matches_main": true,
+  "readpixels_a": [
+    64,
+    128,
+    191,
+    255
+  ],
+  "readpixels_b": [
+    64,
+    128,
+    191,
+    255
+  ],
+  "readpixels_off": [
+    64,
+    128,
+    191,
+    255
+  ],
+  "readpixels_equal": true,
+  "a_seed": "standard:9b7bafe24167f6af",
+  "b_seed": "standard:6be1f4cf6ab4f6cb",
+  "off_a_seed": "off",
+  "off_b_seed": "off",
+  "ok": true
+}

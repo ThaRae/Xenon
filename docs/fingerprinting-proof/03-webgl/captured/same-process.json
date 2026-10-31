@@ -1,0 +1,1349 @@
+{
+  "runId": "same-process",
+  "events": [
+    {
+      "key": "a-direct",
+      "value": {
+        "seed": "standard:9b7bafe24167f6af",
+        "measure": {
+          "seed": "standard:9b7bafe24167f6af",
+          "origin": "http://site-a.test:8080",
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "dba2429b4f0e1b88"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 127,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "d93a8b5e58021755"
+          }
+        },
+        "reloads": [
+          {
+            "seed": "standard:9b7bafe24167f6af",
+            "webgl2Hash": "d93a8b5e58021755",
+            "webgl2": {
+              "kind": "webgl2",
+              "ok": true,
+              "vendor": "Xenon",
+              "renderer": "Xenon Generic Renderer",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+                "MAX_VARYING_COMPONENTS": 127,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+              },
+              "extensions": [
+                "EXT_texture_norm16",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "WEBGL_debug_renderer_info",
+                "EXT_color_buffer_float",
+                "EXT_render_snorm",
+                "WEBGL_compressed_texture_s3tc"
+              ],
+              "extensionOk": true,
+              "allocOk": true,
+              "allocError": null,
+              "readPixels": [
+                64,
+                128,
+                191,
+                255
+              ],
+              "hash": "d93a8b5e58021755"
+            },
+            "webgl": {
+              "kind": "webgl",
+              "ok": true,
+              "vendor": "Xenon",
+              "renderer": "Xenon Generic Renderer",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+                "MAX_VERTEX_UNIFORM_BLOCKS": null,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+                "MAX_VARYING_COMPONENTS": null,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+                "MAX_UNIFORM_BUFFER_BINDINGS": null,
+                "MAX_COMBINED_UNIFORM_BLOCKS": null,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+              },
+              "extensions": [
+                "OES_element_index_uint",
+                "OES_standard_derivatives",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "OES_vertex_array_object",
+                "ANGLE_instanced_arrays",
+                "EXT_blend_minmax",
+                "WEBGL_debug_renderer_info",
+                "WEBGL_draw_buffers",
+                "WEBGL_compressed_texture_s3tc"
+              ],
+              "extensionOk": true,
+              "allocOk": null,
+              "allocError": null,
+              "readPixels": [
+                64,
+                128,
+                191,
+                255
+              ],
+              "hash": "dba2429b4f0e1b88"
+            }
+          },
+          {
+            "seed": "standard:9b7bafe24167f6af",
+            "webgl2Hash": "d93a8b5e58021755",
+            "webgl2": {
+              "kind": "webgl2",
+              "ok": true,
+              "vendor": "Xenon",
+              "renderer": "Xenon Generic Renderer",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+                "MAX_VARYING_COMPONENTS": 127,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+              },
+              "extensions": [
+                "EXT_texture_norm16",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "WEBGL_debug_renderer_info",
+                "EXT_color_buffer_float",
+                "EXT_render_snorm",
+                "WEBGL_compressed_texture_s3tc"
+              ],
+              "extensionOk": true,
+              "allocOk": true,
+              "allocError": null,
+              "readPixels": [
+                64,
+                128,
+                191,
+                255
+              ],
+              "hash": "d93a8b5e58021755"
+            },
+            "webgl": {
+              "kind": "webgl",
+              "ok": true,
+              "vendor": "Xenon",
+              "renderer": "Xenon Generic Renderer",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+                "MAX_VERTEX_UNIFORM_BLOCKS": null,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+                "MAX_VARYING_COMPONENTS": null,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+                "MAX_UNIFORM_BUFFER_BINDINGS": null,
+                "MAX_COMBINED_UNIFORM_BLOCKS": null,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+              },
+              "extensions": [
+                "OES_element_index_uint",
+                "OES_standard_derivatives",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "OES_vertex_array_object",
+                "ANGLE_instanced_arrays",
+                "EXT_blend_minmax",
+                "WEBGL_debug_renderer_info",
+                "WEBGL_draw_buffers",
+                "WEBGL_compressed_texture_s3tc"
+              ],
+              "extensionOk": true,
+              "allocOk": null,
+              "allocError": null,
+              "readPixels": [
+                64,
+                128,
+                191,
+                255
+              ],
+              "hash": "dba2429b4f0e1b88"
+            }
+          },
+          {
+            "seed": "standard:9b7bafe24167f6af",
+            "webgl2Hash": "d93a8b5e58021755",
+            "webgl2": {
+              "kind": "webgl2",
+              "ok": true,
+              "vendor": "Xenon",
+              "renderer": "Xenon Generic Renderer",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+                "MAX_VARYING_COMPONENTS": 127,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+              },
+              "extensions": [
+                "EXT_texture_norm16",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "WEBGL_debug_renderer_info",
+                "EXT_color_buffer_float",
+                "EXT_render_snorm",
+                "WEBGL_compressed_texture_s3tc"
+              ],
+              "extensionOk": true,
+              "allocOk": true,
+              "allocError": null,
+              "readPixels": [
+                64,
+                128,
+                191,
+                255
+              ],
+              "hash": "d93a8b5e58021755"
+            },
+            "webgl": {
+              "kind": "webgl",
+              "ok": true,
+              "vendor": "Xenon",
+              "renderer": "Xenon Generic Renderer",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+                "MAX_VERTEX_UNIFORM_BLOCKS": null,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+                "MAX_VARYING_COMPONENTS": null,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+                "MAX_UNIFORM_BUFFER_BINDINGS": null,
+                "MAX_COMBINED_UNIFORM_BLOCKS": null,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+              },
+              "extensions": [
+                "OES_element_index_uint",
+                "OES_standard_derivatives",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "OES_vertex_array_object",
+                "ANGLE_instanced_arrays",
+                "EXT_blend_minmax",
+                "WEBGL_debug_renderer_info",
+                "WEBGL_draw_buffers",
+                "WEBGL_compressed_texture_s3tc"
+              ],
+              "extensionOk": true,
+              "allocOk": null,
+              "allocError": null,
+              "readPixels": [
+                64,
+                128,
+                191,
+                255
+              ],
+              "hash": "dba2429b4f0e1b88"
+            }
+          }
+        ],
+        "crossIframe": {
+          "seed": "standard:9b7bafe24167f6af",
+          "origin": "http://site-b.test:8080",
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "dba2429b4f0e1b88"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 127,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "d93a8b5e58021755"
+          },
+          "kind": "cross"
+        }
+      },
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-direct",
+      "value": {
+        "seed": "standard:6be1f4cf6ab4f6cb",
+        "measure": {
+          "seed": "standard:6be1f4cf6ab4f6cb",
+          "origin": "http://site-b.test:8080",
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "dba2429b4f0e1b88"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 14,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
+              "MAX_VARYING_COMPONENTS": 128,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4095,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 44,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "5fbdf4ab1da773c0"
+          }
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "value": {
+        "seed": "standard:6be1f4cf6ab4f6cb",
+        "measure": {
+          "seed": "standard:6be1f4cf6ab4f6cb",
+          "origin": "http://site-b.test:8080",
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "dba2429b4f0e1b88"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 14,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
+              "MAX_VARYING_COMPONENTS": 128,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4095,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 44,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "5fbdf4ab1da773c0"
+          }
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    }
+  ],
+  "reads": {
+    "a-direct": {
+      "seed": "standard:9b7bafe24167f6af",
+      "measure": {
+        "seed": "standard:9b7bafe24167f6af",
+        "origin": "http://site-a.test:8080",
+        "webgl": {
+          "kind": "webgl",
+          "ok": true,
+          "vendor": "Xenon",
+          "renderer": "Xenon Generic Renderer",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_VERTEX_UNIFORM_BLOCKS": null,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+            "MAX_VARYING_COMPONENTS": null,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+            "MAX_UNIFORM_BUFFER_BINDINGS": null,
+            "MAX_COMBINED_UNIFORM_BLOCKS": null,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+          },
+          "extensions": [
+            "OES_element_index_uint",
+            "OES_standard_derivatives",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "OES_vertex_array_object",
+            "ANGLE_instanced_arrays",
+            "EXT_blend_minmax",
+            "WEBGL_debug_renderer_info",
+            "WEBGL_draw_buffers",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": null,
+          "allocError": null,
+          "readPixels": [
+            64,
+            128,
+            191,
+            255
+          ],
+          "hash": "dba2429b4f0e1b88"
+        },
+        "webgl2": {
+          "kind": "webgl2",
+          "ok": true,
+          "vendor": "Xenon",
+          "renderer": "Xenon Generic Renderer",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+            "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+          },
+          "extensions": [
+            "EXT_texture_norm16",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "WEBGL_debug_renderer_info",
+            "EXT_color_buffer_float",
+            "EXT_render_snorm",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": true,
+          "allocError": null,
+          "readPixels": [
+            64,
+            128,
+            191,
+            255
+          ],
+          "hash": "d93a8b5e58021755"
+        }
+      },
+      "reloads": [
+        {
+          "seed": "standard:9b7bafe24167f6af",
+          "webgl2Hash": "d93a8b5e58021755",
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 127,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "d93a8b5e58021755"
+          },
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "dba2429b4f0e1b88"
+          }
+        },
+        {
+          "seed": "standard:9b7bafe24167f6af",
+          "webgl2Hash": "d93a8b5e58021755",
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 127,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "d93a8b5e58021755"
+          },
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "dba2429b4f0e1b88"
+          }
+        },
+        {
+          "seed": "standard:9b7bafe24167f6af",
+          "webgl2Hash": "d93a8b5e58021755",
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 127,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "d93a8b5e58021755"
+          },
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Xenon",
+            "renderer": "Xenon Generic Renderer",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixels": [
+              64,
+              128,
+              191,
+              255
+            ],
+            "hash": "dba2429b4f0e1b88"
+          }
+        }
+      ],
+      "crossIframe": {
+        "seed": "standard:9b7bafe24167f6af",
+        "origin": "http://site-b.test:8080",
+        "webgl": {
+          "kind": "webgl",
+          "ok": true,
+          "vendor": "Xenon",
+          "renderer": "Xenon Generic Renderer",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_VERTEX_UNIFORM_BLOCKS": null,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+            "MAX_VARYING_COMPONENTS": null,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+            "MAX_UNIFORM_BUFFER_BINDINGS": null,
+            "MAX_COMBINED_UNIFORM_BLOCKS": null,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+          },
+          "extensions": [
+            "OES_element_index_uint",
+            "OES_standard_derivatives",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "OES_vertex_array_object",
+            "ANGLE_instanced_arrays",
+            "EXT_blend_minmax",
+            "WEBGL_debug_renderer_info",
+            "WEBGL_draw_buffers",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": null,
+          "allocError": null,
+          "readPixels": [
+            64,
+            128,
+            191,
+            255
+          ],
+          "hash": "dba2429b4f0e1b88"
+        },
+        "webgl2": {
+          "kind": "webgl2",
+          "ok": true,
+          "vendor": "Xenon",
+          "renderer": "Xenon Generic Renderer",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+            "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+          },
+          "extensions": [
+            "EXT_texture_norm16",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "WEBGL_debug_renderer_info",
+            "EXT_color_buffer_float",
+            "EXT_render_snorm",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": true,
+          "allocError": null,
+          "readPixels": [
+            64,
+            128,
+            191,
+            255
+          ],
+          "hash": "d93a8b5e58021755"
+        },
+        "kind": "cross"
+      }
+    },
+    "b-direct": {
+      "seed": "standard:6be1f4cf6ab4f6cb",
+      "measure": {
+        "seed": "standard:6be1f4cf6ab4f6cb",
+        "origin": "http://site-b.test:8080",
+        "webgl": {
+          "kind": "webgl",
+          "ok": true,
+          "vendor": "Xenon",
+          "renderer": "Xenon Generic Renderer",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_VERTEX_UNIFORM_BLOCKS": null,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+            "MAX_VARYING_COMPONENTS": null,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+            "MAX_UNIFORM_BUFFER_BINDINGS": null,
+            "MAX_COMBINED_UNIFORM_BLOCKS": null,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+          },
+          "extensions": [
+            "OES_element_index_uint",
+            "OES_standard_derivatives",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "OES_vertex_array_object",
+            "ANGLE_instanced_arrays",
+            "EXT_blend_minmax",
+            "WEBGL_debug_renderer_info",
+            "WEBGL_draw_buffers",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": null,
+          "allocError": null,
+          "readPixels": [
+            64,
+            128,
+            191,
+            255
+          ],
+          "hash": "dba2429b4f0e1b88"
+        },
+        "webgl2": {
+          "kind": "webgl2",
+          "ok": true,
+          "vendor": "Xenon",
+          "renderer": "Xenon Generic Renderer",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+            "MAX_VERTEX_UNIFORM_BLOCKS": 14,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
+            "MAX_VARYING_COMPONENTS": 128,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4095,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+          },
+          "extensions": [
+            "EXT_texture_norm16",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "WEBGL_debug_renderer_info",
+            "EXT_color_buffer_float",
+            "EXT_render_snorm",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": true,
+          "allocError": null,
+          "readPixels": [
+            64,
+            128,
+            191,
+            255
+          ],
+          "hash": "5fbdf4ab1da773c0"
+        }
+      }
+    },
+    "complete": {
+      "seed": "standard:6be1f4cf6ab4f6cb",
+      "measure": {
+        "seed": "standard:6be1f4cf6ab4f6cb",
+        "origin": "http://site-b.test:8080",
+        "webgl": {
+          "kind": "webgl",
+          "ok": true,
+          "vendor": "Xenon",
+          "renderer": "Xenon Generic Renderer",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_VERTEX_UNIFORM_BLOCKS": null,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+            "MAX_VARYING_COMPONENTS": null,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+            "MAX_UNIFORM_BUFFER_BINDINGS": null,
+            "MAX_COMBINED_UNIFORM_BLOCKS": null,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+          },
+          "extensions": [
+            "OES_element_index_uint",
+            "OES_standard_derivatives",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "OES_vertex_array_object",
+            "ANGLE_instanced_arrays",
+            "EXT_blend_minmax",
+            "WEBGL_debug_renderer_info",
+            "WEBGL_draw_buffers",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": null,
+          "allocError": null,
+          "readPixels": [
+            64,
+            128,
+            191,
+            255
+          ],
+          "hash": "dba2429b4f0e1b88"
+        },
+        "webgl2": {
+          "kind": "webgl2",
+          "ok": true,
+          "vendor": "Xenon",
+          "renderer": "Xenon Generic Renderer",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+            "MAX_VERTEX_UNIFORM_BLOCKS": 14,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
+            "MAX_VARYING_COMPONENTS": 128,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4095,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+          },
+          "extensions": [
+            "EXT_texture_norm16",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "WEBGL_debug_renderer_info",
+            "EXT_color_buffer_float",
+            "EXT_render_snorm",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": true,
+          "allocError": null,
+          "readPixels": [
+            64,
+            128,
+            191,
+            255
+          ],
+          "hash": "5fbdf4ab1da773c0"
+        }
+      }
+    }
+  },
+  "complete": true
+}

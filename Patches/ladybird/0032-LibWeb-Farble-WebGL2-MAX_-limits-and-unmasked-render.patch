@@ -1,0 +1,534 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 00:17:50 +0000
+Subject: [PATCH] LibWeb: Farble WebGL2 MAX_* limits and unmasked renderer
+ strings
+
+Subtract 0 or 1 from Brave's twelve WebGL2 MAX_* getParameter values
+using a per-pname stream from the ESO seed. UNMASKED_VENDOR_WEBGL and
+UNMASKED_RENDERER_WEBGL are the fixed strings Xenon / Xenon Generic
+Renderer. Extensions and Standard readPixels stay honest. Strict zeros
+the farbled set and skips probe writes. The GPU process never sees the
+seed.
+---
+ .../LibWeb/Bindings/Rust/src/web_gl/canvas.rs | 15 ++++
+ .../Bindings/Rust/src/web_gl/parameters.rs    | 53 ++++++++----
+ .../web_gl2_rendering_context_overloads.rs    |  8 +-
+ .../web_gl/web_gl_rendering_context_base.rs   |  9 ++
+ .../web_gl_rendering_context_overloads.rs     |  5 +-
+ Libraries/LibWeb/CMakeLists.txt               |  1 +
+ Libraries/LibWeb/Farbling/WebGLFarbling.cpp   | 82 +++++++++++++++++++
+ Libraries/LibWeb/Farbling/WebGLFarbling.h     | 27 ++++++
+ .../WebGL/WebGLRenderingContextBase.cpp       | 30 +++++++
+ Tests/LibWeb/CMakeLists.txt                   |  1 +
+ Tests/LibWeb/TestWebGLFarbling.cpp            | 74 +++++++++++++++++
+ 11 files changed, 288 insertions(+), 17 deletions(-)
+ create mode 100644 Libraries/LibWeb/Farbling/WebGLFarbling.cpp
+ create mode 100644 Libraries/LibWeb/Farbling/WebGLFarbling.h
+ create mode 100644 Tests/LibWeb/TestWebGLFarbling.cpp
+
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_gl/canvas.rs b/Libraries/LibWeb/Bindings/Rust/src/web_gl/canvas.rs
+index 9d8952950ae0ef2e9205f7932ded9ddc842bfd6a..3434970b76596a6c89c0ff145792d6591e2bdec7 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_gl/canvas.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_gl/canvas.rs
+@@ -39,6 +39,9 @@ unsafe extern "C" {
+     fn web_webgl_canvas_bitmap_size(canvas_host: *mut c_void, out_width: *mut i32, out_height: *mut i32);
+     fn web_webgl_canvas_wrapper(canvas: *mut c_void, canvas_is_offscreen: bool, realm: *mut c_void) -> *mut c_void;
+     fn web_webgl_canvas_relevant_realm(canvas_host: *mut c_void) -> *mut c_void;
++    fn web_webgl_farbling_level(canvas_host: *mut c_void) -> u8;
++    fn web_webgl_farble_max_i32(canvas_host: *mut c_void, pname: u32, real: i32) -> i32;
++    fn web_webgl_farble_max_i64(canvas_host: *mut c_void, pname: u32, real: i64) -> i64;
+     safe fn web_webgl_expose_experimental_interfaces() -> bool;
+     safe fn web_webgl_is_valid_2d_pixel_unpack_state(width: i32, unpack_state: &PixelUnpackState) -> bool;
+     safe fn web_webgl_required_2d_texture_data_size(
+@@ -107,6 +110,18 @@ impl Canvas {
+         // SAFETY: LibWeb returns a live realm, or null.
+         NonNull::new(realm.cast::<Realm>()).map(|realm| unsafe { Gc::from_non_null(realm) })
+     }
++
++    pub(crate) fn farbling_level(self) -> u8 {
++        unsafe { web_webgl_farbling_level(self.host.as_ptr()) }
++    }
++
++    pub(crate) fn farble_max_i32(self, pname: u32, real: i32) -> i32 {
++        unsafe { web_webgl_farble_max_i32(self.host.as_ptr(), pname, real) }
++    }
++
++    pub(crate) fn farble_max_i64(self, pname: u32, real: i64) -> i64 {
++        unsafe { web_webgl_farble_max_i64(self.host.as_ptr(), pname, real) }
++    }
+ }
+ 
+ pub(crate) fn expose_experimental_interfaces() -> bool {
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_gl/parameters.rs b/Libraries/LibWeb/Bindings/Rust/src/web_gl/parameters.rs
+index 652e6e04a211a43de474a02c2067b950de795325..0db858d3600a8ed654c660dc899a65210e38f047 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_gl/parameters.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_gl/parameters.rs
+@@ -110,6 +110,9 @@ fn masked_string_parameter(context: &ContextState, cx: &CallContext, pname: u32)
+ /// The unmasked vendor: the GPU's, except that a navigator claiming WebKit on macOS answers as that engine does there,
+ /// and one claiming Gecko answers with the vendor's bare name.
+ fn unmasked_vendor(context: &ContextState, cx: &CallContext) -> Value {
++    if context.canvas().farbling_level() != FARBLING_OFF {
++        return string_value(cx, Utf16String::from_ascii(GENERIC_UNMASKED_VENDOR));
++    }
+     let vendor = context.proxy.get_string(GL_VENDOR);
+     let text: Option<&str> = match navigator_compatibility_mode() {
+         MODE_WEBKIT if cfg!(target_os = "macos") => Some("Apple Inc."),
+@@ -125,6 +128,9 @@ fn unmasked_vendor(context: &ContextState, cx: &CallContext) -> Value {
+ /// The unmasked renderer: the GPU's, except that a navigator claiming WebKit on macOS answers as that engine does
+ /// there, and one claiming Gecko answers with a representative device of the GPU's family.
+ fn unmasked_renderer(context: &ContextState, cx: &CallContext) -> Value {
++    if context.canvas().farbling_level() != FARBLING_OFF {
++        return string_value(cx, Utf16String::from_ascii(GENERIC_UNMASKED_RENDERER));
++    }
+     match navigator_compatibility_mode() {
+         MODE_WEBKIT if cfg!(target_os = "macos") => string_value(cx, Utf16String::from_ascii(b"Apple GPU")),
+         MODE_GECKO => string_value(cx, sanitized_renderer(context)),
+@@ -203,6 +209,20 @@ fn integer64_parameter(context: &ContextState, pname: u32) -> i64 {
+     result[0]
+ }
+ 
++const FARBLING_OFF: u8 = 0;
++const GENERIC_UNMASKED_VENDOR: &[u8] = b"Xenon";
++const GENERIC_UNMASKED_RENDERER: &[u8] = b"Xenon Generic Renderer";
++
++fn farbled_max_i32(context: &ContextState, pname: u32) -> Value {
++    let real = integer_parameter(context, pname);
++    Value::from_i32(context.canvas().farble_max_i32(pname, real))
++}
++
++fn farbled_max_i64(context: &ContextState, pname: u32) -> Value {
++    let real = integer64_parameter(context, pname);
++    Value::from_f64(context.canvas().farble_max_i64(pname, real) as f64)
++}
++
+ fn float_parameter(context: &ContextState, pname: u32) -> f32 {
+     let mut result = [0.0];
+     context.proxy.get_floatv_robust_angle(pname, 1, &mut result);
+@@ -420,26 +440,31 @@ fn parameter_of_either_version(context: &ContextState, cx: &CallContext, pname:
+ 
+ fn parameter_of_webgl2(context: &ContextState, cx: &CallContext, pname: u32) -> Option<Value> {
+     Some(match pname {
++        GL_MAX_VERTEX_UNIFORM_COMPONENTS
++        | GL_MAX_VERTEX_UNIFORM_BLOCKS
++        | GL_MAX_VERTEX_OUTPUT_COMPONENTS
++        | GL_MAX_VARYING_COMPONENTS
++        | GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS
++        | GL_MAX_FRAGMENT_UNIFORM_COMPONENTS
++        | GL_MAX_FRAGMENT_UNIFORM_BLOCKS
++        | GL_MAX_FRAGMENT_INPUT_COMPONENTS
++        | GL_MAX_UNIFORM_BUFFER_BINDINGS
++        | GL_MAX_COMBINED_UNIFORM_BLOCKS => farbled_max_i32(context, pname),
++
++        GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS | GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS => {
++            farbled_max_i64(context, pname)
++        }
++
+         GL_MAX_SAMPLES
+         | GL_MAX_3D_TEXTURE_SIZE
+         | GL_MAX_ARRAY_TEXTURE_LAYERS
+-        | GL_MAX_VERTEX_UNIFORM_COMPONENTS
+-        | GL_MAX_UNIFORM_BUFFER_BINDINGS
+         | GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
+-        | GL_MAX_VERTEX_UNIFORM_BLOCKS
+-        | GL_MAX_FRAGMENT_INPUT_COMPONENTS
+-        | GL_MAX_FRAGMENT_UNIFORM_COMPONENTS
+-        | GL_MAX_COMBINED_UNIFORM_BLOCKS
+-        | GL_MAX_FRAGMENT_UNIFORM_BLOCKS
+-        | GL_MAX_VARYING_COMPONENTS
+         | GL_MAX_ELEMENTS_INDICES
+         | GL_MAX_ELEMENTS_VERTICES
+-        | GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS
+         | GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS
+         | GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_COMPONENTS
+         | GL_MIN_PROGRAM_TEXEL_OFFSET
+         | GL_MAX_PROGRAM_TEXEL_OFFSET
+-        | GL_MAX_VERTEX_OUTPUT_COMPONENTS
+         | GL_PACK_ROW_LENGTH
+         | GL_PACK_SKIP_ROWS
+         | GL_PACK_SKIP_PIXELS
+@@ -449,11 +474,9 @@ fn parameter_of_webgl2(context: &ContextState, cx: &CallContext, pname: u32) ->
+         | GL_UNPACK_SKIP_PIXELS
+         | GL_UNPACK_SKIP_ROWS => Value::from_i32(integer_parameter(context, pname)),
+ 
+-        GL_MAX_UNIFORM_BLOCK_SIZE
+-        | GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS
+-        | GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS
+-        | GL_MAX_ELEMENT_INDEX
+-        | GL_MAX_SERVER_WAIT_TIMEOUT => Value::from_f64(integer64_parameter(context, pname) as f64),
++        GL_MAX_UNIFORM_BLOCK_SIZE | GL_MAX_ELEMENT_INDEX | GL_MAX_SERVER_WAIT_TIMEOUT => {
++            Value::from_f64(integer64_parameter(context, pname) as f64)
++        }
+ 
+         GL_MAX_TEXTURE_LOD_BIAS => number_value(float_parameter(context, pname)),
+ 
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl2_rendering_context_overloads.rs b/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl2_rendering_context_overloads.rs
+index 9a43c967eb129acc282b6c88cad18b66b25a72de..f822140833aed7b0af2020a4fbd6895ff3875cc9 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl2_rendering_context_overloads.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl2_rendering_context_overloads.rs
+@@ -11,7 +11,7 @@
+ use super::buffer_source::{destination_bytes, list_bytes, source_bytes, write_checked};
+ use super::canvas::is_valid_2d_pixel_unpack_state;
+ use super::constants::{GL_INVALID_ENUM, GL_INVALID_OPERATION, GL_INVALID_VALUE, GL_OUT_OF_MEMORY};
+-use super::state::{RenderingContext, WebGL2};
++use super::state::{ContextState, RenderingContext, WebGL2};
+ use super::types::Float32List;
+ use super::web_gl_rendering_context_overloads::{Int32List, TexImageSource};
+ use super::web_gl_uniform_location::WebGLUniformLocation;
+@@ -799,6 +799,9 @@ impl RenderingContext<WebGL2> {
+         dst_data: ArrayBufferView,
+         dst_offset: u64,
+     ) -> WebIdlResult<()> {
++        if ContextState::canvas(self).farbling_level() == 2 {
++            return Ok(());
++        }
+         // If a WebGLBuffer is bound to the PIXEL_PACK_BUFFER target, generates an INVALID_OPERATION error.
+         if self.pixel_pack_buffer_binding.get().is_some() {
+             self.set_error(GL_INVALID_OPERATION);
+@@ -841,6 +844,9 @@ impl RenderingContext<WebGL2> {
+         r#type: u32,
+         offset: i64,
+     ) -> WebIdlResult<()> {
++        if ContextState::canvas(self).farbling_level() == 2 {
++            return Ok(());
++        }
+         // If no WebGLBuffer is bound to the PIXEL_PACK_BUFFER target, generates an INVALID_OPERATION error.
+         if self.pixel_pack_buffer_binding.get().is_none() {
+             self.set_error(GL_INVALID_OPERATION);
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl_rendering_context_base.rs b/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl_rendering_context_base.rs
+index 3548f590dabbb9b181d6e6fbc8d5e82b8e8210cc..816d6bfd004c93d93bae65048a9c2271223b682c 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl_rendering_context_base.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl_rendering_context_base.rs
+@@ -785,6 +785,9 @@ impl<V: Version> RenderingContext<V> {
+         program: Ref<WebGLProgram>,
+         index: u32,
+     ) -> WebIdlResult<Option<Ref<WebGLActiveInfo>>> {
++        if ContextState::canvas(self).farbling_level() == 2 {
++            return Ok(None);
++        }
+         let Some(program_handle) = self.handle_of(program) else {
+             return Ok(None);
+         };
+@@ -807,6 +810,9 @@ impl<V: Version> RenderingContext<V> {
+         program: Ref<WebGLProgram>,
+         index: u32,
+     ) -> WebIdlResult<Option<Ref<WebGLActiveInfo>>> {
++        if ContextState::canvas(self).farbling_level() == 2 {
++            return Ok(None);
++        }
+         let Some(program_handle) = self.handle_of(program) else {
+             return Ok(None);
+         };
+@@ -894,6 +900,9 @@ impl<V: Version> RenderingContext<V> {
+         shadertype: u32,
+         precisiontype: u32,
+     ) -> WebIdlResult<Option<Ref<WebGLShaderPrecisionFormat>>> {
++        if ContextState::canvas(self).farbling_level() == 2 {
++            return Ok(None);
++        }
+         let mut range = [0i32; 2];
+         let mut precision = [0i32; 1];
+         self.proxy
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl_rendering_context_overloads.rs b/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl_rendering_context_overloads.rs
+index ce72a6b5c6c11c7979b7919e520268e89c83759d..dc63f5f263daf2708bcc3b2d08f804a32cf561b1 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl_rendering_context_overloads.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_gl/web_gl_rendering_context_overloads.rs
+@@ -17,7 +17,7 @@ use super::constants::{
+     GL_OUT_OF_MEMORY, GL_RGB, GL_RGBA, GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT_4_4_4_4, GL_UNSIGNED_SHORT_5_5_5_1,
+     GL_UNSIGNED_SHORT_5_6_5,
+ };
+-use super::state::{RenderingContext, WebGL1};
++use super::state::{ContextState, RenderingContext, WebGL1};
+ use super::types::Float32List;
+ use super::web_gl_uniform_location::WebGLUniformLocation;
+ use crate::bindings::conversions::{ArrayBufferView, BufferSource, CppInterface};
+@@ -192,6 +192,9 @@ impl RenderingContext<WebGL1> {
+         r#type: u32,
+         pixels: Option<ArrayBufferView>,
+     ) -> WebIdlResult<()> {
++        if ContextState::canvas(self).farbling_level() == 2 {
++            return Ok(());
++        }
+         let Some(view) = pixels else {
+             self.set_error(GL_INVALID_VALUE);
+             return Ok(());
+diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
+index c172cf0013bbee71886f51eed3ac020a64f37c1b..63093ae1b0e410c12b09e59d47780c41940d719f 100644
+--- a/Libraries/LibWeb/CMakeLists.txt
++++ b/Libraries/LibWeb/CMakeLists.txt
+@@ -351,6 +351,7 @@ set(SOURCES
+     EventTiming/PerformanceEventTiming.cpp
+     Farbling/CanvasPerturb.cpp
+     Farbling/FarblingRNG.cpp
++    Farbling/WebGLFarbling.cpp
+     Fetch/Body.cpp
+     Fetch/BodyInit.cpp
+     Fetch/Engine/FetchBodyDeliveryGate.cpp
+diff --git a/Libraries/LibWeb/Farbling/WebGLFarbling.cpp b/Libraries/LibWeb/Farbling/WebGLFarbling.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..858231576022397cab64b68988be9d0b89b15394
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/WebGLFarbling.cpp
+@@ -0,0 +1,82 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/String.h>
++#include <LibWeb/Farbling/FarblingRNG.h>
++#include <LibWeb/Farbling/WebGLFarbling.h>
++
++namespace Web::Farbling {
++
++// GLES3 / WebGL2RenderingContextBase.idl
++static constexpr u32 GL_MAX_VERTEX_UNIFORM_BLOCKS = 0x8A2B;
++static constexpr u32 GL_MAX_FRAGMENT_UNIFORM_BLOCKS = 0x8A2D;
++static constexpr u32 GL_MAX_COMBINED_UNIFORM_BLOCKS = 0x8A2E;
++static constexpr u32 GL_MAX_UNIFORM_BUFFER_BINDINGS = 0x8A2F;
++static constexpr u32 GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS = 0x8A31;
++static constexpr u32 GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS = 0x8A33;
++static constexpr u32 GL_MAX_FRAGMENT_UNIFORM_COMPONENTS = 0x8B49;
++static constexpr u32 GL_MAX_VERTEX_UNIFORM_COMPONENTS = 0x8B4A;
++static constexpr u32 GL_MAX_VARYING_COMPONENTS = 0x8B4B;
++static constexpr u32 GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS = 0x8C8A;
++static constexpr u32 GL_MAX_VERTEX_OUTPUT_COMPONENTS = 0x9122;
++static constexpr u32 GL_MAX_FRAGMENT_INPUT_COMPONENTS = 0x9125;
++
++bool is_farbled_webgl_max_pname(u32 pname)
++{
++    switch (pname) {
++    case GL_MAX_VERTEX_UNIFORM_COMPONENTS:
++    case GL_MAX_VERTEX_UNIFORM_BLOCKS:
++    case GL_MAX_VERTEX_OUTPUT_COMPONENTS:
++    case GL_MAX_VARYING_COMPONENTS:
++    case GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS:
++    case GL_MAX_FRAGMENT_UNIFORM_COMPONENTS:
++    case GL_MAX_FRAGMENT_UNIFORM_BLOCKS:
++    case GL_MAX_FRAGMENT_INPUT_COMPONENTS:
++    case GL_MAX_UNIFORM_BUFFER_BINDINGS:
++    case GL_MAX_COMBINED_UNIFORM_BLOCKS:
++    case GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS:
++    case GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS:
++        return true;
++    default:
++        return false;
++    }
++}
++
++static bool subtract_one(Seed const& seed, u32 pname)
++{
++    auto key = MUST(String::formatted("webgl:{:08x}", pname));
++    return (RNG(seed).integer(key) & 1u) != 0;
++}
++
++i32 farble_webgl_max_i32(Seed const& seed, u32 pname, i32 real)
++{
++    if (!is_farbled_webgl_max_pname(pname) || !seed.enabled() || real <= 0)
++        return real;
++    if (seed.level == Level::Strict)
++        return 0;
++    return subtract_one(seed, pname) ? real - 1 : real;
++}
++
++i64 farble_webgl_max_i64(Seed const& seed, u32 pname, i64 real)
++{
++    if (!is_farbled_webgl_max_pname(pname) || !seed.enabled() || real <= 0)
++        return real;
++    if (seed.level == Level::Strict)
++        return 0;
++    return subtract_one(seed, pname) ? real - 1 : real;
++}
++
++StringView generic_unmasked_vendor()
++{
++    return "Xenon"sv;
++}
++
++StringView generic_unmasked_renderer()
++{
++    return "Xenon Generic Renderer"sv;
++}
++
++}
+diff --git a/Libraries/LibWeb/Farbling/WebGLFarbling.h b/Libraries/LibWeb/Farbling/WebGLFarbling.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..874995e55a576cb55c9266ba77a27997e9fdb697
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/WebGLFarbling.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/StringView.h>
++#include <AK/Types.h>
++#include <LibWeb/Export.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
++
++namespace Web::Farbling {
++
++// Brave's WebGL2 Balanced MAX_* set. Shared WebGL1 pnames are none of these; WebGL1 getParameter of them is invalid.
++WEB_API bool is_farbled_webgl_max_pname(u32 pname);
++
++// Standard: real, or real-1 with probability 1/2 from a per-pname PRNG stream. Strict: 0. Off / non-positive: real.
++WEB_API i32 farble_webgl_max_i32(Seed const&, u32 pname, i32 real);
++WEB_API i64 farble_webgl_max_i64(Seed const&, u32 pname, i64 real);
++
++// One pair of strings for every Xenon user, not per-site.
++WEB_API StringView generic_unmasked_vendor();
++WEB_API StringView generic_unmasked_renderer();
++
++}
+diff --git a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
+index 5f7decf2d6d823559fc35a5c520d261a35167551..0ed4f0dff1322ea17772b0e56b81598cdd1b4812 100644
+--- a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
++++ b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
+@@ -22,6 +22,8 @@
+ #include <LibWeb/HTML/Canvas/CanvasHost.h>
+ #include <LibWeb/HTML/EventLoop/Task.h>
+ #include <LibWeb/HTML/HTMLCanvasElement.h>
++#include <LibWeb/HTML/Scripting/Environments.h>
++#include <LibWeb/Farbling/WebGLFarbling.h>
+ #include <LibWeb/HTML/HTMLImageElement.h>
+ #include <LibWeb/HTML/HTMLVideoElement.h>
+ #include <LibWeb/HTML/OffscreenCanvas.h>
+@@ -124,6 +126,9 @@ void web_webgl_canvas_did_change_content(void* canvas_host);
+ void web_webgl_canvas_bitmap_size(void* canvas_host, i32* out_width, i32* out_height);
+ void* web_webgl_canvas_wrapper(void* canvas, bool canvas_is_offscreen, void* realm);
+ void* web_webgl_canvas_relevant_realm(void* canvas_host);
++u8 web_webgl_farbling_level(void* canvas_host);
++i32 web_webgl_farble_max_i32(void* canvas_host, u32 pname, i32 real);
++i64 web_webgl_farble_max_i64(void* canvas_host, u32 pname, i64 real);
+ bool web_webgl_expose_experimental_interfaces();
+ bool web_webgl_is_valid_2d_pixel_unpack_state(i32 width, PixelUnpackState const* unpack_state);
+ bool web_webgl_required_2d_texture_data_size(i32 width, i32 height, u32 format, u32 type, PixelUnpackState const* unpack_state, size_t* out_size);
+@@ -461,6 +466,31 @@ void* web_webgl_canvas_relevant_realm(void* canvas_host)
+     return &static_cast<HTML::CanvasHost*>(canvas_host)->canvas_relevant_global_object().shape().realm();
+ }
+ 
++static Web::Farbling::Seed farbling_seed_for_canvas_host(void* canvas_host)
++{
++    if (!canvas_host)
++        return {};
++    auto& settings = HTML::relevant_settings_object(static_cast<HTML::CanvasHost*>(canvas_host)->canvas_relevant_global_object());
++    if (settings.origin().is_opaque())
++        return {};
++    return settings.farbling_seed();
++}
++
++u8 web_webgl_farbling_level(void* canvas_host)
++{
++    return to_underlying(farbling_seed_for_canvas_host(canvas_host).level);
++}
++
++i32 web_webgl_farble_max_i32(void* canvas_host, u32 pname, i32 real)
++{
++    return Farbling::farble_webgl_max_i32(farbling_seed_for_canvas_host(canvas_host), pname, real);
++}
++
++i64 web_webgl_farble_max_i64(void* canvas_host, u32 pname, i64 real)
++{
++    return Farbling::farble_webgl_max_i64(farbling_seed_for_canvas_host(canvas_host), pname, real);
++}
++
+ bool web_webgl_expose_experimental_interfaces()
+ {
+     return HTML::WindowOrWorkerGlobalScopeMixin::expose_experimental_interfaces();
+diff --git a/Tests/LibWeb/CMakeLists.txt b/Tests/LibWeb/CMakeLists.txt
+index 4e9e6a6b90f91f752720a645626977b3d4b52f74..1286d1e01130cc7137150e6a18ccfa40f7a01a56 100644
+--- a/Tests/LibWeb/CMakeLists.txt
++++ b/Tests/LibWeb/CMakeLists.txt
+@@ -27,6 +27,7 @@ set(TEST_SOURCES
+     TestEventLoop.cpp
+     TestFarblingRNG.cpp
+     TestCanvasPerturb.cpp
++    TestWebGLFarbling.cpp
+     TestFaviconDecoding.cpp
+     TestFetchBodyDeliveryGate.cpp
+     TestFetchByteChannel.cpp
+diff --git a/Tests/LibWeb/TestWebGLFarbling.cpp b/Tests/LibWeb/TestWebGLFarbling.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..cc2f3d50d278f0d9d0b4c9d16790d31ca7751ce7
+--- /dev/null
++++ b/Tests/LibWeb/TestWebGLFarbling.cpp
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibTest/TestCase.h>
++#include <LibWeb/Farbling/WebGLFarbling.h>
++
++static constexpr u32 MAX_VERTEX_UNIFORM_COMPONENTS = 0x8B4A;
++static constexpr u32 MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS = 0x8A31;
++static constexpr u32 MAX_TEXTURE_SIZE = 0x0D33;
++
++TEST_CASE(farbled_pnames_are_the_brave_webgl2_set)
++{
++    EXPECT(Web::Farbling::is_farbled_webgl_max_pname(MAX_VERTEX_UNIFORM_COMPONENTS));
++    EXPECT(Web::Farbling::is_farbled_webgl_max_pname(MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS));
++    EXPECT(!Web::Farbling::is_farbled_webgl_max_pname(MAX_TEXTURE_SIZE));
++}
++
++TEST_CASE(off_leaves_the_real_value)
++{
++    Web::Farbling::Seed off {};
++    EXPECT_EQ(Web::Farbling::farble_webgl_max_i32(off, MAX_VERTEX_UNIFORM_COMPONENTS, 1024), 1024);
++    EXPECT_EQ(Web::Farbling::farble_webgl_max_i64(off, MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS, 4096), 4096);
++}
++
++TEST_CASE(standard_is_real_or_real_minus_one)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 };
++    auto value = Web::Farbling::farble_webgl_max_i32(seed, MAX_VERTEX_UNIFORM_COMPONENTS, 1024);
++    EXPECT(value == 1024 || value == 1023);
++}
++
++TEST_CASE(same_seed_is_deterministic)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 9, .low = 8 };
++    auto first = Web::Farbling::farble_webgl_max_i32(seed, MAX_VERTEX_UNIFORM_COMPONENTS, 1024);
++    auto second = Web::Farbling::farble_webgl_max_i32(seed, MAX_VERTEX_UNIFORM_COMPONENTS, 1024);
++    EXPECT_EQ(first, second);
++}
++
++TEST_CASE(different_pnames_are_independent_streams)
++{
++    bool found_difference = false;
++    for (u64 n = 1; n <= 64 && !found_difference; ++n) {
++        Web::Farbling::Seed trial { .level = Web::Farbling::Level::Standard, .high = n, .low = n * 7 };
++        auto a = Web::Farbling::farble_webgl_max_i32(trial, MAX_VERTEX_UNIFORM_COMPONENTS, 100);
++        auto b = Web::Farbling::farble_webgl_max_i32(trial, 0x8A2B, 100);
++        if (a != b)
++            found_difference = true;
++    }
++    EXPECT(found_difference);
++}
++
++TEST_CASE(strict_returns_zero)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Strict, .high = 1, .low = 2 };
++    EXPECT_EQ(Web::Farbling::farble_webgl_max_i32(seed, MAX_VERTEX_UNIFORM_COMPONENTS, 1024), 0);
++    EXPECT_EQ(Web::Farbling::farble_webgl_max_i64(seed, MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS, 4096), 0);
++}
++
++TEST_CASE(non_positive_stays_non_positive)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 };
++    EXPECT_EQ(Web::Farbling::farble_webgl_max_i32(seed, MAX_VERTEX_UNIFORM_COMPONENTS, 0), 0);
++    EXPECT_EQ(Web::Farbling::farble_webgl_max_i32(seed, MAX_VERTEX_UNIFORM_COMPONENTS, -4), -4);
++}
++
++TEST_CASE(vendor_and_renderer_are_the_generic_strings)
++{
++    EXPECT_EQ(Web::Farbling::generic_unmasked_vendor(), "Xenon"sv);
++    EXPECT_EQ(Web::Farbling::generic_unmasked_renderer(), "Xenon Generic Renderer"sv);
++}

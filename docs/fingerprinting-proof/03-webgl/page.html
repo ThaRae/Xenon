@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>WebGL farbling</title>
+<pre id="out">loading…</pre>
+<iframe id="same" src="iframe.html?kind=same"></iframe>
+<iframe id="cross" src="http://site-b.test:8080/iframe.html?kind=cross"></iframe>
+<script src="measure.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "run";
+const out = document.getElementById("out");
+const sample = measureDocumentCanvases();
+sample.sameIframe = null;
+sample.crossIframe = null;
+sample.worker = null;
+let remaining = 3;
+function got() {
+    remaining -= 1;
+    if (remaining <= 0)
+        finish();
+}
+function finish() {
+    const samples = JSON.parse(sessionStorage.getItem("samples") || "[]");
+    samples.push(sample);
+    sessionStorage.setItem("samples", JSON.stringify(samples));
+    out.textContent = "XENON-WEBGL " + JSON.stringify({ runId, count: samples.length, webgl2: sample.webgl2 && sample.webgl2.ok });
+    if (samples.length < 3) {
+        location.reload();
+        return;
+    }
+    fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId, host: location.host, samples }),
+    }).finally(() => setTimeout(() => window.close(), 50));
+}
+window.addEventListener("message", event => {
+    const data = event.data || {};
+    if (data.kind === "same")
+        sample.sameIframe = data;
+    else
+        sample.crossIframe = data;
+    got();
+});
+const worker = new Worker("worker.js");
+worker.onmessage = event => {
+    sample.worker = event.data;
+    got();
+};
+worker.onerror = event => {
+    sample.worker = { error: event.message };
+    got();
+};
+worker.postMessage({});
+setTimeout(() => {
+    if (remaining > 0) {
+        remaining = 0;
+        finish();
+    }
+}, 12000);
+</script>

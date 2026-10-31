@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>B webgl</title>
+<script src="measure.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "same-process";
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+const sample = measureDocumentCanvases();
+const payload = { seed: sample.seed, measure: sample };
+post("b-direct", payload).then(() => post("complete", payload)).finally(() => setTimeout(() => window.close(), 50));
+</script>

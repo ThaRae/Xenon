@@ -1,0 +1,5 @@
+[4/8] Linking CXX executable bin/TestWebGLFarbling
+[5/8] Linking CXX executable xenon/libexec/WebWorker
+[6/8] Linking CXX executable xenon/libexec/WebContent
+[7/8] Linking CXX executable xenon/bin/Xenon
+NINJA_EXIT:0

@@ -1,0 +1,11 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>webgl iframe</title>
+<script src="measure.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const kind = params.get("kind") || "iframe";
+const sample = measureDocumentCanvases();
+sample.kind = kind;
+parent.postMessage(sample, "*");
+</script>
