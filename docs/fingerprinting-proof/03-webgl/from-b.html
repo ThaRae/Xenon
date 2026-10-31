@@ -13,6 +13,8 @@ function post(key, value) {
     });
 }
 const sample = measureDocumentCanvases();
-const payload = { seed: sample.seed, measure: sample };
-post("b-direct", payload).then(() => post("complete", payload)).finally(() => setTimeout(() => window.close(), 50));
+withWorker().then(worker => {
+    const payload = { seed: sample.seed, measure: sample, worker };
+    return post("b-direct", payload).then(() => post("complete", payload));
+}).finally(() => setTimeout(() => window.close(), 50));
 </script>

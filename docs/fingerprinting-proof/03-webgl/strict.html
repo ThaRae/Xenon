@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>WebGL Strict</title>
+<script src="measure.js"></script>
+<script>
+const sample = measureStrictWebGL2();
+fetch("/report?run=strict", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ runId: "strict", samples: [sample] }),
+}).finally(() => setTimeout(() => window.close(), 50));
+</script>

@@ -1,0 +1,29 @@
+{
+  "runId": "strict",
+  "samples": [
+    {
+      "ok": true,
+      "seed": "strict:299789e4e268f927",
+      "vendor": "Xenon",
+      "renderer": "Xenon Generic Renderer",
+      "maxes": {
+        "MAX_VERTEX_UNIFORM_COMPONENTS": 0,
+        "MAX_VERTEX_UNIFORM_BLOCKS": 0,
+        "MAX_VERTEX_OUTPUT_COMPONENTS": 0,
+        "MAX_VARYING_COMPONENTS": 0,
+        "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 0,
+        "MAX_FRAGMENT_UNIFORM_COMPONENTS": 0,
+        "MAX_FRAGMENT_UNIFORM_BLOCKS": 0,
+        "MAX_FRAGMENT_INPUT_COMPONENTS": 0,
+        "MAX_UNIFORM_BUFFER_BINDINGS": 0,
+        "MAX_COMBINED_UNIFORM_BLOCKS": 0,
+        "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 0,
+        "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 0
+      },
+      "shaderPrecision": null,
+      "activeAttrib": null,
+      "activeUniform": null,
+      "readPixelsAaUntouched": true
+    }
+  ]
+}

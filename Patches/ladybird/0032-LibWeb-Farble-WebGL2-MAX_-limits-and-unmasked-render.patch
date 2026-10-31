@@ -19,10 +19,13 @@ seed.
  Libraries/LibWeb/CMakeLists.txt               |  1 +
  Libraries/LibWeb/Farbling/WebGLFarbling.cpp   | 82 +++++++++++++++++++
  Libraries/LibWeb/Farbling/WebGLFarbling.h     | 27 ++++++
+ Libraries/LibWeb/Internals/Internals.cpp      | 13 +++
+ Libraries/LibWeb/Internals/Internals.h        |  1 +
+ Libraries/LibWeb/Internals/Internals.idl      |  2 +
  .../WebGL/WebGLRenderingContextBase.cpp       | 30 +++++++
  Tests/LibWeb/CMakeLists.txt                   |  1 +
- Tests/LibWeb/TestWebGLFarbling.cpp            | 74 +++++++++++++++++
- 11 files changed, 288 insertions(+), 17 deletions(-)
+ Tests/LibWeb/TestWebGLFarbling.cpp            | 77 +++++++++++++++++
+ 14 files changed, 307 insertions(+), 17 deletions(-)
  create mode 100644 Libraries/LibWeb/Farbling/WebGLFarbling.cpp
  create mode 100644 Libraries/LibWeb/Farbling/WebGLFarbling.h
  create mode 100644 Tests/LibWeb/TestWebGLFarbling.cpp
@@ -385,6 +388,55 @@ index 0000000000000000000000000000000000000000..874995e55a576cb55c9266ba77a27997
 +WEB_API StringView generic_unmasked_renderer();
 +
 +}
+diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
+index 3baa081d3361b6f04b23bf7315bd558acd8fec55..24c830a4052dfa77c1d9d37924291fb6a261d29d 100644
+--- a/Libraries/LibWeb/Internals/Internals.cpp
++++ b/Libraries/LibWeb/Internals/Internals.cpp
+@@ -1720,6 +1720,19 @@ Utf16String Internals::farbling_seed_info()
+     return Utf16String::from_utf8(Farbling::seed_info(window().associated_document().relevant_settings_object().farbling_seed()));
+ }
+ 
++void Internals::set_farbling_level(Utf16String const& level)
++{
++    auto& settings = window().associated_document().relevant_settings_object();
++    auto seed = settings.farbling_seed();
++    if (level == "strict"sv)
++        seed.level = Farbling::Level::Strict;
++    else if (level == "off"sv)
++        seed.level = Farbling::Level::Off;
++    else
++        seed.level = Farbling::Level::Standard;
++    settings.set_farbling_seed(seed);
++}
++
+ void Internals::set_device_pixel_ratio(double ratio)
+ {
+     page().client().page_did_set_device_pixel_ratio_for_testing(ratio);
+diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
+index 11670b026fc97ef4539c11b0c87334df5d117200..f5743a9d9816aa798b508d1cecc1365ad6c1d273 100644
+--- a/Libraries/LibWeb/Internals/Internals.h
++++ b/Libraries/LibWeb/Internals/Internals.h
+@@ -205,6 +205,7 @@ public:
+ 
+     void set_browser_zoom(double factor);
+     Utf16String farbling_seed_info();
++    void set_farbling_level(Utf16String const& level);
+     void set_device_pixel_ratio(double ratio);
+     void resize_window(i32 width, i32 height);
+ 
+diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
+index f4ecb1b8b4dc90be382e14e78d584488aa6f0175..78bcf08d8b518357879c67ddde2a11eb0fa3929b 100644
+--- a/Libraries/LibWeb/Internals/Internals.idl
++++ b/Libraries/LibWeb/Internals/Internals.idl
+@@ -207,6 +207,8 @@ interface Internals {
+     undefined setBrowserZoom(double factor);
+     // Test-only readout of this document's farbling seed. Not exposed to ordinary web content.
+     DOMString farblingSeedInfo();
++    // Test-only: "off", "standard", or "strict". No UI. Hidden Strict level for proofs.
++    undefined setFarblingLevel(DOMString level);
+     undefined setDevicePixelRatio(double ratio);
+     undefined resizeWindow(long width, long height);
+ 
 diff --git a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
 index 5f7decf2d6d823559fc35a5c520d261a35167551..0ed4f0dff1322ea17772b0e56b81598cdd1b4812 100644
 --- a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
@@ -454,10 +506,10 @@ index 4e9e6a6b90f91f752720a645626977b3d4b52f74..1286d1e01130cc7137150e6a18ccfa40
      TestFetchByteChannel.cpp
 diff --git a/Tests/LibWeb/TestWebGLFarbling.cpp b/Tests/LibWeb/TestWebGLFarbling.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..cc2f3d50d278f0d9d0b4c9d16790d31ca7751ce7
+index 0000000000000000000000000000000000000000..6e3bf11537b15dcc8727c63c16b16c7ffd5a884c
 --- /dev/null
 +++ b/Tests/LibWeb/TestWebGLFarbling.cpp
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,77 @@
 +/*
 + * Copyright (c) 2026, the Xenon developers.
 + *
@@ -516,8 +568,11 @@ index 0000000000000000000000000000000000000000..cc2f3d50d278f0d9d0b4c9d16790d31c
 +TEST_CASE(strict_returns_zero)
 +{
 +    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Strict, .high = 1, .low = 2 };
-+    EXPECT_EQ(Web::Farbling::farble_webgl_max_i32(seed, MAX_VERTEX_UNIFORM_COMPONENTS, 1024), 0);
-+    EXPECT_EQ(Web::Farbling::farble_webgl_max_i64(seed, MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS, 4096), 0);
++    u32 const i32_pnames[] = { 0x8B4A, 0x8A2B, 0x9122, 0x8B4B, 0x8C8A, 0x8B49, 0x8A2D, 0x9125, 0x8A2F, 0x8A2E };
++    for (auto pname : i32_pnames)
++        EXPECT_EQ(Web::Farbling::farble_webgl_max_i32(seed, pname, 1024), 0);
++    EXPECT_EQ(Web::Farbling::farble_webgl_max_i64(seed, 0x8A31, 4096), 0);
++    EXPECT_EQ(Web::Farbling::farble_webgl_max_i64(seed, 0x8A33, 4096), 0);
 +}
 +
 +TEST_CASE(non_positive_stays_non_positive)

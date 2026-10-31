@@ -95,43 +95,89 @@ def analyze() -> dict:
     a_gl2 = a["measure"]["webgl2"]
     b_gl2 = b["measure"]["webgl2"]
     a_gl1 = a["measure"]["webgl"]
+    b_gl1 = b["measure"]["webgl"]
     off_a = off_both["reads"]["a-direct"]["measure"]
     off_b = off_both["reads"]["b-direct"]["measure"]
+    off_a_gl1 = off_a.get("webgl") or {}
+    off_b_gl1 = off_b.get("webgl") or {}
+    off_a_gl2 = off_a.get("webgl2") or {}
     reloads = [item["webgl2Hash"] for item in a.get("reloads") or []]
     iframe = a.get("crossIframe") or {}
     samples = site_a["samples"]
-    worker = samples[0].get("worker") or {}
+    a_worker = a.get("worker") or {}
+    b_worker = b.get("worker") or {}
     differ = differing_maxes(a_gl2.get("maxes") or {}, b_gl2.get("maxes") or {})
+    strict = {}
+    strict_path = CAPTURED / "strict.json"
+    if strict_path.exists():
+        strict_data = json.loads(strict_path.read_text())
+        strict = (strict_data.get("samples") or [{}])[0]
+    maxes_all_zero = bool(strict.get("maxes")) and all(value == 0 for value in strict["maxes"].values())
     summary = {
         "webgl_ok": a_gl1.get("ok") is True,
         "webgl2_ok": a_gl2.get("ok") is True,
+        "a_webgl_hash": a_gl1.get("hash"),
+        "b_webgl_hash": b_gl1.get("hash"),
         "a_webgl2_hash": a_gl2.get("hash"),
         "b_webgl2_hash": b_gl2.get("hash"),
+        "a_webgl_vendor": a_gl1.get("vendor"),
+        "a_webgl_renderer": a_gl1.get("renderer"),
+        "b_webgl_vendor": b_gl1.get("vendor"),
+        "b_webgl_renderer": b_gl1.get("renderer"),
+        "off_a_webgl_hash": off_a_gl1.get("hash"),
+        "off_b_webgl_hash": off_b_gl1.get("hash"),
+        "off_a_webgl_vendor": off_a_gl1.get("vendor"),
+        "off_a_webgl_renderer": off_a_gl1.get("renderer"),
+        "off_b_webgl_vendor": off_b_gl1.get("vendor"),
+        "off_b_webgl_renderer": off_b_gl1.get("renderer"),
+        "webgl1_generic_on_a_and_b": a_gl1.get("vendor") == "Xenon"
+        and b_gl1.get("vendor") == "Xenon"
+        and a_gl1.get("renderer") == "Xenon Generic Renderer"
+        and b_gl1.get("renderer") == "Xenon Generic Renderer",
+        "webgl1_off_a_equals_off_b": off_a_gl1.get("hash") == off_b_gl1.get("hash")
+        and off_a_gl1.get("vendor") not in (None, "Xenon")
+        and off_a_gl1.get("renderer") not in (None, "Xenon Generic Renderer"),
         "differing_maxes": differ,
         "a_ne_b": a_gl2.get("hash") != b_gl2.get("hash"),
         "same_process_reloads": reloads,
         "reloads_match_a": len(reloads) == 3 and len(set(reloads)) == 1 and reloads[0] == a_gl2.get("hash"),
         "iframe_webgl2_hash": (iframe.get("webgl2") or {}).get("hash"),
         "iframe_matches_a": (iframe.get("webgl2") or {}).get("hash") == a_gl2.get("hash"),
-        "values_real_or_minus_one": values_are_real_or_minus_one(a_gl2.get("maxes") or {}, (off_a.get("webgl2") or {}).get("maxes") or {}),
+        "values_real_or_minus_one": values_are_real_or_minus_one(a_gl2.get("maxes") or {}, off_a_gl2.get("maxes") or {}),
         "alloc_ok": a_gl2.get("allocOk"),
         "a_vendor": a_gl2.get("vendor"),
         "a_renderer": a_gl2.get("renderer"),
-        "off_vendor": (off_a.get("webgl2") or {}).get("vendor"),
-        "off_renderer": (off_a.get("webgl2") or {}).get("renderer"),
+        "off_vendor": off_a_gl2.get("vendor"),
+        "off_renderer": off_a_gl2.get("renderer"),
         "generic_on_standard": a_gl2.get("vendor") == "Xenon" and a_gl2.get("renderer") == "Xenon Generic Renderer",
-        "real_on_off": (off_a.get("webgl2") or {}).get("vendor") not in (None, "Xenon")
-        and (off_a.get("webgl2") or {}).get("renderer") not in (None, "Xenon Generic Renderer"),
+        "real_on_off": off_a_gl2.get("vendor") not in (None, "Xenon")
+        and off_a_gl2.get("renderer") not in (None, "Xenon Generic Renderer"),
         "extensions_a": a_gl2.get("extensions"),
-        "extensions_off": (off_a.get("webgl2") or {}).get("extensions"),
-        "extensions_match_off": a_gl2.get("extensions") == (off_a.get("webgl2") or {}).get("extensions"),
-        "extension_ok": a_gl2.get("extensionOk") is True and (off_a.get("webgl2") or {}).get("extensionOk") is True,
-        "worker_webgl2_hash": (worker.get("webgl2") or {}).get("hash"),
-        "worker_matches_main": (worker.get("webgl2") or {}).get("hash") == samples[0]["webgl2"]["hash"],
-        "readpixels_a": a_gl2.get("readPixels"),
-        "readpixels_b": b_gl2.get("readPixels"),
-        "readpixels_off": (off_a.get("webgl2") or {}).get("readPixels"),
-        "readpixels_equal": a_gl2.get("readPixels") == b_gl2.get("readPixels") == (off_a.get("webgl2") or {}).get("readPixels"),
+        "extensions_off": off_a_gl2.get("extensions"),
+        "extensions_match_off": a_gl2.get("extensions") == off_a_gl2.get("extensions"),
+        "extension_ok": a_gl2.get("extensionOk") is True and off_a_gl2.get("extensionOk") is True,
+        "a_worker_webgl_hash": (a_worker.get("webgl") or {}).get("hash"),
+        "a_worker_webgl2_hash": (a_worker.get("webgl2") or {}).get("hash"),
+        "b_worker_webgl_hash": (b_worker.get("webgl") or {}).get("hash"),
+        "b_worker_webgl2_hash": (b_worker.get("webgl2") or {}).get("hash"),
+        "worker_a_equals_main_a": (a_worker.get("webgl") or {}).get("hash") == a_gl1.get("hash")
+        and (a_worker.get("webgl2") or {}).get("hash") == a_gl2.get("hash"),
+        "worker_b_equals_main_b": (b_worker.get("webgl") or {}).get("hash") == b_gl1.get("hash")
+        and (b_worker.get("webgl2") or {}).get("hash") == b_gl2.get("hash"),
+        "readpixels_a": a_gl2.get("readPixelsHash"),
+        "readpixels_b": b_gl2.get("readPixelsHash"),
+        "readpixels_off": off_a_gl2.get("readPixelsHash"),
+        "readpixels_equal": a_gl2.get("readPixelsHash") == b_gl2.get("readPixelsHash") == off_a_gl2.get("readPixelsHash"),
+        "readpixels_webgl_equal": a_gl1.get("readPixelsHash") == b_gl1.get("readPixelsHash") == off_a_gl1.get("readPixelsHash"),
+        "strict_seed": strict.get("seed"),
+        "strict_vendor": strict.get("vendor"),
+        "strict_renderer": strict.get("renderer"),
+        "strict_maxes": strict.get("maxes"),
+        "strict_maxes_all_zero": maxes_all_zero,
+        "strict_shader_precision": strict.get("shaderPrecision"),
+        "strict_active_attrib": strict.get("activeAttrib"),
+        "strict_active_uniform": strict.get("activeUniform"),
+        "strict_readpixels_aa_untouched": strict.get("readPixelsAaUntouched"),
         "a_seed": a.get("seed"),
         "b_seed": b.get("seed"),
         "off_a_seed": off_both["reads"]["a-direct"].get("seed") or off_a.get("seed"),
@@ -148,10 +194,20 @@ def analyze() -> dict:
         and summary["alloc_ok"] is True
         and summary["generic_on_standard"]
         and summary["real_on_off"]
+        and summary["webgl1_generic_on_a_and_b"]
+        and summary["webgl1_off_a_equals_off_b"]
         and summary["extensions_match_off"]
         and summary["extension_ok"]
-        and summary["worker_matches_main"]
+        and summary["worker_a_equals_main_a"]
+        and summary["worker_b_equals_main_b"]
         and summary["readpixels_equal"]
+        and summary["strict_vendor"] == "Xenon"
+        and summary["strict_renderer"] == "Xenon Generic Renderer"
+        and summary["strict_maxes_all_zero"]
+        and summary["strict_shader_precision"] is None
+        and summary["strict_active_attrib"] is None
+        and summary["strict_active_uniform"] is None
+        and summary["strict_readpixels_aa_untouched"] is True
     )
     return summary
 
@@ -210,6 +266,18 @@ def main() -> int:
         off_both,
         lambda data: "a-direct" in data.get("reads", {}) and "b-direct" in data.get("reads", {}) and data.get("complete"),
         timeout=120,
+    )
+
+    strict = CAPTURED / "strict.json"
+    strict.unlink(missing_ok=True)
+    run_xenon_until(
+        args.xenon,
+        Path(tempfile.mkdtemp(prefix="fp3-strict-")),
+        "http://site-a.test:8080/strict.html",
+        extra,
+        strict,
+        lambda data: "samples" in data and data["samples"] and data["samples"][0].get("ok"),
+        timeout=40,
     )
 
     summary = analyze()

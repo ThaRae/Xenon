@@ -2,8 +2,8 @@ importScripts("measure.js");
 
 self.onmessage = () => {
     try {
-        const webglCanvas = new OffscreenCanvas(8, 8);
-        const webgl2Canvas = new OffscreenCanvas(8, 8);
+        const webglCanvas = new OffscreenCanvas(SCENE_SIZE, SCENE_SIZE);
+        const webgl2Canvas = new OffscreenCanvas(SCENE_SIZE, SCENE_SIZE);
         postMessage({
             seed: seedInfo(),
             webgl: measureGL(webglCanvas.getContext("webgl"), "webgl"),

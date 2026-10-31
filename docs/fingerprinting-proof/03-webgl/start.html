@@ -15,12 +15,18 @@ function post(key, value) {
 }
 const reloads = JSON.parse(sessionStorage.getItem("a-reloads") || "[]");
 const sample = measureDocumentCanvases();
-reloads.push({ seed: sample.seed, webgl2Hash: sample.webgl2.hash, webgl2: sample.webgl2, webgl: sample.webgl });
+reloads.push({
+    seed: sample.seed,
+    webglHash: sample.webgl.hash,
+    webgl2Hash: sample.webgl2.hash,
+    webgl: sample.webgl,
+    webgl2: sample.webgl2,
+});
 sessionStorage.setItem("a-reloads", JSON.stringify(reloads));
 if (reloads.length < 3) {
     location.reload();
 } else {
-    const state = { seed: sample.seed, measure: sample, reloads, crossIframe: null };
+    const state = { seed: sample.seed, measure: sample, reloads, crossIframe: null, worker: null };
     function goToB() {
         location.href = "http://site-b.test:8080/from-b.html?run=" + encodeURIComponent(runId);
     }
@@ -31,6 +37,9 @@ if (reloads.length < 3) {
         });
         setTimeout(resolve, 8000);
     });
-    iframeWait.then(() => post("a-direct", state)).then(goToB);
+    Promise.all([iframeWait, withWorker()]).then(([, worker]) => {
+        state.worker = worker;
+        return post("a-direct", state);
+    }).then(goToB);
 }
 </script>

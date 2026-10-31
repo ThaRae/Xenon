@@ -46,13 +46,9 @@
             "extensionOk": true,
             "allocOk": null,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "4cb9aa79ba3546aa"
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
           },
           "webgl2": {
             "kind": "webgl2",
@@ -89,62 +85,16 @@
             "extensionOk": true,
             "allocOk": true,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "89100a0804d3da88"
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
           }
         },
         "reloads": [
           {
             "seed": "off",
-            "webgl2Hash": "89100a0804d3da88",
-            "webgl2": {
-              "kind": "webgl2",
-              "ok": true,
-              "vendor": "Google Inc. (Mesa)",
-              "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
-              "maskedVendor": "WebKit",
-              "maskedRenderer": "WebKit WebGL",
-              "maxes": {
-                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
-                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
-                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
-                "MAX_VARYING_COMPONENTS": 128,
-                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
-                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-                "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
-                "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
-                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
-                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
-              },
-              "extensions": [
-                "EXT_texture_norm16",
-                "EXT_float_blend",
-                "WEBGL_compressed_texture_s3tc_srgb",
-                "EXT_texture_filter_anisotropic",
-                "OES_texture_float_linear",
-                "WEBGL_debug_renderer_info",
-                "EXT_color_buffer_float",
-                "EXT_render_snorm",
-                "WEBGL_compressed_texture_s3tc"
-              ],
-              "extensionOk": true,
-              "allocOk": true,
-              "allocError": null,
-              "readPixels": [
-                64,
-                128,
-                191,
-                255
-              ],
-              "hash": "89100a0804d3da88"
-            },
+            "webglHash": "7347392f5bcaf3a8",
+            "webgl2Hash": "27063e48c3c11bbf",
             "webgl": {
               "kind": "webgl",
               "ok": true,
@@ -183,61 +133,54 @@
               "extensionOk": true,
               "allocOk": null,
               "allocError": null,
-              "readPixels": [
-                64,
-                128,
-                191,
-                255
+              "readPixelsHash": "86daf8af5769f960",
+              "pixelCount": 4096,
+              "hash": "7347392f5bcaf3a8"
+            },
+            "webgl2": {
+              "kind": "webgl2",
+              "ok": true,
+              "vendor": "Google Inc. (Mesa)",
+              "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+                "MAX_VARYING_COMPONENTS": 128,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+              },
+              "extensions": [
+                "EXT_texture_norm16",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "WEBGL_debug_renderer_info",
+                "EXT_color_buffer_float",
+                "EXT_render_snorm",
+                "WEBGL_compressed_texture_s3tc"
               ],
-              "hash": "4cb9aa79ba3546aa"
+              "extensionOk": true,
+              "allocOk": true,
+              "allocError": null,
+              "readPixelsHash": "86daf8af5769f960",
+              "pixelCount": 4096,
+              "hash": "27063e48c3c11bbf"
             }
           },
           {
             "seed": "off",
-            "webgl2Hash": "89100a0804d3da88",
-            "webgl2": {
-              "kind": "webgl2",
-              "ok": true,
-              "vendor": "Google Inc. (Mesa)",
-              "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
-              "maskedVendor": "WebKit",
-              "maskedRenderer": "WebKit WebGL",
-              "maxes": {
-                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
-                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
-                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
-                "MAX_VARYING_COMPONENTS": 128,
-                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
-                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-                "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
-                "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
-                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
-                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
-              },
-              "extensions": [
-                "EXT_texture_norm16",
-                "EXT_float_blend",
-                "WEBGL_compressed_texture_s3tc_srgb",
-                "EXT_texture_filter_anisotropic",
-                "OES_texture_float_linear",
-                "WEBGL_debug_renderer_info",
-                "EXT_color_buffer_float",
-                "EXT_render_snorm",
-                "WEBGL_compressed_texture_s3tc"
-              ],
-              "extensionOk": true,
-              "allocOk": true,
-              "allocError": null,
-              "readPixels": [
-                64,
-                128,
-                191,
-                255
-              ],
-              "hash": "89100a0804d3da88"
-            },
+            "webglHash": "7347392f5bcaf3a8",
+            "webgl2Hash": "27063e48c3c11bbf",
             "webgl": {
               "kind": "webgl",
               "ok": true,
@@ -276,61 +219,54 @@
               "extensionOk": true,
               "allocOk": null,
               "allocError": null,
-              "readPixels": [
-                64,
-                128,
-                191,
-                255
+              "readPixelsHash": "86daf8af5769f960",
+              "pixelCount": 4096,
+              "hash": "7347392f5bcaf3a8"
+            },
+            "webgl2": {
+              "kind": "webgl2",
+              "ok": true,
+              "vendor": "Google Inc. (Mesa)",
+              "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+                "MAX_VARYING_COMPONENTS": 128,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+              },
+              "extensions": [
+                "EXT_texture_norm16",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "WEBGL_debug_renderer_info",
+                "EXT_color_buffer_float",
+                "EXT_render_snorm",
+                "WEBGL_compressed_texture_s3tc"
               ],
-              "hash": "4cb9aa79ba3546aa"
+              "extensionOk": true,
+              "allocOk": true,
+              "allocError": null,
+              "readPixelsHash": "86daf8af5769f960",
+              "pixelCount": 4096,
+              "hash": "27063e48c3c11bbf"
             }
           },
           {
             "seed": "off",
-            "webgl2Hash": "89100a0804d3da88",
-            "webgl2": {
-              "kind": "webgl2",
-              "ok": true,
-              "vendor": "Google Inc. (Mesa)",
-              "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
-              "maskedVendor": "WebKit",
-              "maskedRenderer": "WebKit WebGL",
-              "maxes": {
-                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
-                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
-                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
-                "MAX_VARYING_COMPONENTS": 128,
-                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
-                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-                "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
-                "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
-                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
-                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
-              },
-              "extensions": [
-                "EXT_texture_norm16",
-                "EXT_float_blend",
-                "WEBGL_compressed_texture_s3tc_srgb",
-                "EXT_texture_filter_anisotropic",
-                "OES_texture_float_linear",
-                "WEBGL_debug_renderer_info",
-                "EXT_color_buffer_float",
-                "EXT_render_snorm",
-                "WEBGL_compressed_texture_s3tc"
-              ],
-              "extensionOk": true,
-              "allocOk": true,
-              "allocError": null,
-              "readPixels": [
-                64,
-                128,
-                191,
-                255
-              ],
-              "hash": "89100a0804d3da88"
-            },
+            "webglHash": "7347392f5bcaf3a8",
+            "webgl2Hash": "27063e48c3c11bbf",
             "webgl": {
               "kind": "webgl",
               "ok": true,
@@ -369,13 +305,48 @@
               "extensionOk": true,
               "allocOk": null,
               "allocError": null,
-              "readPixels": [
-                64,
-                128,
-                191,
-                255
+              "readPixelsHash": "86daf8af5769f960",
+              "pixelCount": 4096,
+              "hash": "7347392f5bcaf3a8"
+            },
+            "webgl2": {
+              "kind": "webgl2",
+              "ok": true,
+              "vendor": "Google Inc. (Mesa)",
+              "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+              "maskedVendor": "WebKit",
+              "maskedRenderer": "WebKit WebGL",
+              "maxes": {
+                "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+                "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+                "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+                "MAX_VARYING_COMPONENTS": 128,
+                "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+                "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+                "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+                "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+                "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+                "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+                "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+                "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+              },
+              "extensions": [
+                "EXT_texture_norm16",
+                "EXT_float_blend",
+                "WEBGL_compressed_texture_s3tc_srgb",
+                "EXT_texture_filter_anisotropic",
+                "OES_texture_float_linear",
+                "WEBGL_debug_renderer_info",
+                "EXT_color_buffer_float",
+                "EXT_render_snorm",
+                "WEBGL_compressed_texture_s3tc"
               ],
-              "hash": "4cb9aa79ba3546aa"
+              "extensionOk": true,
+              "allocOk": true,
+              "allocError": null,
+              "readPixelsHash": "86daf8af5769f960",
+              "pixelCount": 4096,
+              "hash": "27063e48c3c11bbf"
             }
           }
         ],
@@ -420,13 +391,9 @@
             "extensionOk": true,
             "allocOk": null,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "4cb9aa79ba3546aa"
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
           },
           "webgl2": {
             "kind": "webgl2",
@@ -463,15 +430,95 @@
             "extensionOk": true,
             "allocOk": true,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "89100a0804d3da88"
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
           },
           "kind": "cross"
+        },
+        "worker": {
+          "seed": "off",
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 128,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
+          }
         }
       },
       "origin": "http://site-a.test:8080",
@@ -522,13 +569,9 @@
             "extensionOk": true,
             "allocOk": null,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "4cb9aa79ba3546aa"
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
           },
           "webgl2": {
             "kind": "webgl2",
@@ -565,13 +608,93 @@
             "extensionOk": true,
             "allocOk": true,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
+          }
+        },
+        "worker": {
+          "seed": "off",
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
             ],
-            "hash": "89100a0804d3da88"
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 128,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
           }
         }
       },
@@ -623,13 +746,9 @@
             "extensionOk": true,
             "allocOk": null,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "4cb9aa79ba3546aa"
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
           },
           "webgl2": {
             "kind": "webgl2",
@@ -666,13 +785,93 @@
             "extensionOk": true,
             "allocOk": true,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
+          }
+        },
+        "worker": {
+          "seed": "off",
+          "webgl": {
+            "kind": "webgl",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_VERTEX_UNIFORM_BLOCKS": null,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+              "MAX_VARYING_COMPONENTS": null,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+              "MAX_UNIFORM_BUFFER_BINDINGS": null,
+              "MAX_COMBINED_UNIFORM_BLOCKS": null,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+            },
+            "extensions": [
+              "OES_element_index_uint",
+              "OES_standard_derivatives",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "OES_vertex_array_object",
+              "ANGLE_instanced_arrays",
+              "EXT_blend_minmax",
+              "WEBGL_debug_renderer_info",
+              "WEBGL_draw_buffers",
+              "WEBGL_compressed_texture_s3tc"
             ],
-            "hash": "89100a0804d3da88"
+            "extensionOk": true,
+            "allocOk": null,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 128,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
+            ],
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
           }
         }
       },
@@ -724,13 +923,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "4cb9aa79ba3546aa"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "7347392f5bcaf3a8"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -767,62 +962,16 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "89100a0804d3da88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "27063e48c3c11bbf"
         }
       },
       "reloads": [
         {
           "seed": "off",
-          "webgl2Hash": "89100a0804d3da88",
-          "webgl2": {
-            "kind": "webgl2",
-            "ok": true,
-            "vendor": "Google Inc. (Mesa)",
-            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
-            "maskedVendor": "WebKit",
-            "maskedRenderer": "WebKit WebGL",
-            "maxes": {
-              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
-              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
-              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
-              "MAX_VARYING_COMPONENTS": 128,
-              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
-              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
-              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
-              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
-              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
-            },
-            "extensions": [
-              "EXT_texture_norm16",
-              "EXT_float_blend",
-              "WEBGL_compressed_texture_s3tc_srgb",
-              "EXT_texture_filter_anisotropic",
-              "OES_texture_float_linear",
-              "WEBGL_debug_renderer_info",
-              "EXT_color_buffer_float",
-              "EXT_render_snorm",
-              "WEBGL_compressed_texture_s3tc"
-            ],
-            "extensionOk": true,
-            "allocOk": true,
-            "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "89100a0804d3da88"
-          },
+          "webglHash": "7347392f5bcaf3a8",
+          "webgl2Hash": "27063e48c3c11bbf",
           "webgl": {
             "kind": "webgl",
             "ok": true,
@@ -861,61 +1010,54 @@
             "extensionOk": true,
             "allocOk": null,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 128,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
             ],
-            "hash": "4cb9aa79ba3546aa"
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
           }
         },
         {
           "seed": "off",
-          "webgl2Hash": "89100a0804d3da88",
-          "webgl2": {
-            "kind": "webgl2",
-            "ok": true,
-            "vendor": "Google Inc. (Mesa)",
-            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
-            "maskedVendor": "WebKit",
-            "maskedRenderer": "WebKit WebGL",
-            "maxes": {
-              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
-              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
-              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
-              "MAX_VARYING_COMPONENTS": 128,
-              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
-              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
-              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
-              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
-              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
-            },
-            "extensions": [
-              "EXT_texture_norm16",
-              "EXT_float_blend",
-              "WEBGL_compressed_texture_s3tc_srgb",
-              "EXT_texture_filter_anisotropic",
-              "OES_texture_float_linear",
-              "WEBGL_debug_renderer_info",
-              "EXT_color_buffer_float",
-              "EXT_render_snorm",
-              "WEBGL_compressed_texture_s3tc"
-            ],
-            "extensionOk": true,
-            "allocOk": true,
-            "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "89100a0804d3da88"
-          },
+          "webglHash": "7347392f5bcaf3a8",
+          "webgl2Hash": "27063e48c3c11bbf",
           "webgl": {
             "kind": "webgl",
             "ok": true,
@@ -954,61 +1096,54 @@
             "extensionOk": true,
             "allocOk": null,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 128,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
             ],
-            "hash": "4cb9aa79ba3546aa"
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
           }
         },
         {
           "seed": "off",
-          "webgl2Hash": "89100a0804d3da88",
-          "webgl2": {
-            "kind": "webgl2",
-            "ok": true,
-            "vendor": "Google Inc. (Mesa)",
-            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
-            "maskedVendor": "WebKit",
-            "maskedRenderer": "WebKit WebGL",
-            "maxes": {
-              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
-              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
-              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
-              "MAX_VARYING_COMPONENTS": 128,
-              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
-              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
-              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
-              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
-              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
-            },
-            "extensions": [
-              "EXT_texture_norm16",
-              "EXT_float_blend",
-              "WEBGL_compressed_texture_s3tc_srgb",
-              "EXT_texture_filter_anisotropic",
-              "OES_texture_float_linear",
-              "WEBGL_debug_renderer_info",
-              "EXT_color_buffer_float",
-              "EXT_render_snorm",
-              "WEBGL_compressed_texture_s3tc"
-            ],
-            "extensionOk": true,
-            "allocOk": true,
-            "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
-            ],
-            "hash": "89100a0804d3da88"
-          },
+          "webglHash": "7347392f5bcaf3a8",
+          "webgl2Hash": "27063e48c3c11bbf",
           "webgl": {
             "kind": "webgl",
             "ok": true,
@@ -1047,13 +1182,48 @@
             "extensionOk": true,
             "allocOk": null,
             "allocError": null,
-            "readPixels": [
-              64,
-              128,
-              191,
-              255
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "7347392f5bcaf3a8"
+          },
+          "webgl2": {
+            "kind": "webgl2",
+            "ok": true,
+            "vendor": "Google Inc. (Mesa)",
+            "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+            "maskedVendor": "WebKit",
+            "maskedRenderer": "WebKit WebGL",
+            "maxes": {
+              "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+              "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+              "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+              "MAX_VARYING_COMPONENTS": 128,
+              "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+              "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+              "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+              "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+              "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+              "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+              "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+              "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+            },
+            "extensions": [
+              "EXT_texture_norm16",
+              "EXT_float_blend",
+              "WEBGL_compressed_texture_s3tc_srgb",
+              "EXT_texture_filter_anisotropic",
+              "OES_texture_float_linear",
+              "WEBGL_debug_renderer_info",
+              "EXT_color_buffer_float",
+              "EXT_render_snorm",
+              "WEBGL_compressed_texture_s3tc"
             ],
-            "hash": "4cb9aa79ba3546aa"
+            "extensionOk": true,
+            "allocOk": true,
+            "allocError": null,
+            "readPixelsHash": "86daf8af5769f960",
+            "pixelCount": 4096,
+            "hash": "27063e48c3c11bbf"
           }
         }
       ],
@@ -1098,13 +1268,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "4cb9aa79ba3546aa"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "7347392f5bcaf3a8"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -1141,15 +1307,95 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "89100a0804d3da88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "27063e48c3c11bbf"
         },
         "kind": "cross"
+      },
+      "worker": {
+        "seed": "off",
+        "webgl": {
+          "kind": "webgl",
+          "ok": true,
+          "vendor": "Google Inc. (Mesa)",
+          "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_VERTEX_UNIFORM_BLOCKS": null,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+            "MAX_VARYING_COMPONENTS": null,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+            "MAX_UNIFORM_BUFFER_BINDINGS": null,
+            "MAX_COMBINED_UNIFORM_BLOCKS": null,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+          },
+          "extensions": [
+            "OES_element_index_uint",
+            "OES_standard_derivatives",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "OES_vertex_array_object",
+            "ANGLE_instanced_arrays",
+            "EXT_blend_minmax",
+            "WEBGL_debug_renderer_info",
+            "WEBGL_draw_buffers",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": null,
+          "allocError": null,
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "7347392f5bcaf3a8"
+        },
+        "webgl2": {
+          "kind": "webgl2",
+          "ok": true,
+          "vendor": "Google Inc. (Mesa)",
+          "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+            "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+            "MAX_VARYING_COMPONENTS": 128,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+          },
+          "extensions": [
+            "EXT_texture_norm16",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "WEBGL_debug_renderer_info",
+            "EXT_color_buffer_float",
+            "EXT_render_snorm",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": true,
+          "allocError": null,
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "27063e48c3c11bbf"
+        }
       }
     },
     "b-direct": {
@@ -1195,13 +1441,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "4cb9aa79ba3546aa"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "7347392f5bcaf3a8"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -1238,13 +1480,93 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "27063e48c3c11bbf"
+        }
+      },
+      "worker": {
+        "seed": "off",
+        "webgl": {
+          "kind": "webgl",
+          "ok": true,
+          "vendor": "Google Inc. (Mesa)",
+          "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_VERTEX_UNIFORM_BLOCKS": null,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+            "MAX_VARYING_COMPONENTS": null,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+            "MAX_UNIFORM_BUFFER_BINDINGS": null,
+            "MAX_COMBINED_UNIFORM_BLOCKS": null,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+          },
+          "extensions": [
+            "OES_element_index_uint",
+            "OES_standard_derivatives",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "OES_vertex_array_object",
+            "ANGLE_instanced_arrays",
+            "EXT_blend_minmax",
+            "WEBGL_debug_renderer_info",
+            "WEBGL_draw_buffers",
+            "WEBGL_compressed_texture_s3tc"
           ],
-          "hash": "89100a0804d3da88"
+          "extensionOk": true,
+          "allocOk": null,
+          "allocError": null,
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "7347392f5bcaf3a8"
+        },
+        "webgl2": {
+          "kind": "webgl2",
+          "ok": true,
+          "vendor": "Google Inc. (Mesa)",
+          "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+            "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+            "MAX_VARYING_COMPONENTS": 128,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+          },
+          "extensions": [
+            "EXT_texture_norm16",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "WEBGL_debug_renderer_info",
+            "EXT_color_buffer_float",
+            "EXT_render_snorm",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": true,
+          "allocError": null,
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "27063e48c3c11bbf"
         }
       }
     },
@@ -1291,13 +1613,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "4cb9aa79ba3546aa"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "7347392f5bcaf3a8"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -1334,13 +1652,93 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "27063e48c3c11bbf"
+        }
+      },
+      "worker": {
+        "seed": "off",
+        "webgl": {
+          "kind": "webgl",
+          "ok": true,
+          "vendor": "Google Inc. (Mesa)",
+          "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_VERTEX_UNIFORM_BLOCKS": null,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": null,
+            "MAX_VARYING_COMPONENTS": null,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": null,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": null,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": null,
+            "MAX_UNIFORM_BUFFER_BINDINGS": null,
+            "MAX_COMBINED_UNIFORM_BLOCKS": null,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": null,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": null
+          },
+          "extensions": [
+            "OES_element_index_uint",
+            "OES_standard_derivatives",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "OES_vertex_array_object",
+            "ANGLE_instanced_arrays",
+            "EXT_blend_minmax",
+            "WEBGL_debug_renderer_info",
+            "WEBGL_draw_buffers",
+            "WEBGL_compressed_texture_s3tc"
           ],
-          "hash": "89100a0804d3da88"
+          "extensionOk": true,
+          "allocOk": null,
+          "allocError": null,
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "7347392f5bcaf3a8"
+        },
+        "webgl2": {
+          "kind": "webgl2",
+          "ok": true,
+          "vendor": "Google Inc. (Mesa)",
+          "renderer": "ANGLE (Mesa, llvmpipe (LLVM 21.1.8 256 bits), OpenGL ES 3.2)",
+          "maskedVendor": "WebKit",
+          "maskedRenderer": "WebKit WebGL",
+          "maxes": {
+            "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
+            "MAX_VERTEX_UNIFORM_BLOCKS": 15,
+            "MAX_VERTEX_OUTPUT_COMPONENTS": 128,
+            "MAX_VARYING_COMPONENTS": 128,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262144,
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
+          },
+          "extensions": [
+            "EXT_texture_norm16",
+            "EXT_float_blend",
+            "WEBGL_compressed_texture_s3tc_srgb",
+            "EXT_texture_filter_anisotropic",
+            "OES_texture_float_linear",
+            "WEBGL_debug_renderer_info",
+            "EXT_color_buffer_float",
+            "EXT_render_snorm",
+            "WEBGL_compressed_texture_s3tc"
+          ],
+          "extensionOk": true,
+          "allocOk": true,
+          "allocError": null,
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "27063e48c3c11bbf"
         }
       }
     }

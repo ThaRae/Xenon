@@ -3,7 +3,7 @@
   "host": "site-a.test:8080",
   "samples": [
     {
-      "seed": "standard:107123afddb19706",
+      "seed": "standard:930a989e08522f73",
       "origin": "http://site-a.test:8080",
       "webgl": {
         "kind": "webgl",
@@ -43,13 +43,9 @@
         "extensionOk": true,
         "allocOk": null,
         "allocError": null,
-        "readPixels": [
-          64,
-          128,
-          191,
-          255
-        ],
-        "hash": "dba2429b4f0e1b88"
+        "readPixelsHash": "86daf8af5769f960",
+        "pixelCount": 4096,
+        "hash": "239e5c1f7339ce08"
       },
       "webgl2": {
         "kind": "webgl2",
@@ -62,15 +58,15 @@
           "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
           "MAX_VERTEX_UNIFORM_BLOCKS": 14,
           "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-          "MAX_VARYING_COMPONENTS": 128,
-          "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+          "MAX_VARYING_COMPONENTS": 127,
+          "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
           "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-          "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-          "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-          "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-          "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+          "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+          "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+          "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+          "MAX_COMBINED_UNIFORM_BLOCKS": 44,
           "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-          "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+          "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
         },
         "extensions": [
           "EXT_texture_norm16",
@@ -86,16 +82,12 @@
         "extensionOk": true,
         "allocOk": true,
         "allocError": null,
-        "readPixels": [
-          64,
-          128,
-          191,
-          255
-        ],
-        "hash": "fe8aaf3fda2608a7"
+        "readPixelsHash": "86daf8af5769f960",
+        "pixelCount": 4096,
+        "hash": "be4cc9ed12832f81"
       },
       "sameIframe": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "origin": "http://site-a.test:8080",
         "webgl": {
           "kind": "webgl",
@@ -135,13 +127,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -154,15 +142,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -178,18 +166,14 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         },
         "kind": "same"
       },
       "crossIframe": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "origin": "http://site-b.test:8080",
         "webgl": {
           "kind": "webgl",
@@ -229,13 +213,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -248,15 +228,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -272,18 +252,14 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         },
         "kind": "cross"
       },
       "worker": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "webgl": {
           "kind": "webgl",
           "ok": true,
@@ -322,13 +298,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -341,15 +313,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -365,18 +337,14 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         }
       }
     },
     {
-      "seed": "standard:107123afddb19706",
+      "seed": "standard:930a989e08522f73",
       "origin": "http://site-a.test:8080",
       "webgl": {
         "kind": "webgl",
@@ -416,13 +384,9 @@
         "extensionOk": true,
         "allocOk": null,
         "allocError": null,
-        "readPixels": [
-          64,
-          128,
-          191,
-          255
-        ],
-        "hash": "dba2429b4f0e1b88"
+        "readPixelsHash": "86daf8af5769f960",
+        "pixelCount": 4096,
+        "hash": "239e5c1f7339ce08"
       },
       "webgl2": {
         "kind": "webgl2",
@@ -435,15 +399,15 @@
           "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
           "MAX_VERTEX_UNIFORM_BLOCKS": 14,
           "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-          "MAX_VARYING_COMPONENTS": 128,
-          "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+          "MAX_VARYING_COMPONENTS": 127,
+          "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
           "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-          "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-          "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-          "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-          "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+          "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+          "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+          "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+          "MAX_COMBINED_UNIFORM_BLOCKS": 44,
           "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-          "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+          "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
         },
         "extensions": [
           "EXT_texture_norm16",
@@ -459,16 +423,12 @@
         "extensionOk": true,
         "allocOk": true,
         "allocError": null,
-        "readPixels": [
-          64,
-          128,
-          191,
-          255
-        ],
-        "hash": "fe8aaf3fda2608a7"
+        "readPixelsHash": "86daf8af5769f960",
+        "pixelCount": 4096,
+        "hash": "be4cc9ed12832f81"
       },
       "sameIframe": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "origin": "http://site-a.test:8080",
         "webgl": {
           "kind": "webgl",
@@ -508,13 +468,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -527,15 +483,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -551,18 +507,14 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         },
         "kind": "same"
       },
       "crossIframe": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "origin": "http://site-b.test:8080",
         "webgl": {
           "kind": "webgl",
@@ -602,13 +554,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -621,15 +569,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -645,18 +593,14 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         },
         "kind": "cross"
       },
       "worker": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "webgl": {
           "kind": "webgl",
           "ok": true,
@@ -695,13 +639,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -714,15 +654,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -738,18 +678,14 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         }
       }
     },
     {
-      "seed": "standard:107123afddb19706",
+      "seed": "standard:930a989e08522f73",
       "origin": "http://site-a.test:8080",
       "webgl": {
         "kind": "webgl",
@@ -789,13 +725,9 @@
         "extensionOk": true,
         "allocOk": null,
         "allocError": null,
-        "readPixels": [
-          64,
-          128,
-          191,
-          255
-        ],
-        "hash": "dba2429b4f0e1b88"
+        "readPixelsHash": "86daf8af5769f960",
+        "pixelCount": 4096,
+        "hash": "239e5c1f7339ce08"
       },
       "webgl2": {
         "kind": "webgl2",
@@ -808,15 +740,15 @@
           "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
           "MAX_VERTEX_UNIFORM_BLOCKS": 14,
           "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-          "MAX_VARYING_COMPONENTS": 128,
-          "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+          "MAX_VARYING_COMPONENTS": 127,
+          "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
           "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-          "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-          "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-          "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-          "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+          "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+          "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+          "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+          "MAX_COMBINED_UNIFORM_BLOCKS": 44,
           "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-          "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+          "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
         },
         "extensions": [
           "EXT_texture_norm16",
@@ -832,16 +764,12 @@
         "extensionOk": true,
         "allocOk": true,
         "allocError": null,
-        "readPixels": [
-          64,
-          128,
-          191,
-          255
-        ],
-        "hash": "fe8aaf3fda2608a7"
+        "readPixelsHash": "86daf8af5769f960",
+        "pixelCount": 4096,
+        "hash": "be4cc9ed12832f81"
       },
       "sameIframe": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "origin": "http://site-a.test:8080",
         "webgl": {
           "kind": "webgl",
@@ -881,13 +809,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -900,15 +824,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -924,18 +848,14 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         },
         "kind": "same"
       },
       "crossIframe": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "origin": "http://site-b.test:8080",
         "webgl": {
           "kind": "webgl",
@@ -975,13 +895,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -994,15 +910,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -1018,18 +934,14 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         },
         "kind": "cross"
       },
       "worker": {
-        "seed": "standard:107123afddb19706",
+        "seed": "standard:930a989e08522f73",
         "webgl": {
           "kind": "webgl",
           "ok": true,
@@ -1068,13 +980,9 @@
           "extensionOk": true,
           "allocOk": null,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "dba2429b4f0e1b88"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "239e5c1f7339ce08"
         },
         "webgl2": {
           "kind": "webgl2",
@@ -1087,15 +995,15 @@
             "MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
             "MAX_VERTEX_UNIFORM_BLOCKS": 14,
             "MAX_VERTEX_OUTPUT_COMPONENTS": 127,
-            "MAX_VARYING_COMPONENTS": 128,
-            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 64,
+            "MAX_VARYING_COMPONENTS": 127,
+            "MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS": 63,
             "MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
-            "MAX_FRAGMENT_UNIFORM_BLOCKS": 14,
-            "MAX_FRAGMENT_INPUT_COMPONENTS": 128,
-            "MAX_UNIFORM_BUFFER_BINDINGS": 72,
-            "MAX_COMBINED_UNIFORM_BLOCKS": 45,
+            "MAX_FRAGMENT_UNIFORM_BLOCKS": 15,
+            "MAX_FRAGMENT_INPUT_COMPONENTS": 127,
+            "MAX_UNIFORM_BUFFER_BINDINGS": 71,
+            "MAX_COMBINED_UNIFORM_BLOCKS": 44,
             "MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS": 262143,
-            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262143
+            "MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS": 262144
           },
           "extensions": [
             "EXT_texture_norm16",
@@ -1111,13 +1019,9 @@
           "extensionOk": true,
           "allocOk": true,
           "allocError": null,
-          "readPixels": [
-            64,
-            128,
-            191,
-            255
-          ],
-          "hash": "fe8aaf3fda2608a7"
+          "readPixelsHash": "86daf8af5769f960",
+          "pixelCount": 4096,
+          "hash": "be4cc9ed12832f81"
         }
       }
     }
