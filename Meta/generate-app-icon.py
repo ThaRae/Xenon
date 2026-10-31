@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
 
-# Renders Xenon's app icon from its sources in UI/Icons into the PNGs the build uses: the macOS iconset that
-# UI/Xenon.cmake turns into app_icon.icns, the window icon (UI/Icons/xenon.png) that xenon.qrc embeds, Xenon's
-# versions of Ladybird's logo (UI/Resources/icons), which the build ships in place of Ladybird's, and the background of
-# the installer disk image's window (UI/Icons/macos/installer-background.png, from installer-background.svg), which
-# Meta/release.py makes, and the icon theme sizes the Linux AppImage installs (UI/Icons/linux/hicolor).
-#
-#   Meta/generate-app-icon.py
-#
-# xenon.svg is the artwork, full bleed. xenon-small.svg is the same mark with heavier strokes, for 32px and below.
-# The script places the artwork on Apple's icon grid (an 824px rounded square on a 1024px canvas, with a drop shadow)
-# and renders each size with rsvg-convert (from librsvg: `brew install librsvg`).
-
 import math
 import re
 import shutil
@@ -25,37 +13,26 @@ XENON_SOURCE_DIR = Path(__file__).resolve().parent.parent
 ICONS_DIR = XENON_SOURCE_DIR / "UI" / "Icons"
 ICONSET_DIR = ICONS_DIR / "macos" / "app_icon.iconset"
 
-# The largest pixel size that uses xenon-small.svg.
 SMALL_ARTWORK_MAX_SIZE = 32
 
-# Every file in the iconset, and its size in pixels.
 ICONSET = {f"icon_{size}x{size}.png": size for size in (16, 32, 128, 256, 512)} | {
     f"icon_{size}x{size}@2x.png": size * 2 for size in (16, 32, 128, 256, 512)
 }
 
 WINDOW_ICON_SIZE = 256
 
-# The Linux AppImage's icon, in the sizes of the hicolor icon theme, named after the desktop file
-# (UI/Linux/org.xenon.Xenon.desktop). It's the same picture as the window icon.
 LINUX_ICONS_DIR = ICONS_DIR / "linux" / "hicolor"
 LINUX_ICON_NAME = "org.xenon.Xenon.png"
 LINUX_ICON_SIZES = (16, 24, 32, 48, 64, 128, 256, 512)
 
-# Ladybird's logo, as its internal pages show it (their favicon, and the picture on an empty history or bookmarks page)
-# and its task manager shows it for the browser, by path under resource://icons, and its size. The 48px one is mostly
-# drawn at 16px, as a favicon, so it takes the small artwork. Ladybird's "-dark" logo is the one for light backgrounds;
-# Xenon's icon brings its own dark square, so it's the same picture.
 LADYBIRD_ICONS_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "icons"
 LADYBIRD_ICONS = {"48x48/app-browser.png": 48, "128x128/app-browser.png": 128, "128x128/app-browser-dark.png": 128}
 
-# The installer's background, at the window's size and at twice it, for Retina screens. dmgbuild finds the @2x one by its
-# name.
 INSTALLER_BACKGROUND = ICONS_DIR / "macos" / "installer-background.svg"
 INSTALLER_BACKGROUND_WIDTH = 640
 
 
 def rounded_square(size: float, offset: float) -> str:
-    # A superellipse, which is close to the continuous corners of Apple's icon shape.
     exponent, steps = 5, 192
     points = []
     for i in range(steps):

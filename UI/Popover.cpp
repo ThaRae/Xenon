@@ -117,8 +117,6 @@ void MessagePopover::hideEvent(QHideEvent* event)
         on_dismiss();
 }
 
-// Places the popover's card below the anchor with their right edges aligned, kept on the anchor's screen, and above the
-// anchor when there is no room below it. Only the shadow around the card may reach past the edge of the screen.
 void move_popover_below(Popover& popover, QWidget& anchor)
 {
     auto card_size = popover.size().shrunkBy({ POPOVER_SHADOW_MARGIN, POPOVER_SHADOW_MARGIN, POPOVER_SHADOW_MARGIN, POPOVER_SHADOW_MARGIN });

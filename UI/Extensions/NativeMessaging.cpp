@@ -29,8 +29,6 @@ namespace Ladybird::Extensions {
 
 static constexpr size_t MAX_HOST_MESSAGE_SIZE = 1024 * 1024;
 static constexpr size_t MAX_BROWSER_MESSAGE_SIZE = 1024 * 1024 * 1024;
-// A host's stdout is read this much at a time, and at most a message's worth each time it's readable, so that a host
-// that never stops writing can't hold up the event loop: the notifier fires again for the rest.
 static constexpr size_t READ_CHUNK_SIZE = 16 * 1024;
 static constexpr size_t MAX_READ_PER_ACTIVATION = sizeof(u32) + MAX_HOST_MESSAGE_SIZE;
 static constexpr auto HOSTS_VARIABLE = "XENON_NATIVE_MESSAGING_HOSTS"sv;
@@ -76,8 +74,6 @@ Vector<ByteString> native_messaging_host_directories()
 #if defined(AK_OS_MACOS)
     directories.append(LexicalPath::join(home, "Library/Application Support/Xenon/NativeMessagingHosts"sv).string());
     directories.append("/Library/Application Support/Xenon/NativeMessagingHosts");
-    // Apple registers iCloud Passwords' helper for Chrome. Xenon is not Chrome, but the helper's allowed_origins
-    // lists the store extension by its Chrome ID, which is the ID Xenon keeps when it installs that extension.
     directories.append(LexicalPath::join(home, "Library/Application Support/Google/Chrome/NativeMessagingHosts"sv).string());
     directories.append("/Library/Google/Chrome/NativeMessagingHosts");
     directories.append(LexicalPath::join(home, "Library/Application Support/Chromium/NativeMessagingHosts"sv).string());
@@ -218,9 +214,6 @@ static void close_fd(int& fd)
     fd = -1;
 }
 
-// Writes to a host's stdin. Writing to a host that has gone must fail with EPIPE instead of raising SIGPIPE, which would
-// end the browser: macOS turns SIGPIPE off for the pipe itself (F_SETNOSIGPIPE, when the host starts), and elsewhere it's
-// blocked for the write, and the one the write raised is taken before it's unblocked.
 static ssize_t write_to_host(int fd, ReadonlyBytes bytes)
 {
 #if defined(F_SETNOSIGPIPE)
@@ -305,7 +298,6 @@ ErrorOr<NonnullRefPtr<NativeHostProcess>, String> NativeHostProcess::start(
     posix_spawn_file_actions_addchdir_np(&actions, working_directory.characters());
 #endif
 
-    // The host gets stdin, stdout, and stderr, and none of the browser's other files and sockets, as in Chrome.
 #if defined(AK_OS_MACOS)
     posix_spawn_file_actions_addinherit_np(&actions, STDERR_FILENO);
     posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT);
@@ -406,8 +398,6 @@ void NativeHostProcess::read_from_host()
 {
     NonnullRefPtr protect = *this;
 
-    // Each message goes to the opener as soon as it's whole, so that a reply arrives even when the host exits right after
-    // sending it, and one that's too large is refused before the rest of it is read.
     u8 chunk[READ_CHUNK_SIZE];
     for (size_t read_so_far = 0; read_so_far < MAX_READ_PER_ACTIVATION && !m_closed;) {
         auto nread = ::read(m_stdout_fd, chunk, sizeof(chunk));
@@ -438,8 +428,6 @@ void NativeHostProcess::read_from_host()
     }
 }
 
-// Whether the host still has its end of stdout open: reading what's left in the pipe gets to the end of the file once
-// it's closed, and to EAGAIN while it's open.
 bool NativeHostProcess::host_holds_stdout() const
 {
     u8 chunk[READ_CHUNK_SIZE];
@@ -473,9 +461,6 @@ void NativeHostProcess::close_pipes()
     m_stdout_notifier = nullptr;
     m_stdin_notifier = nullptr;
     close_fd(m_stdin_fd);
-    // A host should exit once its stdin closes, but one that doesn't would run on with no port, so Xenon terminates it, as
-    // Chrome does. Only while it still holds stdout, though: once that's closed it has exited, and LibWebView's
-    // ProcessMonitor, which reaps every child, may have reaped it and freed its pid for another process.
     if (m_pid > 0 && m_stdout_fd >= 0 && host_holds_stdout())
         ::kill(m_pid, SIGTERM);
     close_fd(m_stdout_fd);

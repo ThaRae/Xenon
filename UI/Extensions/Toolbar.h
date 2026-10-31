@@ -26,7 +26,6 @@ namespace Ladybird::Extensions {
 
 class ActionPopup;
 
-// An extension's toolbar button: its action's icon, title, and badge in this tab, opening its popup.
 class ActionButton final : public QToolButton {
 public:
     AK_ALLOC_WITH_KMALLOC;
@@ -52,7 +51,6 @@ private:
     Optional<QColor> m_badge_text_color;
 };
 
-// The buttons of every loaded extension that has an action, in a tab's toolbar.
 class ActionToolbar final : public QWidget {
 public:
     AK_ALLOC_WITH_KMALLOC;

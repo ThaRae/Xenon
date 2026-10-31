@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
 
-# Turns Xenon's !bangs (UI/Resources/bangs/bangs.json, from Meta/update-bangs.py) into the table UI/Bangs.cpp looks
-# them up in. The build runs it (UI/Xenon.cmake).
-#
-# The table has one entry per trigger, sorted by trigger, so a lookup is a binary search. Every string lives in one
-# array that the entries point into by offset, which keeps the table in read-only memory with no relocations for the
-# loader to apply: the list costs nothing at startup, and only the pages a lookup touches are ever read in.
-
 from __future__ import annotations
 
 import argparse
@@ -14,7 +7,6 @@ import json
 
 from pathlib import Path
 
-# The bits of Bangs::Format, in Kagi's fmt names. Kagi turns every one on for a bang that has no fmt.
 FORMAT_FLAGS = {
     "open_base_path": 1 << 0,
     "open_snap_domain": 1 << 1,
@@ -37,7 +29,6 @@ class Strings:
 
 
 def c_string_literal(data: bytes) -> str:
-    # NB: Octal escapes are at most three digits long, so unlike hex escapes they can't swallow the character after them.
     escaped = "".join(chr(byte) if 0x20 <= byte < 0x7F and byte not in b'"\\' else f"\\{byte:03o}" for byte in data)
     return f'"{escaped}"'
 

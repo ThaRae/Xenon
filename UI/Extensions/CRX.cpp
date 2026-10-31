@@ -31,7 +31,6 @@ static constexpr u8 PUBLISHER_KEY_HASH[] = {
 static constexpr auto CRX_MAGIC = "Cr24"sv;
 static constexpr u32 CRX_VERSION = 3;
 static constexpr size_t MAXIMUM_HEADER_SIZE = 16 * MiB;
-// What every signature in a CRX3 file covers, ahead of the signed header's size, the signed header, and the archive.
 static constexpr auto SIGNATURE_CONTEXT = "CRX3 SignedData\0"sv;
 static constexpr size_t CRX_ID_SIZE = 16;
 
@@ -53,7 +52,6 @@ static u32 read_u32(ReadonlyBytes bytes, size_t offset)
     return bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);
 }
 
-// Reads protocol buffer fields, only as far as CRX headers need: length-delimited fields are read, others skipped.
 class ProtobufReader {
 public:
     explicit ProtobufReader(ReadonlyBytes bytes)
@@ -63,11 +61,9 @@ public:
 
     struct Field {
         u64 number { 0 };
-        // Only for length-delimited fields.
         ReadonlyBytes bytes;
     };
 
-    // The next field, or none at the end.
     ErrorOr<Optional<Field>, String> next()
     {
         if (m_offset == m_bytes.size())
@@ -181,7 +177,6 @@ static bool signature_is_valid(Proof const& proof, ReadonlyBytes signed_header_d
         static_cast<u8>(signed_header_data.size() >> 24),
     };
 
-    // NB: An RSA key verifies PKCS #1 v1.5 signatures by default.
     return EVP_DigestVerifyInit(context, nullptr, EVP_sha256(), nullptr, key) == 1
         && EVP_DigestVerifyUpdate(context, SIGNATURE_CONTEXT.characters_without_null_termination(), SIGNATURE_CONTEXT.length()) == 1
         && EVP_DigestVerifyUpdate(context, signed_header_size, sizeof(signed_header_size)) == 1
@@ -190,7 +185,6 @@ static bool signature_is_valid(Proof const& proof, ReadonlyBytes signed_header_d
         && EVP_DigestVerifyFinal(context, proof.signature.data(), proof.signature.size()) == 1;
 }
 
-// An ID's 16 bytes as Chrome writes them, as letters from a to p.
 static String extension_id_from_crx_id(ReadonlyBytes crx_id)
 {
     StringBuilder builder;
@@ -214,7 +208,6 @@ ErrorOr<PackedExtension, String> verify_crx(ReadonlyBytes crx, StringView expect
     auto header = crx.slice(12, header_size);
     auto archive = crx.slice(12 + header_size);
 
-    // Chrome turns down headers that a zip reader could take for the end of the archive.
     auto header_view = StringView { header };
     if (header_view.contains("PK\x05\x06"sv) || header_view.contains("PK\x06\x06"sv))
         return "Its header could be taken for part of the archive."_string;
@@ -282,7 +275,6 @@ ErrorOr<PackedExtension, String> verify_crx(ReadonlyBytes crx, StringView expect
     return PackedExtension { .id = move(id), .public_key = public_key.release_value(), .archive = archive };
 }
 
-// A path in the archive that stays inside the directory it's unpacked into, on every platform.
 static bool is_safe_entry_path(StringView path)
 {
     if (path.is_empty() || !Utf8View { path }.validate())
@@ -301,7 +293,6 @@ static bool is_safe_entry_path(StringView path)
 
 static ErrorOr<ByteBuffer, String> inflate_entry(ReadonlyBytes compressed, u32 size)
 {
-    // NB: zlib wants somewhere to write even for an empty file.
     auto output = ByteBuffer::create_uninitialized(max(size, 1u));
     if (output.is_error())
         return "there's no memory for it"_string;
@@ -324,7 +315,6 @@ static ErrorOr<ByteBuffer, String> inflate_entry(ReadonlyBytes compressed, u32 s
 
 ErrorOr<void, String> unpack_zip(ReadonlyBytes archive, ByteString const& directory)
 {
-    // The end of central directory record: 22 bytes, then a comment of up to 64 KiB, which it gives the length of.
     static constexpr size_t END_RECORD_SIZE = 22;
     if (archive.size() < END_RECORD_SIZE)
         return "The archive is empty."_string;
@@ -364,7 +354,6 @@ ErrorOr<void, String> unpack_zip(ReadonlyBytes archive, ByteString const& direct
     u64 unpacked_size = 0;
     size_t offset = directory_offset;
     for (size_t i = 0; i < entry_count; ++i) {
-        // A central directory header: 46 bytes, then the name, extra fields, and comment.
         if (offset + 46 > *end_record || read_u32(archive, offset) != 0x02014b50)
             return "The archive's table of contents is damaged."_string;
 
@@ -390,7 +379,6 @@ ErrorOr<void, String> unpack_zip(ReadonlyBytes archive, ByteString const& direct
             return MUST(String::formatted("The archive has a file named \"{}\", which isn't allowed.", name));
         if (flags & 1)
             return MUST(String::formatted("{} is encrypted.", name));
-        // Archives made on Unix keep the file's mode in the high bits of its external attributes.
         if ((made_by >> 8) == 3 && S_ISLNK(external_attributes >> 16))
             return MUST(String::formatted("{} is a symbolic link.", name));
 
@@ -409,7 +397,6 @@ ErrorOr<void, String> unpack_zip(ReadonlyBytes archive, ByteString const& direct
         if (unpacked_size > MAXIMUM_UNPACKED_SIZE)
             return "The archive is too large unpacked."_string;
 
-        // The local header, 30 bytes, then the name and extra fields again, and then the file's data.
         if (static_cast<u64>(local_offset) + 30 > directory_offset || read_u32(archive, local_offset) != 0x04034b50)
             return MUST(String::formatted("{} is missing from the archive.", name));
         auto local_name_length = read_u16(archive, local_offset + 26);
@@ -434,7 +421,6 @@ ErrorOr<void, String> unpack_zip(ReadonlyBytes archive, ByteString const& direct
 
         auto write = [&]() -> ErrorOr<void> {
             TRY(Core::Directory::create(LexicalPath { destination }.parent(), Core::Directory::CreateDirectories::Yes));
-            // NB: Every file is new, so nothing in the archive can write through a link or over another of its files.
             auto file = TRY(Core::File::open(destination, Core::File::OpenMode::Write | Core::File::OpenMode::MustBeNew));
             TRY(file->write_until_depleted(data));
             return {};

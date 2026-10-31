@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
 
-# Builds and runs Xenon: Ladybird's engine (the `ladybird` submodule) with Xenon's own frontend in `UI/`.
-#
-# Ladybird is configured from its own source tree, and Meta/CMake/XenonHook.cmake is injected after its
-# project() call so the Xenon frontend is added once every engine library and helper process exists. Xenon's patches
-# to the engine (Patches/ladybird) are applied first, if ladybird/ doesn't have them yet; see Meta/patches.py.
-
 from __future__ import annotations
 
 import argparse
@@ -60,54 +54,34 @@ PRESETS = {
 APP_TARGET = "xenon"
 TESTS_TARGET = "xenon-tests"
 
-# The tests that ladybird-test leaves out: Xenon's own, which test runs, and those Ladybird's own CI leaves out of its Test
-# step (ladybird/.github/workflows/build-and-test.yml), the accessibility bridges, which need a desktop's accessibility
-# bus (AT-SPI2) or macOS's, and which Ladybird runs apart.
 LADYBIRD_TESTS_EXCLUDED = "^TestXenon|LibWebAccessibilityBridge|AccessibilityBridgeMac"
-# How long one of Ladybird's tests may run, as in Ladybird's CI. LibWeb's runs every web test, so it's the long one.
 LADYBIRD_TEST_TIMEOUT_SECONDS = 1800
-# The Python packages Ladybird's CI installs for its tests (ladybird/.github/actions/setup): test-web's HTTP server makes
-# the certificates for its TLS tests with cryptography, and WPT's WebSocket server needs six.
 LADYBIRD_TEST_PYTHON_PACKAGES = ["pyyaml", "requests", "six", "cryptography"]
 
-# A page rendered with nothing on it compresses to a few kilobytes; the welcome page is well over this.
 SMOKE_TEST_MIN_SCREENSHOT_BYTES = 20_000
 
-# Text on Xenon's welcome page that Ladybird's doesn't have.
 WELCOME_PAGE_TEXT = "Choose for myself"
 
-# A 1x1 PNG, for the check that an image starts an ImageDecoder and that a new one serves the images after it is gone.
 IMAGE_DECODER_TEST_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 )
 IMAGE_DECODER_TEST_MARKER = "XENON-IMAGE-DECODER-TEST "
 
-# The headless screenshot is taken this long after the load starts, not after it finishes.
 WELCOME_SCREENSHOT_DELAY_SECONDS = 4
 
-# What check_app reports, along with the welcome page, when Xenon doesn't finish loading it: the checks after it load
-# pages too, so they don't run (Meta/release.py's either).
 SKIPPED_CHECKS = "the checks that load pages (skipped: about:welcome didn't load)"
 
-# The crash reports check_app prints when a check fails, and how much of each.
 PRINTED_CRASH_REPORTS = 5
 PRINTED_CRASH_REPORT_CHARACTERS = 6000
 
-# Requests the bundled filter lists block (EasyList: /jquery.popunder.js; EasyPrivacy: -tracking-pixel.), and ordinary
-# ones nothing should block.
 BLOCKED_REQUESTS = {"/jquery.popunder.js": "script", "/site-tracking-pixel.gif": "img"}
 ALLOWED_REQUESTS = {"/app.js": "script", "/logo.gif": "img"}
 
-# A page at a site the bundled lists have a scriptlet and a hiding rule for (AdGuard's list:
-# citationmachine.net##+js(set-constant, canRunAds, true); AdGuard's and EasyList: citationmachine.net##.adds-wrapper).
-# Xenon serves it from a local file at the site's own address (--resource-map), so nothing goes to the network. The
-# page writes what it found into its text, on a line starting with FILTERED_PAGE_MARKER, which a text-mode run prints.
 FILTERED_PAGE_URL = "https://citationmachine.net/"
 FILTERED_PAGE_MARKER = "XENON-CONTENT-BLOCKING "
 FILTERED_PAGE = f"""<!doctype html><title>Xenon content blocking</title>
 <div class="adds-wrapper">ad</div><div class="article">article</div>
 <script>
-    // The site's ad script would set this; its adblock detection reads it.
     const found = {{
         "canRunAds": String(window.canRunAds),
         ".adds-wrapper": getComputedStyle(document.querySelector(".adds-wrapper")).display,
@@ -120,39 +94,26 @@ FILTERED_PAGE_EXPECTED = {
     True: {"canRunAds": "true", ".adds-wrapper": "none", ".article": "block"},
 }
 
-# The blocking dashboard (UI/BlockingDashboard.cpp), whose page shows the bundled lists once Xenon sends them.
 BLOCKING_DASHBOARD_URL = "xenon://blocking/"
 FILTER_LIST_MANIFEST = XENON_SOURCE_DIR / "UI" / "Resources" / "filter-lists" / "manifest.json"
 
-# Bundles that a local server publishes to test filter list updates, signed with a key of their own
-# (Tests/FilterListUpdates/make-bundles.py). Each test page prints what it found on a line starting with the marker.
 FILTER_LIST_UPDATES_DIR = XENON_SOURCE_DIR / "Tests" / "FilterListUpdates"
 FILTER_LIST_UPDATES_MARKER = "XENON-FILTER-LIST-UPDATES-TEST "
 
-# A test extension whose pages check the chrome.* APIs and print what they found on a line starting with this.
 TEST_EXTENSION_DIR = XENON_SOURCE_DIR / "Tests" / "Extensions" / "basic"
 EXTENSION_TEST_MARKER = "XENON-EXTENSION-TEST "
 NATIVE_MESSAGING_ECHO_HOST = XENON_SOURCE_DIR / "Tests" / "NativeMessaging" / "echo_host.py"
 
-# A local HTTPS server's self-signed certificate (Tests/CertificateErrors). Xenon's certificate warning and the server's
-# page each print what they found on a line starting with the marker.
 CERTIFICATE_ERRORS_DIR = XENON_SOURCE_DIR / "Tests" / "CertificateErrors"
 CERTIFICATE_ERROR_TEST_MARKER = "XENON-CERTIFICATE-ERROR-TEST "
 
-# A page that tries WebAuthn and prints what it found on a line starting with this.
 WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
 
-# XENON_TEST_UPDATE_READY stands in for an update that's ready, in builds that don't update themselves (UI/Updater.h).
-# The toolbar's Update button says so on a line like this when it shows for a version.
 UPDATE_STAND_IN_VERSION = "99.0.0"
 UPDATE_BUTTON_SHOWN = "The toolbar offers to relaunch to update to Xenon "
 
-# Xenon saves the session a second after a change (UI/SessionSaving.cpp). The session restore check waits this long after
-# its changes before it kills Xenon.
 SESSION_SAVE_WAIT_SECONDS = 3
 
-# Stand-ins for the password managers, served from a stand-in for the Chrome Web Store and signed with keys of their own
-# (Tests/ExtensionStore/make-crxs.py). The page that looks for them prints what it found on a line starting with this.
 EXTENSION_STORE_DIR = XENON_SOURCE_DIR / "Tests" / "ExtensionStore"
 PASSWORD_MANAGER_TEST_MARKER = "XENON-PASSWORD-MANAGER-TEST "
 
@@ -237,7 +198,6 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
     build_vcpkg(vcpkg_dir)
 
     if build_dir.joinpath("build.ninja").exists():
-        # A build directory configured before Xenon used the baseline CPU (below) would go on building for this one.
         if cmake_cache_value(build_dir, "ENABLE_CI_BASELINE_CPU") != "ON":
             run_command(["cmake", "-S", LADYBIRD_SOURCE_DIR, "-B", build_dir, "-DENABLE_CI_BASELINE_CPU=ON"])
         return build_dir
@@ -256,11 +216,7 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
             f"-DCMAKE_C_COMPILER={cc}",
             f"-DCMAKE_CXX_COMPILER={cxx}",
             f"-DCMAKE_PROJECT_ladybird_INCLUDE={XENON_SOURCE_DIR / 'Meta' / 'CMake' / 'XenonHook.cmake'}",
-            # Xenon only needs the engine and helper processes. Ladybird's tests are built by ladybird-test, which turns them
-            # on (enable_ladybird_tests).
             "-DBUILD_TESTING=OFF",
-            # Build C++ and Rust for a CPU every machine Xenon runs on has (x86-64-v2, or the M1 on Apple silicon), as
-            # Ladybird's own packages are, rather than with -march=native for whichever Mac or runner builds it.
             "-DENABLE_CI_BASELINE_CPU=ON",
         ]
     )
@@ -268,8 +224,6 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
     return build_dir
 
 
-# Xenon's builds leave Ladybird's tests out (configure_main). ladybird-test turns them on in the build directory, so they
-# build against the same engine Xenon does, from the same objects.
 def enable_ladybird_tests(build_dir: Path):
     if cmake_cache_value(build_dir, "BUILD_TESTING") == "ON":
         return
@@ -293,7 +247,6 @@ def build_main(build_dir: Path, jobs: str | None, *targets: str):
 
 
 def app_executable(platform: Platform, build_dir: Path) -> Path:
-    # On Linux, Xenon has an install prefix of its own in the build directory (see UI/Xenon.cmake).
     if platform.host_system == HostSystem.macOS:
         executable = build_dir / "bin" / "Xenon.app" / "Contents" / "MacOS" / "Xenon"
     else:
@@ -312,8 +265,6 @@ def run_main(platform: Platform, build_dir: Path, args: list[str]):
 def test_main(platform: Platform, build_dir: Path):
     failures = []
 
-    # The unit tests that draw Xenon's popovers and buttons save how they look beside the welcome page's render, which CI
-    # keeps.
     smoke_dir = build_dir / "smoke"
     smoke_dir.mkdir(parents=True, exist_ok=True)
     test_env = {"XENON_SCREENSHOT_DIR": str(smoke_dir), **os.environ}
@@ -333,9 +284,6 @@ def test_main(platform: Platform, build_dir: Path):
     print("All tests passed.")
 
 
-# Runs Ladybird's own tests (AK and the libraries' unit tests, test-js, test-web's web tests, the Rust crates' tests) against
-# the engine with Xenon's patches, as Ladybird's CI runs them, so that a patch that breaks something upstream tests says so.
-# TESTS_ONLY has the unit tests skip their benchmarks. timeout is how long one test may run, in seconds.
 def ladybird_test_main(build_dir: Path, timeout: int):
     os.environ["TESTS_ONLY"] = "1"
     paths = [ladybird_test_python_packages(build_dir), os.environ.get("PYTHONPATH")]
@@ -354,9 +302,6 @@ def ladybird_test_main(build_dir: Path, timeout: int):
     )
 
 
-# The tests run their Python scripts with the Python the build was configured with, so the packages they need go in a
-# virtual environment of that Python, in the build directory, whose packages the tests get through PYTHONPATH. Pointing
-# the build at another Python instead would run all of its code generators again. Returns the packages' directory.
 def ladybird_test_python_packages(build_dir: Path) -> str:
     environment = build_dir / "ladybird-test-python"
     python = environment / "bin" / "python3"
@@ -370,11 +315,7 @@ def ladybird_test_python_packages(build_dir: Path) -> str:
     ).strip()
 
 
-# The checks that run Xenon itself, and return what failed: the build's, or a release's, which Meta/release.py test runs
-# them against. The welcome page's render goes in smoke_dir.
 def check_app(platform: Platform, executable: Path, smoke_dir: Path) -> list[str]:
-    # A helper process that crashes on a signal says so only in the report it saves, so the check it fails shows nothing
-    # of the crash. When one fails, this prints the reports saved while they ran.
     reports_dir = crash_report_directory(platform)
     earlier_reports = saved_crash_reports(reports_dir)
     failures = run_app_checks(platform, executable, smoke_dir)
@@ -389,7 +330,6 @@ def check_app(platform: Platform, executable: Path, smoke_dir: Path) -> list[str
     return failures
 
 
-# Where Xenon saves crash reports, whatever the profile path (Documentation/Profile.md).
 def crash_report_directory(platform: Platform) -> Path:
     if data := os.environ.get("XDG_DATA_HOME"):
         return Path(data) / "Xenon" / "CrashReports"
@@ -398,7 +338,6 @@ def crash_report_directory(platform: Platform) -> Path:
     return Path.home() / ".local" / "share" / "Xenon" / "CrashReports"
 
 
-# The reports in the directory, by name. The ones the browser has shown are moved to Seen/ in it.
 def saved_crash_reports(reports_dir: Path) -> dict[str, Path]:
     if not reports_dir.is_dir():
         return {}
@@ -408,22 +347,16 @@ def saved_crash_reports(reports_dir: Path) -> dict[str, Path]:
 def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> list[str]:
     failures = []
 
-    # Rendering the welcome page without a window runs Xenon's bundled resources, the WebUI bridge, and the engine's
-    # helper processes together, which unit tests can't.
     smoke_dir.mkdir(parents=True, exist_ok=True)
     screenshot = smoke_dir / "welcome.png"
     screenshot.unlink(missing_ok=True)
 
-    # The session restore check opens Xenon's windows. CI gives Linux a real X server for them (Meta/ci/start-xvfb.sh);
-    # without a display, they go to Qt's offscreen platform.
     env = dict(os.environ)
     if platform.host_system != HostSystem.macOS and not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
         env["QT_QPA_PLATFORM"] = "offscreen"
 
     print("==> headless render of about:welcome", flush=True)
     with tempfile.TemporaryDirectory() as profile:
-        # Text mode waits for the page to finish loading, so this checks the page itself whatever the machine's speed.
-        # It also gets the first launch's one-off work, like building the font cache, out of the screenshot's time.
         loaded, output = run_headless(executable, env, ["--headless=text", "--profile-path", profile, "about:welcome"])
         if loaded and WELCOME_PAGE_TEXT in output:
             print(f'    loaded, with "{WELCOME_PAGE_TEXT}"')
@@ -451,8 +384,6 @@ def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> lis
             print(output[-4000:], file=sys.stderr)
             failures.append("headless render of about:welcome")
 
-    # Should Xenon not finish loading a page at all, every check that follows would wait out its timeouts, which add up
-    # to more than CI gives the job, and a job that's stopped doesn't say what failed.
     if not loaded:
         failures.append(SKIPPED_CHECKS)
         return failures
@@ -512,8 +443,6 @@ def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> lis
     return failures
 
 
-# Starts Xenon as on a fresh install, with no profile arguments and a home directory of its own, and checks that its
-# profile and crash reports go in Xenon's directories and that nothing goes in Ladybird's.
 def check_profile_directory(platform: Platform, executable: Path, env: dict) -> bool:
     with tempfile.TemporaryDirectory() as temporary_home:
         home = Path(temporary_home).resolve()
@@ -526,7 +455,6 @@ def check_profile_directory(platform: Platform, executable: Path, env: dict) -> 
             roots = [config, data, cache]
         else:
             config, data, cache = ".config", ".local/share", ".cache"
-            # The runtime directory isn't under the home directory by default. Moving it moves Wayland's socket too.
             (home / "runtime").mkdir(mode=0o700)
             fresh_env["XDG_RUNTIME_DIR"] = str(home / "runtime")
             fresh_env["QT_QPA_PLATFORM"] = "offscreen"
@@ -551,9 +479,6 @@ def check_profile_directory(platform: Platform, executable: Path, env: dict) -> 
         return True
 
 
-# Loads a local page with blocking on and off, in a throwaway profile, and checks which of its requests reach the server,
-# then loads FILTERED_PAGE and checks that a scriptlet and a hiding rule apply only with blocking on. Xenon is given no
-# lists here, so this also proves it loads its bundled ones, and uBlock Origin's resources, by itself.
 def check_content_blocking(executable: Path, env: dict) -> bool:
     requested: set[str] = set()
     tags = "".join(f'<{tag} src="{path}"></{tag}>' for path, tag in {**BLOCKED_REQUESTS, **ALLOWED_REQUESTS}.items())
@@ -633,8 +558,6 @@ def check_content_blocking(executable: Path, env: dict) -> bool:
     return passed
 
 
-# The lifecycle checks' pages report how far they got with /event?name=..., and wait at /go?step=N until the check lets
-# them on with release(N), so that the check can look at Xenon's processes in between rather than guess at timings.
 class LifecyclePages:
     SCRIPT = """
     function report(name) {
@@ -692,7 +615,6 @@ class LifecyclePages:
         self.server.shutdown()
 
 
-# Opens a lifecycle check's page in headless Xenon with a profile of its own, which stop_lifecycle_page() removes.
 def start_lifecycle_page(executable: Path, env: dict, url: str) -> tuple[subprocess.Popen, str]:
     profile = tempfile.mkdtemp(prefix="xenon-lifecycle-")
     process = subprocess.Popen(
@@ -706,7 +628,6 @@ def start_lifecycle_page(executable: Path, env: dict, url: str) -> tuple[subproc
     return process, profile
 
 
-# Stops the page's Xenon unless it has quit by itself, and returns what it printed.
 def stop_lifecycle_page(process: subprocess.Popen, profile: str) -> str:
     try:
         output, _ = process.communicate(timeout=1)
@@ -721,7 +642,6 @@ def stop_lifecycle_page(process: subprocess.Popen, profile: str) -> str:
     return output
 
 
-# Whether the condition holds within the timeout, checked five times a second.
 def wait_until(condition, timeout: float) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -731,7 +651,6 @@ def wait_until(condition, timeout: float) -> bool:
     return bool(condition())
 
 
-# The last result a lifecycle page logged after its marker.
 def lifecycle_results(output: str, marker: str):
     results = None
     for line in output.splitlines():
@@ -740,9 +659,6 @@ def lifecycle_results(output: str, marker: str):
     return results
 
 
-# A renderer asks the Browser for an ImageDecoder when it first decodes an image, and lets it go once it has had nothing
-# to decode for 15 s; one that crashes is replaced at the next image. So a page without images never starts one, and a
-# page that has finished decoding does not keep one.
 def check_image_decoder_lifecycle(executable: Path, env: dict) -> bool:
     image_page = f"""<!doctype html><title>image decoder</title>
 <p>images</p>
@@ -760,11 +676,9 @@ def check_image_decoder_lifecycle(executable: Path, env: dict) -> bool:
     (async () => {{
         await load("first");
         await report("first");
-        // The check stops the decoder the first image started.
         await waitForStep(1);
         await load("second");
         await report("second");
-        // The check waits for the second image's decoder to go by itself.
         await waitForStep(2);
         await load("third");
         console.log("{IMAGE_DECODER_TEST_MARKER}" + JSON.stringify(results));
@@ -842,11 +756,9 @@ def check_image_decoder_lifecycle(executable: Path, env: dict) -> bool:
 
 MEDIA_SERVER_TEST_MARKER = "XENON-MEDIA-SERVER-TEST "
 MEDIA_SERVER_TEST_TONE_SECONDS = 1
-# Longer than a MediaServer's idle timeout and then its AudioServer's (15 s each, engine patch 0047), plus a margin.
 MEDIA_SERVER_TEST_PAUSE_SECONDS = 35
 
 
-# A tone for a page to play, so a playback session starts without a media file on disk.
 def media_test_tone() -> bytes:
     frames = b"".join(
         struct.pack("<h", int(8000 * math.sin(2 * math.pi * 440 * index / 22_050)))
@@ -861,14 +773,10 @@ def media_test_tone() -> bytes:
     return buffer.getvalue()
 
 
-# A renderer asks the Browser for a MediaServer when it first needs one, not with its WebContent process, and gives it
-# up once nothing has used it for 15 s; the AudioServer it plays through exits 15 s after its last client. A paused
-# media element keeps its session, so a page can pause for longer than that and play on.
 def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
     probe_page = f"""<!doctype html><title>media probe</title>
 <p>no media</p>
 <script>
-    // A feature test alone reaches the MediaServer. Nothing plays, so nothing should keep it.
     const supported = document.createElement("video").canPlayType("video/mp4");
     console.log("{MEDIA_SERVER_TEST_MARKER}" + JSON.stringify({{ supported }}));
 </script>"""
@@ -884,10 +792,8 @@ def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
         results.played = await audio.play().then(() => true, error => error.name);
         audio.pause();
         await report("paused");
-        // The check waits for longer than an idle media server would last.
         await waitForStep(1);
         results.resumed = await audio.play().then(() => true, error => error.name);
-        // Then the page is done with media, as one that has finished a video is.
         audio.pause();
         audio.removeAttribute("src");
         audio.load();
@@ -979,11 +885,6 @@ def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
     return passed
 
 
-# Each compositor context drops the rasters it caches once it has painted nothing for a while: after 30 s while it is
-# visible, as a headless page is, and after 4 s once it is hidden (Services/Compositor/CompositorState.cpp, engine patch
-# 0049). With LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG set, the compositor logs each context it releases, with the bytes it
-# dropped and whether it draws on the GPU, each one it keeps, and each frame and screenshot, with whether it painted
-# released rasters again.
 COMPOSITOR_VISIBLE_RELEASE_DELAY = 30
 COMPOSITOR_RELEASE_PATTERN = re.compile(
     r"COMPOSITOR-IDLE-RELEASE context=(?P<context>\d+) nested=(?P<nested>true|false) visible=(?:true|false) "
@@ -994,8 +895,6 @@ COMPOSITOR_KEEP_PATTERN = re.compile(
     r"idle_ms=(?P<idle_ms>\d+)"
 )
 COMPOSITOR_SCREENSHOT_PATTERN = re.compile(r"COMPOSITOR-SCREENSHOT context=(?P<context>\d+) after_release=true")
-# An SVG image, which the compositor rasterizes once and keeps (a nested display list) when it draws on the GPU, and
-# keeps as a repeated tile when it is a repeating background, on the GPU or not.
 COMPOSITOR_IDLE_TEST_SVG_URL = "data:image/svg+xml," + urllib.parse.quote(
     "<svg xmlns='http://www.w3.org/2000/svg' width='160' height='100' viewBox='0 0 160 100'>"
     "<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>"
@@ -1003,8 +902,6 @@ COMPOSITOR_IDLE_TEST_SVG_URL = "data:image/svg+xml," + urllib.parse.quote(
     "<rect x='4' y='4' width='152' height='92' rx='16' fill='url(#g)'/>"
     "<circle cx='80' cy='50' r='28' fill='#fff' opacity='.7'/></svg>"
 )
-# A page that stops painting, with every kind of raster the compositor keeps (an SVG image and a repeating SVG
-# background) beside a filtered layer, a transformed one, and a canvas.
 COMPOSITOR_IDLE_TEST_PAGE = """<!doctype html><meta charset="utf-8"><title>idle</title>
 <style>
     body { margin: 0; font: 20px sans-serif; background: #fff; color: #123; }
@@ -1033,7 +930,6 @@ COMPOSITOR_IDLE_TEST_PAGE = """<!doctype html><meta charset="utf-8"><title>idle<
     context.fillText("2D canvas", 40, 60);
 </script>
 """.replace("SVG_URL", COMPOSITOR_IDLE_TEST_SVG_URL)
-# A page that paints every frame, with SVG rasters of its own, and a still frame (a context of its own) beside it.
 COMPOSITOR_BUSY_TEST_PAGE = """<!doctype html><meta charset="utf-8"><title>busy</title>
 <style>
     body { margin: 0; font: 20px sans-serif; }
@@ -1058,15 +954,10 @@ COMPOSITOR_BUSY_TEST_PAGE = """<!doctype html><meta charset="utf-8"><title>busy<
 )
 
 
-# The rasters a release must have dropped: repeated tiles always, and the SVG image's raster too when the compositor
-# draws on the GPU, the only place it keeps one.
 def released_svg_rasters(release: re.Match) -> bool:
     return int(release["tiles"]) > 0 and (release["gpu"] == "false" or int(release["nested_lists"]) > 0)
 
 
-# A page that stops painting gives its rasters back, and is painted the same afterwards: a screenshot taken after the
-# release is the same page, byte for byte, as one taken before it. And a frame that stops painting gives its rasters back
-# while the page around it keeps painting and keeps its own.
 def check_compositor_idle_memory_release(executable: Path, env: dict) -> bool:
     logging_env = dict(env, LADYBIRD_COMPOSITOR_IDLE_RELEASE_LOG="1")
     with tempfile.TemporaryDirectory() as temporary_directory:
@@ -1096,7 +987,6 @@ def check_compositor_idle_memory_release(executable: Path, env: dict) -> bool:
             return rendered, output, screenshot.read_bytes() if rendered else b""
 
         before = screenshot_page("before", 5)
-        # The screenshot after the release and the busy page each wait out the release delay, so they run side by side.
         after = {}
         after_thread = threading.Thread(
             target=lambda: after.setdefault("result", screenshot_page("after", COMPOSITOR_VISIBLE_RELEASE_DELAY + 12))
@@ -1142,8 +1032,6 @@ def check_compositor_screenshots(before: tuple[bool, str, bytes], after: tuple[b
     return True
 
 
-# Runs the busy page until its frame has been released and the page has painted for a while after that, and returns what
-# Xenon printed. It prints every frame, so it goes to a file, which a pipe nobody reads yet would block on.
 def run_compositor_busy_page(executable: Path, env: dict, directory: Path) -> str:
     page = directory / "busy.html"
     page.write_text(COMPOSITOR_BUSY_TEST_PAGE)
@@ -1212,17 +1100,7 @@ def check_compositor_busy_page(output: str) -> bool:
     return True
 
 
-# Daily filter list updates (UI/FilterListUpdates.h), from a local server publishing the bundles in
-# Tests/FilterListUpdates, through one profile's life:
-#   1. it takes v1 while it runs, and blocks what v1 blocks from then on;
-#   2. at its next start it uses v1 in place of the bundled lists, and fetches nothing, since a day hasn't passed;
-#   3. a day later it takes v2, downloading only the list that changed;
-#   4. it turns down v3, whose list isn't the one its manifest describes, and keeps v2.
 def bundle_file_for_request(path: str, version_dir: Path) -> Path | None:
-    """The file a /bundle/ request names in the published version's directory, or none if it names no file there. The
-    remainder after /bundle/ may not arrive as an absolute path, which replaces the directory it's joined onto, or climb
-    out with "..". Either would serve any file the user running the test can read, to anything that can reach the
-    server while it's up."""
     file = (version_dir / path.removeprefix("/bundle/")).resolve()
     if ".." in path or not file.is_relative_to(version_dir.resolve()) or not file.is_file():
         return None
@@ -1232,8 +1110,6 @@ def bundle_file_for_request(path: str, version_dir: Path) -> Path | None:
 def start_bundle_server(
     pages: dict, published: dict, requested: list, updates_dir: Path
 ) -> http.server.ThreadingHTTPServer:
-    """Serves the check's pages and the bundle of the version published now, out of updates_dir, and records the bundle
-    paths the client asks for. It binds the loopback, and only lives for the check's run."""
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
@@ -1266,8 +1142,6 @@ def start_bundle_server(
 
 
 def self_test() -> int:
-    """Drives the bundle server's path handling: an honest bundle path is served, and one that climbs out of the
-    published version's directory, or arrives absolute, is not."""
     problems = 0
 
     def check(condition: bool, message: str) -> None:
@@ -1293,7 +1167,6 @@ def self_test() -> int:
             got = bundle_file_for_request(path, version_dir)
             check(got == want, f"{path} resolved to {got}, wanted {want}")
 
-        # The live server answers the same way, over HTTP.
         server = start_bundle_server({"/wait": ""}, published, [], updates_dir)
         origin = f"http://127.0.0.1:{server.server_address[1]}"
         try:
@@ -1346,7 +1219,6 @@ def check_filter_list_updates(executable: Path, env: dict) -> bool:
     }}
     const sources = new URLSearchParams(location.search).getAll("src");"""
     pages = {
-        # Loads a script until the content blocker stops it, which it does once the update is in.
         "/poll": f"""{report}
             const deadline = Date.now() + 60000;
             (async () => {{
@@ -1357,7 +1229,6 @@ def check_filter_list_updates(executable: Path, env: dict) -> bool:
                 }}
                 report({{ blocked: false }});
             }})();""",
-        # Loads each script once, then stays open past the time a check would start (FIRST_CHECK_DELAY).
         "/wait": f"""{report}
             (async () => {{
                 const results = {{}};
@@ -1422,7 +1293,6 @@ def check_filter_list_updates(executable: Path, env: dict) -> bool:
                 files = list(Path(profile).rglob("ContentBlocking/Xenon/state.json"))
                 return json.loads(files[0].read_text()) if files else {}
 
-            # NB: A Xenon that didn't start wrote no state, which the steps report on.
             def a_day_passes():
                 for file in Path(profile).rglob("ContentBlocking/Xenon/state.json"):
                     file.write_text(json.dumps({**state(), "checkedAt": 0}))
@@ -1471,10 +1341,6 @@ def check_filter_list_updates(executable: Path, env: dict) -> bool:
     return passed
 
 
-# The WebAuthn engine patches are in the build: the API is there, and requests go to the UI process, which checks them
-# against its own records of the page and runs the ceremony. A headless browser has no prompt to ask the user with,
-# so it answers as a browser with no authenticators does. The ceremonies themselves are tested in the engine, with
-# virtual authenticators (Tests/LibWeb/Text/input/WebAuthn).
 def check_web_authn(executable: Path, env: dict) -> bool:
     page = f"""<!doctype html><script>
         const outcome = promise => promise.then(() => "resolved", error => error.name);
@@ -1484,7 +1350,6 @@ def check_web_authn(executable: Path, env: dict) -> bool:
             challenge: new Uint8Array(32),
             pubKeyCredParams: [{{ type: "public-key", alg: -7 }}],
         }};
-        // NB: One at a time, since a window may only have one request for a credential type pending.
         (async () => [
             await outcome(navigator.credentials.create({{ publicKey }})),
             await outcome(navigator.credentials.get({{ publicKey: {{ challenge: new Uint8Array(32), rpId: "example.com" }} }})),
@@ -1515,7 +1380,6 @@ def check_web_authn(executable: Path, env: dict) -> bool:
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
-        # WebAuthn needs a secure context whose host is a domain: localhost is both.
         url = f"http://localhost:{server.server_address[1]}/"
         with tempfile.TemporaryDirectory() as profile:
             command = [str(executable), "--headless=manual", "--profile-path", profile, url]
@@ -1538,18 +1402,12 @@ def check_web_authn(executable: Path, env: dict) -> bool:
     return False
 
 
-# Chrome's ID for an unpacked extension without a key: its directory's path, hashed (see UI/Extensions/Extension.cpp).
-# Installs, updates, switches, and removes password managers, as the welcome page and the Extensions window do, through
-# --password-manager. A local server answers update checks the way the Chrome Web Store does, with the test CRX files.
 def check_password_managers(executable: Path, env: dict) -> bool:
     keys = json.loads((EXTENSION_STORE_DIR / "keys.json").read_text())
     bitwarden, proton_pass = keys["bitwarden"], keys["proton-pass"]
-    # The version of each extension the store offers, and its file.
     published = {bitwarden: ("1.0", "bitwarden-1.0.crx"), proton_pass: ("1.0", "proton-pass-1.0.crx")}
     requested: list[str] = []
 
-    # Reloads until a password manager's content script marks the page, up to the number of tries asked for, then stays
-    # open as long as asked (past the time the daily update check starts) and reports the mark.
     page = f"""<!doctype html><script>
         const params = new URLSearchParams(location.search);
         const attempt = Number(params.get("attempt") ?? 0);
@@ -1780,9 +1638,6 @@ def unpacked_extension_id(directory: Path) -> str:
     return "".join(chr(ord("a") + int(digit, 16)) for digit in digest)
 
 
-# Runs a page in a headless browser until the page closes itself, and returns the results it printed after
-# EXTENSION_TEST_MARKER. The profile is a throwaway one with content blocking on, unless one is given. The page gets
-# Ladybird's internals object, whose grantTransientActivation() stands in for the user's gesture that some APIs need.
 def run_extension_test_page(
     executable: Path, env: dict, url: str, profile: str | None = None, arguments: tuple[str, ...] = ()
 ) -> dict | None:
@@ -1800,7 +1655,6 @@ def run_extension_test_page(
             url,
         ]
         try:
-            # The browser prints what it would have asked the user, which isn't ASCII.
             result = subprocess.run(
                 command, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
             )
@@ -1809,14 +1663,12 @@ def run_extension_test_page(
             return None
 
     output = result.stdout + result.stderr
-    # The browser has to exit cleanly too: a crash as it closes is still a crash.
     if result.returncode != 0:
         print(output[-4000:], file=sys.stderr)
         print(f"    the browser exited with {result.returncode} on {url}", file=sys.stderr)
         return None
     for line in output.splitlines():
         if EXTENSION_TEST_MARKER in line:
-            # The console prints the logged string in quotes.
             return json.loads(line.split(EXTENSION_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
     print(output[-4000:], file=sys.stderr)
     return None
@@ -1855,10 +1707,8 @@ def check_extensions(executable: Path, env: dict) -> bool:
     )
     env = {**env, "XENON_NATIVE_MESSAGING_HOSTS": str(hosts_directory)}
 
-    # A web page, and JSON with no CORS headers, from two local servers: two origins.
     page = f"""<!doctype html><script>
         const results = {{ "no chrome.runtime": typeof chrome === "undefined" || !chrome.runtime }};
-        // Only an extension's pages copy and paste from script without a user gesture.
         const text = document.createElement("textarea");
         document.documentElement.append(text);
         text.focus();
@@ -1889,7 +1739,6 @@ def check_extensions(executable: Path, env: dict) -> bool:
         }});
     </script>""".encode()
     data = b'{"ok": true}'
-    # A 1x1 GIF, at a path the bundled lists block (BLOCKED_REQUESTS).
     gif = bytes.fromhex("47494638396101000100800000000000ffffff21f90401000000002c00000000010001000002024401003b")
     content_script_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "content-scripts.html").read_bytes()
     connectable_page = (XENON_SOURCE_DIR / "Tests" / "Extensions" / "externally-connectable.html").read_bytes()
@@ -1924,8 +1773,6 @@ def check_extensions(executable: Path, env: dict) -> bool:
     data_url = f"http://127.0.0.1:{data_server.server_address[1]}/data.json"
 
     try:
-        # An extension page gets chrome.* and its extension's origin, and its background worker runs. The page runs
-        # twice in one profile: the first time, the extension is installed; the second, the browser starts up with it.
         with tempfile.TemporaryDirectory() as profile:
             turn_on_content_blocking(profile)
             for run, expected_event in enumerate(("installed:install", "startup"), 1):
@@ -1947,24 +1794,18 @@ def check_extensions(executable: Path, env: dict) -> bool:
                         f"    extension page, run {run}: {checks} checks passed, and the background got {expected_event}"
                     )
 
-        # A web page gets neither chrome.* nor the extension's files, which aren't web accessible, nor the extension's
-        # exemption from CORS.
         page_url = f"http://127.0.0.1:{page_server.server_address[1]}/?data={urllib.parse.quote(data_url, safe='')}"
         results = run_extension_test_page(executable, env, page_url)
 
-        # A web page that the extension's content scripts match gets them, each in its world, at its time.
         content_script_url = f"http://127.0.0.1:{page_server.server_address[1]}/content-scripts"
         content_script_results = run_extension_test_page(executable, env, content_script_url)
 
-        # A web page that the extension's externally_connectable matches messages it with chrome.runtime.
         connectable_url = f"http://127.0.0.1:{page_server.server_address[1]}/connectable?id={extension_id}"
         connectable_results = run_extension_test_page(executable, env, connectable_url)
 
-        # The background worker stops once it's idle, and starts again for what it listens to.
         idle_url = f"chrome-extension://{extension_id}/idle.html"
         idle_results = run_extension_test_page(executable, env, idle_url, arguments=("--extension-idle-timeout=2",))
 
-        # A background that stops takes its processes with it, the RequestServer of its extension's site too.
         stopped_results = check_stopped_background(executable, env, extension_id)
     finally:
         for server in (page_server, data_server):
@@ -1990,9 +1831,6 @@ def check_extensions(executable: Path, env: dict) -> bool:
     return passed
 
 
-# Starts Xenon with the test extension and a blank tab, and watches the RequestServer of the extension's site: it starts
-# with the background, and goes once the background has stopped when idle, as nothing else of the extension needs it. A
-# site's RequestServer otherwise stays a minute after its last page has gone.
 def check_stopped_background(executable: Path, env: dict, extension_id: str) -> dict | None:
     site_argument = f"--site chrome-extension://{extension_id}"
     with tempfile.TemporaryDirectory() as profile:
@@ -2040,18 +1878,15 @@ def check_stopped_background(executable: Path, env: dict, extension_id: str) -> 
     }
 
 
-# The command lines of a process's descendants, from /proc on Linux and from ps(1) on macOS.
 def descendant_command_lines(root: int) -> list[str]:
     return [command for _, command in descendant_processes(root)]
 
 
-# The process IDs of a process's descendants that run one of the named helpers (ImageDecoder, MediaServer, ...).
 def helper_pids(root: int, *names: str) -> list[int]:
     executable = re.compile(rf"^(?:.*/)?(?:{'|'.join(re.escape(name) for name in names)})(?:\s|$)")
     return [pid for pid, command in descendant_processes(root) if executable.match(command)]
 
 
-# A process's descendants, as process IDs and command lines.
 def descendant_processes(root: int) -> list[tuple[int, str]]:
     processes: list[tuple[int, int, str]] = []
     if Path("/proc/self/stat").exists():
@@ -2059,7 +1894,6 @@ def descendant_processes(root: int) -> list[tuple[int, str]]:
             if not entry.name.isdigit():
                 continue
             try:
-                # The process's name, in parentheses, may hold spaces; its parent comes second after it.
                 parent = int((entry / "stat").read_text().rsplit(")", 1)[1].split()[1])
                 command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
             except (OSError, IndexError, ValueError):
@@ -2083,7 +1917,6 @@ def descendant_processes(root: int) -> list[tuple[int, str]]:
     return descendants
 
 
-# Loads the blocking dashboard, whose lists only show up once its page and Xenon have talked over the script bridge.
 def check_blocking_dashboard(executable: Path, env: dict) -> bool:
     titles = [entry["title"] for entry in json.loads(FILTER_LIST_MANIFEST.read_text())["lists"]]
     with tempfile.TemporaryDirectory() as profile:
@@ -2099,8 +1932,6 @@ def check_blocking_dashboard(executable: Path, env: dict) -> bool:
     return True
 
 
-# A test extension's background worker sends the test's server the tabs every half second, and makes the calls to
-# chrome.tabs that the server answers with, each on the tab at an index or on none.
 SESSION_RESTORE_EXTENSION_MANIFEST = {
     "manifest_version": 3,
     "name": "Xenon session restore test",
@@ -2126,10 +1957,6 @@ SESSION_RESTORE_EXTENSION_BACKGROUND = """
 """
 
 
-# Session restore runs Xenon with its windows, since a headless run's session is never saved. Xenon is started three
-# times on one profile with the setting to restore the last session on: it's killed right after it opens and duplicates
-# tabs (a duplicate restores its source's history, as a reopened tab does), then quits normally after changes made to
-# the restored session, and each time its tabs have to come back with their pages.
 def check_session_restore(executable: Path, env: dict) -> bool:
     state = {"tabs": None, "commands": [], "requests": []}
     changed = threading.Condition()
@@ -2205,8 +2032,6 @@ def check_session_restore(executable: Path, env: dict) -> bool:
                 returncode = process.wait(timeout=60) if how == signal.SIGTERM else None
             except subprocess.TimeoutExpired:
                 returncode = None
-            # A crash takes Xenon's helper processes with it, and so does a quit. macOS refuses with EPERM rather than
-            # ESRCH when all that's left of the group is zombies waiting to be reaped, which is just as gone.
             try:
                 os.killpg(process.pid, signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
@@ -2228,9 +2053,6 @@ def check_session_restore(executable: Path, env: dict) -> bool:
             return True
 
         try:
-            # A tab the session store hasn't written since it opened comes back as about:blank. The store writes every
-            # 30 seconds by itself, and Xenon has it write a change within a second, so a crash a few seconds after
-            # tabs open has to keep them.
             start(pages[0])
             if not wait_for("the first page loads", lambda tabs: urls(tabs) == pages[:1] and loaded(tabs)):
                 return False
@@ -2246,8 +2068,6 @@ def check_session_restore(executable: Path, env: dict) -> bool:
             time.sleep(SESSION_SAVE_WAIT_SECONDS)
             stop(signal.SIGKILL)
 
-            # The tabs come back, the duplicate active, as when Xenon was killed. The others wait to be selected, and
-            # then load their pages.
             start()
             if not wait_for(
                 "after a crash, the tabs come back with their pages",
@@ -2289,8 +2109,6 @@ def check_session_restore(executable: Path, env: dict) -> bool:
             server.shutdown()
 
 
-# Opens a window with XENON_TEST_UPDATE_READY standing in for an update that's ready, and checks that its toolbar offers
-# it. Nothing can click in a window here, so TestXenonUpdateButton clicks the button, against a stand-in for the updater.
 def check_update_button(executable: Path, env: dict) -> bool:
     expected = UPDATE_BUTTON_SHOWN + UPDATE_STAND_IN_VERSION
     with tempfile.TemporaryDirectory() as directory:
@@ -2315,7 +2133,6 @@ def check_update_button(executable: Path, env: dict) -> bool:
                 process.wait(timeout=30)
             except subprocess.TimeoutExpired:
                 pass
-            # Xenon's helper processes go with it. macOS refuses with EPERM once only zombies are left of the group.
             try:
                 os.killpg(process.pid, signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
@@ -2331,20 +2148,12 @@ def check_update_button(executable: Path, env: dict) -> bool:
     return True
 
 
-# Opens a page on a local HTTPS server whose certificate is self-signed. Xenon refuses the certificate, and shows its
-# warning in place of the page, saying why (UI/CertificateErrors.h). Nothing can click in a headless browser, so XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS
-# has the warning print what it shows and then proceed, as the user would. The page then loads, and closes the browser.
-#
-# The page is made like the web UIs of homelab servers, such as Proxmox VE's: it loads a stylesheet and a script, and
-# calls fetch(), XMLHttpRequest and a WebSocket on the same host and port, which the accepted certificate has to cover
-# too. Its script calls a method the way Ext JS (which Proxmox VE's UI is built on) does, reading caller through apply().
 def check_certificate_errors(executable: Path, env: dict) -> bool:
     page = f"""<!doctype html><title>Xenon certificate test</title>
     <link rel="stylesheet" href="/style.css">
     <script src="/script.js"></script>
     <script>
         const report = {{ loaded: location.href, script: window.scriptResult ?? null }};
-        // The console escapes quotes in what it prints, which the report's JSON has to do without.
         const failure = error => `failed: ${{String(error).replaceAll('"', "'")}}`;
         async function attempt(name, request) {{
             try {{
@@ -2374,8 +2183,6 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
         }});
     </script>
     <body>Xenon certificate test</body>""".encode()
-    # Ext JS's callParent() calls the method an override replaced through apply(), and that finds the override from
-    # caller.caller.
     script = b"""
         function callOverridden() { return callOverridden.caller.caller.name; }
         function callParent() { return callOverridden.apply(this, arguments); }
@@ -2396,7 +2203,6 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
     requested: list[str] = []
 
     class Handler(http.server.BaseHTTPRequestHandler):
-        # WebSockets need HTTP/1.1.
         protocol_version = "HTTP/1.1"
 
         def do_GET(self):
@@ -2411,7 +2217,6 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
             self.end_headers()
             self.wfile.write(body)
 
-        # https://www.rfc-editor.org/rfc/rfc6455#section-4.2.2: the handshake, then one unmasked text frame.
         def answer_web_socket(self):
             key = self.headers.get("Sec-WebSocket-Key", "") + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
             self.send_response(101)
@@ -2422,7 +2227,6 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
             message = web_socket_message.encode()
             self.wfile.write(bytes([0x81, len(message)]) + message)
             self.wfile.flush()
-            # The page closes the browser once it has the message.
             time.sleep(5)
             self.close_connection = True
 
@@ -2430,7 +2234,6 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
             pass
 
     class Server(http.server.ThreadingHTTPServer):
-        # Xenon hangs up as soon as it has seen the certificate, until it's told to accept it.
         def handle_error(self, request, client_address):
             pass
 
@@ -2497,7 +2300,6 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
         loaded.get("script") == "overridingMethod",
         f"the script reported {loaded.get('script')}",
     )
-    # The warning on its own, opened at its address, knows of no certificate to accept for the site.
     with tempfile.TemporaryDirectory() as profile:
         warning_url = "xenon://certificate-error/?url=" + urllib.parse.quote(url, safe="")
         command = [str(executable), "--headless=manual", "--profile-path", profile, warning_url]
@@ -2516,7 +2318,6 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
     )
 
     if not passed:
-        # A crash's stack trace would push what the pages printed out of the output's tail.
         for line in output.splitlines():
             if CERTIFICATE_ERROR_TEST_MARKER in line or "VERIFICATION FAILED" in line or "Failed load" in line:
                 print(line, file=sys.stderr)
@@ -2525,7 +2326,6 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
 
 
 def certificate_error_reports(output: str) -> list[dict]:
-    # The console prints the logged string in quotes.
     return [
         json.loads(line.split(CERTIFICATE_ERROR_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
         for line in output.splitlines()
@@ -2537,13 +2337,11 @@ def run_headless(executable: Path, env: dict, args: list[str]) -> tuple[bool, st
     try:
         result = subprocess.run([str(executable), *args], env=env, capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired as error:
-        # What it printed before it was stopped, which can be bytes even in text mode.
         parts = (error.stdout, error.stderr)
         output = "".join(part.decode(errors="replace") if isinstance(part, bytes) else part for part in parts if part)
         return False, f"{output}\ntimed out after {error.timeout} s"
     output = result.stdout + result.stderr
     if result.returncode != 0:
-        # A crash can print nothing, so say how it ended.
         how = (
             f"was killed by signal {-result.returncode}"
             if result.returncode < 0

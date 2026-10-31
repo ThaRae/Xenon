@@ -69,7 +69,6 @@ enum Column {
     Memory,
 };
 
-// Rows are identified by the process's child ID, which, unlike its PID, never comes to name another process.
 constexpr int ChildIDRole = Qt::UserRole + 1;
 
 class ProcessHeader final : public QHeaderView {
@@ -404,8 +403,6 @@ void ProcessManagerWindow::refresh()
         auto* item = static_cast<ProcessItem*>(items.take(process.child_id).value_or_lazy_evaluated([] { return new ProcessItem; }));
         auto name = qstring_from_ak_string(WebView::process_name_from_type(process.type));
         if (first_is_one_of(process.type, WebView::ProcessType::WebContent, WebView::ProcessType::ImageDecoder, WebView::ProcessType::RequestServer, WebView::ProcessType::WebWorker) || process.owner_child_id.has_value()) {
-            // NB: A process that works for another, such as a page's image decoder or a worker's media server, is
-            //     labeled with the process it works for, following owners up to one with a site.
             auto const* label_process = &process;
             for (size_t depth = 0; depth < processes.size() && !label_process->site_url.has_value() && label_process->owner_child_id.has_value(); ++depth) {
                 auto owner = processes_by_child_id.get(*label_process->owner_child_id);

@@ -225,7 +225,6 @@ WebCompatReportReview::WebCompatReportReview(WebView::WebCompatReport::Page page
     QObject::connect(m_show_report_button, &QPushButton::clicked, this, [this] { show_report_text(); });
     details_layout->addWidget(m_show_report_button, 0, Qt::AlignLeft);
     auto* details_toggle = create_disclosure(tr("Report details"), details, contents);
-    // The toggle comes before what it shows, although it is created after it.
     QWidget::setTabOrder(details_toggle, m_show_report_button);
     contents_layout->addWidget(details_toggle);
     contents_layout->addWidget(details);

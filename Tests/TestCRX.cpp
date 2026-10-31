@@ -19,7 +19,6 @@
 
 using namespace Ladybird::Extensions;
 
-// The CRX files and keys Tests/ExtensionStore/make-crxs.py wrote.
 static ByteBuffer read_fixture(StringView name)
 {
     auto file = MUST(Core::File::open(ByteString::formatted("{}/Tests/ExtensionStore/{}", XENON_SOURCE_DIR, name), Core::File::OpenMode::Read));
@@ -38,7 +37,6 @@ static ByteBuffer publisher_key_hash()
     return MUST(decode_hex(key("publisherKeyHash"sv)));
 }
 
-// A directory that's deleted again at the end of the test.
 class TemporaryDirectory {
 public:
     TemporaryDirectory()
@@ -66,7 +64,6 @@ TEST_CASE(crx_from_the_store_checks_out)
     auto packed = verify_crx(crx, key("bitwarden"sv), store_key_hash);
     EXPECT(!packed.is_error());
     EXPECT_EQ(packed.value().id, key("bitwarden"sv));
-    // The developer's key gives the extension its ID, as the manifest's "key" does.
     EXPECT_EQ(extension_id_from_bytes(packed.value().public_key), key("bitwarden"sv));
     EXPECT(packed.value().archive.size() > 0);
 }
@@ -97,10 +94,8 @@ TEST_CASE(crx_has_to_be_signed_by_the_store)
     EXPECT(packed.is_error());
     EXPECT(packed.error().contains("Chrome Web Store"sv));
 
-    // Without a publisher to ask for, the developer's signature is enough.
     EXPECT(!verify_crx(unpublished, key("bitwarden"sv), {}).is_error());
 
-    // The test files' store isn't Google's.
     auto published = read_fixture("bitwarden-1.0.crx"sv);
     EXPECT(verify_crx(published, key("bitwarden"sv), chrome_web_store_publisher_key_hash()).is_error());
 }
@@ -137,7 +132,6 @@ TEST_CASE(crx_unpacks)
     EXPECT_EQ(manifest.get_string("version"sv).value(), "2.0"sv);
     EXPECT(FileSystem::is_regular_file(LexicalPath::join(unpacked, "content.js"sv).string()));
 
-    // Unpacking goes into a new directory only.
     EXPECT(unpack_zip(packed.archive, unpacked).is_error());
 }
 

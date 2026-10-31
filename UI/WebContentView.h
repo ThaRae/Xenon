@@ -191,7 +191,6 @@ public:
 #ifdef LADYBIRD_QT_USE_IOSURFACE_LAYER
     void set_has_rounded_corners(bool);
 #endif
-    // The radius of the page's rounded corners, which stays zero until a tab rounds its view.
     double viewport_corner_radius() const { return m_viewport_corner_radius; }
 
     WebView::AccessibilityTreeManager const* accessibility_tree_manager() const { return m_accessibility_manager.ptr(); }

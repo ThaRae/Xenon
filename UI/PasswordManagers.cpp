@@ -24,24 +24,18 @@
 
 namespace Ladybird {
 
-// The Chrome Web Store IDs of the extensions, which their developers' keys give them.
 static constexpr auto BITWARDEN_ID = "nngceckbapebfimnlniiiahkandclblb"sv;
 static constexpr auto PROTON_PASS_ID = "ghmbeldphafepmbegfdlkpapadhbakde"sv;
 static constexpr auto ONE_PASSWORD_ID = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"sv;
 static constexpr auto ICLOUD_PASSWORDS_ID = "pejdijmoenmkgeppbflobdenhhabjlaj"sv;
 
-// For tests, whose extensions are signed with keys of their own:
-// "bitwarden=<id>,proton-pass=<id>,1password=<id>,icloud-passwords=<id>".
 static constexpr auto EXTENSION_IDS_VARIABLE = "XENON_PASSWORD_MANAGER_IDS"sv;
 
 static constexpr auto STATE_NAME = "password-manager-updates.json"sv;
 
-// As often as Chrome checks the store for updates to the extensions it installed from there.
 static constexpr auto CHECK_INTERVAL = AK::Duration::from_seconds(24 * 60 * 60);
 static constexpr auto RETRY_INTERVAL = AK::Duration::from_seconds(60 * 60);
-// How often Xenon looks at whether a check is due, which also catches up soon after the computer wakes.
 static constexpr auto TICK_INTERVAL = AK::Duration::from_seconds(10 * 60);
-// The first check waits a moment, so that its downloads don't compete with the pages the browser opens with.
 static constexpr auto FIRST_CHECK_DELAY = AK::Duration::from_seconds(5);
 
 static String offered_ids(Vector<PasswordManagers::Choice> const& choices)
@@ -113,7 +107,6 @@ void PasswordManagers::initialize(Optional<ByteString> const& command_line_choic
             warnln("There's no password manager called {}; Xenon offers {}", *command_line_choice, offered_ids(m_choices));
     }
 
-    // The chosen password manager stays installed: one whose files are gone is installed again.
     if (auto current = this->current(); current.has_value() && !m_installing.has_value() && !Extensions::Registry::the().extension(current->extension_id)) {
         warnln("{} didn't load, so Xenon installs it again", current->name);
         install(*current);
@@ -212,7 +205,6 @@ void PasswordManagers::install(Choice const& chosen)
             return;
         }
 
-        // One password manager at a time: the one chosen before gives way.
         for (auto const& other : m_choices) {
             if (other.id != chosen.id && Extensions::Registry::the().installed_version(other.extension_id).has_value())
                 Extensions::Registry::the().remove(other.extension_id);
@@ -278,7 +270,6 @@ void PasswordManagers::notify()
             send_status(*web_ui);
     }
 
-    // NB: A listener can add another, so this goes through the ones there are now.
     auto listeners = move(m_change_listeners);
     for (auto& listener : listeners) {
         if (listener())
@@ -331,7 +322,6 @@ void PasswordManagers::check_for_updates_if_due()
         return;
     auto version = Extensions::Registry::the().installed_version(current->extension_id);
 
-    // A check from the future means the clock was wrong then, or is now, so it doesn't count.
     auto now = UnixDateTime::now();
     if (m_checked_at.has_value() && *m_checked_at <= now && now - *m_checked_at < CHECK_INTERVAL)
         return;
@@ -346,7 +336,6 @@ void PasswordManagers::check_for_updates_if_due()
             warnln("Could not check for a new version of {}: {}", name, result.error());
             return;
         }
-        // NB: The password manager may have changed while the store answered.
         if (result.value().has_value() && Extensions::Registry::the().installed_version(extension_id).has_value()) {
             if (auto installed = Extensions::Registry::the().install(result.value()->crx, extension_id, Extensions::WebStore::publisher_key_hash()); installed.is_error()) {
                 warnln("Could not update {}: {}", name, installed.error());

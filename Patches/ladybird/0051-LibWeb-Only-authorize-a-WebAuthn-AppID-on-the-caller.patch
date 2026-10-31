@@ -21,25 +21,14 @@ Until the trusted facet list is fetched and checked, the same-origin
 shortcut other browsers use is the only safe one: the caller's host
 must equal the AppID's host.
 ---
- Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp | 14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+ Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
 diff --git a/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp b/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
-index 0b01a6e12a9f323b717b1c88ab06812615c0484f..e9ed06a6905f93805814328aaff14529ab44ee91 100644
+index 09cbe7c8d8cce45499ba13d989f1bb361a7a8a35..6b5c49f2bb0d90c496e3210b776691917f1a19e5 100644
 --- a/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
 +++ b/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
-@@ -647,21 +647,17 @@ void PublicKeyCredential::create_a_new_credential(JS::Realm& realm, URL::Origin
- // https://fidoalliance.org/specs/fido-v2.0-id-20180227/fido-appid-and-facets-v2.0-id-20180227.html#determining-if-a-caller-s-facetid-is-authorized-for-an-appid
- static bool is_a_caller_s_facet_id_authorized_for_an_app_id(URL::Origin const& caller_origin, String const& app_id)
- {
--    // NB: Like other browsers, this allows an AppID on the caller's own site without fetching its trusted facet list.
-+    // NB: Like other browsers, this allows an AppID on the caller's own host without fetching its trusted facet list.
-+    //     Fetching the list isn't implemented, so a caller on another host of the same site must not pass either: the
-+    //     FIDO algorithm only authorizes facets the AppID's list names, and a shared registrable domain says nothing
-+    //     about that.
-     auto app_id_url = URL::Parser::basic_parse(app_id);
-     if (!app_id_url.has_value() || app_id_url->scheme() != "https"sv || !app_id_url->host().has_value())
-         return false;
+@@ -622,14 +622,7 @@ static bool is_a_caller_s_facet_id_authorized_for_an_app_id(URL::Origin const& c
      if (caller_origin.is_opaque() || caller_origin.scheme().value_or({}) != "https"sv)
          return false;
  

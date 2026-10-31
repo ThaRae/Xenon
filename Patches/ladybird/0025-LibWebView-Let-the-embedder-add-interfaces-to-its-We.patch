@@ -10,8 +10,8 @@ Its callback runs as each page is created, after the page has registered
 the engine's interfaces.
 ---
  Libraries/LibWebView/WebUI.cpp | 14 ++++++++++++++
- Libraries/LibWebView/WebUI.h   | 11 ++++++++---
- 2 files changed, 22 insertions(+), 3 deletions(-)
+ Libraries/LibWebView/WebUI.h   |  9 ++++++---
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
 diff --git a/Libraries/LibWebView/WebUI.cpp b/Libraries/LibWebView/WebUI.cpp
 index 1aa3d88ec2dd29b73b253efa87642587314a5d80..0c35f5e5865de89287bbf2d926ad6d56da287b6b 100644
@@ -53,25 +53,23 @@ index 1aa3d88ec2dd29b73b253efa87642587314a5d80..0c35f5e5865de89287bbf2d926ad6d56
      return web_ui;
  }
 diff --git a/Libraries/LibWebView/WebUI.h b/Libraries/LibWebView/WebUI.h
-index cabd23c968fd34de5439242cdaeccec2bfdc995f..bafeeb706665d05e02bac057c142b26b8c790dc9 100644
+index cabd23c968fd34de5439242cdaeccec2bfdc995f..9dcac8db3663d11c7dd928d80188e26648c822a0 100644
 --- a/Libraries/LibWebView/WebUI.h
 +++ b/Libraries/LibWebView/WebUI.h
-@@ -49,6 +49,14 @@ public:
+@@ -49,6 +49,12 @@ public:
      String const& host() const { return m_host; }
      Web::PageId page_id() const { return m_page_id; }
  
 +    using Interface = Function<void(JsonValue)>;
 +    void register_interface(StringView name, Interface);
 +
-+    // Lets the embedder give WebUI pages interfaces of its own, beside the engine's. It's called for each page as the
-+    // page is created, after the page has registered its own.
 +    using EmbedderInterfaces = Function<void(WebUI&)>;
 +    static void set_embedder_interfaces(EmbedderInterfaces);
 +
  protected:
      WebUI(WebContentClient&, Web::PageId, NonnullOwnPtr<IPC::Transport>, String host);
  
-@@ -57,10 +65,7 @@ protected:
+@@ -57,10 +63,7 @@ protected:
      WebContentClient& client() const { return *m_client; }
      bool has_client() const { return !m_client.is_null(); }
  

@@ -32,12 +32,9 @@
 
 namespace Ladybird::Extensions {
 
-// Installed extensions are unpacked into <extensions directory>/Installed/<id>/<version>, by way of a staging directory
-// beside the versions.
 static constexpr auto INSTALLED_DIRECTORY = "Installed"sv;
 static constexpr auto STAGING_DIRECTORY = "staging"sv;
 
-// The background page's view lays nothing out that anyone sees.
 static constexpr Web::DevicePixelSize BACKGROUND_PAGE_SIZE { 800, 600 };
 
 Registry& Registry::the()
@@ -46,8 +43,6 @@ Registry& Registry::the()
     return *registry;
 }
 
-// As in Chrome, an extension's pages may copy and paste from script, with no user gesture, if it has the clipboard
-// permissions. Proton Pass clears what it copied from its offscreen document this way.
 static bool page_has_permission(WebView::ScriptBridgeEndpoint const& endpoint, StringView permission)
 {
     auto extension = Registry::the().extension_for_url(endpoint.url());
@@ -78,7 +73,6 @@ void Registry::initialize(ByteString profile_data_directory, Vector<ByteString> 
         if (auto extension = load_unpacked(directory, Persist::No); extension.is_error())
             warnln("Could not load the extension in {}: {}", directory, extension.error());
     }
-    // NB: Installed extensions come after unpacked ones, so an installed extension wins over an unpacked copy of itself.
     for (auto const& [id, version] : HashMap { m_installed_versions }) {
         auto directory = LexicalPath::join(installed_extension_directory(id), version).string();
         if (auto extension = load_unpacked(directory, Persist::No); extension.is_error())
@@ -122,10 +116,7 @@ ErrorOr<NonnullRefPtr<Extension>, String> Registry::reload(StringView id)
 
 void Registry::add(NonnullRefPtr<Extension> extension)
 {
-    // Loading an extension that's loaded already reloads it, as Chrome's "Load unpacked" does: its pages and background
-    // start over, and it keeps its storage.
     stop_background_page(extension->id());
-    // A reloaded extension starts without the content scripts it registered, as an updated one does in Chrome.
     if (m_extensions.remove_all_matching([&](auto const& loaded) { return loaded->id() == extension->id(); }))
         m_registered_content_scripts.remove(extension->id());
     if (auto granted = m_granted_permissions.get(extension->id()); granted.has_value())
@@ -176,8 +167,6 @@ void Registry::remove(StringView id)
     notify_extensions_changed();
 }
 
-// Chrome keeps the developer's key as an installed extension's "key", which gives the extension its ID wherever it's
-// loaded from. Xenon writes it into the manifest.
 static ErrorOr<void, String> write_manifest_key(ByteString const& directory, PackedExtension const& packed)
 {
     auto path = LexicalPath::join(directory, "manifest.json"sv).string();
@@ -236,7 +225,6 @@ ErrorOr<Registry::Installed, String> Registry::install(ReadonlyBytes crx, String
         return MUST(String::formatted("It can't be moved into place: {}", result.error()));
 
     m_installed_versions.set(packed.id, version);
-    // An unpacked copy of the extension gives way to the installed one from now on.
     if (running && !running_installed_version.has_value())
         m_persisted_directories.remove_all_matching([&](auto const& persisted) { return persisted == running->root(); });
     save_state();
@@ -258,7 +246,6 @@ bool Registry::is_installed(Extension const& extension) const
 {
     if (!m_installed_versions.contains(extension.id()))
         return false;
-    // NB: An unpacked copy of an installed extension has its ID too.
     auto directory = FileSystem::real_path(installed_extension_directory(extension.id()));
     return !directory.is_error() && extension.root().starts_with(ByteString::formatted("{}/", directory.value()));
 }
@@ -268,8 +255,6 @@ ByteString Registry::installed_extension_directory(StringView id) const
     return LexicalPath::join(m_extensions_directory, INSTALLED_DIRECTORY, id).string();
 }
 
-// Removes whatever of the installed extensions' files won't load: earlier versions, extensions that were removed, and
-// installs that stopped partway.
 void Registry::remove_stale_installed_files() const
 {
     auto installed = LexicalPath::join(m_extensions_directory, INSTALLED_DIRECTORY).string();
@@ -397,8 +382,6 @@ void Registry::on_extensions_change(Function<bool()> listener)
     m_change_listeners.append(move(listener));
 }
 
-// An extension's pages and workers fetch from the hosts it has permission for without CORS, as in Chrome. Ports in
-// its patterns aren't kept: a pattern reaches its hosts on any port.
 void Registry::update_origin_access_allow_list()
 {
     Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list;
@@ -431,12 +414,6 @@ void Registry::notify_extensions_changed()
     m_change_listeners.remove_all_matching([](auto& listener) { return !listener(); });
 }
 
-// --- Background pages --------------------------------------------------------------------------------------------------
-
-// A view no one sees, for background pages and offscreen documents. A headless view reports itself visible, so its
-// page's timers, and its workers, run at full speed. Its pages are the extension's own, which the content blocker
-// leaves alone, as uBlock Origin doesn't see other extensions' requests in Chrome, so it goes without the content
-// blocker, whose engine would otherwise take tens of MiB in its process.
 OwnPtr<WebView::HeadlessWebView> Registry::create_hidden_view(URL::URL const& url)
 {
     if (!m_theme.has_value()) {
@@ -456,14 +433,11 @@ OwnPtr<WebView::HeadlessWebView> Registry::create_hidden_view(URL::URL const& ur
 
 void Registry::close_hidden_view(NonnullOwnPtr<WebView::HeadlessWebView> view)
 {
-    // The extension's RequestServer has nothing more to do once its pages are gone, so it goes with their processes
-    // rather than a minute later, as a site's RequestServer otherwise does in case the site is visited again.
     if (auto site = URL::Site::serialize_for_partitioning(view->url().origin()); site.has_value())
         WebView::RequestServerManager::the().retire_when_idle(view->session(), *site);
 
     auto request_close = view->prepare_for_immediate_close();
     request_close();
-    // NB: The view goes once its page has had the chance to close.
     Core::deferred_invoke([view = move(view)] { });
 }
 
@@ -538,10 +512,6 @@ bool Registry::is_hidden_view(u64 view_id) const
     return false;
 }
 
-// --- chrome-extension:// -----------------------------------------------------------------------------------------------
-
-// The response body of a generated resource, in an unlinked temporary file, since the renderer reads responses from a
-// file descriptor.
 static ErrorOr<IPC::File> file_with_contents(StringView contents)
 {
     auto pattern = ByteString::formatted("{}/xenon-extension-XXXXXX", Core::StandardPaths::tempfile_directory());
@@ -568,7 +538,6 @@ Optional<String> Registry::generated_resource(Extension const& extension, String
     if (path == BACKGROUND_PAGE_PATH)
         return MUST(String::formatted("<!doctype html>\n<meta charset=\"utf-8\">\n<title>{} background</title>\n", extension.manifest().name));
 
-    // The worker loads the chrome.* API, then the extension's script, then tells the UI process it's running.
     if (path == "/_generated_background_worker.js"sv) {
         if (extension.manifest().background_is_module)
             return MUST(String::formatted("import \"/_generated_chrome_api.js\";\nimport \"/{}\";\nself[Symbol.for(\"xenon.background.ready\")]?.();\n", *worker));
@@ -589,11 +558,6 @@ ErrorOr<WebView::URLSchemeResponse> Registry::respond(WebView::URLSchemeRequest 
 
     auto path = URL::percent_decode(request.url.serialize_path());
 
-    // An extension's own pages may load any of its files, and the user may open any of its pages. Other pages may only
-    // reach what it lists in web_accessible_resources for them.
-    // FIXME: A subresource request names every origin of the page that asks, in its process, not the one document that
-    //        asks, so one of a page's frames could load what web_accessible_resources only lets a frame of another
-    //        origin of the same site have.
     bool allowed = false;
     if (request.is_navigation) {
         allowed = !request.navigation_initiator.has_value()
@@ -612,14 +576,12 @@ ErrorOr<WebView::URLSchemeResponse> Registry::respond(WebView::URLSchemeRequest 
         headers.append(HTTP::Header::isomorphic_encode("Cache-Control"sv, "no-cache"sv));
         headers.append(HTTP::Header::isomorphic_encode("X-Content-Type-Options"sv, "nosniff"sv));
 
-        // Extension pages run under MV3's policy, and sandboxed pages under theirs, which also makes their origin opaque.
         if (mime_type.starts_with("text/html"sv)) {
             auto const& policy = is_sandboxed ? extension->manifest().sandbox_csp : extension->manifest().extension_pages_csp;
             headers.append(HTTP::Header::isomorphic_encode("Content-Security-Policy"sv, policy));
         }
     };
 
-    // Xenon's own resources, which only the extension and the browser may reach.
     if (path.starts_with("/_generated_"sv)) {
         bool from_extension_or_browser = request.is_navigation ? !request.navigation_initiator.has_value() : request.from_same_origin_process;
         auto contents = from_extension_or_browser ? generated_resource(*extension, path) : Optional<String> {};
@@ -634,8 +596,6 @@ ErrorOr<WebView::URLSchemeResponse> Registry::respond(WebView::URLSchemeRequest 
     add_headers(mime_type_for_path(file_path), extension->is_sandboxed_page(path));
     return WebView::URLSchemeResponse { .file = TRY(WebView::open_local_file_for_renderer(file_path)), .headers = move(headers) };
 }
-
-// --- State -------------------------------------------------------------------------------------------------------------
 
 static ErrorOr<JsonObject> read_state_file(ByteString const& path)
 {

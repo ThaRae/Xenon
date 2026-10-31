@@ -39,8 +39,6 @@ static void hide_native_context_menu_shortcuts(QMenu& menu)
         return;
     menu.setProperty(property, true);
 
-    // Qt ignores QAction::isShortcutVisibleInContextMenu() for native menus. Run after Qt's aboutToShow handling,
-    // which can update the native items.
     QObject::connect(menu.platformMenu(), &QPlatformMenu::aboutToShow, &menu, [&menu] {
         for (auto* action : menu.actions()) {
             if (auto* submenu = action->menu())

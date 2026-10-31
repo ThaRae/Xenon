@@ -1,5 +1,3 @@
-// A content script at document_end, in the same world as content-start.js.
-// NB: Content scripts share their world's global scope, so each keeps its own names in a function.
 (() => {
     const test = globalThis.xenonContentTest;
     test.order.push("end");
@@ -19,18 +17,15 @@
     check("the page's expandos stay out of the content scripts' world", marker.pageExpando === undefined);
     marker.contentExpando = "content";
 
-    // The background's tabs.sendMessage() (see background.js).
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message?.toContentScript === "ping" && sender.id === chrome.runtime.id) sendResponse({ pong: location.pathname });
     });
 
-    // The page posts a message once DOMContentLoaded has fired, which comes after this.
     window.addEventListener("message", event => {
         if (event.source !== window || event.data?.toContentScript !== "ping") return;
         document.documentElement.dataset.contentPostMessage = event.isTrusted ? "trusted" : "untrusted";
     });
 
-    // Neither of these may reach the page's error handlers.
     setTimeout(() => {
         throw new Error("A content script's error");
     });

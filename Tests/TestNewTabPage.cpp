@@ -19,7 +19,6 @@ static URL::URL parse(StringView url)
 TEST_CASE(xenons_new_tab_page_hides_its_url)
 {
     EXPECT(NewTabPage::should_hide_url(URL::about_newtab(), URL::about_newtab()));
-    // A tab can still show it after the user picks another new tab page.
     EXPECT(NewTabPage::should_hide_url(URL::about_newtab(), parse("https://example.com/"sv)));
 }
 

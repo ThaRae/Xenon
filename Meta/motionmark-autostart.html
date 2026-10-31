@@ -22,12 +22,6 @@
   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
   THE POSSIBILITY OF SUCH DAMAGE.
 -->
-
-<!--
-  Xenon harness copy: Meta/measure.py serves this file in place of https://browserbench.org/MotionMark1.3.1/ through
-  Xenon's --resource-map so the suite can start without a click. It is the published index.html plus the auto-start
-  script at the end of the body; every other resource is still fetched from browserbench.org.
--->
 <!DOCTYPE html>
 <html>
 <head>
@@ -49,7 +43,6 @@
 
     <script>
         window.addEventListener("load", function() {
-            // Start the fade in animation.
             document.body.classList.add("images-loaded");
         });
     </script>
@@ -102,8 +95,6 @@
     </main>
 <script>
 (function () {
-    // MotionMark 1.3.1 only starts from the Run Benchmark button; the button stays disabled until its
-    // frame-rate probe completes, so poll for that instead of clicking immediately on load.
     var timer = null;
     function tryStart() {
         if (typeof benchmarkController === "undefined") return;

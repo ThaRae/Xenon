@@ -53,7 +53,6 @@ enum class TabBarEdge : u8;
 
 static constexpr int TAB_ICON_SIZE = 16;
 
-// The tab a tab drag is moving, while one is under way.
 Tab* tab_being_dragged();
 
 enum class TabLayout : u8 {
@@ -77,8 +76,6 @@ public:
     // While collapsed vertical tabs only peek open on hover, the pinned tabs keep their rows, one tab each, rather than
     // forming the grid, so no tab moves out from under the pointer.
     void set_pinned_tabs_in_rows(bool);
-    // In the compact layout, the tabs share a row with the toolbar, so the selected tab floats like the others rather
-    // than flowing into a toolbar below it.
     void set_floating_selected_tab(bool);
     void set_vertical_tabs_position(WebView::VerticalTabsPosition);
     void refresh_tab_layout();
@@ -92,7 +89,6 @@ public:
     void update_drop_preview(QPoint const&);
     void hide_drop_preview();
 
-    // Xenon's tab groups.
     void tab_groups_changed();
     void show_tab_group_editor(TabGroup&, bool focus_title);
     int preferred_horizontal_width() const;
@@ -129,7 +125,6 @@ private:
     };
     struct DropPreview {
         Vector<TabShift> tab_shifts;
-        // How far the header of each tab group moves, along the strip.
         QHash<TabGroup const*, qreal> group_header_shifts;
         qreal strip_growth { 0 };
         qreal pinned_region_growth { 0 };
@@ -181,14 +176,10 @@ private:
     QRect visual_tab_rect(int index) const;
     int tab_index_at(QPoint const&) const;
 
-    // Xenon's tab groups. A group's header sits before its first tab, in a horizontal tab's place in the strip or in a
-    // row of its own above the vertical tabs, and the tabs of a collapsed group don't show.
     struct TabGroupHeader {
         TabGroup* group { nullptr };
         int first { 0 };
         int last { 0 };
-        // The tab whose place in the horizontal strip holds the header: the group's first tab that shows, or else the
-        // last tab in the strip that does.
         int owner { -1 };
         bool trailing { false };
         int width { 0 };
@@ -308,7 +299,6 @@ public:
     void set_vertical_tabs_expanded(bool);
     void set_vertical_tabs_expand_on_hover(bool);
     void set_vertical_tabs_position(WebView::VerticalTabsPosition);
-    // Xenon's compact layout: horizontal tabs share one row with the toolbar, which sits before them.
     void set_compact_toolbar(bool);
     bool can_expand_vertical_tabs_on_hover() const;
     void update_tab_button_visibility();
@@ -429,7 +419,6 @@ public:
 
     explicit TabBarButton(QIcon const& icon, QWidget* parent = nullptr);
     void set_collapsed_vertical_overlay(bool);
-    // Shrinks the icon by this much on each side, within the same button.
     void set_icon_inset(int);
 
 protected:

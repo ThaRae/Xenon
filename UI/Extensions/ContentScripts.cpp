@@ -17,10 +17,8 @@
 
 namespace Ladybird::Extensions {
 
-// UI/Resources/extensions/externally-connectable.js, which the build embeds.
 extern String const& externally_connectable_source;
 
-// Each extension file a content script needs, read once while the extensions stay as they are.
 static HashMap<ByteString, String>& file_cache()
 {
     static NeverDestroyed<HashMap<ByteString, String>> cache;
@@ -46,7 +44,6 @@ Optional<String> ContentScripts::read_file(Extension const& extension, StringVie
         warnln("Extensions: unable to read {}: {}", url, contents.error());
         return {};
     }
-    // Chrome reads content scripts and their stylesheets as UTF-8.
     auto text = String::from_utf8(contents.value());
     if (text.is_error()) {
         warnln("Extensions: {} isn't UTF-8", url);
@@ -103,7 +100,6 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
     auto is_top_level_frame = !document.navigable().parent_id.has_value();
 
     for (auto const& extension : Registry::the().extensions()) {
-        // The manifest's content scripts come first, then those the extension registered, as in Chrome.
         Vector<ContentScript const&> matching;
         for (auto const& content_script : extension->manifest().content_scripts) {
             if (content_script.matches_document(url, is_top_level_frame))
@@ -121,7 +117,6 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
             return content_script.world == World::Main ? String {} : world;
         };
 
-        // chrome.* comes first in the extension's world, before any of its scripts, whenever they run.
         auto has_isolated_scripts = any_of(matching, [](auto const& content_script) {
             return content_script.world == World::Isolated && !content_script.js.is_empty();
         });
@@ -135,8 +130,6 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
             });
         }
 
-        // Stylesheets go in before the page shows, as in Chrome. The page sees them among its adopted stylesheets.
-        // FIXME: Apply them as user stylesheets the page can't see or remove.
         for (auto const& content_script : matching) {
             for (auto const& path : content_script.css) {
                 auto css = read_file(*extension, path);
@@ -175,10 +168,6 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
     return scripts;
 }
 
-// A web page that an extension's externally_connectable matches gets chrome.runtime in its own world, to message the
-// extension with. The page's world can't have a bridge, so its chrome.runtime talks over DOM events to a relay in an
-// isolated world of its own for each extension, which has one, and which the router only lets message that extension.
-// https://developer.chrome.com/docs/extensions/develop/concepts/messaging#external-webpage
 Vector<Web::HTML::UserScript> ContentScripts::externally_connectable_scripts(WebView::ScriptBridgeEndpoint const& document)
 {
     auto const& url = document.url();
@@ -194,7 +183,6 @@ Vector<Web::HTML::UserScript> ContentScripts::externally_connectable_scripts(Web
     if (extensions.is_empty())
         return {};
 
-    // The events get a name of their own in each document, so that they don't meet the page's own events by chance.
     auto event_name = MUST(String::formatted("xenon-externally-connectable-{:016x}", get_random<u64>()));
 
     Vector<Web::HTML::UserScript> scripts;
@@ -217,7 +205,6 @@ Vector<Web::HTML::UserScript> ContentScripts::externally_connectable_scripts(Web
     scripts.append({
         .world = {},
         .source = MUST(String::formatted("(config => {{\n{}\n}})({});", externally_connectable_source, config.serialized())),
-        // NB: The script is the browser's, not any one extension's, but its errors need a URL.
         .url = extensions.first()->url_for("_generated_externally_connectable.js"sv),
         .injection_time = Web::HTML::UserScriptInjectionTime::DocumentStart,
         .takes_bridge = false,

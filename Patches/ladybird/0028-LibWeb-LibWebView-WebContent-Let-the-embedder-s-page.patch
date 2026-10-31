@@ -25,23 +25,23 @@ without activation write the clipboard only if it hosts such a document.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibWeb/Editing/ExecCommand.cpp  |  16 ++++
- Libraries/LibWeb/Page/EventHandler.cpp    | 111 ++++++++++++----------
+ Libraries/LibWeb/Editing/ExecCommand.cpp  |  13 +++
+ Libraries/LibWeb/Page/EventHandler.cpp    | 107 +++++++++++-----------
  Libraries/LibWeb/Page/EventHandler.h      |   1 +
  Libraries/LibWeb/Page/Page.cpp            |   5 +
- Libraries/LibWeb/Page/Page.h              |   6 ++
- Libraries/LibWebView/URLSchemeHandler.h   |   6 ++
+ Libraries/LibWeb/Page/Page.h              |   2 +
+ Libraries/LibWebView/URLSchemeHandler.h   |   3 +
  Libraries/LibWebView/WebContentClient.cpp |  16 ++++
  Libraries/LibWebView/WebContentClient.h   |   2 +
- Libraries/LibWebView/WebContentPage.cpp   |  53 ++++++++++-
- Libraries/LibWebView/WebContentPage.h     |   5 +
- Services/WebContent/PageClient.cpp        |  26 +++++
+ Libraries/LibWebView/WebContentPage.cpp   |  49 +++++++++-
+ Libraries/LibWebView/WebContentPage.h     |   4 +
+ Services/WebContent/PageClient.cpp        |  25 +++++
  Services/WebContent/PageClient.h          |   2 +
  Services/WebContent/WebContentClient.ipc  |   2 +
- 13 files changed, 198 insertions(+), 53 deletions(-)
+ 13 files changed, 178 insertions(+), 53 deletions(-)
 
 diff --git a/Libraries/LibWeb/Editing/ExecCommand.cpp b/Libraries/LibWeb/Editing/ExecCommand.cpp
-index 1a069c0375cb9919db45befdcab04693e3c2cb3c..54b7ddd9c4d973fc8b5ca4f3013c63c33ffa8829 100644
+index 1a069c0375cb9919db45befdcab04693e3c2cb3c..84280bb7a043908fe612e9feb1e9547012503c2f 100644
 --- a/Libraries/LibWeb/Editing/ExecCommand.cpp
 +++ b/Libraries/LibWeb/Editing/ExecCommand.cpp
 @@ -29,9 +29,11 @@
@@ -56,13 +56,10 @@ index 1a069c0375cb9919db45befdcab04693e3c2cb3c..54b7ddd9c4d973fc8b5ca4f3013c63c3
  
  namespace Web::DOM {
  
-@@ -176,6 +178,20 @@ WebIDL::ExceptionOr<bool> Document::exec_command(Utf16FlyString const& command,
+@@ -176,6 +178,17 @@ WebIDL::ExceptionOr<bool> Document::exec_command(Utf16FlyString const& command,
          return navigable->event_handler().perform_cut_action(trigger);
      }
  
-+    // NB: Script may paste only where the embedder lets it, as browsers let the pages of an extension with the
-+    //     clipboardRead permission. The paste then runs synchronously, so that the pasted content is there once
-+    //     execCommand() returns. Anywhere else, paste isn't a supported command.
 +    if (command.equals_ignoring_ascii_case(Editing::CommandNames::paste) && is_html_document() && !m_inside_exec_command) {
 +        auto navigable = this->navigable();
 +        if (navigable && navigable->active_document().ptr() == this) {
@@ -78,7 +75,7 @@ index 1a069c0375cb9919db45befdcab04693e3c2cb3c..54b7ddd9c4d973fc8b5ca4f3013c63c3
      //     enabled for the active range only, so check whether it is enabled for the text control here.
      if (auto* control = focused_text_control(*this); control && is_html_document() && !m_inside_exec_command) {
 diff --git a/Libraries/LibWeb/Page/EventHandler.cpp b/Libraries/LibWeb/Page/EventHandler.cpp
-index b8be2a94a3397116bf96ce55149887a448f5d914..28749f40d0595340f77b8a0f221a8f626e93b278 100644
+index b8be2a94a3397116bf96ce55149887a448f5d914..a7643afdfdfd05504469042601d60d7b0e1808fc 100644
 --- a/Libraries/LibWeb/Page/EventHandler.cpp
 +++ b/Libraries/LibWeb/Page/EventHandler.cpp
 @@ -2586,7 +2586,9 @@ EventResult EventHandler::perform_copy_action()
@@ -92,7 +89,7 @@ index b8be2a94a3397116bf96ce55149887a448f5d914..28749f40d0595340f77b8a0f221a8f62
  }
  
  static bool has_selected_password_input(DOM::Document& document)
-@@ -2773,62 +2775,69 @@ EventResult EventHandler::perform_paste_action()
+@@ -2773,62 +2775,65 @@ EventResult EventHandler::perform_paste_action()
      // NB: The system clipboard lives in the UI process. So, retrieve its contents first — and run the rest of the paste
      //     action once the contents arrive.
      document->page().request_clipboard_entries(GC::create_function(document->heap(), [document = GC::Ref { *document }](Vector<Clipboard::SystemClipboardItem> items) {
@@ -154,7 +151,6 @@ index b8be2a94a3397116bf96ce55149887a448f5d914..28749f40d0595340f77b8a0f221a8f62
  }
  
 +// https://w3c.github.io/clipboard-apis/#paste-action
-+// This is the paste action from the point where the system clipboard's contents are in hand.
 +EventResult EventHandler::perform_paste_action(Vector<Clipboard::SystemClipboardItem> items)
 +{
 +    auto data_store = HTML::DragDataStore::create();
@@ -194,9 +190,6 @@ index b8be2a94a3397116bf96ce55149887a448f5d914..28749f40d0595340f77b8a0f221a8f62
 +                    if (essence.is_one_of("text/plain"sv, "text/html"sv)) {
 +                        add_text_item(move(essence), Utf16String::from_utf8_with_replacement_character(text));
 +                    } else if (essence == "image/png"sv) {
-+                        // AD-HOC: The spec doesn't say what to do here, but other engines add a file named
-+                        //         image.png for any PNG inserted via navigator.clipboard. Note that only PNG
-+                        //         images are supported via that API.
 +                        add_file_item(move(essence), "image.png"_utf16, text.to_byte_buffer());
 +                    }
 +                },
@@ -239,39 +232,32 @@ index e9f6aa40d7e6537cc12c0ba57572bb527a3e7ff8..5ff09bcd179a951aab2300c1ea10db19
 +
  }
 diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
-index a7d890cb0cbce2f1137df211641cfba0a880ff6d..686b5ff3bd91714f5b8d9500d7bc654431dde645 100644
+index d913c9935ab31f0b629b793f0588bb6f98b0fa82..0f10734afccfcef2b549be930365d230c2212cf0 100644
 --- a/Libraries/LibWeb/Page/Page.h
 +++ b/Libraries/LibWeb/Page/Page.h
-@@ -929,6 +929,12 @@ public:
+@@ -922,6 +922,8 @@ public:
  
      virtual void page_did_insert_clipboard_item(Clipboard::SystemClipboardItem const&, [[maybe_unused]] StringView presentation_style) { }
      virtual void page_did_request_clipboard_entries([[maybe_unused]] u64 request_id) { }
-+    // Whether the embedder lets a document copy and cut from script without the user's activation, as browsers let the
-+    // pages of an extension with the clipboardWrite permission.
 +    virtual bool page_embedder_allows_clipboard_write(DOM::Document&) { return false; }
-+    // The system clipboard's contents, if the embedder lets a document paste from script, as browsers let the pages of
-+    // an extension with the clipboardRead permission. Script can't paste otherwise.
 +    virtual Optional<Vector<Clipboard::SystemClipboardItem>> page_did_request_clipboard_entries_for_script(DOM::Document&);
      virtual void page_did_request_spell_check([[maybe_unused]] u64 request_id, [[maybe_unused]] Utf16String const& text) { }
      virtual void page_did_request_writing_suggestion([[maybe_unused]] u64 request_id, [[maybe_unused]] Utf16String const& text, [[maybe_unused]] u32 caret_offset) { }
      virtual void page_did_request_primary_paste() { }
 diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
-index 0b5bc6d988baf5001186956a628358ddb184c9f9..8c4a08074daf3f0e26d286edd47f8ac374614f8c 100644
+index 14b9dab5f2059ffbc8c82f94dd6db98c0630ea52..0fba1f00409aea2619382a195e18868f4e9347f8 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.h
 +++ b/Libraries/LibWebView/URLSchemeHandler.h
-@@ -101,6 +101,12 @@ private:
+@@ -78,6 +78,9 @@ private:
  struct URLSchemeBridge {
      Function<Optional<String>(ScriptBridgeEndpoint const&)> bootstrap_script;
      Function<void(ScriptBridgeEndpoint const&, String message)> on_message;
 +
-+    // Whether a document may use the clipboard from script without the user's activation, as browsers let the pages of
-+    // an extension with the clipboardRead and clipboardWrite permissions: reading lets execCommand("paste") paste, and
-+    // writing lets execCommand("copy") and execCommand("cut") copy. Neither is allowed without them.
 +    Function<bool(ScriptBridgeEndpoint const&)> may_read_clipboard;
 +    Function<bool(ScriptBridgeEndpoint const&)> may_write_clipboard;
  };
  
- // Serves a URL scheme from the UI process, as a browser serves its extension pages. The scheme's URLs get tuple origins
+ WEBVIEW_API void register_url_scheme(String scheme, URLSchemeHandler, Optional<URLSchemeBridge> = {});
 diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
 index 8c6840fd717ed4c917b6b45783507e7f2ab57906..79ca2cbf65b1ccf427f3be7f1e57711eba651938 100644
 --- a/Libraries/LibWebView/WebContentClient.cpp
@@ -313,10 +299,10 @@ index 95f9f3d07d6dde5b625409271578d73dc368c4cb..c2f638954b9815fcd2c6005da9b27d67
      virtual void did_retain_blob_url_token(Web::HTML::CrossProcessId navigable_id, URL::BlobURLEntry::Token token) override;
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 77395a4b1386db1575593dfa9636f12755a8aa39..11ef42de9ac384aa5c1433953d8ae7655a30c4ab 100644
+index 5873a48b2afd5e6f078a53516234afaa25130024..1f7c7ac639a7dab87f4af314f6b3b3014d047b82 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1780,6 +1780,54 @@ Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::Cross
+@@ -1772,6 +1772,52 @@ Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::Cross
      return url_scheme_bridge(*endpoint->origin().scheme())->bootstrap_script(*endpoint);
  }
  
@@ -329,8 +315,6 @@ index 77395a4b1386db1575593dfa9636f12755a8aa39..11ef42de9ac384aa5c1433953d8ae765
 +    return may_write && may_write(*endpoint);
 +}
 +
-+// NB: A renderer copies from script without the user's activation only for a document whose bridge lets it, but the
-+//     clipboard item doesn't say which document it's from, so any of the page's documents that may will do.
 +bool WebContentPage::hosts_a_document_allowed_to_write_the_clipboard()
 +{
 +    if (!m_is_open || !m_traversable)
@@ -370,14 +354,12 @@ index 77395a4b1386db1575593dfa9636f12755a8aa39..11ef42de9ac384aa5c1433953d8ae765
 +
  void WebContentPage::did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message)
  {
-     // NB: A document may post a message as it goes away, so one this page no longer hosts is dropped rather than taken
-@@ -2202,10 +2250,11 @@ void WebContentPage::did_change_background_color(Gfx::Color color)
+     auto endpoint = embedder_bridge_endpoint(document_id);
+@@ -2181,10 +2227,9 @@ void WebContentPage::did_change_background_color(Gfx::Color color)
  }
  
  // NB: The system clipboard belongs to the user, so a page reaches it only right after the user's own input to it, as
 -//     with a copy or paste shortcut, a click on a page control, or the browser's Paste command.
-+//     with a copy or paste shortcut, a click on a page control, or the browser's Paste command, or where the embedder
-+//     lets a document of its own scheme copy (see URLSchemeBridge::may_write_clipboard).
  void WebContentPage::did_insert_clipboard_item(Web::Clipboard::SystemClipboardItem item, String)
  {
 -    if (!has_transient_user_activation())
@@ -386,20 +368,19 @@ index 77395a4b1386db1575593dfa9636f12755a8aa39..11ef42de9ac384aa5c1433953d8ae765
      view().insert_clipboard_item(move(item));
  }
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 9de2bf2df3d15c67ef8898654528fd1f40e07b80..a1e956f183aae8854c98bef821c4067c3d3777d5 100644
+index 9c8ef6459f2e8d18214a9504253c45bacfd9b806..aeecf4d0486897fe661269fd2ead7cd8bf7656ab 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -182,6 +182,9 @@ public:
+@@ -181,6 +181,8 @@ public:
+     void reset_state_for_testing();
  
-     // A document of this page whose scheme has a script bridge, which the page hosts or is creating.
      Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
-+    // Whether the bridge of a document of this page lets the document copy from script without the user's activation.
 +    bool embedder_allows_clipboard_write(Web::HTML::CrossProcessId document_id);
 +    bool hosts_a_document_allowed_to_write_the_clipboard();
-     // An isolated world of the UI process's in a document of this page, which the UI process gave a bridge.
      Optional<ScriptBridgeEndpoint> user_script_endpoint(Web::HTML::CrossProcessId document_id, String const& world);
-     // A document of this page, which the page hosts or is creating.
-@@ -406,6 +409,8 @@ private:
+     Optional<ScriptBridgeEndpoint> hosted_document_endpoint(Web::HTML::CrossProcessId document_id, String world = {});
+     void run_user_script(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::HTML::UserScript, Function<void(UserScriptResult)>);
+@@ -400,6 +402,8 @@ private:
      Messages::WebContentClient::DidRequestAllCookiesCookiestoreResponse did_request_all_cookies_cookiestore(Web::HTML::EnvironmentId const&, URL::URL);
      Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry);
      Optional<String> did_request_embedder_bootstrap(Web::HTML::CrossProcessId document_id);
@@ -409,7 +390,7 @@ index 9de2bf2df3d15c67ef8898654528fd1f40e07b80..a1e956f183aae8854c98bef821c4067c
  
      // Test-only handlers, reached over the separate test transport (see WebContentTestClient).
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index e1741c27d7c935bdfcea6c3aeb03291f92912cc0..123a6abf091970a2af8d15416b8976250041782c 100644
+index e1741c27d7c935bdfcea6c3aeb03291f92912cc0..06f7ecffc3f3dd130f44b2e59094de83de909496 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
 @@ -26,6 +26,7 @@
@@ -420,11 +401,10 @@ index e1741c27d7c935bdfcea6c3aeb03291f92912cc0..123a6abf091970a2af8d15416b897625
  #include <LibWeb/CSS/StyleScope.h>
  #include <LibWeb/CSS/StyleSheetIdentifier.h>
  #include <LibWeb/CSS/StyleSheetImport.h>
-@@ -2052,6 +2053,31 @@ void PageClient::page_did_request_clipboard_entries(u64 request_id)
+@@ -2052,6 +2053,30 @@ void PageClient::page_did_request_clipboard_entries(u64 request_id)
      client().async_did_request_clipboard_entries(m_id, request_id);
  }
  
-+// NB: Only the embedder's own schemes have documents it might let use the clipboard, so others don't ask.
 +static bool is_embedder_scheme_document(Web::DOM::Document const& document)
 +{
 +    auto const& origin = document.origin();

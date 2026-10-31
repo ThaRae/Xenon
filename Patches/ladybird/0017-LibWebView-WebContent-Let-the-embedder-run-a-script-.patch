@@ -24,20 +24,20 @@ choose from.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibWebView/URLSchemeHandler.cpp    |  11 ++
- Libraries/LibWebView/URLSchemeHandler.h      |   6 +
- Libraries/LibWebView/UserScriptHandler.h     |   9 ++
- Libraries/LibWebView/ViewImplementation.cpp  |  17 ++
- Libraries/LibWebView/ViewImplementation.h    |   2 +
- Libraries/LibWebView/WebContentPage.cpp      |  29 +++-
- Libraries/LibWebView/WebContentPage.h        |   9 +-
+ Libraries/LibWebView/URLSchemeHandler.h      |   4 +
+ Libraries/LibWebView/UserScriptHandler.h     |   5 +
+ Libraries/LibWebView/ViewImplementation.cpp  |  17 +++
+ Libraries/LibWebView/ViewImplementation.h    |   1 +
+ Libraries/LibWebView/WebContentPage.cpp      |  27 +++-
+ Libraries/LibWebView/WebContentPage.h        |   7 +-
  Services/WebContent/ConnectionFromClient.cpp |   8 +
  Services/WebContent/ConnectionFromClient.h   |   1 +
  Services/WebContent/PageClient.h             |   1 +
- Services/WebContent/UserScripts.cpp          | 154 +++++++++++++++++--
- Services/WebContent/UserScripts.h            |  20 ++-
+ Services/WebContent/UserScripts.cpp          | 149 +++++++++++++++++--
+ Services/WebContent/UserScripts.h            |  16 +-
  Services/WebContent/WebContentClient.ipc     |   1 +
  Services/WebContent/WebContentServer.ipc     |   2 +
- 14 files changed, 252 insertions(+), 18 deletions(-)
+ 14 files changed, 232 insertions(+), 18 deletions(-)
 
 diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
 index 40e44cbc811b0bcbfae2323d378412075fd75491..e79a314514f1bec201ff33d6c86bc9c647ae1085 100644
@@ -69,7 +69,7 @@ index 40e44cbc811b0bcbfae2323d378412075fd75491..e79a314514f1bec201ff33d6c86bc9c6
  {
      return m_page.ptr() == other.m_page.ptr() && m_document_id == other.m_document_id && m_world == other.m_world;
 diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
-index ed9672b54ea581b54e4022e04e107d290783bd12..29f3cab80d12c5a7280145f57851eaab00ce34cf 100644
+index d74e050ca54f2509b4ebff20b7356840b71e483d..ad236d28897c4f7ab1ad3da8d79c0130b94b90a7 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.h
 +++ b/Libraries/LibWebView/URLSchemeHandler.h
 @@ -17,11 +17,14 @@
@@ -87,36 +87,30 @@ index ed9672b54ea581b54e4022e04e107d290783bd12..29f3cab80d12c5a7280145f57851eaab
  struct URLSchemeRequest {
      URL::URL url;
  
-@@ -72,6 +75,9 @@ public:
-     // The view showing the document, which is the top-level traversable's.
+@@ -57,6 +60,7 @@ public:
+     bool is_open() const;
      Optional<u64> view_id() const;
      void post_message(String) const;
-+    // Runs a script in the document, in the world the script names, once the document reaches the script's injection
-+    // time. A script that takes a bridge opens that world's endpoint.
 +    void run_user_script(Web::HTML::UserScript, Function<void(UserScriptResult)>) const;
  
      bool operator==(ScriptBridgeEndpoint const&) const;
  
 diff --git a/Libraries/LibWebView/UserScriptHandler.h b/Libraries/LibWebView/UserScriptHandler.h
-index d1c85bd4ae293da1d6626af082b898ce4dd7dfc9..c0bd46d82b65f013fc6dea5f1864ae3b3d3d75ec 100644
+index 55309dffbde74f0eed89727293a99bfcb7b8affe..cd02ae3a67dd397a1882fc9c0423e263cece1d70 100644
 --- a/Libraries/LibWebView/UserScriptHandler.h
 +++ b/Libraries/LibWebView/UserScriptHandler.h
-@@ -15,6 +15,15 @@
+@@ -15,6 +15,11 @@
  
  namespace WebView {
  
-+// What running a user script in a document on request came to (see ScriptBridgeEndpoint::run_user_script()).
 +struct UserScriptResult {
-+    // Whether the script ran: it doesn't if its document has gone, or isn't the navigable's active document any more.
 +    bool ran { false };
-+    // The script's completion value as JSON, once it settles if it's a promise. None for undefined, for an exception
-+    // (which goes to the console), for a rejected promise, and for a value JSON can't carry.
 +    Optional<String> result;
 +};
 +
- // The embedder's user scripts, as WebKit's WKUserContentController: which scripts each document gets, in its own world
- // or in isolated worlds of the embedder's (see Web::HTML::UserScript), and the messages of those worlds' bridges.
  struct UserScriptHandler {
+     AK_ALLOC_WITH_KMALLOC;
+ 
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
 index 30ca237c3fdc94ff2b5099351b28b96c4064f9b6..b25f9af73c49ff2d10dc74a83479f6baaf2bc303 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
@@ -146,37 +140,35 @@ index 30ca237c3fdc94ff2b5099351b28b96c4064f9b6..b25f9af73c49ff2d10dc74a83479f6ba
  {
      VERIFY(!m_top_level_traversable);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 01fdbf534363f8c92c062186420574c111ce99d4..66a11907cc4321e0852490455e8f7315bcdcb99f 100644
+index 589976a5b8890207e57d96fe52a383e761d33619..e6e3e892f8785aa19eb4377e6c4c89b4828afcd1 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -168,6 +168,8 @@ public:
+@@ -168,6 +168,7 @@ public:
  
      CanonicalTraversable& traversable() const;
      bool has_traversable() const { return m_top_level_traversable != nullptr; }
-+    // The active document of each of the view's navigables that a page hosts, the top-level one first, in tree order.
 +    Vector<ScriptBridgeEndpoint> frame_document_endpoints() const;
      // A page that comes to host any navigable of the tab gets the tab's settings: the spoofed User-Agent and
      // navigator compatibility mode, the preferred languages and color scheme, the window geometry, and the rest of
      // what the UI decides for the tab. A page that displays the tab gets its viewport and focus on top of that.
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index b24eab8c0411c505bd4bf40bf2c35323a56ea237..8123b475f2c71c7d2fb5bc36312ec5af434d61f9 100644
+index 9658370bf74df261e34dc836919509f6bd7dd106..b5ecd4923cc6b4a2abf3a467b607cee9b42368c4 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -167,7 +167,12 @@ WebContentPage::WebContentPage(WebContentClient& client, Web::PageId id, Canonic
+@@ -167,7 +167,11 @@ WebContentPage::WebContentPage(WebContentClient& client, Web::PageId id, Canonic
  {
  }
  
 -WebContentPage::~WebContentPage() = default;
 +WebContentPage::~WebContentPage()
 +{
-+    // NB: Whoever waits for a script's result learns that it didn't run, rather than waiting forever.
 +    for (auto& run : m_user_script_runs)
 +        run.value({});
 +}
  
  WebContentServerProxy* WebContentPage::routed_proxy() const
  {
-@@ -1716,6 +1721,28 @@ Vector<Web::HTML::UserScript> WebContentPage::did_request_user_scripts(Web::HTML
+@@ -1712,6 +1716,27 @@ Vector<Web::HTML::UserScript> WebContentPage::did_request_user_scripts(Web::HTML
      return scripts;
  }
  
@@ -187,7 +179,6 @@ index b24eab8c0411c505bd4bf40bf2c35323a56ea237..8123b475f2c71c7d2fb5bc36312ec5af
 +        return;
 +    }
 +
-+    // NB: A world given a bridge this way may post messages too.
 +    if (script.takes_bridge && !script.world.is_empty())
 +        m_bridged_user_script_worlds.ensure(document_id).set(script.world);
 +
@@ -204,9 +195,9 @@ index b24eab8c0411c505bd4bf40bf2c35323a56ea237..8123b475f2c71c7d2fb5bc36312ec5af
 +
  void WebContentPage::did_post_user_script_message(Web::HTML::CrossProcessId document_id, String world, String message)
  {
-     // NB: As for an embedder page's bridge, the sender comes from the UI process's records, never from the message.
+     auto endpoint = user_script_endpoint(document_id, world);
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 2f5fc0369ff0e2200e14787679bb191d55975fd2..e0147dd1ae8fc30ac1aeaf1abcf604df32fb0d93 100644
+index 977a071ec2e362cb7258b0175283a67a37467a21..d835620f2ead30e28e5adf64f622a49291a54eb4 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
 @@ -27,6 +27,7 @@
@@ -217,18 +208,16 @@ index 2f5fc0369ff0e2200e14787679bb191d55975fd2..e0147dd1ae8fc30ac1aeaf1abcf604df
  #include <LibWebView/WebAuthn/Coordinator.h>
  #include <WebContent/WebContentClientEndpoint.h>
  #include <WebContent/WebContentServerEndpoint.h>
-@@ -183,6 +184,10 @@ public:
+@@ -181,6 +182,8 @@ public:
+ 
      Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
-     // An isolated world of the UI process's in a document of this page, which the UI process gave a bridge.
      Optional<ScriptBridgeEndpoint> user_script_endpoint(Web::HTML::CrossProcessId document_id, String const& world);
-+    // A document of this page, which the page hosts or is creating.
 +    Optional<ScriptBridgeEndpoint> hosted_document_endpoint(Web::HTML::CrossProcessId document_id, String world = {});
-+    // Runs a script in one of this page's documents, once the document reaches the script's injection time.
 +    void run_user_script(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::HTML::UserScript, Function<void(UserScriptResult)>);
  
  private:
-     // The caller of a WebAuthn ceremony, from this process's records of the documents a page hosts, or the error to
-@@ -194,7 +199,6 @@ private:
+     ErrorOr<WebAuthnCoordinator::CeremonyContext, Web::WebAuthn::Error> web_authn_ceremony_context(StringView message_name, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::PermissionsPolicy::PolicyControlledFeature, String const& rp_id);
+@@ -190,7 +193,6 @@ private:
      bool continue_navigation_population_in_selected_process(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id);
      void for_each_hosted_document(Function<IterationDecision(CanonicalDocument&)> const&) const;
      void for_each_hosted_document(Function<IterationDecision(CanonicalDocument&, CanonicalNavigable const&)> const&) const;
@@ -236,7 +225,7 @@ index 2f5fc0369ff0e2200e14787679bb191d55975fd2..e0147dd1ae8fc30ac1aeaf1abcf604df
      bool populates_a_navigation_to_local_file(ByteString const& path) const;
      Optional<CanonicalDocument&> document_with_hosted_environment(Web::HTML::EnvironmentId const& environment_id) const;
      StorageJar* storage_jar(Web::StorageAPI::StorageEndpointType) const;
-@@ -292,6 +296,7 @@ private:
+@@ -288,6 +290,7 @@ private:
      virtual void did_request_embedder_resource(URL::URL url, i32 request_id) override;
      virtual void did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message) override;
      virtual void did_post_user_script_message(Web::HTML::CrossProcessId document_id, String world, String message) override;
@@ -244,9 +233,9 @@ index 2f5fc0369ff0e2200e14787679bb191d55975fd2..e0147dd1ae8fc30ac1aeaf1abcf604df
      virtual void did_request_color_picker(Color current_color) override;
      virtual void did_request_geolocation_position(u64 request_id, Web::HTML::CrossProcessId document_id) override;
      virtual void did_cancel_geolocation_position_request(u64 request_id) override;
-@@ -430,6 +435,8 @@ private:
+@@ -425,6 +428,8 @@ private:
+     bool m_is_open { true };
      RefPtr<WebUI> m_web_ui;
-     // The isolated worlds of each document that the UI process gave a bridge, which alone may post it messages.
      HashMap<Web::HTML::CrossProcessId, HashTable<String>> m_bridged_user_script_worlds;
 +    HashMap<u64, Function<void(UserScriptResult)>> m_user_script_runs;
 +    u64 m_next_user_script_run_id { 1 };
@@ -254,10 +243,10 @@ index 2f5fc0369ff0e2200e14787679bb191d55975fd2..e0147dd1ae8fc30ac1aeaf1abcf604df
      Optional<PresentedBackingStores> m_presented_backing_stores;
      bool m_needs_beforeunload_check { true };
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 297643d98bb53efb5a0e490042cc9afa5a8e3d57..f2bad902f0bf4a572dc4ba64a97aa1d05634853d 100644
+index 0490c8f3b9507050ff4c6fc5250a4bb2cb6ae776..facb16fc15cc557a1a67a30a567a9c9a5a6bf3da 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3409,6 +3409,14 @@ void ConnectionFromClient::post_user_script_message(Web::PageId page_id, Web::HT
+@@ -3408,6 +3408,14 @@ void ConnectionFromClient::post_user_script_message(Web::PageId page_id, Web::HT
          page->deliver_user_script_message(document_id, world, move(message));
  }
  
@@ -273,10 +262,10 @@ index 297643d98bb53efb5a0e490042cc9afa5a8e3d57..f2bad902f0bf4a572dc4ba64a97aa1d0
  {
      if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 6420dd5eaeb5ff5bda8d76c0afd89acc19515f34..41fc3b3a4c018ed558228ca7aebc988b7adbed2a 100644
+index 5d62fc2cc2b70f09c65f464eda188911446a4c20..136237b018932476114525ef10d16a19b2364738 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -282,6 +282,7 @@ private:
+@@ -281,6 +281,7 @@ private:
      virtual void handle_embedder_resource_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, Vector<HTTP::Header> headers, i32 request_id) override;
      virtual void post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) override;
      virtual void post_user_script_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String world, String message) override;
@@ -297,7 +286,7 @@ index 95ace52be7b6b233d69bb8feffcbd5574f0a5715..0fc5f70ae3d803b81d5c498f23659695
      void did_handle_webdriver_mouse_event(u64 request_id);
      bool prepare_webdriver_input_command(u64, Optional<Web::HTML::CrossProcessId>, JsonValue&);
 diff --git a/Services/WebContent/UserScripts.cpp b/Services/WebContent/UserScripts.cpp
-index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e146b7812e 100644
+index 5229231e01450355874162b15a53834d9c597343..6571857daf65ae0ce68af69b29485e06d96efd10 100644
 --- a/Services/WebContent/UserScripts.cpp
 +++ b/Services/WebContent/UserScripts.cpp
 @@ -6,15 +6,19 @@
@@ -320,12 +309,10 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
  #include <WebContent/ConnectionFromClient.h>
  #include <WebContent/UserScripts.h>
  
-@@ -30,12 +34,31 @@ void UserScripts::document_reached(ConnectionFromClient& client, Web::PageId pag
+@@ -28,12 +32,29 @@ void UserScripts::document_reached(ConnectionFromClient& client, Web::PageId pag
  {
      auto document_id = document.id();
  
-+    // Scripts the UI process asked for that were waiting for this document: those for document end run now, and
-+    // those for document idle start waiting no longer than DOCUMENT_IDLE_TIMEOUT, or run if it's idle already.
 +    if (injection_time != UserScriptInjectionTime::DocumentStart) {
 +        Vector<u64> to_run;
 +        Vector<u64> to_time;
@@ -353,7 +340,7 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
          if (!response)
              return;
          auto scripts = response->take_scripts();
-@@ -104,11 +127,11 @@ void UserScripts::run_scripts(ConnectionFromClient& client, Web::PageId page_id,
+@@ -98,38 +119,35 @@ void UserScripts::run_scripts(ConnectionFromClient& client, Web::PageId page_id,
      for (auto const& script : scripts_to_run) {
          if (protected_document->has_been_destroyed())
              return;
@@ -367,8 +354,7 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
  {
      auto source = Utf16String::from_utf8(script.source);
  
-@@ -116,28 +139,25 @@ void UserScripts::run_script(ConnectionFromClient& client, Web::PageId page_id,
-         // NB: A bridge in the document's own world would be the document's to use as well.
+     if (script.world.is_empty()) {
          if (script.takes_bridge) {
              dbgln("UserScripts: Not running {}, since only isolated worlds get a bridge", script.url);
 -            return;
@@ -393,7 +379,6 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
 +    if (!script.takes_bridge)
 +        return world->run_script(source.utf16_view(), script.url);
  
-     // NB: The script is a function body, so that the bridge is a parameter rather than something on the world's global.
      auto function_source = Utf16String::formatted("(function (bridge) {{\n{}\n}})", source);
      auto function = world->run_script(function_source.utf16_view(), script.url);
      if (function.is_abrupt())
@@ -402,7 +387,7 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
  
      auto& realm = world->realm();
      auto document_id = document.id();
-@@ -148,7 +168,107 @@ void UserScripts::run_script(ConnectionFromClient& client, Web::PageId page_id,
+@@ -140,7 +158,104 @@ void UserScripts::run_script(ConnectionFromClient& client, Web::PageId page_id,
          return JS::js_undefined(); }, 1, JS::default_attributes);
  
      m_bridges.ensure(document_id).set(script.world, { .document = document, .world = *world, .object = *bridge });
@@ -410,7 +395,6 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
 +    return world->call(function.value(), JS::js_undefined(), { { JS::Value { bridge } } });
 +}
 +
-+// A script's completion value as JSON, or none for undefined and for values JSON can't carry.
 +static Optional<String> serialize_result(Web::DOM::Document& document, JS::Value value)
 +{
 +    if (value.is_undefined())
@@ -482,7 +466,6 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
 +        client.async_did_run_user_script(page_id, request_id, false, {});
 +        return;
 +    }
-+    // An exception has gone to the console already.
 +    if (completion->is_abrupt()) {
 +        client.async_did_run_user_script(page_id, request_id, true, {});
 +        return;
@@ -494,7 +477,6 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
 +        return;
 +    }
 +
-+    // A promise answers once it settles: with its value, or with nothing if it's rejected.
 +    auto& realm = value.as_object().shape().realm();
 +    auto& heap = protected_document->heap();
 +    Web::HTML::TemporaryExecutionContext execution_context { protected_document->relevant_settings_object(), Web::HTML::TemporaryExecutionContext::CallbacksEnabled::Yes };
@@ -511,7 +493,7 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
  }
  
  void UserScripts::deliver_message(Web::HTML::CrossProcessId document_id, String const& world_name, String message)
-@@ -188,11 +308,17 @@ void UserScripts::deliver_message(Web::HTML::CrossProcessId document_id, String
+@@ -180,11 +295,17 @@ void UserScripts::deliver_message(Web::HTML::CrossProcessId document_id, String
      }));
  }
  
@@ -531,7 +513,7 @@ index 73c84009f9886491b33ef2b147579300cce20960..9b052ce67821bc5dae15e7aeac87f9e1
      m_bridges.remove_all_matching([&](auto const&, auto& bridges) {
          bridges.remove_all_matching([&](auto const&, auto const& bridge) { return is_gone(bridge.document); });
 diff --git a/Services/WebContent/UserScripts.h b/Services/WebContent/UserScripts.h
-index 8c72a24be7063922adc0de4bef494a22e4605118..b943d34d7ef9bcd34c101ffefa9ab445f87288cd 100644
+index 5f65e43f5860ca5a49c61b0b66d82d24da2fab8c..c6cbb280074db7807596fdf741855e0f4adac247 100644
 --- a/Services/WebContent/UserScripts.h
 +++ b/Services/WebContent/UserScripts.h
 @@ -12,6 +12,7 @@
@@ -542,22 +524,19 @@ index 8c72a24be7063922adc0de4bef494a22e4605118..b943d34d7ef9bcd34c101ffefa9ab445
  #include <LibWeb/Forward.h>
  #include <LibWebCommon/HTML/CrossProcessId.h>
  #include <LibWebCommon/HTML/Scripting/UserScript.h>
-@@ -29,6 +30,10 @@ public:
+@@ -25,6 +26,8 @@ public:
      void document_reached(ConnectionFromClient&, Web::PageId, Web::DOM::Document&, Web::HTML::UserScriptInjectionTime);
      void deliver_message(Web::HTML::CrossProcessId document_id, String const& world, String message);
  
-+    // Runs a script the UI process asks for in a navigable's document, once the document reaches the script's injection
-+    // time, and answers with the script's completion value as JSON, once it settles if it's a promise.
 +    void run_on_request(ConnectionFromClient&, Web::PageId, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::HTML::UserScript, u64 request_id);
 +
  private:
      struct DocumentScripts {
          GC::Weak<Web::DOM::Document> document;
-@@ -43,12 +48,23 @@ private:
+@@ -39,12 +42,21 @@ private:
          GC::Weak<JS::Object> object;
      };
  
-+    // A script the UI process asked for, waiting for its document to reach its injection time.
 +    struct RequestedScript {
 +        GC::Weak<Web::DOM::Document> document;
 +        Web::HTML::UserScript script;
@@ -567,7 +546,6 @@ index 8c72a24be7063922adc0de4bef494a22e4605118..b943d34d7ef9bcd34c101ffefa9ab445
      void run_scripts(ConnectionFromClient&, Web::PageId, Web::HTML::CrossProcessId document_id, Web::HTML::UserScriptInjectionTime);
 -    void run_script(ConnectionFromClient&, Web::PageId, Web::DOM::Document&, Web::HTML::UserScript const&);
 -    void forget_documents_that_are_gone();
-+    // None if the script had nowhere to run.
 +    Optional<JS::Completion> run_script(ConnectionFromClient&, Web::PageId, Web::DOM::Document&, Web::HTML::UserScript const&);
 +    void run_requested_script(ConnectionFromClient&, Web::PageId, u64 request_id);
 +    void start_idle_timer_for_requested_script(ConnectionFromClient&, Web::PageId, u64 request_id);

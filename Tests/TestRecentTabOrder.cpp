@@ -13,8 +13,6 @@ using namespace Ladybird;
 using Order = RecentTabOrder<char>;
 using enum Order::Direction;
 
-// A window's tab strip, which drives the order the way TabCycler does: the order catches up with the strip before
-// anything else happens, and every tab that becomes active is reported.
 struct Window {
     void open(char tab, bool activate = true)
     {
@@ -29,7 +27,6 @@ struct Window {
         order.did_activate(tab);
     }
 
-    // The strip picks the tab that becomes active when the active one closes.
     void close(char tab, Optional<char> next_active = {})
     {
         strip.remove_first_matching([&](auto other) { return other == tab; });
@@ -145,7 +142,6 @@ TEST_CASE(tabs_opened_in_the_background_join_the_end)
     window.open('C', false);
     window.open('D', false);
 
-    // The order catches up with the strip once something happens, and the first press is enough.
     EXPECT_EQ(window.press(LessRecent), 'A');
     window.release();
     EXPECT_EQ(window.recent_first(), "ABCD"sv);
@@ -162,7 +158,6 @@ TEST_CASE(closed_tabs_leave_the_order)
     window.close('B');
     EXPECT_EQ(window.recent_first(), "DCA"sv);
 
-    // The strip activates a neighbor of the active tab when it closes, and that tab becomes the most recent.
     window.close('D', 'A');
     EXPECT_EQ(window.recent_first(), "AC"sv);
     EXPECT_EQ(window.press(LessRecent), 'C');
@@ -184,7 +179,6 @@ TEST_CASE(tabs_moved_between_windows)
     auto first = window_with("ABC"sv);
     auto second = window_with("XY"sv);
 
-    // A tab dragged to another window becomes that window's active tab, and the window it left activates another.
     first.close('C', 'B');
     second.open('C');
     EXPECT_EQ(first.recent_first(), "BA"sv);
@@ -218,7 +212,6 @@ TEST_CASE(closing_a_tab_behind_the_cycle)
 
 TEST_CASE(closing_the_tab_the_cycle_stands_on)
 {
-    // The next press goes on to the tab after it...
     auto window = window_with("ABCD"sv);
     EXPECT_EQ(window.press(LessRecent), 'C');
     window.close('C', 'D');
@@ -226,7 +219,6 @@ TEST_CASE(closing_the_tab_the_cycle_stands_on)
     window.release();
     EXPECT_EQ(window.recent_first(), "BDA"sv);
 
-    // ...or back to the tab before it.
     window = window_with("ABCD"sv);
     EXPECT_EQ(window.press(LessRecent), 'C');
     EXPECT_EQ(window.press(LessRecent), 'B');
@@ -238,7 +230,6 @@ TEST_CASE(closing_the_tab_the_cycle_stands_on)
 
 TEST_CASE(a_press_always_lands_on_another_tab)
 {
-    // The strip activated the tab the next press would have reached, so the press goes one further.
     auto window = window_with("ABCD"sv);
     EXPECT_EQ(window.press(LessRecent), 'C');
     window.close('C', 'B');

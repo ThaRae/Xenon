@@ -32,51 +32,47 @@ LoaderConfig::enable_fingerprinting_protection turns it on, and it is
 on by default. Test mode turns it off in WebContent and WebWorker,
 since test output has to be deterministic.
 ---
- .../Bindings/Rust/src/bindings/services.rs    |   4 +
- .../Rust/src/html/canvas_image_data.rs        |  10 +
- .../LibWeb/Bindings/RustBindingsServices.cpp  |  10 +
+ .../Bindings/Rust/src/bindings/services.rs    |   2 +
+ .../Rust/src/html/canvas_image_data.rs        |   8 +
+ .../LibWeb/Bindings/RustBindingsServices.cpp  |  10 ++
  Libraries/LibWeb/CMakeLists.txt               |   1 +
- Libraries/LibWeb/Fingerprinting/Farbling.cpp  | 185 ++++++++++++++++++
- Libraries/LibWeb/Fingerprinting/Farbling.h    |  71 +++++++
- Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp   |  25 ++-
- .../HTML/NavigatorConcurrentHardware.cpp      |   8 +-
- .../LibWeb/HTML/NavigatorDeviceMemory.cpp     |   9 +-
- Libraries/LibWeb/WebAudio/AnalyserNode.cpp    |  15 +-
+ Libraries/LibWeb/Fingerprinting/Farbling.cpp  | 169 ++++++++++++++++++
+ Libraries/LibWeb/Fingerprinting/Farbling.h    |  50 ++++++
+ Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp   |  24 ++-
+ .../HTML/NavigatorConcurrentHardware.cpp      |   5 +-
+ .../LibWeb/HTML/NavigatorDeviceMemory.cpp     |   8 +-
+ Libraries/LibWeb/WebAudio/AnalyserNode.cpp    |  14 +-
  Libraries/LibWeb/WebAudio/AnalyserNode.h      |   1 +
- Libraries/LibWeb/WebAudio/AudioBuffer.cpp     |  14 ++
- Libraries/LibWeb/WebAudio/AudioBuffer.h       |   2 +
- .../Loader/LoaderConfigSnapshot.h             |   4 +
+ Libraries/LibWeb/WebAudio/AudioBuffer.cpp     |  12 ++
+ Libraries/LibWeb/WebAudio/AudioBuffer.h       |   1 +
+ .../Loader/LoaderConfigSnapshot.h             |   2 +
  Services/WebContent/main.cpp                  |   3 +
  Services/WebWorker/main.cpp                   |   3 +
- 16 files changed, 356 insertions(+), 9 deletions(-)
+ 16 files changed, 304 insertions(+), 9 deletions(-)
  create mode 100644 Libraries/LibWeb/Fingerprinting/Farbling.cpp
  create mode 100644 Libraries/LibWeb/Fingerprinting/Farbling.h
 
 diff --git a/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs b/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
-index 8633f55fc71ac4123be95cb090b5fc416d9c741a..f5d5606a1556aaf39e188a2b41e0e4bf05ba747b 100644
+index 8633f55fc71ac4123be95cb090b5fc416d9c741a..820608cfa8f8a82d088fb435726cdf6f1a0859a4 100644
 --- a/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
 +++ b/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
-@@ -35,6 +35,10 @@ unsafe extern "C" {
+@@ -35,6 +35,8 @@ unsafe extern "C" {
      /// Whether the global object of the realm is a Window.
      pub(crate) fn web_bindings_realm_is_window(realm: *mut c_void) -> bool;
  
-+    /// If fingerprinting protection is enabled, farbles the RGBA8888 pixels in place with the seed of the realm's
-+    /// origin (Web::Fingerprinting::perturb_pixels()).
 +    pub(crate) fn web_bindings_farble_image_data(realm: *mut c_void, pixels: *mut u8, length: usize);
 +
      /// Runs the steps with the context while an execution context of the realm is on the stack, as an
      /// HTML::TemporaryExecutionContext puts it there, with callbacks enabled if `callbacks_enabled`.
      pub(crate) fn web_bindings_with_temporary_execution_context(
 diff --git a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
-index 94d8734923cece5a43cd5c3ba4a6710bc572fd56..86670d95d33ac114566daa0a7d58328fa717f404 100644
+index 94d8734923cece5a43cd5c3ba4a6710bc572fd56..6e7b03bee7d675db0a0d1e04c0dc561a5cee661c 100644
 --- a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
 +++ b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
-@@ -351,6 +351,16 @@ impl<K: CanvasKind> RenderingContext2D<K> {
+@@ -351,6 +351,14 @@ impl<K: CanvasKind> RenderingContext2D<K> {
          //    bitmap to transparent black.
          // NOTE: No-op, already done during creation.
  
-+        // Fingerprinting protection: farble the copy handed to script, never the canvas itself.
-+        // SAFETY: The pixels of the new ImageData hold width * height RGBA8888 pixels, and nothing else aliases them.
 +        unsafe {
 +            crate::bindings::services::web_bindings_farble_image_data(
 +                cx.realm().as_ptr().cast(),
@@ -137,17 +133,15 @@ index 75c1f6caad0bd2618232798a3287e74651954a3a..766d0af6ccc4cc1902745bddc54d0086
      Gamepad/GamepadButton.cpp
 diff --git a/Libraries/LibWeb/Fingerprinting/Farbling.cpp b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a712454fc6
+index 0000000000000000000000000000000000000000..671af3e895d8f5b098641ccb91c778634c0ab574
 --- /dev/null
 +++ b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
-@@ -0,0 +1,185 @@
+@@ -0,0 +1,169 @@
 +/*
 + * Copyright (c) 2026, Ryan E <76752281+ThaRae@users.noreply.github.com>
 + *
 + * SPDX-License-Identifier: BSD-2-Clause
 + */
-+
-+// Independent reimplementation inspired by Brave's farbling. See Farbling.h.
 +
 +#include <AK/Random.h>
 +#include <AK/StdLibExtras.h>
@@ -158,7 +152,6 @@ index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a7
 +
 +namespace Web::Fingerprinting {
 +
-+// SplitMix64 finalizer, used as a strong 64-bit mixing function.
 +static constexpr u64 mix64(u64 value)
 +{
 +    value += 0x9E3779B97F4A7C15ull;
@@ -174,13 +167,9 @@ index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a7
 +
 +u64 session_secret()
 +{
-+    // The browser sends every WebContent and WebWorker process the same secret, so that a site gets the same values
-+    // in all the processes that host it. Were each process to make up its own, a site could open a few and combine
-+    // their readings to see through the noise.
 +    if (auto secret = current_loader_config()->config.fingerprinting_session_secret; secret != 0)
 +        return secret;
 +
-+    // Function-local static initialization is thread-safe.
 +    static u64 const fallback_secret = [] {
 +        u64 value = 0;
 +        while (value == 0)
@@ -193,7 +182,6 @@ index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a7
 +u64 seed_for_host(StringView host)
 +{
 +    u64 state = mix64(session_secret());
-+    // FNV-1a over the host bytes, keyed by the session secret, then finalized.
 +    u64 hash = 0xCBF29CE484222325ull ^ state;
 +    for (auto byte : host.bytes()) {
 +        hash ^= byte;
@@ -227,7 +215,6 @@ index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a7
 +
 +u64 lfsr_next(u64 value)
 +{
-+    // Galois LFSR with taps 64, 63, 61, 60 (maximal length).
 +    value = nonzero(value);
 +    auto lsb = value & 1;
 +    value >>= 1;
@@ -236,7 +223,6 @@ index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a7
 +    return value;
 +}
 +
-+// Hashes the pixels eight bytes at a time, which keeps it cheap next to encoding the image.
 +static u64 hash_pixels(ReadonlyBytes pixels)
 +{
 +    u64 hash = 0;
@@ -257,21 +243,16 @@ index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a7
 +    if (rgba.size() < 4)
 +        return;
 +
-+    // The pixels are part of the key. With the seed alone, every image on a site would get the same pattern, so a
-+    // script could read it off an image it drew itself and undo it on any other. Reading the same image again still
-+    // gives the same result.
 +    auto key = seed_for_key(seed ^ hash_pixels(rgba), FarbleKey::Canvas);
 +    auto lfsr = nonzero(mix64(key));
 +    auto pixel_count = rgba.size() / 4;
 +
-+    // Walk the buffer touching roughly one pixel in eight; the key bits decide which channel's LSB flips.
 +    size_t index = static_cast<size_t>(lfsr % 8);
 +    while (index < pixel_count) {
 +        lfsr = lfsr_next(lfsr);
-+        auto channel = static_cast<size_t>((key >> (lfsr & 63)) & 1) + static_cast<size_t>(lfsr & 1); // 0, 1, or 2
++        auto channel = static_cast<size_t>((key >> (lfsr & 63)) & 1) + static_cast<size_t>(lfsr & 1);
 +        u8 alpha = has_alpha == PixelsHaveAlpha::Yes ? rgba[index * 4 + 3] : 255;
 +        auto& value = rgba[index * 4 + channel];
-+        // Flipping the low bit moves the value by one; when that would push it above alpha, move down instead.
 +        if (alpha != 0) {
 +            u8 flipped = value ^ 1;
 +            value = flipped > alpha ? static_cast<u8>(value - 1) : flipped;
@@ -283,7 +264,6 @@ index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a7
 +void farble_audio(Span<float> samples, u64 seed)
 +{
 +    auto key = seed_for_key(seed, FarbleKey::Audio);
-+    // Map 53 bits to [0, 1), then into [0.99, 1.0).
 +    double unit = static_cast<double>(key >> 11) * (1.0 / 9007199254740992.0);
 +    auto fudge = static_cast<float>(0.99 + unit * 0.01);
 +    if (fudge >= 1.0f)
@@ -328,10 +308,10 @@ index 0000000000000000000000000000000000000000..175334e7065b89902297758b59af35a7
 +}
 diff --git a/Libraries/LibWeb/Fingerprinting/Farbling.h b/Libraries/LibWeb/Fingerprinting/Farbling.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..a6b190a362366a4954e65f6bc5ac07fdb07b018a
+index 0000000000000000000000000000000000000000..f3c77937be17613afcdd0597f4a778b85efccd2a
 --- /dev/null
 +++ b/Libraries/LibWeb/Fingerprinting/Farbling.h
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 2026, Ryan E <76752281+ThaRae@users.noreply.github.com>
 + *
@@ -345,12 +325,6 @@ index 0000000000000000000000000000000000000000..a6b190a362366a4954e65f6bc5ac07fd
 +#include <AK/Types.h>
 +#include <LibJS/Forward.h>
 +
-+// Fingerprinting protection by "farbling": small, per-session and per-site deterministic randomization of values that
-+// scripts commonly read to fingerprint a user (canvas pixels, audio samples, hardware concurrency, device memory).
-+//
-+// The design is inspired by Brave's farbling (https://brave.com/privacy-updates/4-fingerprinting-defenses-2.0/ and
-+// brave-core's farbling_audio / canvas perturbation). This is an independent reimplementation; no Brave code is used.
-+
 +namespace Web::Fingerprinting {
 +
 +enum class FarbleKey : u8 {
@@ -360,23 +334,16 @@ index 0000000000000000000000000000000000000000..a6b190a362366a4954e65f6bc5ac07fd
 +    Audio,
 +};
 +
-+// The browser session's secret (LoaderConfig::fingerprinting_session_secret), or, until the browser has sent one, a
-+// process-local secret generated once from the system CSPRNG.
 +u64 session_secret();
 +
-+// Mixes the session secret with the given host. An empty host yields a seed derived from the session secret alone.
 +u64 seed_for_host(StringView host);
 +
-+// Seed for the host of the relevant settings object's origin of the given object (empty host if opaque).
 +u64 seed_for_relevant_global(JS::Object const&);
 +
-+// Seed for the host of the current settings object's origin, for getters with no object of their own.
 +u64 seed_for_current_settings_object();
 +
-+// Derives a per-feature seed so that different APIs do not share a random stream.
 +u64 seed_for_key(u64 seed, FarbleKey);
 +
-+// One step of a 64-bit Galois LFSR (never returns 0 for a non-zero input).
 +u64 lfsr_next(u64 value);
 +
 +enum class PixelsHaveAlpha : u8 {
@@ -384,27 +351,19 @@ index 0000000000000000000000000000000000000000..a6b190a362366a4954e65f6bc5ac07fd
 +    Yes,
 +};
 +
-+// XORs the least significant bit of a subset of color channels in a 4-byte-per-pixel buffer (RGBA8, BGRA8, or their x
-+// variants; the 4th byte is alpha when PixelsHaveAlpha::Yes). The subset is decided by the seed and the pixels
-+// together, so the same image always comes out the same and different images get unrelated subsets. With alpha, fully
-+// transparent pixels are left alone and channel values never exceed alpha, so premultiplied data stays valid.
 +void perturb_pixels(Bytes rgba, u64 seed, PixelsHaveAlpha = PixelsHaveAlpha::Yes);
 +
-+// Multiplies every sample by a fudge factor in [0.99, 1.0).
 +void farble_audio(Span<float> samples, u64 seed);
 +
-+// Brave "balanced" behavior: a value in [2, true_value] when true_value is small, else in [4, min(8, true_value)].
 +int farbled_hardware_concurrency(unsigned true_value, u64 seed);
 +
-+// Picks a value from {1, 2, 4} (GiB) that does not exceed the true rounded value.
 +double farbled_device_memory_gib(double true_rounded_gib, u64 seed);
 +
-+// Reads LoaderConfig::enable_fingerprinting_protection from the current loader config.
 +bool protection_enabled();
 +
 +}
 diff --git a/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp b/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
-index 1bc3caa30926c96f3efec48b21b975940caede15..20485351cc3321ebd06474f5fd526fa73a40b19d 100644
+index 1bc3caa30926c96f3efec48b21b975940caede15..50b01a75bbac4f714368d32066ce63e2ea03d813 100644
 --- a/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
 +++ b/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
 @@ -8,6 +8,7 @@
@@ -415,7 +374,7 @@ index 1bc3caa30926c96f3efec48b21b975940caede15..20485351cc3321ebd06474f5fd526fa7
  #include <LibWeb/HTML/Canvas/Canvas2DContextBase.h>
  #include <LibWeb/HTML/Canvas/CanvasHost.h>
  #include <LibWeb/HTML/Canvas/PredefinedColorSpace.h>
-@@ -85,12 +86,24 @@ Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_from_surface()
+@@ -85,12 +86,23 @@ Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_from_surface()
  
  Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_for_serialization(Utf16View type)
  {
@@ -434,7 +393,6 @@ index 1bc3caa30926c96f3efec48b21b975940caede15..20485351cc3321ebd06474f5fd526fa7
 +    if (!frame.has_value() || !Fingerprinting::protection_enabled())
 +        return frame;
 +
-+    // Fingerprinting protection: serialize a farbled copy, leaving the canvas itself untouched.
 +    auto copy_or_error = frame->bitmap().clone();
 +    if (copy_or_error.is_error())
 +        return frame;
@@ -447,7 +405,7 @@ index 1bc3caa30926c96f3efec48b21b975940caede15..20485351cc3321ebd06474f5fd526fa7
  
  // https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-origin-clean
 diff --git a/Libraries/LibWeb/HTML/NavigatorConcurrentHardware.cpp b/Libraries/LibWeb/HTML/NavigatorConcurrentHardware.cpp
-index 535dff71160dd5cc714721b6e9640ebb91942fb1..3b040d9a0931078749fae2e33fd6574897da82aa 100644
+index 535dff71160dd5cc714721b6e9640ebb91942fb1..dc0e83bbd18591498283d06b051b89a0c6ceeb15 100644
 --- a/Libraries/LibWeb/HTML/NavigatorConcurrentHardware.cpp
 +++ b/Libraries/LibWeb/HTML/NavigatorConcurrentHardware.cpp
 @@ -6,6 +6,7 @@
@@ -458,17 +416,14 @@ index 535dff71160dd5cc714721b6e9640ebb91942fb1..3b040d9a0931078749fae2e33fd65748
  #include <LibWeb/HTML/NavigatorConcurrentHardware.h>
  #include <LibWeb/Loader/ResourceLoader.h>
  
-@@ -23,10 +24,15 @@ WebIDL::UnsignedLongLong NavigatorConcurrentHardwareMixin::hardware_concurrency(
+@@ -23,10 +24,12 @@ WebIDL::UnsignedLongLong NavigatorConcurrentHardwareMixin::hardware_concurrency(
  
      // In WebKit mode, the count is capped the way the claimed engine caps it: 8 on a machine with eight or more
      // logical processors, and 4 on the rest. The real count would single the navigator out as not that engine. But
 -    // the count never exceeds the real one, which the spec's range above forbids.
-+    // the count never exceeds the real one, which the spec's range above forbids. That's already as coarse as
-+    // fingerprinting protection would make it, and a farbled value other than 4 or 8 would give the navigator away.
      if (ResourceLoader::navigator_compatibility_mode() == NavigatorCompatibilityMode::WebKit)
          return min(logical_processors, logical_processors < 8 ? 4u : 8u);
  
-+    // Fingerprinting protection: a per-site, per-session value in Brave's "balanced" range, never above the real count.
 +    if (Fingerprinting::protection_enabled())
 +        return Fingerprinting::farbled_hardware_concurrency(logical_processors, Fingerprinting::seed_for_current_settings_object());
 +
@@ -476,7 +431,7 @@ index 535dff71160dd5cc714721b6e9640ebb91942fb1..3b040d9a0931078749fae2e33fd65748
  }
  
 diff --git a/Libraries/LibWeb/HTML/NavigatorDeviceMemory.cpp b/Libraries/LibWeb/HTML/NavigatorDeviceMemory.cpp
-index 7e1ec77b5ac90d0f1d80b6a3e146c9ec9a5bc2a8..1e7a6e379b867191af4fa86b3f636612c11eb867 100644
+index 7e1ec77b5ac90d0f1d80b6a3e146c9ec9a5bc2a8..38cadce5ac7147558f8fd8443696c9b8c9de5966 100644
 --- a/Libraries/LibWeb/HTML/NavigatorDeviceMemory.cpp
 +++ b/Libraries/LibWeb/HTML/NavigatorDeviceMemory.cpp
 @@ -6,6 +6,7 @@
@@ -487,14 +442,13 @@ index 7e1ec77b5ac90d0f1d80b6a3e146c9ec9a5bc2a8..1e7a6e379b867191af4fa86b3f636612
  #include <LibWeb/HTML/NavigatorDeviceMemory.h>
  
  namespace Web::HTML {
-@@ -28,7 +29,13 @@ WebIDL::Double NavigatorDeviceMemoryMixin::device_memory() const
+@@ -28,7 +29,12 @@ WebIDL::Double NavigatorDeviceMemoryMixin::device_memory() const
      auto memory_in_gib = static_cast<WebIDL::Double>(rounded_memory_in_mib) / 1024.0;
  
      // An upper bound and a lower bound should be set on the list of values.
 -    return AK::clamp(memory_in_gib, 1.0, 4.0);
 +    auto clamped_memory_in_gib = AK::clamp(memory_in_gib, 1.0, 4.0);
 +
-+    // Fingerprinting protection: a per-site, per-session value from {1, 2, 4} that never exceeds the real value.
 +    if (Fingerprinting::protection_enabled())
 +        return Fingerprinting::farbled_device_memory_gib(clamped_memory_in_gib, Fingerprinting::seed_for_current_settings_object());
 +
@@ -503,7 +457,7 @@ index 7e1ec77b5ac90d0f1d80b6a3e146c9ec9a5bc2a8..1e7a6e379b867191af4fa86b3f636612
  
  }
 diff --git a/Libraries/LibWeb/WebAudio/AnalyserNode.cpp b/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
-index adbfc7d4753346974d3d55d91bf73f98b6b6b83b..8dd757225432f57e7b5572e78d806c31b59a3c2e 100644
+index adbfc7d4753346974d3d55d91bf73f98b6b6b83b..f390aaae9758280f1af9367f1392992059ae7df2 100644
 --- a/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
 +++ b/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
 @@ -12,6 +12,7 @@
@@ -514,11 +468,10 @@ index adbfc7d4753346974d3d55d91bf73f98b6b6b83b..8dd757225432f57e7b5572e78d806c31
  #include <LibWeb/WebAudio/AnalyserNode.h>
  #include <LibWeb/WebAudio/BaseAudioContext.h>
  #include <LibWeb/WebAudio/Rendering/AnalyserRenderNode.h>
-@@ -232,13 +233,22 @@ Vector<f32> AnalyserNode::current_frequency_data()
+@@ -232,13 +233,21 @@ Vector<f32> AnalyserNode::current_frequency_data()
      return result;
  }
  
-+// Fingerprinting protection: farble the copy of the analysis data handed to script.
 +void AnalyserNode::farble_if_enabled(Vector<f32>& data) const
 +{
 +    if (!Fingerprinting::protection_enabled())
@@ -538,7 +491,7 @@ index adbfc7d4753346974d3d55d91bf73f98b6b6b83b..8dd757225432f57e7b5572e78d806c31
  
      auto record = JS::make_typed_array_with_buffer_witness_record(*array, JS::ArrayBuffer::Order::SeqCst);
      if (JS::is_typed_array_out_of_bounds(record))
-@@ -253,6 +263,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_frequency_data(GC::Ref<JS::Flo
+@@ -253,6 +262,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_frequency_data(GC::Ref<JS::Flo
  WebIDL::ExceptionOr<void> AnalyserNode::get_byte_frequency_data(GC::Ref<JS::Uint8Array> array)
  {
      Vector<f32> dB_data = current_frequency_data();
@@ -546,7 +499,7 @@ index adbfc7d4753346974d3d55d91bf73f98b6b6b83b..8dd757225432f57e7b5572e78d806c31
      Vector<u8> byte_data;
      byte_data.ensure_capacity(dB_data.size());
  
-@@ -287,6 +298,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_time_domain_data(GC::Ref<JS::F
+@@ -287,6 +297,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_time_domain_data(GC::Ref<JS::F
      // fftSize, the excess elements will be ignored. The most recent fftSize frames are written (after downmixing).
  
      Vector<f32> time_domain_data = current_time_domain_data();
@@ -554,7 +507,7 @@ index adbfc7d4753346974d3d55d91bf73f98b6b6b83b..8dd757225432f57e7b5572e78d806c31
  
      auto record = JS::make_typed_array_with_buffer_witness_record(*array, JS::ArrayBuffer::Order::SeqCst);
      if (JS::is_typed_array_out_of_bounds(record))
-@@ -305,6 +317,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_byte_time_domain_data(GC::Ref<JS::Ui
+@@ -305,6 +316,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_byte_time_domain_data(GC::Ref<JS::Ui
      // the excess elements will be ignored. The most recent fftSize frames are used in computing the byte data.
  
      Vector<f32> time_domain_data = current_time_domain_data();
@@ -575,7 +528,7 @@ index 70bdc6922bd95e6013b4965d9d4d59a0a2c77b86..70801e594abc122161822fbe7fba5daa
      // https://webaudio.github.io/web-audio-api/#blackman-window
      Vector<f32> apply_a_blackman_window(Vector<f32> const& x) const;
 diff --git a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
-index 4d4d8a1d2fa08557ac8d701318ba359a81236996..c4af9f1bedf1587d5e6c957ab2242c455d7acab8 100644
+index 4d4d8a1d2fa08557ac8d701318ba359a81236996..2f766b01ccbefe8a79d31a50966d16528aa06f02 100644
 --- a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
 +++ b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
 @@ -14,6 +14,7 @@
@@ -586,11 +539,10 @@ index 4d4d8a1d2fa08557ac8d701318ba359a81236996..c4af9f1bedf1587d5e6c957ab2242c45
  #include <LibWeb/HTML/Scripting/Environments.h>
  #include <LibWeb/WebAudio/AudioArray.h>
  #include <LibWeb/WebAudio/AudioBuffer.h>
-@@ -231,6 +232,13 @@ WebIDL::ExceptionOr<GC::Ref<JS::Float32Array>> AudioBuffer::get_channel_data(JS:
+@@ -231,6 +232,12 @@ WebIDL::ExceptionOr<GC::Ref<JS::Float32Array>> AudioBuffer::get_channel_data(JS:
      // again, so the copies of the acquired samples become this buffer's internal data before anything reads them.
      attach_acquired_channels();
  
-+    // Fingerprinting protection: the view handed to script is live, so the samples are farbled in place, once.
 +    if (!m_channels[channel].farbled && Fingerprinting::protection_enabled()) {
 +        Fingerprinting::farble_audio({ reinterpret_cast<float*>(m_channels[channel].data.data()), m_length },
 +            Fingerprinting::seed_for_relevant_global(relevant_global_object));
@@ -600,11 +552,10 @@ index 4d4d8a1d2fa08557ac8d701318ba359a81236996..c4af9f1bedf1587d5e6c957ab2242c45
      auto& relevant_global_realm = HTML::relevant_realm(relevant_global_object);
      auto& cache = cache_for(*this, channel);
  
-@@ -280,6 +288,12 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_from_channel(GC::Root<JS::Float32Arr
+@@ -280,6 +287,11 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_from_channel(GC::Root<JS::Float32Arr
      auto destination_bytes = destination->viewed_array_buffer();
      channel_data.slice(buffer_offset, count).copy_to({ reinterpret_cast<float*>(destination_bytes->data_at(destination->byte_offset())), count });
  
-+    // Fingerprinting protection: farble the copy unless getChannelData() already farbled the source samples.
 +    if (!channel.farbled && Fingerprinting::protection_enabled()) {
 +        Fingerprinting::farble_audio({ reinterpret_cast<float*>(destination_bytes->data_at(destination->byte_offset())), count },
 +            Fingerprinting::seed_for_relevant_global(*destination));
@@ -614,29 +565,26 @@ index 4d4d8a1d2fa08557ac8d701318ba359a81236996..c4af9f1bedf1587d5e6c957ab2242c45
  }
  
 diff --git a/Libraries/LibWeb/WebAudio/AudioBuffer.h b/Libraries/LibWeb/WebAudio/AudioBuffer.h
-index 5173d4c511fa8b49e65ed8d24ff1b0251cbb9a3a..aae6d95da2ef9c6c582764de5e58da75f01017ee 100644
+index 5173d4c511fa8b49e65ed8d24ff1b0251cbb9a3a..503bd89d29ecdfa86ca9a31ea0a12eaabb8c857f 100644
 --- a/Libraries/LibWeb/WebAudio/AudioBuffer.h
 +++ b/Libraries/LibWeb/WebAudio/AudioBuffer.h
-@@ -52,6 +52,8 @@ private:
+@@ -52,6 +52,7 @@ private:
      // ArrayBuffer handed to script holds an owner edge back to the AudioBuffer, so the storage outlives every view.
      struct Channel {
          JS::DataBlock::OwnedBackingStore data;
-+        // Fingerprinting protection: set once getChannelData() has farbled the samples in place.
 +        bool farbled { false };
      };
  
      explicit AudioBuffer(AudioBufferOptions const&);
 diff --git a/Libraries/LibWebCommon/Loader/LoaderConfigSnapshot.h b/Libraries/LibWebCommon/Loader/LoaderConfigSnapshot.h
-index c00e7f9f031b9e122368da9d3a3144dd1de34258..eebd63c421b66cd6608393078211b58f0f3f4c13 100644
+index c00e7f9f031b9e122368da9d3a3144dd1de34258..f72d49b59c3b829e3595595ae4d90dbcffff6fda 100644
 --- a/Libraries/LibWebCommon/Loader/LoaderConfigSnapshot.h
 +++ b/Libraries/LibWebCommon/Loader/LoaderConfigSnapshot.h
-@@ -33,6 +33,10 @@ struct LoaderConfig {
+@@ -33,6 +33,8 @@ struct LoaderConfig {
      NonnullRefPtr<SharedSiteCompatibilityData const> site_compatibility;
      Vector<String> preferred_languages;
      bool enable_global_privacy_control { false };
 +    bool enable_fingerprinting_protection { true };
-+    // The secret fingerprinting protection keys its values with, shared by every process of a browser session. Zero
-+    // until the browser sends one, and then each process makes up its own.
 +    u64 fingerprinting_session_secret { 0 };
  
      String user_agent_for_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_url(url, user_agent); }

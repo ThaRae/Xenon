@@ -55,7 +55,6 @@ void Download::fetch(URL::URL url)
         return;
     }
 
-    // A redirect stops the request it answers, whose callbacks may still come, so each request's are its own.
     auto id = ++m_request_id;
     m_request->set_unbuffered_request_callbacks(
         [self = NonnullRefPtr(*this), id](NonnullRefPtr<HTTP::HeaderList> response_headers, Optional<u32> response_code, Optional<String> const&, Optional<Core::ImmutableBytes>, Optional<u64>, Requests::CacheState) {
@@ -134,7 +133,6 @@ void Download::finish(ErrorOr<ByteBuffer> result)
         request->stop();
     }
 
-    // NB: The request is let go of only after its own callback has returned.
     Core::deferred_invoke([self = NonnullRefPtr(*this), request = move(request), result = move(result)]() mutable {
         request = nullptr;
         self->m_timeout = nullptr;

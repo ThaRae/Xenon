@@ -1,6 +1,3 @@
-// Runs in Meta/xenon.py test, with --extension-idle-timeout=2: the background worker stops once it has been idle that
-// long, as Chrome stops a service worker, and starts again for a message, or for an event it has a listener for. Prints
-// one line of results, and closes the page, which ends the headless browser.
 const results = {};
 
 function check(name, condition) {
@@ -9,7 +6,6 @@ function check(name, condition) {
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-// NB: These calls are the page's, which keep nothing else running.
 async function backgroundIsRunning() {
     return (await chrome.runtime.getContexts({ contextTypes: ["BACKGROUND"] })).length > 0;
 }
@@ -22,7 +18,6 @@ async function backgroundStops() {
 }
 
 async function run() {
-    // The background starts with the browser, so it may still be starting.
     let first;
     for (let attempt = 0; attempt < 50 && !first; ++attempt) {
         first = await chrome.runtime.sendMessage({ toBackground: "ping" }).catch(() => undefined);
@@ -46,7 +41,6 @@ async function run() {
     );
 
     check("it stops again", await backgroundStops());
-    // The background has no storage.onChanged listener.
     await chrome.storage.local.set({ idle: Date.now() });
     await sleep(500);
     check("an event it has no listener for leaves it stopped", !(await backgroundIsRunning()));

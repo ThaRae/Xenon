@@ -20,8 +20,6 @@ static constexpr auto CONTENT_BLOCKER_LIST_OPTION = "--content-blocker-list"sv;
 static constexpr auto TRUSTED_CONTENT_BLOCKER_LIST_OPTION = "--trusted-content-blocker-list"sv;
 static constexpr auto CONTENT_BLOCKER_RESOURCES_OPTION = "--content-blocker-resources"sv;
 
-// The lists live in the application's resources, which Ladybird looks for next to the executable: in the bundle's
-// Resources on macOS, and in share/Lagom under the install prefix elsewhere (see WebView::platform_init()).
 Optional<ByteString> bundled_lists_directory()
 {
     auto executable = Core::System::current_executable_path();
@@ -52,7 +50,6 @@ static Vector<ByteString> lists_in(StringView directory, StringView subdirectory
         auto path = iterator.next_full_path();
         if (!path.ends_with(".txt"sv) || !FileSystem::is_regular_file(path))
             continue;
-        // Each list's file is named after its id in the manifest.
         if (disabled_ids.contains(MUST(String::from_utf8(LexicalPath { path }.title()))))
             continue;
         list_paths.append(move(path));
@@ -77,7 +74,6 @@ ContentBlockers content_blockers_in(StringView directory)
 
 Main::Arguments with_bundled_filter_lists(Main::Arguments arguments)
 {
-    // NB: Main::Arguments only views its strings, and the browser holds on to them, so they have to outlive main().
     static auto& paths = *new Vector<ByteString>;
     static auto& strings = *new Vector<StringView>;
 
@@ -87,7 +83,6 @@ Main::Arguments with_bundled_filter_lists(Main::Arguments arguments)
         return arguments;
     }
 
-    // The lists go right after the program name, so that they are options however the user's own arguments end.
     strings.append(arguments.strings[0]);
 
     auto content_blockers = content_blockers_in(*directory);

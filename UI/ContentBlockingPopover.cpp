@@ -30,8 +30,6 @@ public:
         : QCheckBox("Block ads on this site", parent)
     {
         setAttribute(Qt::WA_MacShowFocusRect, false);
-        // NB: The macOS style widens a checkbox past its layout cell to make room for a focus ring. This switch draws
-        //     its own, so keep it inside its cell, where its text lines up with the site name above it.
         setAttribute(Qt::WA_LayoutUsesWidgetRect);
         setFocusPolicy(Qt::StrongFocus);
     }
@@ -49,7 +47,6 @@ private:
         QStylePainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         auto track = QStyle::visualRect(layoutDirection(), rect(), QRect(width() - 43, (height() - 22) / 2, 40, 22));
-        // Match the switch colors in Base/res/ladybird/ladybird.css, including disabled states.
         auto dark = ChromeStyle::is_dark(palette());
         auto track_color = isChecked() ? ChromeStyle::chrome_accent() : QColor(dark ? 0x6b6b6b : 0x8f8f8f);
         auto thumb_color = QColor(Qt::white);
@@ -139,7 +136,6 @@ ContentBlockingPopover::ContentBlockingPopover(QWidget* parent)
 
 void ContentBlockingPopover::set_favicon(QIcon const& favicon)
 {
-    // Without a favicon, the site name moves over to the edge rather than sitting next to an empty space.
     m_favicon->setVisible(!favicon.isNull());
     m_favicon->setPixmap(favicon.pixmap(m_favicon->size(), devicePixelRatioF()));
 }
@@ -190,7 +186,6 @@ void ContentBlockingPopover::focus_switch()
 
 void ContentBlockingPopover::mousePressEvent(QMouseEvent* event)
 {
-    // The transparent shadow margin can overlap the toolbar button. Treat it as outside the card.
     if (!card().geometry().contains(event->position().toPoint())) {
         close();
         event->accept();
@@ -225,7 +220,6 @@ void ContentBlockingPopover::update_size()
     auto count_padding = m_count->contentsMargins().left() + m_count->contentsMargins().right();
     auto available_count_width = available_width - 34 - count_padding;
     if (count_width > available_count_width) {
-        // Keep the exact total on one line even on a narrow screen.
         count_font.setPixelSize(qMax(10, 16 * available_count_width / (count_width + 1)));
         m_count->setFont(count_font);
     }
@@ -243,7 +237,6 @@ void ContentBlockingPopover::update_size()
 
     m_site->setText(m_site->fontMetrics().elidedText(m_site->toolTip(), Qt::ElideRight, card().width() - 80));
 
-    // Refresh the minimum sizes before resizing after rows are hidden or shown.
     card().layout()->activate();
     layout()->activate();
     adjustSize();
