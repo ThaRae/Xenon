@@ -31,6 +31,8 @@ const sample = sampleNavigator();
 post("site-" + i, sample).then(() => {
     if (i + 1 < SITES.length) {
         location.href = SITES[i + 1] + "/spread.html?run=" + encodeURIComponent(runId) + "&i=" + (i + 1);
+    } else if (runId === "same-process" || runId === "off-both") {
+        location.href = "http://site-b.test:8080/from-b.html?run=" + encodeURIComponent(runId);
     } else {
         return post("complete", { sites: SITES.length }).then(() => setTimeout(() => window.close(), 50));
     }

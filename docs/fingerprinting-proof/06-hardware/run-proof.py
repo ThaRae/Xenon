@@ -17,6 +17,7 @@ XENON_ROOT = HERE.parents[2]
 DEFAULT_XENON = XENON_ROOT / "Build" / "release" / "xenon" / "bin" / "Xenon"
 CAPTURED = HERE / "captured"
 SPEC_BUCKETS = {0.25, 0.5, 1.0, 2.0, 4.0, 8.0}
+LADYBIRD_BUCKETS = {1.0, 2.0, 4.0}
 
 
 def nproc() -> int:
@@ -81,7 +82,6 @@ def memory_ok(value, exposed: bool, real_guess: float) -> bool:
 
 def analyze(real_cores: int, mem_kib_value: int) -> dict:
     same = json.loads((CAPTURED / "same-process.json").read_text())
-    spread = json.loads((CAPTURED / "spread.json").read_text())
     off_both = json.loads((CAPTURED / "off-both.json").read_text())
     strict = json.loads((CAPTURED / "strict.json").read_text())
     a = same["reads"]["a-direct"]
@@ -96,9 +96,32 @@ def analyze(real_cores: int, mem_kib_value: int) -> dict:
     off_a = off_both["reads"]["a-direct"]["measure"]
     off_b = off_both["reads"]["b-direct"]["measure"]
     sites = []
-    for key, value in sorted((spread.get("reads") or {}).items()):
+    for key, value in sorted((same.get("reads") or {}).items()):
         if key.startswith("site-"):
             sites.append(value)
+    site_a_spread = next((item for item in sites if (item or {}).get("host") == "site-a.test:8080"), {})
+    a_hw = a_m.get("hardwareConcurrency")
+    site_a_views = {
+        "start": a_hw,
+        "spread": site_a_spread.get("hardwareConcurrency"),
+        "reloads": [item.get("hardwareConcurrency") for item in reloads],
+        "same_iframe": same_iframe.get("hardwareConcurrency"),
+        "worker": worker.get("hardwareConcurrency"),
+        "shared_worker": shared.get("hardwareConcurrency"),
+        "cross_iframe": cross_iframe.get("hardwareConcurrency"),
+        "start_seed": a_m.get("seed"),
+        "spread_seed": site_a_spread.get("seed"),
+    }
+    site_a_same_process_stable = (
+        site_a_views["spread"] == a_hw
+        and site_a_views["same_iframe"] == a_hw
+        and site_a_views["worker"] == a_hw
+        and site_a_views["shared_worker"] == a_hw
+        and site_a_views["cross_iframe"] == a_hw
+        and len(reloads) == 3
+        and all(item.get("hardwareConcurrency") == a_hw for item in reloads)
+        and site_a_views["start_seed"] == site_a_views["spread_seed"]
+    )
     hw_values = [item.get("hardwareConcurrency") for item in sites]
     a_strict = (strict.get("reads") or {}).get("a-strict") or {}
     b_strict = (strict.get("reads") or {}).get("b-strict") or {}
@@ -129,6 +152,9 @@ def analyze(real_cores: int, mem_kib_value: int) -> dict:
         "strict_a": a_strict,
         "strict_b": b_strict,
         "strict_concurrency_fixed": a_strict.get("hardwareConcurrency") == min(4, real_cores) and b_strict.get("hardwareConcurrency") == min(4, real_cores),
+        "same_process_profile": "captured/same-process.json",
+        "site_a_views": site_a_views,
+        "site_a_same_process_stable": site_a_same_process_stable,
         "spread": sites,
         "spread_n": len(sites),
         "spread_concurrency_values": sorted({v for v in hw_values if isinstance(v, int)}),
@@ -142,7 +168,10 @@ def analyze(real_cores: int, mem_kib_value: int) -> dict:
         if item and item.get("deviceMemoryExposed"):
             mem_values.append(item.get("deviceMemory"))
     summary["device_memory_values"] = mem_values
+    standard_mem = [item.get("deviceMemory") for item in sites if item and item.get("deviceMemoryExposed")]
+    summary["standard_device_memory_values"] = standard_mem
     summary["device_memory_all_spec_buckets"] = all(v in SPEC_BUCKETS for v in mem_values)
+    summary["standard_device_memory_ladybird_buckets"] = all(v in LADYBIRD_BUCKETS for v in standard_mem)
     off_loop = {}
     off_loop_path = CAPTURED / "off-loopback.json"
     if off_loop_path.exists():
@@ -178,6 +207,8 @@ def analyze(real_cores: int, mem_kib_value: int) -> dict:
         and summary["strict_concurrency_fixed"]
         and summary["concurrency_in_range"]
         and summary["device_memory_all_spec_buckets"]
+        and summary["standard_device_memory_ladybird_buckets"]
+        and summary["site_a_same_process_stable"]
         and summary.get("off_device_memory_equals_real")
         and summary.get("strict_device_memory_fixed")
     )
@@ -197,6 +228,15 @@ def main() -> int:
     extra = ["--expose-internals-object", "--force-cpu-painting", "--disable-sandbox"]
     print(f"nproc={real_cores} MemTotal_kib={mem}", flush=True)
 
+    def same_process_ready(data):
+        reads = data.get("reads") or {}
+        return (
+            "a-direct" in reads
+            and "b-direct" in reads
+            and data.get("complete")
+            and sum(1 for key in reads if key.startswith("site-")) >= 8
+        )
+
     same_process = CAPTURED / "same-process.json"
     same_process.unlink(missing_ok=True)
     run_xenon_until(
@@ -205,21 +245,10 @@ def main() -> int:
         "http://site-a.test:8080/start.html",
         extra,
         same_process,
-        lambda data: "a-direct" in data.get("reads", {}) and "b-direct" in data.get("reads", {}) and data.get("complete"),
-        timeout=180,
+        same_process_ready,
+        timeout=240,
     )
-
-    spread = CAPTURED / "spread.json"
-    spread.unlink(missing_ok=True)
-    run_xenon_until(
-        args.xenon,
-        Path(tempfile.mkdtemp(prefix="fp6-spread-")),
-        "http://site-a.test:8080/spread.html?run=spread&i=0",
-        extra,
-        spread,
-        lambda data: data.get("complete") and sum(1 for key in data.get("reads", {}) if key.startswith("site-")) >= 6,
-        timeout=120,
-    )
+    (CAPTURED / "spread.json").write_text(same_process.read_text())
 
     off_both = CAPTURED / "off-both.json"
     off_both.unlink(missing_ok=True)
@@ -235,8 +264,8 @@ def main() -> int:
         "http://site-a.test:8080/start.html?run=off-both",
         extra,
         off_both,
-        lambda data: "a-direct" in data.get("reads", {}) and "b-direct" in data.get("reads", {}) and data.get("complete"),
-        timeout=180,
+        same_process_ready,
+        timeout=240,
     )
 
     strict_path = CAPTURED / "strict.json"

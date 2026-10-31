@@ -1,16 +1,93 @@
 {
-  "runId": "spread",
+  "runId": "same-process",
   "events": [
+    {
+      "key": "a-direct",
+      "value": {
+        "measure": {
+          "seed": "standard:660407c05278c58c",
+          "hardwareConcurrency": 10,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        "reloads": [
+          {
+            "seed": "standard:660407c05278c58c",
+            "hardwareConcurrency": 10,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          },
+          {
+            "seed": "standard:660407c05278c58c",
+            "hardwareConcurrency": 10,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          },
+          {
+            "seed": "standard:660407c05278c58c",
+            "hardwareConcurrency": 10,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          }
+        ],
+        "sameIframe": {
+          "seed": "standard:660407c05278c58c",
+          "hardwareConcurrency": 10,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/iframe.html?kind=same",
+          "kind": "same"
+        },
+        "crossIframe": {
+          "seed": "standard:660407c05278c58c",
+          "hardwareConcurrency": 10,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/iframe.html?kind=cross",
+          "kind": "cross"
+        },
+        "worker": {
+          "ok": true,
+          "hardwareConcurrency": 10,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        },
+        "sharedWorker": {
+          "ok": true,
+          "hardwareConcurrency": 10,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        }
+      },
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
     {
       "key": "site-0",
       "value": {
-        "seed": "standard:94e9bcadd0584b82",
-        "hardwareConcurrency": 8,
+        "seed": "standard:660407c05278c58c",
+        "hardwareConcurrency": 10,
         "deviceMemoryExposed": false,
         "deviceMemory": null,
         "origin": "http://site-a.test:8080",
         "host": "site-a.test:8080",
-        "href": "http://site-a.test:8080/spread.html?run=spread&i=0"
+        "href": "http://site-a.test:8080/spread.html?run=same-process&i=0"
       },
       "origin": "http://site-a.test:8080",
       "host": "site-a.test:8080",
@@ -19,13 +96,13 @@
     {
       "key": "site-1",
       "value": {
-        "seed": "standard:281836c2d34bbec2",
+        "seed": "standard:6d5f5cbe1e45e1aa",
         "hardwareConcurrency": 9,
         "deviceMemoryExposed": false,
         "deviceMemory": null,
         "origin": "http://site-b.test:8080",
         "host": "site-b.test:8080",
-        "href": "http://site-b.test:8080/spread.html?run=spread&i=1"
+        "href": "http://site-b.test:8080/spread.html?run=same-process&i=1"
       },
       "origin": "http://site-b.test:8080",
       "host": "site-b.test:8080",
@@ -34,13 +111,13 @@
     {
       "key": "site-2",
       "value": {
-        "seed": "standard:7fbcb80bc8c38404",
+        "seed": "standard:a675e26e0cc34684",
         "hardwareConcurrency": 9,
         "deviceMemoryExposed": true,
-        "deviceMemory": 0.25,
+        "deviceMemory": 4,
         "origin": "http://127.0.0.1:8080",
         "host": "127.0.0.1:8080",
-        "href": "http://127.0.0.1:8080/spread.html?run=spread&i=2"
+        "href": "http://127.0.0.1:8080/spread.html?run=same-process&i=2"
       },
       "origin": "http://127.0.0.1:8080",
       "host": "127.0.0.1:8080",
@@ -49,13 +126,13 @@
     {
       "key": "site-3",
       "value": {
-        "seed": "standard:fa651095e5f4c83d",
-        "hardwareConcurrency": 3,
+        "seed": "standard:a4468d9f593e03d9",
+        "hardwareConcurrency": 10,
         "deviceMemoryExposed": true,
-        "deviceMemory": 4,
+        "deviceMemory": 1,
         "origin": "http://localhost:8080",
         "host": "localhost:8080",
-        "href": "http://localhost:8080/spread.html?run=spread&i=3"
+        "href": "http://localhost:8080/spread.html?run=same-process&i=3"
       },
       "origin": "http://localhost:8080",
       "host": "localhost:8080",
@@ -64,13 +141,13 @@
     {
       "key": "site-4",
       "value": {
-        "seed": "standard:c3cbd48c262e984a",
-        "hardwareConcurrency": 11,
+        "seed": "standard:a2ad601a8ee9255d",
+        "hardwareConcurrency": 9,
         "deviceMemoryExposed": true,
-        "deviceMemory": 4,
+        "deviceMemory": 2,
         "origin": "http://127.0.0.2:8080",
         "host": "127.0.0.2:8080",
-        "href": "http://127.0.0.2:8080/spread.html?run=spread&i=4"
+        "href": "http://127.0.0.2:8080/spread.html?run=same-process&i=4"
       },
       "origin": "http://127.0.0.2:8080",
       "host": "127.0.0.2:8080",
@@ -79,13 +156,13 @@
     {
       "key": "site-5",
       "value": {
-        "seed": "standard:e89a22bde12b934b",
-        "hardwareConcurrency": 3,
+        "seed": "standard:c16b30e65d01ac70",
+        "hardwareConcurrency": 10,
         "deviceMemoryExposed": true,
-        "deviceMemory": 1,
+        "deviceMemory": 4,
         "origin": "http://127.0.0.3:8080",
         "host": "127.0.0.3:8080",
-        "href": "http://127.0.0.3:8080/spread.html?run=spread&i=5"
+        "href": "http://127.0.0.3:8080/spread.html?run=same-process&i=5"
       },
       "origin": "http://127.0.0.3:8080",
       "host": "127.0.0.3:8080",
@@ -94,13 +171,13 @@
     {
       "key": "site-6",
       "value": {
-        "seed": "standard:e3438b935b8e96c6",
-        "hardwareConcurrency": 2,
+        "seed": "standard:f315755f8df6325c",
+        "hardwareConcurrency": 4,
         "deviceMemoryExposed": true,
-        "deviceMemory": 0.25,
+        "deviceMemory": 2,
         "origin": "http://127.0.0.4:8080",
         "host": "127.0.0.4:8080",
-        "href": "http://127.0.0.4:8080/spread.html?run=spread&i=6"
+        "href": "http://127.0.0.4:8080/spread.html?run=same-process&i=6"
       },
       "origin": "http://127.0.0.4:8080",
       "host": "127.0.0.4:8080",
@@ -109,103 +186,265 @@
     {
       "key": "site-7",
       "value": {
-        "seed": "standard:dfc6bd7e022cd98b",
-        "hardwareConcurrency": 9,
+        "seed": "standard:154d15592b6a2afe",
+        "hardwareConcurrency": 8,
         "deviceMemoryExposed": true,
-        "deviceMemory": 2,
+        "deviceMemory": 1,
         "origin": "http://127.0.0.5:8080",
         "host": "127.0.0.5:8080",
-        "href": "http://127.0.0.5:8080/spread.html?run=spread&i=7"
+        "href": "http://127.0.0.5:8080/spread.html?run=same-process&i=7"
       },
       "origin": "http://127.0.0.5:8080",
       "host": "127.0.0.5:8080",
       "i": 7
     },
     {
+      "key": "b-direct",
+      "value": {
+        "measure": {
+          "seed": "standard:6d5f5cbe1e45e1aa",
+          "hardwareConcurrency": 9,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/from-b.html?run=same-process"
+        },
+        "worker": {
+          "ok": true,
+          "hardwareConcurrency": 9,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        },
+        "sharedWorker": {
+          "ok": true,
+          "hardwareConcurrency": 9,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
       "key": "complete",
       "value": {
-        "sites": 8
+        "measure": {
+          "seed": "standard:6d5f5cbe1e45e1aa",
+          "hardwareConcurrency": 9,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/from-b.html?run=same-process"
+        },
+        "worker": {
+          "ok": true,
+          "hardwareConcurrency": 9,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        },
+        "sharedWorker": {
+          "ok": true,
+          "hardwareConcurrency": 9,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        }
       },
-      "origin": "http://127.0.0.5:8080",
-      "host": "127.0.0.5:8080",
-      "i": 7
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
     }
   ],
   "reads": {
+    "a-direct": {
+      "measure": {
+        "seed": "standard:660407c05278c58c",
+        "hardwareConcurrency": 10,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/start.html"
+      },
+      "reloads": [
+        {
+          "seed": "standard:660407c05278c58c",
+          "hardwareConcurrency": 10,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        {
+          "seed": "standard:660407c05278c58c",
+          "hardwareConcurrency": 10,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        {
+          "seed": "standard:660407c05278c58c",
+          "hardwareConcurrency": 10,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        }
+      ],
+      "sameIframe": {
+        "seed": "standard:660407c05278c58c",
+        "hardwareConcurrency": 10,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/iframe.html?kind=same",
+        "kind": "same"
+      },
+      "crossIframe": {
+        "seed": "standard:660407c05278c58c",
+        "hardwareConcurrency": 10,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/iframe.html?kind=cross",
+        "kind": "cross"
+      },
+      "worker": {
+        "ok": true,
+        "hardwareConcurrency": 10,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      },
+      "sharedWorker": {
+        "ok": true,
+        "hardwareConcurrency": 10,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      }
+    },
     "site-0": {
-      "seed": "standard:94e9bcadd0584b82",
-      "hardwareConcurrency": 8,
+      "seed": "standard:660407c05278c58c",
+      "hardwareConcurrency": 10,
       "deviceMemoryExposed": false,
       "deviceMemory": null,
       "origin": "http://site-a.test:8080",
       "host": "site-a.test:8080",
-      "href": "http://site-a.test:8080/spread.html?run=spread&i=0"
+      "href": "http://site-a.test:8080/spread.html?run=same-process&i=0"
     },
     "site-1": {
-      "seed": "standard:281836c2d34bbec2",
+      "seed": "standard:6d5f5cbe1e45e1aa",
       "hardwareConcurrency": 9,
       "deviceMemoryExposed": false,
       "deviceMemory": null,
       "origin": "http://site-b.test:8080",
       "host": "site-b.test:8080",
-      "href": "http://site-b.test:8080/spread.html?run=spread&i=1"
+      "href": "http://site-b.test:8080/spread.html?run=same-process&i=1"
     },
     "site-2": {
-      "seed": "standard:7fbcb80bc8c38404",
+      "seed": "standard:a675e26e0cc34684",
       "hardwareConcurrency": 9,
       "deviceMemoryExposed": true,
-      "deviceMemory": 0.25,
+      "deviceMemory": 4,
       "origin": "http://127.0.0.1:8080",
       "host": "127.0.0.1:8080",
-      "href": "http://127.0.0.1:8080/spread.html?run=spread&i=2"
+      "href": "http://127.0.0.1:8080/spread.html?run=same-process&i=2"
     },
     "site-3": {
-      "seed": "standard:fa651095e5f4c83d",
-      "hardwareConcurrency": 3,
-      "deviceMemoryExposed": true,
-      "deviceMemory": 4,
-      "origin": "http://localhost:8080",
-      "host": "localhost:8080",
-      "href": "http://localhost:8080/spread.html?run=spread&i=3"
-    },
-    "site-4": {
-      "seed": "standard:c3cbd48c262e984a",
-      "hardwareConcurrency": 11,
-      "deviceMemoryExposed": true,
-      "deviceMemory": 4,
-      "origin": "http://127.0.0.2:8080",
-      "host": "127.0.0.2:8080",
-      "href": "http://127.0.0.2:8080/spread.html?run=spread&i=4"
-    },
-    "site-5": {
-      "seed": "standard:e89a22bde12b934b",
-      "hardwareConcurrency": 3,
+      "seed": "standard:a4468d9f593e03d9",
+      "hardwareConcurrency": 10,
       "deviceMemoryExposed": true,
       "deviceMemory": 1,
-      "origin": "http://127.0.0.3:8080",
-      "host": "127.0.0.3:8080",
-      "href": "http://127.0.0.3:8080/spread.html?run=spread&i=5"
+      "origin": "http://localhost:8080",
+      "host": "localhost:8080",
+      "href": "http://localhost:8080/spread.html?run=same-process&i=3"
     },
-    "site-6": {
-      "seed": "standard:e3438b935b8e96c6",
-      "hardwareConcurrency": 2,
-      "deviceMemoryExposed": true,
-      "deviceMemory": 0.25,
-      "origin": "http://127.0.0.4:8080",
-      "host": "127.0.0.4:8080",
-      "href": "http://127.0.0.4:8080/spread.html?run=spread&i=6"
-    },
-    "site-7": {
-      "seed": "standard:dfc6bd7e022cd98b",
+    "site-4": {
+      "seed": "standard:a2ad601a8ee9255d",
       "hardwareConcurrency": 9,
       "deviceMemoryExposed": true,
       "deviceMemory": 2,
+      "origin": "http://127.0.0.2:8080",
+      "host": "127.0.0.2:8080",
+      "href": "http://127.0.0.2:8080/spread.html?run=same-process&i=4"
+    },
+    "site-5": {
+      "seed": "standard:c16b30e65d01ac70",
+      "hardwareConcurrency": 10,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.3:8080",
+      "host": "127.0.0.3:8080",
+      "href": "http://127.0.0.3:8080/spread.html?run=same-process&i=5"
+    },
+    "site-6": {
+      "seed": "standard:f315755f8df6325c",
+      "hardwareConcurrency": 4,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 2,
+      "origin": "http://127.0.0.4:8080",
+      "host": "127.0.0.4:8080",
+      "href": "http://127.0.0.4:8080/spread.html?run=same-process&i=6"
+    },
+    "site-7": {
+      "seed": "standard:154d15592b6a2afe",
+      "hardwareConcurrency": 8,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 1,
       "origin": "http://127.0.0.5:8080",
       "host": "127.0.0.5:8080",
-      "href": "http://127.0.0.5:8080/spread.html?run=spread&i=7"
+      "href": "http://127.0.0.5:8080/spread.html?run=same-process&i=7"
+    },
+    "b-direct": {
+      "measure": {
+        "seed": "standard:6d5f5cbe1e45e1aa",
+        "hardwareConcurrency": 9,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/from-b.html?run=same-process"
+      },
+      "worker": {
+        "ok": true,
+        "hardwareConcurrency": 9,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      },
+      "sharedWorker": {
+        "ok": true,
+        "hardwareConcurrency": 9,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      }
     },
     "complete": {
-      "sites": 8
+      "measure": {
+        "seed": "standard:6d5f5cbe1e45e1aa",
+        "hardwareConcurrency": 9,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/from-b.html?run=same-process"
+      },
+      "worker": {
+        "ok": true,
+        "hardwareConcurrency": 9,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      },
+      "sharedWorker": {
+        "ok": true,
+        "hardwareConcurrency": 9,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      }
     }
   },
   "complete": true

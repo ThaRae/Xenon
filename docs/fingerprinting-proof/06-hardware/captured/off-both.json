@@ -79,6 +79,126 @@
       "host": "site-a.test:8080"
     },
     {
+      "key": "site-0",
+      "value": {
+        "seed": "off",
+        "hardwareConcurrency": 12,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/spread.html?run=off-both&i=0"
+      },
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080",
+      "i": 0
+    },
+    {
+      "key": "site-1",
+      "value": {
+        "seed": "off",
+        "hardwareConcurrency": 12,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/spread.html?run=off-both&i=1"
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080",
+      "i": 1
+    },
+    {
+      "key": "site-2",
+      "value": {
+        "seed": "off",
+        "hardwareConcurrency": 12,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://127.0.0.1:8080",
+        "host": "127.0.0.1:8080",
+        "href": "http://127.0.0.1:8080/spread.html?run=off-both&i=2"
+      },
+      "origin": "http://127.0.0.1:8080",
+      "host": "127.0.0.1:8080",
+      "i": 2
+    },
+    {
+      "key": "site-3",
+      "value": {
+        "seed": "off",
+        "hardwareConcurrency": 12,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://localhost:8080",
+        "host": "localhost:8080",
+        "href": "http://localhost:8080/spread.html?run=off-both&i=3"
+      },
+      "origin": "http://localhost:8080",
+      "host": "localhost:8080",
+      "i": 3
+    },
+    {
+      "key": "site-4",
+      "value": {
+        "seed": "off",
+        "hardwareConcurrency": 12,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://127.0.0.2:8080",
+        "host": "127.0.0.2:8080",
+        "href": "http://127.0.0.2:8080/spread.html?run=off-both&i=4"
+      },
+      "origin": "http://127.0.0.2:8080",
+      "host": "127.0.0.2:8080",
+      "i": 4
+    },
+    {
+      "key": "site-5",
+      "value": {
+        "seed": "off",
+        "hardwareConcurrency": 12,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://127.0.0.3:8080",
+        "host": "127.0.0.3:8080",
+        "href": "http://127.0.0.3:8080/spread.html?run=off-both&i=5"
+      },
+      "origin": "http://127.0.0.3:8080",
+      "host": "127.0.0.3:8080",
+      "i": 5
+    },
+    {
+      "key": "site-6",
+      "value": {
+        "seed": "off",
+        "hardwareConcurrency": 12,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://127.0.0.4:8080",
+        "host": "127.0.0.4:8080",
+        "href": "http://127.0.0.4:8080/spread.html?run=off-both&i=6"
+      },
+      "origin": "http://127.0.0.4:8080",
+      "host": "127.0.0.4:8080",
+      "i": 6
+    },
+    {
+      "key": "site-7",
+      "value": {
+        "seed": "off",
+        "hardwareConcurrency": 12,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://127.0.0.5:8080",
+        "host": "127.0.0.5:8080",
+        "href": "http://127.0.0.5:8080/spread.html?run=off-both&i=7"
+      },
+      "origin": "http://127.0.0.5:8080",
+      "host": "127.0.0.5:8080",
+      "i": 7
+    },
+    {
       "key": "b-direct",
       "value": {
         "measure": {
@@ -207,6 +327,78 @@
         "deviceMemoryExposed": false,
         "deviceMemory": null
       }
+    },
+    "site-0": {
+      "seed": "off",
+      "hardwareConcurrency": 12,
+      "deviceMemoryExposed": false,
+      "deviceMemory": null,
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080",
+      "href": "http://site-a.test:8080/spread.html?run=off-both&i=0"
+    },
+    "site-1": {
+      "seed": "off",
+      "hardwareConcurrency": 12,
+      "deviceMemoryExposed": false,
+      "deviceMemory": null,
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080",
+      "href": "http://site-b.test:8080/spread.html?run=off-both&i=1"
+    },
+    "site-2": {
+      "seed": "off",
+      "hardwareConcurrency": 12,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.1:8080",
+      "host": "127.0.0.1:8080",
+      "href": "http://127.0.0.1:8080/spread.html?run=off-both&i=2"
+    },
+    "site-3": {
+      "seed": "off",
+      "hardwareConcurrency": 12,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://localhost:8080",
+      "host": "localhost:8080",
+      "href": "http://localhost:8080/spread.html?run=off-both&i=3"
+    },
+    "site-4": {
+      "seed": "off",
+      "hardwareConcurrency": 12,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.2:8080",
+      "host": "127.0.0.2:8080",
+      "href": "http://127.0.0.2:8080/spread.html?run=off-both&i=4"
+    },
+    "site-5": {
+      "seed": "off",
+      "hardwareConcurrency": 12,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.3:8080",
+      "host": "127.0.0.3:8080",
+      "href": "http://127.0.0.3:8080/spread.html?run=off-both&i=5"
+    },
+    "site-6": {
+      "seed": "off",
+      "hardwareConcurrency": 12,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.4:8080",
+      "host": "127.0.0.4:8080",
+      "href": "http://127.0.0.4:8080/spread.html?run=off-both&i=6"
+    },
+    "site-7": {
+      "seed": "off",
+      "hardwareConcurrency": 12,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.5:8080",
+      "host": "127.0.0.5:8080",
+      "href": "http://127.0.0.5:8080/spread.html?run=off-both&i=7"
     },
     "b-direct": {
       "measure": {

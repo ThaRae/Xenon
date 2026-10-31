@@ -1,0 +1,125 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 03:00:16 +0000
+Subject: [PATCH] LibWeb: Keep Standard deviceMemory inside Ladybird's buckets
+
+Unpatched Ladybird clamps deviceMemory to {1, 2, 4}. Standard was
+drawing 0.25 and 0.5, which no real Ladybird returns. Pick only from
+those three, still capped at the real bucket. Strict is unchanged.
+---
+ Libraries/LibWeb/Farbling/DeviceMemory.cpp | 36 +++++++++++-----------
+ Libraries/LibWeb/Farbling/DeviceMemory.h   |  4 +--
+ Tests/LibWeb/TestHardwareFarbling.cpp      | 12 ++++++--
+ 3 files changed, 29 insertions(+), 23 deletions(-)
+
+diff --git a/Libraries/LibWeb/Farbling/DeviceMemory.cpp b/Libraries/LibWeb/Farbling/DeviceMemory.cpp
+index a3aa3792fd4e489fd2ed7dd52dbfce96188b3dd5..9530e688dbee035a87eada53035b57dbbf73737b 100644
+--- a/Libraries/LibWeb/Farbling/DeviceMemory.cpp
++++ b/Libraries/LibWeb/Farbling/DeviceMemory.cpp
+@@ -9,40 +9,40 @@
+ 
+ namespace Web::Farbling {
+ 
+-static constexpr double buckets[] = { 0.25, 0.5, 1.0, 2.0, 4.0, 8.0 };
++// Unpatched Ladybird rounds RAM to a power-of-two GiB then clamps to [1, 4], so it
++// never returns 0.25, 0.5, or 8. Standard must stay inside that set or the value
++// itself marks a farbled Xenon.
++static constexpr double ladybird_buckets[] = { 1.0, 2.0, 4.0 };
++static constexpr double spec_buckets[] = { 0.25, 0.5, 1.0, 2.0, 4.0, 8.0 };
+ 
+-static double cap_bucket(double real)
++static double cap_spec_bucket(double real)
+ {
+-    double cap = buckets[0];
+-    for (auto bucket : buckets) {
++    double cap = spec_buckets[0];
++    for (auto bucket : spec_buckets) {
+         if (bucket <= real)
+             cap = bucket;
+     }
+     return cap;
+ }
+ 
+-static size_t bucket_count_up_to(double cap)
+-{
+-    size_t n = 0;
+-    for (auto bucket : buckets) {
+-        if (bucket <= cap)
+-            ++n;
+-    }
+-    return n == 0 ? 1 : n;
+-}
+-
+ double farbled_device_memory(Seed const& seed, double real)
+ {
+-    auto cap = cap_bucket(real);
+     if (!seed.enabled())
+         return real;
+ 
+     if (seed.level == Level::Strict)
+-        return cap; // min(8, real bucket): cap is already the real bucket, at most 8
++        return cap_spec_bucket(real);
+ 
+-    auto n = bucket_count_up_to(cap);
++    double allowed[3];
++    size_t n = 0;
++    for (auto bucket : ladybird_buckets) {
++        if (bucket <= real)
++            allowed[n++] = bucket;
++    }
++    if (n == 0)
++        return real;
+     auto index = RNG(seed).integer("deviceMemory"sv) % n;
+-    return buckets[index];
++    return allowed[index];
+ }
+ 
+ }
+diff --git a/Libraries/LibWeb/Farbling/DeviceMemory.h b/Libraries/LibWeb/Farbling/DeviceMemory.h
+index ceca2fc420c472368d69e175369a190019a3e7aa..b258c31e8026939a333942084e71eeef540e43ae 100644
+--- a/Libraries/LibWeb/Farbling/DeviceMemory.h
++++ b/Libraries/LibWeb/Farbling/DeviceMemory.h
+@@ -11,8 +11,8 @@
+ 
+ namespace Web::Farbling {
+ 
+-// Spec buckets: 0.25, 0.5, 1, 2, 4, 8. Off: real. Standard: a bucket <= real, keyed by
+-// (seed, "deviceMemory"). Strict: 8, or the real bucket if that is lower. Never outside the set.
++// Off: real. Standard: a bucket unpatched Ladybird can return ({1, 2, 4}), capped at
++// the real bucket. Strict: 8, or the real spec bucket if that is lower.
+ WEB_API double farbled_device_memory(Seed const& seed, double real);
+ 
+ }
+diff --git a/Tests/LibWeb/TestHardwareFarbling.cpp b/Tests/LibWeb/TestHardwareFarbling.cpp
+index 816695164a1e9db33a971b17335f2abc54c7d874..7e75c5fbab85928a39c193731a6e44beede94c51 100644
+--- a/Tests/LibWeb/TestHardwareFarbling.cpp
++++ b/Tests/LibWeb/TestHardwareFarbling.cpp
+@@ -81,19 +81,25 @@ TEST_CASE(memory_off_returns_real)
+     EXPECT_EQ(Web::Farbling::farbled_device_memory(off, 8.0), 8.0);
+ }
+ 
+-TEST_CASE(memory_standard_is_a_capped_spec_bucket)
++TEST_CASE(memory_standard_is_a_ladybird_bucket)
+ {
+     double const reals[] = { 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 64.0 };
+-    double const buckets[] = { 0.25, 0.5, 1.0, 2.0, 4.0, 8.0 };
++    double const ladybird_buckets[] = { 1.0, 2.0, 4.0 };
+     for (auto real : reals) {
+         for (u64 n = 1; n <= 32; ++n) {
+             auto value = Web::Farbling::farbled_device_memory(standard_seed(n, n * 5), real);
++            if (real < 1.0) {
++                EXPECT_EQ(value, real);
++                continue;
++            }
+             bool allowed = false;
+-            for (auto bucket : buckets) {
++            for (auto bucket : ladybird_buckets) {
+                 if (value == bucket && bucket <= real)
+                     allowed = true;
+             }
+             EXPECT(allowed);
++            EXPECT(value != 0.25);
++            EXPECT(value != 0.5);
+         }
+     }
+ }

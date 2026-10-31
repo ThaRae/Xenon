@@ -48,7 +48,7 @@ if (reloads.length < 3) {
         const state = { measure: sample, reloads, sameIframe, crossIframe, worker, sharedWorker };
         return post("a-direct", state);
     }).then(() => {
-        location.href = "http://site-b.test:8080/from-b.html?run=" + encodeURIComponent(runId);
+        location.href = "spread.html?run=" + encodeURIComponent(runId) + "&i=0";
     });
 }
 </script>

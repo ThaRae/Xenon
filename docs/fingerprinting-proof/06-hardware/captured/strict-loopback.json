@@ -4,7 +4,7 @@
     {
       "key": "a-strict",
       "value": {
-        "seed": "strict:8d0869561983007b",
+        "seed": "strict:59fb30b5a8b87edc",
         "hardwareConcurrency": 4,
         "deviceMemoryExposed": true,
         "deviceMemory": 4,
@@ -19,7 +19,7 @@
     {
       "key": "b-strict",
       "value": {
-        "seed": "strict:31d79f2acce1908c",
+        "seed": "strict:1d49fbfd12d496ec",
         "hardwareConcurrency": 4,
         "deviceMemoryExposed": true,
         "deviceMemory": 4,
@@ -34,7 +34,7 @@
     {
       "key": "complete",
       "value": {
-        "seed": "strict:31d79f2acce1908c",
+        "seed": "strict:1d49fbfd12d496ec",
         "hardwareConcurrency": 4,
         "deviceMemoryExposed": true,
         "deviceMemory": 4,
@@ -49,7 +49,7 @@
   ],
   "reads": {
     "a-strict": {
-      "seed": "strict:8d0869561983007b",
+      "seed": "strict:59fb30b5a8b87edc",
       "hardwareConcurrency": 4,
       "deviceMemoryExposed": true,
       "deviceMemory": 4,
@@ -59,7 +59,7 @@
       "levelSet": "strict"
     },
     "b-strict": {
-      "seed": "strict:31d79f2acce1908c",
+      "seed": "strict:1d49fbfd12d496ec",
       "hardwareConcurrency": 4,
       "deviceMemoryExposed": true,
       "deviceMemory": 4,
@@ -69,7 +69,7 @@
       "levelSet": "strict"
     },
     "complete": {
-      "seed": "strict:31d79f2acce1908c",
+      "seed": "strict:1d49fbfd12d496ec",
       "hardwareConcurrency": 4,
       "deviceMemoryExposed": true,
       "deviceMemory": 4,
