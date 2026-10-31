@@ -65,12 +65,14 @@ void ActionButton::update_appearance()
 {
     auto appearance = Browser::action_appearance(*m_extension, &m_tab);
 
-    if (appearance.icon_path.has_value()) {
-        auto file = LexicalPath::join(m_extension->root(), appearance.icon_path->bytes_as_string_view()).string();
-        setIcon(QIcon(qstring_from_ak_string(file)));
-    } else {
+    // An icon path the extension chose may only name a file inside it (Extension::confined_file).
+    auto icon_file = appearance.icon_path.has_value()
+        ? Extension::confined_file(m_extension->root(), appearance.icon_path->bytes_as_string_view())
+        : ErrorOr<ByteString> { Error::from_errno(ENOENT) };
+    if (!icon_file.is_error())
+        setIcon(QIcon(qstring_from_ak_string(icon_file.value())));
+    else
         setIcon(QIcon::fromTheme("application-x-addon"));
-    }
 
     auto title = qstring_from_ak_string(appearance.title);
     setToolTip(title);

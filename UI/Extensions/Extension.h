@@ -40,6 +40,10 @@ public:
     // The file a chrome-extension:// URL of this extension names, if it names a file inside the extension's directory.
     ErrorOr<ByteString> resolve(URL::URL const&) const;
 
+    // A file an extension names for itself, as an icon path does: it may only name a file inside the extension, and
+    // what comes back is the real path of the file, so callers may join it with nothing.
+    static ErrorOr<ByteString> confined_file(StringView root, StringView path);
+
     // Whether a page of another origin may load this path: it has to be in web_accessible_resources for that origin.
     bool is_web_accessible(StringView path, URL::Origin const& requester) const;
 

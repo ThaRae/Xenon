@@ -261,8 +261,10 @@ void ExtensionsDialog::rebuild()
         auto* icon = new QLabel(row);
         icon->setFixedSize(40, 40);
         if (auto path = best_icon(manifest.icons, 80); path.has_value()) {
-            auto file = LexicalPath::join(extension->root(), path->bytes_as_string_view()).string();
-            icon->setPixmap(QIcon(qstring_from_ak_string(file)).pixmap(40, 40));
+            // An icon path the extension chose may only name a file inside it (Extension::confined_file).
+            auto icon_file = Extension::confined_file(extension->root(), path->bytes_as_string_view());
+            if (!icon_file.is_error())
+                icon->setPixmap(QIcon(qstring_from_ak_string(icon_file.value())).pixmap(40, 40));
         }
         row_layout->addWidget(icon, 0, Qt::AlignTop);
 
