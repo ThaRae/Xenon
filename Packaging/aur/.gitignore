@@ -1,0 +1,7 @@
+*/src/
+*/pkg/
+*/xenon/
+*/ladybird/
+*/*.AppImage
+*/*.pkg.tar.*
+*/*.log

@@ -53,3 +53,5 @@ the architecture and workflow, and `Documentation/Features.md` what each feature
 - `./Meta/patches.py apply` / `export` / `pin` / `status`: the engine patch series (see `Documentation/Development.md`).
 - `./Meta/release.py test` / `package` / `publish`: macOS releases, which Xenon updates itself from
   (`Documentation/Updates.md`). Publishing is outward-facing: only when asked.
+- `./Meta/aur.py update` / `check` / `push`: the AUR packages in `Packaging/aur`, which are changed there and pushed
+  from there (`Documentation/Updates.md`). Pushing to the AUR is outward-facing: only when asked.

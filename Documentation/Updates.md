@@ -1,13 +1,14 @@
 # Updates and releases
 
 Xenon updates itself on macOS with [Sparkle 2](https://sparkle-project.org), as Helium does. On Linux, a release is an
-AppImage, which AppImage updaters update. Releases are built with `Meta/release.py`, on a Mac and on Linux or by the
+AppImage, which AppImage updaters update, and on Arch Linux, two packages on the AUR install it. Releases are built with `Meta/release.py`, on a Mac and on Linux or by the
 release workflow on GitHub's runners, and published as GitHub releases of
 [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases), a repository of their own.
 
 - [The published releases](#the-published-releases)
 - [Making a release](#making-a-release)
 - [The AppImage](#the-appimage)
+- [The AUR packages](#the-aur-packages)
 - [Signing](#signing)
 - [In Xenon](#in-xenon)
 - [Testing](#testing)
@@ -72,13 +73,20 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
    `main`. It pushes over HTTPS with `gh`'s credentials, whatever Xenon's `origin` is. It reads the version and the
    feed the release was packaged for from the app in the archive the appcast names, so it runs on Linux too, from those
    files alone.
+6. Once it's up, move the AUR packages to it and push them to the AUR, then commit the bump
+   ([The AUR packages](#keeping-them-current)):
 
-The release workflow can do steps 2, 4 and 5 instead, without a Mac ([On GitHub's runners](#on-githubs-runners)).
+   ```bash
+   ./Meta/aur.py update
+   ./Meta/aur.py push
+   ```
+
+The release workflow can do steps 2, 4, 5 and 6 instead, without a Mac ([On GitHub's runners](#on-githubs-runners)).
 
 ### On GitHub's runners
 
-`.github/workflows/release.yml` does steps 2 and 4, and step 5 too with **publish** ticked, when it's run by hand,
-from **Actions → Release → Run workflow** or with:
+`.github/workflows/release.yml` does steps 2 and 4, and steps 5 and 6 too with **publish** ticked, when it's run by
+hand, from **Actions → Release → Run workflow** or with:
 
 ```bash
 gh workflow run release.yml --repo ThaRae/Xenon --ref main
@@ -117,6 +125,11 @@ Its jobs:
   run has to be on `main`. Before it builds, the macos job checks both, and that ThaRae/xenon-releases has no release
   of `VERSION.txt`'s version yet, so a run that couldn't publish stops at once rather than after the build. If
   publishing fails anyway, the release is still the run's artifacts.
+- **aur**, once **publish** has put the release up: `Meta/aur.py update` moves the AUR packages to it, with the
+  published AppImage's checksum, and `Meta/ci/test-aur-package.sh` builds, installs and tests `xenon-bin`
+  ([Testing them](#testing-them)). With the `AUR_SSH_PRIVATE_KEY` secret set, `Meta/aur.py push` pushes both packages
+  to the AUR. Either way, it pushes the bump to the branch `aur-<version>` with `XENON_RELEASES_TOKEN`, and opens a pull
+  request from it if the token may, or links the branch in the run's summary.
 
 The artifacts are kept for 30 days, and the run's summary has each file's SHA-256.
 
@@ -197,12 +210,86 @@ against the AppImage, as it's run once downloaded: it loads and renders `about:w
 on a fresh start, blocks what the bundled filter lists block, takes filter list updates, shows the blocking dashboard
 and the certificate warning, runs extensions, sends WebAuthn requests to the UI process, installs password managers,
 and opens Xenon's windows for session restore. Then it loads `https://example.com` over HTTPS, with the system's
-certificates, unless Xenon loaded no page at all, which skips it too. `--appimage <file>` tests another AppImage.
+certificates, unless Xenon loaded no page at all, which skips it too. `--appimage <file>` tests another AppImage, and
+`--installed <executable>` a Xenon installed from its AppDir, as the [AUR packages](#the-aur-packages) install it.
 
 `Meta/ci/test-appimage.sh <image>` runs it in a container of a distribution's image (Ubuntu or Debian, Fedora, Arch
 Linux) with only what a desktop system has: the libraries the AppImage leaves to the system, fonts, certificates, a
 D-Bus session, Xvfb and FUSE. Nothing of the build is there, so a library the AppImage misses fails it there rather
 than on someone's machine. The release workflow runs it on Ubuntu 26.04, Fedora 44 and Arch Linux.
+
+## The AUR packages
+
+Two packages on the [Arch User Repository](https://aur.archlinux.org) install Xenon on Arch Linux. They're kept in
+`Packaging/aur`, a directory each, which is where they're changed; the AUR's copies are pushed from there.
+
+| Package | What it installs |
+| --- | --- |
+| [`xenon-bin`](https://aur.archlinux.org/packages/xenon-bin) | The release's AppImage, downloaded from ThaRae/xenon-releases and checked against its SHA-256 |
+| [`xenon`](https://aur.archlinux.org/packages/xenon) | The release built from source: ThaRae/Xenon's `v<version>` tag, built as the release workflow builds the AppImage |
+
+Both install the AppImage's AppDir in `/usr/lib/xenon`, with `/usr/bin/xenon` a link to its `AppRun`, and the desktop
+file (its `Exec` pointed at `xenon`) and the icons where desktops look for them. The AppDir is the same either way, so
+Xenon runs with the libraries it brings, as from the AppImage, and the packages depend on what it leaves to the system
+([Where it runs](#where-it-runs)) and a font. The two conflict, and `xenon-bin` provides `xenon`. Nothing is stripped,
+as in the AppImage, so that crash reports name every function. `xenon-bin` unpacks the AppImage with `unsquashfs` from
+where its runtime ends: the runtime is an ELF executable whose section headers come last in it, so the image starts at
+`e_shoff + e_shentsize × e_shnum`, read from its ELF header. That way nothing it downloaded runs while it builds. `xenon`
+turns off makepkg's compiler flags and link-time optimization (`!buildflags`, `!lto`), as Ladybird's build sets its
+own.
+
+`xenon` has makepkg clone the tag and Ladybird, and points the `ladybird` submodule at that clone. `Meta/xenon.py build`
+then applies the patch series and builds, with vcpkg fetching and building Ladybird's dependencies as it goes, and
+`Meta/release.py package` puts the AppDir together, as the release workflow's linux job does. It builds with Arch
+Linux's clang and Qt rather than the CI image's, but with the Rust Ladybird pins (`rust-toolchain.toml`), which rustup
+installs: Ladybird builds its Rust with warnings as errors, and a newer Rust deprecates what it uses (Rust 1.99
+deprecated `fetch_update`). It needs the network while it builds (rustup, vcpkg, cargo, and the AppImage tools), and
+takes hours and tens of gigabytes from a cold start.
+
+Xenon doesn't update itself on Linux, and Settings says to update it the way it was installed. Installed from the AUR,
+it updates as other AUR packages do, once the packages there move to the next release: with an AUR helper such as yay,
+or by building the new PKGBUILD.
+
+### Keeping them current
+
+```bash
+./Meta/aur.py update    # both packages to VERSION.txt's release, with the published AppImage's checksum
+./Meta/aur.py check     # each .SRCINFO is what makepkg makes of its PKGBUILD
+./Meta/aur.py push      # commit both to their repositories on the AUR, and push them
+```
+
+`update` sets `pkgver`, puts `pkgrel` back to 1 for a new version, and sets `xenon-bin`'s checksum from the published
+AppImage, which it downloads, so it runs once the release is up (`--appimage <file>` takes a file's checksum instead).
+Then it writes each `.SRCINFO`, the AUR's summary of a PKGBUILD, which makepkg writes: pacman's own, on Arch Linux, and
+elsewhere one in Arch Linux's container image, with docker. makepkg won't print a `.SRCINFO` from a directory it can't
+write to, even though it writes nothing there, and in a container the checkout may not be the build user's, so it runs
+with a temporary directory for everything it would write. To change a PKGBUILD between releases, bump its `pkgrel`,
+and run `update` for the `.SRCINFO`. `Meta/check.py` checks that each `.SRCINFO` has its PKGBUILD's version, and the
+AUR workflow that makepkg writes the same one.
+
+`push` clones each package's repository on the AUR, replaces what's there with the package's files as git has them, and
+commits and pushes them, as whichever AUR account ssh is set up for. With `--ssh-key <file>`, it uses that key, and
+trusts only the AUR's own ED25519 host key, `SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4`, as
+[aur.archlinux.org](https://aur.archlinux.org) lists it. A package that isn't on the AUR yet is created by its first
+push. The release workflow does all three once a release is up ([On GitHub's runners](#on-githubs-runners)).
+
+### Testing them
+
+`Meta/ci/test-aur-package.sh <package>` builds a package as an AUR user would, with makepkg in a container of Arch
+Linux's own image, after checking its `.SRCINFO`. It checks the package with namcap, whose errors fail the test and
+whose warnings it only shows, installs it with pacman, and runs `Meta/release.py test --installed /usr/bin/xenon`:
+[the AppImage's checks](#testing-the-appimage), against the Xenon the package installed. The package is left in
+`Build/aur`.
+
+`.github/workflows/aur.yml` runs it for `xenon-bin` on pull requests that change the packaging, and for `xenon` by
+hand, with **xenon** ticked, or on pull requests that change its PKGBUILD. `xenon`'s job can't start from `main`'s build
+caches, which are the CI image's, so it keeps ccache's objects and vcpkg's packages in a cache entry of its own
+(`aur-xenon-…`, up to about 2 GB of ccache), saved whether or not the build finished, so that a run that stops at the
+time limit leaves the next one less to build.
+
+On Apple silicon, Docker runs the x86-64 container through emulation, where Xenon's helper processes stop at their
+sandbox ("Landlock must be applied before the process starts a second thread"), so the checks of a running Xenon only
+pass on x86-64 machines, GitHub's runners among them. Building, namcap and installing work either way.
 
 ## Signing
 
@@ -360,8 +447,37 @@ Then:
 gh secret set XENON_RELEASES_TOKEN --repo ThaRae/Xenon    # asks for it
 ```
 
+It also pushes the AUR packages' bump to a branch. To have the workflow open the pull request from it too, give the token
+the **Pull requests** permission, set to **Read and write**, as well.
+
 When the token expires, make a new one and set the secret again. Only publishing needs it: the workflow builds without
 it.
+
+### Pushing to the AUR
+
+The packages go to the AUR over SSH, as an AUR account that maintains them. Once:
+
+1. Make an account at [aur.archlinux.org](https://aur.archlinux.org/register), and a key for it alone:
+
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/aur -N "" -C "Xenon's AUR packages"
+   ```
+
+   Add `~/.ssh/aur.pub` to the account, under **My Account → SSH Public Key**.
+2. Push the packages for the first time, which creates them on the AUR:
+
+   ```bash
+   ./Meta/aur.py push --ssh-key ~/.ssh/aur
+   ```
+
+3. For the release workflow to push them from then on:
+
+   ```bash
+   gh secret set AUR_SSH_PRIVATE_KEY --repo ThaRae/Xenon < ~/.ssh/aur
+   ```
+
+Without the secret, the workflow still moves the packages to each release and tests `xenon-bin`, and the push is left
+to `Meta/aur.py push`.
 
 After making a new key or certificate, set its secret again, and change `UPDATE_PUBLIC_KEY` or `CERTIFICATE_SHA1` in
 the workflow to match.

@@ -81,6 +81,10 @@ def shell_sources() -> list[Path]:
     return scripts + (sorted(path for path in hooks.iterdir() if path.is_file()) if hooks.exists() else [])
 
 
+def aur_pkgbuilds() -> list[Path]:
+    return sorted((XENON_SOURCE_DIR / "Packaging" / "aur").glob("*/PKGBUILD"))
+
+
 def check_includes(checks: Checks):
     for path in ui_sources(".cpp", ".h", ".mm"):
         for number, line in enumerate(path.read_text().splitlines(), 1):
@@ -282,6 +286,19 @@ def check_symlinks(checks: Checks):
             checks.fail("symlinks", f"{name} should be a symlink to {target}")
 
 
+def check_aur_packages(checks: Checks):
+    for pkgbuild in aur_pkgbuilds():
+        srcinfo = pkgbuild.with_name(".SRCINFO")
+        if not srcinfo.is_file():
+            checks.fail("aur", f"{relative(pkgbuild.parent)} has no .SRCINFO; run Meta/aur.py update")
+            continue
+        for name in ("pkgver", "pkgrel"):
+            set_to = re.search(rf"^{name}=(\S+)$", pkgbuild.read_text(), re.MULTILINE)
+            listed = re.search(rf"^\t{name} = (\S+)$", srcinfo.read_text(), re.MULTILINE)
+            if not set_to or not listed or set_to[1] != listed[1]:
+                checks.fail("aur", f"{relative(srcinfo)} doesn't have its PKGBUILD's {name}; run Meta/aur.py update")
+
+
 def check_submodule(checks: Checks, online: bool, unpinned: bool):
     if not (LADYBIRD_SOURCE_DIR / ".git").exists():
         checks.fail("submodule", "ladybird/ isn't checked out; run git submodule update --init --depth 1")
@@ -421,6 +438,8 @@ def check_formatting(checks: Checks):
 
     if shutil.which("shellcheck"):
         run_formatter(checks, "shellcheck", ["shellcheck"], ["shellcheck"], shell_sources())
+        pkgbuild_shellcheck = ["shellcheck", "--shell=bash", "--exclude=SC2034,SC2154,SC2164"]
+        run_formatter(checks, "shellcheck", pkgbuild_shellcheck, pkgbuild_shellcheck, aur_pkgbuilds())
     else:
         print("note: shellcheck isn't installed; skipping the shell scripts (CI checks them)")
 
@@ -491,6 +510,7 @@ def main():
     check_palette(checks)
     check_filter_lists(checks)
     check_symlinks(checks)
+    check_aur_packages(checks)
     check_submodule(checks, online=args.online, unpinned=args.unpinned)
     check_patch_messages(checks)
     if not args.skip_formatting:
