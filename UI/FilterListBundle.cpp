@@ -25,7 +25,6 @@ Optional<BundleFile const&> BundleManifest::file(StringView path) const
     return files.first_matching([&](auto const& file) { return file.path == path; });
 }
 
-// A file in one of the layout's directories, with a plain name: nothing a manifest says can reach outside the bundle.
 static bool is_list_path(StringView path, StringView directory)
 {
     if (!path.starts_with(directory) || path.length() <= directory.length() + 1 || path[directory.length()] != '/')

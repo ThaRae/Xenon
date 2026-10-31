@@ -15,32 +15,29 @@ the engine already, and that process is never given the rules, including
 when the lists or settings change. Documents that site isolation puts in
 other processes, such as cross-site frames, still get them.
 ---
- Libraries/LibWebView/Application.cpp        | 15 ++++++++++-----
+ Libraries/LibWebView/Application.cpp        | 11 +++++++----
  Libraries/LibWebView/Application.h          |  4 ++--
  Libraries/LibWebView/HeadlessWebView.cpp    |  8 ++++----
  Libraries/LibWebView/HeadlessWebView.h      |  4 ++--
  Libraries/LibWebView/ViewImplementation.cpp |  5 +++--
- Libraries/LibWebView/ViewImplementation.h   |  6 +++++-
- Libraries/LibWebView/WebContentClient.h     |  5 +++++
- 7 files changed, 31 insertions(+), 16 deletions(-)
+ Libraries/LibWebView/ViewImplementation.h   |  4 +++-
+ Libraries/LibWebView/WebContentClient.h     |  4 ++++
+ 7 files changed, 25 insertions(+), 15 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 68dd9f6ea46ecc03d431c73240c2646e4c22c1ab..237f39e321f151440d696a4029fa297408aa6729 100644
+index e394b28f1819e74348a034491b46be2f57060bb8..27a34401088aba475e5bbdffc2e928486307a05e 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -914,8 +914,9 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -914,7 +914,7 @@ void Application::send_content_blockers(WebContentClient& client) const
  {
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
--    // Each process builds an engine from the rules, which can take tens of MiB, so while blocking is off it gets none.
 -    if (!content_blocking_enabled()) {
-+    // Each process builds an engine from the rules, which can take tens of MiB, so while blocking is off it gets none,
-+    // and neither does a process for a view without the content blocker.
 +    if (!content_blocking_enabled() || client.enable_content_blocker() == EnableContentBlocker::No) {
          client.async_set_content_blockers(Core::AnonymousBuffer {}, Core::AnonymousBuffer {}, Core::AnonymousBuffer {});
          return;
      }
-@@ -1248,7 +1249,7 @@ void Application::open_bookmark_in_new_window(String const& bookmark_id, IsPriva
+@@ -1247,7 +1247,7 @@ void Application::open_bookmark_in_new_window(String const& bookmark_id, IsPriva
          open_url_in_new_window(bookmark->bookmark().url, is_private);
  }
  
@@ -49,7 +46,7 @@ index 68dd9f6ea46ecc03d431c73240c2646e4c22c1ab..237f39e321f151440d696a4029fa2974
  {
      // The client's WebContentClient picks up this same session when it is created.
      auto session = session_for_new_view(is_private);
-@@ -1295,6 +1296,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1294,6 +1294,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
      if (auto* webdriver_bidi = WebDriverBiDi::the(); webdriver_bidi && webdriver_bidi->session_state().is_active)
          webdriver_bidi->push_session_state_for_client(*client);
  
@@ -57,7 +54,7 @@ index 68dd9f6ea46ecc03d431c73240c2646e4c22c1ab..237f39e321f151440d696a4029fa2974
      send_content_blockers(*client);
  
      m_web_content_clients.set(client);
-@@ -1741,10 +1743,13 @@ void Application::crash_compositor_process()
+@@ -1740,10 +1741,12 @@ void Application::crash_compositor_process()
      m_compositor_client->async_crash();
  }
  
@@ -66,7 +63,6 @@ index 68dd9f6ea46ecc03d431c73240c2646e4c22c1ab..237f39e321f151440d696a4029fa2974
  {
      RefPtr<WebContentClient> web_content_client;
 -    if (is_private == IsPrivate::Yes) {
-+    // NB: The spare process has built the content blocker's engine already.
 +    if (enable_content_blocker == EnableContentBlocker::No) {
 +        web_content_client = TRY(create_web_content_client(is_private, allocate_page_id(), {}, {}, {}, {}, Web::HTML::VisibilityState::Hidden, EnableContentBlocker::No));
 +    } else if (is_private == IsPrivate::Yes) {
@@ -74,10 +70,10 @@ index 68dd9f6ea46ecc03d431c73240c2646e4c22c1ab..237f39e321f151440d696a4029fa2974
      } else if (m_spare_web_content_process) {
          web_content_client = m_spare_web_content_process.release_nonnull();
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 194718728ed81e2adec749213a70b5b502a81cbc..dfe5fa7d7e7e2f5bca05e0394fc4b943ffad9273 100644
+index be829d3af4f50e578915c21b815f4dcdb291fe4a..b860721b6bd931e589a20df7a18a41a1c97eb04a 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -268,7 +268,7 @@ public:
+@@ -258,7 +258,7 @@ public:
      ErrorOr<Core::GeolocationProvider::WatchId, Core::GeolocationError> start_watching_geolocation_position(Core::GeolocationProvider::SuccessCallback on_success, Core::GeolocationProvider::ErrorCallback on_error);
      void stop_watching_geolocation_position(Core::GeolocationProvider::WatchId);
  
@@ -86,7 +82,7 @@ index 194718728ed81e2adec749213a70b5b502a81cbc..dfe5fa7d7e7e2f5bca05e0394fc4b943
      struct ChildFrameWebContentProcess {
          NonnullRefPtr<WebContentClient> client;
          Web::PageId page_id { 0 };
-@@ -490,7 +490,7 @@ private:
+@@ -480,7 +480,7 @@ private:
      ErrorOr<void> create_profile(Optional<StringView> profile_name, Optional<StringView> profile_path, bool force_new_process, bool temporary_profile);
      void create_mach_port_server(ByteString const& profile_identity);
      void update_website_color_scheme();
@@ -169,7 +165,7 @@ index ff638fe2de727c403372c804cd934c9d1b3bf287..5647a88d08726c5beb78e1ffc2563cc8
      }
      display_traversable(*traversable, system_visibility_state);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 8baedba9a41d9710cc961a9d39554401ac8b5dc6..39748df57afe8e72eceef67393bf96b9c06cec1d 100644
+index ea33da1134e58816fe288286d48c3d75ec5caaaa..ce68c089c861fd21042230c5df758b99c3c1d7fb 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
 @@ -76,6 +76,7 @@
@@ -180,18 +176,16 @@ index 8baedba9a41d9710cc961a9d39554401ac8b5dc6..39748df57afe8e72eceef67393bf96b9
  #include <LibWebView/PermissionManager.h>
  #include <LibWebView/SessionHistory.h>
  #include <LibWebView/SessionStore.h>
-@@ -742,7 +743,9 @@ protected:
+@@ -729,7 +730,7 @@ protected:
      virtual Optional<ScreenRects> screen_rects() const { return {}; }
      void update_compositor_display_metadata(WebContentPage&);
  
 -    explicit ViewImplementation(IsPrivate = IsPrivate::No);
-+    // A view without the content blocker, for pages nothing should be blocked in such as the embedder's own, opens its
-+    // tab in a process of its own that never builds the content blocker's engine.
 +    explicit ViewImplementation(IsPrivate = IsPrivate::No, EnableContentBlocker = EnableContentBlocker::Yes);
  
      void set_owner_view(ViewImplementation const& owner_view) { m_owner_view_id = owner_view.view_id(); }
  
-@@ -889,6 +892,7 @@ protected:
+@@ -876,6 +877,7 @@ protected:
      bool m_accessibility_tree_requested { false };
  
      IsPrivate m_is_private { IsPrivate::No };
@@ -200,7 +194,7 @@ index 8baedba9a41d9710cc961a9d39554401ac8b5dc6..39748df57afe8e72eceef67393bf96b9
  
      // A load the browser's UI started, whose URL the address bar shows while it is the ongoing navigation.
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index c2f638954b9815fcd2c6005da9b27d671d2dd591..c2e71d898fcf24bbe2d7cd733af7825f19a1359e 100644
+index c2f638954b9815fcd2c6005da9b27d671d2dd591..45aa60a2c452f83a328425a588bf7a5eecaef80f 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
 @@ -62,6 +62,7 @@
@@ -211,17 +205,16 @@ index c2f638954b9815fcd2c6005da9b27d671d2dd591..c2e71d898fcf24bbe2d7cd733af7825f
  #include <LibWebView/RequestServerSiteBindings.h>
  #include <LibWebView/StorageAreaRegistry.h>
  #include <LibWebView/WebContentPage.h>
-@@ -133,6 +134,9 @@ public:
+@@ -133,6 +134,8 @@ public:
      // documents processes of their own, which host nothing else.
      Optional<String> const& hosted_web_ui() const { return m_hosted_web_ui; }
      void set_hosted_web_ui(String host) { m_hosted_web_ui = move(host); }
-+    // A process launched for a view that goes without the content blocker is never given its rules.
 +    EnableContentBlocker enable_content_blocker() const { return m_enable_content_blocker; }
 +    void set_enable_content_blocker(EnableContentBlocker enable_content_blocker) { m_enable_content_blocker = enable_content_blocker; }
      void register_embedded_page(Web::PageId page_id, CanonicalTraversable&);
      void unregister_embedded_page(Web::PageId page_id);
      Optional<Web::PageId> page_id_for_traversable(CanonicalTraversable const&) const;
-@@ -246,6 +250,7 @@ private:
+@@ -246,6 +249,7 @@ private:
      bool m_rejected_ipc { false };
      bool m_has_hosted_local_file_content { false };
      Optional<String> m_hosted_web_ui;

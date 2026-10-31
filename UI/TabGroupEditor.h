@@ -20,15 +20,12 @@ namespace Ladybird {
 
 class TabGroupColorSwatch;
 
-// What a group's header opens, as Chromium's tab group editor bubble: the group's title and color, which change as
-// they're edited, and what can be done with the group's tabs.
 class TabGroupEditor final : public Popover {
 public:
     AK_ALLOC_WITH_KMALLOC;
 
     explicit TabGroupEditor(QWidget* parent);
 
-    // Opens below the anchor, a rect in global coordinates, or beside it when it's a row of the vertical tabs.
     enum class Placement : u8 {
         Below,
         Beside,

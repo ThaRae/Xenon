@@ -19,12 +19,12 @@ load them.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .../BlockingAlgorithms.cpp                    |  7 +++++++
- .../FetchIntegration.cpp                      | 19 +++++++++++++++++++
- 2 files changed, 26 insertions(+)
+ .../ContentSecurityPolicy/BlockingAlgorithms.cpp       |  4 ++++
+ .../LibWeb/ContentSecurityPolicy/FetchIntegration.cpp  | 10 ++++++++++
+ 2 files changed, 14 insertions(+)
 
 diff --git a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
-index 7d4e4a6cbd353b318081fce44391abb5b8300236..d2afdda7bc24968368263a9df93e1b621a26da8e 100644
+index 7d4e4a6cbd353b318081fce44391abb5b8300236..fb285c77394a752806a94b551e663952e95ed4de 100644
 --- a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 +++ b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 @@ -6,6 +6,7 @@
@@ -35,13 +35,10 @@ index 7d4e4a6cbd353b318081fce44391abb5b8300236..d2afdda7bc24968368263a9df93e1b62
  #include <LibWeb/Bindings/PrincipalHostDefined.h>
  #include <LibWeb/ContentSecurityPolicy/BlockingAlgorithms.h>
  #include <LibWeb/ContentSecurityPolicy/Directives/DirectiveOperations.h>
-@@ -123,6 +124,12 @@ void report_a_violation_found_in_another_process(HTML::EnvironmentSettingsObject
+@@ -123,6 +124,9 @@ void report_a_violation_found_in_another_process(HTML::EnvironmentSettingsObject
  // https://w3c.github.io/webappsec-csp/#should-block-navigation-request
  Directives::Directive::Result should_navigation_request_of_type_be_blocked_by_content_security_policy(NonnullRefPtr<Fetch::Infrastructure::Request> navigation_request, Directives::Directive::NavigationType navigation_type, Page& page)
  {
-+    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
-+    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages
-+    //         may load them.
 +    if (URL::is_embedder_scheme(navigation_request->current_url().scheme()))
 +        return Directives::Directive::Result::Allowed;
 +
@@ -49,7 +46,7 @@ index 7d4e4a6cbd353b318081fce44391abb5b8300236..d2afdda7bc24968368263a9df93e1b62
      auto result = Directives::Directive::Result::Allowed;
  
 diff --git a/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp b/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
-index f3efd21e81fb262c984be77b99bfd36c992c32b9..3532cd9cdcb5b4aca1e4e6a753b5bd615e145527 100644
+index f3efd21e81fb262c984be77b99bfd36c992c32b9..7dc86d203f98e4db032507d31477b0880fede132 100644
 --- a/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
 +++ b/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
 @@ -6,6 +6,7 @@
@@ -60,39 +57,30 @@ index f3efd21e81fb262c984be77b99bfd36c992c32b9..3532cd9cdcb5b4aca1e4e6a753b5bd61
  #include <LibWeb/ContentSecurityPolicy/Directives/FetchIntegration.h>
  #include <LibWeb/ContentSecurityPolicy/FetchIntegration.h>
  #include <LibWeb/ContentSecurityPolicy/PolicyList.h>
-@@ -71,6 +72,12 @@ namespace Web::ContentSecurityPolicy {
+@@ -71,6 +72,9 @@ namespace Web::ContentSecurityPolicy {
  // https://w3c.github.io/webappsec-csp/#report-for-request
  void report_content_security_policy_violations_for_request(Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
  {
-+    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
-+    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages
-+    //         may load them.
 +    if (URL::is_embedder_scheme(request.current_url().scheme()))
 +        return;
 +
      // 1. Let CSP list be request’s policy container's CSP list.
      auto const& csp_list = request.policy_container().get<NonnullRefPtr<HTML::PolicyContainer const>>()->csp_list;
  
-@@ -93,6 +100,12 @@ void report_content_security_policy_violations_for_request(Fetch::Infrastructure
+@@ -93,6 +97,9 @@ void report_content_security_policy_violations_for_request(Fetch::Infrastructure
  // https://w3c.github.io/webappsec-csp/#should-block-request
  Directives::Directive::Result should_request_be_blocked_by_content_security_policy(Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
  {
-+    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
-+    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages
-+    //         may load them.
 +    if (URL::is_embedder_scheme(request.current_url().scheme()))
 +        return Directives::Directive::Result::Allowed;
 +
      // 1. Let CSP list be request’s policy container's CSP list.
      auto const& csp_list = request.policy_container().get<NonnullRefPtr<HTML::PolicyContainer const>>()->csp_list;
  
-@@ -126,6 +139,12 @@ Directives::Directive::Result should_request_be_blocked_by_content_security_poli
+@@ -126,6 +133,9 @@ Directives::Directive::Result should_request_be_blocked_by_content_security_poli
  // https://w3c.github.io/webappsec-csp/#should-block-response
  Directives::Directive::Result should_response_to_request_be_blocked_by_content_security_policy(Fetch::Infrastructure::Response const& response, Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
  {
-+    // AD-HOC: The embedder's own schemes bypass the page's policy, as Blink lets a browser's extension resources do
-+    //         (WebSecurityPolicy::RegisterURLSchemeAsBypassingContentSecurityPolicy). The embedder decides which pages
-+    //         may load them.
 +    if (URL::is_embedder_scheme(request.current_url().scheme()))
 +        return Directives::Directive::Result::Allowed;
 +

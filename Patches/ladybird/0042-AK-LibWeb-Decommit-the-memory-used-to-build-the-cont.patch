@@ -13,13 +13,13 @@ then puts the purge option back as it was, and use it there.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- AK/kmalloc.cpp                             | 17 +++++++++++++++++
+ AK/kmalloc.cpp                             | 12 ++++++++++++
  AK/kmalloc.h                               |  1 +
- Libraries/LibWeb/Loader/ContentBlocker.cpp |  4 +++-
- 3 files changed, 21 insertions(+), 1 deletion(-)
+ Libraries/LibWeb/Loader/ContentBlocker.cpp |  2 +-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/AK/kmalloc.cpp b/AK/kmalloc.cpp
-index 70ad04dd5f48514f48d50befc8948d4a8e396a1e..9f1a6c7d1dbce072231a520909e826b38ba43e0e 100644
+index 70ad04dd5f48514f48d50befc8948d4a8e396a1e..27acede46db73224a7ed9853d976bb566b3151fa 100644
 --- a/AK/kmalloc.cpp
 +++ b/AK/kmalloc.cpp
 @@ -85,6 +85,10 @@ void ak_kmalloc_collect()
@@ -33,17 +33,12 @@ index 70ad04dd5f48514f48d50befc8948d4a8e396a1e..9f1a6c7d1dbce072231a520909e826b3
  #else
  
  #    if defined(AK_OS_LINUX) || defined(AK_OS_MACOS)
-@@ -188,4 +192,17 @@ void ak_kmalloc_collect()
+@@ -188,4 +192,12 @@ void ak_kmalloc_collect()
      mi_collect(true);
  }
  
 +void ak_kmalloc_decommit_free_pages()
 +{
-+    // On Linux a purge only resets pages (see MimallocConfiguration above), which keeps them in RSS until the kernel is
-+    // short of memory, so ak_kmalloc_collect() alone does not give a process's memory back. Decommit for this collect
-+    // instead, so that freed pages leave the process's RSS and PSS. Later reuse faults them in again, so this is for a
-+    // moment when the process is not about to allocate much, not for every collect. Where purges already decommit
-+    // (mimalloc's default, kept on macOS), the option is left as it was.
 +    auto purge_decommits = mi_option_get(mi_option_purge_decommits);
 +    mi_option_set(mi_option_purge_decommits, 1);
 +    ak_kmalloc_collect();
@@ -64,16 +59,14 @@ index 9517b892c27c40571d68ebc48b0a4ad5cca9fd35..38c10f16087dc7bb8b86be574c724034
  [[nodiscard]] inline void* kcalloc(size_t count, size_t size)
  {
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index ba8a962a5e630f20240caa4cb9b0f782b5390ddb..03b93253689e1452735cc93e11ea094400792700 100644
+index 42bea0ef552dacd8a8f72399260a0f824579ab88..651e356c6972a2e33be0993e10675abc9adbcd24 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-@@ -162,7 +162,9 @@ ErrorOr<void> ContentBlocker::set_rules_from_bytes(ReadonlyBytes rules_bytes, Re
+@@ -160,7 +160,7 @@ ErrorOr<void> ContentBlocker::set_patterns(ReadonlySpan<String> patterns)
+ 
+ ErrorOr<void> ContentBlocker::set_rules_from_bytes(ReadonlyBytes rules_bytes, ReadonlyBytes trusted_rules_bytes, ReadonlyBytes resources_bytes)
  {
-     // NB: Building an engine allocates several times what the engine keeps, on this thread, whose heap nothing else
-     //     collects. Give that memory back, and an old engine's, rather than keeping it for the life of the process.
 -    ScopeGuard collect_memory = [] { ak_kmalloc_collect(); };
-+    //     A plain collect only resets the freed pages on Linux, which keeps them in RSS, so decommit them: this runs
-+    //     only when the rules arrive or change, not on every collect.
 +    ScopeGuard collect_memory = [] { ak_kmalloc_decommit_free_pages(); };
  
      // OPTIMIZATION: Building an engine costs the same tokenizing and flatbuffer work whether or not there are any

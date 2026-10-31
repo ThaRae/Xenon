@@ -39,7 +39,6 @@ namespace Ladybird {
 static constexpr qreal TAB_GROUP_CHIP_HEIGHT = 20;
 static constexpr qreal TAB_GROUP_CHIP_PADDING = 8;
 static constexpr qreal TAB_GROUP_CHIP_MAX_WIDTH = 160;
-// A group without a title shows its color as a dot.
 static constexpr qreal TAB_GROUP_DOT_SIZE = 12;
 
 struct TabGroupColorTones {
@@ -48,8 +47,6 @@ struct TabGroupColorTones {
     QRgb dark;
 };
 
-// The tones are OKLCH colors at the lightness of Xenon's rose, chosen so that white titles stand out on them in a light
-// chrome, and lighter ones that dark titles stand out on in a dark chrome. Rose is the accent itself.
 static constexpr TabGroupColorTones s_tab_group_color_tones[TAB_GROUP_COLOR_COUNT] = {
     { "Rose", BrandColors::Rose300, BrandColors::Rose40 },
     { "Sky", qRgb(0x07, 0x87, 0xb5), qRgb(0x6b, 0xce, 0xff) },
@@ -135,8 +132,6 @@ static BrowserWindow* browser_window_of(QWidget& widget)
     return qobject_cast<BrowserWindow*>(widget.window());
 }
 
-// The groups are saved with the session, as Chromium saves them, in a file of the profile's beside its Sessions database.
-// They're kept under the session's ids for windows and tabs, so they come back with the windows the session restores.
 static Optional<QString> saved_tab_groups_path()
 {
     if (!WebView::Application::default_session().session_store->is_persistent())
@@ -170,8 +165,6 @@ static void write_saved_tab_groups(QJsonObject const& saved_groups)
         dbgln("Unable to save the tab groups to {}", ak_byte_string_from_qstring(*path));
 }
 
-// Window ids outlive a run only for the windows the next run restores. The event loop first runs once startup has
-// restored them, so then the groups of every other window can go.
 static void forget_groups_of_windows_not_restored()
 {
     static bool s_scheduled = false;
@@ -255,7 +248,6 @@ bool TabGroups::holds_every_tab(TabGroup const& group) const
     return tab_count(group) == count();
 }
 
-// A new group takes the color fewest groups have, the first of those in the order of the colors.
 TabGroupColor TabGroups::next_color() const
 {
     Array<int, TAB_GROUP_COLOR_COUNT> uses {};
@@ -285,7 +277,6 @@ void TabGroups::move_tab(int from, int to)
 
 TabGroup& TabGroups::add_to_new_group(Tab& tab)
 {
-    // Chromium unpins a tab that joins a group.
     if (tab.is_pinned()) {
         if (auto* window = browser_window_of(m_tab_widget))
             window->unpin_tab(tab);
@@ -313,7 +304,6 @@ void TabGroups::add_to_group(Tab& tab, TabGroup& group)
     if (!span.has_value())
         return;
 
-    // The tab joins at the group's end.
     auto index = index_of(&tab);
     move_tab(index, index < span->first ? span->last : span->last + 1);
     m_groups_of_tabs.insert(&tab, &group);
@@ -329,7 +319,6 @@ void TabGroups::remove_from_group(Tab& tab)
     auto span = span_of(group);
     m_groups_of_tabs.remove(&tab);
 
-    // As in Chromium, a tab from the middle of its group moves past the group's end, so the group's tabs stay together.
     if (auto index = index_of(&tab); span.has_value() && index > span->first && index < span->last)
         move_tab(index, span->last);
     update();
@@ -360,8 +349,6 @@ void TabGroups::set_collapsed(TabGroup& group, bool collapsed)
     if (!span.has_value())
         return;
 
-    // The current tab can't hide, so another takes its place, as in Chromium: The first one that shows after the group,
-    // or else the last one before it, or else a new tab at the end of the strip.
     if (collapsed) {
         auto current = m_tab_widget.current_index();
         if (current >= span->first && current <= span->last) {
@@ -401,8 +388,6 @@ void TabGroups::close_group(TabGroup& group)
     if (!span.has_value() || !window)
         return;
 
-    // Closing the current tab selects a neighbor, which would load a tab that's about to close too. So a tab that stays
-    // becomes the current tab first, and a new tab stays when the group holds every tab.
     if (holds_every_tab(group)) {
         window->open_new_tab();
     } else if (auto current = m_tab_widget.current_index(); current >= span->first && current <= span->last) {
@@ -506,7 +491,6 @@ void TabGroups::will_pin_tab(Tab& tab)
 
 void TabGroups::did_insert_tab(int index)
 {
-    // A tab that comes in between two tabs of a group joins it.
     if (auto* tab = tab_at(index); tab && !tab->is_pinned() && !m_is_moving_tabs) {
         if (auto* group = group_at(index - 1); group && group == group_at(index + 1))
             m_groups_of_tabs.insert(tab, group);
@@ -520,7 +504,6 @@ void TabGroups::will_remove_tab(int index)
     if (!tab)
         return;
 
-    // When the last tab that shows goes, Qt has no other tab to select, so the nearest collapsed group opens.
     auto* tab_bar = m_tab_widget.tab_bar();
     auto another_tab_shows = false;
     for (int other = 0; other < count() && !another_tab_shows; ++other)
@@ -551,8 +534,6 @@ void TabGroups::did_move_tab(int, int to)
     if (m_is_moving_tabs)
         return;
 
-    // A tab moved between two tabs of a group joins it, and a tab moved away from its group's other tabs leaves it. A
-    // group's only tab takes the group along.
     if (auto* tab = tab_at(to); tab && !tab->is_pinned()) {
         auto* left = group_at(to - 1);
         auto* right = group_at(to + 1);
@@ -565,8 +546,6 @@ void TabGroups::did_move_tab(int, int to)
     update();
 }
 
-// A tab in a collapsed group that becomes the current tab, as a link or an extension can make it, opens its group. A
-// window checking whether it may close shows its tabs only for their pages' prompts, and leaves its groups as they are.
 void TabGroups::did_change_current_tab(int index)
 {
     if (auto* window = browser_window_of(m_tab_widget); window && window->is_checking_whether_to_close())
@@ -577,7 +556,6 @@ void TabGroups::did_change_current_tab(int index)
 
 void TabGroups::keep_groups_together()
 {
-    // Pinned tabs and tabs that left the strip are in no group.
     Vector<TabGroup*> groups_at_indices;
     groups_at_indices.ensure_capacity(count());
     for (int index = 0; index < count(); ++index) {
@@ -586,7 +564,6 @@ void TabGroups::keep_groups_together()
         groups_at_indices.unchecked_append(group && !tab->is_pinned() ? group : nullptr);
     }
 
-    // A group's tabs sit together. If something else split them up, the group keeps its longest run of tabs.
     QHash<TabGroup*, TabGroupSpan> longest_runs;
     for (int index = 0; index < count();) {
         auto* group = groups_at_indices[index];
@@ -616,7 +593,6 @@ void TabGroups::keep_groups_together()
             m_spans.append({ group, index, index });
     }
 
-    // A group without tabs is gone.
     for (auto* group : findChildren<TabGroup*>(Qt::FindDirectChildrenOnly)) {
         if (!span_of(group).has_value()) {
             group->setParent(nullptr);
@@ -629,7 +605,6 @@ void TabGroups::update_tab_visibility()
 {
     auto* tab_bar = m_tab_widget.tab_bar();
 
-    // The current tab always shows.
     if (auto* group = group_at(m_tab_widget.current_index()); group && group->is_collapsed())
         group->m_collapsed = false;
 
@@ -692,7 +667,6 @@ void TabGroups::restore(WebView::SessionWindowId window_id)
     if (saved_groups.isEmpty())
         return;
 
-    // What's saved is replaced by what comes back, so groups whose tabs didn't come back aren't kept.
     m_has_saved_groups = true;
 
     QHash<i64, Tab*> tabs_by_id;
@@ -734,7 +708,6 @@ static QIcon tab_group_menu_icon(TabGroup const& group, QPalette const& palette)
     return QIcon(pixmap);
 }
 
-// How a group is named in a menu. A group without a title is named by its tabs, as Chromium does.
 static QString tab_group_menu_text(TabGroups const& groups, TabWidget const& tab_widget, TabGroup const& group)
 {
     auto text = group.title();
@@ -778,7 +751,6 @@ void add_tab_group_actions(QMenu& menu, Tab& tab)
     auto* add_to_group_action = menu.addMenu(add_to_group_menu);
     menu.addAction(remove_from_group_action);
 
-    // With other groups to join, the menu offers them, along with a new one.
     QObject::connect(&menu, &QMenu::aboutToShow, &tab, [&tab, groups_of, add_to_new_group_action, add_to_group_action, add_to_group_menu, remove_from_group_action] {
         auto* groups = groups_of();
         auto* tab_widget = groups ? qobject_cast<TabWidget*>(groups->parent()) : nullptr;

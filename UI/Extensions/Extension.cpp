@@ -93,7 +93,6 @@ ErrorOr<JsonObject, String> read_extension_json(ByteString const& path, ByteStri
     if (contents.is_error())
         return MUST(String::formatted("Could not read {}: {}", relative, contents.error()));
 
-    // A UTF-8 byte order mark is allowed, as in Chrome.
     auto text = StringView { contents.value().bytes() };
     if (text.starts_with("\xEF\xBB\xBF"sv))
         text = text.substring_view(3);
@@ -106,7 +105,6 @@ ErrorOr<JsonObject, String> read_extension_json(ByteString const& path, ByteStri
     return json.release_value().as_object();
 }
 
-// The manifest strings Chrome localizes.
 static void localize_manifest(JsonObject& json, Locales const& locales)
 {
     auto localize = [&](JsonObject& object, StringView key) {
@@ -154,7 +152,6 @@ ErrorOr<NonnullRefPtr<Extension>, String> Extension::load_unpacked(StringView di
     localize_manifest(json, locales);
     auto manifest = TRY(Manifest::parse(move(json)));
 
-    // Chrome refuses an extension whose scripts or icons are missing, so that it fails at load rather than later.
     auto require_file = [&](String const& path, StringView what) -> ErrorOr<void, String> {
         auto confined = confined_file(root.value(), path);
         if (confined.is_error())
@@ -202,9 +199,6 @@ URL::URL Extension::url_for(StringView path) const
 
 ErrorOr<ByteString> Extension::confined_file(StringView root, StringView path)
 {
-    // A file an extension names for itself, as an icon path does, may only name a file inside the extension, however
-    // its root is joined onto it later. LexicalPath::join canonicalizes "..", so the segments are checked on their
-    // own, the way resolve() checks the URL's.
     while (path.starts_with('/'))
         path = path.substring_view(1);
     if (path.is_empty() || path.contains('\\') || path.contains('\0'))
@@ -215,7 +209,6 @@ ErrorOr<ByteString> Extension::confined_file(StringView root, StringView path)
             return Error::from_errno(EACCES);
         joined = joined.append(segment);
     }
-    // Symbolic links inside the extension may only lead to other files inside it.
     auto real_path = TRY(FileSystem::real_path(joined.string()));
     if (!real_path.starts_with(ByteString::formatted("{}/", root)))
         return Error::from_errno(EACCES);
@@ -227,8 +220,6 @@ ErrorOr<ByteString> Extension::resolve(URL::URL const& url) const
     if (url.scheme() != EXTENSION_SCHEME || url.serialized_host() != m_id.bytes_as_string_view())
         return Error::from_errno(ENOENT);
 
-    // Each segment is percent-decoded on its own, so an encoded slash can't make a new one, and no segment may climb
-    // out of the extension's directory.
     LexicalPath path { m_root };
     size_t segments = 0;
     for (auto segment : url.path_segments()) {
@@ -243,7 +234,6 @@ ErrorOr<ByteString> Extension::resolve(URL::URL const& url) const
     if (segments == 0)
         return Error::from_errno(EISDIR);
 
-    // Symbolic links inside the extension may only lead to other files inside it.
     auto real_path = TRY(FileSystem::real_path(path.string()));
     if (!real_path.starts_with(ByteString::formatted("{}/", m_root)))
         return Error::from_errno(EACCES);
@@ -267,7 +257,6 @@ bool Extension::has_permission(StringView permission) const
     return m_manifest.has_permission(permission) || m_granted_optional_permissions.contains_slow(permission);
 }
 
-// Only what the manifest still lists as optional, since an update may drop some.
 void Extension::set_granted_optional_permissions(Vector<String> permissions)
 {
     permissions.remove_all_matching([&](auto const& permission) { return !m_manifest.optional_permissions.contains_slow(permission); });
@@ -304,7 +293,6 @@ bool Extension::is_sandboxed_page(StringView path) const
 
 StringView mime_type_for_path(StringView path)
 {
-    // Text types get a charset, as extension files are UTF-8 unless they say otherwise.
     auto mime_type = Core::guess_mime_type_based_on_filename(path);
     if (mime_type == "text/html"sv)
         return "text/html; charset=utf-8"sv;

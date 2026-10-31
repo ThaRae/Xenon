@@ -60,7 +60,6 @@ public:
 
     Optional<ByteString> const& password_manager_choice() const { return m_password_manager_choice; }
 
-    // Loads the profile's extensions and those given with --load-extension.
     void initialize_extensions();
 
     void open_new_tab();
@@ -206,9 +205,7 @@ private:
     virtual void on_recently_closed_entries_changed() const override;
 
     OwnPtr<QApplication> m_application;
-    // Unpacked extensions to load for this session (Xenon's --load-extension, as in Chrome).
     Vector<ByteString> m_extensions_to_load;
-    // The password manager to install (Xenon's --password-manager).
     Optional<ByteString> m_password_manager_choice;
     BrowserWindow* m_active_window { nullptr };
     OwnPtr<ProcessManagerWindow> m_process_manager_window;

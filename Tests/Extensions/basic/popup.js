@@ -1,4 +1,3 @@
-// The test extension's popup: a localized greeting, and how often it has been opened, kept in chrome.storage.local.
 document.getElementById("greeting").textContent = chrome.i18n.getMessage("greeting", "Xenon");
 document.getElementById("origin").textContent = location.origin;
 document.getElementById("close").addEventListener("click", () => window.close());

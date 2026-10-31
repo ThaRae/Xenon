@@ -16,9 +16,6 @@
 
 namespace Ladybird::Extensions {
 
-// One of an extension's chrome.storage areas. Values are JSON, as Chrome stores them, and each change reports the old
-// and new values of the keys it touched, for storage.onChanged.
-// https://developer.chrome.com/docs/extensions/reference/api/storage
 class StorageArea {
     AK_MAKE_NONCOPYABLE(StorageArea);
 
@@ -38,21 +35,16 @@ public:
         Optional<size_t> max_items;
     };
 
-    // Chrome's quotas. storage.sync is kept on this device, but within sync's quotas, so that an extension behaves as it
-    // would in Chrome.
     static Quota quota_for(Kind, bool unlimited_storage);
 
-    // An area kept in a JSON file, or in memory only if there is none (storage.session, storage.managed).
     static ErrorOr<NonnullOwnPtr<StorageArea>> create(Kind, Quota, Optional<ByteString> file);
 
     Kind kind() const { return m_kind; }
 
-    // Every item, or those with the given keys.
     JsonObject get(Optional<Vector<String>> const& keys) const;
     Vector<String> keys() const;
     size_t bytes_in_use(Optional<Vector<String>> const& keys) const;
 
-    // Each returns the changes it made, as storage.onChanged reports them: {key: {oldValue, newValue}}.
     ErrorOr<JsonObject, String> set(JsonObject const& items);
     JsonObject remove(Vector<String> const& keys);
     JsonObject clear();

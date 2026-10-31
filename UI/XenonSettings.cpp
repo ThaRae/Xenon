@@ -48,7 +48,6 @@ Observer::~Observer()
 
 static void notify_observers()
 {
-    // NB: An observer may come or go while it's told.
     auto observers_to_notify = observers();
     for (auto* observer : observers_to_notify) {
         if (observers().contains_slow(observer))
@@ -88,11 +87,8 @@ void set_chrome_layout(ChromeLayout layout)
 }
 
 static constexpr auto TAB_HIBERNATION_KEY = "tabs/hibernation";
-// In seconds.
 static constexpr auto TAB_HIBERNATION_TIMEOUT_KEY = "tabs/hibernationTimeout";
 
-// Chromium's Memory Saver discards a tab after 2 hours at its most aggressive. Xenon goes by time alone, without Memory
-// Saver's other trigger, memory pressure, so it takes that timing.
 static constexpr auto DEFAULT_TAB_HIBERNATION_TIMEOUT = AK::Duration::from_seconds(2 * 60 * 60);
 static constexpr auto MINIMUM_TAB_HIBERNATION_TIMEOUT = AK::Duration::from_seconds(5);
 

@@ -4,13 +4,8 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// Xenon's settings page: its sections and search, and Xenon's own settings, which UI/SettingsPage.cpp answers for as
-// "xenon/..." messages. Ladybird's scripts in about-pages/settings run Ladybird's settings, by their element ids.
-
 const isMac = navigator.platform.startsWith("Mac");
 
-// Ladybird's scripts name the tab of its page that each dialog belongs to (see dialog-deep-link.js), and other pages
-// link to those tabs. Each comes to the section that holds the same settings here.
 const SECTION_FOR_LADYBIRD_TAB = {
     general: "startup",
     languages: "startup",
@@ -35,7 +30,6 @@ function setCurrentSection(section) {
     }
 }
 
-// The section at the top of the window, or the last one once the page is scrolled to its end.
 function updateCurrentSection() {
     const visible = sections.filter(section => !section.hidden);
     if (visible.length === 0) {
@@ -66,7 +60,6 @@ window.addEventListener("scroll", updateCurrentSection, { passive: true });
 window.addEventListener("resize", updateCurrentSection);
 window.addEventListener("hashchange", () => scrollToHash({ smooth: true }));
 
-// Finding a setting: rows match on their text and keywords, and a section's title shows all of it.
 const findSetting = document.querySelector("#find-setting");
 const noMatches = document.querySelector("#no-matches");
 
@@ -105,7 +98,6 @@ function applyFind() {
 
     noMatches.hidden = anyMatch;
     noMatches.querySelector("span").textContent = findSetting.value.trim();
-    // Easy setup repeats settings further down, so a search shows only the rows themselves.
     document.querySelector("#easy-setup").hidden = query.length !== 0;
     updateCurrentSection();
 }
@@ -122,7 +114,6 @@ for (const shortcut of document.querySelectorAll("kbd[data-other]")) {
     if (!isMac) shortcut.textContent = shortcut.dataset.other;
 }
 
-// Layout, and the vertical tab options that come with it, which are Ladybird's tab settings.
 const layoutRadios = [...document.querySelectorAll('input[name="layout"]')];
 const verticalTabsPosition = document.querySelector("#vertical-tabs-position");
 const verticalTabsExpandOnHover = document.querySelector("#vertical-tabs-expand-on-hover");
@@ -130,7 +121,6 @@ const verticalTabsExpandOnHover = document.querySelector("#vertical-tabs-expand-
 let XENON = null;
 let TAB_SETTINGS = null;
 
-// The vertical layout's picture puts the sidebar on the side it's on.
 function renderVerticalTabsSide() {
     document.querySelector("#vertical-layout").classList.toggle("right-side", verticalTabsPosition.value === "right");
 }
@@ -164,7 +154,6 @@ verticalTabsExpandOnHover.addEventListener("change", () =>
     saveTabSettings({ verticalTabsExpandOnHover: verticalTabsExpandOnHover.checked })
 );
 
-// Tabs.
 const cycleTabs = document.querySelector("#cycle-tabs-in-recently-used-order");
 const hibernationEnabled = document.querySelector("#tab-hibernation-enabled");
 const hibernationTimeout = document.querySelector("#tab-hibernation-timeout");
@@ -185,7 +174,6 @@ function renderTabs() {
     hibernationEnabled.checked = enabled;
     hibernationOnMemoryPressure.checked = onMemoryPressure;
 
-    // A timeout set some other way, like a short one for testing, shows as a choice of its own.
     const choices = timeoutChoices.includes(timeoutSeconds) ? timeoutChoices : [...timeoutChoices, timeoutSeconds];
     hibernationTimeout.replaceChildren(
         ...choices
@@ -222,7 +210,6 @@ splitViewDragAndDrop.addEventListener("change", () =>
     ladybird.sendMessage("xenon/setSplitViewDragAndDrop", splitViewDragAndDrop.checked)
 );
 
-// Bangs.
 const bangsEnabled = document.querySelector("#bangs-enabled");
 const bangFinder = document.querySelector("#bang-finder");
 const bangResults = document.querySelector("#bang-results");
@@ -267,7 +254,6 @@ function showBangs({ query, bangs }) {
     );
 }
 
-// The count of what's blocked on the toolbar's shield.
 const showContentBlockerCount = document.querySelector("#show-content-blocker-count");
 
 function renderContentBlockerCount() {
@@ -279,14 +265,12 @@ showContentBlockerCount.addEventListener("change", () =>
     ladybird.sendMessage("xenon/setShowContentBlockerCount", showContentBlockerCount.checked)
 );
 
-// Filter lists.
 const filterListsSummary = document.querySelector("#filter-lists-summary");
 const filterListsStatus = document.querySelector("#filter-lists-status");
 const checkFilterLists = document.querySelector("#check-filter-lists");
 const filterListUpdates = document.querySelector("#filter-list-updates");
 let filterListsTimer;
 
-// "2026-10-27 05:17 UTC", as the manifest writes it.
 function parseGeneratedAt(generatedAt) {
     const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}) UTC$/.exec(generatedAt);
     if (!match) return null;
@@ -310,7 +294,6 @@ function renderFilterLists() {
     }
 
     const generatedAt = parseGeneratedAt(lists.generatedAt);
-    // Lists are turned off one by one in the blocking dashboard.
     const listsOn = Math.max(lists.listCount - lists.turnedOff, 0);
     filterListsSummary.textContent =
         lists.turnedOff > 0
@@ -326,7 +309,6 @@ function renderFilterLists() {
     else if (lists.checkedAt) parts.push(`checked ${formatDate(new Date(lists.checkedAt))}`);
     filterListsStatus.textContent = `${parts.join(", ")}.`;
 
-    // The updater has nothing to say when it's done, so the page asks again while it works.
     checkFilterLists.hidden = !filterListUpdates.checked || filterListUpdates.disabled;
     checkFilterLists.disabled = lists.checking;
     checkFilterLists.textContent = lists.checking ? "Checking…" : "Check now";
@@ -338,7 +320,6 @@ filterListUpdates.addEventListener("change", () => {
     if (XENON) renderFilterLists();
 });
 
-// Updates, which Xenon gets from Sparkle on macOS (UI/Updater.h).
 const updatesVersion = document.querySelector("#updates-version");
 const updatesStatus = document.querySelector("#updates-status");
 const checkForUpdates = document.querySelector("#check-for-updates");
@@ -362,7 +343,6 @@ function updatesStatusText(updates) {
     return "Not checked yet.";
 }
 
-// The updater tells the page whenever its status changes, so nothing here asks again.
 function renderUpdates() {
     const updates = XENON.updates;
 
@@ -390,7 +370,6 @@ automaticUpdates.addEventListener("change", () => {
     ladybird.sendMessage("xenon/setAutomaticUpdates", automaticUpdates.checked);
 });
 
-// Extensions.
 const extensionList = document.querySelector("#extension-list");
 
 function renderExtensions() {
@@ -449,8 +428,6 @@ document
     .querySelector("#show-extensions")
     .addEventListener("click", () => ladybird.sendMessage("xenon/showExtensions"));
 
-// Ladybird's startup.js resets the new tab page to about:blank. Xenon's is its own about:newtab, so this runs after that
-// and resets it to about:newtab instead.
 const newTabPageURL = document.querySelector("#new-tab-page-url");
 
 document.querySelector("#new-tab-page-url-reset").addEventListener("click", () => {
@@ -469,7 +446,6 @@ newTabPageRecentlyClosed.addEventListener("change", () =>
     ladybird.sendMessage("xenon/setNewTabPageShowsRecentlyClosed", newTabPageRecentlyClosed.checked)
 );
 
-// Profile.
 function renderProfile() {
     const { name, temporary, locations } = XENON.profile;
     let lede = "Where Xenon keeps what it saves.";
@@ -488,8 +464,6 @@ for (const button of document.querySelectorAll("[data-show-location]")) {
     button.addEventListener("click", () => ladybird.sendMessage("xenon/showLocation", button.dataset.showLocation));
 }
 
-// The blocking dashboard, once Xenon has one, turns each list on or off and keeps your own filters, so the page links to
-// its tabs for those rather than editing them here.
 function renderBlockingDashboard() {
     const url = XENON.blockingDashboard;
     document.querySelector("#blocking-dashboard-row").hidden = !url;
@@ -512,8 +486,6 @@ function renderBlockingDashboard() {
     destination.replaceChildren(myFilters, ", in the dashboard");
 }
 
-// The password manager, which UI/PasswordManagers.h installs from its developer's Chrome Web Store listing. Without one,
-// the section says how to load one by hand.
 const passwordManagerChoices = document.querySelector("#password-manager-choices");
 const passwordManagerStatus = document.querySelector("#password-manager-status");
 let PASSWORD_MANAGERS = null;
@@ -578,9 +550,6 @@ function choosePasswordManager(id) {
     ladybird.sendMessage("setPasswordManager", id || null);
 }
 
-// Easy setup: the six settings people change most, as preset keys at the top of the page. Each one reads and drives the
-// control for its setting further down, so it needs nothing of its own from the browser and follows every change, made
-// here, further down or from the menus.
 const easySetup = document.querySelector("#easy-setup");
 const enableContentBlocking = document.querySelector("#enable-content-blocking");
 const enableForceDark = document.querySelector("#enable-force-dark");
@@ -732,7 +701,6 @@ easySetup.addEventListener("keydown", event => {
     slot?.querySelector(".preset").focus();
 });
 
-// The controls further down change from Ladybird's scripts as well as from here, so the presets follow every change.
 document.addEventListener("change", () => setTimeout(renderEasySetup));
 new MutationObserver(renderEasySetup).observe(document.querySelector("#search-engine"), {
     childList: true,
@@ -780,16 +748,12 @@ document.addEventListener("WebUIMessage", event => {
             verticalTabsExpandOnHover.checked = !!TAB_SETTINGS.verticalTabsExpandOnHover;
             renderVerticalTabsSide();
         }
-        // Ladybird's services.js has just set whether filter list updates are on.
         if (XENON) renderFilterLists();
     }
 
-    // Ladybird's scripts set their controls from these messages without a change event, so Easy setup looks again once
-    // they all have.
     setTimeout(renderEasySetup);
 });
 
-// FIXME: Remove this once closedby="any" triggers for Esc key.
 for (const dialog of document.querySelectorAll("dialog")) {
     dialog.addEventListener("keydown", event => {
         if (event.key === "Escape") dialog.close();

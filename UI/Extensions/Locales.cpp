@@ -15,7 +15,6 @@
 
 namespace Ladybird::Extensions {
 
-// Chrome names locale directories with underscores ("en_US"), where BCP 47 uses hyphens ("en-US").
 static String locale_directory_name(StringView language)
 {
     return MUST(String::from_byte_string(language.replace("-"sv, "_"sv, ReplaceMode::All)));
@@ -33,8 +32,6 @@ static Vector<String> fallback_locales(StringView ui_language, Optional<String> 
     return locales;
 }
 
-// Fills in a message's $name$ placeholders (named in any case) from its "placeholders", whose contents may themselves
-// hold $1 to $9 for the substitutions. A message without a "message" gives nothing.
 static Optional<String> fill_placeholders(JsonObject const& entry)
 {
     auto message = entry.get_string("message"sv);
@@ -48,7 +45,6 @@ static Optional<String> fill_placeholders(JsonObject const& entry)
     StringBuilder builder;
     auto view = message->bytes_as_string_view();
     for (size_t i = 0; i < view.length();) {
-        // "$$" is a literal dollar sign, which the renderer's substitution step turns into one.
         if (view.substring_view(i).starts_with("$$"sv)) {
             builder.append("$$"sv);
             i += 2;
@@ -119,7 +115,6 @@ ErrorOr<Locales, String> Locales::load(ByteString const& extension_root, Optiona
         if (!FileSystem::is_regular_file(default_messages))
             return MUST(String::formatted("Default locale file _locales/{}/messages.json is missing.", *default_locale));
 
-        // Lower-priority locales first, so that the UI locale's messages replace theirs.
         auto chain = fallback_locales(ui_language, default_locale);
         for (auto const& locale : chain.in_reverse()) {
             auto path = LexicalPath::join(locales_directory, locale.bytes_as_string_view(), "messages.json"sv).string();
@@ -140,7 +135,6 @@ ErrorOr<Locales, String> Locales::load(ByteString const& extension_root, Optiona
     auto locale = locale_directory_name(ui_language);
     locales.m_messages.set("@@extension_id"sv, MUST(String::from_utf8(extension_id)));
     locales.m_messages.set("@@ui_locale"sv, locale);
-    // FIXME: Right-to-left UI languages.
     locales.m_messages.set("@@bidi_dir"sv, "ltr"_string);
     locales.m_messages.set("@@bidi_reversed_dir"sv, "rtl"_string);
     locales.m_messages.set("@@bidi_start_edge"sv, "left"_string);

@@ -17,42 +17,39 @@ brand.
 internals.setUserAgent() lets the tests of the rules that hide the
 Ladybird token set a User-Agent that has one.
 ---
- Libraries/LibWeb/Fetch/Fetching/Fetching.cpp           |  4 ++++
- Libraries/LibWeb/Internals/Internals.cpp               |  6 ++++++
- Libraries/LibWeb/Internals/Internals.h                 |  1 +
- Libraries/LibWeb/Internals/Internals.idl               |  1 +
- Libraries/LibWebCommon/Loader/UserAgent.h              | 10 +++++-----
- .../Text/expected/Fetch/user-agent-client-hints.txt    |  5 +++--
- ...e-compatibility-user-agent-change-during-fetch.html |  5 +++++
- .../Fetch/site-compatibility-user-agent-redirects.html |  5 +++++
- .../Text/input/Fetch/user-agent-client-hints.html      |  5 +++--
- .../HTML/navigator-useragent-frozen-platform.html      |  3 ++-
- 10 files changed, 35 insertions(+), 10 deletions(-)
+ Libraries/LibWeb/Fetch/Fetching/Fetching.cpp               | 2 ++
+ Libraries/LibWeb/Internals/Internals.cpp                   | 5 +++++
+ Libraries/LibWeb/Internals/Internals.h                     | 1 +
+ Libraries/LibWeb/Internals/Internals.idl                   | 1 +
+ Libraries/LibWebCommon/Loader/UserAgent.h                  | 7 ++-----
+ .../LibWeb/Text/expected/Fetch/user-agent-client-hints.txt | 5 +++--
+ .../site-compatibility-user-agent-change-during-fetch.html | 4 ++++
+ .../Fetch/site-compatibility-user-agent-redirects.html     | 4 ++++
+ Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html | 4 ++--
+ .../input/HTML/navigator-useragent-frozen-platform.html    | 2 +-
+ 10 files changed, 25 insertions(+), 10 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 608ec4ba6829e987e4e98fd8cbad2a48848a197b..d7bf54aee88c889f2ed8a9715d15f9e59d8541a4 100644
+index 7f7fb637b9d026c5aa7f76bbe30a9df51c0fc30c..5a98149cc547cad96aa673286e8b537f180fb6a4 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -3493,6 +3493,10 @@ void append_user_agent_client_hints_for_request(Infrastructure::Request& request
+@@ -3485,6 +3485,8 @@ void append_user_agent_client_hints_for_request(Infrastructure::Request& request
      brand_list.append(ByteString::formatted("\"Chromium\";v=\"{}\"", *chrome_version));
      if (auto version = product_major_version(*user_agent, BROWSER_NAME "/"sv); version.has_value())
          brand_list.append(ByteString::formatted("\"{}\";v=\"{}\"", BROWSER_NAME, *version));
 +    else
-+        // A plain Chrome User-Agent (the default) is answered with the brand list Google Chrome itself sends, so the
-+        // client hints don't contradict the User-Agent header.
 +        brand_list.append(ByteString::formatted("\"Google Chrome\";v=\"{}\"", *chrome_version));
  
      StringBuilder brands;
      bool first = true;
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 5813f7cce38a1566a3213e2fb13562f8e3a95707..544e0447d57d6504459847fb03e878bf9b64f588 100644
+index 5813f7cce38a1566a3213e2fb13562f8e3a95707..d99d27dc06835c3811bf5814b4ae32722ac8e02d 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1446,6 +1446,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
+@@ -1446,6 +1446,11 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
      return {};
  }
  
-+// The default User-Agent has no Ladybird token, so tests of the rules that hide it set one that does.
 +void Internals::set_user_agent(Utf16String const& user_agent)
 +{
 +    Web::update_loader_config([&](auto& config) { config.user_agent = user_agent.to_utf8(); });
@@ -74,7 +71,7 @@ index bdf45065978eebbf483614ddc88c3ed436f9e62e..bf716e627ffc47dd526a6c52ec1cc207
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
      WebIDL::UnsignedLongLong partial_layout_count();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 21a155296c65c72cef999ef5fdccf6e2619f5578..a6e04d4c454052a3ba8f3ef0d302de183d9025d9 100644
+index 3a73bf279e318ec3e5caa80c8416e3c560ae8ec5..695de617a9d17c30a257be642eba57c5472cd725 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
 @@ -173,6 +173,7 @@ interface Internals {
@@ -86,10 +83,10 @@ index 21a155296c65c72cef999ef5fdccf6e2619f5578..a6e04d4c454052a3ba8f3ef0d302de18
      DOMString? cosmeticFilterForElement(Element element);
      unsigned long long partialLayoutCount();
 diff --git a/Libraries/LibWebCommon/Loader/UserAgent.h b/Libraries/LibWebCommon/Loader/UserAgent.h
-index d223988917a8384763533bbfc878293f86e8a2fa..32c98d9ae1c03232cfe9bc23e66b527b9ce315a8 100644
+index d223988917a8384763533bbfc878293f86e8a2fa..73e521d579df59894ad8f673ea7b1f59e924c079 100644
 --- a/Libraries/LibWebCommon/Loader/UserAgent.h
 +++ b/Libraries/LibWebCommon/Loader/UserAgent.h
-@@ -64,10 +64,10 @@ namespace Web {
+@@ -64,10 +64,7 @@ namespace Web {
  #define BROWSER_NAME "Ladybird"
  #define BROWSER_VERSION "1.0"
  
@@ -97,14 +94,11 @@ index d223988917a8384763533bbfc878293f86e8a2fa..32c98d9ae1c03232cfe9bc23e66b527b
 -//     This token is appended to the User-Agent string to improve compatibility.
 -//     We will need to update this periodically to match a somewhat recent version.
 -#define SAD_COMPATIBILITY_HACK "Chrome/153.0.0.0 AppleWebKit/537.36 Safari/537.36"
-+// NB: Some web servers treat us very badly unless we pretend to be one of the major browsers, and a unique browser
-+//     token is itself a fingerprinting vector. The default User-Agent therefore has exactly the shape Chrome sends,
-+//     without a Ladybird token. We will need to update the Chrome version periodically.
 +#define CHROME_MAJOR_VERSION "153"
  
  // NB: Servers sniff the parenthesized platform token of the User-Agent string and only recognize
  //     the frozen tokens sent by major browsers. Reporting the actual OS and CPU here gets us
-@@ -85,7 +85,7 @@ namespace Web {
+@@ -85,7 +82,7 @@ namespace Web {
  #    define UA_PLATFORM_STRING "X11; Linux x86_64"
  #endif
  
@@ -133,21 +127,20 @@ index c684a5ba87a0c273e18f2754c248045a953ae09c..a711a483457b1a09e5644ac4c80328c1
  Android platform: "Android"
  Firefox User-Agent sends no hints: PASS
 diff --git a/Tests/LibWeb/Text/input/Fetch/site-compatibility-user-agent-change-during-fetch.html b/Tests/LibWeb/Text/input/Fetch/site-compatibility-user-agent-change-during-fetch.html
-index 7c380a088ccc0a767a1eb3603cc72d1713a8b6c6..6f1485098e3b739c15a6134c9d27dfd795b6fbc1 100644
+index 7c380a088ccc0a767a1eb3603cc72d1713a8b6c6..ea3fa2b2e6410e727b74a04d6f0a27ff63fee9c6 100644
 --- a/Tests/LibWeb/Text/input/Fetch/site-compatibility-user-agent-change-during-fetch.html
 +++ b/Tests/LibWeb/Text/input/Fetch/site-compatibility-user-agent-change-during-fetch.html
-@@ -12,6 +12,10 @@
+@@ -12,6 +12,9 @@
              reflect_headers_in_body: true,
          });
  
-+        // The default User-Agent has no Ladybird token for "hide_Ladybird" to hide, so use one that does.
 +        const defaultUserAgent = navigator.userAgent;
 +        internals.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) Ladybird/1.0 Chrome/153.0.0.0 AppleWebKit/537.36 Safari/537.36");
 +
          try {
              const responsePromise = fetch(url);
              internals.setSiteCompatibilityData(JSON.stringify([{
-@@ -25,6 +29,7 @@
+@@ -25,6 +28,7 @@
              println(`FAIL: ${error}`);
          } finally {
              internals.setSiteCompatibilityData("[]");
@@ -156,21 +149,20 @@ index 7c380a088ccc0a767a1eb3603cc72d1713a8b6c6..6f1485098e3b739c15a6134c9d27dfd7
      });
  </script>
 diff --git a/Tests/LibWeb/Text/input/Fetch/site-compatibility-user-agent-redirects.html b/Tests/LibWeb/Text/input/Fetch/site-compatibility-user-agent-redirects.html
-index 48995797403d93d6589bf2d01edadf6005286850..f56ea5d642e7541be7b744ade15a32c650f39f39 100644
+index 48995797403d93d6589bf2d01edadf6005286850..f8dffb0a544a344a96b962d53ea6b852e25fd05c 100644
 --- a/Tests/LibWeb/Text/input/Fetch/site-compatibility-user-agent-redirects.html
 +++ b/Tests/LibWeb/Text/input/Fetch/site-compatibility-user-agent-redirects.html
-@@ -34,6 +34,10 @@
+@@ -34,6 +34,9 @@
              return (await response.json())["User-Agent"][0];
          }
  
-+        // The default User-Agent has no Ladybird token for "hide_Ladybird" to hide, so use one that does.
 +        const defaultUserAgent = navigator.userAgent;
 +        internals.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) Ladybird/1.0 Chrome/153.0.0.0 AppleWebKit/537.36 Safari/537.36");
 +
          try {
              const matchingTarget = await redirectedUserAgent("matching-target", false, true);
              println(`non-matching to matching: ${matchingTarget.includes("Ladybird/") ? "FAIL" : "PASS"}`);
-@@ -47,6 +51,7 @@
+@@ -47,6 +50,7 @@
              println(`FAIL: ${error}`);
          } finally {
              internals.setSiteCompatibilityData("[]");
@@ -179,7 +171,7 @@ index 48995797403d93d6589bf2d01edadf6005286850..f56ea5d642e7541be7b744ade15a32c6
      });
  </script>
 diff --git a/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html b/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
-index 460165ae2fb4cdd15d8afcc8284b325c1550eefa..1cde70014628a3a2c633d93582bb208604802b36 100644
+index 460165ae2fb4cdd15d8afcc8284b325c1550eefa..0f6ee24b7d236e807ab9f416af1e69a59086ca05 100644
 --- a/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
 +++ b/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
 @@ -31,7 +31,8 @@
@@ -192,25 +184,23 @@ index 460165ae2fb4cdd15d8afcc8284b325c1550eefa..1cde70014628a3a2c633d93582bb2086
              println(`own mobile hint is a boolean: ${["?0", "?1"].includes(own("Sec-CH-UA-Mobile")) ? "PASS" : `FAIL (${own("Sec-CH-UA-Mobile")})`}`);
              println(`own platform hint is quoted: ${/^".+"$/.test(own("Sec-CH-UA-Platform") ?? "") ? "PASS" : `FAIL (${own("Sec-CH-UA-Platform")})`}`);
  
-@@ -40,7 +41,7 @@
+@@ -40,7 +41,6 @@
              println(`Chrome + Ladybird mobile: ${chrome("Sec-CH-UA-Mobile")}`);
              println(`Chrome + Ladybird platform: ${chrome("Sec-CH-UA-Platform")}`);
  
 -            // A site-compatibility rule hiding the Ladybird token drops the brand along with it.
-+            // Without a Ladybird token, the brands are Google Chrome's, as for the default User-Agent.
              const hidden = await hintsFor(chromeUA(""));
              println(`Chrome without Ladybird: ${hidden("Sec-CH-UA")}`);
  
 diff --git a/Tests/LibWeb/Text/input/HTML/navigator-useragent-frozen-platform.html b/Tests/LibWeb/Text/input/HTML/navigator-useragent-frozen-platform.html
-index 468364f1d84c226d3e4478d0d02518102aad46cb..2a5534569c485f808ea4c00238fee726a0a9fb80 100644
+index 468364f1d84c226d3e4478d0d02518102aad46cb..07e2431026c4792611cfbcf062e080337c0853c0 100644
 --- a/Tests/LibWeb/Text/input/HTML/navigator-useragent-frozen-platform.html
 +++ b/Tests/LibWeb/Text/input/HTML/navigator-useragent-frozen-platform.html
-@@ -14,7 +14,8 @@
+@@ -14,7 +14,7 @@
              "iPhone; CPU iPhone OS 17_5 like Mac OS X",
          ];
  
 -        const match = navigator.userAgent.match(/^Mozilla\/5\.0 \(([^)]*)\) Ladybird\//);
-+        // The default User-Agent has exactly Chrome's shape, with no Ladybird token.
 +        const match = navigator.userAgent.match(/^Mozilla\/5\.0 \(([^)]*)\) AppleWebKit\/537\.36 \(KHTML, like Gecko\) Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/);
          if (!match) {
              println(`FAIL: unexpected User-Agent shape: ${navigator.userAgent}`);

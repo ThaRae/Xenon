@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
 
-# Writes the certificates that test Xenon's certificate warning (UI/CertificateErrors.h):
-#
-#   self-signed.pem, self-signed-key.pem
-#                       a self-signed certificate for 127.0.0.1, ::1 and localhost, which Meta/xenon.py test serves a
-#                       local HTTPS page with (and self-signed.der, its DER encoding, for Tests/TestCertificateDetails.cpp)
-#   self-signed-server.der
-#                       self-signed too, but only for a server's use, as many are, rather than for signing certificates
-#   untrusted.der       for 127.0.0.1, from a test authority that nothing trusts
-#   expired.der         the same, valid through 2020 only
-#   not-yet-valid.der   the same, valid from 2099
-#   other-host.der      the same, for example.com
-#
-# The test authority's key isn't kept. Needs OpenSSL 3.4 or later for -not_before and -not_after (not macOS's
-# LibreSSL): Tests/CertificateErrors/make-certificates.py [--openssl PATH]
-
 from __future__ import annotations
 
 import argparse
@@ -25,7 +10,6 @@ from pathlib import Path
 
 DIRECTORY = Path(__file__).resolve().parent
 
-# Long enough not to expire under the tests.
 VALID_FROM = "20260101000000Z"
 VALID_UNTIL = "21251231235959Z"
 

@@ -255,7 +255,6 @@ static void initialize_native_control(WebView::Action& action, QAction& qaction,
 #endif
         break;
     case WebView::ActionID::ToggleDevTools:
-        // NB: Ctrl+Shift+C copies the current page's link instead (see BrowserWindow).
         qaction.setShortcuts({
             QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I),
             QKeySequence(Qt::Key_F12),

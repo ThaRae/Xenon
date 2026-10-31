@@ -160,7 +160,6 @@ static void draw_star_icon(QPainter& painter, QColor const& color, bool filled)
     painter.drawPath(path);
 }
 
-// A stop sign: an octagon outline with a bar across its middle.
 static void draw_content_blocking_icon(QPainter& painter, QColor const& color)
 {
     static constexpr qreal center = 10.0;
@@ -177,7 +176,6 @@ static void draw_content_blocking_icon(QPainter& painter, QColor const& color)
     }
     octagon.closeSubpath();
 
-    // Same stroke as the hamburger icon next to it.
     painter.setBrush(Qt::NoBrush);
     painter.setPen(chrome_icon_pen(color, 1.55));
     painter.drawPath(octagon);
@@ -192,8 +190,6 @@ static QPainterPath horizontally_flipped_path(QPainterPath const& path)
     return transform.map(path);
 }
 
-// The expanded sidebar's button shows the sidebar with an arrow into it. The collapsed sidebar's button is a double
-// chevron pointing away from the sidebar's edge of the window.
 static void draw_vertical_tab_bar_icon(QPainter& painter, QColor const& color, bool expanded, bool right_side)
 {
     if (!expanded) {

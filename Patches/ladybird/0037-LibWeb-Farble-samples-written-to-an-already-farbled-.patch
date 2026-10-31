@@ -20,13 +20,13 @@ hardwareConcurrency, deviceMemory, the Chrome User-Agent, and
 navigator.webdriver.
 ---
  .../LibWeb/Bindings/RustBindingsServices.cpp  |   2 +-
- Libraries/LibWeb/Internals/Internals.cpp      |   6 +
+ Libraries/LibWeb/Internals/Internals.cpp      |   5 +
  Libraries/LibWeb/Internals/Internals.h        |   1 +
  Libraries/LibWeb/Internals/Internals.idl      |   1 +
- Libraries/LibWeb/WebAudio/AudioBuffer.cpp     |   7 ++
+ Libraries/LibWeb/WebAudio/AudioBuffer.cpp     |   5 +
  .../expected/Fingerprinting/protection.txt    |  15 +++
- .../Text/input/Fingerprinting/protection.html | 106 ++++++++++++++++++
- 7 files changed, 137 insertions(+), 1 deletion(-)
+ .../Text/input/Fingerprinting/protection.html | 102 ++++++++++++++++++
+ 7 files changed, 130 insertions(+), 1 deletion(-)
  create mode 100644 Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
  create mode 100644 Tests/LibWeb/Text/input/Fingerprinting/protection.html
 
@@ -51,14 +51,13 @@ index be8578d40623792d197eb03e2ec10df185ccb9e6..f6e7f67a3066f14678f93fc1eae9ac64
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 544e0447d57d6504459847fb03e878bf9b64f588..ab3571c131333fb0d74b55c1fe80e5894c032ae3 100644
+index d99d27dc06835c3811bf5814b4ae32722ac8e02d..4242657f27684cbd69344415e4cd22fb96bac7c6 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1452,6 +1452,12 @@ void Internals::set_user_agent(Utf16String const& user_agent)
+@@ -1451,6 +1451,11 @@ void Internals::set_user_agent(Utf16String const& user_agent)
      Web::update_loader_config([&](auto& config) { config.user_agent = user_agent.to_utf8(); });
  }
  
-+// Test mode forces fingerprinting protection off so output stays deterministic. Tests of farbling turn it back on.
 +void Internals::set_fingerprinting_protection(bool enabled)
 +{
 +    Web::update_loader_config([&](auto& config) { config.enable_fingerprinting_protection = enabled; });
@@ -80,7 +79,7 @@ index bf716e627ffc47dd526a6c52ec1cc2077934451a..61568b54376e825cd6d7aac06f89dff3
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
      WebIDL::UnsignedLongLong partial_layout_count();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index a6e04d4c454052a3ba8f3ef0d302de183d9025d9..585e810737eeccf22f2c408325c85ea6afe60bfe 100644
+index 695de617a9d17c30a257be642eba57c5472cd725..12e78aed7b87a916669a0ac1df6e63457d00db2e 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
 @@ -174,6 +174,7 @@ interface Internals {
@@ -92,15 +91,13 @@ index a6e04d4c454052a3ba8f3ef0d302de183d9025d9..585e810737eeccf22f2c408325c85ea6
      DOMString? cosmeticFilterForElement(Element element);
      unsigned long long partialLayoutCount();
 diff --git a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
-index c4af9f1bedf1587d5e6c957ab2242c455d7acab8..5fe0717028cb2cc4066746bd8760a2fa67ca7cc7 100644
+index 2f766b01ccbefe8a79d31a50966d16528aa06f02..fa772e1a2bb85676ee77e40e23dde8e0a947eb49 100644
 --- a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
 +++ b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
-@@ -332,6 +332,13 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_to_channel(GC::Root<JS::Float32Array
+@@ -330,6 +330,11 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_to_channel(GC::Root<JS::Float32Array
          bytes.copy_to({ reinterpret_cast<u8*>(channel_data.data() + buffer_offset), bytes.size() });
      });
  
-+    // Fingerprinting protection: a live getChannelData() view already saw farbled samples, so newly written
-+    // samples are farbled too. Unfarbled channels stay clean until the next read.
 +    if (channel.farbled && Fingerprinting::protection_enabled()) {
 +        Fingerprinting::farble_audio({ channel_data.data() + buffer_offset, count },
 +            Fingerprinting::seed_for_relevant_global(*source));
@@ -132,10 +129,10 @@ index 0000000000000000000000000000000000000000..3cff823f90350a96fc916fc11db2a1dc
 +deviceMemory is 1, 2, or 4: PASS
 diff --git a/Tests/LibWeb/Text/input/Fingerprinting/protection.html b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
 new file mode 100644
-index 0000000000000000000000000000000000000000..cba8b5bb83506aaca65aa02bf0409ec02094b69b
+index 0000000000000000000000000000000000000000..85abd6601d4ddb56f2042fcbff3483039b13fd9f
 --- /dev/null
 +++ b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,102 @@
 +<!DOCTYPE html>
 +<script src="../include.js"></script>
 +<script>
@@ -188,8 +185,6 @@ index 0000000000000000000000000000000000000000..cba8b5bb83506aaca65aa02bf0409ec0
 +            println(`canvas toDataURL is stable: ${farbledUrl === farbledUrlAgain ? "PASS" : "FAIL"}`);
 +            println(`canvas toDataURL differs when farbled: ${exactUrl === farbledUrl ? "FAIL" : "PASS"}`);
 +
-+            // An image drawn to learn which bits get flipped says nothing about another image: one grey pixel in the last
-+            // row changes the pattern everywhere else too.
 +            const other = document.createElement("canvas");
 +            other.width = 64;
 +            other.height = 64;
@@ -213,8 +208,6 @@ index 0000000000000000000000000000000000000000..cba8b5bb83506aaca65aa02bf0409ec0
 +            const channel = buffer.getChannelData(0);
 +            println(`audio getChannelData scales in [0.99, 1): ${allEqual(channel) && channel[0] >= 0.99 && channel[0] < 1 ? "PASS" : `FAIL (${channel[0]})`}`);
 +
-+            // Playing the buffer acquires its content, and getChannelData() then hands back a copy of samples that were
-+            // already scaled. They mustn't be scaled again.
 +            const audioContext = new OfflineAudioContext(1, 128, 8000);
 +            const played = audioContext.createBuffer(1, 128, 8000);
 +            played.copyToChannel(new Float32Array(128).fill(1), 0);

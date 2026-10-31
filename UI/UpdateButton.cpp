@@ -34,16 +34,12 @@ static constexpr int PILL_LEADING_PADDING = 9;
 static constexpr int PILL_TRAILING_PADDING = 11;
 static constexpr int ICON_SIZE = 14;
 static constexpr int ICON_GAP = 5;
-// A narrower toolbar, like the compact layout's, which shares its row with the tabs, gets the icon alone.
 static constexpr int MIN_TOOLBAR_WIDTH_FOR_LABEL = 640;
 static constexpr int POPOVER_WIDTH = 320;
 
-// The version that Later put off, until Xenon starts again.
 static Optional<ByteString> s_put_off_version;
-// The version the buttons last showed for, which Xenon logs once (Meta/release.py test looks for it).
 static Optional<ByteString> s_shown_version;
 
-// Every window's buttons, which show and hide together.
 static Vector<UpdateButton*>& buttons()
 {
     static Vector<UpdateButton*> buttons;
@@ -73,7 +69,6 @@ static QFont label_font(QFont font)
     return font;
 }
 
-// An arrow pointing up, as Chrome's update chip has.
 static void paint_update_arrow(QPainter& painter, QRectF const& rect, QColor const& color)
 {
     painter.setPen(QPen(color, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -84,7 +79,6 @@ static void paint_update_arrow(QPainter& painter, QRectF const& rect, QColor con
     painter.drawPolyline(head, 3);
 }
 
-// Unlike a message popover, it's put off only by Later: clicking outside it, or Escape, only closes it.
 class UpdatePopover final : public Popover {
 public:
     AK_ALLOC_WITH_KMALLOC;
@@ -143,7 +137,6 @@ public:
     {
         m_title->setText(qformatted("Xenon {} is ready", version));
 
-        // Every window reopens after the relaunch but the private ones (Updater::relaunched_to_update()).
         auto reopen = private_windows == 0 ? "your windows and tabs reopen"sv
             : private_windows == 1         ? "your windows and tabs reopen, but your private window doesn't"sv
                                            : "your windows and tabs reopen, but private windows don't"sv;
@@ -185,7 +178,6 @@ UpdateButton::UpdateButton(QWidget& toolbar, int height)
     setAttribute(Qt::WA_Hover);
     QObject::connect(this, &QToolButton::clicked, this, [this] { show_popover(); });
 
-    // The label comes and goes with the toolbar's width.
     toolbar.installEventFilter(this);
 
     buttons().append(this);
@@ -292,7 +284,6 @@ void UpdateButton::paintEvent(QPaintEvent*)
     painter.setBrush(QColor(background));
     painter.drawRoundedRect(pill, pill.height() / 2, pill.height() / 2);
 
-    // Only the keyboard focuses the button, so a ring around it shows where the keyboard is.
     if (hasFocus()) {
         painter.setPen(QPen(QColor(BrandColors::Rose300), 1.5));
         painter.setBrush(Qt::NoBrush);

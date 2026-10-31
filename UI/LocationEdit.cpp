@@ -100,8 +100,6 @@ static constexpr int LOCATION_TRAILING_ACTION_WIDTH = 24;
 static constexpr int LOCATION_TRAILING_ACTION_HEIGHT = 23;
 static constexpr int LOCATION_PILL_HEIGHT = 22;
 static constexpr int LOCATION_PILL_HORIZONTAL_PADDING = 18;
-// The bang chip stands where the search icon does, and the query starts LOCATION_LEADING_ITEM_GAP after it. The text
-// starts LOCATION_TEXT_EDGE in from the field's edge, past its 1px border and 16px padding.
 static constexpr int LOCATION_LEADING_ITEM_X = 12;
 static constexpr int LOCATION_LEADING_ITEM_GAP = 6;
 static constexpr int LOCATION_TEXT_EDGE = 17;
@@ -209,11 +207,9 @@ LocationEdit::LocationEdit(QWidget* parent, WebView::IsPrivate is_private)
         if (text() != input_text)
             setText(input_text);
 
-        // Clearing focus ends the chip's dismissal, so it's read first.
         auto is_bang_chip_dismissed = m_is_bang_chip_dismissed;
         clearFocus();
 
-        // A !bang goes straight to its site, ahead of the search engine and URL guessing.
         auto bang_navigation = is_bang_chip_dismissed || !XenonSettings::bangs_enabled() ? Optional<Bangs::BangNavigation> {} : Bangs::resolve(input);
         if (bang_navigation.has_value()) {
             set_url(bang_navigation->url);
@@ -499,7 +495,6 @@ void LocationEdit::focusOutEvent(QFocusEvent* event)
     m_should_show_full_url_on_mouse_release = false;
 
     if (m_url_is_hidden) {
-        // Xenon: A new tab page's URL stays hidden, rather than showing once the address bar loses focus.
         if (!url_stays_hidden()) {
             m_url_is_hidden = false;
             m_has_user_edited_hidden_url = false;
@@ -521,7 +516,6 @@ void LocationEdit::update_focus_glow(int alpha)
     if (!m_focus_glow_effect)
         return;
     m_focus_glow_effect->setColor(location_focus_glow_color(alpha));
-    // NB: An enabled effect renders the edit offscreen and blurs it on every repaint, even when the glow is invisible.
     m_focus_glow_effect->setEnabled(alpha > 0);
 }
 
@@ -571,8 +565,6 @@ void LocationEdit::native_text_editing_command_will_execute(Web::TextEditingComm
 
 void LocationEdit::keyPressEvent(QKeyEvent* event)
 {
-    // Backspace at the start of the text takes the chip away, as it does in Chrome's keyword mode. The bang stays in the
-    // text as plain text, which Enter then searches as typed.
     if (event->key() == Qt::Key_Backspace && m_has_bang_chip && cursorPosition() == 0 && !hasSelectedText()) {
         m_is_bang_chip_dismissed = true;
         update_bang_chip();
@@ -585,7 +577,6 @@ void LocationEdit::keyPressEvent(QKeyEvent* event)
     if (event->key() == Qt::Key_Escape) {
         if (m_omnibox.escape_pressed() == WebView::Omnibox::EscapeAction::ClosedPopup)
             return;
-        // Xenon: Nor does Escape show a hidden URL.
         if (m_url_is_hidden)
             setText({});
         else if (m_url.has_value())
@@ -727,7 +718,6 @@ void LocationEdit::update_location_icon()
     if (!m_leading_icon_button)
         return;
 
-    // The chip takes the search icon's place while it shows.
     if (m_has_bang_chip) {
         m_leading_icon_button->hide();
         return;
@@ -813,10 +803,6 @@ void LocationEdit::update_location_icon()
     }
 }
 
-// The chip names the site of a bang at the start of the text, once the space after the bang has been typed. It stands
-// where the search icon does, and the query starts after it. The bang stays in the text, hidden under the chip (see
-// highlight_location()), so the text is still what the user typed. A chip that wouldn't fit beside the query doesn't
-// show, and the bang stays as plain text.
 void LocationEdit::update_bang_chip()
 {
     m_has_bang_chip = false;
@@ -828,7 +814,6 @@ void LocationEdit::update_bang_chip()
         auto prefix_width = fontMetrics().horizontalAdvance(text().left(m_bang_chip_prefix_length));
         auto name = fontMetrics().elidedText(qstring_from_ak_string(leading_bang->bang.name), Qt::ElideRight, LOCATION_BANG_CHIP_MAX_TEXT_WIDTH);
 
-        // The chip is never narrower than the bang it covers, so the query can't start under it.
         auto chip_width = max(fontMetrics().horizontalAdvance(name) + LOCATION_PILL_HORIZONTAL_PADDING, prefix_width);
         auto text_margin = LOCATION_LEADING_ITEM_X + chip_width + LOCATION_LEADING_ITEM_GAP - LOCATION_TEXT_EDGE - prefix_width;
 
@@ -879,7 +864,6 @@ void LocationEdit::highlight_location()
     auto url = ak_string_from_qstring(text());
     QList<QInputMethodEvent::Attribute> attributes;
 
-    // The parts of the URL around the domain are secondary, but should not look disabled.
     auto darkened_text_color = ChromeStyle::chrome_text(palette());
     darkened_text_color.setAlpha(ChromeStyle::is_dark(palette()) ? 178 : 148);
 
@@ -932,7 +916,6 @@ void LocationEdit::highlight_location()
         append_attributes(url_parts->scheme_and_subdomain, url_parts->effective_tld_plus_one, url_parts->remainder);
     }
 
-    // The chip covers the bang's letters, which are made transparent so that they can't show past its edge.
     if (m_has_bang_chip) {
         QTextCharFormat hidden_attributes;
         hidden_attributes.setForeground(Qt::transparent);
@@ -963,8 +946,6 @@ void LocationEdit::set_text_and_restart_editing(QString const& text)
 
 void LocationEdit::set_url(Optional<URL::URL> url)
 {
-    // Xenon: A new tab page hides its URL however the tab came to it (restored, woken from hibernation, or gone back
-    //        to), and the page the tab goes on to shows its own.
     auto url_was_hidden_for_good = url_stays_hidden();
     m_url = AK::move(url);
     if (url_stays_hidden())

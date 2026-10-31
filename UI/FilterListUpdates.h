@@ -17,23 +17,11 @@
 
 namespace Ladybird::FilterLists {
 
-// Keeps the filter lists up to date between releases. xenon-filter-lists, a public repository on GitHub, rebuilds
-// the bundle every day with Meta/update-filter-lists.py and signs its manifest (Documentation/FilterListUpdates.md).
-//
-// Once a day, while content blocking and filter list updates (Settings, Services) are on, Xenon fetches that manifest,
-// checks its signature, and downloads the files whose hash changed, checking each against it. The newest bundle that
-// checks out is kept in the profile (ContentBlocking/Xenon), and replaces the bundled lists for as long as it's newer
-// than them, starting the moment it's downloaded. Anything that fails leaves the lists in use as they were, and is
-// tried again an hour later.
 class Updater final : public WebView::SettingsObserver {
 public:
-    // Switches to the profile's downloaded lists if they're newer than the bundled ones, and starts the daily checks.
-    // Call it once the application exists, before any page opens.
     static void initialize();
 
-    // The directory of the bundle whose lists Ladybird has: the downloaded one, or the bundled one.
     static Optional<ByteString> current_directory();
-    // Gives Ladybird the current bundle's lists again, after the lists turned off in the blocking dashboard changed.
     static void reapply_lists();
 
     struct Bundle {
@@ -42,27 +30,21 @@ public:
         bool downloaded { false };
     };
 
-    // What about:settings says about the lists in use and the daily check. There's none while updates can't run at all,
-    // in test mode or with content blocking turned off on the command line.
     struct Status {
-        // When the lists in use were generated, as their manifest says.
         ByteString generated_at;
         size_t list_count { 0 };
         bool downloaded { false };
         Optional<UnixDateTime> checked_at;
         bool checking { false };
-        // Why the last check failed, until one succeeds.
         Optional<ByteString> error;
     };
     static Optional<Status> status();
 
-    // Checks for new lists now, rather than once the day is up, if content blocking and filter list updates are on.
     static void check_now();
 
 private:
     Updater(ByteString directory, URL::URL base_url, ByteBuffer public_key);
 
-    // WebView::SettingsObserver
     virtual void background_networking_settings_changed() override;
     virtual void content_blocker_settings_changed() override;
 
@@ -85,7 +67,6 @@ private:
     ByteBuffer m_public_key;
 
     Optional<Bundle> m_bundled;
-    // The bundle whose lists Ladybird has: the downloaded one, or the bundled one.
     Optional<Bundle> m_current;
 
     Optional<UnixDateTime> m_checked_at;
@@ -94,7 +75,6 @@ private:
     RefPtr<Core::Timer> m_timer;
     RefPtr<Core::Timer> m_first_check;
 
-    // The update in progress, written into the staging directory one file at a time.
     bool m_updating { false };
     ByteBuffer m_new_manifest;
     ByteBuffer m_new_signature;

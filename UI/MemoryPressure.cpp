@@ -159,7 +159,6 @@ Sample sample()
     else
         sample.total_bytes = (static_cast<u64>(vm.free_count) + vm.active_count + vm.inactive_count + vm.wire_count) * page_size;
 
-    // Free + inactive + speculative: pages the kernel can reclaim without swapping, as MemAvailable is.
     sample.available_bytes = (static_cast<u64>(vm.free_count) + vm.inactive_count + vm.speculative_count) * page_size;
     return sample;
 }

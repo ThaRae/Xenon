@@ -16,7 +16,6 @@
 
 namespace Ladybird {
 
-// The physical Control key. Qt calls it Meta on macOS, where its Control is the Command key.
 #if defined(AK_OS_MACOS)
 static constexpr auto CYCLE_MODIFIER = Qt::MetaModifier;
 static constexpr auto CYCLE_MODIFIER_KEY = Qt::Key_Meta;
@@ -69,8 +68,6 @@ void TabCycler::step(Order::Direction direction)
     auto was_cycling = m_order.is_cycling();
     auto tab = m_order.step(direction);
 
-    // Tabs in collapsed tab groups are passed over, as open_next_tab() passes over them. If every other tab is in one,
-    // the step lands on one anyway, and its group opens.
     auto is_shown = [&](Tab* candidate) { return m_tabs_container.tab_bar()->isTabVisible(m_window.tab_index(candidate)); };
     for (size_t attempt = 1; tab.has_value() && !is_shown(*tab) && attempt < m_order.tabs().size(); ++attempt)
         tab = m_order.step(direction);
@@ -78,7 +75,6 @@ void TabCycler::step(Order::Direction direction)
     if (!tab.has_value())
         return;
 
-    // Letting go of Ctrl ends the cycle, as does anything that turns the user's attention elsewhere.
     if (!was_cycling)
         qApp->installEventFilter(this);
 

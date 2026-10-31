@@ -175,7 +175,6 @@ public:
     // Brings the window forward for a page's beforeunload prompt during an application-wide close check.
     void raise_for_close_prompt();
     bool is_window_close_approved() const { return m_window_close_approved; }
-    // While the window checks whether its pages let it close, it shows each of them in turn.
     bool is_checking_whether_to_close() const { return m_window_close_coordinator.is_running(); }
     void report_activation_to_session_store();
     void cancel_window_close_preflight();

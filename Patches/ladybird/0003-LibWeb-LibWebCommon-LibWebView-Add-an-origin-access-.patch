@@ -22,13 +22,13 @@ The UI process keeps the list
 WebContent and WebWorker process as it starts, and again whenever it
 changes.
 ---
- Libraries/LibWeb/Fetch/Fetching/Fetching.cpp  |  7 +++
+ Libraries/LibWeb/Fetch/Fetching/Fetching.cpp  |  5 +++
  Libraries/LibWebCommon/CMakeLists.txt         |  2 +
  .../Infrastructure/OriginAccessAllowList.cpp  | 45 +++++++++++++++++++
- .../Infrastructure/OriginAccessAllowList.h    | 35 +++++++++++++++
+ .../Infrastructure/OriginAccessAllowList.h    | 30 +++++++++++++
  .../Infrastructure/OriginAccessAllowList.ipc  | 11 +++++
  Libraries/LibWebView/Application.cpp          | 13 ++++++
- Libraries/LibWebView/Application.h            |  7 +++
+ Libraries/LibWebView/Application.h            |  5 +++
  Libraries/LibWebView/WorkerProcessManager.cpp |  8 ++++
  Libraries/LibWebView/WorkerProcessManager.h   |  2 +
  Services/WebContent/ConnectionFromClient.cpp  |  5 +++
@@ -37,13 +37,13 @@ changes.
  Services/WebWorker/ConnectionFromClient.cpp   |  5 +++
  Services/WebWorker/ConnectionFromClient.h     |  1 +
  Services/WebWorker/WebWorkerServer.ipc        |  2 +
- 15 files changed, 146 insertions(+)
+ 15 files changed, 137 insertions(+)
  create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp
  create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h
  create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.ipc
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index e465c885c3293d426043add4f127173c028f2d92..0b9163d55deab38de6a9f14f6fe478fea8841c72 100644
+index 48f7afb58b80ad0e8ba235497602795c12333082..f7268b04b0b8ed64640a857963d3431d59e75a7f 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 @@ -86,6 +86,7 @@
@@ -54,12 +54,10 @@ index e465c885c3293d426043add4f127173c028f2d92..0b9163d55deab38de6a9f14f6fe478fe
  #include <LibWebCommon/Fetch/Infrastructure/URL.h>
  #include <LibWebCommon/Loader/UserAgent.h>
  #include <LibWebCommon/SecureContexts/AbstractOperations.h>
-@@ -673,8 +674,14 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -673,8 +674,12 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
              && request->current_url().scheme() == "file"sv
              && request->destination() == Infrastructure::Request::Destination::Font;
  
-+        // AD-HOC: Treat a request as same-origin, too, when the embedder lets its origin reach the current URL's origin,
-+        //         as Blink and WebKit let browser extensions reach the hosts they were granted.
 +        auto is_allowed_by_embedder = origin && request->response_tainting() == Infrastructure::Request::ResponseTainting::Basic
 +            && Infrastructure::is_allowed_by_origin_access_allow_list(*origin, request->current_url());
 +
@@ -142,10 +140,10 @@ index 0000000000000000000000000000000000000000..810b7710a73b6f0b8ed39b7f5cf77807
 +}
 diff --git a/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..55b69d034aec1efac337f6ca034c5192df1f2a91
+index 0000000000000000000000000000000000000000..5a1bf90bb0addceb1cce10cb7f883c6afd908b56
 --- /dev/null
 +++ b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.h
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,30 @@
 +/*
 + * Copyright (c) 2026, the Xenon developers.
 + *
@@ -161,10 +159,6 @@ index 0000000000000000000000000000000000000000..55b69d034aec1efac337f6ca034c5192
 +
 +namespace Web::Fetch::Infrastructure {
 +
-+// The embedder may let an origin fetch from some others as if they were the same origin: with no CORS, and with the
-+// credentials of a same-origin request. Blink and WebKit keep such allowlists for browser extensions, which reach the
-+// hosts their users granted them this way. A destination is a scheme and a host, on any port; an empty host is any
-+// host.
 +struct WEBCOMMON_API OriginAccessAllowListEntry {
 +    URL::Origin source_origin;
 +    String destination_scheme;
@@ -174,7 +168,6 @@ index 0000000000000000000000000000000000000000..55b69d034aec1efac337f6ca034c5192
 +    bool allows(URL::Origin const& source_origin, URL::URL const& destination) const;
 +};
 +
-+// Each process keeps the allowlist the embedder last gave it.
 +WEBCOMMON_API void set_origin_access_allow_list(Vector<OriginAccessAllowListEntry>);
 +WEBCOMMON_API bool is_allowed_by_origin_access_allow_list(URL::Origin const& source_origin, URL::URL const& destination);
 +
@@ -230,7 +223,7 @@ index cfa443045b5418b45de5beb13a6f659fbbae8fe7..aaa42160e6d85b246926d1ce7cab9d3a
  {
      VERIFY(m_next_page_or_compositor_context_id > 0);
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index a13797116f97d06b08bf08f6063470a012c1405c..5b695af6a780427e61fb3b32241a5cb0c816cee3 100644
+index a13797116f97d06b08bf08f6063470a012c1405c..ae8b933b795a0ce2eb9dd1ff8f7368f47ac3f2a8 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
 @@ -36,6 +36,7 @@
@@ -241,19 +234,17 @@ index a13797116f97d06b08bf08f6063470a012c1405c..5b695af6a780427e61fb3b32241a5cb0
  #include <LibWebCommon/HTML/ActivateTab.h>
  #include <LibWebCommon/HTML/CrossProcessId.h>
  #include <LibWebCommon/HTML/PreparedNavigationDescriptor.h>
-@@ -111,6 +112,11 @@ public:
+@@ -111,6 +112,9 @@ public:
      bool blocks_pop_ups() const;
      ErrorOr<void> reload_site_compatibility_data();
  
-+    // Origins of the embedder's own that may fetch from others as if they were the same origin. Every process that
-+    // runs web content or workers gets the list.
 +    Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> const& origin_access_allow_list() const { return m_origin_access_allow_list; }
 +    void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry>);
 +
      bool claim_cpu_profiler(ProcessType);
      void set_cpu_profiler_process(Core::Process, OwnPtr<Core::File> control_socket);
  
-@@ -629,6 +635,7 @@ private:
+@@ -629,6 +633,7 @@ private:
      RefPtr<FontService> m_font_service;
      OwnPtr<FontServiceHost> m_font_service_host;
      JsonValue m_site_compatibility_data;
@@ -262,7 +253,7 @@ index a13797116f97d06b08bf08f6063470a012c1405c..5b695af6a780427e61fb3b32241a5cb0
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
 diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
-index 76d1a4cf043c2054b9897f7469ea33dd7bb927cf..4e8f79f8ced3d1616a1f14fd8a52d08bd174e224 100644
+index d090ad2728b1a580684795074b6f1bcb5a8d1ff9..d7b710f59d2435b8f8eb5fe49d07e70fa5078829 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.cpp
 +++ b/Libraries/LibWebView/WorkerProcessManager.cpp
 @@ -214,6 +214,8 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O

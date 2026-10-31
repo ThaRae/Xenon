@@ -5,11 +5,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/*
- * The first run: the defaults on one screen, as preset keys, then a step for each choice under a rail that counts them
- * off. Choices are pictures of the result where there's something to picture, and lists where there isn't.
- */
-
 body {
     display: flex;
     flex-direction: column;
@@ -47,8 +42,6 @@ body[data-step="hello"] .topbar {
     visibility: hidden;
 }
 
-/* The rail */
-
 .rail {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -79,7 +72,6 @@ body[data-step="hello"] .rail {
     color: var(--xenon-muted);
 }
 
-/* Steps behind you are ink, so the rose stays on the one you're on. */
 .rail .done .bar {
     background-color: var(--xenon-ink-soft);
     box-shadow: none;
@@ -113,8 +105,6 @@ body[data-step="hello"] .rail {
     background-color: var(--xenon-rose);
     border-radius: 50%;
 }
-
-/* The steps */
 
 form {
     flex: 1;
@@ -180,8 +170,6 @@ form {
     color: var(--xenon-muted);
 }
 
-/* The first screen */
-
 .step[data-step="hello"] {
     justify-content: center;
     padding-bottom: 72px;
@@ -207,7 +195,6 @@ form {
     margin-top: 40px;
 }
 
-/* Keys as wide as what they say, as on a keyboard, rather than a row of equal cards. They wrap on a narrow window. */
 .presets.defaults,
 .presets.summary {
     display: flex;
@@ -237,8 +224,6 @@ form {
     gap: 16px;
     margin-top: 32px;
 }
-
-/* Picture choices */
 
 .choices {
     display: grid;
@@ -304,7 +289,6 @@ form {
     border-top: 1px solid var(--xenon-hairline);
 }
 
-/* The drawings. Their parts take their colours from these classes, so they follow the page into the dark. */
 .picture .win {
     fill: var(--xenon-card);
     stroke: var(--xenon-hairline);
@@ -387,8 +371,6 @@ form {
     stroke: var(--xenon-lamp-off);
 }
 
-/* Lists of choices: the search engines */
-
 .pick-head {
     display: flex;
     align-items: baseline;
@@ -457,8 +439,6 @@ form {
     color: var(--xenon-muted);
 }
 
-/* Blocking */
-
 .updates {
     display: flex;
     align-items: flex-start;
@@ -490,10 +470,6 @@ form {
     flex: none;
 }
 
-/*
- * Password managers: each a key with its initial for a picture, and none as a long key below. They share the row however
- * many this platform offers, which a grid's spanning row would leave a column short of.
- */
 .choices.managers {
     display: flex;
     flex-wrap: wrap;
@@ -546,8 +522,6 @@ form {
 .manager-note:empty {
     display: none;
 }
-
-/* Done */
 
 .step[data-step="done"] .presets {
     margin-top: 32px;

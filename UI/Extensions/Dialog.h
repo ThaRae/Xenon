@@ -17,13 +17,10 @@ class QVBoxLayout;
 
 namespace Ladybird::Extensions {
 
-// The Extensions dialog: the password manager (UI/PasswordManagers.h), the loaded extensions, with their versions, IDs,
-// and directories, and buttons to load an unpacked extension, reload one, or remove one.
 class ExtensionsDialog final : public QDialog {
 public:
     AK_ALLOC_WITH_KMALLOC;
 
-    // Shows the one dialog, creating it if need be.
     static void show_dialog(QWidget* parent);
 
 private:
@@ -39,7 +36,6 @@ private:
     QVBoxLayout* m_list { nullptr };
 };
 
-// The menu action that opens the dialog.
 QAction* create_extensions_action(QWidget* parent);
 
 }

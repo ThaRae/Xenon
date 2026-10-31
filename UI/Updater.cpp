@@ -8,10 +8,8 @@
 #include <UI/Application.h>
 #include <UI/Updater.h>
 
-// Xenon updates itself on macOS only (UI/Updater.mm). Elsewhere it's updated the way it was installed.
 namespace Ladybird::Updater {
 
-// XENON_TEST_UPDATE_READY's stand-in for an update that's ready (UI/Updater.h).
 static Optional<ByteString> const& test_ready_version()
 {
     static auto const version = []() -> Optional<ByteString> {
@@ -41,7 +39,6 @@ Status status()
         return status;
     }
 
-    // NB: A status is unsupported unless it says otherwise.
     return {};
 }
 
@@ -55,7 +52,6 @@ void check_for_updates()
 
 void install_and_relaunch()
 {
-    // The stand-in has nothing to install, so Xenon only quits.
     if (auto const& stand_in = test_ready_version(); stand_in.has_value()) {
         dbgln("Relaunching to update to Xenon {}, which XENON_TEST_UPDATE_READY stands in for, so Xenon only quits", *stand_in);
         Application::the().quit();

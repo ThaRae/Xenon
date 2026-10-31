@@ -28,12 +28,8 @@ namespace Ladybird::BlockingDashboard {
 static constexpr auto SCHEME = "xenon"sv;
 static constexpr auto DASHBOARD_HOST = "blocking"sv;
 
-// No page may frame the dashboard, so none can trick a click on it, and it runs nothing but its own script.
 static constexpr auto CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"sv;
 
-// The dashboard's line to the UI process: window.xenonBlocking.send() takes a message, and the answers arrive as
-// xenonblocking events on the window. The state comes along as initialState (a constant put before the script), so
-// that the dashboard is filled in by the time it has loaded, rather than when the answer to its first message arrives.
 static constexpr auto BOOTSTRAP_SCRIPT = R"~~~(
 window.xenonBlocking = Object.freeze({
     initialState,
@@ -46,7 +42,6 @@ bridge.onmessage = text => {
 };
 )~~~"sv;
 
-// The dashboard's files by path: its own, and the stylesheets of the browser's internal pages, which it looks like.
 static Optional<StringView> resource_for_path(StringView path)
 {
     if (path.is_empty() || path == "/"sv)
@@ -80,7 +75,6 @@ static ErrorOr<WebView::URLSchemeResponse> respond(WebView::URLSchemeRequest con
     if (request.url.serialized_host() != DASHBOARD_HOST)
         return Error::from_errno(ENOENT);
 
-    // Anyone may open the dashboard, which can't be framed, but only the dashboard may load its files.
     if (!request.is_navigation && !request.from_same_origin_process)
         return Error::from_errno(EACCES);
 
@@ -108,7 +102,6 @@ static ErrorOr<JsonValue> read_manifest(StringView directory)
     return JsonValue::from_string(contents);
 }
 
-// The bundled (or downloaded) lists, from the manifest of the bundle in use, with whether each is turned on.
 static JsonObject filter_lists()
 {
     JsonObject lists;
@@ -192,7 +185,6 @@ static String dashboard_state()
     return state.serialized();
 }
 
-// The open dashboards, which get the state again when the blocking settings change elsewhere.
 class Dashboards final : public WebView::SettingsObserver {
 public:
     static Dashboards& the()
@@ -271,7 +263,6 @@ static void handle_message(WebView::ScriptBridgeEndpoint const& endpoint, String
         return;
     }
 
-    // Changes to the settings reach every dashboard through the observer too, but the lists aren't a setting.
     endpoint.post_message(dashboard_state());
 }
 
@@ -283,11 +274,9 @@ void register_url_scheme()
                 return CertificateErrors::bootstrap_script(endpoint);
             if (!is_dashboard(endpoint))
                 return {};
-            // NB: The state is JSON, which is also a JavaScript expression.
             return MUST(String::formatted("const initialState = {};\n{}", dashboard_state(), BOOTSTRAP_SCRIPT));
         },
         .on_message = [](WebView::ScriptBridgeEndpoint const& endpoint, String message) { handle_message(endpoint, message); },
-        // The dashboard uses the clipboard only as any page does.
         .may_read_clipboard = {},
         .may_write_clipboard = {},
     };

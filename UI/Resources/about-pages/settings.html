@@ -4,10 +4,6 @@ Copyright (c) 2026-present, the Ladybird developers.
 Copyright (c) 2026, the Xenon developers.
 
 SPDX-License-Identifier: BSD-2-Clause
-
-Xenon's settings page. Xenon's own settings come first, from UI/SettingsPage.cpp ("xenon/..." messages, settings.js).
-Ladybird's settings below them keep the element ids of Ladybird's page, so Ladybird's own scripts in about-pages/settings
-run them unchanged, except for tabs.js, whose vertical tabs switch is the layout picker here.
 -->
 <html lang="en">
     <head>
@@ -137,7 +133,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
             <main>
                 <p id="no-matches" class="no-matches" hidden>No settings match “<span></span>”.</p>
 
-                <!-- The settings people change most, as preset keys. Each drives the control for it further down. -->
                 <section id="easy-setup" class="easy-setup" aria-labelledby="easy-setup-title">
                     <div class="easy-setup-head">
                         <h2 id="easy-setup-title">Easy setup</h2>
@@ -453,8 +448,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
                                     </label>
                                 </div>
                             </div>
-                            <!-- Ladybird's theme for its own interface, which appearance.js sets. Xenon's chrome
-                                 doesn't follow it, so it isn't offered. -->
                             <div id="interface-theme" class="segmented hidden" role="radiogroup" aria-label="Theme">
                                 <label><input type="radio" name="interface-theme" value="system" />System</label>
                                 <label><input type="radio" name="interface-theme" value="light" />Light</label>
@@ -1300,7 +1293,6 @@ run them unchanged, except for tabs.js, whose vertical tabs switch is the layout
         </dialog>
 
         <script>
-            // Ladybird's settings scripts use these globals of its page.
             // FIXME: When we support per-glyph font fallbacks, replace these SVGs with analogous code points.
             //        https://github.com/LadybirdBrowser/ladybird/issues/864
             const upwardArrowSVG =

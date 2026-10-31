@@ -20,32 +20,29 @@ renderer. Site isolation keeps them to one site.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibWebView/URLSchemeHandler.h       |  5 +++++
+ Libraries/LibWebView/URLSchemeHandler.h       |  2 ++
  Libraries/LibWebView/WebContentPage.cpp       | 11 ++++++++++-
  Libraries/LibWebView/WorkerProcessManager.cpp |  1 +
- 3 files changed, 16 insertions(+), 1 deletion(-)
+ 3 files changed, 13 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
-index 29f3cab80d12c5a7280145f57851eaab00ce34cf..0b5bc6d988baf5001186956a628358ddb184c9f9 100644
+index ad236d28897c4f7ab1ad3da8d79c0130b94b90a7..14b9dab5f2059ffbc8c82f94dd6db98c0630ea52 100644
 --- a/Libraries/LibWebView/URLSchemeHandler.h
 +++ b/Libraries/LibWebView/URLSchemeHandler.h
-@@ -37,6 +37,11 @@ struct URLSchemeRequest {
+@@ -32,6 +32,8 @@ struct URLSchemeRequest {
+ 
      bool is_navigation { false };
-     // The origin of the document that started the navigation, or none if the user started it from the browser's UI.
      Optional<URL::Origin> navigation_initiator;
 +
-+    // For a subresource, the origins that may be asking for it: a worker's, or those of the documents the asking process
-+    // hosts for its page. The UI process knows which documents those are, but not which one asks, so this is as close
-+    // to the request's initiator as it gets. Site isolation keeps them to one site.
 +    Vector<URL::Origin> requester_origins;
  };
  
  struct URLSchemeResponse {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 26475b83d80c7623b9bb5cf1aefe5824e7f30d93..b9a129a7c066f6a43ada809bff8f9ffa52dc9190 100644
+index 56032396309308190d8938744a6d02a609d2d933..82b01636c725b053c1e865b2d3d8a5f7e83439b7 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1640,7 +1640,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1638,7 +1638,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return;
      }
  
@@ -54,7 +51,7 @@ index 26475b83d80c7623b9bb5cf1aefe5824e7f30d93..b9a129a7c066f6a43ada809bff8f9ffa
      traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
          auto navigation = navigable.uncommitted_navigation();
          if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
-@@ -1652,6 +1652,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1650,6 +1650,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return IterationDecision::Break;
      });
  
@@ -71,10 +68,10 @@ index 26475b83d80c7623b9bb5cf1aefe5824e7f30d93..b9a129a7c066f6a43ada809bff8f9ffa
      if (response.is_error()) {
          async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
 diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
-index 4e8f79f8ced3d1616a1f14fd8a52d08bd174e224..08b2c88d8be71729ca6e96b452939e78dbf0762d 100644
+index d7b710f59d2435b8f8eb5fe49d07e70fa5078829..2632878dce0d8c373106ad36c594ebd44680db26 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.cpp
 +++ b/Libraries/LibWebView/WorkerProcessManager.cpp
-@@ -707,6 +707,7 @@ void WorkerProcessManager::worker_did_request_embedder_resource(Web::HTML::Worke
+@@ -706,6 +706,7 @@ void WorkerProcessManager::worker_did_request_embedder_resource(Web::HTML::Worke
          .from_same_origin_process = agent.inside_settings->origin().is_same_origin(url.origin()),
          .is_navigation = false,
          .navigation_initiator = {},

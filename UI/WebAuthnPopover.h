@@ -19,17 +19,10 @@ namespace Ladybird {
 
 class WebContentView;
 
-// The prompt of a WebAuthn ceremony (signing in with a security key, or registering one): a popover over the view
-// whose page asked, saying what the ceremony waits for and taking the user's answer. Leaving it, by clicking elsewhere
-// or pressing Escape, cancels the ceremony.
-//
-// It is a popover, rather than a dialog, so that it can open over an extension's action popup: a popup closes when
-// another window takes focus, and would end the ceremony with it, but stays open under a popover of its own.
 class WebAuthnPopover final : public Popover {
 public:
     AK_ALLOC_WITH_KMALLOC;
 
-    // Shows the view's WebAuthn prompts from now on.
     static void attach(WebContentView&);
 
 private:

@@ -1201,7 +1201,6 @@ void WebContentView::paintEvent(QPaintEvent*)
 #ifdef LADYBIRD_QT_USE_IOSURFACE_LAYER
 void WebContentView::paintEvent(QPaintEvent*)
 {
-    // The page layer has rounded corners, so the area outside them should match the chrome around this view.
     QPainter painter(this);
     painter.fillRect(rect(), ChromeStyle::chrome_background(window()->palette()));
 }

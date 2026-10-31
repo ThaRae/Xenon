@@ -19,8 +19,6 @@ namespace Ladybird::Extensions::WebStore {
 
 static constexpr auto UPDATE_URL = "https://clients2.google.com/service/update2/crx"sv;
 
-// For tests, which serve extensions of their own from a local server, signed with a publisher key of their own (given
-// as the hex of its SHA-256 hash).
 static constexpr auto UPDATE_URL_VARIABLE = "XENON_EXTENSION_STORE_URL"sv;
 static constexpr auto PUBLISHER_KEY_HASH_VARIABLE = "XENON_EXTENSION_STORE_PUBLISHER_KEY_HASH"sv;
 
@@ -29,8 +27,6 @@ static constexpr u64 MAXIMUM_CRX_SIZE = 256 * MiB;
 static constexpr auto UPDATE_CHECK_TIMEOUT = AK::Duration::from_seconds(60);
 static constexpr auto CRX_TIMEOUT = AK::Duration::from_seconds(15 * 60);
 
-// The store offers the newest version that runs in the Chrome version asked with, which is the one Xenon's user agent
-// names.
 static StringView chrome_version()
 {
     static constexpr auto prefix = "Chrome/"sv;
@@ -143,8 +139,6 @@ ReadonlyBytes publisher_key_hash()
 void fetch(String id, Optional<String> current_version, Callback callback)
 {
     auto base_url = Core::Environment::get(UPDATE_URL_VARIABLE).value_or(UPDATE_URL);
-    // The x parameter holds the extension's own parameters, URL-encoded: its ID, the version Xenon has, and "uc" (an
-    // update check, rather than a ping).
     auto check_url = URL::Parser::basic_parse(ByteString::formatted("{}?response=updatecheck&acceptformat=crx3&prodversion={}&x=id%3D{}%26v%3D{}%26uc",
         base_url, chrome_version(), id, current_version.has_value() ? current_version->bytes_as_string_view() : "0.0.0.0"sv));
     if (!check_url.has_value()) {

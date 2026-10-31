@@ -90,7 +90,6 @@ struct MaterialColorAnchors {
     QColor border;
 };
 
-// Xenon's neutrals lean slightly warm, toward its rose accent, where Ladybird's lean cool.
 static MaterialColorAnchors material_color_anchors(bool dark)
 {
     if (dark) {
@@ -139,7 +138,6 @@ bool shows_opaque_pixels_only(QWidget const& widget)
 #endif
 }
 
-// The tab strip is darker than the toolbar below it, whose color the selected tab shares, so the selected tab stands out.
 WindowActivity window_activity(QWidget const& widget)
 {
     return widget.isActiveWindow() ? WindowActivity::Active : WindowActivity::Inactive;
@@ -149,14 +147,11 @@ QColor chrome_tab_strip_background(QPalette const& palette, WindowActivity activ
 {
     auto dark = is_dark(palette);
     auto color = mix(chrome_window(palette), material_color_anchors(dark).tab_strip, dark ? 0.70 : 0.68);
-    // An inactive window's tab strip is lifted toward the toolbar, so the window recedes behind the active one.
     if (activity == WindowActivity::Inactive)
         color = mix(color, chrome_background(palette), 0.4);
     return color;
 }
 
-// In dark mode, the chrome is lifted from near black toward a warm gray, which sits better beside Xenon's rose accent
-// than a cool slate would.
 static constexpr QColor dark_chrome_base { 20, 18, 20 };
 static constexpr QColor dark_chrome_tint { 172, 162, 166 };
 
@@ -245,8 +240,6 @@ QColor chrome_window_outline(QPalette const& palette)
     if (dark)
         return chrome_border(palette);
 
-    // The window outline has to hold up against arbitrary backdrops behind the window, not just our own chrome
-    // surfaces, so in light mode it is mixed further toward the border anchor than chrome_border().
     return mix(chrome_background(palette), material_color_anchors(false).border, 0.5);
 }
 
@@ -284,12 +277,10 @@ QColor chrome_muted_text(QPalette const& palette)
     return palette.color(QPalette::PlaceholderText);
 }
 
-// The titles of tabs and bookmarks share one size.
 QFont chrome_title_font(QFont font)
 {
 #if defined(AK_OS_MACOS)
     // NB: The macOS style gives tab bars and tool buttons small fonts of different sizes when it polishes them, so the
-    //     titles are drawn a point smaller than the application's font rather than in the font of their widget.
     if (auto application_point_size = QGuiApplication::font().pointSizeF(); application_point_size > 0)
         font.setPointSizeF(application_point_size - 1);
 #endif
@@ -400,7 +391,6 @@ QString toolbar_container_style_sheet(QPalette const& palette)
     auto background = style_sheet_color(background_color);
     auto surface_hover = style_sheet_color(chrome_control_surface_hover(palette));
     auto surface_pressed = style_sheet_color(chrome_control_surface_pressed(palette));
-    // In dark mode, the line under the toolbar is as soft as the one under the tab strip.
     auto separator = style_sheet_color(dark ? mix(background_color, chrome_border(palette), 0.44) : chrome_border(palette));
     auto window_controls_separator = style_sheet_color(mix(chrome_background(palette), chrome_border(palette), dark ? 0.36 : 0.46));
     auto text = style_sheet_color(chrome_button_text(palette));
@@ -687,12 +677,9 @@ QString location_edit_style_sheet(QPalette const& palette)
     auto surface_color = chrome_surface(palette);
     if (dark)
         surface_color = mix(chrome_background(palette), material_color_anchors(true).background, 0.62);
-    // Hovering the field moves it a little toward the color of the toolbar around it, to show that it can be clicked,
-    // while it stays set apart from the toolbar.
     auto hover_color = mix(surface_color, chrome_background(palette), 0.35);
     auto focus_color = dark ? mix(surface_color, QColor(255, 255, 255), 0.035) : surface_color;
 
-    // NB: In dark mode, the field is set apart from the toolbar by its darker fill alone, so its border takes its fill.
     auto border_color = dark ? surface_color : location_edit_border(palette);
     auto hover_border_color = dark ? hover_color : border_color;
     auto focus_border_color = location_edit_focus_border(palette);
@@ -718,7 +705,6 @@ QString location_edit_style_sheet(QPalette const& palette)
     auto zoom_hover = style_sheet_color(dark ? mix(surface_color, chrome_surface_recessed(palette), 0.36) : mix(surface_color, chrome_surface_recessed(palette), 0.20));
     auto zoom_pressed = style_sheet_color(dark ? mix(surface_color, chrome_surface_recessed(palette), 0.44) : mix(surface_color, chrome_surface_recessed(palette), 0.28));
     auto zoom_border = style_sheet_color(dark ? mix(chrome_border(palette), surface_color, 0.38) : mix(chrome_border(palette), surface_color, 0.54));
-    // The bang chip takes its colors from Xenon's rose scale, as the badges do.
     auto bang_chip_text = style_sheet_color(QColor(dark ? BrandColors::Rose40 : BrandColors::Rose500));
     auto bang_chip_surface = style_sheet_color(QColor(dark ? BrandColors::Rose950 : BrandColors::Rose10));
     auto bang_chip_border = style_sheet_color(QColor(dark ? BrandColors::Rose900 : BrandColors::Rose20));
@@ -1798,8 +1784,6 @@ Optional<ControlFrameColors> circular_control_frame_colors(QAbstractButton const
         border = chrome_control_border(palette);
     }
     if (pressed) {
-        // A frameless button can sit on the chrome or on a lighter tab, so pressing it deepens the hover fill rather
-        // than painting an opaque color that could be darker than what is below.
         if (frame_style == CircularControlFrameStyle::InteractionOnly)
             background = is_dark(palette) ? QColor(255, 255, 255, 40) : QColor(0, 0, 0, 26);
         else
@@ -1816,8 +1800,6 @@ void paint_circular_control_frame(QPainter& painter, QAbstractButton const& butt
         paint_circular_control_frame(painter, button.rect(), button.devicePixelRatioF(), colors->background, colors->border);
 }
 
-// A purple gradient with two soft bright spots that moves steadily along a border, to show that something is loading.
-// Every swirl follows the same clock, so the swirls on screen move in step.
 void paint_loading_swirl(QPainter& painter, QPainterPath const& border)
 {
     static QElapsedTimer clock;
@@ -1825,10 +1807,8 @@ void paint_loading_swirl(QPainter& painter, QPainterPath const& border)
         clock.start();
     auto phase = static_cast<qreal>(clock.elapsed() % LOADING_SWIRL_PERIOD_MS) / LOADING_SWIRL_PERIOD_MS;
 
-    // The border is drawn in short segments, each colored by where it sits along the border.
     static constexpr qreal segment_length = 2.0;
     static constexpr qreal bright_spots = 2.0;
-    // NB: Without caching, every pointAtPercent() call below measures the whole path again.
     auto path = border;
     path.setCachingEnabled(true);
     auto segments = max(1, static_cast<int>(ceil(path.length() / segment_length)));
@@ -1838,8 +1818,6 @@ void paint_loading_swirl(QPainter& painter, QPainterPath const& border)
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setBrush(Qt::NoBrush);
 
-    // NB: pointAtPercent() measures along the path's length, so the swirl moves just as fast around the curves of a
-    //     border as along its straight edges.
     auto from_point = path.pointAtPercent(0);
     for (int segment = 0; segment < segments; ++segment) {
         auto from = static_cast<qreal>(segment) / segments;

@@ -1,7 +1,4 @@
 <!doctype html>
-<!-- Meta/xenon.py test serves this from a local web server, at a URL the test extension's externally_connectable
-     matches, with the extension's ID in the query. It messages the extension as a web page, prints one line of
-     results, and closes, which ends the headless browser. -->
 <script>
     const results = {};
     function check(name, condition) {
@@ -20,8 +17,6 @@
         chrome.runtime.id === undefined && chrome.runtime.getURL === undefined && chrome.storage === undefined
     );
 
-    // The page's world sees the events its chrome.runtime sends, so it can send its own. The UI process still only lets
-    // it message the extension.
     let requestEventName;
     const dispatchEvent = EventTarget.prototype.dispatchEvent;
     EventTarget.prototype.dispatchEvent = function (event) {
@@ -60,7 +55,6 @@
     }
 
     async function run() {
-        // Proton Pass draws its icon in login fields with one of its images as the field's background.
         check("a web page loads web accessible images", await loadImage("icon16.png"));
         check("but no other files of the extension", !(await loadImage("icon32.png")));
 

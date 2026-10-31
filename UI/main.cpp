@@ -42,17 +42,13 @@
 
 namespace Ladybird {
 
-// FIXME: Find a place to put this declaration (and other helper functions).
 bool is_using_dark_system_theme(QWidget&);
 bool is_using_dark_system_theme(QWidget& widget)
 {
-    // Use the explicitly set or system default color scheme whenever available
     auto color_scheme = QGuiApplication::styleHints()->colorScheme();
     if (color_scheme != Qt::ColorScheme::Unknown)
         return color_scheme == Qt::ColorScheme::Dark;
 
-    // Calculate luma based on Rec. 709 coefficients
-    // https://en.wikipedia.org/wiki/Rec._709#Luma_coefficients
     auto color = widget.palette().color(widget.backgroundRole());
     auto luma = 0.2126f * color.redF() + 0.7152f * color.greenF() + 0.0722f * color.blueF();
     return luma <= 0.5f;
@@ -64,7 +60,6 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
 {
     AK::set_rich_debug_enabled(true);
 
-    // Profiles and crash reports go under Xenon's own directories, apart from Ladybird's.
     WebView::set_application_name("Xenon"sv);
 
     if (auto result = WebView::CrashReportStore::the().initialize_browser_crash_handler(); result.is_error())
@@ -100,15 +95,10 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
         return 0;
     }
 
-    // NB: Extensions are served from the UI process, which renderers have to know before the first of them starts. The
-    //     first starts once the event loop runs, and the profile they live in is only known once the application has
-    //     been created.
     app->initialize_extensions();
 
     Ladybird::CertificateErrors::initialize();
 
-    // Ladybird opens new tabs blank. Xenon has a new tab page of its own (UI/NewTabPage.cpp), which a new profile opens
-    // new tabs to until the user picks another page.
     if (!Ladybird::Application::settings().first_run_complete())
         Ladybird::Application::settings().set_new_tab_page_url(URL::about_newtab());
 

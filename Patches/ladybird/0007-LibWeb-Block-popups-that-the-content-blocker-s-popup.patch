@@ -16,11 +16,11 @@ navigates, and closed if a filter matches.
 ---
  Libraries/LibWeb/DOM/Element.cpp          |  2 +-
  Libraries/LibWeb/HTML/HTMLFormElement.cpp |  2 +-
- Libraries/LibWeb/HTML/LocalNavigable.cpp  |  9 ++++++++-
- Libraries/LibWeb/HTML/LocalNavigable.h    |  3 ++-
- Libraries/LibWeb/HTML/Navigable.cpp       | 15 +++++++++++++++
+ Libraries/LibWeb/HTML/LocalNavigable.cpp  |  7 ++++++-
+ Libraries/LibWeb/HTML/LocalNavigable.h    |  2 +-
+ Libraries/LibWeb/HTML/Navigable.cpp       | 13 +++++++++++++
  Libraries/LibWeb/HTML/Window.cpp          |  2 +-
- 6 files changed, 28 insertions(+), 5 deletions(-)
+ 6 files changed, 23 insertions(+), 5 deletions(-)
 
 diff --git a/Libraries/LibWeb/DOM/Element.cpp b/Libraries/LibWeb/DOM/Element.cpp
 index 975550e2245166b5f2604786759c075fa3ec5ba8..9ef21ba2faec9764b125c06324327bfa2e1c46d4 100644
@@ -49,10 +49,10 @@ index 39d695b80bf647cacde3254484065a3e64d13848..bc35bbf3f9fdeb20f1b7e0719a4adf37
      // 23. If targetNavigable is null, then return.
      if (!target_navigable) {
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index 05368d5cc31fd18f1ebd01911a2cb014374be160..ccf70720c98c596cd6a4e3f24aa6f3bb4c964889 100644
+index 11c6b3e167811b1712303be202a833f398402b94..c8b13d259a6846b224fde35503dccc582f8fb25a 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-@@ -1800,7 +1800,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
+@@ -1798,7 +1798,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
  }
  
  // https://html.spec.whatwg.org/multipage/document-sequences.html#the-rules-for-choosing-a-navigable
@@ -61,12 +61,10 @@ index 05368d5cc31fd18f1ebd01911a2cb014374be160..ccf70720c98c596cd6a4e3f24aa6f3bb
  {
      // 1. Let chosen be null.
      GC::Ptr<Navigable> chosen;
-@@ -1862,6 +1862,13 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
+@@ -1860,6 +1860,11 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
              dbgln("Pop-up blocked!");
          }
  
-+        // AD-HOC: --> If the content blocker has a popup filter for the URL the new top-level traversable would open
-+        //             from currentNavigable's active document (uBlock Origin's $popup)
 +        else if (url.has_value() && active_document() && active_document()->content_blocking_enabled() && ContentBlocker::the().is_popup_filtered(*url, active_document()->url())) {
 +            dbgln("Pop-up blocked by the content blocker: {}", *url);
 +            page().client().page_did_block_resource(*url, "Frame"sv);
@@ -76,21 +74,20 @@ index 05368d5cc31fd18f1ebd01911a2cb014374be160..ccf70720c98c596cd6a4e3f24aa6f3bb
          else if (auto new_web_view = request_new_web_view(); new_web_view.page) {
              // 1. Consume user activation of currentNavigable's active window.
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.h b/Libraries/LibWeb/HTML/LocalNavigable.h
-index d9919f6fad35bbc24c1390e25113078038329227..58e43e0adaafdd43681c8953da2182477d562f14 100644
+index d9919f6fad35bbc24c1390e25113078038329227..0cb6cfba5b29038d864acfe2500345b53c9dd89b 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.h
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.h
-@@ -176,7 +176,8 @@ public:
+@@ -176,7 +176,7 @@ public:
          WindowType window_type;
      };
  
 -    ChosenNavigable choose_a_navigable(Utf16View name, TokenizedFeature::NoOpener no_opener, ActivateTab = ActivateTab::Yes, Optional<TokenizedFeature::Map const&> window_features = {});
-+    // NB: url is the URL a new top-level traversable would open, for the content blocker's popup filters.
 +    ChosenNavigable choose_a_navigable(Utf16View name, TokenizedFeature::NoOpener no_opener, ActivateTab = ActivateTab::Yes, Optional<TokenizedFeature::Map const&> window_features = {}, Optional<URL::URL const&> url = {});
  
      GC::Ptr<Navigable> find_a_navigable_by_target_name(Utf16View name);
      bool is_familiar_with(Navigable&);
 diff --git a/Libraries/LibWeb/HTML/Navigable.cpp b/Libraries/LibWeb/HTML/Navigable.cpp
-index 48a4fd206395aa58fd8f1ea7a80c87a9df4af54f..682f9a981597a2bb1938dd7fb42ce1485fa49cdd 100644
+index 48a4fd206395aa58fd8f1ea7a80c87a9df4af54f..a7f453d1a4d2387cfb94048f22d4ae1a36a0e2d2 100644
 --- a/Libraries/LibWeb/HTML/Navigable.cpp
 +++ b/Libraries/LibWeb/HTML/Navigable.cpp
 @@ -6,12 +6,14 @@
@@ -108,13 +105,11 @@ index 48a4fd206395aa58fd8f1ea7a80c87a9df4af54f..682f9a981597a2bb1938dd7fb42ce148
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/WebIDL/DOMException.h>
  #include <LibWebCommon/HTML/SandboxingFlagSet.h>
-@@ -212,6 +214,19 @@ WebIDL::ExceptionOr<void> Navigable::navigate(NavigateParams params)
+@@ -212,6 +214,17 @@ WebIDL::ExceptionOr<void> Navigable::navigate(NavigateParams params)
              // 2. Return.
              return {};
          }
 +
-+        // AD-HOC: A popup that its opener opened empty and then sent somewhere (window.open() followed by setting its
-+        //         location) gets the content blocker's popup filters too, checked against the opener's URL.
 +        if (auto* traversable = as_if<LocalTraversableNavigable>(*this); traversable && traversable->is_created_by_web_content()) {
 +            auto document = traversable->active_document();
 +            if (document && document->is_initial_about_blank() && source_document->content_blocking_enabled()

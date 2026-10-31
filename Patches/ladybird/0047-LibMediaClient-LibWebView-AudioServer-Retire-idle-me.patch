@@ -19,39 +19,35 @@ Have a worker's request retry the same way.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibMediaClient/Client.cpp      |  4 +++-
- Libraries/LibWebView/WebWorkerClient.cpp | 12 ++++++++++--
- Services/AudioServer/Tabs.cpp            | 21 +++++++++++++++++++++
- Services/AudioServer/Tabs.h              |  5 +++++
- 4 files changed, 39 insertions(+), 3 deletions(-)
+ Libraries/LibMediaClient/Client.cpp      |  2 +-
+ Libraries/LibWebView/WebWorkerClient.cpp | 10 ++++++++--
+ Services/AudioServer/Tabs.cpp            | 20 ++++++++++++++++++++
+ Services/AudioServer/Tabs.h              |  3 +++
+ 4 files changed, 32 insertions(+), 3 deletions(-)
 
 diff --git a/Libraries/LibMediaClient/Client.cpp b/Libraries/LibMediaClient/Client.cpp
-index e57a7113283fed6a2ddcc292671031f7f854772e..47d69519229e8741c89b7d969e53d2a608dcf84b 100644
+index e57a7113283fed6a2ddcc292671031f7f854772e..1216abc5665015cc6fa9729c021b6c279468dad8 100644
 --- a/Libraries/LibMediaClient/Client.cpp
 +++ b/Libraries/LibMediaClient/Client.cpp
-@@ -13,7 +13,9 @@
+@@ -13,7 +13,7 @@
  
  namespace MediaClient {
  
 -static constexpr int IDLE_EXIT_DELAY_MS = 30'000;
-+// A renderer with no media session, stream, or decode request for this long gives up its MediaServer, which
-+// exits with it; the next use launches a new one.
 +static constexpr int IDLE_EXIT_DELAY_MS = 15'000;
  
  static NeverDestroyed<Client::TransportFactory> s_transport_factory;
  static NeverDestroyed<RefPtr<Client>> s_client;
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index a9e7a856132464e102899af3a4fee2310e74ff2c..0db7ccf18e32d996ceeaa778f859bf7991b8fc3d 100644
+index a9e7a856132464e102899af3a4fee2310e74ff2c..0cf74314594bcb5da3bd2900b962d577dd4d0d2f 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
-@@ -197,8 +197,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
+@@ -197,8 +197,14 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
          auto self = weak_self.strong_ref();
          if (!self)
              return Error::from_string_literal("The worker process is gone");
 -        TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id()));
 -        return connect_new_audio_server_client(*self->m_audio_server_client, self->m_audio_tab_id);
-+        // An idle AudioServer exits by itself, so it may have gone just before this request reached it. The failed
-+        // request closes its connection, and a second try launches a new server.
 +        auto connect = [&]() -> ErrorOr<IPC::TransportHandle> {
 +            TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id()));
 +            return connect_new_audio_server_client(*self->m_audio_server_client, self->m_audio_tab_id);
@@ -64,7 +60,7 @@ index a9e7a856132464e102899af3a4fee2310e74ff2c..0db7ccf18e32d996ceeaa778f859bf79
      if (connection.is_error()) {
          warnln("Unable to connect a MediaServer client: {}", connection.error());
 diff --git a/Services/AudioServer/Tabs.cpp b/Services/AudioServer/Tabs.cpp
-index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3929ccf08 100644
+index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..f5524a36599e97e7bdc21ebaf533cc5f3bce4f5c 100644
 --- a/Services/AudioServer/Tabs.cpp
 +++ b/Services/AudioServer/Tabs.cpp
 @@ -13,6 +13,8 @@
@@ -76,16 +72,15 @@ index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3
  #include <LibIPC/Transport.h>
  
  namespace AudioServer {
-@@ -20,6 +22,8 @@ namespace AudioServer {
+@@ -20,6 +22,7 @@ namespace AudioServer {
  // The device never underruns, since the mix is silence where no client has frames, so its own buffer can stay well
  // below the lookahead the clients keep in their rings.
  static constexpr u32 DEVICE_TARGET_LATENCY_MS = 40;
-+// No client for this long after the last one went: the renderer is not playing anything.
 +static constexpr int IDLE_EXIT_DELAY_MS = 15'000;
  
  Tabs& Tabs::the()
  {
-@@ -105,6 +109,9 @@ Audio::CaptureDevices& Tabs::capture_devices()
+@@ -105,6 +108,9 @@ Audio::CaptureDevices& Tabs::capture_devices()
  
  ErrorOr<IPC::TransportHandle> Tabs::connect_client(u64 tab_id)
  {
@@ -95,7 +90,7 @@ index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3
      auto paired_transports = TRY(IPC::Transport::create_paired());
      auto handle = move(paired_transports.remote_handle);
  
-@@ -203,6 +210,20 @@ void Tabs::connection_died(u64 tab_id, int client_id)
+@@ -203,6 +209,20 @@ void Tabs::connection_died(u64 tab_id, int client_id)
          return;
      tab->mixer->report_every_group_inaudible();
      m_tabs.remove(tab_id);
@@ -117,7 +112,7 @@ index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3
  
  }
 diff --git a/Services/AudioServer/Tabs.h b/Services/AudioServer/Tabs.h
-index d84cb55afb02ff09a904e6fae553d5687be65419..1665860f776477bda74f243422aa45543fae694b 100644
+index d84cb55afb02ff09a904e6fae553d5687be65419..487b6c5ce08077d8960f43ab8fac6157fc841ee4 100644
 --- a/Services/AudioServer/Tabs.h
 +++ b/Services/AudioServer/Tabs.h
 @@ -18,6 +18,7 @@
@@ -128,17 +123,15 @@ index d84cb55afb02ff09a904e6fae553d5687be65419..1665860f776477bda74f243422aa4554
  #include <LibIPC/TransportHandle.h>
  
  namespace AudioServer {
-@@ -53,6 +54,9 @@ private:
+@@ -53,6 +54,7 @@ private:
      };
  
      Tab& tab_for(u64 tab_id);
-+    // The server exists for the renderers it serves, so with no client left for a while it exits by itself and
-+    // the Browser launches a new one when a renderer next asks for a client.
 +    void schedule_idle_exit();
      Audio::CaptureDevices& capture_devices();
      void connection_died(u64 tab_id, int client_id);
      void request_capture_permission(u64 tab_id, ByteString const& device_id, Function<void(bool)> on_decided);
-@@ -65,6 +69,7 @@ private:
+@@ -65,6 +67,7 @@ private:
      int m_next_client_id { 1 };
      Audio::AudioOutput m_audio_output { Audio::AudioOutput::Platform };
  

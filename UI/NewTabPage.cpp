@@ -24,7 +24,6 @@ namespace Ladybird::NewTabPage {
 static constexpr size_t MAX_TOP_SITES = 8;
 static constexpr size_t HISTORY_ENTRIES_CONSIDERED = 500;
 static constexpr size_t MAX_RECENTLY_CLOSED = 3;
-// Closed tabs on internal pages are passed over, so a few more are looked at than are shown.
 static constexpr size_t RECENTLY_CLOSED_CONSIDERED = 10;
 static constexpr size_t MAX_BOOKMARKS_BAR_ITEMS = 8;
 
@@ -53,7 +52,6 @@ static Optional<String> favicon_data_url(ReadonlyBytes favicon_png)
     return MUST(String::formatted("data:image/png;base64,{}", icon.value()));
 }
 
-// The host a tile names, for the pages on the web that the new tab page shows.
 static Optional<String> web_host(URL::URL const& url)
 {
     if (!url.scheme().is_one_of("http"sv, "https"sv))
@@ -61,7 +59,6 @@ static Optional<String> web_host(URL::URL const& url)
     return MUST(String::from_utf8(url.serialized_host()));
 }
 
-// The sites visited most, by the history's decaying visit score, one per host so a single busy site can't fill the page.
 static JsonArray top_sites(WebView::HistoryStore& history)
 {
     auto entries = history.list_entries({}, 0, HISTORY_ENTRIES_CONSIDERED);
@@ -99,8 +96,6 @@ static JsonArray top_sites(WebView::HistoryStore& history)
     return sites;
 }
 
-// The tabs and windows closed most recently, newest first, by the page each was on. The session store keeps only that
-// page's URL, so its title and favicon come from the history.
 static JsonArray recently_closed(WebView::BrowsingSession& session)
 {
     JsonArray closed;
@@ -136,7 +131,6 @@ static JsonArray recently_closed(WebView::BrowsingSession& session)
     return closed;
 }
 
-// The links on the bookmarks bar, in its order. Its folders are left out, since a tile opens one page.
 static JsonArray bookmarks_bar(WebView::BrowsingSession& session)
 {
     JsonArray bookmarks;
@@ -175,14 +169,12 @@ void populate(WebView::ViewImplementation& view, WebView::BrowsingSession& sessi
     JsonObject data;
     data.set("isPrivate"sv, is_private);
     data.set("sites"sv, session.history_store ? top_sites(*session.history_store) : JsonArray {});
-    // A private window's page says what it keeps instead, so it gets neither of these.
     if (!is_private) {
         data.set("bookmarksBar"sv, bookmarks_bar(session));
         if (show_recently_closed == ShowRecentlyClosed::Yes)
             data.set("recentlyClosed"sv, recently_closed(session));
     }
 
-    // NB: JSON is a JavaScript expression, so the data can be passed as the call's argument as it is.
     view.run_javascript(MUST(String::formatted("window.xenonNewTab?.show({});", data.serialized())));
 }
 

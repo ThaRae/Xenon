@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
 
-# Xenon's fast checks: formatting, and the invariants that keep Xenon building on upstream Ladybird plus Xenon's patch
-# series (Patches/ladybird, see Meta/patches.py).
-# The same script runs locally (by hand or from the pre-push hook in .githooks/) and as CI's first job.
-#
-#   Meta/check.py            check everything
-#   Meta/check.py --fix      apply the formatters, then check
-#   Meta/check.py --online   also confirm the ladybird submodule's commit exists upstream (CI does this)
-#   Meta/check.py --unpinned allow ladybird/ to be off its pinned commit (the weekly build against upstream master)
-#
-# The formatters are the versions Ladybird's own CI uses, read from the submodule, so bumping Ladybird bumps them too.
-# clang-format and ruff are installed into Build/tools on first use; prettier runs through npx.
-
 from __future__ import annotations
 
 import argparse
@@ -34,10 +22,8 @@ UI_DIR = XENON_SOURCE_DIR / "UI"
 TOOLS_DIR = XENON_SOURCE_DIR / "Build" / "tools"
 LADYBIRD_UPSTREAM = "https://github.com/LadybirdBrowser/ladybird.git"
 
-# For reading the workflows, whose shell steps are checked like the scripts.
 PYYAML_VERSION = "6.0.2"
 
-# Sources in UI/ that UI/Xenon.cmake builds only on some platforms, or not yet at all.
 PLATFORM_SOURCES = {
     "AccessibilityInterface.cpp",
     "ExternalURLActivationToken.cpp",
@@ -48,13 +34,10 @@ PLATFORM_SOURCES = {
     "X11Window.cpp",
 }
 
-# Upstream's chart colors in the performance monitor; Xenon's chrome itself uses the rose scale.
 LADYBIRD_BRAND_COLOR_ALLOWED_IN = {"BrandColors.h", "PerformanceMonitorWidget.cpp"}
 
-# Kagi's format flags for a bang (its "fmt"), which Bangs::Format implements.
 BANG_FORMAT_FLAGS = ("open_base_path", "open_snap_domain", "url_encode_placeholder", "url_encode_space_to_plus")
 
-# Config shared with Ladybird, linked from the submodule so that tools find it from anywhere in Xenon's tree.
 REQUIRED_SYMLINKS = {
     ".clang-format": "ladybird/.clang-format",
     ".prettierrc": "ladybird/.prettierrc",
@@ -93,36 +76,28 @@ def python_sources() -> list[Path]:
 
 
 def shell_sources() -> list[Path]:
-    # The AppImage's entry point is a script too (Meta/release.py).
     scripts = sorted((XENON_SOURCE_DIR / "Meta").rglob("*.sh")) + [XENON_SOURCE_DIR / "UI" / "Linux" / "AppRun"]
     hooks = XENON_SOURCE_DIR / ".githooks"
     return scripts + (sorted(path for path in hooks.iterdir() if path.is_file()) if hooks.exists() else [])
 
 
-# --- Invariants -------------------------------------------------------------------------------------------------------
-
-
 def check_includes(checks: Checks):
-    # <UI/Qt/Foo.h> resolves to Ladybird's copy of a header, silently compiling against upstream's class instead of ours.
     for path in ui_sources(".cpp", ".h", ".mm"):
         for number, line in enumerate(path.read_text().splitlines(), 1):
             if re.match(r'\s*#\s*(include|import)\s*[<"]UI/Qt/', line):
                 checks.fail("includes", f"{relative(path)}:{number} includes from UI/Qt/; use <UI/...>")
 
 
-# C++ tokens that can hold text: raw and plain string literals, character literals, and comments.
 CXX_TEXT_TOKEN = re.compile(
     r'R"(?P<delimiter>[^()\\\s]*)\((?P<raw>.*?)\)(?P=delimiter)"|"(?P<plain>(?:[^"\\\n]|\\.)*)"'
     r"|'(?:[^'\\\n]|\\.)*'|(?P<comment>//[^\n]*|/\*.*?\*/)",
     re.DOTALL,
 )
 CXX_WHITESPACE = re.compile(r"\s*")
-# An escape in a plain string literal. Those that name a character by its number can name a non-ASCII one.
 CXX_ESCAPE = re.compile(r"\\(?:u([0-9A-Fa-f]{4})|U([0-9A-Fa-f]{8})|x([0-9A-Fa-f]+)|([0-7]{1,3})|.)", re.DOTALL)
 
 
 def cxx_without_comments(source: str) -> str:
-    # Blanks out comments, keeping line numbers, and leaves "//" in a string alone.
     def blank(token: re.Match) -> str:
         return re.sub(r"[^\n]", " ", token.group()) if token.group("comment") else token.group()
 
@@ -130,8 +105,6 @@ def cxx_without_comments(source: str) -> str:
 
 
 def cxx_string_literal_text(source: str, position: int) -> str | None:
-    # The text of the string literals at position, as the compiler reads them: adjacent ones joined, and escapes such as
-    # \u201C decoded. None when there's no literal there.
     def unescape(escape: re.Match) -> str:
         if number := escape.group(1) or escape.group(2) or escape.group(3):
             return chr(min(int(number, 16), 0x10FFFF))
@@ -152,16 +125,11 @@ def cxx_string_literal_text(source: str, position: int) -> str | None:
 
 
 def check_format_strings(checks: Checks):
-    # qformatted() and Utf16String::formatted() copy a format string's literal text into a UTF-16 builder one ASCII
-    # character at a time, and assert on anything else, so a "…" or "—" in one crashes the moment it's formatted. That
-    # includes text spelled with an escape, such as "\u201C". Non-ASCII text goes through tr("…%1").arg() instead.
-    # The format string has to be a literal, so that this check can read it.
     call = re.compile(r"\b(?:qformatted|Utf16String::formatted)\s*\(")
     for path in cxx_sources():
         source = cxx_without_comments(path.read_text())
         for match in call.finditer(source):
             number = source.count("\n", 0, match.start()) + 1
-            # qformatted()'s own declaration.
             if source[match.end() :].lstrip().startswith("CheckedFormatString"):
                 continue
             text = cxx_string_literal_text(source, match.end())
@@ -176,8 +144,6 @@ def check_format_strings(checks: Checks):
 
 def check_build_lists_every_source(checks: Checks):
     build_file = (UI_DIR / "Xenon.cmake").read_text()
-    # Sources are listed relative to UI/ (Bangs.cpp, Extensions/Manifest.cpp), or by a path ending in Tests/ or UI/.
-    # Generated sources live in the build directory.
     source_pattern = r"(?<!GENERATED_DIR\})(?<![A-Za-z0-9_/])([A-Za-z0-9_/]+\.(?:cpp|mm))\b"
     listed = {name.removeprefix("/") for name in re.findall(source_pattern, build_file)}
     listed = {name.split("/UI/")[-1].removeprefix("UI/") for name in listed}
@@ -221,7 +187,6 @@ def check_about_page_overrides(checks: Checks):
 
 
 def check_bangs(checks: Checks):
-    # The bangs Xenon ships (Meta/update-bangs.py writes them), which the build turns into UI/Bangs.cpp's lookup table.
     directory = UI_DIR / "Resources" / "bangs"
     try:
         bangs = json.loads((directory / "bangs.json").read_text())
@@ -250,7 +215,6 @@ def check_bangs(checks: Checks):
                 "bangs", f"!{bang['t']} has format flags Xenon doesn't know: {', '.join(sorted(unknown_flags))}"
             )
 
-    # The bangs Xenon's own pages suggest.
     for path in web_sources():
         for number, line in enumerate(path.read_text().splitlines(), 1):
             for trigger in re.findall(r"<kbd>!([^\s<]+)", line):
@@ -277,8 +241,6 @@ def check_palette(checks: Checks):
 
 
 def check_filter_lists(checks: Checks):
-    # The lists Xenon ships (Meta/update-filter-lists.py writes them): every one the manifest names is there, none is
-    # there that it doesn't name, and none ships without a license that allows it.
     directory = UI_DIR / "Resources" / "filter-lists"
     manifest_path = directory / "manifest.json"
     if not manifest_path.exists():
@@ -325,8 +287,6 @@ def check_submodule(checks: Checks, online: bool, unpinned: bool):
         checks.fail("submodule", "ladybird/ isn't checked out; run git submodule update --init --depth 1")
         return
 
-    # Xenon builds on upstream Ladybird plus the patch series, so an engine change that isn't in the series would build
-    # here and nowhere else.
     status = git("-C", str(LADYBIRD_SOURCE_DIR), "status", "--porcelain", "--untracked-files=no")
     if status:
         checks.fail("submodule", "ladybird/ has uncommitted changes; commit them there and run Meta/patches.py export")
@@ -354,8 +314,6 @@ def check_submodule(checks: Checks, online: bool, unpinned: bool):
 
 
 def check_patch_messages(checks: Checks):
-    # Each patch's commit message, as `git am` makes it, through the commit lint Ladybird's own hooks run (category,
-    # capitalization, lines of at most 72 characters), so that the series could go upstream as it is.
     lint = LADYBIRD_SOURCE_DIR / "Meta" / "lint-commit.sh"
     if not lint.exists():
         return
@@ -377,12 +335,8 @@ def check_patch_messages(checks: Checks):
             message_path.write_text(f"{subject.group(1)}\n\n{body}" if body else f"{subject.group(1)}\n")
             result = subprocess.run(["bash", str(lint), str(message_path)], capture_output=True, text=True)
             if result.returncode != 0:
-                # The lint prints the rule that failed, in color, and then the message.
                 output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout).splitlines() or [result.stderr.strip()]
                 checks.fail("patches", f"{relative(path)}: {output[0].removesuffix(':')}")
-
-
-# --- Formatters -------------------------------------------------------------------------------------------------------
 
 
 def ladybird_ci_versions() -> dict[str, str]:
@@ -395,8 +349,6 @@ def ladybird_ci_versions() -> dict[str, str]:
     }
 
 
-# A venv's python runs the Python that made it, so updating that Python (as Homebrew does between patch releases, and
-# then removes the old one) breaks the venv without changing its stamp.
 def venv_python_runs(bin_dir: Path) -> bool:
     try:
         return subprocess.run([bin_dir / "python", "-c", ""], capture_output=True).returncode == 0
@@ -449,9 +401,6 @@ def check_formatting(checks: Checks):
     )
 
     ruff = str(bin_dir / "ruff")
-    # isort counts a module as first-party if it's found under `src`, which defaults to the working directory here.
-    # There, `import patches` would find Patches/ on a case-insensitive filesystem (macOS) and nothing on Linux, so the
-    # two would sort Meta/xenon.py's imports differently. Meta/ is where Xenon's scripts import each other from.
     ruff_config = ["--config", str(LADYBIRD_SOURCE_DIR / "pyproject.toml"), "--config", 'src = ["Meta"]']
     run_formatter(
         checks, "ruff", [ruff, "check", *ruff_config], [ruff, "check", "--fix", *ruff_config], python_sources()
@@ -478,8 +427,6 @@ def check_formatting(checks: Checks):
     check_workflow_steps(checks, bin_dir / "python")
 
 
-# Prints the shell steps of the workflows named on the command line as JSON: [where, script] pairs. It runs in the tools
-# venv, which has PyYAML.
 WORKFLOW_STEPS_PROGRAM = """
 import json, sys, yaml
 steps = []
@@ -492,8 +439,6 @@ print(json.dumps(steps))
 """
 
 
-# A workflow's shell step that doesn't parse only fails once a runner reaches it, which can be hours into a build.
-# Each step is checked as Gitea runs it, by bash, with its ${{ }} expressions filled in by a placeholder.
 def check_workflow_steps(checks: Checks, python: Path):
     workflows = [relative(path) for path in sorted((XENON_SOURCE_DIR / ".github" / "workflows").glob("*.yml"))]
     result = subprocess.run(

@@ -34,7 +34,6 @@ void set_profile_application_icon(WebView::Profile const& profile)
                                     blue:qBlue(color) / 255.0
                                    alpha:1];
     };
-    // Shades of Xenon's rose far enough apart to tell profiles' badges apart.
     NSArray<NSColor*>* badge_colors = @[
         ns_color(BrandColors::Rose100),
         ns_color(BrandColors::Rose900),
