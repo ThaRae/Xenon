@@ -145,7 +145,8 @@ the first time, so the tests build from the same objects as Xenon. It leaves out
 that changes what an upstream test checks updates that test's expectation in the same patch, as it would upstream. CI
 runs it after `Meta/xenon.py test` on Linux and macOS; when a web test fails, the `ladybird-test-dumps-linux` or
 `-macos` artifact has what it rendered or printed. A test may run for 30 minutes, as in Ladybird's CI; `--timeout`
-gives it longer, which the Sanitizer workflow does.
+gives it longer, which the Sanitizer workflow does, and so does the Linux build in `ci.yml` (an hour, as `test-web`
+takes about 40 minutes on slab's runner).
 
 Should Xenon not finish loading `about:welcome` at all, the checks after it, which all load pages, are skipped rather
 than each waiting out its timeouts, which would add up to more than CI gives the job. A helper process that crashes on a

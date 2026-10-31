@@ -17,7 +17,7 @@ if command -v pulseaudio >/dev/null; then
     --load="module-null-sink sink_name=virtual_sink" || true
 fi
 ladybird_status=0
-./Meta/xenon.py --jobs "$JOBS" ladybird-test || ladybird_status=$?
+./Meta/xenon.py --jobs "$JOBS" ladybird-test --timeout 3600 || ladybird_status=$?
 ((ladybird_status == 0)) || echo "::error::Ladybird's own tests failed against the patched engine (see the ctest output above)"
 ((status != 0)) || status=$ladybird_status
 
