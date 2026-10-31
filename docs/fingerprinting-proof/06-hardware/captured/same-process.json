@@ -1,0 +1,259 @@
+{
+  "runId": "same-process",
+  "events": [
+    {
+      "key": "a-direct",
+      "value": {
+        "measure": {
+          "seed": "standard:f25b873d4d13c545",
+          "hardwareConcurrency": 5,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        "reloads": [
+          {
+            "seed": "standard:f25b873d4d13c545",
+            "hardwareConcurrency": 5,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          },
+          {
+            "seed": "standard:f25b873d4d13c545",
+            "hardwareConcurrency": 5,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          },
+          {
+            "seed": "standard:f25b873d4d13c545",
+            "hardwareConcurrency": 5,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          }
+        ],
+        "sameIframe": {
+          "seed": "standard:f25b873d4d13c545",
+          "hardwareConcurrency": 5,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/iframe.html?kind=same",
+          "kind": "same"
+        },
+        "crossIframe": {
+          "seed": "standard:f25b873d4d13c545",
+          "hardwareConcurrency": 5,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/iframe.html?kind=cross",
+          "kind": "cross"
+        },
+        "worker": {
+          "ok": true,
+          "hardwareConcurrency": 5,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        },
+        "sharedWorker": {
+          "ok": true,
+          "hardwareConcurrency": 5,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        }
+      },
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-direct",
+      "value": {
+        "measure": {
+          "seed": "standard:3a348d8108b3b790",
+          "hardwareConcurrency": 3,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/from-b.html?run=same-process"
+        },
+        "worker": {
+          "ok": true,
+          "hardwareConcurrency": 3,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        },
+        "sharedWorker": {
+          "ok": true,
+          "hardwareConcurrency": 3,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "value": {
+        "measure": {
+          "seed": "standard:3a348d8108b3b790",
+          "hardwareConcurrency": 3,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/from-b.html?run=same-process"
+        },
+        "worker": {
+          "ok": true,
+          "hardwareConcurrency": 3,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        },
+        "sharedWorker": {
+          "ok": true,
+          "hardwareConcurrency": 3,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    }
+  ],
+  "reads": {
+    "a-direct": {
+      "measure": {
+        "seed": "standard:f25b873d4d13c545",
+        "hardwareConcurrency": 5,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/start.html"
+      },
+      "reloads": [
+        {
+          "seed": "standard:f25b873d4d13c545",
+          "hardwareConcurrency": 5,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        {
+          "seed": "standard:f25b873d4d13c545",
+          "hardwareConcurrency": 5,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        {
+          "seed": "standard:f25b873d4d13c545",
+          "hardwareConcurrency": 5,
+          "deviceMemoryExposed": false,
+          "deviceMemory": null,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        }
+      ],
+      "sameIframe": {
+        "seed": "standard:f25b873d4d13c545",
+        "hardwareConcurrency": 5,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/iframe.html?kind=same",
+        "kind": "same"
+      },
+      "crossIframe": {
+        "seed": "standard:f25b873d4d13c545",
+        "hardwareConcurrency": 5,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/iframe.html?kind=cross",
+        "kind": "cross"
+      },
+      "worker": {
+        "ok": true,
+        "hardwareConcurrency": 5,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      },
+      "sharedWorker": {
+        "ok": true,
+        "hardwareConcurrency": 5,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      }
+    },
+    "b-direct": {
+      "measure": {
+        "seed": "standard:3a348d8108b3b790",
+        "hardwareConcurrency": 3,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/from-b.html?run=same-process"
+      },
+      "worker": {
+        "ok": true,
+        "hardwareConcurrency": 3,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      },
+      "sharedWorker": {
+        "ok": true,
+        "hardwareConcurrency": 3,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      }
+    },
+    "complete": {
+      "measure": {
+        "seed": "standard:3a348d8108b3b790",
+        "hardwareConcurrency": 3,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/from-b.html?run=same-process"
+      },
+      "worker": {
+        "ok": true,
+        "hardwareConcurrency": 3,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      },
+      "sharedWorker": {
+        "ok": true,
+        "hardwareConcurrency": 3,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null
+      }
+    }
+  },
+  "complete": true
+}

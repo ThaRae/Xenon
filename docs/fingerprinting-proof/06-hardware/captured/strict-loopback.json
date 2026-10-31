@@ -1,0 +1,83 @@
+{
+  "runId": "strict-loopback",
+  "events": [
+    {
+      "key": "a-strict",
+      "value": {
+        "seed": "strict:8d0869561983007b",
+        "hardwareConcurrency": 4,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://127.0.0.1:8080",
+        "host": "127.0.0.1:8080",
+        "href": "http://127.0.0.1:8080/strict.html?run=strict-loopback&next=http%3A%2F%2F127.0.0.2%3A8080%2Fstrict.html%3Frun%3Dstrict-loopback",
+        "levelSet": "strict"
+      },
+      "origin": "http://127.0.0.1:8080",
+      "host": "127.0.0.1:8080"
+    },
+    {
+      "key": "b-strict",
+      "value": {
+        "seed": "strict:31d79f2acce1908c",
+        "hardwareConcurrency": 4,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://127.0.0.2:8080",
+        "host": "127.0.0.2:8080",
+        "href": "http://127.0.0.2:8080/strict.html?run=strict-loopback",
+        "levelSet": "strict"
+      },
+      "origin": "http://127.0.0.2:8080",
+      "host": "127.0.0.2:8080"
+    },
+    {
+      "key": "complete",
+      "value": {
+        "seed": "strict:31d79f2acce1908c",
+        "hardwareConcurrency": 4,
+        "deviceMemoryExposed": true,
+        "deviceMemory": 4,
+        "origin": "http://127.0.0.2:8080",
+        "host": "127.0.0.2:8080",
+        "href": "http://127.0.0.2:8080/strict.html?run=strict-loopback",
+        "levelSet": "strict"
+      },
+      "origin": "http://127.0.0.2:8080",
+      "host": "127.0.0.2:8080"
+    }
+  ],
+  "reads": {
+    "a-strict": {
+      "seed": "strict:8d0869561983007b",
+      "hardwareConcurrency": 4,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.1:8080",
+      "host": "127.0.0.1:8080",
+      "href": "http://127.0.0.1:8080/strict.html?run=strict-loopback&next=http%3A%2F%2F127.0.0.2%3A8080%2Fstrict.html%3Frun%3Dstrict-loopback",
+      "levelSet": "strict"
+    },
+    "b-strict": {
+      "seed": "strict:31d79f2acce1908c",
+      "hardwareConcurrency": 4,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.2:8080",
+      "host": "127.0.0.2:8080",
+      "href": "http://127.0.0.2:8080/strict.html?run=strict-loopback",
+      "levelSet": "strict"
+    },
+    "complete": {
+      "seed": "strict:31d79f2acce1908c",
+      "hardwareConcurrency": 4,
+      "deviceMemoryExposed": true,
+      "deviceMemory": 4,
+      "origin": "http://127.0.0.2:8080",
+      "host": "127.0.0.2:8080",
+      "href": "http://127.0.0.2:8080/strict.html?run=strict-loopback",
+      "levelSet": "strict"
+    }
+  },
+  "complete": true
+}

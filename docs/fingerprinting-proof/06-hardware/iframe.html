@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>hardware iframe</title>
+<script src="measure.js"></script>
+</head>
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const sample = sampleNavigator();
+sample.kind = params.get("kind") || "iframe";
+parent.postMessage(sample, "*");
+</script>
+</body>
+</html>

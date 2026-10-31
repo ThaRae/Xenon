@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>hardware strict</title>
+<script src="measure.js"></script>
+</head>
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "strict";
+const next = params.get("next");
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+try { internals.setFarblingLevel("strict"); } catch (error) { /* no internals */ }
+const sample = sampleNavigator();
+sample.levelSet = "strict";
+const key = params.get("key") || (location.host.includes("site-b") || location.host.startsWith("127.0.0.2") ? "b-strict" : "a-strict");
+post(key, sample).then(() => {
+    if (next) {
+        location.href = next;
+    } else {
+        return post("complete", sample).then(() => setTimeout(() => window.close(), 50));
+    }
+});
+</script>
+</body>
+</html>

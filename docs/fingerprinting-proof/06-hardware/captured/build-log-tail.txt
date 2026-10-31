@@ -1,0 +1,15 @@
+CMAKE_EXIT:0
+-- Configuring done (6.3s)
+-- Generating done (1.2s)
+-- Build files have been written to: /home/user/work/xenon/Build/release
+[61/67] Linking CXX executable bin/TestHardwareFarbling
+[65/67] Linking CXX executable bin/test-web
+[66/67] Linking CXX executable xenon/bin/Xenon
+NINJA_EXIT:0
+-rwx------ bin/TestHardwareFarbling
+-rwx------ bin/test-web
+-rwx------ xenon/bin/Xenon
+-rwx------ xenon/libexec/WebContent
+later LibWebView rebuild after content_farbling_seed:
+[71/72] Linking CXX executable xenon/bin/Xenon
+NINJA_EXIT:0

@@ -1,0 +1,13 @@
+nproc=12 MemTotal_kib=32853076
+TestHardwareFarbling 10/10
+TestFontAllow 5/5
+TestAudioFudge 9/9
+TestFarblingRNG 6/6
+TestCanvasPerturb 8/8
+TestWebGLFarbling 8/8
+Meta/xenon.py test --no-build passed
+test-web *avigator* Pass:10 Fail:0
+test-web *Worker* Pass:56 Fail:0
+navigator-compatibility-mode-exposure Pass:1 (fails under Standard file:// farbling; test-mode sends Off seed)
+run-proof.py ok=true
+NINJA_EXIT:0

@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>hardware sample</title>
+<script src="measure.js"></script>
+</head>
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "sample";
+const next = params.get("next");
+const key = params.get("key") || (location.host.startsWith("127.0.0.2") ? "b" : "a");
+function post(name, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: name, value, origin: location.origin, host: location.host }),
+    });
+}
+const sample = sampleNavigator();
+post(key, sample).then(() => {
+    if (next) {
+        location.href = next;
+    } else {
+        return post("complete", sample).then(() => setTimeout(() => window.close(), 50));
+    }
+});
+</script>
+</body>
+</html>

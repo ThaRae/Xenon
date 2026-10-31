@@ -1,0 +1,83 @@
+{
+  "runId": "strict",
+  "events": [
+    {
+      "key": "a-strict",
+      "value": {
+        "seed": "strict:726d4d6c3bf0cf59",
+        "hardwareConcurrency": 4,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/strict.html?run=strict&next=http%3A%2F%2Fsite-b.test%3A8080%2Fstrict.html%3Frun%3Dstrict",
+        "levelSet": "strict"
+      },
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-strict",
+      "value": {
+        "seed": "strict:a65fe4512a20f85c",
+        "hardwareConcurrency": 4,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/strict.html?run=strict",
+        "levelSet": "strict"
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "value": {
+        "seed": "strict:a65fe4512a20f85c",
+        "hardwareConcurrency": 4,
+        "deviceMemoryExposed": false,
+        "deviceMemory": null,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/strict.html?run=strict",
+        "levelSet": "strict"
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    }
+  ],
+  "reads": {
+    "a-strict": {
+      "seed": "strict:726d4d6c3bf0cf59",
+      "hardwareConcurrency": 4,
+      "deviceMemoryExposed": false,
+      "deviceMemory": null,
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080",
+      "href": "http://site-a.test:8080/strict.html?run=strict&next=http%3A%2F%2Fsite-b.test%3A8080%2Fstrict.html%3Frun%3Dstrict",
+      "levelSet": "strict"
+    },
+    "b-strict": {
+      "seed": "strict:a65fe4512a20f85c",
+      "hardwareConcurrency": 4,
+      "deviceMemoryExposed": false,
+      "deviceMemory": null,
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080",
+      "href": "http://site-b.test:8080/strict.html?run=strict",
+      "levelSet": "strict"
+    },
+    "complete": {
+      "seed": "strict:a65fe4512a20f85c",
+      "hardwareConcurrency": 4,
+      "deviceMemoryExposed": false,
+      "deviceMemory": null,
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080",
+      "href": "http://site-b.test:8080/strict.html?run=strict",
+      "levelSet": "strict"
+    }
+  },
+  "complete": true
+}

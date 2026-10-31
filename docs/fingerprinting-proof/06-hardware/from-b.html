@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>B hardware</title>
+<script src="measure.js"></script>
+</head>
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "same-process";
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+const measure = sampleNavigator();
+Promise.all([withWorker(), withSharedWorker()]).then(([worker, sharedWorker]) => {
+    const payload = { measure, worker, sharedWorker };
+    return post("b-direct", payload).then(() => post("complete", payload));
+}).finally(() => setTimeout(() => window.close(), 50));
+</script>
+</body>
+</html>
