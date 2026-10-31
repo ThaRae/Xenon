@@ -244,6 +244,10 @@ palette. `Tab.cpp` and the extension popup each attach it to their view with one
 
 Leaving the popover, by clicking elsewhere or pressing Escape, cancels the ceremony, as Cancel does.
 
+A popover that closes drops its object name before it's deleted later, since the view finds its popover by that name.
+A prompt can open in the same turn as the last one closes, when the page's next request takes over from a ceremony
+that has answered it, and that prompt then gets a popover of its own rather than the one on its way out.
+
 It is a popover rather than a sheet because of extension popups. An action popup is a `Qt::Popup`, which closes when
 another window takes focus, and its page goes with it; a sheet on the browser window would end Bitwarden's two-step
 login the moment it appeared. A popover opened over the popup stacks on it, the way Qt nests popups, and the popup
