@@ -1,5 +1,8 @@
 const SCENE_WIDTH = 320;
 const SCENE_HEIGHT = 180;
+const LARGE_WIDTH = 1000;
+const LARGE_HEIGHT = 200;
+const LARGE_LOWER_Y = 150;
 
 function drawScene(ctx, width, height) {
     ctx.fillStyle = "#1b3a4b";
@@ -154,6 +157,30 @@ function toEqual(a, b) {
             return false;
     }
     return true;
+}
+
+async function measureLowerProbe() {
+    const canvas = document.createElement("canvas");
+    canvas.width = LARGE_WIDTH;
+    canvas.height = LARGE_HEIGHT;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, LARGE_WIDTH, LARGE_HEIGHT);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, LARGE_LOWER_Y, LARGE_WIDTH, LARGE_HEIGHT - LARGE_LOWER_Y);
+    ctx.clip();
+    ctx.translate(0, LARGE_LOWER_Y);
+    drawScene(ctx, LARGE_WIDTH, LARGE_HEIGHT - LARGE_LOWER_Y);
+    ctx.restore();
+    const imageData = ctx.getImageData(0, LARGE_LOWER_Y, LARGE_WIDTH, LARGE_HEIGHT - LARGE_LOWER_Y);
+    const pixels = new Uint8Array(imageData.data.buffer.slice(0));
+    return {
+        lowerSha: sha256Hex(pixels),
+        width: LARGE_WIDTH,
+        height: LARGE_HEIGHT,
+        y: LARGE_LOWER_Y,
+        pixelIndexStart: LARGE_LOWER_Y * LARGE_WIDTH,
+    };
 }
 
 function seedInfo() {

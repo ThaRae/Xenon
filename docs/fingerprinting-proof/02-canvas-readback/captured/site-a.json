@@ -4,14 +4,14 @@
   "samples": [
     {
       "origin": "http://site-a.test:8080",
-      "seed": "standard:f513393432666008",
+      "seed": "standard:6941dbbe27a41728",
       "measure": {
         "width": 320,
         "height": 180,
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toDataURLSha": "9e0c63779eaf51b9",
-        "toBlobSha": "9e0c63779eaf51b9",
-        "convertToBlobMainSha": "9e0c63779eaf51b9",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toDataURLSha": "55ce89561cb39629",
+        "toBlobSha": "55ce89561cb39629",
+        "convertToBlobMainSha": "55ce89561cb39629",
         "offscreenError": null,
         "pngBytesEqual": true,
         "blankZero": true,
@@ -22,36 +22,36 @@
       "sameIframe": {
         "kind": "same",
         "origin": "http://site-a.test:8080",
-        "seed": "standard:f513393432666008",
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toBlobSha": "9e0c63779eaf51b9",
+        "seed": "standard:6941dbbe27a41728",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toBlobSha": "55ce89561cb39629",
         "pngBytesEqual": true,
         "blankZero": true
       },
       "crossIframe": {
         "kind": "cross",
         "origin": "http://site-b.test:8080",
-        "seed": "standard:f513393432666008",
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toBlobSha": "9e0c63779eaf51b9",
+        "seed": "standard:6941dbbe27a41728",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toBlobSha": "55ce89561cb39629",
         "pngBytesEqual": true,
         "blankZero": true
       },
       "worker": {
-        "sha": "9e0c63779eaf51b9",
-        "seed": "standard:f513393432666008"
+        "sha": "55ce89561cb39629",
+        "seed": "standard:6941dbbe27a41728"
       }
     },
     {
       "origin": "http://site-a.test:8080",
-      "seed": "standard:f513393432666008",
+      "seed": "standard:6941dbbe27a41728",
       "measure": {
         "width": 320,
         "height": 180,
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toDataURLSha": "9e0c63779eaf51b9",
-        "toBlobSha": "9e0c63779eaf51b9",
-        "convertToBlobMainSha": "9e0c63779eaf51b9",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toDataURLSha": "55ce89561cb39629",
+        "toBlobSha": "55ce89561cb39629",
+        "convertToBlobMainSha": "55ce89561cb39629",
         "offscreenError": null,
         "pngBytesEqual": true,
         "blankZero": true,
@@ -62,36 +62,36 @@
       "sameIframe": {
         "kind": "same",
         "origin": "http://site-a.test:8080",
-        "seed": "standard:f513393432666008",
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toBlobSha": "9e0c63779eaf51b9",
+        "seed": "standard:6941dbbe27a41728",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toBlobSha": "55ce89561cb39629",
         "pngBytesEqual": true,
         "blankZero": true
       },
       "crossIframe": {
         "kind": "cross",
         "origin": "http://site-b.test:8080",
-        "seed": "standard:f513393432666008",
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toBlobSha": "9e0c63779eaf51b9",
+        "seed": "standard:6941dbbe27a41728",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toBlobSha": "55ce89561cb39629",
         "pngBytesEqual": true,
         "blankZero": true
       },
       "worker": {
-        "sha": "9e0c63779eaf51b9",
-        "seed": "standard:f513393432666008"
+        "sha": "55ce89561cb39629",
+        "seed": "standard:6941dbbe27a41728"
       }
     },
     {
       "origin": "http://site-a.test:8080",
-      "seed": "standard:f513393432666008",
+      "seed": "standard:6941dbbe27a41728",
       "measure": {
         "width": 320,
         "height": 180,
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toDataURLSha": "9e0c63779eaf51b9",
-        "toBlobSha": "9e0c63779eaf51b9",
-        "convertToBlobMainSha": "9e0c63779eaf51b9",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toDataURLSha": "55ce89561cb39629",
+        "toBlobSha": "55ce89561cb39629",
+        "convertToBlobMainSha": "55ce89561cb39629",
         "offscreenError": null,
         "pngBytesEqual": true,
         "blankZero": true,
@@ -102,24 +102,24 @@
       "sameIframe": {
         "kind": "same",
         "origin": "http://site-a.test:8080",
-        "seed": "standard:f513393432666008",
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toBlobSha": "9e0c63779eaf51b9",
+        "seed": "standard:6941dbbe27a41728",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toBlobSha": "55ce89561cb39629",
         "pngBytesEqual": true,
         "blankZero": true
       },
       "crossIframe": {
         "kind": "cross",
         "origin": "http://site-b.test:8080",
-        "seed": "standard:f513393432666008",
-        "getImageDataSha": "dd1edad8f0c5a863",
-        "toBlobSha": "9e0c63779eaf51b9",
+        "seed": "standard:6941dbbe27a41728",
+        "getImageDataSha": "04968f4e2ed603e1",
+        "toBlobSha": "55ce89561cb39629",
         "pngBytesEqual": true,
         "blankZero": true
       },
       "worker": {
-        "sha": "9e0c63779eaf51b9",
-        "seed": "standard:f513393432666008"
+        "sha": "55ce89561cb39629",
+        "seed": "standard:6941dbbe27a41728"
       }
     }
   ]

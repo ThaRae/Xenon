@@ -11,11 +11,13 @@ Running test 'opaque_origin_is_a_no_op'.
 Completed test 'opaque_origin_is_a_no_op' in 0ms
 Running test 'noise_is_tiny'.
 Completed test 'noise_is_tiny' in 0ms
+Running test 'flips_land_past_pixel_65536_on_a_large_canvas'.
+Completed test 'flips_land_past_pixel_65536_on_a_large_canvas' in 5ms
 Running test 'cache_reuse_matches_fresh_hmac'.
 Completed test 'cache_reuse_matches_fresh_hmac' in 0ms
-Finished 7 tests and 0 benchmarks in 0ms (0ms tests, 0ms benchmarks, 0ms other).
-All 7 tests passed.
-Running 7 cases out of 7.
+Finished 8 tests and 0 benchmarks in 5ms (5ms tests, 0ms benchmarks, 0ms other).
+All 8 tests passed.
+Running 8 cases out of 8.
 CANVAS_PERTURB_EXIT:0
 === TestFarblingRNG ===
 Running test 'same_seed_and_key_are_deterministic'.
@@ -71,25 +73,25 @@ Completed test 'find_bang' in 0ms
 Running test 'the_list_is_complete'.
 Completed test 'the_list_is_complete' in 0ms
 Running test 'every_bang_resolves'.
-Completed test 'every_bang_resolves' in 36ms
+Completed test 'every_bang_resolves' in 38ms
 Running test 'placeholder_in_the_host'.
 Completed test 'placeholder_in_the_host' in 0ms
-Finished 19 tests and 0 benchmarks in 36ms (36ms tests, 0ms benchmarks, 0ms other).
+Finished 19 tests and 0 benchmarks in 38ms (38ms tests, 0ms benchmarks, 0ms other).
 All 19 tests passed.
 Running 19 cases out of 19.
 ==> TestXenonBlockingPopover
 Running test 'shows_what_was_blocked_and_where_the_page_connected'.
-Completed test 'shows_what_was_blocked_and_where_the_page_connected' in 16ms
+Completed test 'shows_what_was_blocked_and_where_the_page_connected' in 13ms
 Running test 'a_site_with_blocking_off'.
 Completed test 'a_site_with_blocking_off' in 2ms
 Running test 'blocking_off_everywhere_disables_the_power_button'.
 Completed test 'blocking_off_everywhere_disables_the_power_button' in 2ms
 Running test 'controls_report_to_their_callbacks'.
 Completed test 'controls_report_to_their_callbacks' in 2ms
-Finished 4 tests and 0 benchmarks in 23ms (23ms tests, 0ms benchmarks, 0ms other).
+Finished 4 tests and 0 benchmarks in 21ms (21ms tests, 0ms benchmarks, 0ms other).
 All 4 tests passed.
-QThreadStorage: entry 1 destroyed before end of thread 0x5afb25176980
-QThreadStorage: entry 0 destroyed before end of thread 0x5afb25176980
+QThreadStorage: entry 1 destroyed before end of thread 0x644164db4980
+QThreadStorage: entry 0 destroyed before end of thread 0x644164db4980
 Running 4 cases out of 4.
 ==> TestXenonCRX
 Running test 'crx_from_the_store_checks_out'.
@@ -114,7 +116,7 @@ Running test 'update_check_without_a_newer_version'.
 Completed test 'update_check_without_a_newer_version' in 0ms
 Running test 'update_check_errors'.
 Completed test 'update_check_errors' in 0ms
-Finished 11 tests and 0 benchmarks in 2ms (1ms tests, 0ms benchmarks, 0ms other).
+Finished 11 tests and 0 benchmarks in 2ms (2ms tests, 0ms benchmarks, 0ms other).
 All 11 tests passed.
 Running 11 cases out of 11.
 ==> TestXenonExtensions
@@ -194,7 +196,7 @@ Running test 'files_are_checked_by_size_and_hash'.
 Completed test 'files_are_checked_by_size_and_hash' in 0ms
 Running test 'bundled_manifest_reads'.
 Completed test 'bundled_manifest_reads' in 0ms
-Finished 8 tests and 0 benchmarks in 2ms (2ms tests, 0ms benchmarks, 0ms other).
+Finished 8 tests and 0 benchmarks in 2ms (1ms tests, 0ms benchmarks, 0ms other).
 All 8 tests passed.
 Running 8 cases out of 8.
 ==> TestXenonRecentTabOrder
@@ -233,7 +235,7 @@ All 15 tests passed.
 Running 15 cases out of 15.
 ==> headless render of about:welcome
     loaded, with "Use Xenon's picks"
-    rendered /home/user/work/xenon/Build/release/smoke/welcome.png (281983 bytes)
+    rendered /home/user/work/xenon/Build/release/smoke/welcome.png (281708 bytes)
 ==> a fresh start keeps to Xenon's directories
     ~/.config/Xenon, ~/.local/share/Xenon, ~/.cache/Xenon, ~/runtime/Xenon, and no Ladybird directory
 ==> content blocking with the bundled filter lists
@@ -278,27 +280,7 @@ Running 15 cases out of 15.
     removes it when none is chosen
 All tests passed.
 XENON_TEST_EXIT:0
-=== test-web Text canvas ===
-Failed to read echo server port from buffer: ''
-[31;1mRuntime error[0m: No tests found matching filter
-TEXT_CANVAS_EXIT:1
-=== test-web Ref canvas ===
-Failed to read echo server port from buffer: ''
-[31;1mRuntime error[0m: No tests found matching filter
-REF_CANVAS_EXIT:1
-=== test-web Offscreen ===
-[31;1mRuntime error[0m: No tests found matching filter
-OFFSCREEN_EXIT:1
-=== test-web HTML Worker (F1 baseline) ===
-Running 2 tests...
-1/2: Text/input/HTML/WindowOrWorkerGlobalScope-reportError.html
-2/2: Text/input/HTML/DedicatedWorkerGlobalScope-instanceof.html
-==========================================================
-Pass: 2, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
-==========================================================
-Results: file:///home/user/work/xenon/test-dumps/results/index.html
-WORKER_EXIT:0
-=== test-web *canvas* (551) ===
+=== test-web *canvas* ===
 Running 551 tests...
 1/551: Layout/input/form-controls-and-canvas-resized-after-first-layout.html
 2/551: Text/input/canvas-changed-width-attribute.html
@@ -852,7 +834,12 @@ Running 551 tests...
 550/551: Screenshot/input/canvas-pattern.html
 551/551: Screenshot/input/canvas-shadow.html
 ==========================================================
-Pass: 551, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
+Pass: 549, Fail: 2, Skipped: 0, Timeout: 0, Crashed: 0
 ==========================================================
+Fail: Text/input/wpt-import/html/canvas/element/manual/imagebitmap/createImageBitmap-bounds.html
+Fail: Text/input/wpt-import/html/canvas/offscreen/fill-and-stroke-styles/2d.gradient.interpolate.zerosize.stroke.worker.html
 Results: file:///home/user/work/xenon/test-dumps/results/index.html
+CANVAS_ALL_EXIT:2
+=== test-web rerun 551/0 ===
+Pass: 551, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
 CANVAS_ALL_EXIT:0

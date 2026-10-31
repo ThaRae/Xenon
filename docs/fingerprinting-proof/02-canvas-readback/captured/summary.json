@@ -1,24 +1,33 @@
 {
   "ok": true,
-  "a_sha": "8200e031e4fcbfc7",
-  "b_sha": "4d751c3876b93dcf",
+  "a_sha": "cd41fa1e798004d3",
+  "b_sha": "bffa52f5730e23f1",
   "a_ne_b": true,
-  "iframe_sha": "8200e031e4fcbfc7",
+  "iframe_sha": "cd41fa1e798004d3",
   "iframe_matches_a": true,
+  "same_process_reloads": [
+    "cd41fa1e798004d3",
+    "cd41fa1e798004d3",
+    "cd41fa1e798004d3"
+  ],
+  "same_process_reloads_match_a_sha": true,
+  "a_lower_sha": "dec5587cd4b569c3",
+  "b_lower_sha": "98659a587ce31ff5",
+  "lower_a_ne_b": true,
   "reload_shas": [
-    "dd1edad8f0c5a863",
-    "dd1edad8f0c5a863",
-    "dd1edad8f0c5a863"
+    "04968f4e2ed603e1",
+    "04968f4e2ed603e1",
+    "04968f4e2ed603e1"
   ],
   "reloads_identical": true,
   "png_bytes_equal": true,
   "blank_zero": true,
   "createImageBitmapOk": true,
   "transferToImageBitmapOk": true,
-  "worker_sha": "9e0c63779eaf51b9",
-  "convertToBlobMainSha": "9e0c63779eaf51b9",
-  "toBlobSha": "9e0c63779eaf51b9",
-  "toDataURLSha": "9e0c63779eaf51b9",
+  "worker_sha": "55ce89561cb39629",
+  "convertToBlobMainSha": "55ce89561cb39629",
+  "toBlobSha": "55ce89561cb39629",
+  "toDataURLSha": "55ce89561cb39629",
   "png_vs_getImageData": {
     "differing_bytes": 0,
     "max_delta": 0,
@@ -32,13 +41,21 @@
     "length_a": 230400,
     "length_b": 230400
   },
+  "off_a_sha": "2e8c89ea26526f05",
+  "off_b_sha": "2e8c89ea26526f05",
+  "off_a_equals_off_b": true,
+  "off_a_seed": "off",
+  "off_b_seed": "off",
+  "screenshot_sha": "2e8c89ea26526f05",
+  "off_pixels_sha": "2e8c89ea26526f05",
+  "off_equals_screenshot": true,
   "screenshot_diff": {
     "differing_bytes": 0,
     "max_delta": 0,
     "length_a": 230400,
     "length_b": 230400
   },
-  "a_seed": "standard:31c5560ca7de504e",
-  "b_seed": "standard:b33d374547e614d3",
+  "a_seed": "standard:87dd75d3e7ba5ecf",
+  "b_seed": "standard:8c295c0b5e2819e1",
   "off_seed": "off"
 }

@@ -1,0 +1,169 @@
+{
+  "runId": "off-both",
+  "events": [
+    {
+      "key": "a-direct",
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-direct",
+      "value": {
+        "seed": "off",
+        "measure": {
+          "width": 320,
+          "height": 180,
+          "getImageDataSha": "2e8c89ea26526f05",
+          "toDataURLSha": "12573d51e62608b4",
+          "toBlobSha": "12573d51e62608b4",
+          "convertToBlobMainSha": "12573d51e62608b4",
+          "offscreenError": null,
+          "pngBytesEqual": true,
+          "blankZero": true,
+          "createImageBitmapOk": true,
+          "transferToImageBitmapOk": true,
+          "pixelCount": 230400
+        },
+        "lower": {
+          "lowerSha": "5b13974d47437642",
+          "width": 1000,
+          "height": 200,
+          "y": 150,
+          "pixelIndexStart": 150000
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "value": {
+        "seed": "off",
+        "measure": {
+          "width": 320,
+          "height": 180,
+          "getImageDataSha": "2e8c89ea26526f05",
+          "toDataURLSha": "12573d51e62608b4",
+          "toBlobSha": "12573d51e62608b4",
+          "convertToBlobMainSha": "12573d51e62608b4",
+          "offscreenError": null,
+          "pngBytesEqual": true,
+          "blankZero": true,
+          "createImageBitmapOk": true,
+          "transferToImageBitmapOk": true,
+          "pixelCount": 230400
+        },
+        "lower": {
+          "lowerSha": "5b13974d47437642",
+          "width": 1000,
+          "height": 200,
+          "y": 150,
+          "pixelIndexStart": 150000
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    }
+  ],
+  "reads": {
+    "a-direct": {
+      "seed": "off",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "2e8c89ea26526f05",
+        "toDataURLSha": "12573d51e62608b4",
+        "toBlobSha": "12573d51e62608b4",
+        "convertToBlobMainSha": "12573d51e62608b4",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      },
+      "lower": {
+        "lowerSha": "5b13974d47437642",
+        "width": 1000,
+        "height": 200,
+        "y": 150,
+        "pixelIndexStart": 150000
+      },
+      "reloads": [
+        {
+          "getImageDataSha": "2e8c89ea26526f05",
+          "lowerSha": "5b13974d47437642",
+          "seed": "off"
+        },
+        {
+          "getImageDataSha": "2e8c89ea26526f05",
+          "lowerSha": "5b13974d47437642",
+          "seed": "off"
+        },
+        {
+          "getImageDataSha": "2e8c89ea26526f05",
+          "lowerSha": "5b13974d47437642",
+          "seed": "off"
+        }
+      ],
+      "crossIframe": {
+        "kind": "cross",
+        "origin": "http://site-b.test:8080",
+        "seed": "off",
+        "getImageDataSha": "2e8c89ea26526f05",
+        "toBlobSha": "12573d51e62608b4",
+        "pngBytesEqual": true,
+        "blankZero": true
+      }
+    },
+    "b-direct": {
+      "seed": "off",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "2e8c89ea26526f05",
+        "toDataURLSha": "12573d51e62608b4",
+        "toBlobSha": "12573d51e62608b4",
+        "convertToBlobMainSha": "12573d51e62608b4",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      },
+      "lower": {
+        "lowerSha": "5b13974d47437642",
+        "width": 1000,
+        "height": 200,
+        "y": 150,
+        "pixelIndexStart": 150000
+      }
+    },
+    "complete": {
+      "seed": "off",
+      "measure": {
+        "width": 320,
+        "height": 180,
+        "getImageDataSha": "2e8c89ea26526f05",
+        "toDataURLSha": "12573d51e62608b4",
+        "toBlobSha": "12573d51e62608b4",
+        "convertToBlobMainSha": "12573d51e62608b4",
+        "offscreenError": null,
+        "pngBytesEqual": true,
+        "blankZero": true,
+        "createImageBitmapOk": true,
+        "transferToImageBitmapOk": true,
+        "pixelCount": 230400
+      },
+      "lower": {
+        "lowerSha": "5b13974d47437642",
+        "width": 1000,
+        "height": 200,
+        "y": 150,
+        "pixelIndexStart": 150000
+      }
+    }
+  },
+  "complete": true
+}

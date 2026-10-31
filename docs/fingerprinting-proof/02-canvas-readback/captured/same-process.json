@@ -9,20 +9,27 @@
     {
       "key": "b-direct",
       "value": {
-        "seed": "standard:b33d374547e614d3",
+        "seed": "standard:8c295c0b5e2819e1",
         "measure": {
           "width": 320,
           "height": 180,
-          "getImageDataSha": "4d751c3876b93dcf",
-          "toDataURLSha": "60c5d2c2363b2c52",
-          "toBlobSha": "60c5d2c2363b2c52",
-          "convertToBlobMainSha": "60c5d2c2363b2c52",
+          "getImageDataSha": "bffa52f5730e23f1",
+          "toDataURLSha": "71d40986db3db9b6",
+          "toBlobSha": "71d40986db3db9b6",
+          "convertToBlobMainSha": "71d40986db3db9b6",
           "offscreenError": null,
           "pngBytesEqual": true,
           "blankZero": true,
           "createImageBitmapOk": true,
           "transferToImageBitmapOk": true,
           "pixelCount": 230400
+        },
+        "lower": {
+          "lowerSha": "98659a587ce31ff5",
+          "width": 1000,
+          "height": 200,
+          "y": 150,
+          "pixelIndexStart": 150000
         }
       },
       "origin": "http://site-b.test:8080",
@@ -31,20 +38,27 @@
     {
       "key": "complete",
       "value": {
-        "seed": "standard:b33d374547e614d3",
+        "seed": "standard:8c295c0b5e2819e1",
         "measure": {
           "width": 320,
           "height": 180,
-          "getImageDataSha": "4d751c3876b93dcf",
-          "toDataURLSha": "60c5d2c2363b2c52",
-          "toBlobSha": "60c5d2c2363b2c52",
-          "convertToBlobMainSha": "60c5d2c2363b2c52",
+          "getImageDataSha": "bffa52f5730e23f1",
+          "toDataURLSha": "71d40986db3db9b6",
+          "toBlobSha": "71d40986db3db9b6",
+          "convertToBlobMainSha": "71d40986db3db9b6",
           "offscreenError": null,
           "pngBytesEqual": true,
           "blankZero": true,
           "createImageBitmapOk": true,
           "transferToImageBitmapOk": true,
           "pixelCount": 230400
+        },
+        "lower": {
+          "lowerSha": "98659a587ce31ff5",
+          "width": 1000,
+          "height": 200,
+          "y": 150,
+          "pixelIndexStart": 150000
         }
       },
       "origin": "http://site-b.test:8080",
@@ -53,14 +67,14 @@
   ],
   "reads": {
     "a-direct": {
-      "seed": "standard:31c5560ca7de504e",
+      "seed": "standard:87dd75d3e7ba5ecf",
       "measure": {
         "width": 320,
         "height": 180,
-        "getImageDataSha": "8200e031e4fcbfc7",
-        "toDataURLSha": "c9e4d637ebbaf49e",
-        "toBlobSha": "c9e4d637ebbaf49e",
-        "convertToBlobMainSha": "c9e4d637ebbaf49e",
+        "getImageDataSha": "cd41fa1e798004d3",
+        "toDataURLSha": "52f4c4cbbc724cdd",
+        "toBlobSha": "52f4c4cbbc724cdd",
+        "convertToBlobMainSha": "52f4c4cbbc724cdd",
         "offscreenError": null,
         "pngBytesEqual": true,
         "blankZero": true,
@@ -68,48 +82,86 @@
         "transferToImageBitmapOk": true,
         "pixelCount": 230400
       },
+      "lower": {
+        "lowerSha": "dec5587cd4b569c3",
+        "width": 1000,
+        "height": 200,
+        "y": 150,
+        "pixelIndexStart": 150000
+      },
+      "reloads": [
+        {
+          "getImageDataSha": "cd41fa1e798004d3",
+          "lowerSha": "dec5587cd4b569c3",
+          "seed": "standard:87dd75d3e7ba5ecf"
+        },
+        {
+          "getImageDataSha": "cd41fa1e798004d3",
+          "lowerSha": "dec5587cd4b569c3",
+          "seed": "standard:87dd75d3e7ba5ecf"
+        },
+        {
+          "getImageDataSha": "cd41fa1e798004d3",
+          "lowerSha": "dec5587cd4b569c3",
+          "seed": "standard:87dd75d3e7ba5ecf"
+        }
+      ],
       "crossIframe": {
         "kind": "cross",
         "origin": "http://site-b.test:8080",
-        "seed": "standard:31c5560ca7de504e",
-        "getImageDataSha": "8200e031e4fcbfc7",
-        "toBlobSha": "c9e4d637ebbaf49e",
+        "seed": "standard:87dd75d3e7ba5ecf",
+        "getImageDataSha": "cd41fa1e798004d3",
+        "toBlobSha": "52f4c4cbbc724cdd",
         "pngBytesEqual": true,
         "blankZero": true
       }
     },
     "b-direct": {
-      "seed": "standard:b33d374547e614d3",
+      "seed": "standard:8c295c0b5e2819e1",
       "measure": {
         "width": 320,
         "height": 180,
-        "getImageDataSha": "4d751c3876b93dcf",
-        "toDataURLSha": "60c5d2c2363b2c52",
-        "toBlobSha": "60c5d2c2363b2c52",
-        "convertToBlobMainSha": "60c5d2c2363b2c52",
+        "getImageDataSha": "bffa52f5730e23f1",
+        "toDataURLSha": "71d40986db3db9b6",
+        "toBlobSha": "71d40986db3db9b6",
+        "convertToBlobMainSha": "71d40986db3db9b6",
         "offscreenError": null,
         "pngBytesEqual": true,
         "blankZero": true,
         "createImageBitmapOk": true,
         "transferToImageBitmapOk": true,
         "pixelCount": 230400
+      },
+      "lower": {
+        "lowerSha": "98659a587ce31ff5",
+        "width": 1000,
+        "height": 200,
+        "y": 150,
+        "pixelIndexStart": 150000
       }
     },
     "complete": {
-      "seed": "standard:b33d374547e614d3",
+      "seed": "standard:8c295c0b5e2819e1",
       "measure": {
         "width": 320,
         "height": 180,
-        "getImageDataSha": "4d751c3876b93dcf",
-        "toDataURLSha": "60c5d2c2363b2c52",
-        "toBlobSha": "60c5d2c2363b2c52",
-        "convertToBlobMainSha": "60c5d2c2363b2c52",
+        "getImageDataSha": "bffa52f5730e23f1",
+        "toDataURLSha": "71d40986db3db9b6",
+        "toBlobSha": "71d40986db3db9b6",
+        "convertToBlobMainSha": "71d40986db3db9b6",
         "offscreenError": null,
         "pngBytesEqual": true,
         "blankZero": true,
         "createImageBitmapOk": true,
         "transferToImageBitmapOk": true,
         "pixelCount": 230400
+      },
+      "lower": {
+        "lowerSha": "98659a587ce31ff5",
+        "width": 1000,
+        "height": 200,
+        "y": 150,
+        "pixelIndexStart": 150000
       }
     }
   },

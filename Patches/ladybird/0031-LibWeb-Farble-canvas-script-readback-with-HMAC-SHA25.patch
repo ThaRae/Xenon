@@ -6,21 +6,24 @@ Subject: [PATCH] LibWeb: Farble canvas script readback with HMAC-SHA256
 Noise only the copy handed to script (getImageData, toDataURL, toBlob,
 OffscreenCanvas convertToBlob, transferToImageBitmap, createImageBitmap
 from a canvas). Displayed and compositor bitmaps stay untouched.
+
+Each of the 16 flips takes a 64-bit pixel index from HMAC(seed, digest ||
+counter), so canvases larger than 65536 pixels are covered.
 ---
  .../Bindings/Rust/src/canvas_2d/canvas.rs     |  10 ++
- .../Rust/src/html/canvas_image_data.rs        |  56 +++++++--
+ .../Rust/src/html/canvas_image_data.rs        |  56 ++++++-
  Libraries/LibWeb/CMakeLists.txt               |   1 +
- Libraries/LibWeb/Farbling/CanvasPerturb.cpp   |  81 +++++++++++++
- Libraries/LibWeb/Farbling/CanvasPerturb.h     |  27 +++++
- .../HTML/Canvas/Canvas2DContextBase.cpp       |  18 +++
- Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp   |  95 ++++++++++++++-
+ Libraries/LibWeb/Farbling/CanvasPerturb.cpp   |  99 +++++++++++
+ Libraries/LibWeb/Farbling/CanvasPerturb.h     |  28 ++++
+ .../HTML/Canvas/Canvas2DContextBase.cpp       |  18 ++
+ Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp   |  95 ++++++++++-
  Libraries/LibWeb/HTML/Canvas/CanvasHost.h     |  12 +-
  Libraries/LibWeb/HTML/HTMLCanvasElement.cpp   |   1 +
  Libraries/LibWeb/HTML/OffscreenCanvas.cpp     |   3 +-
  .../LibWeb/HTML/WindowOrWorkerGlobalScope.cpp |   2 +-
  Tests/LibWeb/CMakeLists.txt                   |   1 +
- Tests/LibWeb/TestCanvasPerturb.cpp            | 109 ++++++++++++++++++
- 13 files changed, 402 insertions(+), 14 deletions(-)
+ Tests/LibWeb/TestCanvasPerturb.cpp            | 158 ++++++++++++++++++
+ 13 files changed, 470 insertions(+), 14 deletions(-)
  create mode 100644 Libraries/LibWeb/Farbling/CanvasPerturb.cpp
  create mode 100644 Libraries/LibWeb/Farbling/CanvasPerturb.h
  create mode 100644 Tests/LibWeb/TestCanvasPerturb.cpp
@@ -155,10 +158,10 @@ index a712535db1241713004ba1fc1f68420b5a182428..c172cf0013bbee71886f51eed3ac020a
      Fetch/BodyInit.cpp
 diff --git a/Libraries/LibWeb/Farbling/CanvasPerturb.cpp b/Libraries/LibWeb/Farbling/CanvasPerturb.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..0219a55a1b6f9e4bacc1a38c6ec28be3b294a3dc
+index 0000000000000000000000000000000000000000..c7b4846796df7d61c56b28d1fe1dca5214d34e4c
 --- /dev/null
 +++ b/Libraries/LibWeb/Farbling/CanvasPerturb.cpp
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,99 @@
 +/*
 + * Copyright (c) 2026, the Xenon developers.
 + *
@@ -197,15 +200,33 @@ index 0000000000000000000000000000000000000000..0219a55a1b6f9e4bacc1a38c6ec28be3
 +    return true;
 +}
 +
-+static void apply_hmac_mask(Bytes pixels, u8 const hmac[32])
++static u64 read_be64(u8 const* data)
++{
++    u64 value = 0;
++    for (int i = 0; i < 8; ++i)
++        value = (value << 8) | data[i];
++    return value;
++}
++
++static void apply_hmac_mask(Bytes pixels, u8 const hmac[32], Seed const& seed)
 +{
 +    size_t const pixel_count = pixels.size() / 4;
 +    if (pixel_count == 0)
 +        return;
++
++    u8 key[16];
++    write_be64(key, seed.high);
++    write_be64(key + 8, seed.low);
++
 +    for (size_t i = 0; i < 16; ++i) {
-+        u16 const v = hmac[2 * i] | static_cast<u16>(hmac[2 * i + 1] << 8);
-+        size_t const pixel = v % pixel_count;
-+        u8 const channel = static_cast<u8>((v >> 8) % 3);
++        u8 message[33];
++        memcpy(message, hmac, 32);
++        message[32] = static_cast<u8>(i);
++        Crypto::Authentication::HMAC expander(Crypto::Hash::HashKind::SHA256, { key, sizeof(key) });
++        auto block = expander.process(message, sizeof(message));
++        VERIFY(block.size() >= 9);
++        size_t const pixel = static_cast<size_t>(read_be64(block.data()) % pixel_count);
++        u8 const channel = static_cast<u8>(block.data()[8] % 3);
 +        pixels[pixel * 4 + channel] ^= 1;
 +    }
 +}
@@ -217,7 +238,7 @@ index 0000000000000000000000000000000000000000..0219a55a1b6f9e4bacc1a38c6ec28be3
 +
 +    u64 const content_fnv = fnv1a64(pixels);
 +    if (cache && cache->valid && cache->seed == seed && cache->content_fnv == content_fnv) {
-+        apply_hmac_mask(pixels, cache->hmac);
++        apply_hmac_mask(pixels, cache->hmac, seed);
 +        return;
 +    }
 +
@@ -233,19 +254,19 @@ index 0000000000000000000000000000000000000000..0219a55a1b6f9e4bacc1a38c6ec28be3
 +        cache->content_fnv = content_fnv;
 +        memcpy(cache->hmac, digest.data(), 32);
 +        cache->valid = true;
-+        apply_hmac_mask(pixels, cache->hmac);
++        apply_hmac_mask(pixels, cache->hmac, seed);
 +        return;
 +    }
-+    apply_hmac_mask(pixels, digest.data());
++    apply_hmac_mask(pixels, digest.data(), seed);
 +}
 +
 +}
 diff --git a/Libraries/LibWeb/Farbling/CanvasPerturb.h b/Libraries/LibWeb/Farbling/CanvasPerturb.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..ec1aab9a8dd6f9319bf3a409d247cec6863a9a6e
+index 0000000000000000000000000000000000000000..94cc5a104845337ae1f6b0d6d084788168df3f50
 --- /dev/null
 +++ b/Libraries/LibWeb/Farbling/CanvasPerturb.h
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,28 @@
 +/*
 + * Copyright (c) 2026, the Xenon developers.
 + *
@@ -268,8 +289,9 @@ index 0000000000000000000000000000000000000000..ec1aab9a8dd6f9319bf3a409d247cec6
 +    bool valid { false };
 +};
 +
-+// HMAC-SHA256 of (seed, packed unpremultiplied RGBA8888), then XOR the low bit of one RGB channel of one pixel for
-+// each 16 bits of the digest. No-op when Off, when the origin is opaque, or when every byte is zero.
++// HMAC-SHA256 of (seed, packed unpremultiplied RGBA8888). Each of 16 flips takes a 64-bit pixel index and a channel
++// from HMAC(seed, digest || counter), so canvases larger than 65536 pixels are covered. No-op when Off, when the
++// origin is opaque, or when every byte is zero.
 +WEB_API void perturb_rgba8888(Bytes pixels, Seed const&, bool origin_is_opaque, RgbaFarblingCache* = nullptr);
 +
 +}
@@ -546,10 +568,10 @@ index cd23d0b85187547a41b3136065e7e6b3d9b5eb49..4e9e6a6b90f91f752720a645626977b3
      TestFetchByteChannel.cpp
 diff --git a/Tests/LibWeb/TestCanvasPerturb.cpp b/Tests/LibWeb/TestCanvasPerturb.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..64864862274058e3f03ee22f769fb1590785b6da
+index 0000000000000000000000000000000000000000..670fab47f2c9a039ff6532a60fdc1d02886ac607
 --- /dev/null
 +++ b/Tests/LibWeb/TestCanvasPerturb.cpp
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,158 @@
 +/*
 + * Copyright (c) 2026, the Xenon developers.
 + *
@@ -634,6 +656,55 @@ index 0000000000000000000000000000000000000000..64864862274058e3f03ee22f769fb159
 +    u8 max_delta = 0;
 +    for (size_t i = 0; i < pixels.size(); ++i) {
 +        u8 const delta = pixels[i] > original[i] ? pixels[i] - original[i] : original[i] - pixels[i];
++        if (delta != 0) {
++            ++differing;
++            if (delta > max_delta)
++                max_delta = delta;
++        }
++    }
++    EXPECT(differing > 0);
++    EXPECT(differing <= 16);
++    EXPECT_EQ(max_delta, static_cast<u8>(1));
++}
++
++TEST_CASE(flips_land_past_pixel_65536_on_a_large_canvas)
++{
++    size_t const width = 1000;
++    size_t const height = 200;
++    size_t const pixel_count = width * height;
++    EXPECT(pixel_count > 65536);
++    auto pixels = MUST(ByteBuffer::create_zeroed(pixel_count * 4));
++    for (size_t i = 0; i < pixel_count; ++i) {
++        pixels[i * 4] = 40;
++        pixels[i * 4 + 1] = 80;
++        pixels[i * 4 + 2] = 120;
++        pixels[i * 4 + 3] = 255;
++    }
++    auto original = MUST(ByteBuffer::copy(pixels));
++    bool found_past = false;
++    for (u64 n = 1; n <= 32 && !found_past; ++n) {
++        auto candidate = MUST(ByteBuffer::copy(original));
++        Web::Farbling::perturb_rgba8888(candidate.bytes(), { .level = Web::Farbling::Level::Standard, .high = n, .low = n * 3 }, false);
++        for (size_t p = 65537; p < pixel_count; ++p) {
++            if (candidate[p * 4] != original[p * 4] || candidate[p * 4 + 1] != original[p * 4 + 1]
++                || candidate[p * 4 + 2] != original[p * 4 + 2]) {
++                found_past = true;
++                break;
++            }
++        }
++    }
++    EXPECT(found_past);
++
++    auto first = MUST(ByteBuffer::copy(original));
++    auto second = MUST(ByteBuffer::copy(original));
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 7, .low = 11 };
++    Web::Farbling::perturb_rgba8888(first.bytes(), seed, false);
++    Web::Farbling::perturb_rgba8888(second.bytes(), seed, false);
++    EXPECT_EQ(first.bytes(), second.bytes());
++    size_t differing = 0;
++    u8 max_delta = 0;
++    for (size_t i = 0; i < first.size(); ++i) {
++        u8 const delta = first[i] > original[i] ? first[i] - original[i] : original[i] - first[i];
 +        if (delta != 0) {
 +            ++differing;
 +            if (delta > max_delta)

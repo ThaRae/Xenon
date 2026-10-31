@@ -5,8 +5,11 @@
 <iframe id="cross" src="http://site-b.test:8080/iframe.html?kind=cross"></iframe>
 <script src="scene.js"></script>
 <script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "same-process";
+
 function post(key, value) {
-    return fetch("/report?run=same-process", {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
@@ -15,25 +18,37 @@ function post(key, value) {
 
 const canvas = document.getElementById("c");
 drawScene(canvas.getContext("2d"), SCENE_WIDTH, SCENE_HEIGHT);
-
-const state = { seed: seedInfo(), measure: null, crossIframe: null };
-
-function goToB() {
-    location.href = "http://site-b.test:8080/from-b.html";
-}
+const reloads = JSON.parse(sessionStorage.getItem("a-reloads") || "[]");
+const includePixels = reloads.length === 2;
 
 Promise.all([
-    measureDrawnCanvas(canvas, true).then(measure => {
-        state.measure = measure;
-    }),
-    new Promise(resolve => {
+    measureDrawnCanvas(canvas, includePixels),
+    measureLowerProbe(),
+]).then(([measure, lower]) => {
+    reloads.push({
+        getImageDataSha: measure.getImageDataSha,
+        lowerSha: lower.lowerSha,
+        seed: seedInfo(),
+    });
+    sessionStorage.setItem("a-reloads", JSON.stringify(reloads));
+    if (reloads.length < 3) {
+        location.reload();
+        return;
+    }
+
+    const state = { seed: seedInfo(), measure, lower, reloads, crossIframe: null };
+
+    function goToB() {
+        location.href = "http://site-b.test:8080/from-b.html?run=" + encodeURIComponent(runId);
+    }
+
+    const iframeWait = new Promise(resolve => {
         window.addEventListener("message", event => {
             state.crossIframe = event.data;
             resolve();
         });
         setTimeout(resolve, 8000);
-    }),
-]).then(() => {
-    return post("a-direct", state);
-}).then(goToB);
+    });
+    iframeWait.then(() => post("a-direct", state)).then(goToB);
+});
 </script>
