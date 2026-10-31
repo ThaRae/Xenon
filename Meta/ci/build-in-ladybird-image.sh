@@ -21,6 +21,6 @@ done
 # shellcheck disable=SC2016
 exec "${docker[@]}" run --rm \
   --volume "$root:/xenon" --workdir /xenon \
-  --env JOBS --env CCACHE_MAXSIZE --env CCACHE_TOKEN --env CI=true --env PYTHONDONTWRITEBYTECODE=1 \
+  --env JOBS --env CCACHE_MAXSIZE --env CI=true --env PYTHONDONTWRITEBYTECODE=1 \
   --env HOST_OWNER="$(id -u):$(id -g)" \
   "$image" bash -c '"$@"; status=$?; chown -R "$HOST_OWNER" /xenon; exit $status' bash "$@"
