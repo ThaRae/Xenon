@@ -1,0 +1,58 @@
+# Maintainer: ThaRae <https://github.com/ThaRae>
+
+pkgname=xenon
+pkgver=0.1.2
+pkgrel=1
+pkgdesc='Web browser built on the Ladybird engine, with the features of Helium'
+arch=(x86_64)
+url='https://github.com/ThaRae/Xenon'
+license=(BSD-2-Clause GPL-3.0-only MIT CC0-1.0)
+depends=(expat fontconfig freetype2 glibc harfbuzz hicolor-icon-theme libdrm libgcc libglvnd libice libsm libstdc++
+         libx11 libxcb ttf-font wayland zlib)
+optdepends=('pulse-native-provider: audio'
+            'geoclue: geolocation')
+makedepends=(autoconf-archive clang cmake curl git libpulse lld nasm ninja python qt6-base qt6-positioning qt6-tools
+             qt6-wayland rustup tar unzip xcb-util-wm zip)
+conflicts=(xenon-bin)
+options=(!buildflags !lto !strip !debug !emptydirs)
+source=("xenon::git+https://github.com/ThaRae/Xenon.git#tag=v$pkgver"
+        "ladybird::git+https://github.com/LadybirdBrowser/ladybird.git")
+sha256sums=('SKIP'
+            'SKIP')
+
+_rust_toolchain() {
+  sed -n 's/^channel = "\(.*\)"/\1/p' "$srcdir/xenon/ladybird/rust-toolchain.toml"
+}
+
+prepare() {
+  cd xenon
+  git submodule init ladybird
+  git config submodule.ladybird.url "$srcdir/ladybird"
+  git -c protocol.file.allow=always submodule update --no-recommend-shallow ladybird
+  rustup toolchain install --profile minimal "$(_rust_toolchain)"
+}
+
+build() {
+  cd xenon
+  export CC=clang CXX=clang++
+  RUSTUP_TOOLCHAIN=$(_rust_toolchain)
+  export RUSTUP_TOOLCHAIN
+  unset CARGO_TARGET_DIR
+  ./Meta/xenon.py build
+  ./Meta/release.py package --no-build
+}
+
+package() {
+  local app_dir=xenon/Build/distribution/Xenon.AppDir
+
+  install -d "$pkgdir/usr/lib/xenon" "$pkgdir/usr/bin"
+  cp -a "$app_dir/AppRun" "$app_dir/usr" "$pkgdir/usr/lib/xenon/"
+  ln -s /usr/lib/xenon/AppRun "$pkgdir/usr/bin/xenon"
+
+  install -Dm644 "$app_dir/usr/share/applications/org.xenon.Xenon.desktop" -t "$pkgdir/usr/share/applications"
+  sed -i 's/^Exec=Xenon/Exec=xenon/' "$pkgdir/usr/share/applications/org.xenon.Xenon.desktop"
+  cp -a "$app_dir/usr/share/icons" "$pkgdir/usr/share/"
+
+  install -Dm644 "$app_dir/usr/share/Lagom/xenon/filter-lists/"{NOTICE.txt,LICENSE-GPL-3.0.txt} \
+    -t "$pkgdir/usr/share/licenses/$pkgname/filter-lists"
+}

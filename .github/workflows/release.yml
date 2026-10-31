@@ -395,3 +395,66 @@ jobs:
           if [ "$PUBLISHED" = success ]; then
             echo "Published: https://github.com/ThaRae/xenon-releases/releases/tag/v$VERSION" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  aur:
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: |
+          git submodule update --init --depth 1 ladybird
+          echo "VERSION=$(cat VERSION.txt)" >> "$GITHUB_ENV"
+
+      - name: Update the packages, and test xenon-bin
+        id: update
+        run: Meta/ci/test-aur-package.sh --update xenon-bin
+
+      - name: Push the packages to the AUR
+        if: env.AUR_SSH_PRIVATE_KEY != ''
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          (umask 077 && printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/aur-key")
+          status=0
+          ./Meta/aur.py push --ssh-key "$RUNNER_TEMP/aur-key" || status=$?
+          rm -f "$RUNNER_TEMP/aur-key"
+          exit $status
+
+      - name: Push the bump to a branch
+        if: ${{ !cancelled() && steps.update.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ secrets.XENON_RELEASES_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          branch=aur-$VERSION
+          git switch --create "$branch"
+          git add Packaging/aur
+          if git diff --cached --quiet; then
+            echo "The AUR packages were at $VERSION already." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git commit --quiet --message "Update the AUR packages to $VERSION"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            push --quiet https://github.com/ThaRae/Xenon.git "HEAD:refs/heads/$branch"
+          body="Meta/aur.py update, after Xenon $VERSION was published. The release workflow tested xenon-bin."
+          if url=$(gh pr create --repo ThaRae/Xenon --base main --head "$branch" \
+            --title "Update the AUR packages to $VERSION" --body "$body" 2>&1); then
+            echo "Pull request: $url" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Couldn't open a pull request ($url)"
+            echo "Open a pull request from \`$branch\`: https://github.com/ThaRae/Xenon/compare/main...$branch" >> "$GITHUB_STEP_SUMMARY"
+          fi
