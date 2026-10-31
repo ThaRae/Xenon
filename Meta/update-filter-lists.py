@@ -25,7 +25,6 @@ import subprocess
 import sys
 
 from pathlib import Path
-
 from tempfile import TemporaryDirectory
 
 XENON_SOURCE_DIR = Path(__file__).resolve().parent.parent
@@ -49,15 +48,8 @@ EXCLUDED = {
 def checked_list_id(list_id: str) -> str:
     """A list id out of the converter's manifest, which names the file the list ships as. It must be a plain name, so
     that neither it nor the manifest can reach a file outside the bundle's lists/ or trusted-lists/."""
-    if (
-        not list_id
-        or list_id in (".", "..")
-        or "\\" in list_id
-        or Path(list_id).name != list_id
-    ):
-        sys.exit(
-            f"the manifest's list id '{list_id}' isn't a plain name, so its list can't be shipped"
-        )
+    if not list_id or list_id in (".", "..") or "\\" in list_id or Path(list_id).name != list_id:
+        sys.exit(f"the manifest's list id '{list_id}' isn't a plain name, so its list can't be shipped")
     return list_id
 
 
@@ -65,26 +57,16 @@ def checked_dist_file(dist: Path, file: str, what: str) -> Path:
     """A file name out of the converter's manifest, which may only name a file the converter built into dist/."""
     source = (dist / file).resolve()
     if not source.is_relative_to(dist.resolve()):
-        sys.exit(
-            f"the manifest's {what} '{file}' is outside {dist}, so it isn't a converted file"
-        )
+        sys.exit(f"the manifest's {what} '{file}' is outside {dist}, so it isn't a converted file")
     return source
 
 
 def main():
     global OUTPUT_DIR
-    parser = argparse.ArgumentParser(
-        description="Refresh Xenon's bundled filter lists from xenon-ublock"
-    )
-    parser.add_argument(
-        "--xenon-ublock", type=Path, default=XENON_SOURCE_DIR.parent / "xenon-ublock"
-    )
-    parser.add_argument(
-        "--no-build", action="store_true", help="copy the lists xenon-ublock last built"
-    )
-    parser.add_argument(
-        "--output", type=Path, default=OUTPUT_DIR, help="where to write the bundle"
-    )
+    parser = argparse.ArgumentParser(description="Refresh Xenon's bundled filter lists from xenon-ublock")
+    parser.add_argument("--xenon-ublock", type=Path, default=XENON_SOURCE_DIR.parent / "xenon-ublock")
+    parser.add_argument("--no-build", action="store_true", help="copy the lists xenon-ublock last built")
+    parser.add_argument("--output", type=Path, default=OUTPUT_DIR, help="where to write the bundle")
     parser.add_argument(
         "command",
         nargs="?",
@@ -112,21 +94,15 @@ def main():
 
     unlicensed = [entry["id"] for entry in shipped if entry["license_needs_review"]]
     if unlicensed:
-        sys.exit(
-            f"these lists' licenses need review before Xenon can ship them: {', '.join(unlicensed)}"
-        )
+        sys.exit(f"these lists' licenses need review before Xenon can ship them: {', '.join(unlicensed)}")
 
     for name in ("lists", "trusted-lists", "resources"):
         shutil.rmtree(OUTPUT_DIR / name, ignore_errors=True)
         (OUTPUT_DIR / name).mkdir(parents=True)
     for entry in shipped:
         checked_list_id(entry["id"])
-        source = checked_dist_file(
-            dist, entry["file"], f"file for the list '{entry['id']}'"
-        )
-        entry["file"] = (
-            f"{'trusted-lists' if entry['trusted'] else 'lists'}/{entry['id']}.txt"
-        )
+        source = checked_dist_file(dist, entry["file"], f"file for the list '{entry['id']}'")
+        entry["file"] = f"{'trusted-lists' if entry['trusted'] else 'lists'}/{entry['id']}.txt"
         shutil.copyfile(source, OUTPUT_DIR / entry["file"])
 
     resources = manifest["resources"]
@@ -151,13 +127,9 @@ def main():
         "excluded": EXCLUDED,
         "lists": shipped,
     }
-    (OUTPUT_DIR / "manifest.json").write_text(
-        json.dumps(bundle_manifest, indent=2) + "\n"
-    )
+    (OUTPUT_DIR / "manifest.json").write_text(json.dumps(bundle_manifest, indent=2) + "\n")
     shutil.copyfile(converter / "LICENSE", OUTPUT_DIR / "LICENSE-GPL-3.0.txt")
-    (OUTPUT_DIR / "NOTICE.txt").write_text(
-        notice(shipped, resources, manifest["generated_at"], commit)
-    )
+    (OUTPUT_DIR / "NOTICE.txt").write_text(notice(shipped, resources, manifest["generated_at"], commit))
 
     total = sum((OUTPUT_DIR / entry["file"]).stat().st_size for entry in shipped)
     print(f"Copied {len(shipped)} lists ({total / 1e6:.1f} MB) into {OUTPUT_DIR}")
@@ -271,8 +243,7 @@ def self_test() -> int:
         write_manifest(honest_list, "payload.txt")
         out = root / "bundle"
         check(
-            run("--xenon-ublock", str(fake), "--no-build", "--output", str(out))
-            is None,
+            run("--xenon-ublock", str(fake), "--no-build", "--output", str(out)) is None,
             "an honest manifest was refused",
         )
         check(
@@ -284,13 +255,10 @@ def self_test() -> int:
         traversed = root / "traversed.txt"
         write_manifest([{**honest_list[0], "id": "../traversed"}], "payload.txt")
         check(
-            run("--xenon-ublock", str(fake), "--no-build", "--output", str(out))
-            is not None,
+            run("--xenon-ublock", str(fake), "--no-build", "--output", str(out)) is not None,
             "a manifest with a climbing list id was accepted",
         )
-        check(
-            not traversed.exists(), "a climbing list id wrote a file outside the bundle"
-        )
+        check(not traversed.exists(), "a climbing list id wrote a file outside the bundle")
 
         # A manifest whose file names name files outside the converter's dist/ are refused, for a list and for the
         # resources file, which would otherwise carry an outside file inside the shipped bundle.
@@ -304,14 +272,12 @@ def self_test() -> int:
         ):
             write_manifest(lists, resources_file)
             check(
-                run("--xenon-ublock", str(fake), "--no-build", "--output", str(out))
-                is not None,
+                run("--xenon-ublock", str(fake), "--no-build", "--output", str(out)) is not None,
                 f"a manifest with a {what} outside dist-xenon was accepted",
             )
             resources_out = out / "resources" / "ublock-resources.json"
             check(
-                not resources_out.exists()
-                or "a file outside dist-xenon" not in resources_out.read_text(),
+                not resources_out.exists() or "a file outside dist-xenon" not in resources_out.read_text(),
                 f"a {what} outside dist-xenon was copied into the bundle",
             )
 
