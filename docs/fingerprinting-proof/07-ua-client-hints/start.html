@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>A UA start</title><script src="measure.js"></script></head>
+<body>
+<img src="/pixel.png" alt="" />
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "same-process";
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+function iframeSample(src) {
+    return new Promise(resolve => {
+        const timer = setTimeout(() => resolve({ error: "iframe-timeout" }), 6000);
+        const onMessage = event => {
+            if (event.source !== iframe.contentWindow)
+                return;
+            clearTimeout(timer);
+            window.removeEventListener("message", onMessage);
+            resolve(event.data);
+        };
+        window.addEventListener("message", onMessage);
+        const iframe = document.createElement("iframe");
+        iframe.src = src;
+        document.body.appendChild(iframe);
+    });
+}
+const reloads = JSON.parse(sessionStorage.getItem("ua-reloads") || "[]");
+const sample = navigatorSample();
+reloads.push(sample);
+sessionStorage.setItem("ua-reloads", JSON.stringify(reloads));
+if (reloads.length < 3) {
+    location.reload();
+} else {
+    Promise.all([
+        echoHeaders(),
+        echoXHR(),
+        iframeSample("iframe.html?kind=same"),
+        iframeSample("http://site-b.test:8080/iframe.html?kind=cross"),
+        withWorker(),
+        withSharedWorker(),
+        websocketUa(),
+    ]).then(([fetchHeaders, xhrHeaders, sameIframe, crossIframe, worker, sharedWorker, websocket]) => {
+        const state = { measure: sample, reloads, fetchHeaders, xhrHeaders, sameIframe, crossIframe, worker, sharedWorker, websocket };
+        return post("a-direct", state);
+    }).then(() => {
+        location.href = "http://site-b.test:8080/from-b.html?run=" + encodeURIComponent(runId);
+    });
+}
+</script>
+</body>
+</html>

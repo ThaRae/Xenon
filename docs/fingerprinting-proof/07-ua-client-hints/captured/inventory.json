@@ -1,0 +1,38 @@
+{
+  "runId": "inventory",
+  "events": [
+    {
+      "key": "nav",
+      "value": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) Ladybird/1.0 Chrome/153.0.0.0 AppleWebKit/537.36 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) Ladybird/1.0 Chrome/153.0.0.0 AppleWebKit/537.36 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "vendorSub": "",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "appCodeName": "Mozilla",
+        "appName": "Netscape",
+        "oscpu": null,
+        "userAgentData": false,
+        "seed": "standard:a2e9be0a0d9b2ca3"
+      }
+    }
+  ],
+  "reads": {
+    "nav": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) Ladybird/1.0 Chrome/153.0.0.0 AppleWebKit/537.36 Safari/537.36",
+      "appVersion": "5.0 (X11; Linux x86_64) Ladybird/1.0 Chrome/153.0.0.0 AppleWebKit/537.36 Safari/537.36",
+      "platform": "Linux x86_64",
+      "vendor": "Google Inc.",
+      "vendorSub": "",
+      "product": "Gecko",
+      "productSub": "20030107",
+      "appCodeName": "Mozilla",
+      "appName": "Netscape",
+      "oscpu": null,
+      "userAgentData": false,
+      "seed": "standard:a2e9be0a0d9b2ca3"
+    }
+  }
+}

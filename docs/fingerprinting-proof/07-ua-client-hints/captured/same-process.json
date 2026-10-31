@@ -1,0 +1,559 @@
+{
+  "runId": "same-process",
+  "events": [
+    {
+      "key": "a-direct",
+      "value": {
+        "measure": {
+          "seed": "standard:f8a2975562ca943e",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": "Google Inc.",
+          "product": "Gecko",
+          "productSub": "20030107",
+          "oscpu": null,
+          "userAgentData": false,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        "reloads": [
+          {
+            "seed": "standard:f8a2975562ca943e",
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "platform": "Linux x86_64",
+            "vendor": "Google Inc.",
+            "product": "Gecko",
+            "productSub": "20030107",
+            "oscpu": null,
+            "userAgentData": false,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          },
+          {
+            "seed": "standard:f8a2975562ca943e",
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "platform": "Linux x86_64",
+            "vendor": "Google Inc.",
+            "product": "Gecko",
+            "productSub": "20030107",
+            "oscpu": null,
+            "userAgentData": false,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          },
+          {
+            "seed": "standard:f8a2975562ca943e",
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "platform": "Linux x86_64",
+            "vendor": "Google Inc.",
+            "product": "Gecko",
+            "productSub": "20030107",
+            "oscpu": null,
+            "userAgentData": false,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/start.html"
+          }
+        ],
+        "fetchHeaders": {
+          "kind": "echo",
+          "host": "site-a.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        },
+        "xhrHeaders": {
+          "kind": "echo",
+          "host": "site-a.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        },
+        "sameIframe": {
+          "seed": "standard:f8a2975562ca943e",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": "Google Inc.",
+          "product": "Gecko",
+          "productSub": "20030107",
+          "oscpu": null,
+          "userAgentData": false,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/iframe.html?kind=same",
+          "kind": "same"
+        },
+        "crossIframe": {
+          "seed": "standard:f8a2975562ca943e",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": "Google Inc.",
+          "product": "Gecko",
+          "productSub": "20030107",
+          "oscpu": null,
+          "userAgentData": false,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/iframe.html?kind=cross",
+          "kind": "cross"
+        },
+        "worker": {
+          "ok": true,
+          "navigator": {
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "platform": "Linux x86_64",
+            "vendor": null,
+            "product": "Gecko"
+          },
+          "fetch": {
+            "kind": "echo",
+            "host": "site-a.test:8080",
+            "path": "/echo-headers",
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "secChUa": null,
+            "secChUaMobile": null,
+            "secChUaPlatform": null,
+            "acceptCh": null,
+            "criticalCh": null
+          }
+        },
+        "sharedWorker": {
+          "ok": true,
+          "navigator": {
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "platform": "Linux x86_64"
+          }
+        },
+        "websocket": {
+          "error": "ws-error"
+        }
+      },
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b-direct",
+      "value": {
+        "measure": {
+          "seed": "standard:495c6267dbe6bd0f",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": "Google Inc.",
+          "product": "Gecko",
+          "productSub": "20030107",
+          "oscpu": null,
+          "userAgentData": false,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/from-b.html?run=same-process"
+        },
+        "fetchHeaders": {
+          "kind": "echo",
+          "host": "site-b.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        },
+        "xhrHeaders": {
+          "kind": "echo",
+          "host": "site-b.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        },
+        "worker": {
+          "ok": true,
+          "navigator": {
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "platform": "Linux x86_64",
+            "vendor": null,
+            "product": "Gecko"
+          },
+          "fetch": {
+            "kind": "echo",
+            "host": "site-b.test:8080",
+            "path": "/echo-headers",
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "secChUa": null,
+            "secChUaMobile": null,
+            "secChUaPlatform": null,
+            "acceptCh": null,
+            "criticalCh": null
+          }
+        },
+        "websocket": {
+          "error": "ws-error"
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "value": {
+        "measure": {
+          "seed": "standard:495c6267dbe6bd0f",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": "Google Inc.",
+          "product": "Gecko",
+          "productSub": "20030107",
+          "oscpu": null,
+          "userAgentData": false,
+          "origin": "http://site-b.test:8080",
+          "host": "site-b.test:8080",
+          "href": "http://site-b.test:8080/from-b.html?run=same-process"
+        },
+        "fetchHeaders": {
+          "kind": "echo",
+          "host": "site-b.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        },
+        "xhrHeaders": {
+          "kind": "echo",
+          "host": "site-b.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        },
+        "worker": {
+          "ok": true,
+          "navigator": {
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "platform": "Linux x86_64",
+            "vendor": null,
+            "product": "Gecko"
+          },
+          "fetch": {
+            "kind": "echo",
+            "host": "site-b.test:8080",
+            "path": "/echo-headers",
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+            "secChUa": null,
+            "secChUaMobile": null,
+            "secChUaPlatform": null,
+            "acceptCh": null,
+            "criticalCh": null
+          }
+        },
+        "websocket": {
+          "error": "ws-error"
+        }
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    }
+  ],
+  "reads": {
+    "a-direct": {
+      "measure": {
+        "seed": "standard:f8a2975562ca943e",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "oscpu": null,
+        "userAgentData": false,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/start.html"
+      },
+      "reloads": [
+        {
+          "seed": "standard:f8a2975562ca943e",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": "Google Inc.",
+          "product": "Gecko",
+          "productSub": "20030107",
+          "oscpu": null,
+          "userAgentData": false,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        {
+          "seed": "standard:f8a2975562ca943e",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": "Google Inc.",
+          "product": "Gecko",
+          "productSub": "20030107",
+          "oscpu": null,
+          "userAgentData": false,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        },
+        {
+          "seed": "standard:f8a2975562ca943e",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": "Google Inc.",
+          "product": "Gecko",
+          "productSub": "20030107",
+          "oscpu": null,
+          "userAgentData": false,
+          "origin": "http://site-a.test:8080",
+          "host": "site-a.test:8080",
+          "href": "http://site-a.test:8080/start.html"
+        }
+      ],
+      "fetchHeaders": {
+        "kind": "echo",
+        "host": "site-a.test:8080",
+        "path": "/echo-headers",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "secChUa": null,
+        "secChUaMobile": null,
+        "secChUaPlatform": null,
+        "acceptCh": null,
+        "criticalCh": null
+      },
+      "xhrHeaders": {
+        "kind": "echo",
+        "host": "site-a.test:8080",
+        "path": "/echo-headers",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "secChUa": null,
+        "secChUaMobile": null,
+        "secChUaPlatform": null,
+        "acceptCh": null,
+        "criticalCh": null
+      },
+      "sameIframe": {
+        "seed": "standard:f8a2975562ca943e",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "oscpu": null,
+        "userAgentData": false,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/iframe.html?kind=same",
+        "kind": "same"
+      },
+      "crossIframe": {
+        "seed": "standard:f8a2975562ca943e",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "oscpu": null,
+        "userAgentData": false,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/iframe.html?kind=cross",
+        "kind": "cross"
+      },
+      "worker": {
+        "ok": true,
+        "navigator": {
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": null,
+          "product": "Gecko"
+        },
+        "fetch": {
+          "kind": "echo",
+          "host": "site-a.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        }
+      },
+      "sharedWorker": {
+        "ok": true,
+        "navigator": {
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64"
+        }
+      },
+      "websocket": {
+        "error": "ws-error"
+      }
+    },
+    "b-direct": {
+      "measure": {
+        "seed": "standard:495c6267dbe6bd0f",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "oscpu": null,
+        "userAgentData": false,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/from-b.html?run=same-process"
+      },
+      "fetchHeaders": {
+        "kind": "echo",
+        "host": "site-b.test:8080",
+        "path": "/echo-headers",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "secChUa": null,
+        "secChUaMobile": null,
+        "secChUaPlatform": null,
+        "acceptCh": null,
+        "criticalCh": null
+      },
+      "xhrHeaders": {
+        "kind": "echo",
+        "host": "site-b.test:8080",
+        "path": "/echo-headers",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "secChUa": null,
+        "secChUaMobile": null,
+        "secChUaPlatform": null,
+        "acceptCh": null,
+        "criticalCh": null
+      },
+      "worker": {
+        "ok": true,
+        "navigator": {
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": null,
+          "product": "Gecko"
+        },
+        "fetch": {
+          "kind": "echo",
+          "host": "site-b.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        }
+      },
+      "websocket": {
+        "error": "ws-error"
+      }
+    },
+    "complete": {
+      "measure": {
+        "seed": "standard:495c6267dbe6bd0f",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "oscpu": null,
+        "userAgentData": false,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/from-b.html?run=same-process"
+      },
+      "fetchHeaders": {
+        "kind": "echo",
+        "host": "site-b.test:8080",
+        "path": "/echo-headers",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "secChUa": null,
+        "secChUaMobile": null,
+        "secChUaPlatform": null,
+        "acceptCh": null,
+        "criticalCh": null
+      },
+      "xhrHeaders": {
+        "kind": "echo",
+        "host": "site-b.test:8080",
+        "path": "/echo-headers",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "secChUa": null,
+        "secChUaMobile": null,
+        "secChUaPlatform": null,
+        "acceptCh": null,
+        "criticalCh": null
+      },
+      "worker": {
+        "ok": true,
+        "navigator": {
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "platform": "Linux x86_64",
+          "vendor": null,
+          "product": "Gecko"
+        },
+        "fetch": {
+          "kind": "echo",
+          "host": "site-b.test:8080",
+          "path": "/echo-headers",
+          "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+          "secChUa": null,
+          "secChUaMobile": null,
+          "secChUaPlatform": null,
+          "acceptCh": null,
+          "criticalCh": null
+        }
+      },
+      "websocket": {
+        "error": "ws-error"
+      }
+    }
+  },
+  "complete": true
+}

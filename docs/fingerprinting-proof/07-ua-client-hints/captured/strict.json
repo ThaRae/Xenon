@@ -1,0 +1,101 @@
+{
+  "runId": "strict",
+  "events": [
+    {
+      "key": "a-strict",
+      "value": {
+        "seed": "strict:fb8dd38fc3f6f0e9",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "oscpu": null,
+        "userAgentData": false,
+        "origin": "http://site-a.test:8080",
+        "host": "site-a.test:8080",
+        "href": "http://site-a.test:8080/strict.html?run=strict&next=http%3A%2F%2Fsite-b.test%3A8080%2Fstrict.html%3Frun%3Dstrict%26key%3Db-strict"
+      }
+    },
+    {
+      "key": "b-strict",
+      "value": {
+        "seed": "strict:605ac52d28a59e94",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "oscpu": null,
+        "userAgentData": false,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/strict.html?run=strict&key=b-strict"
+      }
+    },
+    {
+      "key": "complete",
+      "value": {
+        "seed": "strict:605ac52d28a59e94",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        "platform": "Linux x86_64",
+        "vendor": "Google Inc.",
+        "product": "Gecko",
+        "productSub": "20030107",
+        "oscpu": null,
+        "userAgentData": false,
+        "origin": "http://site-b.test:8080",
+        "host": "site-b.test:8080",
+        "href": "http://site-b.test:8080/strict.html?run=strict&key=b-strict"
+      }
+    }
+  ],
+  "reads": {
+    "a-strict": {
+      "seed": "strict:fb8dd38fc3f6f0e9",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "platform": "Linux x86_64",
+      "vendor": "Google Inc.",
+      "product": "Gecko",
+      "productSub": "20030107",
+      "oscpu": null,
+      "userAgentData": false,
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080",
+      "href": "http://site-a.test:8080/strict.html?run=strict&next=http%3A%2F%2Fsite-b.test%3A8080%2Fstrict.html%3Frun%3Dstrict%26key%3Db-strict"
+    },
+    "b-strict": {
+      "seed": "strict:605ac52d28a59e94",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "platform": "Linux x86_64",
+      "vendor": "Google Inc.",
+      "product": "Gecko",
+      "productSub": "20030107",
+      "oscpu": null,
+      "userAgentData": false,
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080",
+      "href": "http://site-b.test:8080/strict.html?run=strict&key=b-strict"
+    },
+    "complete": {
+      "seed": "strict:605ac52d28a59e94",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "appVersion": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "platform": "Linux x86_64",
+      "vendor": "Google Inc.",
+      "product": "Gecko",
+      "productSub": "20030107",
+      "oscpu": null,
+      "userAgentData": false,
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080",
+      "href": "http://site-b.test:8080/strict.html?run=strict&key=b-strict"
+    }
+  },
+  "complete": true
+}

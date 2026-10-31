@@ -1,0 +1,15 @@
+TestUserAgentReduction 6/6
+TestHardwareFarbling 11/11
+TestFontAllow 5/5
+TestAudioFudge 9/9
+TestFarblingRNG 6/6
+TestCanvasPerturb 8/8
+TestWebGLFarbling 8/8
+Meta/xenon.py test --no-build passed
+test-web *avigator* Pass:10
+test-web *user-agent* Pass:7
+test-web navigator-useragent-frozen-platform Pass:1
+test-web user-agent-client-hints Pass:1
+test-web *Worker* Pass:56
+run-proof.py ok=true
+NINJA_EXIT:0

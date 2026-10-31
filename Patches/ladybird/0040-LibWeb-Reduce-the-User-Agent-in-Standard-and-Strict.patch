@@ -1,0 +1,395 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 03:24:21 +0000
+Subject: [PATCH] LibWeb: Reduce the User-Agent in Standard and Strict
+
+Every site gets one Chrome-153 reduced UA per OS. Off keeps Ladybird's
+default. A spoofed LoaderConfig.user_agent wins. navigator.userAgent,
+appVersion, platform, fetch, and WebSocket handshakes go through the
+same helper. No per-site randomness.
+---
+ Libraries/LibWeb/CMakeLists.txt              |  1 +
+ Libraries/LibWeb/Farbling/UserAgent.cpp      | 51 +++++++++++++++++
+ Libraries/LibWeb/Farbling/UserAgent.h        | 34 +++++++++++
+ Libraries/LibWeb/Fetch/Fetching/Fetching.cpp | 11 +++-
+ Libraries/LibWeb/HTML/Navigator.cpp          |  5 ++
+ Libraries/LibWeb/HTML/Navigator.h            |  1 +
+ Libraries/LibWeb/HTML/NavigatorID.cpp        | 14 +++--
+ Libraries/LibWeb/HTML/NavigatorID.h          |  2 +
+ Libraries/LibWeb/HTML/WorkerNavigator.cpp    |  5 ++
+ Libraries/LibWeb/HTML/WorkerNavigator.h      |  1 +
+ Libraries/LibWeb/WebSockets/WebSocket.cpp    |  5 +-
+ Tests/LibWeb/CMakeLists.txt                  |  1 +
+ Tests/LibWeb/TestUserAgentReduction.cpp      | 59 ++++++++++++++++++++
+ 13 files changed, 183 insertions(+), 7 deletions(-)
+ create mode 100644 Libraries/LibWeb/Farbling/UserAgent.cpp
+ create mode 100644 Libraries/LibWeb/Farbling/UserAgent.h
+ create mode 100644 Tests/LibWeb/TestUserAgentReduction.cpp
+
+diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
+index 82299733b2dbdb7b1b6f192cab7873d644861e2c..ef00e62420e4f8803f1a7cdaa53755f5232474fb 100644
+--- a/Libraries/LibWeb/CMakeLists.txt
++++ b/Libraries/LibWeb/CMakeLists.txt
+@@ -355,6 +355,7 @@ set(SOURCES
+     Farbling/FontAllow.cpp
+     Farbling/FarblingRNG.cpp
+     Farbling/HardwareConcurrency.cpp
++    Farbling/UserAgent.cpp
+     Farbling/WebGLFarbling.cpp
+     Fetch/Body.cpp
+     Fetch/BodyInit.cpp
+diff --git a/Libraries/LibWeb/Farbling/UserAgent.cpp b/Libraries/LibWeb/Farbling/UserAgent.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..18a3c760d91e38c349e94b4b316b3e9b8ba4182d
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/UserAgent.cpp
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibWeb/Farbling/UserAgent.h>
++
++namespace Web::Farbling {
++
++StringView reduced_user_agent()
++{
++    // Chrome's reduced UA for this OS. Same string for every Xenon user on this platform.
++    static constexpr auto value = "Mozilla/5.0 (" UA_PLATFORM_STRING ") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"sv;
++    return value;
++}
++
++StringView reduced_platform()
++{
++#if defined(AK_OS_MACOS)
++    return "MacIntel"sv;
++#elif defined(AK_OS_IOS)
++    return "iPhone"sv;
++#elif defined(AK_OS_WINDOWS)
++    return "Win32"sv;
++#else
++    // Matches the frozen Linux UA token (X11; Linux x86_64), not uname().
++    return "Linux x86_64"sv;
++#endif
++}
++
++static bool user_agent_is_overridden(StringView configured)
++{
++    return configured != default_user_agent;
++}
++
++String effective_user_agent(Seed const& seed, StringView configured)
++{
++    if (!seed.enabled() || user_agent_is_overridden(configured))
++        return MUST(String::from_utf8(configured));
++    return MUST(String::from_utf8(reduced_user_agent()));
++}
++
++String effective_platform(Seed const& seed, StringView configured_platform, StringView configured_user_agent)
++{
++    if (!seed.enabled() || user_agent_is_overridden(configured_user_agent))
++        return MUST(String::from_utf8(configured_platform));
++    return MUST(String::from_utf8(reduced_platform()));
++}
++
++}
+diff --git a/Libraries/LibWeb/Farbling/UserAgent.h b/Libraries/LibWeb/Farbling/UserAgent.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..066a9299c734531cb9a1c5f405f37c0fbe023842
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/UserAgent.h
+@@ -0,0 +1,34 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/String.h>
++#include <AK/StringView.h>
++#include <LibWeb/Export.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
++#include <LibWebCommon/Loader/UserAgent.h>
++
++namespace Web::Farbling {
++
++// One reduced UA per OS. Tokens, and why each is here:
++//   Mozilla/5.0 — required prefix; every browser sends it.
++//   (UA_PLATFORM_STRING) — Chrome's frozen desktop/mobile token for this OS. No distro,
++//     no kernel, no real CPU: servers only recognize these frozen values.
++//   AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 — Chrome's
++//     reduced product tokens. Major Chrome version only (zeros after 153). No Ladybird
++//     product: that unique token is the fingerprint.
++// Off keeps Ladybird's default_user_agent. Standard and Strict use this string for every
++// site. A user/devtools spoof of LoaderConfig.user_agent wins over the reduced string.
++
++WEB_API StringView reduced_user_agent();
++WEB_API StringView reduced_platform();
++
++// configured is LoaderConfig.user_agent after site-compatibility transforms.
++WEB_API String effective_user_agent(Seed const& seed, StringView configured);
++WEB_API String effective_platform(Seed const& seed, StringView configured_platform, StringView configured_user_agent);
++
++}
+diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+index 8f16e0969d1f5fd8cfe5e4eea807e6f6d25247e2..0af59c8b4e82f5266784fc9587cab1756227edf1 100644
+--- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
++++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+@@ -54,6 +54,7 @@
+ #include <LibWeb/Fetch/Infrastructure/Task.h>
+ #include <LibWeb/FileAPI/Blob.h>
+ #include <LibWeb/FileAPI/BlobURLStore.h>
++#include <LibWeb/Farbling/UserAgent.h>
+ #include <LibWeb/HTML/EventLoop/EventLoop.h>
+ #include <LibWeb/HTML/LocalNavigable.h>
+ #include <LibWeb/HTML/PreloadEntry.h>
+@@ -2428,7 +2429,15 @@ GC::Ref<PendingResponse> http_network_or_cache_fetch(JS::Realm& realm, Infrastru
+         if (!http_request->header_list()->contains("User-Agent"sv)) {
+             // 1. Let userAgent be httpRequest’s client’s environment default `User-Agent` value.
+             // FIXME: Honor WebDriver BiDi emulated User-Agent.
+-            auto user_agent = Infrastructure::default_user_agent_value(fetch_params.loader_config(), http_request->current_url());
++            auto configured = Infrastructure::default_user_agent_value(fetch_params.loader_config(), http_request->current_url());
++            Farbling::Seed seed {};
++            if (auto const& client = http_request->client(); client.has_value()) {
++                if (auto const* address = client->get_pointer<HTML::EnvironmentSettingsObjectAddress>()) {
++                    if (auto settings = HTML::environment_settings_object_at(*address))
++                        seed = settings->farbling_seed();
++                }
++            }
++            auto user_agent = Farbling::effective_user_agent(seed, configured).to_byte_string();
+ 
+             // 2. Append (`User-Agent`, userAgent) to httpRequest’s header list.
+             http_request->header_list()->append({ "User-Agent"sv, move(user_agent) });
+diff --git a/Libraries/LibWeb/HTML/Navigator.cpp b/Libraries/LibWeb/HTML/Navigator.cpp
+index 6cf45cc2b15395fa5bcb49c20944c0d3474baaeb..e4b6274b93a65c635eae24587bc3291b9712715e 100644
+--- a/Libraries/LibWeb/HTML/Navigator.cpp
++++ b/Libraries/LibWeb/HTML/Navigator.cpp
+@@ -52,6 +52,11 @@ URL::URL Navigator::navigator_id_url() const
+     return m_window->associated_document().url();
+ }
+ 
++Farbling::Seed Navigator::navigator_id_seed() const
++{
++    return relevant_settings_object(*m_window).farbling_seed();
++}
++
+ EnvironmentSettingsObject& Navigator::navigator_storage_settings_object() const
+ {
+     return relevant_settings_object(*m_window);
+diff --git a/Libraries/LibWeb/HTML/Navigator.h b/Libraries/LibWeb/HTML/Navigator.h
+index 1b577412b2483f8810a4fbd7cbe99eeb820d208c..1cc9845a42cdc3be9def907ac68c6340319c9600 100644
+--- a/Libraries/LibWeb/HTML/Navigator.h
++++ b/Libraries/LibWeb/HTML/Navigator.h
+@@ -91,6 +91,7 @@ private:
+     explicit Navigator(Window&);
+ 
+     virtual URL::URL navigator_id_url() const override;
++    virtual Farbling::Seed navigator_id_seed() const override;
+ 
+     // ^StorageAPI::NavigatorStorage
+     virtual EnvironmentSettingsObject& navigator_storage_settings_object() const override;
+diff --git a/Libraries/LibWeb/HTML/NavigatorID.cpp b/Libraries/LibWeb/HTML/NavigatorID.cpp
+index a44afd5c9c82d33df6f93a0543f876f26b6c2bc2..9cd11c19198452b6b32537c2ee1a356f30580320 100644
+--- a/Libraries/LibWeb/HTML/NavigatorID.cpp
++++ b/Libraries/LibWeb/HTML/NavigatorID.cpp
+@@ -8,6 +8,7 @@
+ #include <AK/ByteString.h>
+ #include <AK/StringBuilder.h>
+ #include <AK/Utf16StringBuilder.h>
++#include <LibWeb/Farbling/UserAgent.h>
+ #include <LibWeb/HTML/NavigatorID.h>
+ #include <LibWeb/Loader/LoaderConfig.h>
+ #include <LibWeb/Loader/ResourceLoader.h>
+@@ -20,7 +21,7 @@ Utf16String NavigatorIDMixin::app_version() const
+ {
+     // 1. Let userAgent be this's relevant settings object's environment default `User-Agent` value.
+     // FIXME: Store that on the settings object?
+-    auto user_agent = current_loader_config()->config.user_agent_for_url(navigator_id_url());
++    auto user_agent = Farbling::effective_user_agent(navigator_id_seed(), current_loader_config()->config.user_agent_for_url(navigator_id_url()));
+ 
+     // 2. If userAgent does not start with `Mozilla/5.0 (`, then return the empty string.
+     if (!user_agent.starts_with_bytes("Mozilla/5.0 ("sv))
+@@ -62,8 +63,11 @@ Utf16String NavigatorIDMixin::platform() const
+     // "Linux x86_64", "Linux armv81") or, for privacy and compatibility, a string that is commonly returned on another
+     // platform.
+ 
+-    // FIXME: Use some portion of the user agent string to make spoofing work 100%
+-    return Utf16String::from_ascii_without_validation(ResourceLoader::the().platform().bytes());
++    auto platform = Farbling::effective_platform(
++        navigator_id_seed(),
++        ResourceLoader::the().platform(),
++        current_loader_config()->config.user_agent);
++    return Utf16String::from_ascii_without_validation(platform.bytes());
+ }
+ 
+ // https://html.spec.whatwg.org/multipage/system-state.html#dom-navigator-oscpu
+@@ -73,7 +77,7 @@ Utf16String NavigatorIDMixin::oscpu() const
+     // the browser is executing, e.g. "Windows NT 10.0; Win64; x64", "Linux x86_64".
+     // The platform tokens of the User-Agent string say what it claims to run on: the parenthesized list without the
+     // "Macintosh" and "X11" markers and without the "rv:" version, so "Intel Mac OS X 10.15" or "Linux x86_64".
+-    auto user_agent = current_loader_config()->config.user_agent_for_url(navigator_id_url());
++    auto user_agent = Farbling::effective_user_agent(navigator_id_seed(), current_loader_config()->config.user_agent_for_url(navigator_id_url()));
+     auto open = user_agent.find_byte_offset('(');
+     auto close = user_agent.find_byte_offset(')');
+     if (!open.has_value() || !close.has_value() || *close <= *open)
+@@ -118,7 +122,7 @@ Utf16FlyString NavigatorIDMixin::product_sub() const
+ Utf16String NavigatorIDMixin::user_agent() const
+ {
+     // Must return the default `User-Agent` value.
+-    auto user_agent = current_loader_config()->config.user_agent_for_url(navigator_id_url());
++    auto user_agent = Farbling::effective_user_agent(navigator_id_seed(), current_loader_config()->config.user_agent_for_url(navigator_id_url()));
+     return Utf16String::from_ascii_without_validation(user_agent.bytes());
+ }
+ 
+diff --git a/Libraries/LibWeb/HTML/NavigatorID.h b/Libraries/LibWeb/HTML/NavigatorID.h
+index ffe0ce5818258672817dcb20b425d099c5e5f762..31916a093a933b5123c1c722cc97fdf4c3c7d0de 100644
+--- a/Libraries/LibWeb/HTML/NavigatorID.h
++++ b/Libraries/LibWeb/HTML/NavigatorID.h
+@@ -9,6 +9,7 @@
+ #include <AK/Utf16FlyString.h>
+ #include <AK/Utf16String.h>
+ #include <LibURL/URL.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
+ 
+ namespace Web::HTML {
+ 
+@@ -58,6 +59,7 @@ public:
+ 
+ protected:
+     virtual URL::URL navigator_id_url() const = 0;
++    virtual Farbling::Seed navigator_id_seed() const { return {}; }
+ };
+ 
+ }
+diff --git a/Libraries/LibWeb/HTML/WorkerNavigator.cpp b/Libraries/LibWeb/HTML/WorkerNavigator.cpp
+index 73f4063fe346f1b3a68f51303649f68214d898cd..c302532479ee27015c877f76494d9cdae29faf24 100644
+--- a/Libraries/LibWeb/HTML/WorkerNavigator.cpp
++++ b/Libraries/LibWeb/HTML/WorkerNavigator.cpp
+@@ -32,6 +32,11 @@ URL::URL WorkerNavigator::navigator_id_url() const
+     return m_global_scope->url();
+ }
+ 
++Farbling::Seed WorkerNavigator::navigator_id_seed() const
++{
++    return relevant_settings_object(*m_global_scope).farbling_seed();
++}
++
+ void WorkerNavigator::visit_edges(GC::Cell::Visitor& visitor)
+ {
+     Base::visit_edges(visitor);
+diff --git a/Libraries/LibWeb/HTML/WorkerNavigator.h b/Libraries/LibWeb/HTML/WorkerNavigator.h
+index 409e5a5704edbe9aa14fd4f7216cafa7b5dbc2cc..45d8d99f85eb5e0d8e7ec928bc08dc37d0761fbe 100644
+--- a/Libraries/LibWeb/HTML/WorkerNavigator.h
++++ b/Libraries/LibWeb/HTML/WorkerNavigator.h
+@@ -52,6 +52,7 @@ private:
+     explicit WorkerNavigator(WorkerGlobalScope&);
+ 
+     virtual URL::URL navigator_id_url() const override;
++    virtual Farbling::Seed navigator_id_seed() const override;
+ 
+     virtual void visit_edges(GC::Cell::Visitor&) override;
+ 
+diff --git a/Libraries/LibWeb/WebSockets/WebSocket.cpp b/Libraries/LibWeb/WebSockets/WebSocket.cpp
+index 7e27a8710222f74e41f658f9202ab69ef98c94ad..e4658b9268e39189f7fae8ef148c5f2ff6009327 100644
+--- a/Libraries/LibWeb/WebSockets/WebSocket.cpp
++++ b/Libraries/LibWeb/WebSockets/WebSocket.cpp
+@@ -27,6 +27,7 @@
+ #include <LibWeb/Fetch/Infrastructure/NetworkPartitionKey.h>
+ #include <LibWeb/Fetch/Infrastructure/PortBlocking.h>
+ #include <LibWeb/FileAPI/Blob.h>
++#include <LibWeb/Farbling/UserAgent.h>
+ #include <LibWeb/HTML/CloseEvent.h>
+ #include <LibWeb/HTML/EventHandler.h>
+ #include <LibWeb/HTML/EventNames.h>
+@@ -230,7 +231,9 @@ ErrorOr<void> WebSocket::establish_web_socket_connection(URL::URL const& url_rec
+ 
+     auto additional_headers = HTTP::HeaderList::create();
+ 
+-    auto user_agent = current_loader_config()->config.user_agent_for_websocket_url(connection_url);
++    auto configured = current_loader_config()->config.user_agent_for_websocket_url(connection_url);
++    auto seed = HTML::relevant_settings_object(*window_or_worker).farbling_seed();
++    auto user_agent = Farbling::effective_user_agent(seed, configured);
+     additional_headers->append({ "User-Agent"sv, user_agent.to_byte_string() });
+ 
+     if (ResourceLoader::proxy_autoconfig_url().has_value()) {
+diff --git a/Tests/LibWeb/CMakeLists.txt b/Tests/LibWeb/CMakeLists.txt
+index 010f8371d24b7ee49cfedfe57e32cdf217bd7301..4d5812f678897a396fdcb26303ddc01fc832a9ac 100644
+--- a/Tests/LibWeb/CMakeLists.txt
++++ b/Tests/LibWeb/CMakeLists.txt
+@@ -31,6 +31,7 @@ set(TEST_SOURCES
+     TestAudioFudge.cpp
+     TestFontAllow.cpp
+     TestHardwareFarbling.cpp
++    TestUserAgentReduction.cpp
+     TestFaviconDecoding.cpp
+     TestFetchBodyDeliveryGate.cpp
+     TestFetchByteChannel.cpp
+diff --git a/Tests/LibWeb/TestUserAgentReduction.cpp b/Tests/LibWeb/TestUserAgentReduction.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..1bf300e1b0311cf577d0ac3ecebe4d65094c4009
+--- /dev/null
++++ b/Tests/LibWeb/TestUserAgentReduction.cpp
+@@ -0,0 +1,59 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibTest/TestCase.h>
++#include <LibWeb/Farbling/UserAgent.h>
++#include <LibWebCommon/Loader/UserAgent.h>
++
++TEST_CASE(off_keeps_ladybird_default)
++{
++    Web::Farbling::Seed off {};
++    auto value = Web::Farbling::effective_user_agent(off, Web::default_user_agent);
++    EXPECT_EQ(value, Web::default_user_agent);
++    EXPECT(value.contains("Ladybird/"sv));
++}
++
++TEST_CASE(standard_is_reduced_and_stable)
++{
++    Web::Farbling::Seed a { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 };
++    Web::Farbling::Seed b { .level = Web::Farbling::Level::Standard, .high = 9, .low = 8 };
++    auto first = Web::Farbling::effective_user_agent(a, Web::default_user_agent);
++    auto second = Web::Farbling::effective_user_agent(b, Web::default_user_agent);
++    EXPECT_EQ(first, second);
++    EXPECT_EQ(first, Web::Farbling::reduced_user_agent());
++    EXPECT(!first.contains("Ladybird/"sv));
++    EXPECT(first.contains("Chrome/153"sv));
++    EXPECT(first.starts_with_bytes("Mozilla/5.0 ("sv));
++}
++
++TEST_CASE(strict_matches_standard)
++{
++    Web::Farbling::Seed standard { .level = Web::Farbling::Level::Standard, .high = 3, .low = 4 };
++    Web::Farbling::Seed strict { .level = Web::Farbling::Level::Strict, .high = 3, .low = 4 };
++    EXPECT_EQ(Web::Farbling::effective_user_agent(standard, Web::default_user_agent),
++        Web::Farbling::effective_user_agent(strict, Web::default_user_agent));
++}
++
++TEST_CASE(override_wins)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 1, .low = 1 };
++    auto override_ua = "Mozilla/5.0 (compatible; Override/1.0)"sv;
++    EXPECT_EQ(Web::Farbling::effective_user_agent(seed, override_ua), override_ua);
++}
++
++TEST_CASE(reduced_platform_is_frozen)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 1, .low = 1 };
++    auto platform = Web::Farbling::effective_platform(seed, "Linux aarch64"sv, Web::default_user_agent);
++    EXPECT_EQ(platform, Web::Farbling::reduced_platform());
++    EXPECT(!platform.contains("aarch64"sv));
++}
++
++TEST_CASE(off_platform_is_unchanged)
++{
++    Web::Farbling::Seed off {};
++    EXPECT_EQ(Web::Farbling::effective_platform(off, "Linux aarch64"sv, Web::default_user_agent), "Linux aarch64"sv);
++}

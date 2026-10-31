@@ -1,0 +1,5 @@
+CMAKE_EXIT:0
+[12/18] Linking CXX executable bin/TestUserAgentReduction
+[16/18] Linking CXX executable bin/test-web
+[17/18] Linking CXX executable xenon/bin/Xenon
+NINJA_EXIT:0

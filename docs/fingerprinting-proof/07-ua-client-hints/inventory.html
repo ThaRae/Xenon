@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>UA inventory</title></head>
+<body>
+<script>
+function nav() {
+    const n = navigator;
+    return {
+        userAgent: n.userAgent,
+        appVersion: n.appVersion,
+        platform: n.platform,
+        vendor: n.vendor,
+        vendorSub: n.vendorSub,
+        product: n.product,
+        productSub: n.productSub,
+        appCodeName: n.appCodeName,
+        appName: n.appName,
+        oscpu: "oscpu" in n ? n.oscpu : null,
+        userAgentData: "userAgentData" in n,
+        seed: (typeof internals !== "undefined") ? internals.farblingSeedInfo() : "no-internals",
+    };
+}
+fetch("/report?run=inventory", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: "nav", value: nav() }),
+}).then(() => fetch("/pixel.png")).then(() => setTimeout(() => window.close(), 50));
+</script>
+</body>
+</html>

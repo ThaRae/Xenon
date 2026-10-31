@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>B UA</title><script src="measure.js"></script></head>
+<body>
+<img src="/pixel.png" alt="" />
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "same-process";
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+const measure = navigatorSample();
+Promise.all([echoHeaders(), echoXHR(), withWorker(), websocketUa()]).then(([fetchHeaders, xhrHeaders, worker, websocket]) => {
+    const payload = { measure, fetchHeaders, xhrHeaders, worker, websocket };
+    return post("b-direct", payload).then(() => post("complete", payload));
+}).finally(() => setTimeout(() => window.close(), 50));
+</script>
+</body>
+</html>
