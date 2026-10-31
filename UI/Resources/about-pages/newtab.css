@@ -4,11 +4,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/*
- * The new tab page: today's date, the sites you go to most as a speed dial of keys, and the tabs you closed last. A
- * private window's page says what it does and doesn't keep instead, on the dark ground in either theme.
- */
-
 body {
     overflow-x: hidden;
 }
@@ -40,7 +35,6 @@ body {
     font-size: 14px;
 }
 
-/* The dial groups, switched like tabs. */
 .groups-row {
     display: flex;
     align-items: center;
@@ -75,7 +69,6 @@ body {
     color: var(--xenon-muted);
 }
 
-/* The dial: a site per key, its rank as the legend. */
 .dial {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -172,7 +165,6 @@ body {
     color: var(--xenon-muted);
 }
 
-/* A new profile's dial: empty keys that fill in as the sites come. */
 .dial.empty .tile-face {
     background: none;
     border: 1.5px dashed var(--xenon-hairline);
@@ -190,8 +182,6 @@ body {
     font-size: 14px;
     color: var(--xenon-muted);
 }
-
-/* Recently closed */
 
 .recently-closed {
     margin-top: 32px;
@@ -275,8 +265,6 @@ body {
     right: 24px;
     bottom: 24px;
 }
-
-/* A private window: the app icon's dark ground, in either theme. */
 
 body.private {
     --xenon-page: #0d0a0c;

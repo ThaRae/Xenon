@@ -1,19 +1,8 @@
-// The chrome.* API of Xenon's extension pages, background workers, and content scripts.
-//
-// This runs before an extension's own scripts, given `bridge`, the context's channel to Xenon's UI process
-// (bridge.postMessage(string) and bridge.onmessage), and `config`, what it needs to answer synchronously: the
-// extension's ID, manifest, and messages, and what kind of context this is. Everything else is a call to the UI
-// process, which knows which extension and context sent it and checks what that extension may do. Content scripts run
-// it in their extension's isolated world in a page, which the page's own scripts can't reach.
-//
-// https://developer.chrome.com/docs/extensions/reference/api
-
 "use strict";
 
 const pendingCalls = new Map();
 let nextCallId = 1;
 
-// Events the UI process sends, by name ("alarms.onAlarm").
 const events = new Map();
 
 function post(message) {
@@ -22,7 +11,6 @@ function post(message) {
 
 class ExtensionError extends Error {}
 
-// Calls into the UI process. The promise rejects with the error the UI process gives.
 function call(name, args = []) {
     return new Promise((resolve, reject) => {
         const id = nextCallId++;
@@ -31,7 +19,6 @@ function call(name, args = []) {
     });
 }
 
-// chrome.runtime.lastError is set only while a callback runs, as in Chrome.
 let lastError;
 let lastErrorChecked = false;
 
@@ -52,8 +39,6 @@ function reportListenerError(error) {
     });
 }
 
-// MV3 APIs return a promise, unless the last argument is a callback, which gets the result instead (and
-// chrome.runtime.lastError on failure).
 function promiseOrCallback(args, operation) {
     const callback = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
     const promise = Promise.resolve().then(() => operation(...args));
@@ -76,20 +61,15 @@ function api(operation) {
     return (...args) => promiseOrCallback(args, operation);
 }
 
-// Extension messages and API arguments travel as JSON, as Chrome sends messages.
 function toJSON(value) {
     const json = JSON.stringify(value);
     return json === undefined ? null : JSON.parse(json);
 }
 
-// A method the UI process answers, with the arguments it was given.
 function method(name, transform = result => result) {
     return api((...args) => call(name, args.map(toJSON)).then(transform));
 }
 
-// The events the background worker has listeners for, by the name the UI process sends them by, and how many of
-// chrome.*'s events with listeners each is: storage.onChanged is chrome.storage's and each storage area's. A background
-// that stopped when idle starts again for these, as Chrome's service workers do, so the UI process hears of each.
 const listenedEvents = new Map();
 
 function setListening(name, listening) {
@@ -104,7 +84,6 @@ class ExtensionEvent {
     #listeners = [];
     #name;
 
-    // An event the UI process sends has its name.
     constructor(name) {
         this.#name = name;
     }
@@ -130,7 +109,6 @@ class ExtensionEvent {
         return this.#listeners.length > 0;
     }
 
-    // Returns what each listener returned.
     dispatch(...args) {
         return this.#listeners.map(listener => {
             try {
@@ -151,9 +129,6 @@ function event(name) {
 
 const hasPermission = permission => config.permissions.includes(permission);
 
-// --- chrome.runtime ----------------------------------------------------------------------------------------------------
-
-// A long-lived connection between two contexts of the extension (runtime.connect and runtime.onConnect).
 const ports = new Map();
 
 class Port {
@@ -181,7 +156,6 @@ class Port {
         post({ type: "port-disconnect", port: this.#id });
     }
 
-    // The other end went away, or never came.
     closeFromUIProcess(error) {
         if (this.#disconnected) return;
         this.#disconnected = true;
@@ -191,7 +165,6 @@ class Port {
     }
 }
 
-// What runtime.sendMessage() and tabs.sendMessage() give back: the first response, to a callback if there is one.
 function messageReply(promise, callback) {
     if (!callback) return promise.then(reply => reply.response);
     promise.then(
@@ -215,7 +188,6 @@ function messageReply(promise, callback) {
 
 const runtimeOnMessage = event("runtime.onMessage");
 const runtimeOnConnect = event("runtime.onConnect");
-// Messages and ports from the web pages that externally_connectable lets reach the extension.
 const runtimeOnMessageExternal = event("runtime.onMessageExternal");
 const runtimeOnConnectExternal = event("runtime.onConnectExternal");
 
@@ -240,7 +212,6 @@ const runtime = {
     sendMessage(...args) {
         const callback = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
 
-        // sendMessage(extensionId?, message, options?)
         let extensionId;
         if (args.length >= 3 || (args.length === 2 && (typeof args[0] === "string" || args[0] == null)))
             extensionId = args.shift();
@@ -255,7 +226,6 @@ const runtime = {
     },
 
     connect(...args) {
-        // connect(extensionId?, connectInfo?)
         const extensionId = typeof args[0] === "string" ? args.shift() : undefined;
         const name = args[0]?.name ?? "";
         const id = crypto.randomUUID();
@@ -299,8 +269,6 @@ const runtime = {
         SHARED_MODULE_UPDATE: "shared_module_update",
     },
 };
-
-// --- chrome.storage ----------------------------------------------------------------------------------------------------
 
 const storageOnChanged = event("storage.onChanged");
 const storageAreas = {};
@@ -364,8 +332,6 @@ const storage = {
 };
 for (const name of ["local", "session", "sync", "managed"]) storageAreas[name] = storage[name];
 
-// --- chrome.i18n -------------------------------------------------------------------------------------------------------
-
 function substitute(message, substitutions) {
     return message.replace(/\$(\$|[1-9])/g, (_, which) => {
         if (which === "$") return "$";
@@ -391,11 +357,8 @@ const i18n = {
     detectLanguage: api(() => ({ isReliable: false, languages: [] })),
 };
 
-// --- chrome.alarms -----------------------------------------------------------------------------------------------------
-
 const alarms = {
     create: api((...args) => {
-        // create(name?, alarmInfo)
         const name = typeof args[0] === "string" ? args.shift() : "";
         return call("alarms.create", [name, toJSON(args[0] ?? {})]).then(() => undefined);
     }),
@@ -405,8 +368,6 @@ const alarms = {
     clearAll: method("alarms.clearAll"),
     onAlarm: event("alarms.onAlarm"),
 };
-
-// --- chrome.action -----------------------------------------------------------------------------------------------------
 
 const action = {
     setBadgeText: method("action.setBadgeText"),
@@ -418,7 +379,6 @@ const action = {
     setTitle: method("action.setTitle"),
     getTitle: method("action.getTitle"),
     setIcon: api(details => {
-        // FIXME: Icons drawn as ImageData, which can't travel as JSON.
         if (details?.imageData && !details.path)
             throw new ExtensionError("action.setIcon() takes only a path for now.");
         return call("action.setIcon", [toJSON({ ...details, imageData: undefined })]);
@@ -433,15 +393,12 @@ const action = {
     onClicked: event("action.onClicked"),
 };
 
-// --- chrome.tabs and chrome.windows ------------------------------------------------------------------------------------
-
 const tabs = {
     query: method("tabs.query"),
     get: method("tabs.get"),
     getCurrent: method("tabs.getCurrent", tab => tab ?? undefined),
     create: method("tabs.create"),
     update: api((...args) => {
-        // update(tabId?, updateProperties)
         const tabId = typeof args[0] === "number" ? args.shift() : null;
         return call("tabs.update", [tabId, toJSON(args[0] ?? {})]);
     }),
@@ -451,7 +408,6 @@ const tabs = {
         return call("tabs.reload", [tabId]).then(() => undefined);
     }),
     duplicate: method("tabs.duplicate"),
-    // Messages and ports to a tab go to the extension's content scripts in it.
     sendMessage(tabId, message, ...args) {
         const callback = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
         const options = args[0] ?? {};
@@ -503,10 +459,6 @@ const windows = {
     WINDOW_ID_CURRENT: -2,
 };
 
-// --- chrome.webNavigation and chrome.scripting -------------------------------------------------------------------------
-
-// The events follow every frame of a tab (onCreatedNavigationTarget and onTabReplaced never fire), and getFrame() and
-// getAllFrames() see every frame.
 const webNavigation = {
     getFrame: method("webNavigation.getFrame"),
     getAllFrames: method("webNavigation.getAllFrames"),
@@ -521,8 +473,6 @@ const webNavigation = {
     onHistoryStateUpdated: event("webNavigation.onHistoryStateUpdated"),
 };
 
-// https://developer.chrome.com/docs/extensions/reference/api/scripting
-// A function to run travels as its source, and its arguments as JSON, as Chrome serializes both.
 const scripting = {
     executeScript: api(injection => {
         const details = toJSON({ ...injection, func: undefined, args: undefined });
@@ -549,10 +499,6 @@ const scripting = {
     StyleOrigin: { AUTHOR: "AUTHOR", USER: "USER" },
 };
 
-// --- chrome.webRequest and chrome.notifications ------------------------------------------------------------------------
-
-// FIXME: Seeing requests needs the engine to ask the UI process about them (milestone 4). Until then, the events never
-//        fire, and requests go ahead as if no extension were listening.
 const webRequest = {
     onBeforeRequest: event("webRequest.onBeforeRequest"),
     onBeforeSendHeaders: event("webRequest.onBeforeSendHeaders"),
@@ -567,8 +513,6 @@ const webRequest = {
     MAX_HANDLER_BEHAVIOR_CHANGED_CALLS_PER_10_MINUTES: 20,
 };
 
-// FIXME: Xenon doesn't show extensions' notifications yet (milestone 4). They're accepted, and reported as not
-//        permitted, as in Chrome when the user turns an extension's notifications off.
 const notifications = {
     create: api((...args) => (typeof args[0] === "string" && args[0] ? args[0] : crypto.randomUUID())),
     update: api(() => false),
@@ -584,13 +528,10 @@ const notifications = {
     PermissionLevel: { GRANTED: "granted", DENIED: "denied" },
 };
 
-// --- The rest ----------------------------------------------------------------------------------------------------------
-
 const permissions = {
     contains: method("permissions.contains"),
     getAll: method("permissions.getAll"),
     request: api(details => {
-        // As in Chrome, only in answer to the user's click or key press.
         if (!globalThis.navigator?.userActivation?.isActive)
             throw new ExtensionError("This function must be called during a user gesture");
         return call("permissions.request", [toJSON(details)]);
@@ -647,12 +588,9 @@ const extension = {
     isAllowedFileSchemeAccess: api(() => false),
 };
 
-// --- Messages from the UI process --------------------------------------------------------------------------------------
-
 function deliverMessage({ id, message, sender, external }) {
     const onMessage = external ? runtimeOnMessageExternal : runtimeOnMessage;
 
-    // With no listener, nothing here is a receiving end, which the sender hears if no other context is one either.
     if (!onMessage.hasListeners()) {
         post({ type: "response", id, handled: false, listening: false });
         return;
@@ -668,7 +606,6 @@ function deliverMessage({ id, message, sender, external }) {
 
     for (const result of onMessage.dispatch(message, sender, sendResponse)) {
         if (result === true) keepsChannelOpen = true;
-        // A listener may also answer with a promise, as in Firefox and with Chrome's polyfill.
         else if (result && typeof result.then === "function") {
             keepsChannelOpen = true;
             result.then(sendResponse, error => sendResponse({ error: String(error) }));
@@ -730,10 +667,6 @@ bridge.onmessage = text => {
     }
 };
 
-// --- The popup's size --------------------------------------------------------------------------------------------------
-
-// Chrome sizes an action popup to its page. The page's body sets the width when it has one narrower than the popup, and
-// anything wider than the popup widens it; its content sets the height.
 if (config.isPopup) {
     const reportSize = () => {
         const body = document.body;
@@ -751,15 +684,12 @@ if (config.isPopup) {
     });
 }
 
-// A page that goes away says so, so that its ports close and messages stop waiting for it.
 if (typeof document !== "undefined") addEventListener("pagehide", () => post({ type: "closing" }));
 
-// A service worker's install and activate events, as ExtendableEvents whose waitUntil() Xenon doesn't wait for.
 function dispatchLifecycleEvent(type) {
     const event = new Event(type);
     event.waitUntil = () => {};
     try {
-        // NB: Workers have no oninstall or onactivate event handler attributes, so a function set as one is called here.
         if (typeof self[`on${type}`] === "function") self[`on${type}`](event);
     } catch (error) {
         reportListenerError(error);
@@ -767,10 +697,7 @@ function dispatchLifecycleEvent(type) {
     self.dispatchEvent(event);
 }
 
-// The background worker's script runs right after this, and once it has, the UI process sends runtime.onInstalled or
-// runtime.onStartup (see /_generated_background_worker.js).
 if (config.isBackground) {
-    // Install handlers call skipWaiting() to take over from the service worker before them, which this one has none of.
     Object.defineProperty(self, "skipWaiting", { configurable: true, writable: true, value: () => Promise.resolve() });
 
     const ready = Symbol.for("xenon.background.ready");
@@ -778,10 +705,6 @@ if (config.isBackground) {
         configurable: true,
         value() {
             delete self[ready];
-            // A service worker is installed and activated once its script has run. This worker is a new one each time
-            // the browser starts, so it is each time. MV3 extensions load the rest of their code with importScripts()
-            // while installing, the only time a service worker may import a new script, as Proton Pass does with its
-            // chunks. Loaded later, from a promise's reaction, Ladybird would never finish loading them.
             dispatchLifecycleEvent("install");
             dispatchLifecycleEvent("activate");
             post({ type: "call", id: nextCallId++, name: "runtime.backgroundReady", args: [] });
@@ -789,9 +712,6 @@ if (config.isBackground) {
     });
 }
 
-// --- chrome.privacy ----------------------------------------------------------------------------------------------------
-
-// A browser setting an extension may control (types.ChromeSetting).
 function chromeSetting(name) {
     return {
         get: api(details => call("privacy.get", [name, toJSON(details ?? {})])),
@@ -801,8 +721,6 @@ function chromeSetting(name) {
     };
 }
 
-// FIXME: Xenon has no password manager or autofill of its own, so these are off, and an extension that sets one only
-//        becomes the one controlling it. The network and websites settings come with the features they control.
 const privacy = {
     services: {
         passwordSavingEnabled: chromeSetting("privacy.services.passwordSavingEnabled"),
@@ -811,8 +729,6 @@ const privacy = {
         autofillCreditCardEnabled: chromeSetting("privacy.services.autofillCreditCardEnabled"),
     },
 };
-
-// --- Native messaging --------------------------------------------------------------------------------------------------
 
 function connectNative(application) {
     const id = crypto.randomUUID();
@@ -846,10 +762,6 @@ const sendNativeMessage = api((application, message) => {
     });
 });
 
-// --- chrome ------------------------------------------------------------------------------------------------------------
-
-// Offscreen documents get chrome.runtime alone, and content scripts a few of its members, chrome.i18n, and
-// chrome.storage, as in Chrome.
 const isContentScript = config.contextType === "CONTENT_SCRIPT";
 const contentScriptRuntime = {};
 for (const name of ["id", "getURL", "getManifest", "sendMessage", "connect", "onMessage", "onConnect", "lastError"])
@@ -862,8 +774,6 @@ else if (config.contextType !== "OFFSCREEN_DOCUMENT") {
     if (config.manifest.action) chrome.action = action;
 }
 
-// The APIs that come with permissions. An optional permission's API arrives in every open context when the user grants
-// it, and goes when the extension gives it up, as in Chrome.
 const permittedAPIs = {
     storage,
     alarms,

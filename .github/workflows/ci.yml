@@ -1,20 +1,5 @@
 name: CI
 
-# GitHub-hosted runners. The checks run first; then Xenon is built and tested on Linux and macOS side by side. Each then
-# runs Ladybird's own tests against the engine with Xenon's patches (Meta/xenon.py ladybird-test), as Ladybird's CI runs
-# them, so a patch that breaks something upstream tests fails the build.
-#
-# - Linux builds in Ladybird's own CI image (Meta/ci/build-in-ladybird-image.sh), at the version the pinned submodule
-#   names, so Xenon is built with exactly the compilers, Qt, and system libraries Ladybird is tested with.
-# - macOS builds natively, with the Xcode version and Homebrew packages Ladybird's own CI uses
-#   (ladybird/.github/actions/setup), so bumping the submodule bumps them too.
-#
-# ccache's objects (Build/caches) and vcpkg's prebuilt packages (ladybird/Build/caches) are kept in GitHub's cache, one
-# entry per platform. main saves them; a pull request starts from main's, and only saves its own when there were none to
-# start from, or when its build missed ccache more than 500 times. That's a pull request that changes much of what's
-# compiled (a Ladybird bump, say), and its next push then starts from its own caches rather than recompiling the same
-# files from main's. A cold build takes a few hours, so the build step stops itself in time for the caches to be saved,
-# and the next run carries on from there.
 on:
   push:
     branches: [main]
@@ -49,10 +34,9 @@ jobs:
 
   linux:
     needs: checks
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-24.04' || vars.LINUX_RUNNER || 'slab-xenon' }}
     timeout-minutes: 360
     steps:
-      # The runner starts with about 20 GB free, and a cold build needs more. These are toolchains Xenon doesn't use.
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
@@ -80,6 +64,8 @@ jobs:
       - name: Build Xenon and run its tests, and Ladybird's
         timeout-minutes: 320
         run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/build-and-test.sh
+        env:
+          CCACHE_TOKEN: ${{ runner.environment == 'self-hosted' && secrets.CCACHE_TOKEN || '' }}
 
       - name: Count ccache's misses
         id: ccache
@@ -114,7 +100,6 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # What the web tests that failed rendered or printed, beside what they should have, as Ladybird's CI keeps them.
       - name: Upload the failed web tests' output
         if: failure()
         uses: actions/upload-artifact@v7
@@ -157,7 +142,6 @@ jobs:
       - name: Check out Ladybird (the pinned submodule)
         run: git submodule update --init --depth 1 ladybird
 
-      # The Xcode Ladybird's own CI selects, read from the submodule.
       - name: Select Xcode
         run: |
           version=$(sed -n "s/.*xcode-version: *'\{0,1\}\([0-9.]*\)'\{0,1\}.*/\1/p" ladybird/.github/actions/setup/action.yml)
@@ -170,7 +154,6 @@ jobs:
           echo "XCODE_VERSION=$(xcodebuild -version | head -n 1)" >> "$GITHUB_ENV"
           xcodebuild -version
 
-      # The packages Ladybird's own CI installs on macOS (ladybird/.github/actions/setup).
       - name: Install dependencies
         run: |
           brew update --quiet
@@ -187,7 +170,6 @@ jobs:
           key: macos-${{ env.XCODE_VERSION }}-${{ github.sha }}
           restore-keys: macos-${{ env.XCODE_VERSION }}-
 
-      # Both run, whatever the other's result, and the step fails if either does (as in Meta/ci/build-and-test.sh).
       - name: Build Xenon and run its tests, and Ladybird's
         timeout-minutes: 320
         run: |

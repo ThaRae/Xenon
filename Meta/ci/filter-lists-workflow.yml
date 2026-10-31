@@ -1,12 +1,5 @@
 name: Update
 
-# xenon-filter-lists' workflow, kept in Xenon (Meta/ci/filter-lists-workflow.yml) and copied to
-# .github/workflows/update.yml there. Every day it rebuilds Xenon's filter lists from uBlock Origin's with xenon-ublock,
-# signs their manifest, and commits them, where Xenon fetches them (UI/FilterListUpdates.h,
-# Documentation/FilterListUpdates.md).
-#
-# Xenon and xenon-ublock are public, so checking them out needs no token, and GITHUB_TOKEN pushes the lists. Secret:
-#   FILTER_LISTS_SIGNING_KEY  the Ed25519 private key, in PEM, whose public half Xenon checks manifest.json with
 on:
   schedule:
     - cron: "17 5 * * *"
@@ -47,8 +40,6 @@ jobs:
           persist-credentials: false
 
       - name: Update Rust
-        # tools/build.py checks every filter with a probe built on the engine's adblock crate (Rust, edition 2024), and
-        # builds uBlock Origin's scriptlets with Node.js. The runner image has both, and Python and OpenSSL 3.
         run: rustup update stable --no-self-update
 
       - name: Build and sign the lists

@@ -27,11 +27,9 @@
 
 namespace Ladybird::FilterLists {
 
-// Where xenon-filter-lists publishes the bundle, and the public half of the key it signs manifest.json with.
 static constexpr auto UPDATES_URL = "https://raw.githubusercontent.com/ThaRae/xenon-filter-lists/main/"sv;
 static constexpr auto PUBLIC_KEY = "n1G8auYT7+ppTD19FMr7o3oWbSaioHm38CWCr7FCuZ4="sv;
 
-// For tests, which publish bundles of their own from a local server, signed with a key of their own.
 static constexpr auto UPDATES_URL_VARIABLE = "XENON_FILTER_LIST_UPDATES_URL"sv;
 static constexpr auto PUBLIC_KEY_VARIABLE = "XENON_FILTER_LIST_UPDATES_PUBLIC_KEY"sv;
 
@@ -44,9 +42,7 @@ static constexpr u64 MAXIMUM_SIGNATURE_SIZE = 1 * KiB;
 
 static constexpr auto CHECK_INTERVAL = AK::Duration::from_seconds(24 * 60 * 60);
 static constexpr auto RETRY_INTERVAL = AK::Duration::from_seconds(60 * 60);
-// How often Xenon looks at whether a check is due, which also catches up soon after the computer wakes.
 static constexpr auto TICK_INTERVAL = AK::Duration::from_seconds(10 * 60);
-// The first check waits a moment, so that its downloads don't compete with the pages the browser opens with.
 static constexpr auto FIRST_CHECK_DELAY = AK::Duration::from_seconds(5);
 
 static Updater* s_updater;
@@ -57,7 +53,6 @@ static ErrorOr<ByteBuffer> read_file(StringView path)
     return file->read_until_eof();
 }
 
-// Writes a file in full or not at all, so that nothing reads half of one.
 static ErrorOr<void> write_file(StringView path, ReadonlyBytes contents)
 {
     auto temporary = ByteString::formatted("{}.tmp", path);
@@ -145,8 +140,6 @@ void Updater::content_blocker_settings_changed()
     Core::deferred_invoke([this] { check_if_due(); });
 }
 
-// A bundle in a directory, if its manifest reads, and its files are all there at the sizes it says. A downloaded
-// bundle's manifest must also be signed with Xenon's key, and in the format this build reads.
 Optional<Updater::Bundle> Updater::load_bundle(ByteString directory, bool downloaded) const
 {
     auto manifest_bytes = read_file(LexicalPath::join(directory, MANIFEST_NAME).string());
@@ -177,7 +170,6 @@ Optional<Updater::Bundle> Updater::load_bundle(ByteString directory, bool downlo
 
 Optional<ByteString> Updater::current_directory()
 {
-    // Without the updater (in test mode, or with content blocking off from the start), the bundled lists are in use.
     if (s_updater && s_updater->m_current.has_value())
         return s_updater->m_current->directory;
     return bundled_lists_directory();
@@ -258,7 +250,6 @@ void Updater::check_if_due()
     if (!settings.automatic_filter_list_updates_allowed() || !settings.content_blocker_enabled())
         return;
 
-    // A check from the future means the clock was wrong then, or is now, so it doesn't count.
     auto now = UnixDateTime::now();
     if (m_checked_at.has_value() && *m_checked_at <= now && now - *m_checked_at < CHECK_INTERVAL)
         return;
@@ -307,7 +298,6 @@ void Updater::did_download_manifest(ByteBuffer manifest, ByteBuffer signature)
         return;
     }
 
-    // Lists for a newer Xenon, or ones no newer than these, leave these as they are until tomorrow.
     if (new_bundle.value().format != BUNDLE_FORMAT || !is_newer(new_bundle.value(), m_current)) {
         if (new_bundle.value().format != BUNDLE_FORMAT)
             dbgln("The latest filter lists are for a newer version of Xenon");
@@ -346,7 +336,6 @@ void Updater::update_next_file()
         auto const& file = m_new_bundle->files[m_next_file];
         auto destination = LexicalPath::join(staging, file.path).string();
 
-        // A file that hasn't changed is copied from the lists Xenon has, rather than downloaded again.
         auto copied = [&](Optional<Bundle> const& bundle) {
             if (!bundle.has_value())
                 return false;
@@ -390,7 +379,6 @@ void Updater::finish_update()
 {
     auto staging = LexicalPath::join(m_directory, STAGING_NAME).string();
 
-    // The directory is named for when the lists were generated: "2026-10-27 05:17 UTC" is 202610270517.
     StringBuilder name;
     for (auto c : m_new_bundle->generated_at.view()) {
         if (is_ascii_digit(c))
@@ -423,7 +411,6 @@ void Updater::finish_update()
     m_error.clear();
     save_state();
 
-    // Ladybird has read the new lists, so the older ones can go.
     Core::DirIterator iterator(m_directory, Core::DirIterator::SkipDots);
     while (iterator.has_next()) {
         auto path = iterator.next_full_path();

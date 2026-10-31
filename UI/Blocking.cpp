@@ -24,12 +24,9 @@ namespace Ladybird::Blocking {
 
 static constexpr auto DASHBOARD_URL = "xenon://blocking/"sv;
 
-// The popover reads what a page loaded from the page's performance timeline, in an isolated world of its own, so the
-// page's scripts can neither see the question nor change the answer.
 static constexpr auto DOMAINS_WORLD = "xenon-blocking"sv;
 static constexpr auto DOMAINS_SCRIPT = R"~~~([location.href, ...performance.getEntriesByType("resource").map(entry => entry.name)])~~~"sv;
 
-// How long the popover waits after a page's blocked count last changed before asking it for its domains again.
 static constexpr int DOMAINS_REFRESH_DELAY_MS = 250;
 
 URL::URL dashboard_url()
@@ -39,7 +36,6 @@ URL::URL dashboard_url()
 
 void count_blocked_requests(WebView::ViewImplementation const& view, WebView::ContentBlockingSnapshot const& snapshot)
 {
-    // What each view's page had blocked when it last reported. A count lower than that is a new page's.
     static HashMap<u64, u64> s_counted;
     auto& counted = s_counted.ensure(view.view_id(), [] { return 0; });
     auto count = snapshot.blocked_request_count;
@@ -80,7 +76,6 @@ void set_site_switch(BlockingSiteSwitch site_switch, StringView site, bool enabl
     if (enabled)
         lines.append(filter);
 
-    // The new filters are joined before the old ones they view are replaced.
     auto new_filters = MUST(String::join('\n', lines));
     WebView::Application::settings().set_custom_content_blocker_filters(move(new_filters));
 }
@@ -116,7 +111,6 @@ static bool is_network_url(URL::URL const& url)
     return url.scheme().is_one_of("http"sv, "https"sv, "ws"sv, "wss"sv) && url.host().has_value();
 }
 
-// Asks each of the view's documents what it loaded, and counts the requests by host.
 class DomainQuery final : public RefCounted<DomainQuery> {
 public:
     static void run(WebView::ViewImplementation& view, Function<void(Vector<BlockingDomain>)> on_done)
@@ -154,7 +148,6 @@ private:
             m_page_site = site_of(*page_url.host());
     }
 
-    // A host's registrable domain, or the host itself for an address or a name with no public suffix.
     static String site_of(URL::Host const& host)
     {
         if (auto registrable_domain = host.registrable_domain(); registrable_domain.has_value())
@@ -200,7 +193,6 @@ private:
 void connect_popover(Tab& tab, BlockingPopover& popover)
 {
     struct State : RefCounted<State> {
-        // Whether a site switch changed while the popover was open: the page reloads to show it once it closes.
         bool switches_changed { false };
     };
     auto state = make_ref_counted<State>();

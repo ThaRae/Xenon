@@ -1,21 +1,5 @@
 #!/usr/bin/env python3
 
-# Refreshes the filter lists Xenon ships (UI/Resources/filter-lists) from xenon-ublock, which converts uBlock Origin's
-# filter lists into lists Ladybird's content blocker applies correctly.
-#
-#   Meta/update-filter-lists.py                       rebuild the lists in ../xenon-ublock, then copy them here
-#   Meta/update-filter-lists.py --no-build            copy what ../xenon-ublock last built
-#   Meta/update-filter-lists.py --xenon-ublock PATH   use another checkout
-#   Meta/update-filter-lists.py --output DIR          write the bundle elsewhere, as xenon-filter-lists' daily build does
-#
-# Xenon ships the lists Helium's uBlock Origin fork turns on (xenon-ublock's "helium" preset), except the ones in
-# EXCLUDED. Every shipped list's file records its source, its license, and what the conversion kept.
-#
-# The lists are converted for Ladybird with the content blocker patches in Xenon's patch series (Patches/ladybird, from
-# xenon-ublock): they keep uBlock Origin's scriptlets, procedural filters, popup and CNAME filters. uBlock Origin's own
-# lists go in trusted-lists/, which may use the scriptlets uBO reserves for its lists, and uBO's scriptlets and
-# redirect surrogates in resources/.
-
 from __future__ import annotations
 
 import argparse
@@ -32,12 +16,8 @@ OUTPUT_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "filter-lists"
 PRESET = "helium"
 ENGINE = "xenon"
 
-# The bundle's layout, and the engine features its lists rely on, as Xenon reads them (BUNDLE_FORMAT in
-# UI/FilterListBundle.h). Bump both together whenever a Xenon built before the change couldn't use the new output: a new
-# kind of file, or lists that need engine patches it lacks. Xenon only downloads bundles in the format it reads.
 FORMAT = 1
 
-# Lists in the preset that Xenon doesn't ship, and why.
 EXCLUDED = {
     "plowe-0": "Peter Lowe's list states no license, so it needs its author's permission to redistribute",
     "helium-annoyances": "AGPL-3.0, and almost none of it survives conversion for Ladybird",
@@ -46,15 +26,12 @@ EXCLUDED = {
 
 
 def checked_list_id(list_id: str) -> str:
-    """A list id out of the converter's manifest, which names the file the list ships as. It must be a plain name, so
-    that neither it nor the manifest can reach a file outside the bundle's lists/ or trusted-lists/."""
     if not list_id or list_id in (".", "..") or "\\" in list_id or Path(list_id).name != list_id:
         sys.exit(f"the manifest's list id '{list_id}' isn't a plain name, so its list can't be shipped")
     return list_id
 
 
 def checked_dist_file(dist: Path, file: str, what: str) -> Path:
-    """A file name out of the converter's manifest, which may only name a file the converter built into dist/."""
     source = (dist / file).resolve()
     if not source.is_relative_to(dist.resolve()):
         sys.exit(f"the manifest's {what} '{file}' is outside {dist}, so it isn't a converted file")
@@ -167,8 +144,6 @@ def notice(shipped: list[dict], resources: dict, generated_at: str, commit: str)
 
 
 def self_test() -> int:
-    """Feeds hostile and honest converter manifests to the path checks, through main() itself, and drives the checks
-    directly. A hostile manifest's ids and file names must not reach outside the converter's dist/ or the bundle."""
     problems = 0
 
     def check(condition: bool, message: str) -> None:
@@ -177,7 +152,6 @@ def self_test() -> int:
             problems += 1
             print(f"self-test: {message}", file=sys.stderr)
 
-    # The checks themselves, driven directly.
     for bad_id in ("", ".", "..", "a/b", "a\\b", "../x", "a/", "/a"):
         try:
             checked_list_id(bad_id)
@@ -239,7 +213,6 @@ def self_test() -> int:
             }
         ]
 
-        # An honest manifest still copies its lists.
         write_manifest(honest_list, "payload.txt")
         out = root / "bundle"
         check(
@@ -251,7 +224,6 @@ def self_test() -> int:
             "an honest list wasn't copied",
         )
 
-        # A manifest whose list id climbs out of the bundle is refused, and nothing lands outside.
         traversed = root / "traversed.txt"
         write_manifest([{**honest_list[0], "id": "../traversed"}], "payload.txt")
         check(
@@ -260,8 +232,6 @@ def self_test() -> int:
         )
         check(not traversed.exists(), "a climbing list id wrote a file outside the bundle")
 
-        # A manifest whose file names name files outside the converter's dist/ are refused, for a list and for the
-        # resources file, which would otherwise carry an outside file inside the shipped bundle.
         for what, lists, resources_file in (
             (
                 "list file",

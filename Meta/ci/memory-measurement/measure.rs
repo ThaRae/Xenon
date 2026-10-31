@@ -1,12 +1,3 @@
-// How much memory one WebContent process spends on the content blocker for Xenon's filter lists (issue #28).
-//
-// Each scenario runs in a fresh child process, which reads the lists as Application::load_content_blocker_lists() joins
-// them, builds the engine with the same entry point WebContent uses (rust_content_blocker_create), frees its copy of
-// the text (WebContent's is a shared buffer, unmapped after the IPC call), and reports its memory: physical footprint
-// on macOS (Activity Monitor's Memory column), RSS on Linux.
-//
-//   measure <filter-lists directory>
-
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
@@ -18,7 +9,6 @@ unsafe extern "C" {
     fn mi_collect(force: bool);
 }
 
-// The C++ side of RustPanic.rs and RustDemangle.rs, which the content blocker crate includes.
 #[unsafe(no_mangle)]
 extern "C" fn ladybird_rust_panic(
     _: *const u8,
@@ -162,8 +152,6 @@ fn scenarios(directory: &Path) -> Vec<Scenario> {
     scenarios
 }
 
-// As Application::load_content_blocker_lists() joins them: each file followed by a newline, then the custom filters
-// (none here) and a newline.
 fn joined(paths: &[PathBuf], with_custom_filters: bool) -> Vec<u8> {
     let mut bytes = Vec::new();
     for path in paths {
@@ -176,7 +164,6 @@ fn joined(paths: &[PathBuf], with_custom_filters: bool) -> Vec<u8> {
     bytes
 }
 
-// Builds the engine WebContent builds, and prints one tab-separated row.
 fn measure_webcontent(scenario: &Scenario) {
     collect();
     let start = memory();
@@ -213,8 +200,6 @@ fn measure_webcontent(scenario: &Scenario) {
     std::hint::black_box(engine);
 }
 
-// The plain adblock engine for the same lists (what main_engine_from_lists builds, without Xenon's popup and CNAME
-// engines or the generic selector list index), and its serialized size, which is what it keeps in memory.
 fn measure_adblock(scenario: &Scenario, serialized_path: Option<&Path>) {
     collect();
     let start = memory();
@@ -255,7 +240,6 @@ fn measure_adblock(scenario: &Scenario, serialized_path: Option<&Path>) {
     std::hint::black_box(engine);
 }
 
-// Loads a serialized engine, as a process would if it were handed one instead of the lists.
 fn measure_deserialize(path: &Path) {
     let serialized = std::fs::read(path).unwrap();
     collect();
@@ -280,8 +264,6 @@ fn measure_deserialize(path: &Path) {
     std::hint::black_box(engine);
 }
 
-// Checks that the engine WebContent builds blocks the same pages as a plain adblock engine holding every filter, for
-// URLs made from the lists' `||host/path^$document` filters, which Xenon's patch keeps out of the engine.
 fn verify(scenario: &Scenario) {
     let rules = joined(&scenario.lists, true);
     let trusted_rules = joined(&scenario.trusted_lists, false);
@@ -317,8 +299,6 @@ fn verify(scenario: &Scenario) {
         if pattern.contains(['*', '^', '|', '$']) {
             continue;
         }
-        // Ladybird serializes URLs with lowercase hosts, and the engine doesn't lowercase them itself, so only the path
-        // gets another case.
         let (host, path) = pattern.split_at(pattern.find('/').unwrap_or(pattern.len()));
         urls.push(("exact", format!("https://{pattern}")));
         urls.push(("query", format!("https://{pattern}?x=1")));
@@ -375,7 +355,6 @@ fn verify(scenario: &Scenario) {
     }
 }
 
-// What the lists put in a page at each URL: hiding selectors, procedural filters, and scriptlets.
 fn cosmetics(scenario: &Scenario) {
     let rules = String::from_utf8(joined(&scenario.lists, true)).unwrap();
     let trusted_rules = String::from_utf8(joined(&scenario.trusted_lists, false)).unwrap();

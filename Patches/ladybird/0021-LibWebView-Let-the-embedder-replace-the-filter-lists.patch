@@ -17,8 +17,8 @@ a settings change does. Pages get the new rules only if they changed.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Libraries/LibWebView/Application.cpp | 8 ++++++++
- Libraries/LibWebView/Application.h   | 4 ++++
- 2 files changed, 12 insertions(+)
+ Libraries/LibWebView/Application.h   | 2 ++
+ 2 files changed, 10 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
 index 542d7460f436241435c645bfedbb761ca4d74b86..5daa7f3e4b62cbcf03356e7f373c9b724c3659a1 100644
@@ -40,15 +40,13 @@ index 542d7460f436241435c645bfedbb761ca4d74b86..5daa7f3e4b62cbcf03356e7f373c9b72
  {
      m_browser_options.content_blocker_list_paths = m_explicit_content_blocker_list_paths;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 5b775160a48a9950456c39bf2b75232d4464522e..7602c2d052ea12c69b0435f59fc75e899a7fef17 100644
+index cb2b43e5c9faad61c74ab57e0faee767880d3a13..a3ac4dffdafd9da5775c1fa854e8f6a8012910b2 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -209,6 +209,10 @@ public:
+@@ -201,6 +201,8 @@ public:
      void remove_content_blocker_list(Badge<SettingsUI>, StringView identifier);
      Optional<UnixDateTime> content_blocker_list_last_updated_at(StringView identifier) const;
  
-+    // Replaces the lists and resources the browser was started with (--content-blocker-list,
-+    // --trusted-content-blocker-list, and --content-blocker-resources), and applies them to every page.
 +    void set_explicit_content_blockers(Vector<ByteString> list_paths, Vector<ByteString> trusted_list_paths, Optional<ByteString> resources_path);
 +
      struct BookmarkID {

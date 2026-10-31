@@ -1,19 +1,5 @@
 #!/usr/bin/env python3
 
-# Reproducible memory and BrowserBench measurements for issue #28.
-#
-#   Meta/measure.py content-blocker              # filter-list engine, no browser build
-#   Meta/measure.py processes --pid PID          # RSS/PSS of a running process tree
-#   Meta/measure.py browsers --xenon PATH [...]  # headless Xenon (and Chrome) on sample pages
-#   Meta/measure.py bench --xenon PATH [...]     # Speedometer / JetStream / MotionMark, if reachable
-#   Meta/measure.py web-benchmarks --xenon PATH  # Ladybird's web-benchmarks suites, in headless Xenon
-#   Meta/measure.py js-benchmarks                # Ladybird's js-benchmarks suites, in the js and wasm REPLs
-#   Meta/measure.py report LOG [--baseline LOG]  # a benchmark log as markdown, compared with an earlier one
-#   Meta/measure.py self-test                    # Linux smaps parsing, no Xenon needed
-#
-# Writes JSON to --log (default Meta/measure-results/<stamp>.json) and a markdown table to stdout.
-# Documentation/Memory.md says how to rerun this and what each experiment decided.
-
 from __future__ import annotations
 
 import argparse
@@ -63,17 +49,11 @@ REMOTE_PAGES = [
     "https://x.com/",
 ]
 
-# MotionMark 1.3.1 starts only from its Run Benchmark button, and that button stays disabled until the suite's
-# frame-rate probe finishes, so neither a query string nor an onload handler can start it. This copy of the suite's
-# index.html polls for the enabled button and presses it; --resource-map serves it as the suite's document, and every
-# other resource still comes from browserbench.org.
 MOTIONMARK_PAGE = "https://browserbench.org/MotionMark1.3.1/"
 MOTIONMARK_START_PAGE = XENON_SOURCE_DIR / "Meta" / "motionmark-autostart.html"
 
 BROWSER_BENCH_PAGES = [
     ("Speedometer 3.1", "https://browserbench.org/Speedometer3.1/?startAutomatically"),
-    # JetStreamDriver.js reads ?report=true only (it starts 4 s after its resource prefetch); it has no
-    # ?startAutomatically parameter, so that URL always left the suite on its Start Test page.
     ("JetStream 2.2", "https://browserbench.org/JetStream2.2/?report=true"),
     ("MotionMark 1.3.1", MOTIONMARK_PAGE),
 ]
@@ -83,32 +63,20 @@ BENCH_SUBSTITUTIONS = {
         {"url": MOTIONMARK_PAGE, "file": str(MOTIONMARK_START_PAGE), "content_type": "text/html"},
     ],
 }
-# Headless Linux under Xvfb has no working GPU backend, so MotionMark is measured with CPU painting.
 BENCH_EXTRA_FLAGS = {"MotionMark 1.3.1": ["--force-cpu-painting"]}
 
 SETTLE_SECONDS = 25
-# Default Speedometer 3.1 is 10 iterations and often needs well over 3 minutes on Ladybird.
 BENCH_SECONDS = 900
-# JetStream 2.2 runs every plan's iterations to completion; 20 minutes was still 55 of 64 tests.
-# MotionMark's full run, every test at three seconds plus warm-up, finished inside 600 s on the software rasterizer.
 BENCH_SECONDS_BY_SUITE = {"JetStream 2.2": 1800, "MotionMark 1.3.1": 600}
-# How long Xenon gets to write its dump and quit after the delay, which a page as big as MotionMark's results takes.
 BENCH_DUMP_GRACE = 180
 BENCH_WINDOW = (1280, 900)
 
-# Ladybird's own benchmark suites, which its CI runs on every push to master (ladybird/.github/workflows/
-# web-benchmarks.yml and js-and-wasm-benchmarks.yml). web-benchmarks drives a browser, headless, through a local server
-# its runner starts; js-benchmarks runs the js and wasm REPLs, which Xenon's build makes from the same patched engine.
-# Each is checked out, with a venv for its runner, under Build/benchmarks.
 LADYBIRD_BENCHMARKS = {
     "web-benchmarks": "https://github.com/LadybirdBrowser/web-benchmarks.git",
     "js-benchmarks": "https://github.com/LadybirdBrowser/js-benchmarks.git",
 }
 LADYBIRD_BENCHMARKS_DIR = XENON_SOURCE_DIR / "Build" / "benchmarks"
-# Ladybird's CI runs each test five times.
 LADYBIRD_BENCHMARK_ITERATIONS = 5
-# report counts a difference as a change only when it's bigger than this many standard errors of the difference, and
-# than this share of the earlier value. GitHub's runners are shared machines, where a few percent either way is noise.
 SIGNIFICANT_STANDARD_ERRORS = 2
 SIGNIFICANT_SHARE = 0.03
 
@@ -191,8 +159,6 @@ def main() -> int:
     }
     log_path.write_text(json.dumps(payload, indent=2) + "\n")
     print(f"wrote {log_path}", flush=True)
-    # As Ladybird's runners do, a run that lost a test still counts, with the test named, and fails only when nothing was
-    # measured.
     if result.get("failures") and os.environ.get("CI"):
         print(f"::warning title={args.command}::Left out, as they didn't finish: {', '.join(result['failures'])}")
     if result.get("returncode") or result.get("results") == {}:
@@ -264,7 +230,6 @@ def measure_browsers(xenon_path: Path, chrome_path: Path | None, settle: float, 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             if self.path == "/":
-                # localhost vs 127.0.0.1 is a different origin, so each frame gets its own WebContent process.
                 port = self.server.server_address[1]
                 frames = "".join(f'<iframe src="http://localhost:{port}/frame-{index}"></iframe>' for index in range(3))
                 body = f"<!doctype html><title>Frames</title>Three cross-site frames{frames}".encode()
@@ -327,7 +292,6 @@ def xenon_command(
     (config / "Settings.json").write_text(json.dumps({"contentBlockers": {"enabled": blocking}}))
     flags = list(extra) if extra else ["--headless=manual"]
     if substitutions:
-        # RequestServer loads the map before it enters its sandbox and is allowed to read each substituted file.
         resource_map = profile / "resource-map.json"
         resource_map.write_text(json.dumps({"substitutions": substitutions}))
         flags.append(f"--resource-map={resource_map}")
@@ -341,7 +305,6 @@ QUOTED_SCORE = re.compile(r'^"([0-9]+(?:\.[0-9]+)?)"$')
 
 
 def scan_quoted_score(lines: list[str], header_index: int) -> list[float]:
-    """Decimal values in the quoted fragments that follow a layout-dump `"Score"` fragment line."""
     out = []
     for candidate in lines[header_index + 1 : header_index + 40]:
         match = QUOTED_SCORE.match(candidate)
@@ -355,13 +318,6 @@ def scan_quoted_score(lines: list[str], header_index: int) -> list[float]:
 
 
 def visible_page_lines(text: str) -> list[str]:
-    """Split a suite dump into the strings a user could read.
-
-    Xenon's text mode prints the page's inner text. Builds from before engine patch 0041 captured the dump's type
-    by reference, so their delayed dumps could print the layout tree and the GC graph after the text, or the
-    accessibility tree instead. The first two can be tens of megabytes and never hold a score, so cut them off; in an
-    accessibility tree the visible strings are the name="..." attributes of text leaves and headings/links/buttons.
-    """
     text = text.split("\nViewport <#document> at [", 1)[0]
     if 'text leaf name="' not in text:
         return [line.strip() for line in text.splitlines()]
@@ -374,25 +330,17 @@ def visible_page_lines(text: str) -> list[str]:
 
 
 def parse_browserbench_score(suite: str, text: str) -> float | None:
-    """Pull a numeric suite score out of headless page text. Returns None if the suite never finished."""
     if not text:
         return None
     if 'text leaf name="' in text:
-        # JetStream's summary is <div class="score">96.629</div><label>Score</label>: in an accessibility dump
-        # the total is the cluster's text leaf just before the "Score" label. Scanning forward from "Score"
-        # instead reaches the first benchmark's heading a few leaves later (113.639 on a 10-test run).
         match = re.search(r'text leaf name="([0-9]+(?:\.[0-9]+)?)"\s*\n\s*text leaf name="Score"', text)
         if match is not None:
             value = float(match.group(1))
             if value > 0:
                 return value
         if suite.startswith("JetStream") and "level=3" in text:
-            # Benchmark rows keep their per-benchmark score after the suite stops, but a dump without the
-            # summary leaf has no suite total; the fallbacks below would return the first row's number.
             return None
     lines = visible_page_lines(text)
-    # MotionMark's results table has its own "Score" header, and the row directly under it is Multiply, not the
-    # suite total; the total is the "<n> @ 60fps" line the page prints above the table.
     for line in lines:
         match = re.match(r'^"?([0-9]+(?:\.[0-9]+)?)\s*@\s*60fps', line.strip())
         if match is not None:
@@ -401,9 +349,6 @@ def parse_browserbench_score(suite: str, text: str) -> float | None:
                 return value
     quoted_header_index = None
     if 'text leaf name="' not in text:
-        # Layout-tree dumps quote their text fragments, so the <h1>Score</h1> fragment is a bare
-        # `"Score"` line and the result cell lands later as a bare `"5.51"` fragment line; the ±
-        # confidence has its own fragment, which QUOTED_SCORE only accepts on a bare decimal line.
         for index, line in enumerate(lines):
             inline = re.match(r'^"score:\s*([0-9]+(?:\.[0-9]+)?)"$', line.lower())
             if inline is not None:
@@ -437,22 +382,17 @@ def parse_browserbench_score(suite: str, text: str) -> float | None:
                 value = float(match.group(1))
                 if value > 0:
                     return value
-    # The DOM order can be "<div class=score>142.7</div><label>Score</label>" (JetStream's summary).
     for index, line in enumerate(lines[:-1]):
         if lines[index + 1].lower().rstrip(":") == "score" and SCORE_LINE.match(line):
             return float(SCORE_LINE.match(line).group(1))
-    # MotionMark has no "Score" label next to its total, only the score and its "±" confidence.
     for index, line in enumerate(lines[:-1]):
         if SCORE_LINE.match(line) and lines[index + 1].startswith(("±", "Â±", "+/-")):
             return float(SCORE_LINE.match(line).group(1))
-    # Xenon's text mode also dumps the layout tree, and on some pages body.innerText comes back empty while the
-    # rendered score is still there: the suite puts its total in <div class="score">.
     match = re.search(r'<div\.score[ >\n][^\n]*\n.{0,1600}?"([0-9]+(?:\.[0-9]+)?)"', text, re.DOTALL)
     if match:
         value = float(match.group(1))
         if value > 0:
             return value
-    # JetStream sometimes prints "JetStream 2.2 Score: 142.7" on one line.
     match = re.search(r"(?i)" + re.escape(suite.split()[0]) + r".{0,40}score[:\s]+([0-9]+(?:\.[0-9]+)?)", text)
     if match:
         value = float(match.group(1))
@@ -464,7 +404,6 @@ def parse_browserbench_score(suite: str, text: str) -> float | None:
 def dump_excerpt(output: str) -> str:
     start = output.find("Dumping page text")
     if start != -1:
-        # Keep the helper process lines just before the dump: they say whether the resource substitution was applied.
         return output[max(0, start - 1000) : start + 4000]
     return output[-4000:]
 
@@ -529,8 +468,6 @@ def measure_bench(
                 "seconds": elapsed,
                 "score": score,
                 "sample": sample,
-                # The page text is at the start of the dump; the layout tree and GC graph that follow add tens of
-                # megabytes and hold no score.
                 "output_excerpt": dump_excerpt(output or ""),
             }
         )
@@ -538,26 +475,20 @@ def measure_bench(
 
 
 def measure_web_benchmarks(xenon_path: Path, benchmarks: str, iterations: int, ref: str) -> dict:
-    # Absolute, as run.py runs from its checkout.
     xenon = xenon_executable(xenon_path).resolve()
-    # run.py gives the browser a fresh profile of its own (--profile-path), so Xenon runs with its defaults.
     arguments = ["--executable", str(xenon), "--benchmarks", benchmarks, "--iterations", str(iterations)]
     result = run_ladybird_benchmarks("web-benchmarks", ref, arguments)
-    # run.py drops a benchmark that didn't finish from its results, and names it last.
     failed = re.search(r"The following benchmarks failed: (.*)", result.pop("output"))
     result["failures"] = failed.group(1).strip().split(", ") if failed else []
     return {"executable": str(xenon), "selection": benchmarks, "iterations": iterations, **result}
 
 
 def measure_js_benchmarks(build_dir: Path, suites: str, iterations: int, ref: str) -> dict:
-    # Absolute, as run.py runs from its checkout.
     js = build_dir.resolve() / "bin" / "js"
     wasm = build_dir.resolve() / "bin" / "wasm"
     if not js.exists() or not wasm.exists():
         print(f"{js} and {wasm} are built by: Meta/xenon.py build js && Meta/xenon.py build wasm", file=sys.stderr)
         sys.exit(1)
-    # Without --continue-on-failure, the first test that fails stops the run and loses every result before it. With it,
-    # run.py leaves that test out and says so, and the run fails here once the rest are measured.
     arguments = [
         "--executable",
         str(js),
@@ -570,7 +501,6 @@ def measure_js_benchmarks(build_dir: Path, suites: str, iterations: int, ref: st
         "--continue-on-failure",
     ]
     result = run_ladybird_benchmarks("js-benchmarks", ref, arguments)
-    # The command ends with the test, as a path: ... PosixPath('Octane/box2d.js')]'
     result["failures"] = re.findall(r"Test execution failure: Command '\[.*'([^']+)'\)?\]'", result.pop("output"))
     return {"executable": str(js), "selection": suites, "iterations": iterations, **result}
 
@@ -586,7 +516,6 @@ def run_ladybird_benchmarks(name: str, ref: str, arguments: list[str]) -> dict:
     subprocess.run(["git", "checkout", "--quiet", "--force", "FETCH_HEAD"], cwd=directory, check=True)
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=directory, text=True).strip()
 
-    # The runners' own packages (scipy, tabulate, ...), in a venv beside each, as Ladybird's CI installs them.
     environment = directory / ".venv"
     python = environment / "bin" / "python3"
     if not python.exists():
@@ -615,7 +544,6 @@ def run_ladybird_benchmarks(name: str, ref: str, arguments: list[str]) -> dict:
         "repository": LADYBIRD_BENCHMARKS[name],
         "commit": commit,
         "xenon_commit": source_commit(XENON_SOURCE_DIR),
-        # The commit the patches were applied to; ladybird/'s HEAD is the patched branch.
         "ladybird_commit": patches.applied_base(),
         "host": host_description(),
         "seconds": time.time() - started,
@@ -644,7 +572,6 @@ def host_description() -> dict:
     return {"system": platform.system(), "machine": platform.machine(), "cpu": cpu, "cpus": os.cpu_count()}
 
 
-# One measured quantity: its runs, and whether more is better (a score) or less (a time).
 class Measure:
     def __init__(self, runs: list[float], higher_is_better: bool):
         self.runs = [float(run) for run in runs]
@@ -669,7 +596,6 @@ def number_text(value: float, digits: int) -> str:
 
 
 def ladybird_benchmark_measures(command: str, results: dict) -> tuple[dict, dict]:
-    """A Ladybird suite's results.json as two maps of Measure: one per suite (its total) and one per test."""
     totals = {}
     tests = {}
     for group, entries in results.items():
@@ -677,7 +603,6 @@ def ladybird_benchmark_measures(command: str, results: dict) -> tuple[dict, dict
         for name, entry in entries.items():
             if name == "_total":
                 continue
-            # Octane and WasmCoremark print a score; everything else is timed (js-benchmarks' compare.py picks the same).
             if "reported_score" in entry:
                 group_tests[f"{group}/{name}"] = Measure(entry["reported_score"]["runs"], True)
             elif "time" in entry:
@@ -690,7 +615,6 @@ def ladybird_benchmark_measures(command: str, results: dict) -> tuple[dict, dict
         elif "time" in total:
             totals[group] = Measure(total["time"]["runs"], False)
         elif group_tests:
-            # js-benchmarks has no totals of its own: a suite's total is the sum of its tests, run by run.
             measures = list(group_tests.values())
             counts = {len(measure.runs) for measure in measures}
             if len(counts) == 1 and len({measure.higher_is_better for measure in measures}) == 1:
@@ -700,7 +624,6 @@ def ladybird_benchmark_measures(command: str, results: dict) -> tuple[dict, dict
 
 
 def change_text(new: Measure, old: Measure | None) -> tuple[str, bool]:
-    """How new compares with old, in words, and whether the difference is bigger than the noise."""
     if old is None or old.mean <= 0 or new.mean <= 0:
         return "", False
     ratio = new.mean / old.mean if new.higher_is_better else old.mean / new.mean
@@ -717,7 +640,6 @@ def change_text(new: Measure, old: Measure | None) -> tuple[str, bool]:
 
 
 def markdown_table(header: list[str], rows: list[list[str]]) -> str:
-    # The name and the change read as text; the numbers between them line up on the right.
     alignment = ["---"] + ["---:"] * (len(header) - 2) + ["---"]
     lines = ["| " + " | ".join(header) + " |", "| " + " | ".join(alignment) + " |"]
     lines += ["| " + " | ".join(row) + " |" for row in rows]
@@ -774,7 +696,6 @@ def report_ladybird_benchmarks(command: str, payload: dict, baseline: dict | Non
         old = old_totals.get(group)
         label = "score" if measure.higher_is_better else "time"
         rows.append([group, f"{label} {measure.text()}", old.text() if old else "", change_text(measure, old)[0]])
-    # Without an earlier run, the columns for it would be empty.
     columns = 4 if baseline is not None else 2
     header = ["Suite", "Xenon", "Main", "Change"][:columns]
     lines += [markdown_table(header, [row[:columns] for row in rows]), ""]
@@ -1024,9 +945,6 @@ def self_test() -> int:
     if parsed != 203.5:
         print(f"self-test: MotionMark parser got {parsed!r}, want 203.5", file=sys.stderr)
         return 1
-    # The real 600 s MotionMark dump (scratch/measure-after/A4-mm-dump-2/motionmark-600s.txt): the suite total
-    # is the "<n> @ 60fps" line, while the first row under the results table's Score heading is Multiply. The
-    # parser must return the total, not 423.17.
     motionmark_text_dump = (
         "version 1.3.1\n"
         "414.16 @ 60fps\n"
@@ -1056,8 +974,6 @@ def self_test() -> int:
     if parsed != 142.7:
         print(f"self-test: number-before-Score parser got {parsed!r}, want 142.7", file=sys.stderr)
         return 1
-    # The shape of a 300 s JetStream accessibility dump: the suite total is a text leaf before the label, and each
-    # benchmark heading further down holds its own score.
     jetstream_a11y_dump = (
         "document\n"
         "  generic\n"
@@ -1097,8 +1013,6 @@ def self_test() -> int:
     if parsed != 203.5:
         print(f"self-test: accessibility dump parser got {parsed!r}, want 203.5", file=sys.stderr)
         return 1
-    # A 600 s Speedometer accessibility dump had no page text at all; the score survived only as the first decimal
-    # text leaf under the Score heading. The "3.1" version leaf must not be picked up.
     speedometer_a11y_dump = (
         '    link name="Speedometer 3.1" url="#home"\n'
         '      image name="Speedometer"\n'
@@ -1125,8 +1039,6 @@ def self_test() -> int:
     if parse_browserbench_score("Speedometer 3.1", swap_dump) != 7.44:
         print("self-test: Speedometer accessibility dump ignored its fixture number", file=sys.stderr)
         return 1
-    # A 120 s Speedometer layout dump put the result in div#result-number as a quoted fragment, followed by the ±
-    # confidence fragment.
     speedometer_layout_dump = (
         "        BlockContainer <h1> at [240,180] [0+0+0 800 0+0+0] [30+0+0 44 0+0+26.796875] children: inline\n"
         "          frag 0 from TextNode start: 0, length: 5, rect: [587.734375,180 104.515625x44] baseline: 35.875\n"
@@ -1169,7 +1081,6 @@ def self_test() -> int:
     if not auto_start:
         print("self-test: BrowserBench URLs must start the suite without a click", file=sys.stderr)
         return 1
-    # MotionMark has no URL-driven start, so bench must serve its own start page as the suite's document.
     motionmark_url = dict(BROWSER_BENCH_PAGES)["MotionMark 1.3.1"]
     substitution = BENCH_SUBSTITUTIONS.get("MotionMark 1.3.1", [])
     if not substitution or substitution[0]["url"] != motionmark_url:

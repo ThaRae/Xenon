@@ -21,13 +21,11 @@
 
 namespace Ladybird::Extensions {
 
-// Chrome's limits for popups.
 static constexpr int MINIMUM_WIDTH = 25;
 static constexpr int MINIMUM_HEIGHT = 25;
 static constexpr int MAXIMUM_WIDTH = 800;
 static constexpr int MAXIMUM_HEIGHT = 600;
 
-// Until the page reports its size.
 static constexpr int INITIAL_WIDTH = 360;
 static constexpr int INITIAL_HEIGHT = 480;
 
@@ -52,16 +50,13 @@ QFrame#XenonExtensionPopup {{
         ChromeStyle::style_sheet_color(ChromeStyle::chrome_border(palette))));
 
     auto* layout = new QVBoxLayout(&card());
-    // Inside the card's border and rounded corners.
     layout->setContentsMargins(1, 1, 1, 1);
     layout->setSpacing(0);
 
-    // NB: The popup is the extension's own page, which goes without the content blocker as its background does.
     WebContentViewInitialState initial_state;
     initial_state.enable_content_blocker = WebView::EnableContentBlocker::No;
     m_view = new WebContentView(&card(), {}, initial_state);
     layout->addWidget(m_view);
-    // NB: Before the page loads, so that its chrome.* knows it's a popup.
     Browser::did_open_popup(m_view->view_id(), tab, *this);
 
     m_view->on_close = [this] {
@@ -116,10 +111,6 @@ void ActionPopup::hideEvent(QHideEvent* event)
 {
     Popover::hideEvent(event);
 
-    // A closed popup's page goes away, as in Chrome; the next click opens it afresh. Its ports close then too, which is
-    // how an extension's background learns its popup closed.
-    // NB: The page is asked to close before its view goes. Once the view is gone, the page is closed on this side, and
-    //     the request would have no connection to go out on, leaving WebContent to time out instead.
     Browser::did_close_popup(m_view->view_id());
     m_view->prepare_for_immediate_close()();
     deleteLater();

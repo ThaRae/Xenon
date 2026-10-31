@@ -19,9 +19,6 @@ class WebContentView;
 
 namespace Ladybird::Extensions {
 
-// An extension's action popup: its default_popup page, in a popover below its toolbar button. Like Chrome's, it sizes
-// itself to the page, between 25x25 and 800x600, and closes when it loses focus, on Escape, or when the page calls
-// window.close().
 class ActionPopup final : public Popover {
 public:
     AK_ALLOC_WITH_KMALLOC;

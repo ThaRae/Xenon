@@ -27,23 +27,17 @@ namespace Ladybird {
 
 class BlockingPowerButton;
 
-// uBlock Origin's per-site switches that Xenon has: the ones a filter can stand for (see UI/Blocking.cpp). uBO's others,
-// for large media, cosmetic filtering and JavaScript, need more than Ladybird's content blocker does.
 enum class BlockingSiteSwitch : u8 {
     Popups,
     RemoteFonts,
 };
 
-// A host a page loaded something from, as uBlock Origin lists the domains a page connected to.
 struct BlockingDomain {
     String host;
     size_t requests { 0 };
     bool first_party { false };
 };
 
-// The toolbar shield's popover, laid out like uBlock Origin's popup: a power switch for the site, what was blocked on
-// the page and since Xenon was first run, the domains the page connected to, the site's switches, the element picker
-// and zapper, and a way to the blocking dashboard. It replaces ContentBlockingPopover, and Tab drives it the same way.
 class BlockingPopover final : public Popover {
     AK_ALLOC_WITH_KMALLOC;
 
@@ -57,7 +51,6 @@ public:
     void focus_switch();
 
     void set_blocked_request_total(u64);
-    // The domains the page's documents loaded from, or none while they aren't known.
     void set_domains(Optional<Vector<BlockingDomain>>);
     void set_site_switch(BlockingSiteSwitch, bool enabled);
 
@@ -67,7 +60,6 @@ public:
     Function<void()> on_pick_element;
     Function<void()> on_zap_element;
     Function<void()> on_open_dashboard;
-    // Asks for what the snapshot doesn't carry, when the popover shows, and when its page or blocked count changes.
     Function<void()> on_refresh;
     Function<void()> on_hide;
 

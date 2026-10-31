@@ -1,8 +1,5 @@
 name: Memory measurement
 
-# Opt-in: the content-blocker crate is cheap; a full Xenon + Chrome run is a macOS build.
-# Documentation/Memory.md has the local commands.
-
 on:
   workflow_dispatch:
     inputs:

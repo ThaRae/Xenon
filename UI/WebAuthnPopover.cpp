@@ -115,9 +115,6 @@ WebAuthnPopover::WebAuthnPopover(WebContentView& view)
 
 static QString caller_description(WebView::WebAuthnPrompt const& prompt)
 {
-    // https://w3c.github.io/webauthn/#sctn-createCredential
-    // If the origin that is creating a credential is different from the top-level origin, the client SHOULD make this
-    // fact clear to the user.
     if (!prompt.top_level_origin.has_value())
         return {};
     return qstring_from_ak_string(MUST(String::formatted("Asked by {}, in a frame on {}", prompt.origin.serialize(), prompt.top_level_origin->serialize())));
@@ -242,7 +239,6 @@ void WebAuthnPopover::submit()
     }
 }
 
-// Centered over the view, near its top, where the page the user is looking at asked.
 void WebAuthnPopover::show_over_view()
 {
     adjustSize();

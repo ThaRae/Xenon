@@ -13,24 +13,21 @@ process's RSS.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Services/WebContent/ConnectionFromClient.cpp | 14 ++++++++++++++
- Services/WebContent/ConnectionFromClient.h   |  6 ++++++
+ Services/WebContent/ConnectionFromClient.cpp | 11 +++++++++++
+ Services/WebContent/ConnectionFromClient.h   |  4 ++++
  Services/WebContent/PageClient.cpp           |  1 +
- 3 files changed, 21 insertions(+)
+ 3 files changed, 16 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 602535cc6068d84e836a7faf3b69fdb5e8cc8cee..922ba7de530173dc32ccf6042285e86d14a6dbbd 100644
+index 3fb9f31a9db305669ecabd1ab38e12492d2c9e5e..a1ae7cdd72411b0d85d2799b905d57d26490b079 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3480,6 +3480,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+@@ -3475,6 +3475,17 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
          Web::FileAPI::remove_entry_from_blob_url_store(*url_record);
  }
  
 +void ConnectionFromClient::schedule_memory_release_after_load()
 +{
-+    // A page allocates most around its load event: by then the parser, style and scripts have freed as much as they
-+    // keep, and nothing has collected since. Wait for the page to settle, then collect once and decommit, so the freed
-+    // pages leave the process's RSS rather than sitting in the allocator until the tab is hidden.
 +    if (!m_memory_release_timer) {
 +        m_memory_release_timer = Core::Timer::create_single_shot(AK::Duration::from_seconds(4), [] {
 +            Web::Bindings::main_thread_vm().heap().collect_garbage(GC::Heap::CollectionType::CollectGarbage, false);
@@ -44,7 +41,7 @@ index 602535cc6068d84e836a7faf3b69fdb5e8cc8cee..922ba7de530173dc32ccf6042285e86d
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 98e620a8d194763d3582c1a4cf1147cba3e0cffa..ba81c2f2e20bce229a858c372ef55bbf8f8ae17b 100644
+index 2f57e1e04107ddcb28ca76907eb8bb4625cb1015..131d339c4181aab57f492d74de5a10c4680f5e9d 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -16,6 +16,7 @@
@@ -55,18 +52,16 @@ index 98e620a8d194763d3582c1a4cf1147cba3e0cffa..ba81c2f2e20bce229a858c372ef55bbf
  #include <LibGC/Root.h>
  #include <LibIPC/ConnectionFromClient.h>
  #include <LibJS/Forward.h>
-@@ -88,6 +89,10 @@ public:
+@@ -88,6 +89,8 @@ public:
  
      void pump_and_dispatch_gamepad_events();
  
-+    // Called when a page in this process finishes loading: collects once the page has settled, and gives the freed
-+    // allocator pages back to the OS.
 +    void schedule_memory_release_after_load();
 +
-     // Whether the UI process has user scripts for documents, which they ask it for as they become ready for scripts.
      bool user_scripts_enabled() const { return m_user_scripts_enabled; }
  
-@@ -380,6 +385,7 @@ private:
+ private:
+@@ -379,6 +382,7 @@ private:
  
      RefPtr<TestConnection> m_test_connection;
      RefPtr<Web::Compositor::CompositorConnection> m_compositor_connection;
@@ -75,7 +70,7 @@ index 98e620a8d194763d3582c1a4cf1147cba3e0cffa..ba81c2f2e20bce229a858c372ef55bbf
      OwnPtr<DevToolsDebugger> m_devtools_debugger;
  
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 123a6abf091970a2af8d15416b8976250041782c..ddb314dab5165e9cabe2cd5eff680ad4229605b4 100644
+index 06f7ecffc3f3dd130f44b2e59094de83de909496..d1939a5b578c600360e576f9078d72528e92f6e5 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
 @@ -1046,6 +1046,7 @@ void PageClient::page_did_change_active_document_in_top_level_browsing_context(W

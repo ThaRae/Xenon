@@ -38,7 +38,6 @@ static String name_entry(X509_NAME const* name, int nid)
     return string.release_value();
 }
 
-// In milliseconds since the epoch, as JavaScript's Date takes it.
 static Optional<i64> milliseconds_since_epoch(ASN1_TIME const* time)
 {
     struct tm parts {};
@@ -88,7 +87,6 @@ static bool is_for_host(X509* certificate, URL::URL const& url)
     if (url.host().has_value() && url.host()->is_domain())
         return X509_check_host(certificate, host.characters_without_null_termination(), host.length(), 0, nullptr) == 1;
 
-    // An IPv6 address is serialized in brackets.
     if (host.starts_with('[') && host.ends_with(']'))
         host = host.substring_view(1, host.length() - 2);
     return X509_check_ip_asc(certificate, ByteString { host }.characters(), 0) == 1;
@@ -124,10 +122,6 @@ JsonObject describe_rejected_certificate(ReadonlyBytes der_certificate, URL::URL
     }
     ScopeGuard free_certificate = [&] { X509_free(certificate); };
 
-    // A certificate that vouches for itself has nobody the computer trusts behind it. Otherwise, it's only known that no
-    // trusted authority issued it if nothing else is wrong with it, as RequestServer refused it for something. Many
-    // self-signed server certificates don't allow signing certificates, which X509_check_issued() would hold against
-    // them.
     auto is_self_signed = X509_self_signed(certificate, 1) == 1;
     if (is_self_signed)
         problems.must_append("selfSigned"_string);
