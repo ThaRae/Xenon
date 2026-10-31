@@ -145,17 +145,14 @@ the first time, so the tests build from the same objects as Xenon. It leaves out
 that changes what an upstream test checks updates that test's expectation in the same patch, as it would upstream. CI
 runs it after `Meta/xenon.py test` on Linux and macOS; when a web test fails, the `ladybird-test-dumps-linux` or
 `-macos` artifact has what it rendered or printed. A test may run for 30 minutes, as in Ladybird's CI; `--timeout`
-gives it longer, which the Sanitizer workflow does, and so does the Linux build in `ci.yml` (an hour, as `test-web`
-takes about 40 minutes on slab's runner).
+gives it longer, which the Sanitizer workflow does.
 
 Should Xenon not finish loading `about:welcome` at all, the checks after it, which all load pages, are skipped rather
 than each waiting out its timeouts, which would add up to more than CI gives the job. A helper process that crashes on a
 signal only says so in its crash report, in Xenon's data directory rather than the profile, so when a check fails, the
 test prints the reports saved while it ran.
 
-CI runs on GitHub Actions. The Linux build in `ci.yml`, `sanitizer.yml` and `test262.yml` run on `slab-xenon`, an
-ephemeral runner on slab (16 vCPU, 24 GB, a fresh microVM per job; slab-infra has the rest); everything else runs on
-GitHub's own runners:
+CI runs on GitHub Actions, on GitHub's own runners:
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
@@ -169,11 +166,6 @@ GitHub's own runners:
 
 - **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
   `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
-- **slab**: pull requests from forks run those jobs on `ubuntu-24.04` instead, so code from outside the repository never
-  runs on slab. Setting the repository variable `LINUX_RUNNER` to `ubuntu-24.04` moves them all back to GitHub, for
-  when slab is down: jobs for a runner that never comes up wait in the queue for a day before GitHub fails them. On slab,
-  ccache also reads and writes slab-ccache (`10.255.42.1:8642`, with the `CCACHE_TOKEN` secret) besides the local
-  cache, so a pull request's pushes share what each other compiled even when they don't save a GitHub cache.
 - **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
   (`ladybird/.github/actions/setup`).
 - **Caches**: ccache's objects (`Build/caches`) and vcpkg's prebuilt packages (`ladybird/Build/caches`) are kept in
