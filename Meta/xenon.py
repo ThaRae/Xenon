@@ -27,7 +27,9 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 import wave
 
 from pathlib import Path
@@ -182,6 +184,7 @@ def main():
         help=f"How long one test may run, in seconds (default {LADYBIRD_TEST_TIMEOUT_SECONDS})",
     )
     subparsers.add_parser("clean", help="Delete the build directory for the preset")
+    subparsers.add_parser("self-test", help="Check the filter list bundle server's path handling")
 
     args = parser.parse_args()
     platform = Platform()
@@ -190,6 +193,9 @@ def main():
         build_dir, _ = configure_build_env(args.preset, args.jobs)
         shutil.rmtree(build_dir, ignore_errors=True)
         return
+
+    if args.command == "self-test":
+        sys.exit(self_test())
 
     patches.ensure_applied()
     build_dir = configure_main(platform, args.preset, args.cc, args.cxx, args.jobs)
@@ -1212,6 +1218,115 @@ def check_compositor_busy_page(output: str) -> bool:
 #   2. at its next start it uses v1 in place of the bundled lists, and fetches nothing, since a day hasn't passed;
 #   3. a day later it takes v2, downloading only the list that changed;
 #   4. it turns down v3, whose list isn't the one its manifest describes, and keeps v2.
+def bundle_file_for_request(path: str, version_dir: Path) -> Path | None:
+    """The file a /bundle/ request names in the published version's directory, or none if it names no file there. The
+    remainder after /bundle/ may not arrive as an absolute path, which replaces the directory it's joined onto, or climb
+    out with "..". Either would serve any file the user running the test can read, to anything that can reach the
+    server while it's up."""
+    file = (version_dir / path.removeprefix("/bundle/")).resolve()
+    if ".." in path or not file.is_relative_to(version_dir.resolve()) or not file.is_file():
+        return None
+    return file
+
+
+def start_bundle_server(
+    pages: dict, published: dict, requested: list, updates_dir: Path
+) -> http.server.ThreadingHTTPServer:
+    """Serves the check's pages and the bundle of the version published now, out of updates_dir, and records the bundle
+    paths the client asks for. It binds the loopback, and only lives for the check's run."""
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            path = urllib.parse.urlsplit(self.path).path
+            requested.append(path)
+            status, content_type, body = 200, "application/javascript", b""
+            if path in pages:
+                content_type, body = (
+                    "text/html",
+                    f"<!doctype html><script>{pages[path]}</script>".encode(),
+                )
+            elif path.startswith("/bundle/"):
+                file = bundle_file_for_request(path, updates_dir / published["version"])
+                if file is None:
+                    status = 404
+                else:
+                    content_type, body = "text/plain", file.read_bytes()
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def self_test() -> int:
+    """Drives the bundle server's path handling: an honest bundle path is served, and one that climbs out of the
+    published version's directory, or arrives absolute, is not."""
+    problems = 0
+
+    def check(condition: bool, message: str) -> None:
+        nonlocal problems
+        if not condition:
+            problems += 1
+            print(f"self-test: {message}", file=sys.stderr)
+
+    with tempfile.TemporaryDirectory() as directory:
+        updates_dir = Path(directory)
+        version_dir = updates_dir / "v1"
+        version_dir.mkdir()
+        (version_dir / "manifest.json").write_text("{}\n")
+
+        published = {"version": "v1"}
+        for path, want in (
+            ("/bundle/manifest.json", version_dir / "manifest.json"),
+            ("/bundle//etc/passwd", None),
+            ("/bundle/../../outside.txt", None),
+            ("/bundle/v1/../v2/manifest.json", None),
+            ("/bundle/missing.json", None),
+        ):
+            got = bundle_file_for_request(path, version_dir)
+            check(got == want, f"{path} resolved to {got}, wanted {want}")
+
+        # The live server answers the same way, over HTTP.
+        server = start_bundle_server({"/wait": ""}, published, [], updates_dir)
+        origin = f"http://127.0.0.1:{server.server_address[1]}"
+        try:
+            with urllib.request.urlopen(f"{origin}/bundle/manifest.json", timeout=5) as response:
+                check(
+                    response.status == 200,
+                    "the server didn't serve a bundle file inside the version",
+                )
+        except OSError as error:
+            check(False, f"the server raised {error} for a bundle file inside the version")
+        for path in ("/bundle//etc/passwd", "/bundle/../../../etc/passwd"):
+            try:
+                with urllib.request.urlopen(f"{origin}{path}", timeout=5) as response:
+                    check(
+                        response.status == 404,
+                        f"the server answered {response.status} for {path}",
+                    )
+            except urllib.error.HTTPError as error:
+                check(error.code == 404, f"the server answered {error.code} for {path}")
+            except OSError as error:
+                check(False, f"the server raised {error} for {path}")
+        server.shutdown()
+
+    if problems:
+        print(
+            f"self-test: {problems} problem{'s' if problems != 1 else ''}",
+            file=sys.stderr,
+        )
+        return 1
+    print("self-test: the bundle server served only what it publishes")
+    return 0
+
+
 def check_filter_list_updates(executable: Path, env: dict) -> bool:
     published = {"version": "v1"}
     requested: list[str] = []
@@ -1252,30 +1367,7 @@ def check_filter_list_updates(executable: Path, env: dict) -> bool:
             }})();""",
     }
 
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):
-            path = urllib.parse.urlsplit(self.path).path
-            requested.append(path)
-            status, content_type, body = 200, "application/javascript", b""
-            if path in pages:
-                content_type, body = "text/html", f"<!doctype html><script>{pages[path]}</script>".encode()
-            elif path.startswith("/bundle/"):
-                file = FILTER_LIST_UPDATES_DIR / published["version"] / path.removeprefix("/bundle/")
-                if ".." in path or not file.is_file():
-                    status = 404
-                else:
-                    content_type, body = "text/plain", file.read_bytes()
-            self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def log_message(self, *args):
-            pass
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    server = start_bundle_server(pages, published, requested, FILTER_LIST_UPDATES_DIR)
     origin = f"http://127.0.0.1:{server.server_address[1]}"
     update_env = {
         **env,
