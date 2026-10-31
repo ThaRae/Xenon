@@ -1,0 +1,86 @@
+{
+  "runId": "exposure-standard",
+  "events": [
+    {
+      "key": "exposure",
+      "value": {
+        "parentHw": 2,
+        "seed": "standard:e4340ceaabcfc94e",
+        "lines": [
+          "chrome: hardwareConcurrency 2 real true",
+          "gecko: hardwareConcurrency 2 real true",
+          "webkit: hardwareConcurrency 2 capped false lteParent true"
+        ],
+        "rows": [
+          {
+            "mode": "chrome",
+            "hw": 2,
+            "line": "chrome: hardwareConcurrency 2 real true",
+            "lteParent": true
+          },
+          {
+            "mode": "gecko",
+            "hw": 2,
+            "line": "gecko: hardwareConcurrency 2 real true",
+            "lteParent": true
+          },
+          {
+            "mode": "webkit",
+            "hw": 2,
+            "line": "webkit: hardwareConcurrency 2 capped false lteParent true",
+            "lteParent": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "complete",
+      "value": {
+        "lines": [
+          "chrome: hardwareConcurrency 2 real true",
+          "gecko: hardwareConcurrency 2 real true",
+          "webkit: hardwareConcurrency 2 capped false lteParent true"
+        ]
+      }
+    }
+  ],
+  "reads": {
+    "exposure": {
+      "parentHw": 2,
+      "seed": "standard:e4340ceaabcfc94e",
+      "lines": [
+        "chrome: hardwareConcurrency 2 real true",
+        "gecko: hardwareConcurrency 2 real true",
+        "webkit: hardwareConcurrency 2 capped false lteParent true"
+      ],
+      "rows": [
+        {
+          "mode": "chrome",
+          "hw": 2,
+          "line": "chrome: hardwareConcurrency 2 real true",
+          "lteParent": true
+        },
+        {
+          "mode": "gecko",
+          "hw": 2,
+          "line": "gecko: hardwareConcurrency 2 real true",
+          "lteParent": true
+        },
+        {
+          "mode": "webkit",
+          "hw": 2,
+          "line": "webkit: hardwareConcurrency 2 capped false lteParent true",
+          "lteParent": true
+        }
+      ]
+    },
+    "complete": {
+      "lines": [
+        "chrome: hardwareConcurrency 2 real true",
+        "gecko: hardwareConcurrency 2 real true",
+        "webkit: hardwareConcurrency 2 capped false lteParent true"
+      ]
+    }
+  },
+  "complete": true
+}

@@ -1,0 +1,93 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 03:07:28 +0000
+Subject: [PATCH] LibWeb: Apply the WebKit concurrency cap after farbling
+
+Chrome, Gecko, and WebKit now farble from the real core count first.
+WebKit then takes min(farbled, 8) (or 4 if real < 8), so it cannot
+exceed the Chrome value for the same seed or reveal an 8-core cap
+while Chrome is farbled below 8.
+---
+ Libraries/LibWeb/Farbling/HardwareConcurrency.cpp  |  6 ++++++
+ Libraries/LibWeb/Farbling/HardwareConcurrency.h    |  3 +++
+ .../LibWeb/HTML/NavigatorConcurrentHardware.cpp    | 14 ++++++--------
+ Tests/LibWeb/TestHardwareFarbling.cpp              | 13 +++++++++++++
+ 4 files changed, 28 insertions(+), 8 deletions(-)
+
+diff --git a/Libraries/LibWeb/Farbling/HardwareConcurrency.cpp b/Libraries/LibWeb/Farbling/HardwareConcurrency.cpp
+index b4c7c5f8cbddddad6d33cf696d0acdbde5eec2a9..7c21edaea31b3b50680bb1c1f9baa1f4c131639b 100644
+--- a/Libraries/LibWeb/Farbling/HardwareConcurrency.cpp
++++ b/Libraries/LibWeb/Farbling/HardwareConcurrency.cpp
+@@ -22,4 +22,10 @@ unsigned farbled_hardware_concurrency(Seed const& seed, unsigned real)
+     return 2 + static_cast<unsigned>(RNG(seed).integer("hardwareConcurrency"sv) % span);
+ }
+ 
++unsigned webkit_hardware_concurrency_cap(unsigned farbled, unsigned real)
++{
++    auto cap = real < 8 ? 4u : 8u;
++    return AK::min(farbled, cap);
++}
++
+ }
+diff --git a/Libraries/LibWeb/Farbling/HardwareConcurrency.h b/Libraries/LibWeb/Farbling/HardwareConcurrency.h
+index b30a6ef24f2bd8e236b09881a7b7c8e6aa3a53a0..51c836df863d758112607a96dc7f271b2fa1c2c7 100644
+--- a/Libraries/LibWeb/Farbling/HardwareConcurrency.h
++++ b/Libraries/LibWeb/Farbling/HardwareConcurrency.h
+@@ -16,4 +16,7 @@ namespace Web::Farbling {
+ // if real < 2, real. Strict: 4, or real if real < 4.
+ WEB_API unsigned farbled_hardware_concurrency(Seed const& seed, unsigned real);
+ 
++// WebKit's advertised cap applied after farbling: 8 if real >= 8, else 4.
++WEB_API unsigned webkit_hardware_concurrency_cap(unsigned farbled, unsigned real);
++
+ }
+diff --git a/Libraries/LibWeb/HTML/NavigatorConcurrentHardware.cpp b/Libraries/LibWeb/HTML/NavigatorConcurrentHardware.cpp
+index d69d8993688cb7de470304f23406682995337cb7..4ef2c0c3a10092c2ab23f2046c1d51e70b342eda 100644
+--- a/Libraries/LibWeb/HTML/NavigatorConcurrentHardware.cpp
++++ b/Libraries/LibWeb/HTML/NavigatorConcurrentHardware.cpp
+@@ -25,15 +25,13 @@ WebIDL::UnsignedLongLong NavigatorConcurrentHardwareMixin::hardware_concurrency(
+     // can be created) or when the user agent desires to limit fingerprinting possibilities.
+     auto logical_processors = Core::System::hardware_concurrency();
+ 
+-    // In WebKit mode, the count is capped the way the claimed engine caps it: 8 on a machine with eight or more
+-    // logical processors, and 4 on the rest. The real count would single the navigator out as not that engine. But
+-    // the count never exceeds the real one, which the spec's range above forbids.
+-    if (ResourceLoader::navigator_compatibility_mode() == NavigatorCompatibilityMode::WebKit)
+-        logical_processors = AK::min(logical_processors, logical_processors < 8 ? 4u : 8u);
+-
+-    // Farbling replaces only the value script reads. The process thread pool is unchanged.
++    // Farbling uses the real count first so Chrome, Gecko, and WebKit share one site value.
++    // WebKit then applies its advertised cap on top of that farbled value.
+     auto seed = principal_realm_settings_object(realm).farbling_seed();
+-    return Farbling::farbled_hardware_concurrency(seed, logical_processors);
++    auto farbled = Farbling::farbled_hardware_concurrency(seed, logical_processors);
++    if (ResourceLoader::navigator_compatibility_mode() == NavigatorCompatibilityMode::WebKit)
++        return Farbling::webkit_hardware_concurrency_cap(farbled, logical_processors);
++    return farbled;
+ }
+ 
+ }
+diff --git a/Tests/LibWeb/TestHardwareFarbling.cpp b/Tests/LibWeb/TestHardwareFarbling.cpp
+index 7e75c5fbab85928a39c193731a6e44beede94c51..7f956cdc134522de51597da95cef6bf41def7c11 100644
+--- a/Tests/LibWeb/TestHardwareFarbling.cpp
++++ b/Tests/LibWeb/TestHardwareFarbling.cpp
+@@ -61,6 +61,19 @@ TEST_CASE(concurrency_same_seed_is_deterministic)
+     EXPECT_EQ(first, second);
+ }
+ 
++TEST_CASE(webkit_cap_is_applied_after_farbling)
++{
++    auto seed = standard_seed(1, 1);
++    auto farbled_twelve = Web::Farbling::farbled_hardware_concurrency(seed, 12);
++    EXPECT(farbled_twelve >= 2u);
++    EXPECT(farbled_twelve <= 12u);
++    EXPECT_EQ(Web::Farbling::webkit_hardware_concurrency_cap(farbled_twelve, 12), farbled_twelve < 8 ? farbled_twelve : 8u);
++    EXPECT_EQ(Web::Farbling::webkit_hardware_concurrency_cap(11, 12), 8u);
++    EXPECT_EQ(Web::Farbling::webkit_hardware_concurrency_cap(3, 12), 3u);
++    EXPECT_EQ(Web::Farbling::webkit_hardware_concurrency_cap(3, 6), 3u);
++    EXPECT_EQ(Web::Farbling::webkit_hardware_concurrency_cap(5, 6), 4u);
++}
++
+ TEST_CASE(concurrency_different_seeds_can_differ)
+ {
+     bool found_difference = false;

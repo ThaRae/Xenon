@@ -11,6 +11,7 @@ Proven against `Build/release/xenon/bin/Xenon`. Guest: **nproc=12**, **MemTotal=
 - The process thread pool is unchanged; only the script-visible values are replaced.
 - `deviceMemory` is `[SecureContext]` (`NavigatorDeviceMemory.idl`). `http://site-a.test` is not potentially trustworthy, so the attribute is absent there. `127.0.0.0/8` and `localhost` expose it.
 - Layout tests (`is_test_mode`) get an Off seed so `navigator-compatibility-mode-exposure.html` still sees the real count. Proofs and the shipped Xenon binary farble. Added in feature 6, not earlier.
+- Default `NavigatorCompatibilityMode` is **Chrome** (`LibWebCommon/Loader/UserAgent.h`). A page cannot switch it. The debug menu (Chrome/Gecko/WebKit) can, for the session; it is not a per-site setting. WebKit applies `min(farbled, 8)` (or 4 if real < 8) after farbling.
 
 ## Same-site stability
 

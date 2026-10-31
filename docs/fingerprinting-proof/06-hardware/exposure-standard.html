@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>exposure under Standard</title>
+<script src="measure.js"></script>
+</head>
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "exposure-standard";
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value }),
+    });
+}
+async function probe(mode, parentHw) {
+    internals.setNavigatorCompatibilityMode(mode);
+    const iframe = document.createElement("iframe");
+    iframe.srcdoc = "<!DOCTYPE html>";
+    const loaded = new Promise(resolve => iframe.onload = resolve);
+    document.body.append(iframe);
+    await loaded;
+    const { navigator } = iframe.contentWindow;
+    const hw = navigator.hardwareConcurrency;
+    const line = mode === "webkit"
+        ? `webkit: hardwareConcurrency ${hw} capped ${[4, 8].includes(hw) && hw <= parentHw} lteParent ${hw <= parentHw}`
+        : `${mode}: hardwareConcurrency ${hw} real ${hw === parentHw}`;
+    iframe.remove();
+    return { mode, hw, line, lteParent: hw <= parentHw };
+}
+(async () => {
+    internals.setNavigatorCompatibilityMode("chrome");
+    const parentHw = navigator.hardwareConcurrency;
+    const lines = [];
+    const rows = [];
+    for (const mode of ["chrome", "gecko", "webkit"]) {
+        const row = await probe(mode, parentHw);
+        lines.push(row.line);
+        rows.push(row);
+    }
+    internals.setNavigatorCompatibilityMode("chrome");
+    await post("exposure", { parentHw, seed: seedInfo(), lines, rows });
+    await post("complete", { lines });
+    setTimeout(() => window.close(), 50);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>hardware modes</title>
+<script src="measure.js"></script>
+</head>
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "modes";
+const next = params.get("next");
+const key = params.get("key") || (location.host.includes("site-b") ? "b" : "a");
+function post(name, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: name, value, origin: location.origin, host: location.host }),
+    });
+}
+function workerFor() {
+    return withTimeout(withWorker(), 8000).catch(error => ({ error: String(error), unsupported: true }));
+}
+async function sampleMode(mode) {
+    internals.setNavigatorCompatibilityMode(mode);
+    const main = sampleNavigator();
+    main.mode = mode;
+    const worker = await workerFor();
+    worker.mode = mode;
+    return { mode, main, worker };
+}
+(async () => {
+    const modes = [];
+    for (const mode of ["chrome", "gecko", "webkit"])
+        modes.push(await sampleMode(mode));
+    internals.setNavigatorCompatibilityMode("chrome");
+    const payload = { seed: seedInfo(), nprocHint: navigator.hardwareConcurrency, modes };
+    await post(key, payload);
+    if (next)
+        location.href = next;
+    else
+        await post("complete", payload).then(() => setTimeout(() => window.close(), 50));
+})();
+</script>
+</body>
+</html>

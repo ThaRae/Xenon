@@ -1,0 +1,419 @@
+{
+  "runId": "modes",
+  "events": [
+    {
+      "key": "a",
+      "value": {
+        "seed": "standard:738b56de357ecd21",
+        "nprocHint": 6,
+        "modes": [
+          {
+            "mode": "chrome",
+            "main": {
+              "seed": "standard:738b56de357ecd21",
+              "hardwareConcurrency": 6,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-a.test:8080",
+              "host": "site-a.test:8080",
+              "href": "http://site-a.test:8080/modes.html?run=modes&key=a&next=http%3A%2F%2Fsite-b.test%3A8080%2Fmodes.html%3Frun%3Dmodes%26key%3Db",
+              "mode": "chrome"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 6,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "chrome"
+            }
+          },
+          {
+            "mode": "gecko",
+            "main": {
+              "seed": "standard:738b56de357ecd21",
+              "hardwareConcurrency": 6,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-a.test:8080",
+              "host": "site-a.test:8080",
+              "href": "http://site-a.test:8080/modes.html?run=modes&key=a&next=http%3A%2F%2Fsite-b.test%3A8080%2Fmodes.html%3Frun%3Dmodes%26key%3Db",
+              "mode": "gecko"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 6,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "gecko"
+            }
+          },
+          {
+            "mode": "webkit",
+            "main": {
+              "seed": "standard:738b56de357ecd21",
+              "hardwareConcurrency": 6,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-a.test:8080",
+              "host": "site-a.test:8080",
+              "href": "http://site-a.test:8080/modes.html?run=modes&key=a&next=http%3A%2F%2Fsite-b.test%3A8080%2Fmodes.html%3Frun%3Dmodes%26key%3Db",
+              "mode": "webkit"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 6,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "webkit"
+            }
+          }
+        ]
+      },
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080"
+    },
+    {
+      "key": "b",
+      "value": {
+        "seed": "standard:64d815d497f7fbe8",
+        "nprocHint": 9,
+        "modes": [
+          {
+            "mode": "chrome",
+            "main": {
+              "seed": "standard:64d815d497f7fbe8",
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-b.test:8080",
+              "host": "site-b.test:8080",
+              "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+              "mode": "chrome"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "chrome"
+            }
+          },
+          {
+            "mode": "gecko",
+            "main": {
+              "seed": "standard:64d815d497f7fbe8",
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-b.test:8080",
+              "host": "site-b.test:8080",
+              "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+              "mode": "gecko"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "gecko"
+            }
+          },
+          {
+            "mode": "webkit",
+            "main": {
+              "seed": "standard:64d815d497f7fbe8",
+              "hardwareConcurrency": 8,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-b.test:8080",
+              "host": "site-b.test:8080",
+              "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+              "mode": "webkit"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "webkit"
+            }
+          }
+        ]
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    },
+    {
+      "key": "complete",
+      "value": {
+        "seed": "standard:64d815d497f7fbe8",
+        "nprocHint": 9,
+        "modes": [
+          {
+            "mode": "chrome",
+            "main": {
+              "seed": "standard:64d815d497f7fbe8",
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-b.test:8080",
+              "host": "site-b.test:8080",
+              "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+              "mode": "chrome"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "chrome"
+            }
+          },
+          {
+            "mode": "gecko",
+            "main": {
+              "seed": "standard:64d815d497f7fbe8",
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-b.test:8080",
+              "host": "site-b.test:8080",
+              "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+              "mode": "gecko"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "gecko"
+            }
+          },
+          {
+            "mode": "webkit",
+            "main": {
+              "seed": "standard:64d815d497f7fbe8",
+              "hardwareConcurrency": 8,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "origin": "http://site-b.test:8080",
+              "host": "site-b.test:8080",
+              "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+              "mode": "webkit"
+            },
+            "worker": {
+              "ok": true,
+              "hardwareConcurrency": 9,
+              "deviceMemoryExposed": false,
+              "deviceMemory": null,
+              "mode": "webkit"
+            }
+          }
+        ]
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080"
+    }
+  ],
+  "reads": {
+    "a": {
+      "seed": "standard:738b56de357ecd21",
+      "nprocHint": 6,
+      "modes": [
+        {
+          "mode": "chrome",
+          "main": {
+            "seed": "standard:738b56de357ecd21",
+            "hardwareConcurrency": 6,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/modes.html?run=modes&key=a&next=http%3A%2F%2Fsite-b.test%3A8080%2Fmodes.html%3Frun%3Dmodes%26key%3Db",
+            "mode": "chrome"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 6,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "chrome"
+          }
+        },
+        {
+          "mode": "gecko",
+          "main": {
+            "seed": "standard:738b56de357ecd21",
+            "hardwareConcurrency": 6,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/modes.html?run=modes&key=a&next=http%3A%2F%2Fsite-b.test%3A8080%2Fmodes.html%3Frun%3Dmodes%26key%3Db",
+            "mode": "gecko"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 6,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "gecko"
+          }
+        },
+        {
+          "mode": "webkit",
+          "main": {
+            "seed": "standard:738b56de357ecd21",
+            "hardwareConcurrency": 6,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-a.test:8080",
+            "host": "site-a.test:8080",
+            "href": "http://site-a.test:8080/modes.html?run=modes&key=a&next=http%3A%2F%2Fsite-b.test%3A8080%2Fmodes.html%3Frun%3Dmodes%26key%3Db",
+            "mode": "webkit"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 6,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "webkit"
+          }
+        }
+      ]
+    },
+    "b": {
+      "seed": "standard:64d815d497f7fbe8",
+      "nprocHint": 9,
+      "modes": [
+        {
+          "mode": "chrome",
+          "main": {
+            "seed": "standard:64d815d497f7fbe8",
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-b.test:8080",
+            "host": "site-b.test:8080",
+            "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+            "mode": "chrome"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "chrome"
+          }
+        },
+        {
+          "mode": "gecko",
+          "main": {
+            "seed": "standard:64d815d497f7fbe8",
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-b.test:8080",
+            "host": "site-b.test:8080",
+            "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+            "mode": "gecko"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "gecko"
+          }
+        },
+        {
+          "mode": "webkit",
+          "main": {
+            "seed": "standard:64d815d497f7fbe8",
+            "hardwareConcurrency": 8,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-b.test:8080",
+            "host": "site-b.test:8080",
+            "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+            "mode": "webkit"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "webkit"
+          }
+        }
+      ]
+    },
+    "complete": {
+      "seed": "standard:64d815d497f7fbe8",
+      "nprocHint": 9,
+      "modes": [
+        {
+          "mode": "chrome",
+          "main": {
+            "seed": "standard:64d815d497f7fbe8",
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-b.test:8080",
+            "host": "site-b.test:8080",
+            "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+            "mode": "chrome"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "chrome"
+          }
+        },
+        {
+          "mode": "gecko",
+          "main": {
+            "seed": "standard:64d815d497f7fbe8",
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-b.test:8080",
+            "host": "site-b.test:8080",
+            "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+            "mode": "gecko"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "gecko"
+          }
+        },
+        {
+          "mode": "webkit",
+          "main": {
+            "seed": "standard:64d815d497f7fbe8",
+            "hardwareConcurrency": 8,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "origin": "http://site-b.test:8080",
+            "host": "site-b.test:8080",
+            "href": "http://site-b.test:8080/modes.html?run=modes&key=b",
+            "mode": "webkit"
+          },
+          "worker": {
+            "ok": true,
+            "hardwareConcurrency": 9,
+            "deviceMemoryExposed": false,
+            "deviceMemory": null,
+            "mode": "webkit"
+          }
+        }
+      ]
+    }
+  },
+  "complete": true
+}
