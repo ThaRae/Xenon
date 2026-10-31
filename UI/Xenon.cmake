@@ -525,6 +525,10 @@ target_sources(TestXenonBlockingPopover PRIVATE
 )
 target_include_directories(TestXenonBlockingPopover BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonBlockingPopover PRIVATE Qt::Core Qt::Gui Qt::Widgets)
+if (LINUX AND NOT ANDROID)
+    target_sources(TestXenonBlockingPopover PRIVATE "${XENON_UI_DIR}/X11Window.cpp")
+    target_link_libraries(TestXenonBlockingPopover PRIVATE PkgConfig::XCB_ICCCM)
+endif()
 
 # The toolbar's Update button and its popover, with a stand-in for the updater. With XENON_SCREENSHOT_DIR set, it saves
 # how they look there.
@@ -537,5 +541,9 @@ target_sources(TestXenonUpdateButton PRIVATE
 )
 target_include_directories(TestXenonUpdateButton BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonUpdateButton PRIVATE Qt::Core Qt::Gui Qt::Widgets)
+if (LINUX AND NOT ANDROID)
+    target_sources(TestXenonUpdateButton PRIVATE "${XENON_UI_DIR}/X11Window.cpp")
+    target_link_libraries(TestXenonUpdateButton PRIVATE PkgConfig::XCB_ICCCM)
+endif()
 
 add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUpdateButton TestXenonUserAgent)

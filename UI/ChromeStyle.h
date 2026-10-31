@@ -43,6 +43,8 @@ QColor chrome_control_border(QPalette const&);
 QColor chrome_active_tab_surface(QPalette const&);
 QColor chrome_border(QPalette const&);
 QColor location_edit_border(QPalette const&);
+QColor location_edit_focus_border(QPalette const&);
+QColor autocomplete_surface(QPalette const&);
 QColor chrome_separator(QPalette const&);
 QColor chrome_window_outline(QPalette const&);
 QColor chrome_accent();
@@ -50,6 +52,11 @@ QColor chrome_muted_text(QPalette const&);
 QFont chrome_title_font(QFont);
 
 QString style_sheet_color(QColor const&);
+
+// Whether the widget's window shows only the pixels it paints opaque, so that its edges are painted opaque and without
+// antialiasing.
+bool shows_opaque_pixels_only(QWidget const&);
+
 QString application_style_sheet(QPalette const&);
 QString toolbar_container_style_sheet(QPalette const&);
 QString menu_bar_style_sheet(QPalette const&);
