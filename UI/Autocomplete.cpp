@@ -67,11 +67,25 @@ public:
 protected:
     virtual void paintEvent(QPaintEvent*) override
     {
-        // Translucent top-level frames need their styled background painted explicitly.
-        QStyleOption option;
-        option.initFrom(this);
         QPainter painter(this);
-        style()->drawPrimitive(QStyle::PE_Widget, &option, &painter, this);
+        if (ChromeStyle::shows_opaque_pixels_only(*this)) {
+            // NB: A style sheet paints rounded corners antialiased, and their partly clear pixels would go missing, so
+            //     the frame paints its own edges opaque and without antialiasing.
+            auto application_palette = QApplication::palette();
+            auto radius = ChromeStyle::LOCATION_EDIT_CORNER_RADIUS;
+            painter.setPen(Qt::NoPen);
+            painter.setClipRect(rect());
+            painter.setBrush(ChromeStyle::location_edit_focus_border(application_palette));
+            painter.drawRoundedRect(rect().adjusted(0, -radius, 0, 0), radius, radius);
+            painter.setBrush(ChromeStyle::autocomplete_surface(application_palette));
+            painter.drawRoundedRect(rect().adjusted(1, -radius, -1, -1), radius - 1, radius - 1);
+            painter.setClipping(false);
+        } else {
+            // Translucent top-level frames need their styled background painted explicitly.
+            QStyleOption option;
+            option.initFrom(this);
+            style()->drawPrimitive(QStyle::PE_Widget, &option, &painter, this);
+        }
         auto separator_color = ChromeStyle::mix(palette().color(QPalette::Window), ChromeStyle::chrome_text(palette()), 0.12);
         painter.fillRect(QRect(CELL_HORIZONTAL_PADDING, 0, width() - CELL_HORIZONTAL_PADDING * 2, 1), separator_color);
     }
