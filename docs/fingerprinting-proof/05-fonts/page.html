@@ -1,0 +1,63 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Font farbling</title>
+<body>
+<pre id="out">loading…</pre>
+<script src="measure.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "run";
+const out = document.getElementById("out");
+let sample = null;
+let remaining = 3;
+function got() {
+    remaining -= 1;
+    if (remaining <= 0)
+        finish();
+}
+function finish() {
+    if (!sample)
+        return;
+    const samples = JSON.parse(sessionStorage.getItem("samples") || "[]");
+    samples.push(sample);
+    sessionStorage.setItem("samples", JSON.stringify(samples));
+    out.textContent = "XENON-FONTS " + JSON.stringify({ runId, count: samples.length, hash: sample.hash });
+    if (samples.length < 3) {
+        location.reload();
+        return;
+    }
+    fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId, host: location.host, samples }),
+    }).finally(() => setTimeout(() => window.close(), 50));
+}
+sample = measureAll();
+sample.sameIframe = null;
+sample.crossIframe = null;
+sample.worker = null;
+window.addEventListener("message", event => {
+    const data = event.data || {};
+    if (data.kind === "same")
+        sample.sameIframe = data;
+    else
+        sample.crossIframe = data;
+    got();
+});
+const same = document.createElement("iframe");
+same.src = "iframe.html?kind=same";
+document.body.appendChild(same);
+const cross = document.createElement("iframe");
+cross.src = "http://site-b.test:8080/iframe.html?kind=cross";
+document.body.appendChild(cross);
+withWorker().then(worker => {
+    sample.worker = worker;
+    got();
+});
+setTimeout(() => {
+    if (remaining > 0) {
+        remaining = 0;
+        finish();
+    }
+}, 12000);
+</script>

@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>Font extras</title></head>
+<body>
+<script src="measure.js"></script>
+<script>
+const sample = measureAll();
+const serif = spanWidth("serif");
+function done(extra) {
+    Object.assign(sample, extra);
+    fetch("/report?run=extras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId: "extras", samples: [sample] }),
+    }).finally(() => setTimeout(() => window.close(), 50));
+}
+const web = new FontFace("ProofWebFont", "url(Ahem.ttf)");
+document.fonts.add(web);
+const t = setTimeout(() => done({
+    webFont: { ok: false, error: "timeout", renders: false },
+    localProbes: [{ family: "Lato", used: false, error: "timeout" }],
+}), 2500);
+web.load().then(() => {
+    clearTimeout(t);
+    const localFace = new FontFace("ProofLocalLato", "local('Lato')");
+    document.fonts.add(localFace);
+    return localFace.load().then(() => {
+        done({
+            webFont: { ok: true, renders: spanWidth("ProofWebFont") !== serif, web: spanWidth("ProofWebFont"), fallback: serif },
+            localProbes: [{ family: "Lato", used: spanWidth("ProofLocalLato") !== serif }],
+        });
+    }).catch(() => {
+        done({
+            webFont: { ok: true, renders: spanWidth("ProofWebFont") !== serif, web: spanWidth("ProofWebFont"), fallback: serif },
+            localProbes: [{ family: "Lato", used: false }],
+        });
+    });
+}).catch(error => {
+    clearTimeout(t);
+    done({ webFont: { ok: false, error: String(error), renders: false }, localProbes: [] });
+});
+</script>
+</body>
+</html>

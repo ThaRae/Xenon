@@ -1,0 +1,686 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 02:08:30 +0000
+Subject: [PATCH] LibWeb: Farble font enumeration with a whitelist and 1-in-20
+ extras
+
+Named system families that are not on the generic/bundled/fallback
+whitelist are allowed only with probability 1/20 from the ESO seed.
+Rejected names behave as missing in font matching, src:local(), and
+FontFaceSet.check. URL @font-face is unchanged.
+---
+ Libraries/LibWeb/CMakeLists.txt         |   1 +
+ Libraries/LibWeb/CSS/FontComputer.cpp   |  44 +++++-
+ Libraries/LibWeb/CSS/FontComputer.h     |   2 +
+ Libraries/LibWeb/CSS/FontFaceSet.cpp    |  35 ++++-
+ Libraries/LibWeb/CSS/FontResolution.cpp |  47 +++++--
+ Libraries/LibWeb/CSS/FontResolution.h   |  11 +-
+ Libraries/LibWeb/DOM/Document.cpp       |   1 +
+ Libraries/LibWeb/Farbling/FontAllow.cpp | 169 ++++++++++++++++++++++++
+ Libraries/LibWeb/Farbling/FontAllow.h   |  31 +++++
+ Tests/LibWeb/CMakeLists.txt             |   1 +
+ Tests/LibWeb/TestFontAllow.cpp          |  54 ++++++++
+ 11 files changed, 376 insertions(+), 20 deletions(-)
+ create mode 100644 Libraries/LibWeb/Farbling/FontAllow.cpp
+ create mode 100644 Libraries/LibWeb/Farbling/FontAllow.h
+ create mode 100644 Tests/LibWeb/TestFontAllow.cpp
+
+diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
+index 4565a24dda2cc394687456f3bb2c175121d61863..e1298471eede398547c857a13ec6c4c67af09dc0 100644
+--- a/Libraries/LibWeb/CMakeLists.txt
++++ b/Libraries/LibWeb/CMakeLists.txt
+@@ -351,6 +351,7 @@ set(SOURCES
+     EventTiming/PerformanceEventTiming.cpp
+     Farbling/AudioFudge.cpp
+     Farbling/CanvasPerturb.cpp
++    Farbling/FontAllow.cpp
+     Farbling/FarblingRNG.cpp
+     Farbling/WebGLFarbling.cpp
+     Fetch/Body.cpp
+diff --git a/Libraries/LibWeb/CSS/FontComputer.cpp b/Libraries/LibWeb/CSS/FontComputer.cpp
+index aba17e98726e874ace4bdb0b65a379e84375c1a6..991f552d79ded05a0d4a6ef8f57fd48102b3e80b 100644
+--- a/Libraries/LibWeb/CSS/FontComputer.cpp
++++ b/Libraries/LibWeb/CSS/FontComputer.cpp
+@@ -24,7 +24,9 @@
+ #include <LibWeb/CSS/StyleComputer.h>
+ #include <LibWeb/CSS/StyleSheetState.h>
+ #include <LibWeb/DOM/Document.h>
++#include <LibWeb/DOM/Element.h>
+ #include <LibWeb/DOM/ShadowRoot.h>
++#include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/Fetch/Infrastructure/HTTP/MIME.h>
+ #include <LibWeb/Fetch/Response.h>
+ #include <LibWeb/HTML/Window.h>
+@@ -57,6 +59,7 @@ FontComputer::FontComputer(HTML::EnvironmentSettingsObject& environment_settings
+     : m_environment_settings_object(environment_settings_object)
+     , m_font_cascade_memo(FontCascadeMemo::create())
+ {
++    (void)font_farbling_query();
+ }
+ 
+ FontComputer::FontComputer(DOM::Document& document)
+@@ -67,6 +70,37 @@ FontComputer::FontComputer(DOM::Document& document)
+ 
+ FontComputer::~FontComputer() = default;
+ 
++Farbling::FontFarblingQuery FontComputer::font_farbling_query() const
++{
++    Farbling::FontFarblingQuery query;
++    auto* settings = m_environment_settings_object.ptr();
++    if (!settings && m_document)
++        settings = &m_document->relevant_settings_object();
++    if (settings)
++        query.seed = settings->farbling_seed();
++
++    query.language = "en"_string;
++    if (!m_document)
++        return query;
++
++    Optional<Utf16String> lang;
++    if (auto* root = m_document->document_element())
++        lang = root->lang();
++    if (!lang.has_value())
++        lang = m_document->http_content_language();
++    if (!lang.has_value())
++        lang = m_document->pragma_set_default_language();
++    if (lang.has_value() && !lang->is_empty()) {
++        auto utf8 = lang->to_utf8_but_should_be_ported_to_utf16();
++        auto view = utf8.bytes_as_string_view();
++        auto n = min(view.length(), 2ul);
++        if (n > 0)
++            query.language = MUST(String::from_utf8(view.substring_view(0, n)));
++    }
++    m_font_cascade_memo->set_farbling_query(query);
++    return query;
++}
++
+ FontLoader::FontLoader(FontComputer& font_computer, RuleOrDeclaration rule_or_declaration, Vector<Source> sources, GC::Ptr<GC::Function<void(RefPtr<Gfx::Typeface const>)>> on_load)
+     : m_font_computer(font_computer)
+     , m_rule_or_declaration(rule_or_declaration)
+@@ -141,8 +175,10 @@ void FontLoader::start_loading_next_source()
+         while (!m_sources.is_empty() && m_sources.first().has<Utf16FlyString>()) {
+             auto name = MUST(m_sources.take_first().get<Utf16FlyString>().view().to_utf8());
+             if (auto typeface = Gfx::FontDatabase::the().get_typeface_by_local_name(name)) {
+-                font_did_load_or_fail(move(typeface));
+-                return;
++                if (Farbling::allow_font_family(m_font_computer->font_farbling_query(), typeface->family().bytes_as_string_view())) {
++                    font_did_load_or_fail(move(typeface));
++                    return;
++                }
+             }
+         }
+         if (m_sources.is_empty()) {
+@@ -426,7 +462,7 @@ void FontComputer::invalidate_changed_font_cascades(Vector<Utf16FlyString> const
+             return false;
+         if (!snapshot)
+             snapshot = font_face_snapshot();
+-        auto updated_font_list = resolve_font_cascade(*snapshot, key, font_feature_values_provider(key.font_feature_values_scope));
++        auto updated_font_list = resolve_font_cascade(*snapshot, key, font_feature_values_provider(key.font_feature_values_scope), font_farbling_query());
+         if (font_list->equals(*updated_font_list))
+             return false;
+         invalidated_font_lists.append(font_list.ptr());
+@@ -480,7 +516,7 @@ void FontComputer::did_end_flown_style_drain()
+     // waits on a face the memo would no longer find it waiting on, are found here.
+     auto resolutions = m_font_cascade_memo->take_resolutions_against_older_tables();
+     for (auto const& [key, font_list] : resolutions) {
+-        if (!font_list->equals(*m_font_cascade_memo->resolve(*font_face_snapshot(), key, font_feature_values_provider(key.font_feature_values_scope))))
++        if (!font_list->equals(*m_font_cascade_memo->resolve(*font_face_snapshot(), key, font_feature_values_provider(key.font_feature_values_scope), font_farbling_query())))
+             m_font_lists_changed_beside_flown_transaction.append(font_list.ptr());
+     }
+     auto family_names = move(m_font_families_changed_beside_flown_transaction);
+diff --git a/Libraries/LibWeb/CSS/FontComputer.h b/Libraries/LibWeb/CSS/FontComputer.h
+index 66aa24790bfeb61c3823b3afccc11c2b3f72f756..7316bccfbf24e8ea2a5f6cc07c1feffc71b73fc6 100644
+--- a/Libraries/LibWeb/CSS/FontComputer.h
++++ b/Libraries/LibWeb/CSS/FontComputer.h
+@@ -22,6 +22,7 @@
+ #include <LibWeb/CSS/URL.h>
+ #include <LibWeb/DOM/DocumentLoadEventDelayer.h>
+ #include <LibWeb/Export.h>
++#include <LibWeb/Farbling/FontAllow.h>
+ #include <LibWeb/Forward.h>
+ #include <LibWebCommon/PixelUnits.h>
+ 
+@@ -236,6 +237,7 @@ public:
+     [[nodiscard]] FontCascadeMemo const& font_cascade_memo() const { return *m_font_cascade_memo; }
+     // A resolution's view of the @font-feature-values of one tree scope.
+     [[nodiscard]] Function<FontFeatureValues const&(Utf16FlyString const&)> font_feature_values_provider(TreeScopeID) const;
++    [[nodiscard]] Farbling::FontFarblingQuery font_farbling_query() const;
+ 
+ private:
+     virtual void visit_edges(Visitor&) override;
+diff --git a/Libraries/LibWeb/CSS/FontFaceSet.cpp b/Libraries/LibWeb/CSS/FontFaceSet.cpp
+index ec6cf32acb0f810200129ac0241fee20c0b5655a..7576501e3e4b94e3f3069dda272dab62c4f62425 100644
+--- a/Libraries/LibWeb/CSS/FontFaceSet.cpp
++++ b/Libraries/LibWeb/CSS/FontFaceSet.cpp
+@@ -22,7 +22,9 @@
+ #include <LibWeb/CSS/FontFace.h>
+ #include <LibWeb/CSS/FontFaceSet.h>
+ #include <LibWeb/CSS/FontFaceSetLoadEvent.h>
++#include <LibGfx/Font/FontDatabase.h>
+ #include <LibWeb/CSS/Parser/Parser.h>
++#include <LibWeb/Farbling/FontAllow.h>
+ #include <LibWeb/CSS/PropertyID.h>
+ #include <LibWeb/CSS/StyleSheetState.h>
+ #include <LibWeb/CSS/StyleValues/ShorthandStyleValue.h>
+@@ -433,8 +435,39 @@ WebIDL::ExceptionOr<bool> FontFaceSet::check(Utf16String const& font, Utf16Strin
+ 
+     // 3. If font face list is empty, or all fonts in the font face list either have a status attribute of "loaded" or
+     //    are system fonts, return true. Otherwise, return false.
+-    if (result->elements().is_empty())
++    if (result->elements().is_empty()) {
++        auto property = parse_css_value(CSS::Parser::ParsingParams(), font, PropertyID::Font);
++        auto const& font_family_list = property->as_shorthand().longhand(PropertyID::FontFamily)->as_value_list();
++        auto& settings = relevant_settings_object();
++        Farbling::FontFarblingQuery query { settings.farbling_seed(), "en"_string };
++        if (auto* window = HTML::window_from_global_object(settings.global_object())) {
++            query = window->associated_document().font_computer().font_farbling_query();
++        }
++        bool allowed_installed = false;
++        bool rejected_installed = false;
++        for (auto const& font_family : font_family_list.values()) {
++            if (font_family->is_keyword())
++                continue;
++            auto name = MUST(string_from_style_value(font_family).view().to_utf8());
++            bool installed = false;
++            if (auto fly = FlyString::from_utf8(name.bytes_as_string_view()); !fly.is_error()) {
++                Gfx::FontDatabase::the().for_each_typeface_with_family_name(fly.release_value(), [&](Gfx::Typeface const&) {
++                    installed = true;
++                });
++            }
++            if (!installed)
++                continue;
++            if (Farbling::allow_font_family(query, name))
++                allowed_installed = true;
++            else
++                rejected_installed = true;
++        }
++        // A rejected installed family behaves as missing for fingerprinting, but a truly missing family still
++        // returns true (css-font-loading: empty list => true), which FontFaceSet-check.html requires.
++        if (rejected_installed && !allowed_installed)
++            return false;
+         return true;
++    }
+ 
+     for (auto font_face : result->elements()) {
+         // FIXME: We should check if the font face is a system font here.
+diff --git a/Libraries/LibWeb/CSS/FontResolution.cpp b/Libraries/LibWeb/CSS/FontResolution.cpp
+index 7b074732f9d9e1bf53a2906a2b14f6f5034eb1fb..61f24760cc5de7b5680bae6c7ce06191a7250074 100644
+--- a/Libraries/LibWeb/CSS/FontResolution.cpp
++++ b/Libraries/LibWeb/CSS/FontResolution.cpp
+@@ -16,6 +16,7 @@
+ #include <LibWeb/CSS/ComputedStyleWorkingSet.h>
+ #include <LibWeb/CSS/FontFaceState.h>
+ #include <LibWeb/CSS/FontResolution.h>
++#include <LibWeb/Farbling/FontAllow.h>
+ #include <LibWeb/CSS/StyleValues/CustomIdentStyleValue.h>
+ #include <LibWeb/CSS/StyleValues/KeywordStyleValue.h>
+ #include <LibWeb/CSS/StyleValues/StringStyleValue.h>
+@@ -155,7 +156,7 @@ struct MatchingFontCandidate {
+ 
+ // Partial implementation of the font-matching algorithm: https://www.w3.org/TR/css-fonts-4/#font-matching-algorithm
+ // FIXME: This should be replaced by the full CSS font selection algorithm.
+-static RefPtr<Gfx::FontCascadeList const> font_matching_algorithm(FontFaceSnapshot const& snapshot, Utf16FlyString const& family_name, int weight, Percentage const& font_width, int slope, float font_size_in_pt, Gfx::FontVariationSettings const& variations, Gfx::ShapeFeatures const& shape_features)
++static RefPtr<Gfx::FontCascadeList const> font_matching_algorithm(FontFaceSnapshot const& snapshot, Utf16FlyString const& family_name, int weight, Percentage const& font_width, int slope, float font_size_in_pt, Gfx::FontVariationSettings const& variations, Gfx::ShapeFeatures const& shape_features, Farbling::FontFarblingQuery const& farbling)
+ {
+     // If a font family match occurs, the user agent assembles the set of font faces in that family and then
+     // narrows the set to a single face using other font properties in the order given below.
+@@ -167,6 +168,9 @@ static RefPtr<Gfx::FontCascadeList const> font_matching_algorithm(FontFaceSnapsh
+         }
+     }
+     if (matching_family_fonts.is_empty()) {
++        auto family_utf8 = MUST(family_name.view().to_utf8());
++        if (!Farbling::allow_font_family(farbling, family_utf8))
++            return {};
+         Gfx::FontDatabase::the().for_each_typeface_with_family_name(font_family_name_for_platform(family_name), [&](Gfx::Typeface const& typeface) {
+             matching_family_fonts.append({
+                 .key = {
+@@ -262,7 +266,7 @@ static double font_size_adjust_aspect_value(Gfx::Font const& font, FontSizeAdjus
+     VERIFY_NOT_REACHED();
+ }
+ 
+-NonnullRefPtr<Gfx::FontCascadeList const> resolve_font_cascade(FontFaceSnapshot const& snapshot, ComputedFontCacheKey const& key, FontFeatureValuesProvider const& font_feature_values_for_family)
++NonnullRefPtr<Gfx::FontCascadeList const> resolve_font_cascade(FontFaceSnapshot const& snapshot, ComputedFontCacheKey const& key, FontFeatureValuesProvider const& font_feature_values_for_family, Farbling::FontFarblingQuery const& farbling)
+ {
+     auto const& font_families = key.font_families;
+     auto font_size = key.font_size.to_float();
+@@ -381,7 +385,7 @@ NonnullRefPtr<Gfx::FontCascadeList const> resolve_font_cascade(FontFaceSnapshot
+         }
+ #endif
+ 
+-        if (auto found_font = font_matching_algorithm(snapshot, family, weight, font_width, slope, font_size_in_pt, variation, shape_features); found_font && !found_font->is_empty())
++        if (auto found_font = font_matching_algorithm(snapshot, family, weight, font_width, slope, font_size_in_pt, variation, shape_features, farbling); found_font && !found_font->is_empty())
+             return found_font;
+ 
+         return {};
+@@ -520,38 +524,38 @@ NonnullRefPtr<Gfx::FontCascadeList const> resolve_font_for_style_values(FontComp
+     // all scopes.
+     if (!key.feature_values[to_underlying(FontResolutionFeatureInput::FontVariantAlternates)])
+         key.font_feature_values_scope = {};
+-    auto font_list = font_computer.font_cascade_memo().resolve(font_computer.font_face_snapshot(), key, font_computer.font_feature_values_provider(key.font_feature_values_scope));
++    auto font_list = font_computer.font_cascade_memo().resolve(font_computer.font_face_snapshot(), key, font_computer.font_feature_values_provider(key.font_feature_values_scope), font_computer.font_farbling_query());
+     // Inside a style update the loads wait for its end; everywhere else, such as canvas, they happen right here.
+     request_wanted_web_faces();
+     return font_list;
+ }
+ 
+-NonnullRefPtr<Gfx::FontCascadeList const> FontCascadeMemo::resolve(FontFaceSnapshot const& snapshot, ComputedFontCacheKey const& key, FontFeatureValuesProvider const& font_feature_values_for_family) const
++NonnullRefPtr<Gfx::FontCascadeList const> FontCascadeMemo::resolve(FontFaceSnapshot const& snapshot, ComputedFontCacheKey const& key, FontFeatureValuesProvider const& font_feature_values_for_family, Farbling::FontFarblingQuery const& farbling) const
+ {
+     MutexLocker locker(m_mutex);
+     // A style transaction that flew resolves against the snapshot it was sealed with, which a change to the
+     // @font-face table beside it leaves older than the memo: its answers are its own, and stay out of the memo, retired
+     // with the cascades the change forgot.
+     if (snapshot.generation() < m_generation) {
+-        auto font_list = resolve_font_cascade(snapshot, key, font_feature_values_for_family);
++        auto font_list = resolve_font_cascade(snapshot, key, font_feature_values_for_family, farbling);
+         m_retired.append(font_list);
+         m_resolutions_against_older_tables.append({ key, font_list });
+         return font_list;
+     }
+     m_generation = snapshot.generation();
+     return m_cascades.ensure(key, [&] {
+-        return resolve_font_cascade(snapshot, key, font_feature_values_for_family);
++        return resolve_font_cascade(snapshot, key, font_feature_values_for_family, farbling);
+     });
+ }
+ 
+-NonnullRefPtr<Gfx::FontCascadeList const> FontCascadeMemo::resolve_for_fork(FontFaceSnapshot const& snapshot, ComputedFontCacheKey const& key, FontFeatureValuesProvider const& font_feature_values_for_family) const
++NonnullRefPtr<Gfx::FontCascadeList const> FontCascadeMemo::resolve_for_fork(FontFaceSnapshot const& snapshot, ComputedFontCacheKey const& key, FontFeatureValuesProvider const& font_feature_values_for_family, Farbling::FontFarblingQuery const& farbling) const
+ {
+     MutexLocker locker(m_mutex);
+     if (snapshot.generation() < m_generation)
+-        return resolve_font_cascade(snapshot, key, font_feature_values_for_family);
++        return resolve_font_cascade(snapshot, key, font_feature_values_for_family, farbling);
+     m_generation = snapshot.generation();
+     return m_cascades.ensure(key, [&] {
+-        return resolve_font_cascade(snapshot, key, font_feature_values_for_family);
++        return resolve_font_cascade(snapshot, key, font_feature_values_for_family, farbling);
+     });
+ }
+ 
+@@ -586,6 +590,24 @@ Vector<FontCascadeMemo::ResolutionAgainstOlderTable> FontCascadeMemo::take_resol
+     return exchange(m_resolutions_against_older_tables, {});
+ }
+ 
++void FontCascadeMemo::set_farbling_query(Farbling::FontFarblingQuery query) const
++{
++    MutexLocker locker(m_mutex);
++    if (m_farbling.seed == query.seed && m_farbling.language == query.language)
++        return;
++    m_farbling = move(query);
++    m_cascades.remove_all_matching([&](auto const&, auto const& font_list) {
++        m_retired.append(font_list);
++        return true;
++    });
++}
++
++Farbling::FontFarblingQuery FontCascadeMemo::farbling_query() const
++{
++    MutexLocker locker(m_mutex);
++    return m_farbling;
++}
++
+ }
+ 
+ namespace Web::CSS {
+@@ -622,9 +644,10 @@ static StyleEngineFFI::FfiResolvedFont resolve_font_for_style_engine(void const*
+     auto const& cascade_memo = *static_cast<FontCascadeMemo const*>(memo);
+     FontFeatureValuesProvider font_feature_values_for_family = [&](Utf16FlyString const& family) -> FontFeatureValues const& { return font_faces.font_feature_values(key.font_feature_values_scope, family); };
+     auto resolve = [&] {
++        auto const farbling = cascade_memo.farbling_query();
+         return resolved_for == ResolvedFor::Fork
+-            ? cascade_memo.resolve_for_fork(font_faces, key, font_feature_values_for_family)
+-            : cascade_memo.resolve(font_faces, key, font_feature_values_for_family);
++            ? cascade_memo.resolve_for_fork(font_faces, key, font_feature_values_for_family, farbling)
++            : cascade_memo.resolve(font_faces, key, font_feature_values_for_family, farbling);
+     };
+     auto font_list = resolve();
+     double font_size_adjust_from_font = 0;
+diff --git a/Libraries/LibWeb/CSS/FontResolution.h b/Libraries/LibWeb/CSS/FontResolution.h
+index 38eebf33aeb078564e4f075aa8a06a4f1e69b884..03b13cc3231df1214cd63d16ea38103c9c884807 100644
+--- a/Libraries/LibWeb/CSS/FontResolution.h
++++ b/Libraries/LibWeb/CSS/FontResolution.h
+@@ -13,6 +13,7 @@
+ #include <LibGfx/FontCascadeList.h>
+ #include <LibWeb/CSS/FontComputer.h>
+ #include <LibWeb/CSS/FontFaceSnapshot.h>
++#include <LibWeb/Farbling/FontAllow.h>
+ #include <LibWeb/StyleEngineRustFFI.h>
+ 
+ template<>
+@@ -52,7 +53,7 @@ using FontFeatureValuesProvider = Function<FontFeatureValues const&(Utf16FlyStri
+ 
+ // Resolve a font cascade from the @font-face snapshot and the process-wide font services alone. It cannot start a
+ // load: a web face it selects is only noted, and request_wanted_web_faces() loads it.
+-[[nodiscard]] NonnullRefPtr<Gfx::FontCascadeList const> resolve_font_cascade(FontFaceSnapshot const&, ComputedFontCacheKey const&, FontFeatureValuesProvider const&);
++[[nodiscard]] NonnullRefPtr<Gfx::FontCascadeList const> resolve_font_cascade(FontFaceSnapshot const&, ComputedFontCacheKey const&, FontFeatureValuesProvider const&, Farbling::FontFarblingQuery const& = {});
+ 
+ // The font-family list as font matching wants it: generic families kept apart from names, and a name's syntax kept.
+ [[nodiscard]] Vector<ComputedFontFamily> computed_font_families_from_style_value(StyleValue const& font_family);
+@@ -73,11 +74,11 @@ public:
+     static NonnullRefPtr<FontCascadeMemo> create() { return adopt_ref(*new FontCascadeMemo); }
+ 
+     // NB: A memo of a pure function, so filling it does not change what it answers.
+-    [[nodiscard]] NonnullRefPtr<Gfx::FontCascadeList const> resolve(FontFaceSnapshot const&, ComputedFontCacheKey const&, FontFeatureValuesProvider const&) const;
++    [[nodiscard]] NonnullRefPtr<Gfx::FontCascadeList const> resolve(FontFaceSnapshot const&, ComputedFontCacheKey const&, FontFeatureValuesProvider const&, Farbling::FontFarblingQuery const& = {}) const;
+     // Resolves as resolve() does for a fork of a document's render state, which holds a reference to every cascade it
+     // names: an answer against an older table than the memo's is the fork's alone, which neither the retired cascades
+     // nor the bookkeeping of answers against older tables take in.
+-    [[nodiscard]] NonnullRefPtr<Gfx::FontCascadeList const> resolve_for_fork(FontFaceSnapshot const&, ComputedFontCacheKey const&, FontFeatureValuesProvider const&) const;
++    [[nodiscard]] NonnullRefPtr<Gfx::FontCascadeList const> resolve_for_fork(FontFaceSnapshot const&, ComputedFontCacheKey const&, FontFeatureValuesProvider const&, Farbling::FontFarblingQuery const& = {}) const;
+     // NB: Only under a font environment generation newer than any resolved against: the style engine names the memo's
+     //     cascades without holding a reference to them for as long as a generation stands, so the forgotten ones are
+     //     retired, not released, as a style transaction that flew may still name them.
+@@ -93,12 +94,16 @@ public:
+     // The cascades resolved against an older table since last taken, which may answer their requests differently now.
+     [[nodiscard]] Vector<ResolutionAgainstOlderTable> take_resolutions_against_older_tables() const;
+ 
++    void set_farbling_query(Farbling::FontFarblingQuery query) const;
++    Farbling::FontFarblingQuery farbling_query() const;
++
+ private:
+     FontCascadeMemo() = default;
+ 
+     // Guards the four members below. A resolution runs under it, so a cascade is resolved once however many threads
+     // want it.
+     mutable Mutex m_mutex;
++    mutable Farbling::FontFarblingQuery m_farbling;
+     mutable HashMap<ComputedFontCacheKey, NonnullRefPtr<Gfx::FontCascadeList const>> m_cascades;
+     // The newest snapshot generation resolved against or forgotten under. An older one would write a stale cascade
+     // where every later request reads it.
+diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
+index 02ff71f2e54dcc96533c7c7246dd2138664df966..d76bd812678d8a4b09ca97ce82d51a9a3bfe740a 100644
+--- a/Libraries/LibWeb/DOM/Document.cpp
++++ b/Libraries/LibWeb/DOM/Document.cpp
+@@ -933,6 +933,7 @@ void Document::initialize_document()
+     m_selection = Selection::Selection::create(*this);
+ 
+     m_list_of_available_images = HTML::ListOfAvailableImages::create();
++    (void)font_computer().font_farbling_query();
+ }
+ 
+ // https://html.spec.whatwg.org/multipage/document-lifecycle.html#populate-with-html/head/body
+diff --git a/Libraries/LibWeb/Farbling/FontAllow.cpp b/Libraries/LibWeb/Farbling/FontAllow.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..52d0d3e25527e481eb2b7c8e1885ad9aae58aeb5
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/FontAllow.cpp
+@@ -0,0 +1,169 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/CharacterTypes.h>
++#include <AK/StringBuilder.h>
++#include <LibWeb/Farbling/FarblingRNG.h>
++#include <LibWeb/Farbling/FontAllow.h>
++
++namespace Web::Farbling {
++
++static String ascii_lower(StringView text)
++{
++    StringBuilder builder;
++    for (auto c : text)
++        builder.append(static_cast<char>(AK::to_ascii_lowercase(c)));
++    return MUST(builder.to_string());
++}
++
++static StringView language_prefix(StringView language)
++{
++    size_t n = 0;
++    while (n < language.length() && n < 2 && AK::is_ascii_alpha(language[n]))
++        ++n;
++    return language.substring_view(0, n);
++}
++
++static bool names_contain(Span<StringView const> names, StringView lowered)
++{
++    for (auto name : names) {
++        if (name == lowered)
++            return true;
++    }
++    return false;
++}
++
++// Why each entry is here is in the comment above the group.
++static bool is_whitelisted_lowercased(StringView family, StringView language)
++{
++    // CSS generic families and UA aliases. These are keywords, not installed files, but pages name them.
++    static constexpr StringView generics[] = {
++        "serif"sv,
++        "sans-serif"sv,
++        "monospace"sv,
++        "cursive"sv,
++        "fantasy"sv,
++        "system-ui"sv,
++        "ui-serif"sv,
++        "ui-sans-serif"sv,
++        "ui-monospace"sv,
++        "ui-rounded"sv,
++        "emoji"sv,
++        "math"sv,
++        "fangsong"sv,
++        "-apple-system"sv,
++        "-apple-system-font"sv,
++        "-webkit-system-font"sv,
++    };
++    if (names_contain(generics, family))
++        return true;
++
++    // Families Xenon/Ladybird ship in resource://fonts (layout tests and last-resort UI).
++    static constexpr StringView bundled[] = {
++        "serenitysans"sv,
++        "noto emoji"sv,
++        "notoemoji"sv,
++    };
++    if (names_contain(bundled, family))
++        return true;
++
++    // Names FontPlugin searches when resolving generic families (W3 examples plus Android).
++    // Generic `sans-serif` looks these up by name, so they must stay allowed.
++    static constexpr StringView platform_defaults[] = {
++        "comic sans ms"sv,
++        "comic sans"sv,
++        "apple chancery"sv,
++        "bradley hand"sv,
++        "brush script mt"sv,
++        "snell roundhand"sv,
++        "urw chancery l"sv,
++        "dancing script"sv,
++        "impact"sv,
++        "luminari"sv,
++        "chalkduster"sv,
++        "jazz let"sv,
++        "blippo"sv,
++        "stencil std"sv,
++        "marker felt"sv,
++        "trattatello"sv,
++        "coming soon"sv,
++        "andale mono"sv,
++        "courier new"sv,
++        "courier"sv,
++        "freemono"sv,
++        "ocr a std"sv,
++        "noto sans mono"sv,
++        "dejavu sans mono"sv,
++        "droid sans mono"sv,
++        "liberation mono"sv,
++        "arial"sv,
++        "helvetica"sv,
++        "verdana"sv,
++        "trebuchet ms"sv,
++        "gill sans"sv,
++        "noto sans"sv,
++        "avantgarde"sv,
++        "optima"sv,
++        "arial narrow"sv,
++        "liberation sans"sv,
++        "roboto"sv,
++        "times"sv,
++        "times new roman"sv,
++        "didot"sv,
++        "georgia"sv,
++        "palatino"sv,
++        "bookman"sv,
++        "new century schoolbook"sv,
++        "american typewriter"sv,
++        "liberation serif"sv,
++        "roman"sv,
++        "noto serif"sv,
++    };
++    if (names_contain(platform_defaults, family))
++        return true;
++
++    // Small per-language extras, keyed by the first two letters of the document language.
++    auto prefix = language_prefix(language);
++    if (prefix == "zh"sv) {
++        static constexpr StringView zh[] = { "simsun"sv, "microsoft yahei"sv, "noto sans cjk sc"sv, "source han sans sc"sv };
++        if (names_contain(zh, family))
++            return true;
++    } else if (prefix == "ja"sv) {
++        static constexpr StringView ja[] = { "yu gothic"sv, "meiryo"sv, "noto sans cjk jp"sv, "hiragino sans"sv };
++        if (names_contain(ja, family))
++            return true;
++    } else if (prefix == "ko"sv) {
++        static constexpr StringView ko[] = { "malgun gothic"sv, "apple sd gothic neo"sv, "noto sans cjk kr"sv };
++        if (names_contain(ko, family))
++            return true;
++    } else if (prefix == "ar"sv) {
++        static constexpr StringView ar[] = { "tahoma"sv, "noto naskh arabic"sv, "traditional arabic"sv };
++        if (names_contain(ar, family))
++            return true;
++    }
++
++    return false;
++}
++
++bool is_whitelisted_font_family(StringView family, StringView language)
++{
++    return is_whitelisted_lowercased(ascii_lower(family), language);
++}
++
++bool allow_font_family(Seed const& seed, StringView family, StringView language)
++{
++    if (!seed.enabled())
++        return true;
++
++    auto lowered = ascii_lower(family);
++    if (is_whitelisted_lowercased(lowered, language))
++        return true;
++
++    // Stable 1-in-20 extra set, keyed by (seed, lowercased family). Same site always agrees.
++    return RNG(seed).integer(lowered) % 20 == 0;
++}
++
++}
+diff --git a/Libraries/LibWeb/Farbling/FontAllow.h b/Libraries/LibWeb/Farbling/FontAllow.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..64aad0eb593ac6ec040f15daf230e6aa5d6e1f5e
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/FontAllow.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/String.h>
++#include <AK/StringView.h>
++#include <LibWeb/Export.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
++
++namespace Web::Farbling {
++
++struct FontFarblingQuery {
++    Seed seed {};
++    String language { "en"_string };
++};
++
++// Off: allow every family. Standard/Strict: whitelist, then a stable 1-in-20 extra from the seed.
++WEB_API bool allow_font_family(Seed const& seed, StringView family, StringView language);
++
++inline bool allow_font_family(FontFarblingQuery const& query, StringView family)
++{
++    return allow_font_family(query.seed, family, query.language);
++}
++
++WEB_API bool is_whitelisted_font_family(StringView family, StringView language);
++
++}
+diff --git a/Tests/LibWeb/CMakeLists.txt b/Tests/LibWeb/CMakeLists.txt
+index f78d9455c8bf8d3ea6eb8df80365bb162e619984..b320fc010c4f790a7543db57a2d8f4101783f22f 100644
+--- a/Tests/LibWeb/CMakeLists.txt
++++ b/Tests/LibWeb/CMakeLists.txt
+@@ -29,6 +29,7 @@ set(TEST_SOURCES
+     TestCanvasPerturb.cpp
+     TestWebGLFarbling.cpp
+     TestAudioFudge.cpp
++    TestFontAllow.cpp
+     TestFaviconDecoding.cpp
+     TestFetchBodyDeliveryGate.cpp
+     TestFetchByteChannel.cpp
+diff --git a/Tests/LibWeb/TestFontAllow.cpp b/Tests/LibWeb/TestFontAllow.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..0923f5850490a4f20cc85bcb86bb8f7301d6295e
+--- /dev/null
++++ b/Tests/LibWeb/TestFontAllow.cpp
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <AK/String.h>
++#include <LibTest/TestCase.h>
++#include <LibWeb/Farbling/FontAllow.h>
++
++TEST_CASE(off_allows_all)
++{
++    Web::Farbling::Seed off {};
++    EXPECT(Web::Farbling::allow_font_family(off, "Comic Sans MS"sv, "en"sv));
++    EXPECT(Web::Farbling::allow_font_family(off, "Definitely Not A Font"sv, "en"sv));
++}
++
++TEST_CASE(whitelist_is_always_allowed)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 };
++    EXPECT(Web::Farbling::allow_font_family(seed, "serif"sv, "en"sv));
++    EXPECT(Web::Farbling::allow_font_family(seed, "Liberation Sans"sv, "en"sv));
++    EXPECT(Web::Farbling::allow_font_family(seed, "SerenitySans"sv, "en"sv));
++    EXPECT(Web::Farbling::allow_font_family(seed, "Arial"sv, "en"sv));
++    EXPECT(Web::Farbling::is_whitelisted_font_family("Times New Roman"sv, "en"sv));
++}
++
++TEST_CASE(language_extras_are_allowed)
++{
++    EXPECT(Web::Farbling::is_whitelisted_font_family("Microsoft YaHei"sv, "zh"sv));
++    EXPECT(!Web::Farbling::is_whitelisted_font_family("Microsoft YaHei"sv, "en"sv));
++}
++
++TEST_CASE(same_seed_is_deterministic)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 9, .low = 8 };
++    auto first = Web::Farbling::allow_font_family(seed, "Some Obscure Font"sv, "en"sv);
++    auto second = Web::Farbling::allow_font_family(seed, "Some Obscure Font"sv, "en"sv);
++    EXPECT_EQ(first, second);
++}
++
++TEST_CASE(roughly_one_in_twenty_of_synthetic_names)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 0x111, .low = 0x222 };
++    int allowed = 0;
++    int const n = 1000;
++    for (int i = 0; i < n; ++i) {
++        auto name = MUST(String::formatted("SyntheticFamily{}", i));
++        if (Web::Farbling::allow_font_family(seed, name, "en"sv))
++            ++allowed;
++    }
++    EXPECT(allowed >= 20);
++    EXPECT(allowed <= 80);
++}

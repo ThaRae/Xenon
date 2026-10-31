@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8" />
+<pre id="out">running</pre>
+<script src="measure.js"></script>
+<script>
+measureAll();
+const sample = measureAll();
+document.getElementById("out").textContent = JSON.stringify({ seed: sample.seed, present: sample.present, hash: sample.hash, n: sample.detections.length }, null, 2);
+fetch("/report?run=debug", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ runId: "debug", samples: [sample] }),
+}).finally(() => setTimeout(() => window.close(), 50));
+</script>

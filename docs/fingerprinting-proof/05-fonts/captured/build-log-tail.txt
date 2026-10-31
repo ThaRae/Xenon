@@ -1,0 +1,5 @@
+[8/13] Linking CXX executable xenon/libexec/WebWorker
+[9/13] Linking CXX executable xenon/libexec/WebContent
+[10/13] Linking CXX executable bin/test-web
+[15/16] Linking CXX executable xenon/bin/Xenon
+NINJA_EXIT:0

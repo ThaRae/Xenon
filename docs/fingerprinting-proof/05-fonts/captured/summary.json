@@ -1,0 +1,166 @@
+{
+  "installed_fc_list": [
+    "DejaVu Sans",
+    "DejaVu Sans Mono",
+    "DejaVu Serif",
+    "FontAwesome",
+    "Lato",
+    "Lato Black",
+    "Lato Hairline",
+    "Lato Heavy",
+    "Lato Light",
+    "Lato Medium",
+    "Lato Semibold",
+    "Lato Thin",
+    "Liberation Mono",
+    "Liberation Sans",
+    "Liberation Serif"
+  ],
+  "installed_count": 15,
+  "a_present": [
+    "DejaVu Sans Mono",
+    "Liberation Mono",
+    "Liberation Sans",
+    "Liberation Serif",
+    "Noto Emoji",
+    "SerenitySans"
+  ],
+  "b_present": [
+    "DejaVu Sans",
+    "DejaVu Sans Mono",
+    "Liberation Mono",
+    "Liberation Sans",
+    "Liberation Serif",
+    "Noto Emoji",
+    "SerenitySans"
+  ],
+  "a_hash": "fnv1a64:5a0964c3cf1f01d4",
+  "b_hash": "fnv1a64:3a3fb64c2c92a432",
+  "a_ne_b": true,
+  "only_a": [],
+  "only_b": [
+    "DejaVu Sans"
+  ],
+  "reloads": [
+    "fnv1a64:5a0964c3cf1f01d4",
+    "fnv1a64:5a0964c3cf1f01d4",
+    "fnv1a64:5a0964c3cf1f01d4"
+  ],
+  "reloads_match_a": true,
+  "iframe_hash": "fnv1a64:5a0964c3cf1f01d4",
+  "iframe_matches_a": true,
+  "a_width_canvas_agree": true,
+  "b_width_canvas_agree": true,
+  "a_leaks": [],
+  "b_leaks": [],
+  "off_a_present": [
+    "DejaVu Sans",
+    "DejaVu Sans Mono",
+    "DejaVu Serif",
+    "Lato",
+    "Liberation Mono",
+    "Liberation Sans",
+    "Liberation Serif",
+    "Noto Emoji",
+    "SerenitySans"
+  ],
+  "off_b_present": [
+    "DejaVu Sans",
+    "DejaVu Sans Mono",
+    "DejaVu Serif",
+    "Lato",
+    "Liberation Mono",
+    "Liberation Sans",
+    "Liberation Serif",
+    "Noto Emoji",
+    "SerenitySans"
+  ],
+  "off_a_equals_off_b": true,
+  "off_equals_installed_tested": true,
+  "tested_installed": [
+    "DejaVu Sans",
+    "DejaVu Sans Mono",
+    "DejaVu Serif",
+    "FontAwesome",
+    "Lato",
+    "Lato Black",
+    "Lato Hairline",
+    "Lato Heavy",
+    "Lato Light",
+    "Lato Medium",
+    "Lato Semibold",
+    "Lato Thin",
+    "Liberation Mono",
+    "Liberation Sans",
+    "Liberation Serif"
+  ],
+  "whitelist_installed": [
+    "Liberation Sans",
+    "Liberation Mono",
+    "Liberation Serif",
+    "DejaVu Sans Mono"
+  ],
+  "whitelist_detected_on_a_and_b": [
+    "Liberation Sans",
+    "Noto Emoji",
+    "SerenitySans",
+    "Liberation Mono",
+    "Liberation Serif",
+    "DejaVu Sans Mono"
+  ],
+  "whitelist_always": true,
+  "absent_detected": [],
+  "absent_never_detected": true,
+  "web_font": {
+    "ok": true,
+    "renders": true,
+    "web": 1368,
+    "fallback": 1059.203125
+  },
+  "web_font_renders": true,
+  "local_probes": [
+    {
+      "family": "Lato",
+      "used": false
+    }
+  ],
+  "rejected_installed_on_a": [
+    "DejaVu Sans",
+    "DejaVu Serif",
+    "FontAwesome",
+    "Lato",
+    "Lato Black",
+    "Lato Hairline",
+    "Lato Heavy",
+    "Lato Light",
+    "Lato Medium",
+    "Lato Semibold",
+    "Lato Thin"
+  ],
+  "local_rejected_fails": [
+    {
+      "family": "Lato",
+      "used": false
+    }
+  ],
+  "worker_present": [
+    "DejaVu Sans Mono",
+    "Liberation Mono",
+    "Liberation Sans",
+    "Liberation Serif",
+    "Noto Emoji",
+    "SerenitySans"
+  ],
+  "worker_ok": true,
+  "worker_agrees_a": true,
+  "page_reload_hashes": [
+    "fnv1a64:637f99c29f6d21da",
+    "fnv1a64:637f99c29f6d21da",
+    "fnv1a64:637f99c29f6d21da"
+  ],
+  "a_seed": "standard:9fcfc4141e5b39e3",
+  "b_seed": "standard:ab47a10f2f61c921",
+  "screenshot_a": true,
+  "screenshot_off": true,
+  "ok": true
+}

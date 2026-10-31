@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>fonts iframe</title>
+<script src="measure.js"></script>
+</head>
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const kind = params.get("kind") || "iframe";
+const sample = measureAll();
+sample.kind = kind;
+parent.postMessage(sample, "*");
+</script>
+</body>
+</html>
