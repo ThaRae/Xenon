@@ -21,6 +21,10 @@
 #include <QStyleHints>
 #include <QWidget>
 
+#if defined(AK_OS_LINUX)
+#    include <UI/X11Window.h>
+#endif
+
 namespace Ladybird::ChromeStyle {
 
 static bool color_is_dark(QColor const& color)
@@ -122,6 +126,16 @@ QColor mix(QColor const& from, QColor const& to, double amount)
         channel(from.green(), to.green()),
         channel(from.blue(), to.blue()),
     };
+}
+
+bool shows_opaque_pixels_only(QWidget const& widget)
+{
+#if defined(AK_OS_LINUX)
+    return is_clipped_to_its_opaque_pixels(*widget.window());
+#else
+    (void)widget;
+    return false;
+#endif
 }
 
 WindowActivity window_activity(QWidget const& widget)
@@ -634,7 +648,7 @@ QWidget#LadybirdHamburgerZoomActions QPushButton#LadybirdHamburgerResetZoomButto
         text, background, surface_hover, surface_pressed);
 }
 
-static QColor autocomplete_surface(QPalette const& palette)
+QColor autocomplete_surface(QPalette const& palette)
 {
     if (is_dark(palette))
         return mix(chrome_background(palette), material_color_anchors(true).recessed, 0.5);
@@ -652,7 +666,7 @@ QColor location_edit_border(QPalette const& palette)
     return is_dark(palette) ? mix(chrome_background(palette), chrome_border(palette), 0.36) : chrome_border(palette);
 }
 
-static QColor location_edit_focus_border(QPalette const& palette)
+QColor location_edit_focus_border(QPalette const& palette)
 {
     return mix(chrome_border(palette), chrome_accent(), is_dark(palette) ? 0.50 : 0.54);
 }
