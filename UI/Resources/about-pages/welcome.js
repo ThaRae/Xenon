@@ -147,7 +147,7 @@ function updateSearchDetails() {
     searchSuggestions.disabled = !supportsSuggestions;
     if (!supportsSuggestions) searchSuggestions.checked = false;
     searchSuggestionsLabel.textContent = supportsSuggestions
-        ? `Suggest searches while I type (sends what you type to ${name})`
+        ? `Suggest searches as you type (sends what you type to ${name})`
         : `Suggestions aren't available${name ? ` for ${name}` : ""}`;
 
     updateSummaries();
@@ -281,8 +281,8 @@ function updatePasswordManagerDetails() {
         const name = passwordManagerName(id);
         const developer = passwordManagerInfo[id]?.developer ?? name;
         notes.push(
-            `I'll install ${name} when you finish: from the Chrome Web Store, after checking that ${developer} signed ` +
-                "it. I look for updates once a day. To fill in your logins, it can read and change the sites you visit."
+            `Xenon installs ${name} when you finish: from the Chrome Web Store, after checking that ${developer} signed ` +
+                "it. Xenon looks for updates once a day. To fill in your logins, it can read and change the sites you visit."
         );
         if (id === "icloud-passwords") {
             notes.push(
@@ -291,7 +291,7 @@ function updatePasswordManagerDetails() {
             );
         }
     }
-    if (id && id === current) notes.push(`${passwordManagerName(id)} is installed, and I keep it up to date.`);
+    if (id && id === current) notes.push(`${passwordManagerName(id)} is installed, and Xenon keeps it up to date.`);
     if (current && id !== current) notes.push(`${passwordManagerName(current)} is removed, with its data in Xenon.`);
     passwordManagerNote.textContent = notes.join(" ");
 

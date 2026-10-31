@@ -29,7 +29,7 @@ window.xenonNewTab = {
         document.querySelector("#customize").hidden = isPrivate;
         if (isPrivate) return;
 
-        document.querySelector("#greeting").textContent = greeting(new Date());
+        document.querySelector("#today").textContent = dateTitle(new Date());
 
         const bookmarksBarKey = document.querySelector('[data-group="bookmarksBar"]');
         bookmarksBarKey.hidden = !(shown.bookmarksBar?.length > 0);
@@ -40,12 +40,9 @@ window.xenonNewTab = {
     },
 };
 
-function greeting(now) {
-    const hour = now.getHours();
-    if (hour < 5) return "Good evening.";
-    if (hour < 12) return "Good morning.";
-    if (hour < 18) return "Good afternoon.";
-    return "Good evening.";
+// The page is named for the day, as a calendar is, rather than greeting you.
+function dateTitle(now) {
+    return now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 }
 
 function shortHost(host) {
