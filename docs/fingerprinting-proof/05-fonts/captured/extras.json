@@ -2,13 +2,13 @@
   "runId": "extras",
   "samples": [
     {
-      "seed": "standard:58fca21c5e97d1b0",
+      "seed": "standard:a40a4f34bed45e4f",
       "detections": [
         {
           "family": "DejaVu Sans",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "DejaVu Sans Mono",
@@ -20,19 +20,19 @@
           "family": "DejaVu Serif",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "FontAwesome",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "Lato",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "Lato Black",

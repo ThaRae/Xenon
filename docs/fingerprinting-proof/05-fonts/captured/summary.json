@@ -19,6 +19,7 @@
   "installed_count": 15,
   "a_present": [
     "DejaVu Sans Mono",
+    "Lato",
     "Liberation Mono",
     "Liberation Sans",
     "Liberation Serif",
@@ -26,7 +27,6 @@
     "SerenitySans"
   ],
   "b_present": [
-    "DejaVu Sans",
     "DejaVu Sans Mono",
     "Liberation Mono",
     "Liberation Sans",
@@ -34,20 +34,20 @@
     "Noto Emoji",
     "SerenitySans"
   ],
-  "a_hash": "fnv1a64:5a0964c3cf1f01d4",
-  "b_hash": "fnv1a64:3a3fb64c2c92a432",
+  "a_hash": "fnv1a64:d822feb548658876",
+  "b_hash": "fnv1a64:5a0964c3cf1f01d4",
   "a_ne_b": true,
-  "only_a": [],
-  "only_b": [
-    "DejaVu Sans"
+  "only_a": [
+    "Lato"
   ],
+  "only_b": [],
   "reloads": [
-    "fnv1a64:5a0964c3cf1f01d4",
-    "fnv1a64:5a0964c3cf1f01d4",
-    "fnv1a64:5a0964c3cf1f01d4"
+    "fnv1a64:d822feb548658876",
+    "fnv1a64:d822feb548658876",
+    "fnv1a64:d822feb548658876"
   ],
   "reloads_match_a": true,
-  "iframe_hash": "fnv1a64:5a0964c3cf1f01d4",
+  "iframe_hash": "fnv1a64:d822feb548658876",
   "iframe_matches_a": true,
   "a_width_canvas_agree": true,
   "b_width_canvas_agree": true,
@@ -95,18 +95,18 @@
     "Liberation Serif"
   ],
   "whitelist_installed": [
-    "Liberation Sans",
-    "Liberation Mono",
+    "DejaVu Sans Mono",
     "Liberation Serif",
-    "DejaVu Sans Mono"
+    "Liberation Mono",
+    "Liberation Sans"
   ],
   "whitelist_detected_on_a_and_b": [
-    "Liberation Sans",
-    "Noto Emoji",
+    "DejaVu Sans Mono",
     "SerenitySans",
-    "Liberation Mono",
     "Liberation Serif",
-    "DejaVu Sans Mono"
+    "Noto Emoji",
+    "Liberation Mono",
+    "Liberation Sans"
   ],
   "whitelist_always": true,
   "absent_detected": [],
@@ -128,7 +128,6 @@
     "DejaVu Sans",
     "DejaVu Serif",
     "FontAwesome",
-    "Lato",
     "Lato Black",
     "Lato Hairline",
     "Lato Heavy",
@@ -145,6 +144,7 @@
   ],
   "worker_present": [
     "DejaVu Sans Mono",
+    "Lato",
     "Liberation Mono",
     "Liberation Sans",
     "Liberation Serif",
@@ -154,13 +154,395 @@
   "worker_ok": true,
   "worker_agrees_a": true,
   "page_reload_hashes": [
-    "fnv1a64:637f99c29f6d21da",
-    "fnv1a64:637f99c29f6d21da",
-    "fnv1a64:637f99c29f6d21da"
+    "fnv1a64:5a0964c3cf1f01d4",
+    "fnv1a64:5a0964c3cf1f01d4",
+    "fnv1a64:5a0964c3cf1f01d4"
   ],
-  "a_seed": "standard:9fcfc4141e5b39e3",
-  "b_seed": "standard:ab47a10f2f61c921",
+  "a_seed": "standard:ec0e35b8314ed071",
+  "b_seed": "standard:f5da3a21d9120ff0",
   "screenshot_a": true,
   "screenshot_off": true,
+  "check_table_a": [
+    {
+      "family": "Arial",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "Comic Sans MS",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "Papyrus",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "DejaVu Sans",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "DejaVu Serif",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "FontAwesome",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "Lato",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "Liberation Mono",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "Liberation Sans",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "whitelist"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "whitelist"
+    },
+    {
+      "family": "ProofWebFont",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "url_web_font"
+    }
+  ],
+  "check_table_b": [
+    {
+      "family": "Arial",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "Comic Sans MS",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "Papyrus",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "DejaVu Sans",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "DejaVu Serif",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "FontAwesome",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "Liberation Mono",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "Liberation Sans",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "Liberation Sans",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "whitelist"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "whitelist"
+    },
+    {
+      "family": "ProofWebFont",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "url_web_font"
+    }
+  ],
+  "check_table_off": [
+    {
+      "family": "Arial",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "Comic Sans MS",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "Papyrus",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "absent"
+    },
+    {
+      "family": "FontAwesome",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "Lato Black",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "Lato Hairline",
+      "width": false,
+      "canvas": false,
+      "check": true,
+      "class": "rejected_installed"
+    },
+    {
+      "family": "DejaVu Sans",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "DejaVu Serif",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "allowed_installed"
+    },
+    {
+      "family": "Liberation Sans",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "whitelist"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "whitelist"
+    },
+    {
+      "family": "ProofWebFont",
+      "width": true,
+      "canvas": true,
+      "check": true,
+      "class": "url_web_font"
+    }
+  ],
+  "check_rejected_equals_absent_a": true,
+  "check_rejected_equals_absent_b": true,
+  "check_rejected_equals_absent_off": true,
+  "spread": {
+    "sites": [
+      {
+        "key": "site-0",
+        "host": "site-a.test:8080",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "extras": []
+      },
+      {
+        "key": "site-1",
+        "host": "site-b.test:8080",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "extras": []
+      },
+      {
+        "key": "site-2",
+        "host": "127.0.0.1:8080",
+        "hash": "fnv1a64:3a3fb64c2c92a432",
+        "present": [
+          "DejaVu Sans",
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "extras": [
+          "DejaVu Sans"
+        ]
+      },
+      {
+        "key": "site-3",
+        "host": "localhost:8080",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "extras": []
+      },
+      {
+        "key": "site-4",
+        "host": "127.0.0.2:8080",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "extras": []
+      },
+      {
+        "key": "site-5",
+        "host": "127.0.0.3:8080",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "extras": []
+      },
+      {
+        "key": "site-6",
+        "host": "127.0.0.4:8080",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "extras": []
+      },
+      {
+        "key": "site-7",
+        "host": "127.0.0.5:8080",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "extras": []
+      }
+    ],
+    "n": 8
+  },
+  "retries": "none this run; an earlier review looped profiles to force A\u2260B. this run does not retry.",
   "ok": true
 }

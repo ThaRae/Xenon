@@ -85,17 +85,57 @@ def write_off_profile(path: Path, sites: list[str]) -> None:
     (config / "FarblingSeeds.json").write_text(json.dumps({"tokens": {}, "offSites": sites}))
 
 
+BUNDLED = {"SerenitySans", "Noto Emoji"}
+WHITELIST_NAMES = set(WHITELIST) | BUNDLED
+
+
 def disagreements(detections: list[dict]) -> list[dict]:
     leaks = []
     for item in detections:
-        width = item.get("width")
-        canvas = item.get("canvas")
-        check = item.get("check")
-        if width != canvas:
+        if item.get("width") != item.get("canvas"):
             leaks.append({**item, "why": "width-canvas"})
-        if width is True and check is False:
-            leaks.append({**item, "why": "width-true-check-false"})
     return leaks
+
+
+def detection_row(detections: list[dict], name: str) -> dict:
+    for item in detections:
+        if item.get("family") == name:
+            return {"family": name, "width": item.get("width"), "canvas": item.get("canvas"), "check": item.get("check")}
+    return {"family": name, "width": None, "canvas": None, "check": None}
+
+
+def check_table(detections: list[dict], installed: list[str], present: list[str], web_row: dict | None = None) -> list[dict]:
+    present_set = set(present)
+    installed_set = set(installed)
+    absent = ["Arial", "Comic Sans MS", "Papyrus"]
+    rejected = [name for name in installed if name not in present_set][:3]
+    allowed = [name for name in present if name in installed_set][:3]
+    whitelist = ["Liberation Sans", "DejaVu Sans Mono"]
+    rows = []
+    for label, names in (
+        ("absent", absent),
+        ("rejected_installed", rejected),
+        ("allowed_installed", allowed),
+        ("whitelist", whitelist),
+    ):
+        for name in names:
+            row = detection_row(detections, name)
+            row["class"] = label
+            rows.append(row)
+    if web_row:
+        row = {
+            "family": web_row.get("family") or "ProofWebFont",
+            "width": web_row.get("width"),
+            "canvas": web_row.get("canvas"),
+            "check": web_row.get("check"),
+            "class": "url_web_font",
+        }
+        rows.append(row)
+    return rows
+
+
+def extras_of(present: list[str]) -> list[str]:
+    return sorted(set(present) - WHITELIST_NAMES)
 
 
 def analyze(installed: list[str]) -> dict:
@@ -123,8 +163,37 @@ def analyze(installed: list[str]) -> dict:
     whitelist_on_a = [name for name in WHITELIST if name in {item["family"] for item in a_m.get("detections") or []}]
     whitelist_detected = [name for name in whitelist_on_a if name in a_present and name in b_present]
     whitelist_installed = [name for name in whitelist_on_a if name in installed]
-    bundled = {"SerenitySans", "Noto Emoji"}
+    bundled = BUNDLED
     absent_detected = [name for name in a_present + b_present if name not in installed and name not in bundled]
+    check_a = check_table(a_m.get("detections") or [], installed, a_present, a_m.get("webFontRow"))
+    check_b = check_table(b_m.get("detections") or [], installed, b_present, b_m.get("webFontRow"))
+    check_off = check_table(off_a.get("detections") or [], installed, off_present, off_a.get("webFontRow"))
+
+    def check_rejected_equals_absent(rows: list[dict]) -> bool:
+        absent_checks = {row["check"] for row in rows if row["class"] == "absent"}
+        rejected_checks = {row["check"] for row in rows if row["class"] == "rejected_installed"}
+        return (not rejected_checks) or absent_checks == rejected_checks
+
+    check_rejected_equals_absent_a = check_rejected_equals_absent(check_a)
+    check_rejected_equals_absent_b = check_rejected_equals_absent(check_b)
+    check_rejected_equals_absent_off = check_rejected_equals_absent(check_off)
+    spread = {}
+    spread_path = CAPTURED / "spread.json"
+    if spread_path.exists():
+        spread_data = json.loads(spread_path.read_text())
+        sites = []
+        for key, value in sorted((spread_data.get("reads") or {}).items()):
+            if not key.startswith("site-"):
+                continue
+            present = (value or {}).get("present") or []
+            sites.append({
+                "key": key,
+                "host": (value or {}).get("host"),
+                "hash": (value or {}).get("hash"),
+                "present": present,
+                "extras": extras_of(present),
+            })
+        spread = {"sites": sites, "n": len(sites)}
     off_text = [name for name in off_present if name not in bundled]
     extras_data = {}
     extras_path = CAPTURED / "extras.json"
@@ -181,6 +250,14 @@ def analyze(installed: list[str]) -> dict:
         "b_seed": b.get("seed") or b_m.get("seed"),
         "screenshot_a": (CAPTURED / "a-standard.png").exists(),
         "screenshot_off": (CAPTURED / "a-off.png").exists(),
+        "check_table_a": check_a,
+        "check_table_b": check_b,
+        "check_table_off": check_off,
+        "check_rejected_equals_absent_a": check_rejected_equals_absent_a,
+        "check_rejected_equals_absent_b": check_rejected_equals_absent_b,
+        "check_rejected_equals_absent_off": check_rejected_equals_absent_off,
+        "spread": spread,
+        "retries": "none this run; an earlier review looped profiles to force A≠B. this run does not retry.",
     }
     summary["ok"] = (
         summary["a_ne_b"]
@@ -197,6 +274,10 @@ def analyze(installed: list[str]) -> dict:
         and (summary["worker_agrees_a"] or not summary["worker_ok"])
         and summary["screenshot_a"]
         and summary["screenshot_off"]
+        and summary["check_rejected_equals_absent_a"]
+        and summary["check_rejected_equals_absent_b"]
+        and summary["check_rejected_equals_absent_off"]
+        and (spread.get("n") or 0) >= 8
     )
     return summary
 
@@ -225,6 +306,18 @@ def main() -> int:
         and data.get("complete")
         and len((data.get("reads", {}).get("a-direct") or {}).get("reloads") or []) >= 3,
         timeout=180,
+    )
+
+    spread = CAPTURED / "spread.json"
+    spread.unlink(missing_ok=True)
+    run_xenon_until(
+        args.xenon,
+        Path(tempfile.mkdtemp(prefix="fp5-spread-")),
+        "http://site-a.test:8080/spread.html?run=spread&i=0",
+        extra,
+        spread,
+        lambda data: data.get("complete") and sum(1 for key in data.get("reads", {}) if key.startswith("site-")) >= 8,
+        timeout=120,
     )
 
     site_a = CAPTURED / "site-a.json"

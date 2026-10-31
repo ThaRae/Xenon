@@ -284,7 +284,20 @@
             "Noto Emoji",
             "SerenitySans"
           ],
-          "hash": "fnv1a64:5539d34cde16550a"
+          "hash": "fnv1a64:5539d34cde16550a",
+          "webFontRow": {
+            "family": "ProofWebFont",
+            "width": true,
+            "canvas": true,
+            "check": true,
+            "class": "url_web_font"
+          },
+          "webFont": {
+            "ok": true,
+            "renders": true,
+            "web": 1094.28125,
+            "fallback": 1064.515625
+          }
         },
         "reloads": [
           {
@@ -916,7 +929,20 @@
             "Noto Emoji",
             "SerenitySans"
           ],
-          "hash": "fnv1a64:5539d34cde16550a"
+          "hash": "fnv1a64:5539d34cde16550a",
+          "webFontRow": {
+            "family": "ProofWebFont",
+            "width": true,
+            "canvas": true,
+            "check": true,
+            "class": "url_web_font"
+          },
+          "webFont": {
+            "ok": true,
+            "renders": true,
+            "web": 1094.28125,
+            "fallback": 1064.515625
+          }
         },
         "worker": {
           "present": [
@@ -1219,7 +1245,20 @@
             "Noto Emoji",
             "SerenitySans"
           ],
-          "hash": "fnv1a64:5539d34cde16550a"
+          "hash": "fnv1a64:5539d34cde16550a",
+          "webFontRow": {
+            "family": "ProofWebFont",
+            "width": true,
+            "canvas": true,
+            "check": true,
+            "class": "url_web_font"
+          },
+          "webFont": {
+            "ok": true,
+            "renders": true,
+            "web": 1094.28125,
+            "fallback": 1064.515625
+          }
         },
         "worker": {
           "present": [
@@ -1522,7 +1561,20 @@
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:5539d34cde16550a"
+        "hash": "fnv1a64:5539d34cde16550a",
+        "webFontRow": {
+          "family": "ProofWebFont",
+          "width": true,
+          "canvas": true,
+          "check": true,
+          "class": "url_web_font"
+        },
+        "webFont": {
+          "ok": true,
+          "renders": true,
+          "web": 1094.28125,
+          "fallback": 1064.515625
+        }
       },
       "reloads": [
         {
@@ -2149,7 +2201,20 @@
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:5539d34cde16550a"
+        "hash": "fnv1a64:5539d34cde16550a",
+        "webFontRow": {
+          "family": "ProofWebFont",
+          "width": true,
+          "canvas": true,
+          "check": true,
+          "class": "url_web_font"
+        },
+        "webFont": {
+          "ok": true,
+          "renders": true,
+          "web": 1094.28125,
+          "fallback": 1064.515625
+        }
       },
       "worker": {
         "present": [
@@ -2447,7 +2512,20 @@
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:5539d34cde16550a"
+        "hash": "fnv1a64:5539d34cde16550a",
+        "webFontRow": {
+          "family": "ProofWebFont",
+          "width": true,
+          "canvas": true,
+          "check": true,
+          "class": "url_web_font"
+        },
+        "webFont": {
+          "ok": true,
+          "renders": true,
+          "web": 1094.28125,
+          "fallback": 1064.515625
+        }
       },
       "worker": {
         "present": [

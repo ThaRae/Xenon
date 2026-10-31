@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Font spread</title>
+<script src="measure.js"></script>
+</head>
+<body>
+<script>
+const SITES = [
+    "http://site-a.test:8080",
+    "http://site-b.test:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:8080",
+    "http://127.0.0.2:8080",
+    "http://127.0.0.3:8080",
+    "http://127.0.0.4:8080",
+    "http://127.0.0.5:8080",
+];
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "spread";
+const i = parseInt(params.get("i") || "0", 10);
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host, i }),
+    });
+}
+const sample = measureAll();
+sample.host = location.host;
+sample.origin = location.origin;
+post("site-" + i, sample).then(() => {
+    if (i + 1 < SITES.length) {
+        location.href = SITES[i + 1] + "/spread.html?run=" + encodeURIComponent(runId) + "&i=" + (i + 1);
+    } else {
+        return post("complete", { sites: SITES.length }).then(() => setTimeout(() => window.close(), 50));
+    }
+});
+</script>
+</body>
+</html>

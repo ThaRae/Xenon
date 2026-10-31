@@ -1,19 +1,12 @@
-=== TestFontAllow ===
-Running 5 cases out of 5.
-All 5 tests passed.
-FONT_ALLOW_EXIT:0
-=== TestAudioFudge ===
-Running 9 cases out of 9. All 9 tests passed.
-=== TestFarblingRNG ===
-Running 6 cases out of 6. All 6 tests passed.
-=== TestCanvasPerturb ===
-Running 8 cases out of 8. All 8 tests passed.
-=== TestWebGLFarbling ===
-Running 8 cases out of 8. All 8 tests passed.
-=== xenon.py test --no-build ===
-All tests passed.
-XENON_TEST_EXIT:0
-=== test-web *FontFace* ===
-Pass: 10, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 1
-Crashed: Text/input/css/FontFace-arraybuffer-matching.html
-FontFaceSet-check.html PASS in isolation
+TestFontAllow 5/5
+TestAudioFudge 9/9
+TestFarblingRNG 6/6
+TestCanvasPerturb 8/8
+TestWebGLFarbling 8/8
+Meta/xenon.py test --no-build passed
+test-web *FontFace* Pass:11 Fail:0 Crashed:0
+test-web *font* Pass:452 Fail:0 Crashed:0
+FontFace-arraybuffer-matching Pass:1 (F4 da46d069b8 Pass:1)
+local-font-sources Pass:1 (F4 da46d069b8 Pass:1)
+FontFaceSet-check Pass:1
+run-proof.py ok=true

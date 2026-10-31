@@ -17,7 +17,7 @@ function post(key, value) {
     });
 }
 const measure = measureAll();
-withWorker().then(worker => {
+Promise.all([withWorker(), attachWebFontRow(measure)]).then(([worker]) => {
     const payload = { seed: measure.seed, measure, worker };
     return post("b-direct", payload).then(() => post("complete", payload));
 }).catch(error => {

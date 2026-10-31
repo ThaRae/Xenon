@@ -1,0 +1,4550 @@
+{
+  "runId": "spread",
+  "events": [
+    {
+      "key": "site-0",
+      "value": {
+        "seed": "standard:7b1605f6677ec609",
+        "detections": [
+          {
+            "family": "DejaVu Sans",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "DejaVu Sans Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Serif",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "FontAwesome",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Black",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Hairline",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Heavy",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Light",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Medium",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Semibold",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Thin",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Liberation Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Serif",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "SerenitySans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Noto Emoji",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Arial",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Helvetica",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times New Roman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier New",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Georgia",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Verdana",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Trebuchet MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Comic Sans MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Impact",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Papyrus",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Palatino",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Garamond",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Bookman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Calibri",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Cambria",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Segoe UI",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Tahoma",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lucida Console",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Menlo",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Monaco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "San Francisco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Apple Color Emoji",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "MS Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "SimSun",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Malgun Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          }
+        ],
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "host": "site-a.test:8080",
+        "origin": "http://site-a.test:8080"
+      },
+      "origin": "http://site-a.test:8080",
+      "host": "site-a.test:8080",
+      "i": 0
+    },
+    {
+      "key": "site-1",
+      "value": {
+        "seed": "standard:5f67281ba52c6766",
+        "detections": [
+          {
+            "family": "DejaVu Sans",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "DejaVu Sans Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Serif",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "FontAwesome",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Black",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Hairline",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Heavy",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Light",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Medium",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Semibold",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Thin",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Liberation Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Serif",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "SerenitySans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Noto Emoji",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Arial",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Helvetica",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times New Roman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier New",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Georgia",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Verdana",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Trebuchet MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Comic Sans MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Impact",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Papyrus",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Palatino",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Garamond",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Bookman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Calibri",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Cambria",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Segoe UI",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Tahoma",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lucida Console",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Menlo",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Monaco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "San Francisco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Apple Color Emoji",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "MS Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "SimSun",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Malgun Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          }
+        ],
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "host": "site-b.test:8080",
+        "origin": "http://site-b.test:8080"
+      },
+      "origin": "http://site-b.test:8080",
+      "host": "site-b.test:8080",
+      "i": 1
+    },
+    {
+      "key": "site-2",
+      "value": {
+        "seed": "standard:6070c973210b7f12",
+        "detections": [
+          {
+            "family": "DejaVu Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Sans Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Serif",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "FontAwesome",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Black",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Hairline",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Heavy",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Light",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Medium",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Semibold",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Thin",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Liberation Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Serif",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "SerenitySans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Noto Emoji",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Arial",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Helvetica",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times New Roman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier New",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Georgia",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Verdana",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Trebuchet MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Comic Sans MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Impact",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Papyrus",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Palatino",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Garamond",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Bookman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Calibri",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Cambria",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Segoe UI",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Tahoma",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lucida Console",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Menlo",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Monaco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "San Francisco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Apple Color Emoji",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "MS Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "SimSun",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Malgun Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          }
+        ],
+        "present": [
+          "DejaVu Sans",
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "hash": "fnv1a64:3a3fb64c2c92a432",
+        "host": "127.0.0.1:8080",
+        "origin": "http://127.0.0.1:8080"
+      },
+      "origin": "http://127.0.0.1:8080",
+      "host": "127.0.0.1:8080",
+      "i": 2
+    },
+    {
+      "key": "site-3",
+      "value": {
+        "seed": "standard:fbbe91a3c7580904",
+        "detections": [
+          {
+            "family": "DejaVu Sans",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "DejaVu Sans Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Serif",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "FontAwesome",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Black",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Hairline",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Heavy",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Light",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Medium",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Semibold",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Thin",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Liberation Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Serif",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "SerenitySans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Noto Emoji",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Arial",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Helvetica",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times New Roman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier New",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Georgia",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Verdana",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Trebuchet MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Comic Sans MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Impact",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Papyrus",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Palatino",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Garamond",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Bookman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Calibri",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Cambria",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Segoe UI",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Tahoma",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lucida Console",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Menlo",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Monaco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "San Francisco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Apple Color Emoji",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "MS Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "SimSun",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Malgun Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          }
+        ],
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "host": "localhost:8080",
+        "origin": "http://localhost:8080"
+      },
+      "origin": "http://localhost:8080",
+      "host": "localhost:8080",
+      "i": 3
+    },
+    {
+      "key": "site-4",
+      "value": {
+        "seed": "standard:abbf2a2d22751eae",
+        "detections": [
+          {
+            "family": "DejaVu Sans",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "DejaVu Sans Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Serif",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "FontAwesome",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Black",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Hairline",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Heavy",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Light",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Medium",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Semibold",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Thin",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Liberation Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Serif",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "SerenitySans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Noto Emoji",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Arial",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Helvetica",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times New Roman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier New",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Georgia",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Verdana",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Trebuchet MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Comic Sans MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Impact",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Papyrus",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Palatino",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Garamond",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Bookman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Calibri",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Cambria",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Segoe UI",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Tahoma",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lucida Console",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Menlo",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Monaco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "San Francisco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Apple Color Emoji",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "MS Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "SimSun",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Malgun Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          }
+        ],
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "host": "127.0.0.2:8080",
+        "origin": "http://127.0.0.2:8080"
+      },
+      "origin": "http://127.0.0.2:8080",
+      "host": "127.0.0.2:8080",
+      "i": 4
+    },
+    {
+      "key": "site-5",
+      "value": {
+        "seed": "standard:c353d3633a7d6234",
+        "detections": [
+          {
+            "family": "DejaVu Sans",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "DejaVu Sans Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Serif",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "FontAwesome",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Black",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Hairline",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Heavy",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Light",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Medium",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Semibold",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Thin",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Liberation Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Serif",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "SerenitySans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Noto Emoji",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Arial",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Helvetica",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times New Roman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier New",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Georgia",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Verdana",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Trebuchet MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Comic Sans MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Impact",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Papyrus",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Palatino",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Garamond",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Bookman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Calibri",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Cambria",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Segoe UI",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Tahoma",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lucida Console",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Menlo",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Monaco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "San Francisco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Apple Color Emoji",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "MS Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "SimSun",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Malgun Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          }
+        ],
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "host": "127.0.0.3:8080",
+        "origin": "http://127.0.0.3:8080"
+      },
+      "origin": "http://127.0.0.3:8080",
+      "host": "127.0.0.3:8080",
+      "i": 5
+    },
+    {
+      "key": "site-6",
+      "value": {
+        "seed": "standard:5b57067d0db88f03",
+        "detections": [
+          {
+            "family": "DejaVu Sans",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "DejaVu Sans Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Serif",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "FontAwesome",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Black",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Hairline",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Heavy",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Light",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Medium",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Semibold",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Thin",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Liberation Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Serif",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "SerenitySans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Noto Emoji",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Arial",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Helvetica",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times New Roman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier New",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Georgia",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Verdana",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Trebuchet MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Comic Sans MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Impact",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Papyrus",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Palatino",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Garamond",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Bookman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Calibri",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Cambria",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Segoe UI",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Tahoma",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lucida Console",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Menlo",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Monaco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "San Francisco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Apple Color Emoji",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "MS Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "SimSun",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Malgun Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          }
+        ],
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "host": "127.0.0.4:8080",
+        "origin": "http://127.0.0.4:8080"
+      },
+      "origin": "http://127.0.0.4:8080",
+      "host": "127.0.0.4:8080",
+      "i": 6
+    },
+    {
+      "key": "site-7",
+      "value": {
+        "seed": "standard:d586418790567f2f",
+        "detections": [
+          {
+            "family": "DejaVu Sans",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "DejaVu Sans Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "DejaVu Serif",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "FontAwesome",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Black",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Hairline",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Heavy",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Light",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Medium",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Semibold",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lato Thin",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Liberation Mono",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Sans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Liberation Serif",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "SerenitySans",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Noto Emoji",
+            "width": true,
+            "canvas": true,
+            "check": true
+          },
+          {
+            "family": "Arial",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Helvetica",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times New Roman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Times",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier New",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Courier",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Georgia",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Verdana",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Trebuchet MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Comic Sans MS",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Impact",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Papyrus",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Palatino",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Garamond",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Bookman",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Calibri",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Cambria",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Segoe UI",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Tahoma",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Lucida Console",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Menlo",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Monaco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "San Francisco",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Apple Color Emoji",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "MS Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "SimSun",
+            "width": false,
+            "canvas": false,
+            "check": true
+          },
+          {
+            "family": "Malgun Gothic",
+            "width": false,
+            "canvas": false,
+            "check": true
+          }
+        ],
+        "present": [
+          "DejaVu Sans Mono",
+          "Liberation Mono",
+          "Liberation Sans",
+          "Liberation Serif",
+          "Noto Emoji",
+          "SerenitySans"
+        ],
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
+        "host": "127.0.0.5:8080",
+        "origin": "http://127.0.0.5:8080"
+      },
+      "origin": "http://127.0.0.5:8080",
+      "host": "127.0.0.5:8080",
+      "i": 7
+    },
+    {
+      "key": "complete",
+      "value": {
+        "sites": 8
+      },
+      "origin": "http://127.0.0.5:8080",
+      "host": "127.0.0.5:8080",
+      "i": 7
+    }
+  ],
+  "reads": {
+    "site-0": {
+      "seed": "standard:7b1605f6677ec609",
+      "detections": [
+        {
+          "family": "DejaVu Sans",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "DejaVu Sans Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Serif",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "FontAwesome",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Black",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Hairline",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Heavy",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Light",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Medium",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Semibold",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Thin",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Liberation Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Serif",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "SerenitySans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Noto Emoji",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Arial",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Helvetica",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times New Roman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier New",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Georgia",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Verdana",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Trebuchet MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Comic Sans MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Impact",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Papyrus",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Palatino",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Garamond",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Bookman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Calibri",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Cambria",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Segoe UI",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Tahoma",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lucida Console",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Menlo",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Monaco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "San Francisco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Apple Color Emoji",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "MS Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "SimSun",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Malgun Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        }
+      ],
+      "present": [
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Liberation Sans",
+        "Liberation Serif",
+        "Noto Emoji",
+        "SerenitySans"
+      ],
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
+      "host": "site-a.test:8080",
+      "origin": "http://site-a.test:8080"
+    },
+    "site-1": {
+      "seed": "standard:5f67281ba52c6766",
+      "detections": [
+        {
+          "family": "DejaVu Sans",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "DejaVu Sans Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Serif",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "FontAwesome",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Black",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Hairline",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Heavy",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Light",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Medium",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Semibold",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Thin",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Liberation Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Serif",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "SerenitySans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Noto Emoji",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Arial",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Helvetica",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times New Roman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier New",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Georgia",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Verdana",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Trebuchet MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Comic Sans MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Impact",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Papyrus",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Palatino",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Garamond",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Bookman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Calibri",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Cambria",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Segoe UI",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Tahoma",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lucida Console",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Menlo",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Monaco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "San Francisco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Apple Color Emoji",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "MS Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "SimSun",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Malgun Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        }
+      ],
+      "present": [
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Liberation Sans",
+        "Liberation Serif",
+        "Noto Emoji",
+        "SerenitySans"
+      ],
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
+      "host": "site-b.test:8080",
+      "origin": "http://site-b.test:8080"
+    },
+    "site-2": {
+      "seed": "standard:6070c973210b7f12",
+      "detections": [
+        {
+          "family": "DejaVu Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Sans Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Serif",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "FontAwesome",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Black",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Hairline",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Heavy",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Light",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Medium",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Semibold",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Thin",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Liberation Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Serif",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "SerenitySans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Noto Emoji",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Arial",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Helvetica",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times New Roman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier New",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Georgia",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Verdana",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Trebuchet MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Comic Sans MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Impact",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Papyrus",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Palatino",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Garamond",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Bookman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Calibri",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Cambria",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Segoe UI",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Tahoma",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lucida Console",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Menlo",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Monaco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "San Francisco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Apple Color Emoji",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "MS Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "SimSun",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Malgun Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        }
+      ],
+      "present": [
+        "DejaVu Sans",
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Liberation Sans",
+        "Liberation Serif",
+        "Noto Emoji",
+        "SerenitySans"
+      ],
+      "hash": "fnv1a64:3a3fb64c2c92a432",
+      "host": "127.0.0.1:8080",
+      "origin": "http://127.0.0.1:8080"
+    },
+    "site-3": {
+      "seed": "standard:fbbe91a3c7580904",
+      "detections": [
+        {
+          "family": "DejaVu Sans",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "DejaVu Sans Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Serif",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "FontAwesome",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Black",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Hairline",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Heavy",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Light",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Medium",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Semibold",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Thin",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Liberation Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Serif",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "SerenitySans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Noto Emoji",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Arial",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Helvetica",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times New Roman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier New",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Georgia",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Verdana",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Trebuchet MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Comic Sans MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Impact",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Papyrus",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Palatino",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Garamond",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Bookman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Calibri",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Cambria",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Segoe UI",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Tahoma",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lucida Console",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Menlo",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Monaco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "San Francisco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Apple Color Emoji",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "MS Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "SimSun",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Malgun Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        }
+      ],
+      "present": [
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Liberation Sans",
+        "Liberation Serif",
+        "Noto Emoji",
+        "SerenitySans"
+      ],
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
+      "host": "localhost:8080",
+      "origin": "http://localhost:8080"
+    },
+    "site-4": {
+      "seed": "standard:abbf2a2d22751eae",
+      "detections": [
+        {
+          "family": "DejaVu Sans",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "DejaVu Sans Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Serif",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "FontAwesome",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Black",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Hairline",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Heavy",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Light",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Medium",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Semibold",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Thin",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Liberation Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Serif",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "SerenitySans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Noto Emoji",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Arial",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Helvetica",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times New Roman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier New",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Georgia",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Verdana",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Trebuchet MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Comic Sans MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Impact",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Papyrus",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Palatino",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Garamond",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Bookman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Calibri",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Cambria",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Segoe UI",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Tahoma",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lucida Console",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Menlo",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Monaco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "San Francisco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Apple Color Emoji",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "MS Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "SimSun",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Malgun Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        }
+      ],
+      "present": [
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Liberation Sans",
+        "Liberation Serif",
+        "Noto Emoji",
+        "SerenitySans"
+      ],
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
+      "host": "127.0.0.2:8080",
+      "origin": "http://127.0.0.2:8080"
+    },
+    "site-5": {
+      "seed": "standard:c353d3633a7d6234",
+      "detections": [
+        {
+          "family": "DejaVu Sans",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "DejaVu Sans Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Serif",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "FontAwesome",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Black",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Hairline",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Heavy",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Light",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Medium",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Semibold",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Thin",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Liberation Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Serif",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "SerenitySans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Noto Emoji",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Arial",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Helvetica",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times New Roman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier New",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Georgia",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Verdana",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Trebuchet MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Comic Sans MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Impact",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Papyrus",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Palatino",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Garamond",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Bookman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Calibri",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Cambria",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Segoe UI",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Tahoma",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lucida Console",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Menlo",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Monaco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "San Francisco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Apple Color Emoji",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "MS Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "SimSun",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Malgun Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        }
+      ],
+      "present": [
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Liberation Sans",
+        "Liberation Serif",
+        "Noto Emoji",
+        "SerenitySans"
+      ],
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
+      "host": "127.0.0.3:8080",
+      "origin": "http://127.0.0.3:8080"
+    },
+    "site-6": {
+      "seed": "standard:5b57067d0db88f03",
+      "detections": [
+        {
+          "family": "DejaVu Sans",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "DejaVu Sans Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Serif",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "FontAwesome",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Black",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Hairline",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Heavy",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Light",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Medium",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Semibold",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Thin",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Liberation Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Serif",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "SerenitySans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Noto Emoji",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Arial",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Helvetica",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times New Roman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier New",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Georgia",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Verdana",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Trebuchet MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Comic Sans MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Impact",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Papyrus",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Palatino",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Garamond",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Bookman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Calibri",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Cambria",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Segoe UI",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Tahoma",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lucida Console",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Menlo",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Monaco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "San Francisco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Apple Color Emoji",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "MS Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "SimSun",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Malgun Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        }
+      ],
+      "present": [
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Liberation Sans",
+        "Liberation Serif",
+        "Noto Emoji",
+        "SerenitySans"
+      ],
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
+      "host": "127.0.0.4:8080",
+      "origin": "http://127.0.0.4:8080"
+    },
+    "site-7": {
+      "seed": "standard:d586418790567f2f",
+      "detections": [
+        {
+          "family": "DejaVu Sans",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "DejaVu Sans Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "DejaVu Serif",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "FontAwesome",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Black",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Hairline",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Heavy",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Light",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Medium",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Semibold",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lato Thin",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Liberation Mono",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Sans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Liberation Serif",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "SerenitySans",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Noto Emoji",
+          "width": true,
+          "canvas": true,
+          "check": true
+        },
+        {
+          "family": "Arial",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Helvetica",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times New Roman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Times",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier New",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Courier",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Georgia",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Verdana",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Trebuchet MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Comic Sans MS",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Impact",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Papyrus",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Palatino",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Garamond",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Bookman",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Calibri",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Cambria",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Segoe UI",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Tahoma",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Lucida Console",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Menlo",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Monaco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "San Francisco",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Apple Color Emoji",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "MS Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "SimSun",
+          "width": false,
+          "canvas": false,
+          "check": true
+        },
+        {
+          "family": "Malgun Gothic",
+          "width": false,
+          "canvas": false,
+          "check": true
+        }
+      ],
+      "present": [
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Liberation Sans",
+        "Liberation Serif",
+        "Noto Emoji",
+        "SerenitySans"
+      ],
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
+      "host": "127.0.0.5:8080",
+      "origin": "http://127.0.0.5:8080"
+    },
+    "complete": {
+      "sites": 8
+    }
+  },
+  "complete": true
+}

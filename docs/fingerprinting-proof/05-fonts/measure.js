@@ -130,6 +130,24 @@ function measureAll() {
     };
 }
 
+async function attachWebFontRow(sample) {
+    const face = new FontFace("ProofWebFont", "url(HashSans.woff)");
+    try {
+        await withTimeout(face.load(), 3000);
+        document.fonts.add(face);
+        const row = detectFamily("ProofWebFont");
+        const web = spanWidth("ProofWebFont");
+        const fallback = spanWidth("serif");
+        document.fonts.delete(face);
+        sample.webFontRow = { ...row, class: "url_web_font" };
+        sample.webFont = { ok: true, renders: row.width === true, web, fallback };
+    } catch (error) {
+        sample.webFontRow = { family: "ProofWebFont", width: false, canvas: false, check: null, class: "url_web_font" };
+        sample.webFont = { ok: false, error: String(error), renders: false };
+    }
+    return sample;
+}
+
 async function measureFonts() {
     const sample = measureAll();
     sample.webFont = await detectWebFont();

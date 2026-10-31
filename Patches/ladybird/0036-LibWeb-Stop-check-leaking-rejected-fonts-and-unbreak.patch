@@ -1,0 +1,161 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 02:33:00 +0000
+Subject: [PATCH] LibWeb: Stop check() leaking rejected fonts and unbreak
+ FontFace loads
+
+Rejected installed families must match absent ones: FontFaceSet.check
+returns true on an empty matching list instead of probing FontDatabase.
+Compute the farbling query outside FontCascadeMemo::forget_matching so
+set_farbling_query does not re-lock the non-recursive mutex during
+FontFace arraybuffer matching. Whitelist Ahem so test-web local('Ahem')
+survives Standard farbling on file://.
+---
+ Libraries/LibWeb/CSS/FontComputer.cpp   | 11 +++++--
+ Libraries/LibWeb/CSS/FontComputer.h     |  1 +
+ Libraries/LibWeb/CSS/FontFaceSet.cpp    | 38 +++----------------------
+ Libraries/LibWeb/Farbling/FontAllow.cpp |  3 ++
+ Tests/LibWeb/TestFontAllow.cpp          |  1 +
+ 5 files changed, 18 insertions(+), 36 deletions(-)
+
+diff --git a/Libraries/LibWeb/CSS/FontComputer.cpp b/Libraries/LibWeb/CSS/FontComputer.cpp
+index 991f552d79ded05a0d4a6ef8f57fd48102b3e80b..bf26390d9811b038b1ce4595243b1c9a2e1eefb9 100644
+--- a/Libraries/LibWeb/CSS/FontComputer.cpp
++++ b/Libraries/LibWeb/CSS/FontComputer.cpp
+@@ -70,7 +70,7 @@ FontComputer::FontComputer(DOM::Document& document)
+ 
+ FontComputer::~FontComputer() = default;
+ 
+-Farbling::FontFarblingQuery FontComputer::font_farbling_query() const
++Farbling::FontFarblingQuery FontComputer::compute_font_farbling_query() const
+ {
+     Farbling::FontFarblingQuery query;
+     auto* settings = m_environment_settings_object.ptr();
+@@ -97,6 +97,12 @@ Farbling::FontFarblingQuery FontComputer::font_farbling_query() const
+         if (n > 0)
+             query.language = MUST(String::from_utf8(view.substring_view(0, n)));
+     }
++    return query;
++}
++
++Farbling::FontFarblingQuery FontComputer::font_farbling_query() const
++{
++    auto query = compute_font_farbling_query();
+     m_font_cascade_memo->set_farbling_query(query);
+     return query;
+ }
+@@ -457,12 +463,13 @@ void FontComputer::invalidate_changed_font_cascades(Vector<Utf16FlyString> const
+     //     selections before retiring cascades or invalidating their users.
+     Vector<Gfx::FontCascadeList const*> invalidated_font_lists;
+     RefPtr<FontFaceSnapshot const> snapshot;
++    auto farbling = compute_font_farbling_query();
+     m_font_cascade_memo->forget_matching(m_environment_generation, [&](auto const& key, auto const& font_list) {
+         if (!computed_font_families_reference_any_family(key.font_families, family_names))
+             return false;
+         if (!snapshot)
+             snapshot = font_face_snapshot();
+-        auto updated_font_list = resolve_font_cascade(*snapshot, key, font_feature_values_provider(key.font_feature_values_scope), font_farbling_query());
++        auto updated_font_list = resolve_font_cascade(*snapshot, key, font_feature_values_provider(key.font_feature_values_scope), farbling);
+         if (font_list->equals(*updated_font_list))
+             return false;
+         invalidated_font_lists.append(font_list.ptr());
+diff --git a/Libraries/LibWeb/CSS/FontComputer.h b/Libraries/LibWeb/CSS/FontComputer.h
+index 7316bccfbf24e8ea2a5f6cc07c1feffc71b73fc6..871674aa2169899d79a635679f11acf6444a91c5 100644
+--- a/Libraries/LibWeb/CSS/FontComputer.h
++++ b/Libraries/LibWeb/CSS/FontComputer.h
+@@ -237,6 +237,7 @@ public:
+     [[nodiscard]] FontCascadeMemo const& font_cascade_memo() const { return *m_font_cascade_memo; }
+     // A resolution's view of the @font-feature-values of one tree scope.
+     [[nodiscard]] Function<FontFeatureValues const&(Utf16FlyString const&)> font_feature_values_provider(TreeScopeID) const;
++    [[nodiscard]] Farbling::FontFarblingQuery compute_font_farbling_query() const;
+     [[nodiscard]] Farbling::FontFarblingQuery font_farbling_query() const;
+ 
+ private:
+diff --git a/Libraries/LibWeb/CSS/FontFaceSet.cpp b/Libraries/LibWeb/CSS/FontFaceSet.cpp
+index 7576501e3e4b94e3f3069dda272dab62c4f62425..2bada1eb4a30369c93beb19993baf3282188fb22 100644
+--- a/Libraries/LibWeb/CSS/FontFaceSet.cpp
++++ b/Libraries/LibWeb/CSS/FontFaceSet.cpp
+@@ -22,9 +22,7 @@
+ #include <LibWeb/CSS/FontFace.h>
+ #include <LibWeb/CSS/FontFaceSet.h>
+ #include <LibWeb/CSS/FontFaceSetLoadEvent.h>
+-#include <LibGfx/Font/FontDatabase.h>
+ #include <LibWeb/CSS/Parser/Parser.h>
+-#include <LibWeb/Farbling/FontAllow.h>
+ #include <LibWeb/CSS/PropertyID.h>
+ #include <LibWeb/CSS/StyleSheetState.h>
+ #include <LibWeb/CSS/StyleValues/ShorthandStyleValue.h>
+@@ -435,39 +433,11 @@ WebIDL::ExceptionOr<bool> FontFaceSet::check(Utf16String const& font, Utf16Strin
+ 
+     // 3. If font face list is empty, or all fonts in the font face list either have a status attribute of "loaded" or
+     //    are system fonts, return true. Otherwise, return false.
+-    if (result->elements().is_empty()) {
+-        auto property = parse_css_value(CSS::Parser::ParsingParams(), font, PropertyID::Font);
+-        auto const& font_family_list = property->as_shorthand().longhand(PropertyID::FontFamily)->as_value_list();
+-        auto& settings = relevant_settings_object();
+-        Farbling::FontFarblingQuery query { settings.farbling_seed(), "en"_string };
+-        if (auto* window = HTML::window_from_global_object(settings.global_object())) {
+-            query = window->associated_document().font_computer().font_farbling_query();
+-        }
+-        bool allowed_installed = false;
+-        bool rejected_installed = false;
+-        for (auto const& font_family : font_family_list.values()) {
+-            if (font_family->is_keyword())
+-                continue;
+-            auto name = MUST(string_from_style_value(font_family).view().to_utf8());
+-            bool installed = false;
+-            if (auto fly = FlyString::from_utf8(name.bytes_as_string_view()); !fly.is_error()) {
+-                Gfx::FontDatabase::the().for_each_typeface_with_family_name(fly.release_value(), [&](Gfx::Typeface const&) {
+-                    installed = true;
+-                });
+-            }
+-            if (!installed)
+-                continue;
+-            if (Farbling::allow_font_family(query, name))
+-                allowed_installed = true;
+-            else
+-                rejected_installed = true;
+-        }
+-        // A rejected installed family behaves as missing for fingerprinting, but a truly missing family still
+-        // returns true (css-font-loading: empty list => true), which FontFaceSet-check.html requires.
+-        if (rejected_installed && !allowed_installed)
+-            return false;
++    // NB: A rejected installed family must match an absent one. find_matching_font_faces only sees @font-face
++    //     entries, so both cases are an empty list and return true. Do not special-case installed-but-rejected
++    //     names: that would let check() enumerate the real installed set.
++    if (result->elements().is_empty())
+         return true;
+-    }
+ 
+     for (auto font_face : result->elements()) {
+         // FIXME: We should check if the font face is a system font here.
+diff --git a/Libraries/LibWeb/Farbling/FontAllow.cpp b/Libraries/LibWeb/Farbling/FontAllow.cpp
+index 52d0d3e25527e481eb2b7c8e1885ad9aae58aeb5..a839d9b56bcd762370dfc4132e885eb3b078a097 100644
+--- a/Libraries/LibWeb/Farbling/FontAllow.cpp
++++ b/Libraries/LibWeb/Farbling/FontAllow.cpp
+@@ -62,10 +62,13 @@ static bool is_whitelisted_lowercased(StringView family, StringView language)
+         return true;
+ 
+     // Families Xenon/Ladybird ship in resource://fonts (layout tests and last-resort UI).
++    // Ahem is the CSS test font test-web registers for WPT local('Ahem'); without it, Standard
++    // farbling on file:// (site key "file://") rejects the face and layout tests fail.
+     static constexpr StringView bundled[] = {
+         "serenitysans"sv,
+         "noto emoji"sv,
+         "notoemoji"sv,
++        "ahem"sv,
+     };
+     if (names_contain(bundled, family))
+         return true;
+diff --git a/Tests/LibWeb/TestFontAllow.cpp b/Tests/LibWeb/TestFontAllow.cpp
+index 0923f5850490a4f20cc85bcb86bb8f7301d6295e..6147dab685f13aa251403d7c53b85f40a2c1760e 100644
+--- a/Tests/LibWeb/TestFontAllow.cpp
++++ b/Tests/LibWeb/TestFontAllow.cpp
+@@ -22,6 +22,7 @@ TEST_CASE(whitelist_is_always_allowed)
+     EXPECT(Web::Farbling::allow_font_family(seed, "Liberation Sans"sv, "en"sv));
+     EXPECT(Web::Farbling::allow_font_family(seed, "SerenitySans"sv, "en"sv));
+     EXPECT(Web::Farbling::allow_font_family(seed, "Arial"sv, "en"sv));
++    EXPECT(Web::Farbling::allow_font_family(seed, "Ahem"sv, "en"sv));
+     EXPECT(Web::Farbling::is_whitelisted_font_family("Times New Roman"sv, "en"sv));
+ }
+ 

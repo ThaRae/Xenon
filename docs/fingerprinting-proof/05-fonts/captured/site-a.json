@@ -3,13 +3,13 @@
   "host": "site-a.test:8080",
   "samples": [
     {
-      "seed": "standard:bf4679c3948d6212",
+      "seed": "standard:169377373b6378d1",
       "detections": [
         {
           "family": "DejaVu Sans",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "DejaVu Sans Mono",
@@ -19,21 +19,21 @@
         },
         {
           "family": "DejaVu Serif",
-          "width": true,
-          "canvas": true,
+          "width": false,
+          "canvas": false,
           "check": true
         },
         {
           "family": "FontAwesome",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "Lato",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "Lato Black",
@@ -272,22 +272,21 @@
       ],
       "present": [
         "DejaVu Sans Mono",
-        "DejaVu Serif",
         "Liberation Mono",
         "Liberation Sans",
         "Liberation Serif",
         "Noto Emoji",
         "SerenitySans"
       ],
-      "hash": "fnv1a64:637f99c29f6d21da",
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
       "sameIframe": {
-        "seed": "standard:bf4679c3948d6212",
+        "seed": "standard:169377373b6378d1",
         "detections": [
           {
             "family": "DejaVu Sans",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "DejaVu Sans Mono",
@@ -297,21 +296,21 @@
           },
           {
             "family": "DejaVu Serif",
-            "width": true,
-            "canvas": true,
+            "width": false,
+            "canvas": false,
             "check": true
           },
           {
             "family": "FontAwesome",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato Black",
@@ -550,24 +549,23 @@
         ],
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:637f99c29f6d21da",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
         "kind": "same"
       },
       "crossIframe": {
-        "seed": "standard:bf4679c3948d6212",
+        "seed": "standard:169377373b6378d1",
         "detections": [
           {
             "family": "DejaVu Sans",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "DejaVu Sans Mono",
@@ -577,21 +575,21 @@
           },
           {
             "family": "DejaVu Serif",
-            "width": true,
-            "canvas": true,
+            "width": false,
+            "canvas": false,
             "check": true
           },
           {
             "family": "FontAwesome",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato Black",
@@ -830,20 +828,18 @@
         ],
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:637f99c29f6d21da",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
         "kind": "cross"
       },
       "worker": {
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",
@@ -854,13 +850,13 @@
       }
     },
     {
-      "seed": "standard:bf4679c3948d6212",
+      "seed": "standard:169377373b6378d1",
       "detections": [
         {
           "family": "DejaVu Sans",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "DejaVu Sans Mono",
@@ -870,21 +866,21 @@
         },
         {
           "family": "DejaVu Serif",
-          "width": true,
-          "canvas": true,
+          "width": false,
+          "canvas": false,
           "check": true
         },
         {
           "family": "FontAwesome",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "Lato",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "Lato Black",
@@ -1123,22 +1119,21 @@
       ],
       "present": [
         "DejaVu Sans Mono",
-        "DejaVu Serif",
         "Liberation Mono",
         "Liberation Sans",
         "Liberation Serif",
         "Noto Emoji",
         "SerenitySans"
       ],
-      "hash": "fnv1a64:637f99c29f6d21da",
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
       "sameIframe": {
-        "seed": "standard:bf4679c3948d6212",
+        "seed": "standard:169377373b6378d1",
         "detections": [
           {
             "family": "DejaVu Sans",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "DejaVu Sans Mono",
@@ -1148,21 +1143,21 @@
           },
           {
             "family": "DejaVu Serif",
-            "width": true,
-            "canvas": true,
+            "width": false,
+            "canvas": false,
             "check": true
           },
           {
             "family": "FontAwesome",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato Black",
@@ -1401,24 +1396,23 @@
         ],
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:637f99c29f6d21da",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
         "kind": "same"
       },
       "crossIframe": {
-        "seed": "standard:bf4679c3948d6212",
+        "seed": "standard:169377373b6378d1",
         "detections": [
           {
             "family": "DejaVu Sans",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "DejaVu Sans Mono",
@@ -1428,21 +1422,21 @@
           },
           {
             "family": "DejaVu Serif",
-            "width": true,
-            "canvas": true,
+            "width": false,
+            "canvas": false,
             "check": true
           },
           {
             "family": "FontAwesome",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato Black",
@@ -1681,20 +1675,18 @@
         ],
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:637f99c29f6d21da",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
         "kind": "cross"
       },
       "worker": {
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",
@@ -1705,13 +1697,13 @@
       }
     },
     {
-      "seed": "standard:bf4679c3948d6212",
+      "seed": "standard:169377373b6378d1",
       "detections": [
         {
           "family": "DejaVu Sans",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "DejaVu Sans Mono",
@@ -1721,21 +1713,21 @@
         },
         {
           "family": "DejaVu Serif",
-          "width": true,
-          "canvas": true,
+          "width": false,
+          "canvas": false,
           "check": true
         },
         {
           "family": "FontAwesome",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "Lato",
           "width": false,
           "canvas": false,
-          "check": false
+          "check": true
         },
         {
           "family": "Lato Black",
@@ -1974,22 +1966,21 @@
       ],
       "present": [
         "DejaVu Sans Mono",
-        "DejaVu Serif",
         "Liberation Mono",
         "Liberation Sans",
         "Liberation Serif",
         "Noto Emoji",
         "SerenitySans"
       ],
-      "hash": "fnv1a64:637f99c29f6d21da",
+      "hash": "fnv1a64:5a0964c3cf1f01d4",
       "sameIframe": {
-        "seed": "standard:bf4679c3948d6212",
+        "seed": "standard:169377373b6378d1",
         "detections": [
           {
             "family": "DejaVu Sans",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "DejaVu Sans Mono",
@@ -1999,21 +1990,21 @@
           },
           {
             "family": "DejaVu Serif",
-            "width": true,
-            "canvas": true,
+            "width": false,
+            "canvas": false,
             "check": true
           },
           {
             "family": "FontAwesome",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato Black",
@@ -2252,24 +2243,23 @@
         ],
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:637f99c29f6d21da",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
         "kind": "same"
       },
       "crossIframe": {
-        "seed": "standard:bf4679c3948d6212",
+        "seed": "standard:169377373b6378d1",
         "detections": [
           {
             "family": "DejaVu Sans",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "DejaVu Sans Mono",
@@ -2279,21 +2269,21 @@
           },
           {
             "family": "DejaVu Serif",
-            "width": true,
-            "canvas": true,
+            "width": false,
+            "canvas": false,
             "check": true
           },
           {
             "family": "FontAwesome",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato",
             "width": false,
             "canvas": false,
-            "check": false
+            "check": true
           },
           {
             "family": "Lato Black",
@@ -2532,20 +2522,18 @@
         ],
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",
           "Noto Emoji",
           "SerenitySans"
         ],
-        "hash": "fnv1a64:637f99c29f6d21da",
+        "hash": "fnv1a64:5a0964c3cf1f01d4",
         "kind": "cross"
       },
       "worker": {
         "present": [
           "DejaVu Sans Mono",
-          "DejaVu Serif",
           "Liberation Mono",
           "Liberation Sans",
           "Liberation Serif",

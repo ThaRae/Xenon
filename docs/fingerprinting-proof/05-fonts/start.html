@@ -37,7 +37,8 @@ if (reloads.length < 3) {
         document.body.appendChild(iframe);
         setTimeout(resolve, 6000);
     });
-    Promise.all([iframeWait, withWorker()]).then(([, worker]) => {
+    Promise.all([iframeWait, withWorker(), attachWebFontRow(sample)]).then(([, worker]) => {
+        state.measure = sample;
         state.worker = worker;
         return post("a-direct", state);
     }).then(goToB);
