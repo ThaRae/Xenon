@@ -266,6 +266,9 @@ void WebAuthnPopover::hideEvent(QHideEvent* event)
     Popover::hideEvent(event);
     if (!m_is_closing_without_cancelling)
         m_view.web_authn_cancel();
+    // The view may open its next prompt before this one is deleted, when a new ceremony takes over from one that has
+    // answered its page, and that prompt gets a popover of its own.
+    setObjectName({});
     deleteLater();
 }
 

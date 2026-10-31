@@ -147,7 +147,8 @@ the way `did_completely_finish_loading()` does:
 4. `sameOriginWithAncestors` comes from the canonical ancestors' active documents, and the top-level origin from the
    top-level document.
 5. The view is visible and focused, as the frontend reports to the traversable (Chromium has the same rule), and its
-   tab has no other ceremony running.
+   tab has no other ceremony that the page is still waiting on. One that has answered the page, and keeps its prompt
+   up only to tell the user, makes way for the new one.
 
 A failed check rejects with the exception the spec gives for it (`NotAllowedError` or `SecurityError`), so honest
 pages see the same error as from the renderer's own checks. Then `WebAuthnCoordinator` runs the ceremony:
@@ -163,9 +164,11 @@ pages see the same error as from the renderer's own checks. Then `WebAuthnCoordi
   site gets no verifiable proof of the key's make and model. Level 3 keeps the AAGUID, which names the model without
   proving it. For `"direct"`, the prompt says the site will see the key's make and model, and offers to send `none`
   instead. `"enterprise"` is treated as `"direct"`, since no RP is configured for enterprise attestation.
-- It reports errors the way the spec's privacy rules want: when a key holds no credential for the site, or a key is
-  already registered (`excludeCredentials`), the user is told and can try another key, and the page hears nothing
-  until the user cancels or the timeout ends. A page can't use the timing to find out whether a credential exists.
+- It reports errors the way the spec's privacy rules want: when a key holds no credential for the site, the user is
+  told and can try another key, and the page hears nothing until the user cancels or the timeout ends. A page can't
+  use the timing to find out whether a credential exists. A key that is already registered (`excludeCredentials`)
+  says so only once the user has touched it, so the page gets its `InvalidStateError` right then, as the spec says,
+  and the prompt stays up to tell the user until they close it or the page makes its next request.
 
 `Authenticator` is the interface to an authenticator: `make_credential()`, `get_assertion()`, `wait_for_touch()`,
 `get_pin_retries()`, `cancel()`, and what it supports (from `authenticatorGetInfo`). An `AuthenticatorSource` reports
@@ -338,8 +341,9 @@ Keychain on the Mac itself.
   `NotAllowedError`, as in Chromium. Hiding or closing the tab, or navigating away, cancels the ceremony on the key.
   One ceremony per tab at a time, so a page can't stack prompts.
 - **Timeouts.** Clamped to the spec's recommended 5 to 10 minutes, 5 by default.
-- **No probing for credentials.** "Not registered here" and "already registered" go to the user, not the page, until
-  the user ends the ceremony, so the page can't tell from the result or its timing whether a credential exists.
+- **No probing for credentials.** "Not registered here" goes to the user, not the page, until the user ends the
+  ceremony, so the page can't tell from the result or its timing whether a credential exists. "Already registered"
+  reaches the page only once the user has touched the key.
   Nothing about which keys are plugged in reaches a page.
 - **Attestation.** `none` by default. A verifiable statement of the key's make and model (its attestation certificate)
   goes to a site only when it asks for `direct` attestation and the user agrees. The AAGUID always goes through, as

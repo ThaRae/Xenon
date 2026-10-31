@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 09:58:06 -0400
+Subject: [PATCH] LibWebView: Let a WebAuthn request follow one that has been
+ answered
+
+When an authenticator says it already holds one of the excluded
+credentials, the coordinator rejects the page's create() with an
+InvalidStateError right away, and keeps the ceremony only so that
+its prompt can tell the user. That ceremony still counted as the
+tab's request in progress, so a request the page made as soon as it
+had the error was rejected with "Another WebAuthn request is in
+progress", for as long as the user left the prompt up.
+
+With virtual authenticators, nobody is there to close the prompt,
+and the ceremony ends from a deferred invocation instead. But a
+connection handles every message it has read when it gets to them,
+so a follow-up request read in the same pass of the event loop
+could still get there first, and WebAuthn/create-and-get.html
+failed now and then.
+
+A ceremony that has answered the page now makes way for the tab's
+next request: it ends, closing its prompt, and the new one starts.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/WebAuthn/Coordinator.cpp | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.cpp b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
+index 58a5f51d3053c782ffa546c2072a821e048ce014..0f2690f98536fd3d57aa0aa6f1bdaf0449f95507 100644
+--- a/Libraries/LibWebView/WebAuthn/Coordinator.cpp
++++ b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
+@@ -53,6 +53,7 @@ public:
+     WebContentPage* page() const { return m_page.ptr(); }
+     u64 request_id() const { return m_request_id; }
+     bool is_create() const { return m_request.has<CreateRequest>(); }
++    bool has_answered() const { return m_phase == Phase::Answered; }
+ 
+     ViewImplementation* view() const
+     {
+@@ -878,9 +879,15 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
+         }
+     }
+ 
+-    if (any_of(m_ceremonies, [&](auto const& ceremony) { return ceremony->page() && &ceremony->page()->traversable() == &traversable; })) {
+-        page.async_web_authn_request_completed(request_id, not_allowed("Another WebAuthn request is in progress"sv));
+-        return;
++    if (auto index = m_ceremonies.find_first_index_if([&](auto const& ceremony) { return ceremony->page() && &ceremony->page()->traversable() == &traversable; }); index.has_value()) {
++        auto& ceremony = *m_ceremonies[*index];
++        if (!ceremony.has_answered()) {
++            page.async_web_authn_request_completed(request_id, not_allowed("Another WebAuthn request is in progress"sv));
++            return;
++        }
++        // NB: A ceremony that has answered the renderer keeps its prompt up only to inform the user, and the renderer
++        //     may make its next request as soon as it has the answer, so the ceremony makes way for that request.
++        ceremony.end({});
+     }
+ 
+     auto ceremony = adopt_ref(*new Ceremony(page, request_id, move(context), move(request)));
