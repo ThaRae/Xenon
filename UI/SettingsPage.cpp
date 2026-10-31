@@ -67,7 +67,10 @@ static Optional<String> extension_icon(Extensions::Extension const& extension)
     if (!path.has_value())
         return {};
 
-    auto file = Core::File::open(LexicalPath::join(extension.root(), *path).string(), Core::File::OpenMode::Read);
+    auto icon_file = Extensions::Extension::confined_file(extension.root(), path->bytes_as_string_view());
+    if (icon_file.is_error())
+        return {};
+    auto file = Core::File::open(icon_file.value(), Core::File::OpenMode::Read);
     if (file.is_error())
         return {};
     auto contents = file.value()->read_until_eof();

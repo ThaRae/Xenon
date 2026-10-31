@@ -36,6 +36,8 @@ public:
 
     ErrorOr<ByteString> resolve(URL::URL const&) const;
 
+    static ErrorOr<ByteString> confined_file(StringView root, StringView path);
+
     bool is_web_accessible(StringView path, URL::Origin const& requester) const;
 
     bool is_sandboxed_page(StringView path) const;

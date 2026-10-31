@@ -153,7 +153,10 @@ ErrorOr<NonnullRefPtr<Extension>, String> Extension::load_unpacked(StringView di
     auto manifest = TRY(Manifest::parse(move(json)));
 
     auto require_file = [&](String const& path, StringView what) -> ErrorOr<void, String> {
-        auto full_path = LexicalPath::join(root.value(), path.bytes_as_string_view()).string();
+        auto confined = confined_file(root.value(), path);
+        if (confined.is_error())
+            return MUST(String::formatted("Could not load {} '{}' from the extension.", what, path));
+        auto full_path = confined.release_value();
         if (!FileSystem::is_regular_file(full_path))
             return MUST(String::formatted("Could not load {} '{}'.", what, path));
         return {};
@@ -192,6 +195,24 @@ URL::URL Extension::url_for(StringView path) const
     auto url = URL::create_with_url_or_path(ByteString::formatted("{}://{}/{}", EXTENSION_SCHEME, m_id, path));
     VERIFY(url.has_value());
     return url.release_value();
+}
+
+ErrorOr<ByteString> Extension::confined_file(StringView root, StringView path)
+{
+    while (path.starts_with('/'))
+        path = path.substring_view(1);
+    if (path.is_empty() || path.contains('\\') || path.contains('\0'))
+        return Error::from_errno(EACCES);
+    LexicalPath joined { root };
+    for (auto segment : path.split_view('/')) {
+        if (segment.is_empty() || segment == "."sv || segment == ".."sv)
+            return Error::from_errno(EACCES);
+        joined = joined.append(segment);
+    }
+    auto real_path = TRY(FileSystem::real_path(joined.string()));
+    if (!real_path.starts_with(ByteString::formatted("{}/", root)))
+        return Error::from_errno(EACCES);
+    return real_path;
 }
 
 ErrorOr<ByteString> Extension::resolve(URL::URL const& url) const

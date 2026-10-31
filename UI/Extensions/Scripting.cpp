@@ -48,6 +48,9 @@ Optional<Vector<Router::Frame>> Router::frames_of_tab(i64 tab_id)
 
 static bool may_access(Extension const& extension, URL::URL const& url)
 {
+    if (url.scheme() == "file"sv)
+        return false;
+
     auto matches_any = [&](Vector<String> const& patterns) {
         return any_of(patterns, [&](auto const& pattern) {
             auto parsed = MatchPattern::parse(pattern);
