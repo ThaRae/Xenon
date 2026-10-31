@@ -43,7 +43,7 @@ changes.
  create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.ipc
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 20bf7960488fa33b6cc3706c65ff8c6cc2dd3700..a77c8298502cf57a6b9a965586ca46adf1058f8c 100644
+index 48f7afb58b80ad0e8ba235497602795c12333082..f7268b04b0b8ed64640a857963d3431d59e75a7f 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 @@ -86,6 +86,7 @@
@@ -54,7 +54,7 @@ index 20bf7960488fa33b6cc3706c65ff8c6cc2dd3700..a77c8298502cf57a6b9a965586ca46ad
  #include <LibWebCommon/Fetch/Infrastructure/URL.h>
  #include <LibWebCommon/Loader/UserAgent.h>
  #include <LibWebCommon/SecureContexts/AbstractOperations.h>
-@@ -672,8 +673,12 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -673,8 +674,12 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
              && request->current_url().scheme() == "file"sv
              && request->destination() == Infrastructure::Request::Destination::Font;
  
@@ -68,7 +68,7 @@ index 20bf7960488fa33b6cc3706c65ff8c6cc2dd3700..a77c8298502cf57a6b9a965586ca46ad
              || request->current_url().scheme() == "data"sv
              || (request->mode() == Infrastructure::Request::Mode::Navigate || request->mode() == Infrastructure::Request::Mode::WebSocket)) {
 diff --git a/Libraries/LibWebCommon/CMakeLists.txt b/Libraries/LibWebCommon/CMakeLists.txt
-index 4915171e53b1267336d3a694aa82857e623ccda4..176ee0657596065c1f83ad3893995c3d29833d5e 100644
+index aac22e3369ace5711097d531fda6efe40acea2cd..75f0f0d187e9ca17eedfd0a32db3aa15a983d97e 100644
 --- a/Libraries/LibWebCommon/CMakeLists.txt
 +++ b/Libraries/LibWebCommon/CMakeLists.txt
 @@ -7,6 +7,7 @@ set(SOURCES
@@ -79,14 +79,14 @@ index 4915171e53b1267336d3a694aa82857e623ccda4..176ee0657596065c1f83ad3893995c3d
      Fetch/Infrastructure/URL.cpp
      FileAPI/BlobURLStore.cpp
      FileAPI/SerializedBlobURLEntry.cpp
-@@ -112,6 +113,7 @@ invoke_py_generator(
+@@ -113,6 +114,7 @@ invoke_py_generator(
  )
  
  compile_ipc(ContentSecurityPolicy/RemoteViolationDirective.ipc ContentSecurityPolicy/RemoteViolationDirectiveCodecs.h)
 +compile_ipc(Fetch/Infrastructure/OriginAccessAllowList.ipc Fetch/Infrastructure/OriginAccessAllowListCodecs.h)
  compile_ipc(HTML/NavigationResponse.ipc HTML/NavigationResponseCodecs.h)
+ compile_ipc(MixedContent/ProhibitsMixedSecurityContexts.ipc MixedContent/ProhibitsMixedSecurityContextsCodecs.h)
  compile_ipc(Page/InputEvent.ipc Page/InputEventCodecs.h)
- compile_ipc(Page/TextEditingCommand.ipc Page/TextEditingCommandCodecs.h)
 diff --git a/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp b/Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.cpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..810b7710a73b6f0b8ed39b7f5cf77807218f82ff
@@ -299,7 +299,7 @@ index b96ca014a5075cbb781c5258931588e3b30ca587..9d3fff309425bf639e9c6d1668cc12b1
      // reaches every live worker too.
      void update_user_agent(String const&);
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 7cdd6b50b202c22a5be4e1888d045d5b800b764b..ffd87681afc3e85e788d9c8c5651c9296ad79504 100644
+index 36f19f05165a6a1fbd9ec255c2dc7630489be91b..bce72f92805afc3500f2e51927ac09846f0359a8 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -546,6 +546,11 @@ void ConnectionFromClient::set_permission_snapshot(Web::Permissions::PermissionS
@@ -315,10 +315,10 @@ index 7cdd6b50b202c22a5be4e1888d045d5b800b764b..ffd87681afc3e85e788d9c8c5651c929
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 8557a745eea087b4cbf491160b49b43174bc1bb6..ea8af49f78567b77510a11af29a9ff97519a5fb8 100644
+index 75d7494646c083548985de8a6a86de770627b878..a64ce98086a2edf3c14abff6a5777518d5ff609a 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -121,6 +121,7 @@ private:
+@@ -120,6 +120,7 @@ private:
      virtual void connect_to_compositor_process(IPC::TransportHandle handle, IPC::TransportHandle render_clock_handle) override;
      virtual void set_site_compatibility_data(JsonValue data) override;
      virtual void set_permission_snapshot(Web::Permissions::PermissionSnapshot snapshot) override;
@@ -327,7 +327,7 @@ index 8557a745eea087b4cbf491160b49b43174bc1bb6..ea8af49f78567b77510a11af29a9ff97
      virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 29f48b8b80e0850f6833ad9857f425bac95cf595..2ff6fd47303a0d470636a60174dc71f7f31c2ed9 100644
+index 16a7e1a180361d16195a458538e8482084a025c4..bcc5ae62d91baf9f2e6f33a71aebba217ca1e4d7 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -16,6 +16,7 @@

@@ -30,7 +30,7 @@ Ladybird token set a User-Agent that has one.
  10 files changed, 25 insertions(+), 10 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 0ce3a04006786c3d0a26d77da5bf81870f6eac6f..2841d219b6636628f6a007b0d34b3489288f591b 100644
+index 7f7fb637b9d026c5aa7f76bbe30a9df51c0fc30c..5a98149cc547cad96aa673286e8b537f180fb6a4 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 @@ -3485,6 +3485,8 @@ void append_user_agent_client_hints_for_request(Infrastructure::Request& request
@@ -43,7 +43,7 @@ index 0ce3a04006786c3d0a26d77da5bf81870f6eac6f..2841d219b6636628f6a007b0d34b3489
      StringBuilder brands;
      bool first = true;
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 2dd252e00705c64f54e53d920723d0b254e7b90c..0c61864f79ae1b17af697e1142ac45bab5073256 100644
+index 5813f7cce38a1566a3213e2fb13562f8e3a95707..d99d27dc06835c3811bf5814b4ae32722ac8e02d 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
 @@ -1446,6 +1446,11 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con

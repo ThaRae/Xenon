@@ -30,10 +30,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  9 files changed, 85 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/CanonicalTraversable.h b/Libraries/LibWebView/CanonicalTraversable.h
-index 8f6cb69c2a9f3d8c14eb135a168f53c017bf8c52..63b9397dfed855ae193b23eacd9b70cac3336f98 100644
+index 7bf58e74c85fb43b215cdf9ff5bf5d9b3ae43cec..924a2783510069ee1383e34ba67306633f9c1636 100644
 --- a/Libraries/LibWebView/CanonicalTraversable.h
 +++ b/Libraries/LibWebView/CanonicalTraversable.h
-@@ -182,6 +182,7 @@ public:
+@@ -184,6 +184,7 @@ public:
      void reconstruct_the_history_to_step(i32 step);
      ErrorOr<URL::URL> restore_session_history_from_ui_snapshot(SessionHistorySnapshot);
      void recover_from_web_content_process_crash();
@@ -41,7 +41,7 @@ index 8f6cb69c2a9f3d8c14eb135a168f53c017bf8c52..63b9397dfed855ae193b23eacd9b70ca
      void reset_session_history_for_testing(Web::HTML::SessionHistoryEntryDescriptor);
      bool initialize_session_history_for_testing(Vector<Web::HTML::SessionHistoryEntryDescriptor>, Vector<i32> used_steps, size_t current_used_step_index);
  
-@@ -199,7 +200,6 @@ private:
+@@ -201,7 +202,6 @@ private:
      HistoryOperation* find_history_operation(Web::HTML::CrossProcessId operation_id);
      ApplyHistoryStep* find_history_step_run(Web::HTML::CrossProcessId operation_id);
      RefPtr<CanonicalNavigation> finalized_navigation(HistoryOperation const&) const;
@@ -127,10 +127,10 @@ index e6e3e892f8785aa19eb4377e6c4c89b4828afcd1..b52ef02a6f8703113846b1d82fa8c511
      RefPtr<Action> m_block_element_action;
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 9643fd324767b0698d05bf51b4e9d17c048ae13a..5b7748869774db656029a512673f71cf83fb12bf 100644
+index 82b01636c725b053c1e865b2d3d8a5f7e83439b7..5873a48b2afd5e6f078a53516234afaa25130024 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1261,6 +1261,12 @@ void WebContentPage::did_take_screenshot(Gfx::ShareableBitmap screenshot)
+@@ -1269,6 +1269,12 @@ void WebContentPage::did_take_screenshot(Gfx::ShareableBitmap screenshot)
          view().did_receive_screenshot({}, screenshot);
  }
  
@@ -144,10 +144,10 @@ index 9643fd324767b0698d05bf51b4e9d17c048ae13a..5b7748869774db656029a512673f71cf
  {
      if (displays_tab())
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 46583a19be9681996e0f435ef76dbed4f1b7628e..5cb7b8777645aad13fdf26fccfa39778d62daadc 100644
+index d835620f2ead30e28e5adf64f622a49291a54eb4..9c8ef6459f2e8d18214a9504253c45bacfd9b806 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -247,6 +247,7 @@ private:
+@@ -250,6 +250,7 @@ private:
      virtual void did_resume_debugger() override;
      virtual void did_complete_debugger_breakpoint_operation(u64 request_id, Optional<String> error) override;
      virtual void did_take_screenshot(Gfx::ShareableBitmap screenshot) override;
@@ -156,7 +156,7 @@ index 46583a19be9681996e0f435ef76dbed4f1b7628e..5cb7b8777645aad13fdf26fccfa39778
      virtual void did_get_selected_text(u64 request_id, ByteString selection) override;
      virtual void did_get_selected_text_for_lookup(u64 request_id, Optional<DictionaryLookup> lookup) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 6a14119d2eabada1edf3a6094da8103f1d4233b2..b7401a97329a2903ce5ad2d2f611535f219f8bc6 100644
+index e2021b2657991002cdfc625dd367a8d09412cb71..0104019330c46dfe0da4dee5c9296d8d35864fb7 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -74,6 +74,7 @@
@@ -213,10 +213,10 @@ index 6a14119d2eabada1edf3a6094da8103f1d4233b2..b7401a97329a2903ce5ad2d2f611535f
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index a9d3eed64085710091064a7b3cabc1ed30af9b0d..6fae3aa0de978e3362ba6b2bef6b4949a78a1dfb 100644
+index 780e4f703327a74d12527095a82daf921dad815c..f75fe719e67c5ad4d3a2a39f76637be4d835ed3f 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -131,6 +131,7 @@ private:
+@@ -130,6 +130,7 @@ private:
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
      virtual void populate_navigation(Web::PageId page_id, Web::HTML::NavigationPopulationRequest, Web::HTML::NavigationPopulationResult) override;
      virtual void stop_loading(Web::PageId page_id) override;
@@ -225,7 +225,7 @@ index a9d3eed64085710091064a7b3cabc1ed30af9b0d..6fae3aa0de978e3362ba6b2bef6b4949
      virtual void set_ongoing_navigation(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id) override;
      virtual void navigate_to_a_fragment(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, URL::URL url, Web::HTML::HistoryHandlingBehavior, Web::HTML::UserNavigationInvolvement, Utf16String navigation_id) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index e14b59cbaa66dd576723a53ba2fe8333cb217363..7c52ed8b8896a8c4798ebb9c64db6c02a2a1feb7 100644
+index 0cc0594760bbc6f56c3ddc9242e5cdef48c01771..23deb2bb5991cab73c5c6eaa3321f52dfce1bc6c 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
 @@ -180,6 +180,8 @@ endpoint WebContentClient routed by Web::PageId page_id
@@ -238,7 +238,7 @@ index e14b59cbaa66dd576723a53ba2fe8333cb217363..7c52ed8b8896a8c4798ebb9c64db6c02
  
      did_get_selected_text(Web::PageId page_id, u64 request_id, ByteString selection) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index b977baf9753ccfc13a15ec9a73555941b2f32e0f..61b4106ff7368ed5a772f1414ad04d8d02005a6f 100644
+index 0962ea644cf2b6d9df4e7926f599a48ae4084a34..99a69eb433d196655d32197d8c06d1baf62fae51 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -110,6 +110,7 @@ endpoint WebContentServer routed by Web::PageId page_id

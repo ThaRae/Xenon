@@ -39,10 +39,10 @@ index ad236d28897c4f7ab1ad3da8d79c0130b94b90a7..14b9dab5f2059ffbc8c82f94dd6db98c
  
  struct URLSchemeResponse {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 2897edc23253485215d698c95634e6aa37c7e617..9643fd324767b0698d05bf51b4e9d17c048ae13a 100644
+index 56032396309308190d8938744a6d02a609d2d933..82b01636c725b053c1e865b2d3d8a5f7e83439b7 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1624,7 +1624,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1638,7 +1638,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return;
      }
  
@@ -51,7 +51,7 @@ index 2897edc23253485215d698c95634e6aa37c7e617..9643fd324767b0698d05bf51b4e9d17c
      traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
          auto navigation = navigable.uncommitted_navigation();
          if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
-@@ -1636,6 +1636,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1650,6 +1650,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return IterationDecision::Break;
      });
  

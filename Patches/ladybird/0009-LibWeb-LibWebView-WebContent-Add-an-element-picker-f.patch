@@ -40,7 +40,7 @@ Internals exposes the filter generator for tests.
  16 files changed, 216 insertions(+)
 
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index bf6cc93d91d8811fe925715daab9b9bcc44bbba9..03017c4758f6bc44bcc96c36f44308fc06b3b2be 100644
+index 569850df2fa9dee4c70ade62b4988b1f590fcdc2..216bfb94adbee78773659240bff45af452857418 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
 @@ -1451,6 +1451,11 @@ void Internals::set_content_blocking_enabled(bool enabled)
@@ -398,10 +398,10 @@ index e2ef10618064e7baa66da222390b34383d9e90cb..e9f1aa9627f82f054716c878f2f42fa6
  };
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index b0d82d78053929507395e8e169cdbdbedfa26cec..85d107a07b0226d92650e751c4fa84dea4d3f0a9 100644
+index 9ba4899967162d5124907d5cdd36a73eea43727c..3c1f3794064987bb71359bbe2f28811e5d211bfd 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1167,6 +1167,12 @@ void WebContentPage::did_get_hovered_node_id(Web::UniqueNodeID node_id)
+@@ -1175,6 +1175,12 @@ void WebContentPage::did_get_hovered_node_id(Web::UniqueNodeID node_id)
      }
  }
  
@@ -415,10 +415,10 @@ index b0d82d78053929507395e8e169cdbdbedfa26cec..85d107a07b0226d92650e751c4fa84de
  {
      if (displays_tab()) {
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 60469b4cdf7c299eea7bd766cbc4f1f48f5a8d3a..8d3bca55fd0c48fa3a99f221504f70515aa829c5 100644
+index 850f7643a18b812f213458173aad6f799fe3209f..8e51b68e32f9e6e9de9bb7d642fb7343fd531b42 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -230,6 +230,7 @@ private:
+@@ -233,6 +233,7 @@ private:
      virtual void did_accessibility_focus_change(i64 focused_node_id) override;
      virtual void did_get_hovered_node_id(Web::UniqueNodeID node_id) override;
      virtual void did_get_node_id_at_position(u64 request_id, Web::UniqueNodeID node_id) override;
@@ -427,7 +427,7 @@ index 60469b4cdf7c299eea7bd766cbc4f1f48f5a8d3a..8d3bca55fd0c48fa3a99f221504f7051
      virtual void did_get_style_sheet_source(Web::CSS::StyleSheetIdentifier identifier, URL::URL base_url, Utf16String source) override;
      virtual void did_list_devtools_sources(u64 request_id, Vector<Web::HTML::ScriptRegistryDescription> sources) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 1fd44615f3ffc93fa95d54a49dc164b79c19591a..8a1bb0f6fc12fc99f3618ec1220cbed3b4f5db51 100644
+index 1f6ac84670b62f935fd26d86ea35f08e5f2c34ce..a04f78ed5de0e63c6a11440e6c3a12385010c16a 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -2076,6 +2076,19 @@ void ConnectionFromClient::get_node_id_at_position(Web::PageId page_id, u64 requ
@@ -451,10 +451,10 @@ index 1fd44615f3ffc93fa95d54a49dc164b79c19591a..8a1bb0f6fc12fc99f3618ec1220cbed3
  {
      auto page = this->page(page_id);
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index befd1bfd84d15acd7927098f8c35168cbaa3bd68..7128c0e1f077d97060dca16a896ceae63f1eac1d 100644
+index 95810f36e7e1dd6b95dcbe40a706418d45071ba1..bdeee9b78865bac3cf9e9aa61b2ebd857e312786 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -212,6 +212,7 @@ private:
+@@ -211,6 +211,7 @@ private:
          i32 offset_end, String text) override;
      virtual void get_hovered_node_id(Web::PageId page_id) override;
      virtual void get_node_id_at_position(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) override;
@@ -463,7 +463,7 @@ index befd1bfd84d15acd7927098f8c35168cbaa3bd68..7128c0e1f077d97060dca16a896ceae6
      virtual void list_style_sheets(Web::PageId page_id) override;
      virtual void request_style_sheet_source(Web::PageId page_id, Web::CSS::StyleSheetIdentifier identifier) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index 8a2eccdca7180f14423c46d0deedd466960a2de7..6445f9d84cd6d7fcb5245906d025e6868a9c1a79 100644
+index 1a5edc57da10ff82a0fe48501b32cafaec59d3b9..9392957737852d8a52e7cd74258744269f47d1d9 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
 @@ -157,6 +157,7 @@ endpoint WebContentClient routed by Web::PageId page_id
@@ -475,7 +475,7 @@ index 8a2eccdca7180f14423c46d0deedd466960a2de7..6445f9d84cd6d7fcb5245906d025e686
      did_mutate_dom(Web::PageId page_id, WebView::Mutation mutation) =|
      did_get_dom_node_html(Web::PageId page_id, String html) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 9f442d07cf1658d523fa354d3ee1107eb304fefa..de4c9cad329108d785403cb23db6061357073ee8 100644
+index 23e27c496ddad8c0ba88bab55df30fc2f42e2bad..dbfd98b973af4e24791b29cf74ee39536de18edc 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -192,6 +192,7 @@ endpoint WebContentServer routed by Web::PageId page_id

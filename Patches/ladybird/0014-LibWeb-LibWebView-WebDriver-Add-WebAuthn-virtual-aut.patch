@@ -107,10 +107,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Tests/LibWebView/test-webdriver-webauthn.py
 
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 03017c4758f6bc44bcc96c36f44308fc06b3b2be..2dd252e00705c64f54e53d920723d0b254e7b90c 100644
+index 216bfb94adbee78773659240bff45af452857418..5813f7cce38a1566a3213e2fb13562f8e3a95707 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -2091,6 +2091,24 @@ void Internals::pump_gamepad_events()
+@@ -2092,6 +2092,24 @@ void Internals::pump_gamepad_events()
      page().client().pump_gamepad_events();
  }
  
@@ -162,7 +162,7 @@ index e231640c62700b06206bd79164f690cbdf618ca5..3a73bf279e318ec3e5caa80c8416e3c5
  
      undefined clearElement(HTMLElement element);
 diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
-index b2b85d2c198f64c457755190ea282f18fc6bf918..34fadfb732c29659509da912c5ac3f0b2f61f636 100644
+index 0c0efd9e9122ef164f06f89ed565ebb1cd7b764a..7e75fa0b2e08501c0a957493b74631c48595cb05 100644
 --- a/Libraries/LibWeb/Page/Page.h
 +++ b/Libraries/LibWeb/Page/Page.h
 @@ -103,6 +103,7 @@
@@ -173,7 +173,7 @@ index b2b85d2c198f64c457755190ea282f18fc6bf918..34fadfb732c29659509da912c5ac3f0b
  #include <LibWebCommon/WebView/StorageSetResult.h>
  
  namespace Web {
-@@ -935,6 +936,8 @@ public:
+@@ -937,6 +938,8 @@ public:
      virtual void page_did_request_stop_gamepad_effects([[maybe_unused]] Gamepad::GamepadHandle handle) { }
  
      virtual Optional<Gamepad::VirtualGamepad> create_virtual_gamepad() { return {}; }
@@ -1164,7 +1164,7 @@ index 848f7f1518f493c3607ff86dbb2c40d47585ddf4..9ed424bff482335c0b679a4e031868c6
      virtual void switch_to_window(u64 command_id, String window_handle) override;
      virtual void switch_to_parent_frame(u64 command_id, String window_handle) override;
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 6e7f1d12917c838a4b20e0e94efe01549cac5576..a24cb08413424381fdf11705e245e789b1364820 100644
+index 1158ed8d330891bd05eb55e4706c4f1861ee95bc..4278ffdd0f06edd6ef8b1a1af35c5cd91121c006 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
 @@ -2117,6 +2117,18 @@ void PageClient::page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHand
@@ -1187,7 +1187,7 @@ index 6e7f1d12917c838a4b20e0e94efe01549cac5576..a24cb08413424381fdf11705e245e789
  {
      auto* test_connection = client().test_connection();
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index d73516296eb113399bb00256d9b1066e6ea76e0c..5baf89130f89705abbcf9f1f9801dfced0cc3215 100644
+index f0f52761ac3b5586aaf1147af4164bd4230665d7..f795cc5c7afa0fdb0847cae04ebcfd3ee53667da 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
 @@ -389,6 +389,7 @@ private:
@@ -1199,7 +1199,7 @@ index d73516296eb113399bb00256d9b1066e6ea76e0c..5baf89130f89705abbcf9f1f9801dfce
      virtual void set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle, i32 axis, i16 value) override;
      virtual void disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle) override;
 diff --git a/Services/WebContent/WebContentTestClient.ipc b/Services/WebContent/WebContentTestClient.ipc
-index cf3058e8942a5dc01fbb1457bff990a9ab59a030..46ca945f0c7251096d84a8fe5b1a9a84ce7ced02 100644
+index 3a3b750c2c905f446f4314ab5bee74478c1dab47..57198d084e0edfcdaf2275a2efa811072a09fcb0 100644
 --- a/Services/WebContent/WebContentTestClient.ipc
 +++ b/Services/WebContent/WebContentTestClient.ipc
 @@ -7,6 +7,7 @@
@@ -1210,10 +1210,10 @@ index cf3058e8942a5dc01fbb1457bff990a9ab59a030..46ca945f0c7251096d84a8fe5b1a9a84
  
  endpoint WebContentTestClient routed by Web::PageId page_id
  {
-@@ -46,5 +47,8 @@ endpoint WebContentTestClient routed by Web::PageId page_id
-     set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle handle, i32 axis, i16 value) =|
+@@ -47,5 +48,8 @@ endpoint WebContentTestClient routed by Web::PageId page_id
      disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle handle) =|
      pump_gamepad_events() => (Vector<Web::Gamepad::GamepadChangeEvent> events)
+     reset_gamepad_access_for_testing(Web::PageId page_id) =|
 +    // https://w3c.github.io/webauthn/#sctn-automation
 +    [NotRouted] run_web_authn_command(Web::PageId page_id, String name, JsonValue payload, Vector<String> arguments) => (Web::WebDriver::Response response)
 +
@@ -1366,7 +1366,7 @@ index 34a9bb1b110dcfe696d6402f5f8e91f1ec6a7437..5405b21062fea77b0367bb73f16beffb
      bidi_command(u64 command_id, String method, JsonValue params) =|
      bidi_get_top_level_traversables(u64 command_id, Vector<String> navigable_ids) =|
 diff --git a/Tests/LibWeb/TestConfig.ini b/Tests/LibWeb/TestConfig.ini
-index 05d5c4cf1bc1141d4a88d9732ab9045565e209ba..da23e3ae358ef0eb0c448afb229c3fa0c40f118a 100644
+index e81abb8003adc26d51db95b12d6b5dfb29d50aef..278d337a7534d272d24b4b06999bf816ebbf61b4 100644
 --- a/Tests/LibWeb/TestConfig.ini
 +++ b/Tests/LibWeb/TestConfig.ini
 @@ -27,6 +27,17 @@ Text/input/wpt-import/html/dom/render-blocking/remove-attr-script-keeps-blocking
@@ -3219,7 +3219,7 @@ index 0000000000000000000000000000000000000000..a45b686ca775c94dc015d6d59a4a6d0b
 +    JSON.stringify(deepSortKeys(expected)), optMsg);
 +}
 diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
-index 5588c38d62c76492748d4981db8389cca1e1662c..60b6c0f2d7be8a01b5ba724493136416bdacaae7 100644
+index 8c2164c378ffc34171479a8ded8aaf6abcb2d0bf..a6ef037507c1c74609e31a188e4c99de27709791 100644
 --- a/Tests/LibWebView/CMakeLists.txt
 +++ b/Tests/LibWebView/CMakeLists.txt
 @@ -138,6 +138,12 @@ if (BUILD_TESTING AND NOT WIN32)

@@ -20,10 +20,10 @@ A Window that outlives its initial about:blank document runs it once.
  3 files changed, 9 insertions(+)
 
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index 61ef86d8e4ca6aa52dc9d5cc15ea23571574bb13..e629c13b1becaf6c88d78fe6e4d96ed9cdab650a 100644
+index e132bc9307de9017e6ffe4d3bb4e2f6781b5c7f2..d440329603e80b36c071baf4cafb4f07e1f9b538 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -8053,6 +8053,8 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+@@ -8066,6 +8066,8 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
          if (!scrolling_blocked_in_new_document)
              try_to_scroll_to_the_fragment(allow_text_directive_scroll);
  
@@ -33,7 +33,7 @@ index 61ef86d8e4ca6aa52dc9d5cc15ea23571574bb13..e629c13b1becaf6c88d78fe6e4d96ed9
          set_ready_to_run_scripts();
      }
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index 077c00006700c06a40f94fe28b171ea4d3367d2c..dfeebb8b7cd87893e86fe4bf013cf4d923965264 100644
+index 7d0fcb876d3da2014711f3e37c1df4de6b0af7d7..11c6b3e167811b1712303be202a833f398402b94 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
 @@ -85,6 +85,7 @@

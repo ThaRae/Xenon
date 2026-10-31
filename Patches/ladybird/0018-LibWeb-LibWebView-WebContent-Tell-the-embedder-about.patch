@@ -38,10 +38,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  15 files changed, 88 insertions(+), 25 deletions(-)
 
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index 46b24c361c6be4df9c8fabc3419083224c654907..db07ba0461d53258c9c869790e69c0ff63eb2acd 100644
+index 7520e3a30c9eef5e7241457547bde73a5152d87f..407af97c0e3f1f6a267f71d2771db77be2eff949 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -6736,7 +6736,7 @@ void Document::abort()
+@@ -6743,7 +6743,7 @@ void Document::abort()
          // 1. Invoke WebDriver BiDi navigation aborted with document's node navigable and a new WebDriver BiDi navigation
          //    status whose id is document's during-loading navigation ID for WebDriver BiDi, status is "canceled", and
          //    url is document's URL.
@@ -50,7 +50,7 @@ index 46b24c361c6be4df9c8fabc3419083224c654907..db07ba0461d53258c9c869790e69c0ff
              if (auto navigable = this->navigable())
                  WebDriver::BiDi::navigation_event(*navigable, "browsingContext.navigationAborted"sv, m_navigation_id, url());
          }
-@@ -8003,13 +8003,14 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+@@ -8016,13 +8016,14 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
          // 2. Invoke WebDriver BiDi navigation committed with navigable and a new WebDriver BiDi navigation status whose
          //    id is document's during-loading navigation ID for WebDriver BiDi, status is "committed", and url is
          //    document's URL
@@ -68,7 +68,7 @@ index 46b24c361c6be4df9c8fabc3419083224c654907..db07ba0461d53258c9c869790e69c0ff
          }
  
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index 5b5345e9b0d9636b4cf206f1d8a8f594fff1c4b1..2b7759efb92956c2bad1b50f5b34d7e22fb12c3a 100644
+index a94e1c96e11e4d5ea0d26f52bf18dd560cc8e455..4182aeef1d0d204d055f3052ae12326113d9caf6 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
 @@ -3133,7 +3133,7 @@ void LocalNavigable::queue_navigation_and_traversal_task_for_session_history_ent
@@ -263,7 +263,7 @@ index 429e0b223d76e7d9d394b2165fac1cda4107b521..cb2b43e5c9faad61c74ab57e0faee767
      Optional<Core::AnonymousBuffer> m_trusted_content_blocker_list_buffer;
      Optional<Core::AnonymousBuffer> m_content_blocker_resources_buffer;
 diff --git a/Libraries/LibWebView/CanonicalNavigable.cpp b/Libraries/LibWebView/CanonicalNavigable.cpp
-index ae4c40c0a41d9ec26659fcd86f80ccce7cea2968..6c047a0b23f338ac5eae1c7b6ecd127f797be7d9 100644
+index fd14a333542f73ca2444405b8932890cd5ab8a07..171bd899f947d1466ef86002fa0248f495e01d77 100644
 --- a/Libraries/LibWebView/CanonicalNavigable.cpp
 +++ b/Libraries/LibWebView/CanonicalNavigable.cpp
 @@ -197,6 +197,7 @@ void CanonicalNavigable::begin_navigation(Web::HTML::PreparedNavigationDescripto
@@ -307,10 +307,10 @@ index ae4c40c0a41d9ec26659fcd86f80ccce7cea2968..6c047a0b23f338ac5eae1c7b6ecd127f
      }
      auto start_request = Web::HTML::NavigationStartRequest {
 diff --git a/Libraries/LibWebView/CanonicalTraversable.cpp b/Libraries/LibWebView/CanonicalTraversable.cpp
-index 884df1061d1980a551a3f8d2d35457a93f8df2d0..8fe36924d6050a59583f05228a4fc252d47c3264 100644
+index 3efc3f0651d5be7e900ed8303c00d97e6c2e29aa..9d2c691ae5f164ded8b34abd5d8119e1b94f1769 100644
 --- a/Libraries/LibWebView/CanonicalTraversable.cpp
 +++ b/Libraries/LibWebView/CanonicalTraversable.cpp
-@@ -2165,6 +2165,7 @@ void CanonicalTraversable::apply_the_reload_history_step(HistoryOperation& opera
+@@ -2176,6 +2176,7 @@ void CanonicalTraversable::apply_the_reload_history_step(HistoryOperation& opera
          if (auto* bidi = WebDriverBiDi::the())
              bidi->navigation_started(*this, { .id = navigation_id, .status = WebDriverBiDi::NavigationStatusType::Pending, .url = active_document_url() });
      }
@@ -319,10 +319,10 @@ index 884df1061d1980a551a3f8d2d35457a93f8df2d0..8fe36924d6050a59583f05228a4fc252
      // 2. Return the result of applying the history step step to traversable given true, null, null, userInvolvement, and "reload".
      apply_history_step(operation, step, true, {}, user_involvement, Web::Bindings::NavigationType::Reload);
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index aa26e64016a6fbc366a018356f6cef234fdc7399..2897edc23253485215d698c95634e6aa37c7e617 100644
+index b5ecd4923cc6b4a2abf3a467b607cee9b42368c4..56032396309308190d8938744a6d02a609d2d933 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1479,6 +1479,9 @@ void WebContentPage::webdriver_bidi_event(Web::HTML::CrossProcessId navigable_id
+@@ -1493,6 +1493,9 @@ void WebContentPage::webdriver_bidi_event(Web::HTML::CrossProcessId navigable_id
  
  void WebContentPage::webdriver_bidi_navigation_event(Web::HTML::CrossProcessId navigable_id, String name, Optional<Utf16String> navigation_id, URL::URL url)
  {
@@ -333,7 +333,7 @@ index aa26e64016a6fbc366a018356f6cef234fdc7399..2897edc23253485215d698c95634e6aa
          webdriver_bidi->did_receive_navigation_event(*this, navigable_id, name, move(navigation_id), move(url));
  }
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 4f420060feb2756636ef7fc14c1f14fd229ec505..6a14119d2eabada1edf3a6094da8103f1d4233b2 100644
+index facb16fc15cc557a1a67a30a567a9c9a5a6bf3da..e2021b2657991002cdfc625dd367a8d09412cb71 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -556,6 +556,11 @@ void ConnectionFromClient::set_user_scripts_enabled(bool enabled)
@@ -349,10 +349,10 @@ index 4f420060feb2756636ef7fc14c1f14fd229ec505..6a14119d2eabada1edf3a6094da8103f
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index c6513a0aecc5bfe8eebc257ec51719fa82b17c9e..a9d3eed64085710091064a7b3cabc1ed30af9b0d 100644
+index 136237b018932476114525ef10d16a19b2364738..780e4f703327a74d12527095a82daf921dad815c 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -125,6 +125,7 @@ private:
+@@ -124,6 +124,7 @@ private:
      virtual void set_permission_snapshot(Web::Permissions::PermissionSnapshot snapshot) override;
      virtual void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) override;
      virtual void set_user_scripts_enabled(bool enabled) override;
@@ -361,7 +361,7 @@ index c6513a0aecc5bfe8eebc257ec51719fa82b17c9e..a9d3eed64085710091064a7b3cabc1ed
      virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 48850be52fa3c51e8ed132397ea6dcd4fcbe6831..b977baf9753ccfc13a15ec9a73555941b2f32e0f 100644
+index ec28c5fa5a3da043b215c2a0505682edfb248d59..0962ea644cf2b6d9df4e7926f599a48ae4084a34 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -103,6 +103,7 @@ endpoint WebContentServer routed by Web::PageId page_id

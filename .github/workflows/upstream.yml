@@ -46,7 +46,9 @@ jobs:
           git -C ladybird diff --stat "$PINNED" "$MASTER" -- UI/Qt Base/res/ladybird/about-pages | tee upstream-ui-changes.txt
 
       - name: Apply Xenon's patches to master
-        run: Meta/patches.py apply --base "$MASTER"
+        run: |
+          Meta/patches.py apply
+          Meta/patches.py apply --base "$MASTER"
 
       - name: Meta/check.py
         run: |

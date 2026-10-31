@@ -194,7 +194,7 @@ index ea33da1134e58816fe288286d48c3d75ec5caaaa..ce68c089c861fd21042230c5df758b99
  
      // A load the browser's UI started, whose URL the address bar shows while it is the ongoing navigation.
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index 104996b8f0258e1d95b2e49790e700e1be1aaca6..3b989346b4f75cff3984aac035015697f8e4dfc3 100644
+index c2f638954b9815fcd2c6005da9b27d671d2dd591..45aa60a2c452f83a328425a588bf7a5eecaef80f 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
 @@ -62,6 +62,7 @@
@@ -214,7 +214,7 @@ index 104996b8f0258e1d95b2e49790e700e1be1aaca6..3b989346b4f75cff3984aac035015697
      void register_embedded_page(Web::PageId page_id, CanonicalTraversable&);
      void unregister_embedded_page(Web::PageId page_id);
      Optional<Web::PageId> page_id_for_traversable(CanonicalTraversable const&) const;
-@@ -247,6 +250,7 @@ private:
+@@ -246,6 +249,7 @@ private:
      bool m_rejected_ipc { false };
      bool m_has_hosted_local_file_content { false };
      Optional<String> m_hosted_web_ui;

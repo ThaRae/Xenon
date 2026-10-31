@@ -30,7 +30,7 @@ it as a one-step CNAME.
  Libraries/LibCore/Socket.cpp                  | 22 ++++++--
  Libraries/LibCore/Socket.h                    |  6 +++
  Libraries/LibCore/SocketWindows.cpp           |  5 ++
- Libraries/LibDNS/Resolver.h                   | 12 +++--
+ Libraries/LibDNS/Resolver.h                   | 14 ++++--
  Libraries/LibRequests/NetworkError.h          |  3 ++
  Libraries/LibRequests/Request.cpp             |  6 +++
  Libraries/LibRequests/Request.h               |  3 ++
@@ -51,13 +51,13 @@ it as a one-step CNAME.
  Tests/RequestServer/TestExportImport.cpp      |  2 +-
  Tests/RequestServer/TestRequestTimingInfo.cpp |  2 +-
  Tests/RequestServer/TestSiteBinding.cpp       |  2 +-
- 24 files changed, 185 insertions(+), 23 deletions(-)
+ 24 files changed, 186 insertions(+), 24 deletions(-)
 
 diff --git a/Libraries/LibCore/Socket.cpp b/Libraries/LibCore/Socket.cpp
-index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc94603440 100644
+index 2e4df5a825fd66226293a12c127b5a8f794e2f36..6e5068a518938487d42243a657fb5e2c04460086 100644
 --- a/Libraries/LibCore/Socket.cpp
 +++ b/Libraries/LibCore/Socket.cpp
-@@ -49,8 +49,11 @@ ErrorOr<int> Socket::create_fd(SocketDomain domain, SocketType type)
+@@ -51,8 +51,11 @@ ErrorOr<int> Socket::create_fd(SocketDomain domain, SocketType type)
  #endif
  }
  
@@ -70,7 +70,7 @@ index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc
      int socket_type;
      switch (type) {
      case SocketType::Stream:
-@@ -81,12 +84,15 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
+@@ -83,12 +86,15 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
      struct addrinfo hints = {};
      hints.ai_family = ai_family;
      hints.ai_socktype = socket_type;
@@ -87,7 +87,7 @@ index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc
  
      for (auto const& result : results.addresses()) {
          if (result.ai_family == AF_INET6) {
-@@ -105,7 +111,17 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
+@@ -107,7 +113,17 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
      if (addresses.is_empty())
          return Error::from_string_literal("Could not resolve to IPv4 or IPv6 address");
  
@@ -105,14 +105,14 @@ index 3c244a3f55e974546b7800952347ebf98322530a..44ca7c5be81709fcd5159b7f92a174cc
 +    return resolve_host_with_flags(host, type, address_family, AI_CANONNAME);
  }
  
- ErrorOr<void> Socket::connect_local(int fd, ByteString const& path)
+ // Connecting a datagram socket sends nothing, but has the system choose the local address it would send from.
 diff --git a/Libraries/LibCore/Socket.h b/Libraries/LibCore/Socket.h
-index c73a4204239a4cfafdc19e686eb4ac7f42863f24..99662a2f9660de88e0c622069e61547800b11a52 100644
+index 7e4f4a38477e3efaea6c93f5870247357a145837..c383b89d937d8cb7f6cca0d931eb4c8e4c781617 100644
 --- a/Libraries/LibCore/Socket.h
 +++ b/Libraries/LibCore/Socket.h
-@@ -71,6 +71,12 @@ public:
-     //        base class for all address types is appropriate.
-     static ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> resolve_host(ByteString const&, SocketType, AddressFamily = AddressFamily::Unspecified);
+@@ -74,6 +74,12 @@ public:
+     // Whether this host has a route to the IPv6 internet, from an address that can reach it.
+     static bool is_ipv6_globally_reachable();
  
 +    struct ResolvedHost {
 +        Vector<Variant<IPv4Address, IPv6Address>> addresses;
@@ -124,11 +124,11 @@ index c73a4204239a4cfafdc19e686eb4ac7f42863f24..99662a2f9660de88e0c622069e615478
  
  protected:
 diff --git a/Libraries/LibCore/SocketWindows.cpp b/Libraries/LibCore/SocketWindows.cpp
-index 31181bccc5f53bdd24aa3b94ac2db3560e8311b5..9b2a37fddda8e81fd8202be6fd46e3148306e091 100644
+index 4e555fb82dbd07e1143f0bc9d7b0b2a1df3bc4b9..4f87328541e270b30e8f6d961a1458b6d822864e 100644
 --- a/Libraries/LibCore/SocketWindows.cpp
 +++ b/Libraries/LibCore/SocketWindows.cpp
-@@ -286,6 +286,11 @@ ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> Socket::resolve_host(ByteStri
-     return addresses;
+@@ -318,6 +318,11 @@ bool Socket::is_ipv6_globally_reachable()
+     return true;
  }
  
 +ErrorOr<Socket::ResolvedHost> Socket::resolve_host_and_canonical_name(ByteString const& host, SocketType type, AddressFamily address_family)
@@ -140,20 +140,22 @@ index 31181bccc5f53bdd24aa3b94ac2db3560e8311b5..9b2a37fddda8e81fd8202be6fd46e314
  {
      if (address.type() == SocketAddress::Type::IPv6) {
 diff --git a/Libraries/LibDNS/Resolver.h b/Libraries/LibDNS/Resolver.h
-index 54bdf6f4937456985133bef8c26a0fab6028e5ba..7454f99ace33e8bb644d84590be78691794b0c6f 100644
+index 846438f25eb9375a56f1e3cd7d87a67bd7c03abd..04e45dfd5b0eed98d483b19ef1b6cf2bfa2ccaa3 100644
 --- a/Libraries/LibDNS/Resolver.h
 +++ b/Libraries/LibDNS/Resolver.h
-@@ -490,7 +490,7 @@ public:
-                     [this, name, state = our_state, family,
+@@ -525,8 +525,8 @@ public:
                          &main_thread_event_loop]() mutable {
                          auto worker_started_at = MonotonicTime::now();
--                        auto record_or_error = Core::Socket::resolve_host(name, Core::Socket::SocketType::Stream, family);
-+                        auto record_or_error = Core::Socket::resolve_host_and_canonical_name(name, Core::Socket::SocketType::Stream, family);
+                         auto record_or_error = m_system_resolver_for_testing.resolve_host
+-                            ? m_system_resolver_for_testing.resolve_host(name, family)
+-                            : Core::Socket::resolve_host(name, Core::Socket::SocketType::Stream, family);
++                            ? [&]() -> ErrorOr<Core::Socket::ResolvedHost> { return Core::Socket::ResolvedHost { TRY(m_system_resolver_for_testing.resolve_host(name, family)), {} }; }()
++                            : Core::Socket::resolve_host_and_canonical_name(name, Core::Socket::SocketType::Stream, family);
                          auto worker_finished_at = MonotonicTime::now();
                          PendingSystemResolution::SideTiming timing {
                              .queue_ms = (worker_started_at - state->dispatched_at).to_milliseconds(),
-@@ -877,7 +877,7 @@ private:
-         ByteString const& name,
+@@ -937,7 +937,7 @@ private:
+         ByteString const& pending_key,
          PendingSystemResolution& state,
          Core::Socket::AddressFamily family,
 -        ErrorOr<Vector<Variant<IPv4Address, IPv6Address>>> record_or_error,
@@ -161,7 +163,7 @@ index 54bdf6f4937456985133bef8c26a0fab6028e5ba..7454f99ace33e8bb644d84590be78691
          PendingSystemResolution::SideTiming timing)
      {
          (family == Core::Socket::AddressFamily::IPv4Only ? state.a : state.aaaa) = timing;
-@@ -887,7 +887,13 @@ private:
+@@ -947,7 +947,13 @@ private:
          bool got_records_this_side = false;
          if (!record_or_error.is_error()) {
              constexpr u32 SYSTEM_RESOLVER_SYNTHETIC_TTL_SECONDS = 60;
@@ -215,7 +217,7 @@ index 6042c88fbc200b4ec83c8dda25c6f2272ee3fcc6..6bd8fa6170c69a9b339081bac87874f6
  {
      RefPtr keep_alive = *this;
 diff --git a/Libraries/LibRequests/Request.h b/Libraries/LibRequests/Request.h
-index 05d75d51064a6bade238d7c09e268f88f4493e52..6f26419dff89a019891df549f78aaeb0304c14a4 100644
+index fb50da3b57bb8e7c7dcad70ff7e6283d0593008c..a91b69e015ead0052fda3b1350cba7b563624cd4 100644
 --- a/Libraries/LibRequests/Request.h
 +++ b/Libraries/LibRequests/Request.h
 @@ -126,6 +126,9 @@ public:
@@ -566,10 +568,10 @@ index b7e3d7825a577799e8dfc9ac41a3eafb8565370e..937b7fbf13ab89467451ee131a2c9216
      release_request_transfer_lease(int source_client_id, u64 source_request_id) =|
      stop_request(u64 request_id) => (bool success)
 diff --git a/Tests/RequestServer/TestContentCodingRetry.cpp b/Tests/RequestServer/TestContentCodingRetry.cpp
-index 87161679684ae7f3a72ed6916e85274354507c3e..76e760eba1173a03f2d17ef9ad2223bd605e155a 100644
+index f6258da81a7f45a3e9927f31af8533543b7b309c..e7d5d0f116086bc59c16fb96aeb5f544d8c6ad45 100644
 --- a/Tests/RequestServer/TestContentCodingRetry.cpp
 +++ b/Tests/RequestServer/TestContentCodingRetry.cpp
-@@ -111,7 +111,7 @@ TEST_CASE(content_coding_retry_keeps_client_supplied_cookie_header)
+@@ -105,7 +105,7 @@ TEST_CASE(content_coding_retry_keeps_client_supplied_cookie_header)
      UnsupportedCodingServer server;
      auto message = make<Messages::RequestServer::StartRequest>(
          0, ByteString { "GET" }, server.url(), Vector<HTTP::Header> { { "Cookie", "supplied=by-the-client" } }, ByteBuffer {},
@@ -579,10 +581,10 @@ index 87161679684ae7f3a72ed6916e85274354507c3e..76e760eba1173a03f2d17ef9ad2223bd
  
      event_loop.spin_until([&] { return server.request_heads().size() >= 2; });
 diff --git a/Tests/RequestServer/TestCookieResponses.cpp b/Tests/RequestServer/TestCookieResponses.cpp
-index 119426c92c3973f48471254c08de34e3c48eaf74..47871805eb1eb6ba4567bddf940ecf7a51d865ba 100644
+index b155b4d173be1dcd7228237913aeee261175316c..3e57aedea3384c0a5a279eee64918d1bc943273f 100644
 --- a/Tests/RequestServer/TestCookieResponses.cpp
 +++ b/Tests/RequestServer/TestCookieResponses.cpp
-@@ -175,7 +175,7 @@ public:
+@@ -169,7 +169,7 @@ public:
      void start_request(u64 request_id, Optional<URL::URL> target_url = {}, ByteString method = "GET"sv, Vector<HTTP::Header> headers = {}, Optional<HTTP::NetworkIsolationKey> network_isolation_key = {})
      {
          auto url = target_url.value_or(URL::Parser::basic_parse("http://localhost"sv).release_value());
@@ -592,10 +594,10 @@ index 119426c92c3973f48471254c08de34e3c48eaf74..47871805eb1eb6ba4567bddf940ecf7a
          VERIFY(!response);
      }
 diff --git a/Tests/RequestServer/TestDiskCacheWaiters.cpp b/Tests/RequestServer/TestDiskCacheWaiters.cpp
-index 28115795e7d355ee766eed49642ece75949de110..0a1ffdabfed54ea7dc793336ae3e1eb4d75fb48e 100644
+index b31a9256ef2c44459ab89b64d58f4e0440c91227..bb302fc50c5e1cd5eee856ef25d302603ff76377 100644
 --- a/Tests/RequestServer/TestDiskCacheWaiters.cpp
 +++ b/Tests/RequestServer/TestDiskCacheWaiters.cpp
-@@ -254,7 +254,7 @@ public:
+@@ -248,7 +248,7 @@ public:
              { ByteString { HTTP::TEST_CACHE_ENABLED_HEADER }, "1"sv },
          };
  
@@ -605,10 +607,10 @@ index 28115795e7d355ee766eed49642ece75949de110..0a1ffdabfed54ea7dc793336ae3e1eb4
          VERIFY(!response);
      }
 diff --git a/Tests/RequestServer/TestExportImport.cpp b/Tests/RequestServer/TestExportImport.cpp
-index fe1bd1c317c743d2bd74a100aad2b36b4a76c076..5dead3a4ebbf5e9e82fbbf4a0eb8b85f139bbb80 100644
+index fbfb44e9937d305d5f1e616c367c816136ba87ab..ae6a9088adb411ff4d31cfd12f1ecfca79d46244 100644
 --- a/Tests/RequestServer/TestExportImport.cpp
 +++ b/Tests/RequestServer/TestExportImport.cpp
-@@ -98,7 +98,7 @@ public:
+@@ -92,7 +92,7 @@ public:
  
      void start_request(u64 request_id, URL::URL url, HTTP::NetworkIsolationKey network_isolation_key, bool create_transfer_lease)
      {
@@ -618,10 +620,10 @@ index fe1bd1c317c743d2bd74a100aad2b36b4a76c076..5dead3a4ebbf5e9e82fbbf4a0eb8b85f
      }
  
 diff --git a/Tests/RequestServer/TestRequestTimingInfo.cpp b/Tests/RequestServer/TestRequestTimingInfo.cpp
-index 3610ac83f15ab207f8b35300dab3c50673cd65df..41752c5e75afeff8e7ce229e2fcb5d76ba2dfdf2 100644
+index 6dc9f407a5013489538186d04344cb804cd2fc0c..2e3029442dc6afc86f0b1fc3e3672bd75832ae33 100644
 --- a/Tests/RequestServer/TestRequestTimingInfo.cpp
 +++ b/Tests/RequestServer/TestRequestTimingInfo.cpp
-@@ -145,7 +145,7 @@ public:
+@@ -139,7 +139,7 @@ public:
          auto started_at = MonotonicTime::now();
          m_started_at.set(request_id, started_at);
  
@@ -631,10 +633,10 @@ index 3610ac83f15ab207f8b35300dab3c50673cd65df..41752c5e75afeff8e7ce229e2fcb5d76
          VERIFY(!response);
  
 diff --git a/Tests/RequestServer/TestSiteBinding.cpp b/Tests/RequestServer/TestSiteBinding.cpp
-index 1849e806c44f5b4146ad1284e84f31962d114f89..0fa017924e0cde4699723d2e42b4fb08799cace4 100644
+index 613bdecaab2dad37fe5c60c3a980dbbdd85e37b0..7b0dd45f4c9daf41b9f24393851248b446e64954 100644
 --- a/Tests/RequestServer/TestSiteBinding.cpp
 +++ b/Tests/RequestServer/TestSiteBinding.cpp
-@@ -103,7 +103,7 @@ struct TestServer {
+@@ -97,7 +97,7 @@ struct TestServer {
      {
          auto message = make<Messages::RequestServer::StartRequest>(
              request_id, ByteString { "GET" }, URL::Parser::basic_parse(url).release_value(), Vector<HTTP::Header> {}, ByteBuffer {},
