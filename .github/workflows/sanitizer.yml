@@ -39,7 +39,7 @@ jobs:
   linux:
     needs: changed
     if: needs.changed.outputs.skip != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-24.04' || vars.LINUX_RUNNER || 'slab-xenon' }}
     timeout-minutes: 360
     steps:
       - name: Free disk space
@@ -68,6 +68,8 @@ jobs:
       - name: Build Xenon with the sanitizers and run the tests
         timeout-minutes: 320
         run: time Meta/ci/build-in-ladybird-image.sh Meta/ci/sanitizer.sh
+        env:
+          CCACHE_TOKEN: ${{ runner.environment == 'self-hosted' && secrets.CCACHE_TOKEN || '' }}
 
       - name: Save the build caches
         if: always()
