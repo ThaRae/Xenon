@@ -443,7 +443,7 @@ void Autocomplete::update_chrome_style()
         return;
 
     m_is_updating_chrome_style = true;
-    auto application_palette = QApplication::palette();
+    auto palette = QApplication::palette();
     m_popup->setPalette(palette);
     m_list_view->setPalette(palette);
     m_popup->setStyleSheet(ChromeStyle::autocomplete_popup_style_sheet(palette));
