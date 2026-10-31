@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>A webaudio start</title>
+<script src="measure.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const runId = params.get("run") || "same-process";
+function post(key, value) {
+    return fetch("/report?run=" + encodeURIComponent(runId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, origin: location.origin, host: location.host }),
+    });
+}
+const reloads = JSON.parse(sessionStorage.getItem("a-reloads") || "[]");
+measureAudio().then(sample => {
+    reloads.push({
+        seed: sample.seed,
+        hash: sample.getChannelDataHash,
+        sum: sample.sum,
+        ok: sample.ok,
+    });
+    sessionStorage.setItem("a-reloads", JSON.stringify(reloads));
+    if (reloads.length < 3) {
+        location.reload();
+        return;
+    }
+    const state = { seed: sample.seed, measure: sample, reloads, crossIframe: null, worker: null };
+    function goToB() {
+        location.href = "http://site-b.test:8080/from-b.html?run=" + encodeURIComponent(runId);
+    }
+    const iframeWait = new Promise(resolve => {
+        window.addEventListener("message", event => {
+            state.crossIframe = event.data;
+            resolve();
+        });
+        const iframe = document.createElement("iframe");
+        iframe.src = "http://site-b.test:8080/iframe.html?kind=cross";
+        document.body.appendChild(iframe);
+        setTimeout(resolve, 12000);
+    });
+    Promise.all([iframeWait, withWorker()]).then(([, worker]) => {
+        state.worker = worker;
+        return post("a-direct", state);
+    }).then(goToB);
+});
+</script>

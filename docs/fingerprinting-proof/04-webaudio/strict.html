@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>WebAudio Strict</title>
+<script src="measure.js"></script>
+<script>
+function setStrict() {
+    try {
+        internals.setFarblingLevel("strict");
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+const switched = setStrict();
+measureAudio().then(sample => {
+    sample.switched = switched;
+    return fetch("/report?run=strict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId: "strict", samples: [sample] }),
+    });
+}).finally(() => setTimeout(() => window.close(), 50));
+</script>

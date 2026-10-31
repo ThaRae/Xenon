@@ -1,0 +1,52 @@
+=== TestAudioFudge ===
+Running test 'off_is_one'.
+Completed test 'off_is_one' in 0ms
+Running test 'standard_is_in_range'.
+Completed test 'standard_is_in_range' in 0ms
+Running test 'strict_uses_the_same_fudge'.
+Completed test 'strict_uses_the_same_fudge' in 0ms
+Running test 'same_seed_is_deterministic'.
+Completed test 'same_seed_is_deterministic' in 0ms
+Running test 'different_seeds_can_differ'.
+Completed test 'different_seeds_can_differ' in 0ms
+Running test 'apply_one_is_a_noop'.
+Completed test 'apply_one_is_a_noop' in 0ms
+Running test 'apply_multiplies_exactly_once'.
+Completed test 'apply_multiplies_exactly_once' in 0ms
+Finished 7 tests and 0 benchmarks in 0ms (0ms tests, 0ms benchmarks, 0ms other).
+All 7 tests passed.
+Running 7 cases out of 7.
+AUDIO_FUDGE_EXIT:0
+=== TestFarblingRNG ===
+Finished 6 tests and 0 benchmarks in 0ms (0ms tests, 0ms benchmarks, 0ms other).
+All 6 tests passed.
+RNG_EXIT:0
+=== TestCanvasPerturb ===
+Finished 8 tests and 0 benchmarks in 5ms (5ms tests, 0ms benchmarks, 0ms other).
+All 8 tests passed.
+CANVAS_PERTURB_EXIT:0
+=== TestWebGLFarbling ===
+Finished 8 tests and 0 benchmarks in 0ms (0ms tests, 0ms benchmarks, 0ms other).
+All 8 tests passed.
+WEBGL_FARB_EXIT:0
+=== xenon.py test --no-build ===
+All tests passed.
+XENON_TEST_EXIT:0
+=== test-web *WebAudio* ===
+Running 33 tests...
+==========================================================
+Pass: 33, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
+==========================================================
+WEBAUDIO_TESTS_EXIT:0
+=== test-web *webgl* ===
+Running 21 tests...
+==========================================================
+Pass: 21, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
+==========================================================
+WEBGL_TESTS_EXIT:0
+=== test-web *WebGL* ===
+Running 2 tests...
+==========================================================
+Pass: 2, Fail: 0, Skipped: 0, Timeout: 0, Crashed: 0
+==========================================================
+WEBGL2_TESTS_EXIT:0

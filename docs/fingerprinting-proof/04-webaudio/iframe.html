@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>webaudio iframe</title>
+<script src="measure.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const kind = params.get("kind") || "iframe";
+measureAudio().then(sample => {
+    sample.kind = kind;
+    parent.postMessage(sample, "*");
+}).catch(error => {
+    parent.postMessage({ kind, ok: false, error: String(error) }, "*");
+});
+</script>

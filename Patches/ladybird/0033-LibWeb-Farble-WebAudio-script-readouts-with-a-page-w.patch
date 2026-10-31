@@ -1,0 +1,440 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 01:04:31 +0000
+Subject: [PATCH] LibWeb: Farble WebAudio script readouts with a page-wide
+ fudge
+
+Multiply getChannelData, copyFromChannel, and AnalyserNode copies by one
+factor in [0.999, 1.000) from the ESO seed. Apply it once per buffer so
+the live Float32Array does not compound. Playback and destination output
+stay clean. Strict uses the same fudge.
+---
+ Libraries/LibWeb/CMakeLists.txt               |  1 +
+ Libraries/LibWeb/Farbling/AudioFudge.cpp      | 34 +++++++++
+ Libraries/LibWeb/Farbling/AudioFudge.h        | 21 ++++++
+ .../LibWeb/HTML/Scripting/Environments.cpp    |  8 +++
+ .../LibWeb/HTML/Scripting/Environments.h      |  4 ++
+ Libraries/LibWeb/WebAudio/AnalyserNode.cpp    | 16 ++++-
+ Libraries/LibWeb/WebAudio/AudioBuffer.cpp     | 29 +++++++-
+ Libraries/LibWeb/WebAudio/AudioBuffer.h       |  6 +-
+ .../LibWeb/WebAudio/OfflineAudioContext.cpp   |  7 +-
+ Tests/LibWeb/CMakeLists.txt                   |  1 +
+ Tests/LibWeb/TestAudioFudge.cpp               | 70 +++++++++++++++++++
+ 11 files changed, 191 insertions(+), 6 deletions(-)
+ create mode 100644 Libraries/LibWeb/Farbling/AudioFudge.cpp
+ create mode 100644 Libraries/LibWeb/Farbling/AudioFudge.h
+ create mode 100644 Tests/LibWeb/TestAudioFudge.cpp
+
+diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
+index 63093ae1b0e410c12b09e59d47780c41940d719f..4565a24dda2cc394687456f3bb2c175121d61863 100644
+--- a/Libraries/LibWeb/CMakeLists.txt
++++ b/Libraries/LibWeb/CMakeLists.txt
+@@ -349,6 +349,7 @@ set(SOURCES
+     EventTiming/EventCounts.cpp
+     EventTiming/EventTiming.cpp
+     EventTiming/PerformanceEventTiming.cpp
++    Farbling/AudioFudge.cpp
+     Farbling/CanvasPerturb.cpp
+     Farbling/FarblingRNG.cpp
+     Farbling/WebGLFarbling.cpp
+diff --git a/Libraries/LibWeb/Farbling/AudioFudge.cpp b/Libraries/LibWeb/Farbling/AudioFudge.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..538066fc4d3135deb76ba5232df34e5e5d82517a
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/AudioFudge.cpp
+@@ -0,0 +1,34 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibWeb/Farbling/AudioFudge.h>
++#include <LibWeb/Farbling/FarblingRNG.h>
++
++namespace Web::Farbling {
++
++float audio_fudge_factor(Seed const& seed)
++{
++    if (!seed.enabled())
++        return 1.0f;
++
++    // Strict uses the same factor as Standard. 53 bits mapped into [0.999, 1.000).
++    u64 const mixed = RNG(seed).integer("webaudio"sv) >> 11;
++    double const unit = static_cast<double>(mixed) * 0x1p-53;
++    float factor = static_cast<float>(0.999 + unit * 0.001);
++    if (factor >= 1.0f)
++        factor = 0.99999994f;
++    return factor;
++}
++
++void apply_audio_fudge(Span<float> samples, float fudge)
++{
++    if (fudge == 1.0f)
++        return;
++    for (auto& sample : samples)
++        sample *= fudge;
++}
++
++}
+diff --git a/Libraries/LibWeb/Farbling/AudioFudge.h b/Libraries/LibWeb/Farbling/AudioFudge.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..02567df73a2a61d8db5f29db17a0828da2b13062
+--- /dev/null
++++ b/Libraries/LibWeb/Farbling/AudioFudge.h
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <AK/Span.h>
++#include <LibWeb/Export.h>
++#include <LibWebCommon/Farbling/FarblingSeed.h>
++
++namespace Web::Farbling {
++
++// One page-wide factor in [0.999, 1.000) from the ESO seed, or 1.0 when Off. Strict uses the same range.
++WEB_API float audio_fudge_factor(Seed const&);
++
++// Multiply samples in place. No-op when fudge is 1.
++WEB_API void apply_audio_fudge(Span<float> samples, float fudge);
++
++}
+diff --git a/Libraries/LibWeb/HTML/Scripting/Environments.cpp b/Libraries/LibWeb/HTML/Scripting/Environments.cpp
+index 8d4c70004be4e860fd4d31b4661c1ebabcb63e0d..a12d25d5b0753eeb7bb6bc628378b378a54d4435 100644
+--- a/Libraries/LibWeb/HTML/Scripting/Environments.cpp
++++ b/Libraries/LibWeb/HTML/Scripting/Environments.cpp
+@@ -35,6 +35,7 @@
+ #include <LibWeb/HTML/WorkletGlobalScope.h>
+ #include <LibWeb/Infra/SerializedURL.h>
+ #include <LibWeb/MixedContent/AbstractOperations.h>
++#include <LibWeb/Farbling/AudioFudge.h>
+ #include <LibWeb/Page/Page.h>
+ #include <LibWeb/ServiceWorker/ServiceWorker.h>
+ #include <LibWeb/ServiceWorker/ServiceWorkerRegistration.h>
+@@ -127,6 +128,13 @@ Farbling::RNG& EnvironmentSettingsObject::farbling_rng()
+     return *m_farbling_rng;
+ }
+ 
++float EnvironmentSettingsObject::audio_fudge_factor()
++{
++    if (!m_audio_fudge_factor.has_value())
++        m_audio_fudge_factor = Farbling::audio_fudge_factor(m_farbling_seed);
++    return *m_audio_fudge_factor;
++}
++
+ void EnvironmentSettingsObject::add_owned_worker_agent(WorkerAgentParent& worker_agent)
+ {
+     m_owned_worker_agents.append(worker_agent);
+diff --git a/Libraries/LibWeb/HTML/Scripting/Environments.h b/Libraries/LibWeb/HTML/Scripting/Environments.h
+index 5100450720092d3b3384ec298c599da0e0ee4da2..ba26ee95da653eb6e4693612ba96d4f9dab16162 100644
+--- a/Libraries/LibWeb/HTML/Scripting/Environments.h
++++ b/Libraries/LibWeb/HTML/Scripting/Environments.h
+@@ -8,6 +8,7 @@
+ 
+ #pragma once
+ 
++#include <AK/Optional.h>
+ #include <AK/OwnPtr.h>
+ #include <AK/Utf16String.h>
+ #include <AK/Utf16View.h>
+@@ -168,8 +169,10 @@ public:
+     {
+         m_farbling_seed = seed;
+         m_farbling_rng.clear();
++        m_audio_fudge_factor.clear();
+     }
+     Farbling::RNG& farbling_rng();
++    float audio_fudge_factor();
+ 
+     // FIXME: This method below is from HighResolutionTime spec in section 3. Section for Specification Authors.
+     // The following other methods are currently not supported:
+@@ -232,6 +235,7 @@ private:
+ 
+     Farbling::Seed m_farbling_seed;
+     OwnPtr<Farbling::RNG> m_farbling_rng;
++    Optional<float> m_audio_fudge_factor;
+ };
+ 
+ RunScriptDecision can_run_script(EnvironmentSettingsObject const&);
+diff --git a/Libraries/LibWeb/WebAudio/AnalyserNode.cpp b/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
+index adbfc7d4753346974d3d55d91bf73f98b6b6b83b..d548a13ab27fee924e7c0dfd626f937e7364fae8 100644
+--- a/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
++++ b/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
+@@ -12,6 +12,8 @@
+ #include <LibAudio/SpscAudioFrameRing.h>
+ #include <LibGC/Heap.h>
+ #include <LibJS/Runtime/TypedArray.h>
++#include <LibWeb/Farbling/AudioFudge.h>
++#include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/WebAudio/AnalyserNode.h>
+ #include <LibWeb/WebAudio/BaseAudioContext.h>
+ #include <LibWeb/WebAudio/Rendering/AnalyserRenderNode.h>
+@@ -24,6 +26,14 @@ namespace Web::WebAudio {
+ 
+ GC_DEFINE_ALLOCATOR(AnalyserNode);
+ 
++static float script_audio_fudge(BaseAudioContext& context)
++{
++    auto& settings = context.relevant_settings_object();
++    if (settings.origin().is_opaque())
++        return 1.0f;
++    return settings.audio_fudge_factor();
++}
++
+ AnalyserNode::AnalyserNode(GC::Ref<BaseAudioContext> context, AnalyserOptions const& options)
+     : AudioNode(context)
+     , m_fft_size(options.fft_size)
+@@ -238,7 +248,8 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_frequency_data(GC::Ref<JS::Flo
+     // Write the current frequency data into array. If array has fewer elements than the frequencyBinCount,
+     // the excess elements will be dropped. If array has more elements than the frequencyBinCount, the
+     // excess elements will be ignored. The most recent fftSize frames are used in computing the frequency data.
+-    auto const frequency_data = current_frequency_data();
++    auto frequency_data = current_frequency_data();
++    Farbling::apply_audio_fudge({ frequency_data.data(), frequency_data.size() }, script_audio_fudge(context()));
+ 
+     auto record = JS::make_typed_array_with_buffer_witness_record(*array, JS::ArrayBuffer::Order::SeqCst);
+     if (JS::is_typed_array_out_of_bounds(record))
+@@ -253,6 +264,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_frequency_data(GC::Ref<JS::Flo
+ WebIDL::ExceptionOr<void> AnalyserNode::get_byte_frequency_data(GC::Ref<JS::Uint8Array> array)
+ {
+     Vector<f32> dB_data = current_frequency_data();
++    Farbling::apply_audio_fudge({ dB_data.data(), dB_data.size() }, script_audio_fudge(context()));
+     Vector<u8> byte_data;
+     byte_data.ensure_capacity(dB_data.size());
+ 
+@@ -287,6 +299,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_float_time_domain_data(GC::Ref<JS::F
+     // fftSize, the excess elements will be ignored. The most recent fftSize frames are written (after downmixing).
+ 
+     Vector<f32> time_domain_data = current_time_domain_data();
++    Farbling::apply_audio_fudge({ time_domain_data.data(), time_domain_data.size() }, script_audio_fudge(context()));
+ 
+     auto record = JS::make_typed_array_with_buffer_witness_record(*array, JS::ArrayBuffer::Order::SeqCst);
+     if (JS::is_typed_array_out_of_bounds(record))
+@@ -305,6 +318,7 @@ WebIDL::ExceptionOr<void> AnalyserNode::get_byte_time_domain_data(GC::Ref<JS::Ui
+     // the excess elements will be ignored. The most recent fftSize frames are used in computing the byte data.
+ 
+     Vector<f32> time_domain_data = current_time_domain_data();
++    Farbling::apply_audio_fudge({ time_domain_data.data(), time_domain_data.size() }, script_audio_fudge(context()));
+     VERIFY(time_domain_data.size() == m_fft_size);
+ 
+     Vector<u8> byte_data;
+diff --git a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
+index 4d4d8a1d2fa08557ac8d701318ba359a81236996..28b67d19cd4d083e6a7debb91666f47de95776bc 100644
+--- a/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
++++ b/Libraries/LibWeb/WebAudio/AudioBuffer.cpp
+@@ -14,6 +14,7 @@
+ #include <LibJS/Runtime/ExternalMemory.h>
+ #include <LibJS/Runtime/Object.h>
+ #include <LibJS/Runtime/TypedArray.h>
++#include <LibWeb/Farbling/AudioFudge.h>
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/WebAudio/AudioArray.h>
+ #include <LibWeb/WebAudio/AudioBuffer.h>
+@@ -107,6 +108,27 @@ ErrorOr<GC::Ref<AudioBuffer>> AudioBuffer::create(WebIDL::UnsignedLong number_of
+ 
+ AudioBuffer::~AudioBuffer() = default;
+ 
++void AudioBuffer::ensure_script_fudge(JS::Object* relevant_global_object)
++{
++    if (m_script_fudge_applied)
++        return;
++    m_script_fudge_applied = true;
++
++    auto& settings = relevant_global_object
++        ? HTML::relevant_settings_object(*relevant_global_object)
++        : HTML::incumbent_settings_object();
++    if (settings.origin().is_opaque())
++        return;
++
++    float const fudge = settings.audio_fudge_factor();
++    if (fudge == 1.0f)
++        return;
++
++    for (auto& channel : m_channels) {
++        Farbling::apply_audio_fudge({ reinterpret_cast<float*>(channel.data.data()), m_length }, fudge);
++    }
++}
++
+ // https://webaudio.github.io/web-audio-api/#acquire-the-content
+ RefPtr<Rendering::AudioBufferContents> AudioBuffer::acquire_contents()
+ {
+@@ -230,6 +252,7 @@ WebIDL::ExceptionOr<GC::Ref<JS::Float32Array>> AudioBuffer::get_channel_data(JS:
+     // This is where the deferred final step of acquiring the content runs: script is reaching for the channel data
+     // again, so the copies of the acquired samples become this buffer's internal data before anything reads them.
+     attach_acquired_channels();
++    ensure_script_fudge(&relevant_global_object);
+ 
+     auto& relevant_global_realm = HTML::relevant_realm(relevant_global_object);
+     auto& cache = cache_for(*this, channel);
+@@ -252,7 +275,7 @@ WebIDL::ExceptionOr<GC::Ref<JS::Float32Array>> AudioBuffer::get_channel_data(JS:
+ }
+ 
+ // https://webaudio.github.io/web-audio-api/#dom-audiobuffer-copyfromchannel
+-WebIDL::ExceptionOr<void> AudioBuffer::copy_from_channel(GC::Root<JS::Float32Array> const& destination, WebIDL::UnsignedLong channel_number, WebIDL::UnsignedLong buffer_offset) const
++WebIDL::ExceptionOr<void> AudioBuffer::copy_from_channel(GC::Root<JS::Float32Array> const& destination, WebIDL::UnsignedLong channel_number, WebIDL::UnsignedLong buffer_offset)
+ {
+     // The copyFromChannel() method copies the samples from the specified channel of the AudioBuffer to the destination array.
+     //
+@@ -269,6 +292,9 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_from_channel(GC::Root<JS::Float32Arr
+     if (channel_number >= m_channels.size())
+         return WebIDL::IndexSizeError::create("Channel index is out of range"_utf16);
+ 
++    attach_acquired_channels();
++    ensure_script_fudge(nullptr);
++
+     auto& channel = m_channels[channel_number];
+     ReadonlySpan<float> channel_data { reinterpret_cast<float const*>(channel.data.data()), m_length };
+     auto channel_length = channel_data.size();
+@@ -318,6 +344,7 @@ WebIDL::ExceptionOr<void> AudioBuffer::copy_to_channel(GC::Root<JS::Float32Array
+         bytes.copy_to({ reinterpret_cast<u8*>(channel_data.data() + buffer_offset), bytes.size() });
+     });
+ 
++    m_script_fudge_applied = true;
+     return {};
+ }
+ 
+diff --git a/Libraries/LibWeb/WebAudio/AudioBuffer.h b/Libraries/LibWeb/WebAudio/AudioBuffer.h
+index 5173d4c511fa8b49e65ed8d24ff1b0251cbb9a3a..abfc789fb028e0defba3aae61255bd69cbba4b63 100644
+--- a/Libraries/LibWeb/WebAudio/AudioBuffer.h
++++ b/Libraries/LibWeb/WebAudio/AudioBuffer.h
+@@ -39,7 +39,7 @@ public:
+     WebIDL::UnsignedLong number_of_channels() const;
+     WebIDL::ExceptionOr<Bytes> channel_data(WebIDL::UnsignedLong channel);
+     WebIDL::ExceptionOr<GC::Ref<JS::Float32Array>> get_channel_data(JS::Object& relevant_global_object, WebIDL::UnsignedLong channel);
+-    WebIDL::ExceptionOr<void> copy_from_channel(GC::Root<JS::Float32Array> const&, WebIDL::UnsignedLong channel_number, WebIDL::UnsignedLong buffer_offset = 0) const;
++    WebIDL::ExceptionOr<void> copy_from_channel(GC::Root<JS::Float32Array> const&, WebIDL::UnsignedLong channel_number, WebIDL::UnsignedLong buffer_offset = 0);
+     WebIDL::ExceptionOr<void> copy_to_channel(GC::Root<JS::Float32Array> const&, WebIDL::UnsignedLong channel_number, WebIDL::UnsignedLong buffer_offset = 0);
+ 
+     // https://webaudio.github.io/web-audio-api/#acquire-the-content
+@@ -58,6 +58,8 @@ private:
+ 
+     virtual size_t external_memory_size() const override;
+ 
++    void ensure_script_fudge(JS::Object* relevant_global_object);
++
+     // https://webaudio.github.io/web-audio-api/#dom-audiobuffer-number-of-channels-slot
+     // The number of audio channels for this AudioBuffer, which is an unsigned long.
+     //
+@@ -75,6 +77,8 @@ private:
+     // https://webaudio.github.io/web-audio-api/#dom-audiobuffer-sample-rate-slot
+     // The sample-rate, in Hz, of this AudioBuffer, a float.
+     float m_sample_rate {}; // [[sample rate]]
++
++    bool m_script_fudge_applied { false };
+ };
+ 
+ }
+diff --git a/Libraries/LibWeb/WebAudio/OfflineAudioContext.cpp b/Libraries/LibWeb/WebAudio/OfflineAudioContext.cpp
+index 988bb0ee98ba6e42990fd74781e42b6b367ed555..bf50f42df7d42494414bf5a4bfceb01d7089ff8f 100644
+--- a/Libraries/LibWeb/WebAudio/OfflineAudioContext.cpp
++++ b/Libraries/LibWeb/WebAudio/OfflineAudioContext.cpp
+@@ -160,12 +160,13 @@ void OfflineAudioContext::begin_offline_rendering(GC::Ref<WebIDL::Promise> promi
+ 
+ void OfflineAudioContext::finish_rendering(GC::Ref<WebIDL::Promise> promise)
+ {
+-    // NB: Copy the rendered samples into [[rendered buffer]].
++    // NB: Copy the rendered samples into [[rendered buffer]] through the internal storage, not
++    //     getChannelData(), so script farbling still sees unfarbled samples on first readout.
+     auto const& rendered_channels = m_renderer->rendered_channels();
+     for (size_t channel_index = 0; channel_index < rendered_channels.size(); ++channel_index) {
+-        auto channel_data = MUST(m_rendered_buffer->get_channel_data(relevant_global_object(), channel_index));
++        auto channel_bytes = MUST(m_rendered_buffer->channel_data(channel_index));
+         auto const& samples = rendered_channels[channel_index];
+-        channel_data->viewed_array_buffer()->overwrite(channel_data->byte_offset(), samples.data(), samples.size() * sizeof(float));
++        ReadonlyBytes { reinterpret_cast<u8 const*>(samples.data()), samples.size() * sizeof(float) }.copy_to(channel_bytes);
+     }
+ 
+     set_current_time(m_renderer->frames_rendered() / static_cast<double>(sample_rate()));
+diff --git a/Tests/LibWeb/CMakeLists.txt b/Tests/LibWeb/CMakeLists.txt
+index 1286d1e01130cc7137150e6a18ccfa40f7a01a56..f78d9455c8bf8d3ea6eb8df80365bb162e619984 100644
+--- a/Tests/LibWeb/CMakeLists.txt
++++ b/Tests/LibWeb/CMakeLists.txt
+@@ -28,6 +28,7 @@ set(TEST_SOURCES
+     TestFarblingRNG.cpp
+     TestCanvasPerturb.cpp
+     TestWebGLFarbling.cpp
++    TestAudioFudge.cpp
+     TestFaviconDecoding.cpp
+     TestFetchBodyDeliveryGate.cpp
+     TestFetchByteChannel.cpp
+diff --git a/Tests/LibWeb/TestAudioFudge.cpp b/Tests/LibWeb/TestAudioFudge.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..4563a43317aba7e6442762ff304dbf1226328187
+--- /dev/null
++++ b/Tests/LibWeb/TestAudioFudge.cpp
+@@ -0,0 +1,70 @@
++/*
++ * Copyright (c) 2026, the Xenon developers.
++ *
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibTest/TestCase.h>
++#include <LibWeb/Farbling/AudioFudge.h>
++
++TEST_CASE(off_is_one)
++{
++    Web::Farbling::Seed off {};
++    EXPECT_EQ(Web::Farbling::audio_fudge_factor(off), 1.0f);
++}
++
++TEST_CASE(standard_is_in_range)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 1, .low = 2 };
++    auto factor = Web::Farbling::audio_fudge_factor(seed);
++    EXPECT(factor >= 0.999f);
++    EXPECT(factor < 1.0f);
++}
++
++TEST_CASE(strict_uses_the_same_fudge)
++{
++    Web::Farbling::Seed standard { .level = Web::Farbling::Level::Standard, .high = 9, .low = 8 };
++    Web::Farbling::Seed strict { .level = Web::Farbling::Level::Strict, .high = 9, .low = 8 };
++    EXPECT_EQ(Web::Farbling::audio_fudge_factor(standard), Web::Farbling::audio_fudge_factor(strict));
++}
++
++TEST_CASE(same_seed_is_deterministic)
++{
++    Web::Farbling::Seed seed { .level = Web::Farbling::Level::Standard, .high = 0x0123456789abcdefULL, .low = 0xfedcba9876543210ULL };
++    auto first = Web::Farbling::audio_fudge_factor(seed);
++    auto second = Web::Farbling::audio_fudge_factor(seed);
++    EXPECT_EQ(first, second);
++}
++
++TEST_CASE(different_seeds_can_differ)
++{
++    bool found_difference = false;
++    Web::Farbling::Seed first { .level = Web::Farbling::Level::Standard, .high = 1, .low = 1 };
++    auto baseline = Web::Farbling::audio_fudge_factor(first);
++    for (u64 n = 2; n <= 64 && !found_difference; ++n) {
++        Web::Farbling::Seed trial { .level = Web::Farbling::Level::Standard, .high = n, .low = n * 7 };
++        if (Web::Farbling::audio_fudge_factor(trial) != baseline)
++            found_difference = true;
++    }
++    EXPECT(found_difference);
++}
++
++TEST_CASE(apply_one_is_a_noop)
++{
++    float samples[4] = { 0.25f, -0.5f, 1.0f, 0.0f };
++    Web::Farbling::apply_audio_fudge({ samples, 4 }, 1.0f);
++    EXPECT_EQ(samples[0], 0.25f);
++    EXPECT_EQ(samples[1], -0.5f);
++    EXPECT_EQ(samples[2], 1.0f);
++    EXPECT_EQ(samples[3], 0.0f);
++}
++
++TEST_CASE(apply_multiplies_exactly_once)
++{
++    float samples[3] = { 0.5f, -0.25f, 0.125f };
++    float const fudge = 0.9995f;
++    Web::Farbling::apply_audio_fudge({ samples, 3 }, fudge);
++    EXPECT_EQ(samples[0], 0.5f * fudge);
++    EXPECT_EQ(samples[1], -0.25f * fudge);
++    EXPECT_EQ(samples[2], 0.125f * fudge);
++}
