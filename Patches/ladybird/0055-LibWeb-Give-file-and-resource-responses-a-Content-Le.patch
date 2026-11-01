@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Sat, 31 Oct 2026 15:26:26 -0400
+Subject: [PATCH] LibWeb: Give file and resource responses a Content-Length
+
+A media element learns the size of its resource from the response's
+Content-Length. A file:// response had none, so the size reached the
+MediaServer only when the load completed, after the data. A demuxer
+that started on the data before then could not look at the end of the
+file: an Ogg demuxer had no duration, and loadedmetadata fired with a
+duration of 0, which a durationchange corrected a moment later.
+
+HTMLMediaElement-loop-seek-to-end-while-paused.html seeks to the
+duration it reads after loadedmetadata, so on a busy machine it sought
+to 0 and timed out waiting for the loop's seek back to the start.
+
+The whole file has been read by the time its response is made, so give
+the response its length.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWeb/Loader/ResourceLoader.cpp | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
+index d3c611df7e309f1d5ea76b9affd440a10665b3ec..d58ef08d616eb09f33b7001bf5b4301383abf39f 100644
+--- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
++++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
+@@ -209,7 +209,7 @@ bool ResourceLoader::is_known_hsts_host(Page& page, String const& host)
+     return page.client().page_did_is_known_hsts_host(host);
+ }
+ 
+-static NonnullRefPtr<HTTP::HeaderList> response_headers_for_file(StringView path, Optional<time_t> const& modified_time)
++static NonnullRefPtr<HTTP::HeaderList> response_headers_for_file(StringView path, size_t content_length, Optional<time_t> const& modified_time)
+ {
+     // For file:// and resource:// URLs, we have to guess the MIME type, since there's no HTTP header to tell us what
+     // it is. We insert a fake Content-Type header here, so that clients can use it to learn the MIME type.
+@@ -217,6 +217,7 @@ static NonnullRefPtr<HTTP::HeaderList> response_headers_for_file(StringView path
+ 
+     auto response_headers = HTTP::HeaderList::create({
+         { "Access-Control-Allow-Origin"sv, "null"sv },
++        { "Content-Length"sv, ByteString::number(content_length) },
+         { "Content-Type"sv, mime_type },
+     });
+ 
+@@ -406,7 +407,7 @@ void ResourceLoader::handle_file_load_request(LoadRequest& request, FileHandler
+ 
+         FileLoadResult load_result {
+             .data = maybe_data.value().bytes(),
+-            .response_headers = response_headers_for_file(request.url()->file_path(), st_or_error.value().st_mtime),
++            .response_headers = response_headers_for_file(request.url()->file_path(), maybe_data.value().size(), st_or_error.value().st_mtime),
+         };
+         on_file(load_result);
+     });
+@@ -524,7 +525,7 @@ void ResourceLoader::handle_resource_load_request(LoadRequest const& request, Re
+ 
+     FileLoadResult load_result {
+         .data = resource_value->data(),
+-        .response_headers = response_headers_for_file(url.file_path(), resource_value->modified_time()),
++        .response_headers = response_headers_for_file(url.file_path(), resource_value->data().size(), resource_value->modified_time()),
+         .timing_info = timing_info,
+     };
+     on_resource(load_result);
