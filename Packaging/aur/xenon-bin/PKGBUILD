@@ -1,7 +1,7 @@
 # Maintainer: ThaRae <https://github.com/ThaRae>
 
 pkgname=xenon-bin
-pkgver=0.1.2
+pkgver=0.1.3
 pkgrel=1
 pkgdesc='Web browser built on the Ladybird engine, with the features of Helium'
 arch=(x86_64)
@@ -17,7 +17,7 @@ conflicts=(xenon)
 options=(!strip !debug !emptydirs)
 source=("https://github.com/ThaRae/xenon-releases/releases/download/v$pkgver/Xenon-$pkgver-$CARCH.AppImage")
 noextract=("Xenon-$pkgver-$CARCH.AppImage")
-sha256sums=('b334845575ecb2099f51e941897bfac474e2122af774bb5d622a1bd8349121c4')
+sha256sums=('e8b2fbb5afd5f392b116390fd83c673643d6c14ab8d81cf8096c16d50d81aa43')
 
 prepare() {
   local appimage=Xenon-$pkgver-$CARCH.AppImage
