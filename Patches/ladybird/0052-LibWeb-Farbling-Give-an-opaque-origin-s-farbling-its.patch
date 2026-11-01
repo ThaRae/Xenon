@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 31 Oct 2026 00:41:22 -0400
+Subject: [PATCH] LibWeb+Farbling: Give an opaque origin's farbling its own
+ seed
+
+An opaque origin's seed was derived from the session secret alone,
+so every opaque origin in the session shared one seed. A script
+running as a first-party on many sites can open a sandboxed frame on
+each (its origin is opaque everywhere), read a farbled value out of
+it -- canvas pixels, hardwareConcurrency, deviceMemory -- and get
+the same answer on every site for the whole session: a stable
+cross-site identifier, exactly what the farbling promises to
+prevent.
+
+Opaque origins carry a nonce of their own, so key the seed on that
+(with the session secret mixed in, as for hosts): the same origin
+still sees the same values everywhere it runs, and two different
+opaque origins see unrelated ones.
+---
+ Libraries/LibWeb/Fingerprinting/Farbling.cpp | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/Libraries/LibWeb/Fingerprinting/Farbling.cpp b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
+index 671af3e895d8f5b098641ccb91c778634c0ab574..fa9cc66b7189038831676c2d595b44e179ef858e 100644
+--- a/Libraries/LibWeb/Fingerprinting/Farbling.cpp
++++ b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
+@@ -40,21 +40,26 @@ u64 session_secret()
+     return fallback_secret;
+ }
+ 
+-u64 seed_for_host(StringView host)
++static u64 seed_for_bytes(ReadonlyBytes bytes)
+ {
+     u64 state = mix64(session_secret());
+     u64 hash = 0xCBF29CE484222325ull ^ state;
+-    for (auto byte : host.bytes()) {
++    for (auto byte : bytes) {
+         hash ^= byte;
+         hash *= 0x100000001B3ull;
+     }
+-    return nonzero(mix64(hash ^ mix64(state ^ host.length())));
++    return nonzero(mix64(hash ^ mix64(state ^ bytes.size())));
++}
++
++u64 seed_for_host(StringView host)
++{
++    return seed_for_bytes(host.bytes());
+ }
+ 
+ static u64 seed_for_origin(URL::Origin const& origin)
+ {
+     if (origin.is_opaque())
+-        return seed_for_host({});
++        return seed_for_bytes(origin.opaque_data().nonce.span());
+     auto host = origin.host().serialize();
+     return seed_for_host(host);
+ }
