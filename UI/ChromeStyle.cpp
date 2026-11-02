@@ -1319,8 +1319,6 @@ QPushButton#LadybirdTabButton {{
 }}
 
 QToolButton#LadybirdNewTabButton {{
-    min-width: 30px;
-    min-height: 30px;
     border-radius: 16px;
 }}
 

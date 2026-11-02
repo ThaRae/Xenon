@@ -484,6 +484,14 @@ if (LINUX AND NOT ANDROID)
     target_link_libraries(TestXenonBlockingPopover PRIVATE PkgConfig::XCB_ICCCM)
 endif()
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestChromeStyle.cpp" Xenon NAME TestXenonChromeStyle LIBS LibCore)
+target_sources(TestXenonChromeStyle PRIVATE
+    "${XENON_UI_DIR}/ChromeStyle.cpp"
+    "${XENON_UI_DIR}/StringUtils.cpp"
+)
+target_include_directories(TestXenonChromeStyle BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_link_libraries(TestXenonChromeStyle PRIVATE Qt::Core Qt::Gui Qt::Widgets)
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestUpdateButton.cpp" Xenon NAME TestXenonUpdateButton LIBS LibCore LibURL)
 target_sources(TestXenonUpdateButton PRIVATE
     "${XENON_UI_DIR}/ChromeStyle.cpp"
@@ -498,4 +506,4 @@ if (LINUX AND NOT ANDROID)
     target_link_libraries(TestXenonUpdateButton PRIVATE PkgConfig::XCB_ICCCM)
 endif()
 
-add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUpdateButton TestXenonUserAgent)
+add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonChromeStyle TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUpdateButton TestXenonUserAgent)
