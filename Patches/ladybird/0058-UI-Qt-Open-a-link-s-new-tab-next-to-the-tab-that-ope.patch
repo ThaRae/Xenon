@@ -1,0 +1,142 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 20:35:12 -0500
+Subject: [PATCH] UI/Qt: Open a link's new tab next to the tab that opened it
+
+A link opened through the page's target=_blank or window.open() request
+reaches the traversable overload of create_new_tab(), which always
+appended the tab to the end of the strip. Other link paths, such as
+middle-clicks and the link context menu, already insert after the tab
+they came from.
+
+Thread a TabLocation through that overload and pass after_tab() from the
+on_new_web_view handler, so the tab lands right after the tab it was
+opened from. The new-tab page, session restore, reopening a closed tab,
+and new windows keep appending as before.
+
+The insertion index calculation now lives in insertion_index_for(),
+which both overloads share.
+---
+ UI/Qt/BrowserWindow.cpp | 49 +++++++++++++++++++++++------------------
+ UI/Qt/BrowserWindow.h   |  3 ++-
+ 2 files changed, 29 insertions(+), 23 deletions(-)
+
+diff --git a/UI/Qt/BrowserWindow.cpp b/UI/Qt/BrowserWindow.cpp
+index ccaafb08cc26d343d9bff0105511e7180378555c..01593b651e8163c1d8e882cd7de59b0ef83abf5a 100644
+--- a/UI/Qt/BrowserWindow.cpp
++++ b/UI/Qt/BrowserWindow.cpp
+@@ -382,7 +382,7 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
+     });
+ 
+     if (parent_tab) {
+-        create_new_tab(Web::HTML::ActivateTab::Yes, traversable);
++        create_new_tab(Web::HTML::ActivateTab::Yes, traversable, TabLocation::end());
+     } else {
+         for (size_t i = 0; i < initial_urls.size(); ++i)
+             create_new_tab((i == 0) ? Web::HTML::ActivateTab::Yes : Web::HTML::ActivateTab::No, TabLocation::end());
+@@ -756,11 +756,11 @@ Tab& BrowserWindow::create_restored_tab(WebView::RestoredSessionTab const& resto
+     return *tab;
+ }
+ 
+-Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional<WebView::CanonicalTraversable&> traversable)
++Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional<WebView::CanonicalTraversable&> traversable, TabLocation location)
+ {
+     cancel_window_close_preflight();
+     if (!traversable.has_value())
+-        return create_new_tab(activate_tab, TabLocation::end());
++        return create_new_tab(activate_tab, location);
+ 
+     auto* tab = new Tab(this, traversable);
+ 
+@@ -769,7 +769,8 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional
+         set_current_tab(tab);
+     }
+ 
+-    m_tabs_container->add_tab(tab, "New Tab");
++    // A new tab is unpinned, so it never lands inside the pinned group.
++    m_tabs_container->insert_tab(constrain_insertion_index(insertion_index_for(location), false), tab, "New Tab");
+     if (activate_tab == Web::HTML::ActivateTab::Yes)
+         m_tabs_container->set_current_tab(tab);
+ 
+@@ -802,23 +803,7 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
+         set_current_tab(tab);
+     }
+ 
+-    auto insertion_index = m_tabs_container->count();
+-    switch (location.kind()) {
+-    case TabLocation::Kind::End:
+-        break;
+-    case TabLocation::Kind::AfterCurrentTab:
+-        insertion_index = m_tabs_container->current_index() + 1;
+-        break;
+-    case TabLocation::Kind::AfterTab:
+-        if (auto* source_tab = location.tab(); source_tab) {
+-            if (auto source_tab_index = tab_index(source_tab); source_tab_index != -1)
+-                insertion_index = source_tab_index + 1;
+-        }
+-        break;
+-    case TabLocation::Kind::AtIndex:
+-        insertion_index = location.index();
+-        break;
+-    }
++    auto insertion_index = insertion_index_for(location);
+     // A new tab is unpinned, so it never lands inside the pinned group.
+     m_tabs_container->insert_tab(constrain_insertion_index(insertion_index, false), tab, "New Tab");
+ 
+@@ -889,7 +874,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
+             auto& window = Application::the().new_window({}, configuration, IsPopupWindow::Yes, m_is_private, tab, traversable);
+             return window.current_tab()->view().handle();
+         }
+-        auto& new_tab = create_new_tab(activate_tab, traversable);
++        auto& new_tab = create_new_tab(activate_tab, traversable, TabLocation::after_tab(*tab));
+         return new_tab.view().handle();
+     };
+ }
+@@ -1122,6 +1107,26 @@ int BrowserWindow::pinned_tab_count() const
+     return m_tabs_container->tab_bar()->pinned_tab_count();
+ }
+ 
++int BrowserWindow::insertion_index_for(TabLocation location)
++{
++    switch (location.kind()) {
++    case TabLocation::Kind::End:
++        return m_tabs_container->count();
++    case TabLocation::Kind::AfterCurrentTab:
++        return m_tabs_container->current_index() + 1;
++    case TabLocation::Kind::AfterTab:
++        if (auto* source_tab = location.tab(); source_tab) {
++            if (auto source_tab_index = tab_index(source_tab); source_tab_index != -1)
++                return source_tab_index + 1;
++        }
++        return m_tabs_container->count();
++    case TabLocation::Kind::AtIndex:
++        return location.index();
++    }
++
++    VERIFY_NOT_REACHED();
++}
++
+ int BrowserWindow::constrain_insertion_index(int index, bool pinned) const
+ {
+     auto pinned_count = pinned_tab_count();
+diff --git a/UI/Qt/BrowserWindow.h b/UI/Qt/BrowserWindow.h
+index 680e0b23f765aa6d23e331d6390cc163ebc27a98..5747e22f1b2615e5d206f9d892d809154a9d9646 100644
+--- a/UI/Qt/BrowserWindow.h
++++ b/UI/Qt/BrowserWindow.h
+@@ -264,7 +264,7 @@ private:
+     virtual void appearance_changed() override;
+     virtual void config_variable_changed(WebView::ConfigVariableID) override;
+ 
+-    Tab& create_new_tab(Web::HTML::ActivateTab, Optional<WebView::CanonicalTraversable&>);
++    Tab& create_new_tab(Web::HTML::ActivateTab, Optional<WebView::CanonicalTraversable&>, TabLocation);
+     Tab& create_restored_tab(WebView::RestoredSessionTab const&, int index, bool defer);
+     void initialize_tab(Tab*);
+     void initialize_tab_view(Tab*);
+@@ -294,6 +294,7 @@ private:
+ 
+     void update_chrome_style();
+ 
++    int insertion_index_for(TabLocation);
+     int constrain_insertion_index(int index, bool pinned) const;
+     void pinned_state_changed(Tab&);
+     TabBarButton* create_tab_close_button(Tab&);
