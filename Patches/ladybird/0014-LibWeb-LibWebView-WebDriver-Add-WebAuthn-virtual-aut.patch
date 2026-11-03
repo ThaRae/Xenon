@@ -76,8 +76,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  .../webauthn/getcredential-passing.https.html |  74 ++
  .../Text/input/wpt-import/webauthn/helpers.js | 679 ++++++++++++++++++
  Tests/LibWebView/CMakeLists.txt               |   6 +
- Tests/LibWebView/test-webdriver-webauthn.py   | 140 ++++
- 51 files changed, 2795 insertions(+), 9 deletions(-)
+ Tests/LibWebView/test-webdriver-webauthn.py   | 138 ++++
+ 51 files changed, 2793 insertions(+), 9 deletions(-)
  create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
  create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
  create mode 100644 Tests/LibWeb/Text/data/webauthn-get-in-frame.html
@@ -3276,10 +3276,10 @@ index 6fc5bfa6771ecb9da700aa687b602648c4029f9e..fca70a1ee483b6f29630de2a616dedb5
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test-webdriver-bidi.py $<TARGET_FILE:WebDriver>
 diff --git a/Tests/LibWebView/test-webdriver-webauthn.py b/Tests/LibWebView/test-webdriver-webauthn.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2d1008ad015e12f26bf2aa4d5f4d858afd77d839
+index 0000000000000000000000000000000000000000..7020f7649f1191d15d7e805b3d1c8a4408821544
 --- /dev/null
 +++ b/Tests/LibWebView/test-webdriver-webauthn.py
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,138 @@
 +#!/usr/bin/env python3
 +#
 +# Copyright (c) 2026-present, the Ladybird developers.
@@ -3342,11 +3342,9 @@ index 0000000000000000000000000000000000000000..2d1008ad015e12f26bf2aa4d5f4d858a
 +
 +server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 +threading.Thread(target=server.serve_forever, daemon=True).start()
-+port = helpers["unused_port"]()
-+process = subprocess.Popen([sys.argv[1], "--headless", "-l", "127.0.0.1", "-p", str(port)])
++process, port = helpers["launch_webdriver"](sys.argv[1], "--headless")
 +session = None
 +try:
-+    helpers["wait_for_port"](port)
 +    session = helpers["create_session"](port)
 +
 +    def command(method, path, body=None):
