@@ -18,6 +18,7 @@
 #include <LibWebView/WebUI.h>
 #include <UI/Bangs.h>
 #include <UI/Blocking.h>
+#include <UI/DefaultBrowser.h>
 #include <UI/Extensions/Dialog.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
@@ -30,6 +31,7 @@
 
 #include <QApplication>
 #include <QDesktopServices>
+#include <QGuiApplication>
 #include <QProcess>
 #include <QUrl>
 
@@ -248,6 +250,10 @@ public:
             bridge->send_settings();
             return true;
         });
+        QObject::connect(qApp, &QGuiApplication::applicationStateChanged, [bridge = bridge->make_weak_ptr()](Qt::ApplicationState state) {
+            if (state == Qt::ApplicationActive && bridge)
+                bridge->send_settings();
+        });
         Updater::on_status_change([bridge = bridge->make_weak_ptr()] {
             if (!bridge)
                 return false;
@@ -312,6 +318,20 @@ private:
 
         settings.set("blockingDashboard"sv, Blocking::dashboard_url().serialize());
         settings.set("updates"sv, updates());
+
+        JsonObject default_browser;
+        switch (DefaultBrowser::status()) {
+        case DefaultBrowser::Status::IsDefault:
+            default_browser.set("status"sv, "default"sv);
+            break;
+        case DefaultBrowser::Status::IsNotDefault:
+            default_browser.set("status"sv, "notDefault"sv);
+            break;
+        case DefaultBrowser::Status::Unsupported:
+            default_browser.set("status"sv, "unsupported"sv);
+            break;
+        }
+        settings.set("defaultBrowser"sv, move(default_browser));
 
         settings.set("extensions"sv, extensions());
         settings.set("profile"sv, profile());
@@ -404,6 +424,12 @@ void register_interfaces(WebView::WebUI& web_ui)
 
     web_ui.register_interface("xenon/installUpdate"sv, [](auto const&) {
         RelaunchToUpdate::relaunch(nullptr);
+    });
+
+    web_ui.register_interface("xenon/makeDefaultBrowser"sv, [bridge](auto const&) {
+        DefaultBrowser::request_default([bridge] {
+            bridge->send_settings();
+        });
     });
 
     web_ui.register_interface("xenon/showExtensions"sv, [](auto const&) {

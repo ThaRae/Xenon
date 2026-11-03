@@ -422,6 +422,21 @@ Xenon then checks for a new version when it starts and once a day, downloads it 
 when you quit, as Helium does, with Sparkle. **Settings → Updates** says when a new version is ready and has **Relaunch
 to update**, and turns automatic updates off. **Check for Updates…** in the Xenon menu checks at once.
 
+### The default browser
+
+**Settings → Default browser** shows whether the system opens web links with Xenon, and a **Use Xenon** button when
+it doesn't. On macOS, asking shows the system's confirmation dialog, and the choice is remembered across updates, which
+keep the app's identity. On Linux, asking makes Xenon the handler for `http`, `https`, `text/html` and
+`application/xhtml+xml`, through GIO, so the desktop's own settings, like GNOME's Default Applications, agree with it.
+
+The AppImage signs itself up with the desktop each time it runs: it writes
+`~/.local/share/applications/org.xenon.Xenon.desktop` with its own path, and its icons, into `~/.local/share/icons`,
+so Xenon shows up among the desktop's browsers whether it's a default or not, and moves and updates keep the
+registration pointed at it, because the file keeps its name. The AUR packages install the same file with `Exec=xenon`,
+so a package and an AppImage can take the choice over from each other. Where no desktop entry exists, like a
+development build run from the tree, Settings says so instead of pretending. `UI/Linux/AppRun` does the registration,
+and `UI/DefaultBrowser*` the checks and the asking.
+
 ### The Update button
 
 Once a new version is ready, an **Update** button in Xenon's rose shows at the right end of every window's toolbar,

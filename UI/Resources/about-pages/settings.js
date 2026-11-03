@@ -370,6 +370,31 @@ automaticUpdates.addEventListener("change", () => {
     ladybird.sendMessage("xenon/setAutomaticUpdates", automaticUpdates.checked);
 });
 
+function renderDefaultBrowser() {
+    const defaultBrowser = XENON.defaultBrowser;
+    if (!defaultBrowser) return;
+
+    switch (defaultBrowser.status) {
+        case "default":
+            defaultBrowserStatus.textContent = "Xenon is your default browser.";
+            break;
+        case "unsupported":
+            defaultBrowserStatus.textContent = "This system can't be given a default browser from here.";
+            break;
+        default:
+            defaultBrowserStatus.textContent = "Your system opens web links with another browser.";
+    }
+
+    makeDefaultBrowser.hidden = defaultBrowser.status !== "notDefault";
+    makeDefaultBrowser.disabled = false;
+}
+
+makeDefaultBrowser.addEventListener("click", () => {
+    ladybird.sendMessage("xenon/makeDefaultBrowser");
+    makeDefaultBrowser.disabled = true;
+    defaultBrowserStatus.textContent = "Asking the system to use Xenon…";
+});
+
 const extensionList = document.querySelector("#extension-list");
 
 function renderExtensions() {
@@ -716,6 +741,7 @@ function render() {
     renderBlockingDashboard();
     renderExtensions();
     renderUpdates();
+    renderDefaultBrowser();
     renderProfile();
     renderNewTabPage();
     renderEasySetup();
