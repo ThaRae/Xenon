@@ -491,6 +491,10 @@ target_sources(TestXenonChromeStyle PRIVATE
 )
 target_include_directories(TestXenonChromeStyle BEFORE PRIVATE ${XENON_SOURCE_DIR})
 target_link_libraries(TestXenonChromeStyle PRIVATE LibCore LibURL Qt::Core Qt::Gui Qt::Widgets)
+if (LINUX AND NOT ANDROID)
+    target_sources(TestXenonChromeStyle PRIVATE "${XENON_UI_DIR}/X11Window.cpp")
+    target_link_libraries(TestXenonChromeStyle PRIVATE PkgConfig::XCB_ICCCM)
+endif()
 
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestUpdateButton.cpp" Xenon NAME TestXenonUpdateButton LIBS LibCore LibURL)
 target_sources(TestXenonUpdateButton PRIVATE
