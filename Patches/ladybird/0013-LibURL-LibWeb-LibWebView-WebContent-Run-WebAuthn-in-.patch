@@ -31,26 +31,26 @@ for a registrable domain suffix, which moves from LibWeb to URL::Host.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibURL/Host.cpp                     |  47 +
+ Libraries/LibURL/Host.cpp                     |  48 +
  Libraries/LibURL/Host.h                       |   3 +
  Libraries/LibWeb/CookieStore/CookieStore.cpp  |   2 +-
  Libraries/LibWeb/DOM/Document.cpp             |  47 +-
  Libraries/LibWeb/DOM/Document.h               |   1 -
  Libraries/LibWebView/CMakeLists.txt           |   4 +
  Libraries/LibWebView/ViewImplementation.cpp   |  21 +
- Libraries/LibWebView/ViewImplementation.h     |   9 +
- .../LibWebView/WebAuthn/AttestationObject.cpp | 186 ++++
- .../LibWebView/WebAuthn/AttestationObject.h   |  71 ++
- Libraries/LibWebView/WebAuthn/Authenticator.h | 140 +++
- Libraries/LibWebView/WebAuthn/CBOR.cpp        | 263 ++++++
- Libraries/LibWebView/WebAuthn/CBOR.h          |  71 ++
- Libraries/LibWebView/WebAuthn/ClientData.cpp  | 100 +++
+ Libraries/LibWebView/ViewImplementation.h     |  13 +
+ .../LibWebView/WebAuthn/AttestationObject.cpp | 197 ++++
+ .../LibWebView/WebAuthn/AttestationObject.h   |  75 ++
+ Libraries/LibWebView/WebAuthn/Authenticator.h | 167 ++++
+ Libraries/LibWebView/WebAuthn/CBOR.cpp        | 264 ++++++
+ Libraries/LibWebView/WebAuthn/CBOR.h          |  79 ++
+ Libraries/LibWebView/WebAuthn/ClientData.cpp  | 102 ++
  Libraries/LibWebView/WebAuthn/ClientData.h    |  36 +
- Libraries/LibWebView/WebAuthn/Coordinator.cpp | 835 ++++++++++++++++++
- Libraries/LibWebView/WebAuthn/Coordinator.h   |  61 ++
- Libraries/LibWebView/WebAuthn/Prompt.h        |  60 ++
- Libraries/LibWebView/WebContentPage.cpp       |  88 ++
- Libraries/LibWebView/WebContentPage.h         |   5 +
+ Libraries/LibWebView/WebAuthn/Coordinator.cpp | 897 ++++++++++++++++++
+ Libraries/LibWebView/WebAuthn/Coordinator.h   |  68 ++
+ Libraries/LibWebView/WebAuthn/Prompt.h        |  79 ++
+ Libraries/LibWebView/WebContentPage.cpp       |  99 ++
+ Libraries/LibWebView/WebContentPage.h         |   7 +
  Services/WebContent/ConnectionFromClient.cpp  |   6 +
  Services/WebContent/ConnectionFromClient.h    |   1 +
  Services/WebContent/PageClient.cpp            |  22 +
@@ -58,8 +58,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Services/WebContent/WebContentClient.ipc      |   4 +
  Services/WebContent/WebContentServer.ipc      |   2 +
  Tests/LibWebView/CMakeLists.txt               |   3 +-
- Tests/LibWebView/TestWebAuthn.cpp             | 162 ++++
- 28 files changed, 2205 insertions(+), 49 deletions(-)
+ Tests/LibWebView/TestWebAuthn.cpp             | 167 ++++
+ 28 files changed, 2369 insertions(+), 49 deletions(-)
  create mode 100644 Libraries/LibWebView/WebAuthn/AttestationObject.cpp
  create mode 100644 Libraries/LibWebView/WebAuthn/AttestationObject.h
  create mode 100644 Libraries/LibWebView/WebAuthn/Authenticator.h
@@ -73,10 +73,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Tests/LibWebView/TestWebAuthn.cpp
 
 diff --git a/Libraries/LibURL/Host.cpp b/Libraries/LibURL/Host.cpp
-index 7467ab85f5dd140458d5c56de55f952156b89d5b..9e83605cb99a8c68c870a5107e9cca639ee807b1 100644
+index 7467ab85f5dd140458d5c56de55f952156b89d5b..54ab09971273588363ea778a97c9175975620a5c 100644
 --- a/Libraries/LibURL/Host.cpp
 +++ b/Libraries/LibURL/Host.cpp
-@@ -232,6 +232,53 @@ Optional<String> Host::public_suffix() const
+@@ -232,6 +232,54 @@ Optional<String> Host::public_suffix() const
  }
  
  // https://url.spec.whatwg.org/#host-registrable-domain
@@ -97,6 +97,7 @@ index 7467ab85f5dd140458d5c56de55f952156b89d5b..9e83605cb99a8c68c870a5107e9cca63
 +    // 4. If hostSuffix does not equal originalHost, then:
 +    if (host_suffix != original_host) {
 +        // 1. If hostSuffix or originalHost is not a domain, then return false.
++        // NOTE: This excludes hosts that are IP addresses.
 +        if (!host_suffix.has<String>() || !original_host.has<String>())
 +            return false;
 +        auto const& host_suffix_string = host_suffix.get<String>();
@@ -158,10 +159,10 @@ index 69b7bd6d91be9e95a2577216ec7f0f145e3c58a0..b612518eb09a11f1fdd146bc773a01f5
  
          // 4. Let parsedDomain be the result of host parsing domain.
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index d440329603e80b36c071baf4cafb4f07e1f9b538..72bca198c943b828a83f6e4b39a834b6ca728e29 100644
+index 6fde449e6cc6e900d72d2eee77a5ac137fe33611..64e00365786cc2978cda9bb46030f97b9c1e4d01 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -6248,52 +6248,7 @@ bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_stri
+@@ -6349,52 +6349,7 @@ bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_stri
      if (!host_suffix.has_value())
          return false;
  
@@ -216,10 +217,10 @@ index d440329603e80b36c071baf4cafb4f07e1f9b538..72bca198c943b828a83f6e4b39a834b6
  
  // https://html.spec.whatwg.org/multipage/browsers.html#dom-document-domain
 diff --git a/Libraries/LibWeb/DOM/Document.h b/Libraries/LibWeb/DOM/Document.h
-index 7153d3e6e0c6425954b9d03e39ae72be9bce20bc..a12d8e4b81aca547be1b51dab4e56464cee736e1 100644
+index 81d5fd0fb21a0ee7e7f976f39cdbb640970a7c27..b1a2ed9bccef896cb1f9cbafca2a5662c79427e0 100644
 --- a/Libraries/LibWeb/DOM/Document.h
 +++ b/Libraries/LibWeb/DOM/Document.h
-@@ -2499,6 +2499,5 @@ template<>
+@@ -2550,6 +2550,5 @@ template<>
  inline bool Node::fast_is<Document>() const { return is_document(); }
  
  bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_string, URL::Host const& original_host);
@@ -227,10 +228,10 @@ index 7153d3e6e0c6425954b9d03e39ae72be9bce20bc..a12d8e4b81aca547be1b51dab4e56464
  
  }
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index 27079be4a89fb6b2bf59b41c2ad83db93c443459..9b5ea44154450e2f248d0be2d06f55f875a9ae89 100644
+index a62da03c8cc0587528da319634f3d398e5d3012a..6bf7eef968cd6047a402450d71610a993e0c3482 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -76,6 +76,10 @@ set(SOURCES
+@@ -80,6 +80,10 @@ set(SOURCES
      Utilities.cpp
      VideoDecoderServerControlClient.cpp
      ViewImplementation.cpp
@@ -242,10 +243,10 @@ index 27079be4a89fb6b2bf59b41c2ad83db93c443459..9b5ea44154450e2f248d0be2d06f55f8
      WebContentClient.cpp
      WebContentPage.cpp
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 6fd2d6c3b924dcd6b9b42f6792093e3741b12348..30ca237c3fdc94ff2b5099351b28b96c4064f9b6 100644
+index 543015dc7a612826852bd4af26eeb2f98bf9d4ea..e444f0eeba3c729be4b94545a4c30a1b0e7a36a3 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -42,6 +42,7 @@
+@@ -44,6 +44,7 @@
  #include <LibWebView/URL.h>
  #include <LibWebView/UserAgent.h>
  #include <LibWebView/ViewImplementation.h>
@@ -253,7 +254,7 @@ index 6fd2d6c3b924dcd6b9b42f6792093e3741b12348..30ca237c3fdc94ff2b5099351b28b96c
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
  #include <math.h>
-@@ -496,6 +497,26 @@ void ViewImplementation::set_has_system_focus(bool has_system_focus)
+@@ -514,6 +515,26 @@ void ViewImplementation::set_has_system_focus(bool has_system_focus)
      traversable().set_has_system_focus(has_system_focus, {});
  }
  
@@ -281,10 +282,10 @@ index 6fd2d6c3b924dcd6b9b42f6792093e3741b12348..30ca237c3fdc94ff2b5099351b28b96c
  {
      load(traversable().prepare_navigation(url, {}, history_handling));
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index e9f1aa9627f82f054716c878f2f42fa621dbd867..589976a5b8890207e57d96fe52a383e761d33619 100644
+index 87014ba1d4acb8a589f30e005112c1b2a402d2e2..608997990696f9e7840ec7d0c6d8c241ee2455b4 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -82,6 +82,7 @@
+@@ -83,6 +83,7 @@
  #include <LibWebView/Settings.h>
  #include <LibWebView/SpellChecker.h>
  #include <LibWebView/TabPerformanceStats.h>
@@ -292,10 +293,11 @@ index e9f1aa9627f82f054716c878f2f42fa621dbd867..589976a5b8890207e57d96fe52a383e7
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebContentPage.h>
  #include <LibWebView/WebDriverSessionConfig.h>
-@@ -193,6 +194,11 @@ public:
+@@ -194,6 +195,12 @@ public:
  
      void server_did_paint(Badge<WebContentPage>, i32 bitmap_id, Gfx::IntSize size, Gfx::IntRect damage_rect, double device_pixel_ratio);
  
++    // What the user does in the WebAuthn prompt.
 +    void web_authn_cancel();
 +    void web_authn_provide_pin(String pin);
 +    void web_authn_choose_account(size_t index);
@@ -304,11 +306,14 @@ index e9f1aa9627f82f054716c878f2f42fa621dbd867..589976a5b8890207e57d96fe52a383e7
      void set_window_position(Gfx::IntPoint);
      void set_window_size(Gfx::IntSize);
      void set_system_visibility_state(Web::HTML::VisibilityState);
-@@ -631,6 +637,9 @@ public:
+@@ -647,6 +654,12 @@ public:
      Function<void(PermissionPromptRequest const&, PermissionPromptCallback)> on_request_permission;
      Function<void(PermissionPromptRequest const&)> on_cancel_permission_prompt;
      Function<void(bool)> on_location_in_use_change;
 +
++    // WebAuthn ceremonies of the view's pages. The embedder shows the prompt, and updates it on each call, until
++    // on_web_authn_prompt_closed. It answers with the web_authn_* methods. A view without a prompt has no
++    // authenticators.
 +    Function<void(WebAuthnPrompt const&)> on_web_authn_prompt;
 +    Function<void()> on_web_authn_prompt_closed;
      Function<void(Web::HTML::FileFilter const& accepted_file_types, Web::HTML::AllowMultipleFiles)> on_request_file_picker;
@@ -316,10 +321,10 @@ index e9f1aa9627f82f054716c878f2f42fa621dbd867..589976a5b8890207e57d96fe52a383e7
      Function<void(Web::KeyEvent const&)> on_finish_handling_key_event;
 diff --git a/Libraries/LibWebView/WebAuthn/AttestationObject.cpp b/Libraries/LibWebView/WebAuthn/AttestationObject.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b45505135
+index 0000000000000000000000000000000000000000..2a0f6ec78234b0483bf558279101de1be43df510
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/AttestationObject.cpp
-@@ -0,0 +1,186 @@
+@@ -0,0 +1,197 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -355,6 +360,7 @@ index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b
 +
 +ErrorOr<AuthenticatorData> AuthenticatorData::parse(ReadonlyBytes bytes)
 +{
++    // rpIdHash (32), flags (1), signCount (4), then attestedCredentialData and extensions, if their flags are set.
 +    if (bytes.size() < 37)
 +        return Error::from_string_literal("Authenticator data is too short");
 +
@@ -366,6 +372,7 @@ index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b
 +    if (!(data.flags & AttestedCredentialDataIncluded))
 +        return data;
 +
++    // aaguid (16), credentialIdLength (2), credentialId, credentialPublicKey (CBOR).
 +    auto rest = bytes.slice(37);
 +    if (rest.size() < 18)
 +        return Error::from_string_literal("Attested credential data is too short");
@@ -405,6 +412,8 @@ index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b
 +// https://w3c.github.io/webauthn/#sctn-generating-an-attestation-object
 +ByteBuffer encode_attestation_object(StringView format, ReadonlyBytes attestation_statement, ReadonlyBytes authenticator_data)
 +{
++    // attObj = { authData: bytes, $$attStmtType }, with attStmtType = ( fmt: text, attStmt: { * tstr => any } ), in
++    // CTAP2 canonical CBOR, whose map keys sort shortest first: "fmt", "attStmt", "authData".
 +    CBOR::Encoder encoder;
 +    encoder.begin_map(3);
 +    encoder.write_text("fmt"sv);
@@ -419,6 +428,7 @@ index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b
 +// https://w3c.github.io/webauthn/#sctn-none-attestation
 +ByteBuffer none_attestation_statement()
 +{
++    // The attestation statement is an empty CBOR map.
 +    CBOR::Encoder encoder;
 +    encoder.begin_map(0);
 +    return encoder.finish();
@@ -427,6 +437,9 @@ index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b
 +bool is_self_attestation(StringView format, ReadonlyBytes attestation_statement, ReadonlyBytes aaguid)
 +{
 +    // https://w3c.github.io/webauthn/#sctn-createCredential, constructCredentialAlg:
++    // If the aaguid in the attested credential data is 16 zero bytes, credentialCreationData.attestationObjectResult.fmt
++    // is "packed", and "x5c" is absent from credentialCreationData.attestationObjectResult, then self attestation is
++    // being used and no further action is needed.
 +    if (format != "packed"sv)
 +        return false;
 +    if (!all_of(aaguid, [](u8 byte) { return byte == 0; }))
@@ -458,6 +471,7 @@ index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b
 +    result.algorithm = static_cast<i32>(algorithm->value.get<i64>());
 +
 +    auto key_type_value = key_type->value.get<i64>();
++    // NB: EC2 and OKP keys both keep their curve under -1.
 +    auto const* curve = key.get(COSE_KEY_EC2_CRV);
 +    auto curve_value = curve && curve->is_integer() ? curve->value.get<i64>() : 0;
 +
@@ -485,11 +499,13 @@ index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b
 +        result.subject_public_key_info = TRY(::Crypto::PK::wrap_in_subject_public_key_info(der, ::Crypto::ASN1::rsa_encryption_oid, nullptr));
 +    }
 +
++    // NB: Another algorithm's key leaves getPublicKey() returning null, as the spec allows.
 +    return result;
 +}
 +
 +ByteBuffer cose_key_for_es256(ReadonlyBytes x, ReadonlyBytes y)
 +{
++    // {1: 2, 3: -7, -1: 1, -2: x, -3: y}, in CTAP2 canonical order.
 +    CBOR::Encoder encoder;
 +    encoder.begin_map(5);
 +    encoder.write_integer(COSE_KEY_KTY);
@@ -508,10 +524,10 @@ index 0000000000000000000000000000000000000000..cd232eea769f5379003162636e4f528b
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/AttestationObject.h b/Libraries/LibWebView/WebAuthn/AttestationObject.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..015c12767f9e902a13b1a9fc1739d1a0c6f8add4
+index 0000000000000000000000000000000000000000..c7c31ea181e19112a85b89c7cc93cce2d1a1fd78
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/AttestationObject.h
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,75 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -559,6 +575,7 @@ index 0000000000000000000000000000000000000000..015c12767f9e902a13b1a9fc1739d1a0
 +
 +    static ErrorOr<AuthenticatorData> parse(ReadonlyBytes);
 +
++    // Serializes authenticator data with no extensions.
 +    ByteBuffer serialize() const;
 +};
 +
@@ -568,12 +585,15 @@ index 0000000000000000000000000000000000000000..015c12767f9e902a13b1a9fc1739d1a0
 +// https://w3c.github.io/webauthn/#sctn-none-attestation
 +WEBVIEW_API ByteBuffer none_attestation_statement();
 +
++// Whether a packed attestation statement is self attestation, which WebAuthn passes on even when the RP asked for no
++// attestation, since it identifies nothing.
 +WEBVIEW_API bool is_self_attestation(StringView format, ReadonlyBytes attestation_statement, ReadonlyBytes aaguid);
 +
 +// https://w3c.github.io/webauthn/#sctn-public-key-easy
 +struct WEBVIEW_API CredentialPublicKey {
 +    i32 algorithm { 0 };
 +
++    // The key as a DER SubjectPublicKeyInfo, for the algorithms getPublicKey() supports: ES256, EdDSA and RS256.
 +    Optional<ByteBuffer> subject_public_key_info;
 +
 +    static ErrorOr<CredentialPublicKey> from_cose_key(ReadonlyBytes);
@@ -585,10 +605,10 @@ index 0000000000000000000000000000000000000000..015c12767f9e902a13b1a9fc1739d1a0
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/Authenticator.h b/Libraries/LibWebView/WebAuthn/Authenticator.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..0817ffce6719c6e6e8f62eb42c2c3d483d433b27
+index 0000000000000000000000000000000000000000..4226c1a85332dc4ff93b804792acd544460a5678
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/Authenticator.h
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,167 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -613,9 +633,13 @@ index 0000000000000000000000000000000000000000..0817ffce6719c6e6e8f62eb42c2c3d48
 +namespace WebView {
 +
 +// https://w3c.github.io/webauthn/#sctn-authenticator-model
++// An authenticator the browser process can reach, such as a security key on USB. Its operations are those of CTAP2,
++// one at a time, and complete on the thread that started them.
 +class WEBVIEW_API Authenticator : public RefCounted<Authenticator> {
 +public:
++    // What authenticatorGetInfo says about the authenticator.
 +    struct Info {
++        // The COSE algorithms it supports, in its order of preference.
 +        Vector<i32> algorithms;
 +
 +        bool supports_resident_keys { false };
@@ -623,8 +647,11 @@ index 0000000000000000000000000000000000000000..0817ffce6719c6e6e8f62eb42c2c3d48
 +        bool has_client_pin { false };
 +        bool has_built_in_user_verification { false };
 +
++        // CTAP 2.1's makeCredUvNotRqd: whether it makes non-discoverable credentials without user verification
++        // even when it is protected by user verification.
 +        bool make_credential_without_user_verification { false };
 +
++        // Whether it only speaks CTAP1/U2F.
 +        bool is_u2f_only { false };
 +
 +        Vector<Web::WebAuthn::AuthenticatorTransport> transports;
@@ -659,6 +686,7 @@ index 0000000000000000000000000000000000000000..0817ffce6719c6e6e8f62eb42c2c3d48
 +        ByteBuffer credential_id;
 +        ByteBuffer authenticator_data;
 +        String attestation_format;
++        // The CBOR encoding of the attestation statement.
 +        ByteBuffer attestation_statement;
 +        bool resident_key { false };
 +    };
@@ -677,16 +705,28 @@ index 0000000000000000000000000000000000000000..0817ffce6719c6e6e8f62eb42c2c3d48
 +    };
 +
 +    enum class Error : u8 {
++        // No credential in the allow list is on the authenticator (CTAP2_ERR_NO_CREDENTIALS).
 +        NoCredentials,
++        // A credential in the exclude list is on the authenticator (CTAP2_ERR_CREDENTIAL_EXCLUDED).
 +        CredentialExcluded,
++        // The operation needs the PIN (CTAP2_ERR_PIN_REQUIRED, CTAP2_ERR_PUAT_REQUIRED).
 +        PinRequired,
++        // The PIN was wrong (CTAP2_ERR_PIN_INVALID).
 +        PinInvalid,
++        // Too many wrong PINs or failed verifications (CTAP2_ERR_PIN_BLOCKED, CTAP2_ERR_PIN_AUTH_BLOCKED,
++        // CTAP2_ERR_UV_BLOCKED).
 +        PinBlocked,
++        // User verification is required, and no PIN is set (CTAP2_ERR_PIN_NOT_SET).
 +        PinNotSet,
++        // The authenticator can't do what was asked (CTAP2_ERR_UNSUPPORTED_ALGORITHM, CTAP2_ERR_UNSUPPORTED_OPTION).
 +        NotSupported,
++        // The user declined on the authenticator (CTAP2_ERR_OPERATION_DENIED).
 +        OperationDenied,
++        // The user didn't respond in time (CTAP2_ERR_USER_ACTION_TIMEOUT).
 +        Timeout,
++        // The operation was cancelled.
 +        Cancelled,
++        // The authenticator went away.
 +        Removed,
 +        Other,
 +    };
@@ -707,15 +747,20 @@ index 0000000000000000000000000000000000000000..0817ffce6719c6e6e8f62eb42c2c3d48
 +    virtual void make_credential(MakeCredentialRequest, Function<void(MakeCredentialResult)>) = 0;
 +    virtual void get_assertion(GetAssertionRequest, Function<void(GetAssertionResult)>) = 0;
 +
++    // Waits for the user to touch the authenticator to choose it (CTAP 2.1's authenticatorSelection).
 +    virtual void wait_for_touch(Function<void(Optional<Failure>)>) = 0;
 +
++    // How many PIN attempts are left before the PIN is blocked.
 +    virtual void get_pin_retries(Function<void(Optional<u32>)>) = 0;
 +
++    // Stops the operation in progress, which then completes with Error::Cancelled.
 +    virtual void cancel() = 0;
 +};
 +
++// Finds authenticators for a ceremony while it waits for one.
 +class WEBVIEW_API AuthenticatorSource {
 +public:
++    // Reports authenticators until it is destroyed.
 +    class Discovery {
 +        AK_ALLOC_WITH_KMALLOC;
 +
@@ -725,16 +770,18 @@ index 0000000000000000000000000000000000000000..0817ffce6719c6e6e8f62eb42c2c3d48
 +
 +    virtual ~AuthenticatorSource() = default;
 +
++    // Reports the authenticators that a ceremony in the traversable may use: those present now, and then each that
++    // appears.
 +    virtual NonnullOwnPtr<Discovery> discover(CanonicalTraversable const&, Function<void(NonnullRefPtr<Authenticator>)> on_authenticator) = 0;
 +};
 +
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/CBOR.cpp b/Libraries/LibWebView/WebAuthn/CBOR.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..21da155c1540fd782085fd67635386e01ff541f8
+index 0000000000000000000000000000000000000000..2593a1ee6ddfc67f8f62d89d49b33cdbaa33b439
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/CBOR.cpp
-@@ -0,0 +1,263 @@
+@@ -0,0 +1,264 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -746,6 +793,7 @@ index 0000000000000000000000000000000000000000..21da155c1540fd782085fd67635386e0
 +
 +namespace WebView::CBOR {
 +
++// Authenticators nest a few levels deep at most; this keeps a hostile one from exhausting the stack.
 +static constexpr size_t MAXIMUM_NESTING_DEPTH = 16;
 +
 +enum MajorType : u8 {
@@ -1000,10 +1048,10 @@ index 0000000000000000000000000000000000000000..21da155c1540fd782085fd67635386e0
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/CBOR.h b/Libraries/LibWebView/WebAuthn/CBOR.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..ff5fa57b305a0107883cfb31dc1de32d23e30fa0
+index 0000000000000000000000000000000000000000..cec299a91e2430b6dcb6015a3ff7c071dfc5ee58
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/CBOR.h
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,79 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -1020,6 +1068,8 @@ index 0000000000000000000000000000000000000000..ff5fa57b305a0107883cfb31dc1de32d
 +#include <AK/Vector.h>
 +#include <LibWebView/Export.h>
 +
++// The subset of CBOR (RFC 8949) that WebAuthn and CTAP2 use: integers, byte and text strings, arrays, maps, booleans
++// and null, all of definite length. https://w3c.github.io/webauthn/#sctn-conforming-all-classes
 +namespace WebView::CBOR {
 +
 +struct Value;
@@ -1030,6 +1080,7 @@ index 0000000000000000000000000000000000000000..ff5fa57b305a0107883cfb31dc1de32d
 +struct Null { };
 +
 +struct WEBVIEW_API Value {
++    // Integers are kept as i64 when they fit, which covers everything WebAuthn uses.
 +    Variant<i64, ByteBuffer, String, Array, Map, bool, Null> value;
 +
 +    bool is_integer() const { return value.has<i64>(); }
@@ -1037,6 +1088,7 @@ index 0000000000000000000000000000000000000000..ff5fa57b305a0107883cfb31dc1de32d
 +    bool is_text() const { return value.has<String>(); }
 +    bool is_map() const { return value.has<Map>(); }
 +
++    // Looks up a map entry by an integer or text key.
 +    Value const* get(i64 key) const;
 +    Value const* get(StringView key) const;
 +};
@@ -1046,14 +1098,17 @@ index 0000000000000000000000000000000000000000..ff5fa57b305a0107883cfb31dc1de32d
 +    Value value;
 +};
 +
++// Decodes one data item from the start of the bytes, and says how many bytes it took.
 +struct DecodedValue {
 +    Value value;
 +    size_t length { 0 };
 +};
 +WEBVIEW_API ErrorOr<DecodedValue> decode_prefix(ReadonlyBytes);
 +
++// Decodes bytes that hold exactly one data item.
 +WEBVIEW_API ErrorOr<Value> decode(ReadonlyBytes);
 +
++// Writes CBOR. Map entries are written in the order given, so writers of CTAP2 canonical CBOR sort them themselves.
 +class WEBVIEW_API Encoder {
 +public:
 +    void write_integer(i64);
@@ -1064,6 +1119,7 @@ index 0000000000000000000000000000000000000000..ff5fa57b305a0107883cfb31dc1de32d
 +    void begin_array(size_t length);
 +    void begin_map(size_t length);
 +
++    // Writes an already encoded data item as it is.
 +    void write_encoded(ReadonlyBytes);
 +
 +    ByteBuffer finish() { return move(m_buffer); }
@@ -1077,10 +1133,10 @@ index 0000000000000000000000000000000000000000..ff5fa57b305a0107883cfb31dc1de32d
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/ClientData.cpp b/Libraries/LibWebView/WebAuthn/ClientData.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..59a2819ebbe3473cdf441c1e99163146d01e8cc5
+index 0000000000000000000000000000000000000000..3950a6b924a62c9c0c9937ff2842cf29dec8e70a
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/ClientData.cpp
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,102 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -1141,6 +1197,7 @@ index 0000000000000000000000000000000000000000..59a2819ebbe3473cdf441c1e99163146
 +    result.append(",\"challenge\":"sv);
 +
 +    // 5. Append CCDToString(challenge) to result.
++    // NB: challenge is the base64url encoding of the challenge.
 +    append_ccd_to_string(result, MUST(encode_base64url(challenge, AK::OmitPadding::Yes)));
 +
 +    // 6. Append 0x2c226f726967696e223a (,"origin":) to result.
@@ -1176,6 +1233,7 @@ index 0000000000000000000000000000000000000000..59a2819ebbe3473cdf441c1e99163146
 +// https://w3c.github.io/webauthn/#collectedclientdata-hash-of-the-serialized-client-data
 +ByteBuffer hash_of_the_serialized_client_data(ReadonlyBytes client_data_json)
 +{
++    // This is the hash (computed using SHA-256) of the JSON-compatible serialization of client data.
 +    auto digest = Crypto::Hash::SHA256::hash(client_data_json);
 +    return MUST(ByteBuffer::copy(digest.bytes()));
 +}
@@ -1225,10 +1283,10 @@ index 0000000000000000000000000000000000000000..4263bedc06f091e7bf41f18c033a798a
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.cpp b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf4360dc6284d
+index 0000000000000000000000000000000000000000..14a098cc789c647c3ea75fec25219563d9b2d320
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
-@@ -0,0 +1,835 @@
+@@ -0,0 +1,897 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -1258,6 +1316,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +using Web::WebAuthn::ResidentKeyRequirement;
 +using Web::WebAuthn::UserVerificationRequirement;
 +
++// How often a ceremony checks that its document is still active and its view still in front of the user.
 +static constexpr auto LIVENESS_CHECK_INTERVAL = AK::Duration::from_milliseconds(500);
 +
 +static Web::WebAuthn::Error not_allowed(StringView message)
@@ -1295,8 +1354,10 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +
 +    void authenticator_appeared(NonnullRefPtr<Authenticator>);
 +
++    // Ends the ceremony, answering the renderer unless it has been answered already.
 +    void end(Optional<Web::WebAuthn::Result>);
 +
++    // Ends the ceremony without an answer, because the renderer gave up on it or went away.
 +    void abandon();
 +
 +    void user_cancelled();
@@ -1306,15 +1367,22 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +
 +private:
 +    enum class Phase : u8 {
++        // Waiting for the user to insert or touch an authenticator.
 +        Waiting,
++        // Waiting for the PIN of the selected authenticator.
 +        AwaitingPin,
++        // Waiting for the selected authenticator to finish an operation with the PIN.
 +        AwaitingTouch,
++        // Waiting for the user to choose among the accounts on the selected authenticator.
 +        AwaitingAccountChoice,
++        // Waiting for the user to allow or refuse the site seeing the authenticator's make and model.
 +        AwaitingAttestationConsent,
++        // The renderer has its answer, and the prompt stays up only to inform the user.
 +        Answered,
 +        Ended,
 +    };
 +
++    // What an authenticator is asked to do, given what it supports.
 +    struct Plan {
 +        Optional<WebAuthnPrompt::State> unsuitable;
 +        bool needs_pin { false };
@@ -1371,6 +1439,15 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +void WebAuthnCoordinator::Ceremony::start(Vector<AuthenticatorSource*> const& sources)
 +{
 +    // https://w3c.github.io/webauthn/#sctn-createCredential and https://w3c.github.io/webauthn/#sctn-getAssertion:
++    // Let collectedClientData be a new CollectedClientData instance whose fields are:
++    //   type: "webauthn.create" or "webauthn.get"
++    //   challenge: The base64url encoding of pkOptions.challenge.
++    //   origin: The serialization of callerOrigin.
++    //   crossOrigin: The inverse of the value of the sameOriginWithAncestors argument.
++    //   topOrigin: The serialization of callerOrigin’s top-level origin if sameOriginWithAncestors is false, else
++    //              undefined.
++    // Let clientDataJSON be the JSON-compatible serialization of client data constructed from collectedClientData.
++    // Let clientDataHash be the hash of the serialized client data represented by clientDataJSON.
 +    CollectedClientData client_data;
 +    client_data.type = is_create() ? CollectedClientData::Type::Create : CollectedClientData::Type::Get;
 +    client_data.challenge = m_request.visit([](auto const& request) { return request.challenge; });
@@ -1389,8 +1466,11 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    if (auto const* create_request = m_request.get_pointer<CreateRequest>())
 +        m_prompt.user_name = create_request->user_name;
 +
++    // Start lifetimeTimer.
 +    auto timeout = m_request.visit([](auto const& request) { return request.timeout; });
 +    m_lifetime_timer = Core::Timer::create_single_shot(AK::Duration::from_milliseconds(timeout), [weak_self = make_weak_ptr()] {
++        // If lifetimeTimer expires, then for each authenticator in issuedRequests invoke the authenticatorCancel
++        // operation on authenticator and remove authenticator from issuedRequests. Throw a "NotAllowedError".
 +        if (auto self = weak_self.strong_ref())
 +            self->end(not_allowed("The operation timed out"sv));
 +    });
@@ -1423,6 +1503,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +        return;
 +    }
 +
++    // If the document stopped being active, nobody is waiting for the answer anymore.
 +    auto navigable = m_page->traversable().find(m_context.navigable_id);
 +    if (!navigable.has_value() || navigable->active_document().id() != m_context.document_id || navigable->active_document().host() != m_page.ptr()) {
 +        abandon();
@@ -1432,6 +1513,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    if (m_phase == Phase::Answered)
 +        return;
 +
++    // A ceremony continues only while the user can see the view that started it. It may lose focus to its prompt.
 +    if (m_page->traversable().system_visibility_state() != Web::HTML::VisibilityState::Visible)
 +        end(not_allowed("The page is no longer visible"sv));
 +}
@@ -1447,6 +1529,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +        plan.user_verification = true;
 +        break;
 +    case UserVerificationRequirement::Preferred:
++        // NB: As in other browsers, verify the user when the authenticator is set up for it.
 +        plan.user_verification = can_verify_user;
 +        break;
 +    case UserVerificationRequirement::Discouraged:
@@ -1466,6 +1549,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +            return plan;
 +        }
 +
++        // The first of the requested algorithms the authenticator supports. One that doesn't say supports ES256.
 +        auto supported_algorithms = info.algorithms.is_empty() ? Vector<i32> { COSE_ALGORITHM_ES256 } : info.algorithms;
 +        Optional<i32> algorithm;
 +        for (auto requested : request->public_key_algorithms) {
@@ -1486,6 +1570,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +            plan.resident_key = true;
 +            break;
 +        case ResidentKeyRequirement::Preferred:
++            // NB: As in other browsers, make a discoverable credential when the authenticator can protect it.
 +            plan.resident_key = info.supports_resident_keys && can_verify_user;
 +            break;
 +        case ResidentKeyRequirement::Discouraged:
@@ -1497,10 +1582,13 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +            return plan;
 +        }
 +
++        // A CTAP2 authenticator with a PIN makes a credential only with the PIN, unless it is a non-discoverable one
++        // and the authenticator offers makeCredUvNotRqd.
 +        plan.needs_pin = !info.has_built_in_user_verification && info.has_client_pin && (plan.user_verification || plan.resident_key || !info.make_credential_without_user_verification);
 +    } else {
 +        auto const& get_request = m_request.get<GetRequest>();
 +
++        // An empty allow list asks for discoverable credentials.
 +        if (get_request.allow_credentials.is_empty() && !info.supports_resident_keys) {
 +            plan.unsuitable = WebAuthnPrompt::State::KeyNotSupported;
 +            return plan;
@@ -1532,6 +1620,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    m_candidates.append({ authenticator, plan });
 +    auto& candidate = m_candidates.last();
 +
++    // Once the user has chosen an authenticator, others wait.
 +    if (m_phase != Phase::Waiting)
 +        return;
 +
@@ -1545,6 +1634,8 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +        return;
 +    }
 +
++    // An authenticator needing a PIN is chosen first, so that the PIN goes to the right one: right away if it's the
++    // only one, and otherwise when the user touches it.
 +    bool another_is_present = any_of(m_candidates, [&](auto const& other) { return other.authenticator != candidate.authenticator && !other.plan.unsuitable.has_value(); });
 +    if (!another_is_present) {
 +        select_for_pin_entry(candidate);
@@ -1596,6 +1687,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    candidate.is_busy = true;
 +    auto authenticator = candidate.authenticator;
 +
++    // NB: A PIN is passed on for the one request it was entered for, and never leaves the browser process.
 +    auto user_verification = candidate.plan.user_verification || pin.has_value();
 +
 +    if (auto const* request = m_request.get_pointer<CreateRequest>()) {
@@ -1669,9 +1761,11 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +
 +    case Authenticator::Error::NoCredentials:
 +        // https://w3c.github.io/webauthn/#sctn-appid-extension
++        // If a U2F authenticator indicates that a credential is not applicable, try again with the AppID as the RP ID.
 +        if (auto const* request = m_request.get_pointer<GetRequest>(); request && request->app_id.has_value() && !candidate.tried_app_id) {
 +            candidate.tried_app_id = true;
 +            if (is_selected && m_phase == Phase::AwaitingTouch) {
++                // NB: The PIN has been used up, so the user enters it again for the second request.
 +                m_phase = Phase::AwaitingPin;
 +                m_prompt.pin_was_wrong = false;
 +                show_prompt(WebAuthnPrompt::State::EnterPin);
@@ -1680,10 +1774,15 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +            issue_request(candidate);
 +            return;
 +        }
++        // NB: The page isn't told, so that it can't learn whether the user has a credential for it. The user can try
++        //     another authenticator, or cancel.
 +        break;
 +
 +    case Authenticator::Error::CredentialExcluded:
 +        // https://w3c.github.io/webauthn/#sctn-createCredential
++        // If any authenticator returns an error status equivalent to "InvalidStateError", cancel the others, and
++        // throw an "InvalidStateError" DOMException. The authenticator only says so once the user has consented, so
++        // the RP may know.
 +        cancel_other_candidates(candidate.authenticator.ptr());
 +        if (m_page && m_page->is_open())
 +            m_page->async_web_authn_request_completed(m_request_id, Web::WebAuthn::Error { ErrorName::InvalidStateError, "The authenticator is already registered"_string });
@@ -1733,6 +1832,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +        break;
 +
 +    case Authenticator::Error::OperationDenied:
++        // The user declined on the authenticator itself.
 +        end(not_allowed("The user declined"sv));
 +        return;
 +
@@ -1753,6 +1853,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    if (failure.error == Authenticator::Error::NoCredentials)
 +        show_prompt(WebAuthnPrompt::State::KeyNotRegistered);
 +
++    // The authenticator that failed is done. If the user had chosen it, they may now choose another.
 +    if (is_selected) {
 +        m_selected = nullptr;
 +        m_phase = Phase::Waiting;
@@ -1764,11 +1865,14 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    if (m_phase == Phase::Ended || m_phase == Phase::Answered)
 +        return;
 +
++    // When an authenticator succeeds, cancel the others.
 +    cancel_other_candidates(candidate.authenticator.ptr());
 +    m_selected = candidate.authenticator;
 +    m_pending_registration = move(registration);
 +
 +    // https://w3c.github.io/webauthn/#dom-attestationconveyancepreference-direct
++    // The RP wants the attestation statement as the authenticator generated it. Since it identifies the
++    // authenticator's make and model, the user is asked first.
 +    auto const& request = m_request.get<CreateRequest>();
 +    auto wants_attestation = request.attestation == AttestationConveyancePreference::Direct || request.attestation == AttestationConveyancePreference::Enterprise;
 +    auto authenticator_data = AuthenticatorData::parse(m_pending_registration->authenticator_data);
@@ -1806,6 +1910,11 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    auto const& attested_credential_data = *authenticator_data.value().attested_credential_data;
 +
 +    // https://w3c.github.io/webauthn/#sctn-createCredential, constructCredentialAlg:
++    // If credentialCreationData.attestationConveyancePreferenceOption’s value is "none", replace potentially uniquely
++    // identifying information with non-identifying versions of the same: unless self attestation is being used, set
++    // the attestation statement format to "none" and the attestation statement to an empty CBOR map. "indirect" may
++    // be treated the same way. "direct" and "enterprise" convey the attestation statement as it is, once the user has
++    // allowed it.
 +    auto format = registration.attestation_format;
 +    auto statement = registration.attestation_statement;
 +    if (!share_attestation && !is_self_attestation(format, statement, attested_credential_data.aaguid)) {
@@ -1857,6 +1966,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    }
 +
 +    // https://w3c.github.io/webauthn/#sctn-op-get-assertion
++    // With several credentials for the RP and no allow list, the user chooses one.
 +    m_pending_assertions = move(assertions);
 +    m_prompt.accounts.clear();
 +    for (auto const& assertion : m_pending_assertions) {
@@ -1887,6 +1997,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    // https://w3c.github.io/webauthn/#sctn-getAssertion, constructAssertionAlg:
 +    Web::WebAuthn::AssertionResponse response;
 +
++    // If the allow list had one credential, the authenticator may leave out which one it used.
 +    response.credential_id = assertion.credential_id;
 +    if (response.credential_id.is_empty() && request.allow_credentials.size() == 1)
 +        response.credential_id = request.allow_credentials.first().id;
@@ -1900,6 +2011,9 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +        response.authenticator_attachment = m_selected->info().attachment;
 +
 +    // https://w3c.github.io/webauthn/#sctn-appid-extension
++    // When creating assertionCreationData, if the assertion was created by a U2F authenticator with the U2F
++    // application parameter set to the SHA-256 hash of appId instead of the SHA-256 hash of the RP ID, set output to
++    // true.
 +    if (request.app_id.has_value())
 +        response.used_app_id = m_pending_assertions_used_app_id;
 +
@@ -1908,6 +2022,8 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +
 +void WebAuthnCoordinator::Ceremony::user_cancelled()
 +{
++    // If the user cancels the process, cancel the authenticator operations and throw a "NotAllowedError".
++    // NB: A ceremony that has answered already just closes its prompt.
 +    end(not_allowed("The user cancelled"sv));
 +}
 +
@@ -1935,6 +2051,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +    m_candidates.clear();
 +    m_selected = nullptr;
 +
++    // NB: A discovery may be reporting an authenticator right now, on the stack below.
 +    Core::deferred_invoke([discoveries = move(m_discoveries)] { });
 +    m_pending_registration.clear();
 +    m_pending_assertions.clear();
@@ -1991,6 +2108,8 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +
 +void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyContext context, Variant<CreateRequest, GetRequest> request)
 +{
++    // A ceremony may only start in a view that can ask the user, and that the user is looking at: as in other browsers,
++    // a page in the background can't ask for a credential.
 +    auto& traversable = page.traversable();
 +    auto view = traversable.view();
 +    if (!view.has_value() || !view->on_web_authn_prompt) {
@@ -2014,6 +2133,7 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +
 +void WebAuthnCoordinator::ceremony_ended(Ceremony& ceremony)
 +{
++    // NB: The ceremony may be on the stack, in one of its own callbacks.
 +    auto index = m_ceremonies.find_first_index_if([&](auto const& other) { return other.ptr() == &ceremony; });
 +    if (!index.has_value())
 +        return;
@@ -2066,10 +2186,10 @@ index 0000000000000000000000000000000000000000..6d5d6007f36ef415013d3e2e3f4cf436
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.h b/Libraries/LibWebView/WebAuthn/Coordinator.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..a16e5477eb9de066670c858df9bfe9bf004f1244
+index 0000000000000000000000000000000000000000..0d9212e1b59692fc89eeb84bfb9d3384dc3f5962
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/Coordinator.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,68 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -2089,12 +2209,15 @@ index 0000000000000000000000000000000000000000..a16e5477eb9de066670c858df9bfe9bf
 +
 +namespace WebView {
 +
++// Runs the authenticator part of WebAuthn ceremonies: it finds authenticators, issues them requests, asks the user
++// what it needs to through the requesting view's prompt, and answers the renderer.
 +// https://w3c.github.io/webauthn/#sctn-createCredential
 +// https://w3c.github.io/webauthn/#sctn-discover-from-external-source
 +class WEBVIEW_API WebAuthnCoordinator {
 +public:
 +    static WebAuthnCoordinator& the();
 +
++    // The caller, as the browser process's own records of documents describe it.
 +    struct CeremonyContext {
 +        URL::Origin origin { URL::Origin::create_opaque() };
 +        bool cross_origin { false };
@@ -2103,13 +2226,16 @@ index 0000000000000000000000000000000000000000..a16e5477eb9de066670c858df9bfe9bf
 +        Web::HTML::CrossProcessId document_id;
 +    };
 +
++    // NB: A source must outlive the coordinator.
 +    void add_authenticator_source(AuthenticatorSource&);
 +
 +    void begin_create(WebContentPage&, u64 request_id, CeremonyContext, Web::WebAuthn::CreateRequest);
 +    void begin_get(WebContentPage&, u64 request_id, CeremonyContext, Web::WebAuthn::GetRequest);
 +
++    // The renderer gave up on a request, because its AbortSignal was aborted.
 +    void cancel(WebContentPage const&, u64 request_id);
 +
++    // What the user does in the prompt of the ceremony a view shows.
 +    void user_cancelled(ViewImplementation const&);
 +    void user_entered_pin(ViewImplementation const&, String pin);
 +    void user_chose_account(ViewImplementation const&, size_t index);
@@ -2125,6 +2251,7 @@ index 0000000000000000000000000000000000000000..a16e5477eb9de066670c858df9bfe9bf
 +    void ceremony_ended(Ceremony&);
 +    Ceremony* ceremony_in_view(ViewImplementation const&) const;
 +
++    // NB: A tab runs one ceremony at a time.
 +    Vector<NonnullRefPtr<Ceremony>> m_ceremonies;
 +
 +    Vector<AuthenticatorSource*> m_sources;
@@ -2133,10 +2260,10 @@ index 0000000000000000000000000000000000000000..a16e5477eb9de066670c858df9bfe9bf
 +}
 diff --git a/Libraries/LibWebView/WebAuthn/Prompt.h b/Libraries/LibWebView/WebAuthn/Prompt.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..e28b4ab54859c7c23196e3c90a0c5ea72944411e
+index 0000000000000000000000000000000000000000..bfd39cfcfc12ae4ff3e82254ad9b5151b45680fd
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/Prompt.h
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,79 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -2153,23 +2280,38 @@ index 0000000000000000000000000000000000000000..e28b4ab54859c7c23196e3c90a0c5ea7
 +
 +namespace WebView {
 +
++// What a WebAuthn ceremony is waiting for, for the embedder to show the user. The embedder answers through
++// ViewImplementation's web_authn_* methods.
 +struct WEBVIEW_API WebAuthnPrompt {
 +    enum class Operation : u8 {
++        // navigator.credentials.create(): registering an authenticator with a site.
 +        Create,
++        // navigator.credentials.get(): signing in with one.
 +        Get,
 +    };
 +
 +    enum class State : u8 {
++        // Insert a security key, and touch it.
 +        InsertKey,
++        // Enter the security key's PIN. pin_retries says how many attempts are left, if the key said.
 +        EnterPin,
++        // Touch the security key to finish, after entering its PIN.
 +        TouchKey,
++        // The security key holds several accounts for the site: choose one of accounts.
 +        ChooseAccount,
++        // The site asks to see the security key's make and model: answer with web_authn_allow_attestation().
 +        AttestationConsent,
++        // This security key isn't registered with the site. Another one may be.
 +        KeyNotRegistered,
++        // This security key is already registered with the site. The ceremony has ended.
 +        KeyAlreadyRegistered,
++        // This security key's PIN is blocked, after too many wrong attempts.
 +        PinBlocked,
++        // The site requires a PIN or other verification, and this security key has none set up.
 +        PinNotSet,
++        // This security key can't do what the site asked.
 +        KeyNotSupported,
++        // The site asked for an authenticator built into the device, and there is none.
 +        NoPlatformAuthenticator,
 +    };
 +
@@ -2181,11 +2323,14 @@ index 0000000000000000000000000000000000000000..e28b4ab54859c7c23196e3c90a0c5ea7
 +    Operation operation { Operation::Get };
 +    State state { State::InsertKey };
 +
++    // The site the credential is for.
 +    String rp_id;
 +
++    // The origin asking, and, when it is a frame of another site, the origin the address bar shows.
 +    URL::Origin origin { URL::Origin::create_opaque() };
 +    Optional<URL::Origin> top_level_origin;
 +
++    // For Create: the account being registered.
 +    String user_name;
 +
 +    Optional<u32> pin_retries;
@@ -2193,12 +2338,13 @@ index 0000000000000000000000000000000000000000..e28b4ab54859c7c23196e3c90a0c5ea7
 +
 +    Vector<Account> accounts;
 +
++    // Whether the ceremony is over, so that the prompt only informs.
 +    bool has_ended() const { return state == State::KeyAlreadyRegistered; }
 +};
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 3c1f3794064987bb71359bbe2f28811e5d211bfd..204163c4bb2e34ef843d0b7172b61dc7e3d358c5 100644
+index 68f212b839c997e68f74663f3020d43e18b29b3a..23bac703b941ec610b7b678a2737f590d27ceebc 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -11,6 +11,7 @@
@@ -2209,11 +2355,13 @@ index 3c1f3794064987bb71359bbe2f28811e5d211bfd..204163c4bb2e34ef843d0b7172b61dc7
  #include <LibWebCommon/Geolocation/GeolocationPositionErrorCode.h>
  #include <LibWebCommon/HTML/BrowsingContext.h>
  #include <LibWebCommon/Page/InputEvent.h>
-@@ -1917,6 +1918,93 @@ Web::Permissions::PermissionSnapshot WebContentPage::advance_permission_clock_fo
-     return manager.snapshot_for(client().permission_origins());
+@@ -2033,6 +2034,104 @@ void WebContentPage::did_request_dismiss_notification_for_testing(u64 notificati
+         recording_backend->dismiss(*id);
  }
  
 +// https://w3c.github.io/webauthn/#sctn-api
++// The renderer has checked the request already, but this process decides: it knows which document asks, and
++// where, from its own records, which a renderer can't forge.
 +ErrorOr<WebAuthnCoordinator::CeremonyContext, Web::WebAuthn::Error> WebContentPage::web_authn_ceremony_context(StringView message_name, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::PermissionsPolicy::PolicyControlledFeature feature, String const& rp_id)
 +{
 +    auto not_allowed = [](StringView message) {
@@ -2223,6 +2371,7 @@ index 3c1f3794064987bb71359bbe2f28811e5d211bfd..204163c4bb2e34ef843d0b7172b61dc7
 +        return Web::WebAuthn::Error { Web::WebAuthn::ErrorName::SecurityError, MUST(String::from_utf8(message)) };
 +    };
 +
++    // Only the process hosting a document speaks for it. The document may have been replaced since it asked.
 +    auto navigable = traversable().find(navigable_id);
 +    if (!navigable.has_value())
 +        return not_allowed("The document is gone"sv);
@@ -2241,9 +2390,11 @@ index 3c1f3794064987bb71359bbe2f28811e5d211bfd..204163c4bb2e34ef843d0b7172b61dc7
 +    context.navigable_id = navigable_id;
 +    context.document_id = document_id;
 +
++    // Let callerOrigin be origin. If callerOrigin is an opaque origin, throw a "NotAllowedError" DOMException.
 +    if (context.origin.is_opaque())
 +        return not_allowed("Opaque origins can't use WebAuthn"sv);
 +
++    // NB: Only secure contexts have the API.
 +    auto top_level_origin = document->top_level_origin();
 +    if (!top_level_origin.has_value())
 +        return not_allowed("The document has no top-level browsing context"sv);
@@ -2251,10 +2402,16 @@ index 3c1f3794064987bb71359bbe2f28811e5d211bfd..204163c4bb2e34ef843d0b7172b61dc7
 +        || Web::SecureContexts::is_origin_potentially_trustworthy(*top_level_origin) != Web::SecureContexts::Trustworthiness::PotentiallyTrustworthy)
 +        return not_allowed("WebAuthn requires a secure context"sv);
 +
++    // Let effectiveDomain be the callerOrigin’s effective domain. If effective domain is not a valid domain, then throw
++    // a "SecurityError" DOMException.
++    // NB: This process doesn't follow document.domain, which only ever shortens the host to one of its registrable
++    //     suffixes, so the host allows every RP ID that the effective domain does.
 +    auto const& host = context.origin.host();
 +    if (!host.is_domain() || host.is_empty_host())
 +        return security_error("The caller's origin has no valid domain"sv);
 +
++    // If the RP ID is not a registrable domain suffix of and is not equal to effectiveDomain, throw a "SecurityError"
++    // DOMException.
 +    auto rp_id_host = URL::Parser::parse_host(rp_id);
 +    if (rp_id.is_empty() || !rp_id_host.has_value() || !rp_id_host->is_a_registrable_domain_suffix_of_or_is_equal_to(host))
 +        return security_error("The RP ID is not a registrable domain suffix of the caller's domain"sv);
@@ -2304,7 +2461,7 @@ index 3c1f3794064987bb71359bbe2f28811e5d211bfd..204163c4bb2e34ef843d0b7172b61dc7
  {
      if (view().on_cancel_geolocation_position_request)
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 8e51b68e32f9e6e9de9bb7d642fb7343fd531b42..b92047f37effb658dfe85f4f9cf8a6315d1a7632 100644
+index b4e7db730e5a5a45f2a5ad0240cc54f2a3dbfcc6..e931b7fabe982ba62d094bda11d707c5a9adb678 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
 @@ -27,6 +27,7 @@
@@ -2315,18 +2472,20 @@ index 8e51b68e32f9e6e9de9bb7d642fb7343fd531b42..b92047f37effb658dfe85f4f9cf8a631
  #include <WebContent/WebContentClientEndpoint.h>
  #include <WebContent/WebContentServerEndpoint.h>
  #include <WebContent/WebContentTestClientEndpoint.h>
-@@ -181,6 +182,7 @@ public:
+@@ -182,6 +183,9 @@ public:
      Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
  
  private:
++    // The caller of a WebAuthn ceremony, from this process's records of the documents a page hosts, or the error to
++    // answer the renderer with.
 +    ErrorOr<WebAuthnCoordinator::CeremonyContext, Web::WebAuthn::Error> web_authn_ceremony_context(StringView message_name, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::PermissionsPolicy::PolicyControlledFeature, String const& rp_id);
      void relay_finished_input_event(WebContentPage const& reporting_page, u64 event_id, Web::EventResult);
      Optional<CanonicalNavigable&> population_worker_navigable(Web::HTML::CrossProcessId navigable_id) const;
      bool holds_container_of(CanonicalNavigable const& child_frame, StringView message_name);
-@@ -288,6 +290,9 @@ private:
-     virtual void did_start_geolocation_position_watch(u64 request_id, Web::HTML::CrossProcessId document_id) override;
-     virtual void did_stop_geolocation_position_watch(u64 request_id) override;
-     virtual void did_request_permission(u64 request_id, Web::HTML::CrossProcessId document_id, Utf16String name) override;
+@@ -297,6 +301,9 @@ private:
+     virtual void did_request_click_notification_for_testing(u64 notification_id) override;
+     virtual void did_request_click_notification_by_id_for_testing(u64 browser_notification_id) override;
+     virtual void did_request_dismiss_notification_for_testing(u64 notification_id) override;
 +    virtual void did_request_web_authn_create(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest request) override;
 +    virtual void did_request_web_authn_get(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::GetRequest request) override;
 +    virtual void did_cancel_web_authn_request(u64 request_id) override;
@@ -2334,11 +2493,11 @@ index 8e51b68e32f9e6e9de9bb7d642fb7343fd531b42..b92047f37effb658dfe85f4f9cf8a631
      virtual void did_finish_handling_input_event(u64 event_id, Web::EventResult event_result) override;
      virtual void did_update_input_method_state(Optional<Web::DevicePixelRect> caret_rect, bool is_enabled, i32 cursor_position, i32 anchor_position, Utf16String text_before_cursor, Utf16String text_after_cursor) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index a04f78ed5de0e63c6a11440e6c3a12385010c16a..772a85b106d1b6eed745cf888f51dc03d72593ea 100644
+index f6bbe75fedd8477c1910f771cf43c4364ba49906..e33a3b87e9f7b3b27b046453cc2df1eb51bd13bf 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3289,6 +3289,12 @@ void ConnectionFromClient::permission_request_completed(Web::PageId page_id, u64
-         page->permission_request_completed(request_id, state);
+@@ -3339,6 +3339,12 @@ void ConnectionFromClient::notification_closed(Web::PageId page_id, u64 notifica
+         page->page().notification_closed(notification_id, by_user);
  }
  
 +void ConnectionFromClient::web_authn_request_completed(Web::PageId page_id, u64 request_id, Web::WebAuthn::Result result)
@@ -2351,23 +2510,23 @@ index a04f78ed5de0e63c6a11440e6c3a12385010c16a..772a85b106d1b6eed745cf888f51dc03
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index bdeee9b78865bac3cf9e9aa61b2ebd857e312786..dc0e0fcd9e3ef48fceae7a5627e6c1ea177cca85 100644
+index 341ee89d3d9c6273c5d6f25baeef7cc2f20a7383..6247d293b580a00eee26c0620a8ff07ba6a5dcd1 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -262,6 +262,7 @@ private:
-     virtual void set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData, Optional<u16> error_code) override;
-     virtual void geolocation_position_response(Web::PageId page_id, u64 request_id, WebView::GeolocationPositionData, Optional<u16> error_code) override;
-     virtual void permission_request_completed(Web::PageId page_id, u64 request_id, Web::Permissions::EffectiveState state) override;
+@@ -268,6 +268,7 @@ private:
+     virtual void notification_show_failed(Web::PageId page_id, u64 notification_id) override;
+     virtual void notification_clicked(Web::PageId page_id, u64 notification_id) override;
+     virtual void notification_closed(Web::PageId page_id, u64 notification_id, bool by_user) override;
 +    virtual void web_authn_request_completed(Web::PageId page_id, u64 request_id, Web::WebAuthn::Result result) override;
      virtual void set_has_focus(Web::PageId page_id, bool) override;
      virtual void set_focused_navigable(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id) override;
      virtual void consume_user_activation(Web::PageId page_id, Web::HTML::UserActivationConsumption) override;
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 08e582b0efe3edb730b1cde09a793857c6f64cbb..1158ed8d330891bd05eb55e4706c4f1861ee95bc 100644
+index 032a960cf4cc1e0b2701b09be03f1231a860034c..21ca01fc27b77a085f178f0193c882bddc9be901 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -1307,6 +1307,28 @@ void PageClient::page_did_request_permission(u64 request_id, Web::HTML::CrossPro
-     client().async_did_request_permission(m_id, request_id, requesting_document_id, name);
+@@ -1367,6 +1367,28 @@ void PageClient::page_did_request_dismiss_notification_for_testing(u64 notificat
+     client().async_did_request_dismiss_notification_for_testing(m_id, notification_id);
  }
  
 +bool PageClient::page_did_request_web_authn_create(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest const& request)
@@ -2396,10 +2555,10 @@ index 08e582b0efe3edb730b1cde09a793857c6f64cbb..1158ed8d330891bd05eb55e4706c4f18
  {
      auto response = client().send_sync_but_allow_failure<Messages::WebContentClient::DidRequestPermissionSnapshot>(m_id, top_level_origin);
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index ba52ef758c14731b86b4648f43f2c8cce0ee8143..f0f52761ac3b5586aaf1147af4164bd4230665d7 100644
+index c0f5b75adcbea69ef725778adb33a56c3decf7d4..9d4c0f78d82519f132549be88852da448c0dd64f 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
-@@ -112,6 +112,7 @@ public:
+@@ -113,6 +113,7 @@ public:
      void set_geolocation_emulated_position(WebView::GeolocationPositionData const&, Optional<u16> error_code);
      void geolocation_position_response(u64 request_id, WebView::GeolocationPositionData const&, Optional<u16> error_code);
      void permission_request_completed(u64 request_id, Web::Permissions::EffectiveState);
@@ -2407,10 +2566,10 @@ index ba52ef758c14731b86b4648f43f2c8cce0ee8143..f0f52761ac3b5586aaf1147af4164bd4
      Optional<URL::URL> generate_text_fragment_url(u64 generation_id);
  
      void alert_closed();
-@@ -363,6 +364,9 @@ private:
-     virtual void page_did_set_next_permission_prompt_outcome_for_testing(String const& name, String const& outcome, bool held) override;
-     virtual void page_did_release_held_permission_prompt_for_testing(u32 waiters) override;
-     virtual Optional<Web::Permissions::PermissionSnapshot> page_did_advance_permission_clock_for_testing(u64 milliseconds) override;
+@@ -380,6 +381,9 @@ private:
+     virtual void page_did_request_click_notification_for_testing(u64 notification_id) override;
+     virtual void page_did_request_click_notification_by_id_for_testing(u64 browser_notification_id) override;
+     virtual void page_did_request_dismiss_notification_for_testing(u64 notification_id) override;
 +    virtual bool page_did_request_web_authn_create(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest const&) override;
 +    virtual bool page_did_request_web_authn_get(u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::GetRequest const&) override;
 +    virtual void page_did_cancel_web_authn_request(u64 request_id) override;
@@ -2418,10 +2577,10 @@ index ba52ef758c14731b86b4648f43f2c8cce0ee8143..f0f52761ac3b5586aaf1147af4164bd4
      virtual void page_did_set_test_timeout(double milliseconds) override;
      virtual void page_did_receive_reference_test_metadata(JsonValue) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index 9392957737852d8a52e7cd74258744269f47d1d9..7aadc115473ad4347354b5eee7411b3471366ef2 100644
+index 4ca6a8055fcab15c577359ca577b39243ac8b1e8..58bdbdaf90fd972e54422d335fe09541bd5aa2d3 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
-@@ -66,6 +66,7 @@
+@@ -67,6 +67,7 @@
  #include <LibWebCommon/StorageAPI/StorageAreaId.h>
  #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
  #include <LibWebCommon/WebDriver/Response.h>
@@ -2429,10 +2588,10 @@ index 9392957737852d8a52e7cd74258744269f47d1d9..7aadc115473ad4347354b5eee7411b34
  #include <LibWebCommon/WebView/AccessibilityNodeData.h>
  #include <LibWebCommon/WebView/Attribute.h>
  #include <LibWebCommon/WebView/ConsoleOutput.h>
-@@ -244,6 +245,9 @@ endpoint WebContentClient routed by Web::PageId page_id
-     did_stop_geolocation_position_watch(Web::PageId page_id, u64 request_id) =|
-     did_request_permission(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId document_id, Utf16String name) =|
-     [NotRouted] did_request_permission_snapshot(Web::PageId page_id, URL::Origin top_level_origin) => (Web::Permissions::PermissionSnapshot snapshot)
+@@ -254,6 +255,9 @@ endpoint WebContentClient routed by Web::PageId page_id
+     did_request_click_notification_for_testing(Web::PageId page_id, u64 notification_id) =|
+     did_request_click_notification_by_id_for_testing(Web::PageId page_id, u64 browser_notification_id) =|
+     did_request_dismiss_notification_for_testing(Web::PageId page_id, u64 notification_id) =|
 +    did_request_web_authn_create(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::CreateRequest request) =|
 +    did_request_web_authn_get(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::WebAuthn::GetRequest request) =|
 +    did_cancel_web_authn_request(Web::PageId page_id, u64 request_id) =|
@@ -2440,7 +2599,7 @@ index 9392957737852d8a52e7cd74258744269f47d1d9..7aadc115473ad4347354b5eee7411b34
      did_request_select_dropdown(Web::PageId page_id, Web::HTML::CrossProcessId local_root_id, Gfx::IntPoint content_position, i32 minimum_width, Vector<Web::HTML::SelectItem> items) =|
      did_finish_handling_input_event(Web::PageId page_id, u64 event_id, Web::EventResult event_result) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index dbfd98b973af4e24791b29cf74ee39536de18edc..ddc4847c7de1338b3d30961e211f452674a2f93d 100644
+index 1f926a4d04805d2eb01c9bca423288564b09f480..10973dbece1bd850ba3a85a05a53a58318c01560 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -59,6 +59,7 @@
@@ -2451,19 +2610,19 @@ index dbfd98b973af4e24791b29cf74ee39536de18edc..ddc4847c7de1338b3d30961e211f4526
  #include <LibWebCommon/WebView/Attribute.h>
  #include <LibWebCommon/WebView/BrowsingBehavior.h>
  #include <LibWebCommon/WebView/DOMNodeProperties.h>
-@@ -270,6 +271,7 @@ endpoint WebContentServer routed by Web::PageId page_id
-     set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData position, Optional<u16> error_code) =|
-     geolocation_position_response(Web::PageId page_id, u64 request_id, WebView::GeolocationPositionData position, Optional<u16> error_code) =|
-     permission_request_completed(Web::PageId page_id, u64 request_id, Web::Permissions::EffectiveState state) =|
+@@ -276,6 +277,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     notification_show_failed(Web::PageId page_id, u64 notification_id) =|
+     notification_clicked(Web::PageId page_id, u64 notification_id) =|
+     notification_closed(Web::PageId page_id, u64 notification_id, bool by_user) =|
 +    web_authn_request_completed(Web::PageId page_id, u64 request_id, Web::WebAuthn::Result result) =|
      set_has_focus(Web::PageId page_id, bool has_focus) =|
      set_focused_navigable(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id) =|
      consume_user_activation(Web::PageId page_id, Web::HTML::UserActivationConsumption consumption) =|
 diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
-index 143ae874f8c5a6e1881673a6ad2e9a4dfbe5d155..8c2164c378ffc34171479a8ded8aaf6abcb2d0bf 100644
+index 1c86cf1b1e1a20eae0a9c08e8281b080827eaf38..6fc5bfa6771ecb9da700aa687b602648c4029f9e 100644
 --- a/Tests/LibWebView/CMakeLists.txt
 +++ b/Tests/LibWebView/CMakeLists.txt
-@@ -188,6 +188,7 @@ set(TEST_SOURCES
+@@ -202,6 +202,7 @@ set(TEST_SOURCES
      TestStorageAreaRegistry.cpp
      TestStorageJar.cpp
      TestTabPerformanceStats.cpp
@@ -2471,21 +2630,21 @@ index 143ae874f8c5a6e1881673a6ad2e9a4dfbe5d155..8c2164c378ffc34171479a8ded8aaf6a
      TestWebDriverBiDiNetwork.cpp
      TestWebViewURL.cpp
  )
-@@ -258,7 +259,7 @@ if (NOT WIN32)
+@@ -276,7 +277,7 @@ if (NOT WIN32)
  endif()
  
  target_sources(TestLibWebView PRIVATE ${TEST_SOURCES})
--target_link_libraries(TestLibWebView PRIVATE LibAudio LibCompositing LibDatabase LibGfx LibHTTP LibIPC LibRequests LibThreading LibURL LibWeb LibWebCommon LibWebView)
-+target_link_libraries(TestLibWebView PRIVATE LibAudio LibCompositing LibCrypto LibDatabase LibGfx LibHTTP LibIPC LibRequests LibThreading LibURL LibWeb LibWebCommon LibWebView)
+-target_link_libraries(TestLibWebView PRIVATE LibAudio LibCompositing LibDatabase LibGC LibGfx LibHTTP LibIPC LibRequests LibThreading LibURL LibWeb LibWebCommon LibWebView)
++target_link_libraries(TestLibWebView PRIVATE LibAudio LibCompositing LibCrypto LibDatabase LibGC LibGfx LibHTTP LibIPC LibRequests LibThreading LibURL LibWeb LibWebCommon LibWebView)
  
  if (APPLE)
      add_dependencies(TestLibWebView ProcessReaper)
 diff --git a/Tests/LibWebView/TestWebAuthn.cpp b/Tests/LibWebView/TestWebAuthn.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..06501017caca76439acbec684ba9a94cf2cb5297
+index 0000000000000000000000000000000000000000..0aca2f5892cdf20cd7ecb71f0014b947d1b05193
 --- /dev/null
 +++ b/Tests/LibWebView/TestWebAuthn.cpp
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,167 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -2556,6 +2715,7 @@ index 0000000000000000000000000000000000000000..06501017caca76439acbec684ba9a94c
 +    EXPECT_EQ(authenticator_data.attested_credential_data->aaguid, from_hex("97586fd09799a76401c200455099ef2a"sv));
 +    EXPECT_EQ(authenticator_data.serialize(), authenticator_data_bytes->value.get<ByteBuffer>());
 +
++    // Building the attestation object again gives the same bytes, in CTAP2 canonical order.
 +    auto none_statement = WebView::none_attestation_statement();
 +    EXPECT_EQ(WebView::encode_attestation_object("none"sv, none_statement, authenticator_data_bytes->value.get<ByteBuffer>()), attestation_object);
 +}
@@ -2570,11 +2730,13 @@ index 0000000000000000000000000000000000000000..06501017caca76439acbec684ba9a94c
 +    EXPECT_EQ(public_key.algorithm, WebView::COSE_ALGORITHM_ES256);
 +    EXPECT(public_key.subject_public_key_info.has_value());
 +
++    // The SubjectPublicKeyInfo holds the uncompressed point.
 +    Crypto::ASN1::Decoder decoder { *public_key.subject_public_key_info };
 +    auto subject_public_key = TRY_OR_FAIL(Crypto::Certificate::parse_subject_public_key_info(decoder));
 +    auto expected_point = from_hex("04a1c47c1d82da4ebe82cd72207102b380670701993bc35398ae2e5726427fe01d86c1080d82987028c7f54ecb1b01185de243b359294a0ed210cd47480f0adc88"sv);
 +    EXPECT_EQ(subject_public_key.raw_key, expected_point);
 +
++    // A key of an algorithm getPublicKey() doesn't support has no SubjectPublicKeyInfo.
 +    WebView::CBOR::Encoder encoder;
 +    encoder.begin_map(2);
 +    encoder.write_integer(1);
@@ -2624,6 +2786,7 @@ index 0000000000000000000000000000000000000000..06501017caca76439acbec684ba9a94c
 +
 +TEST_CASE(cbor_rejects_malformed_input)
 +{
++    // Truncated byte string, indefinite length, trailing data, and nesting deeper than any authenticator needs.
 +    EXPECT(is_malformed("4401"sv));
 +    EXPECT(is_malformed("5f4101ff"sv));
 +    EXPECT(is_malformed("0000"sv));
@@ -2633,6 +2796,7 @@ index 0000000000000000000000000000000000000000..06501017caca76439acbec684ba9a94c
 +    deep.append(0x00);
 +    EXPECT(WebView::CBOR::decode(deep).is_error());
 +
++    // A map claiming more entries than there are bytes.
 +    EXPECT(is_malformed("bb7fffffffffffffff"sv));
 +}
 +

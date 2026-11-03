@@ -28,10 +28,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/Libraries/LibWebView/WebAuthn/Coordinator.cpp b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
-index 6b70cf717f0d632dd1b4789003f660a4c1bc7c0f..3d8b45e97578fd8de4d5bccff48fdb14acb9661c 100644
+index 58a5f51d3053c782ffa546c2072a821e048ce014..2377eb49f6bca84432652b60b5ed384f91824a1c 100644
 --- a/Libraries/LibWebView/WebAuthn/Coordinator.cpp
 +++ b/Libraries/LibWebView/WebAuthn/Coordinator.cpp
-@@ -52,6 +52,7 @@ public:
+@@ -53,6 +53,7 @@ public:
      WebContentPage* page() const { return m_page.ptr(); }
      u64 request_id() const { return m_request_id; }
      bool is_create() const { return m_request.has<CreateRequest>(); }
@@ -39,7 +39,7 @@ index 6b70cf717f0d632dd1b4789003f660a4c1bc7c0f..3d8b45e97578fd8de4d5bccff48fdb14
  
      ViewImplementation* view() const
      {
-@@ -814,9 +815,13 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
+@@ -878,9 +879,13 @@ void WebAuthnCoordinator::begin(WebContentPage& page, u64 request_id, CeremonyCo
          }
      }
  

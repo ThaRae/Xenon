@@ -28,39 +28,42 @@ synchronous one of a discarded frame included.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .../Platform/RemoteImageCodecPlugin.cpp       |  84 ++++++++++--
- .../LibWeb/Platform/RemoteImageCodecPlugin.h  |  14 ++
- Libraries/LibWebView/Application.cpp          |   9 --
+ .../Platform/RemoteImageCodecPlugin.cpp       |  93 ++++++++++--
+ .../LibWeb/Platform/RemoteImageCodecPlugin.h  |  19 +++
+ Libraries/LibWebView/Application.cpp          |  10 +-
  Libraries/LibWebView/Application.h            |   3 -
- Libraries/LibWebView/HelperProcess.cpp        |  38 +++---
- Libraries/LibWebView/HelperProcess.h          |  13 +-
+ Libraries/LibWebView/HelperProcess.cpp        |  38 ++---
+ Libraries/LibWebView/HelperProcess.h          |  15 +-
  Libraries/LibWebView/WebContentClient.cpp     |  10 ++
  Libraries/LibWebView/WebContentClient.h       |   1 +
  Libraries/LibWebView/WebWorkerClient.cpp      |  10 ++
  Libraries/LibWebView/WebWorkerClient.h        |   1 +
  Libraries/LibWebView/WorkerProcessManager.cpp |   3 -
  Services/WebContent/ConnectionFromClient.cpp  |   7 +-
- Services/WebContent/ConnectionFromClient.h    |   3 +-
+ Services/WebContent/ConnectionFromClient.h    |   4 +-
  Services/WebContent/WebContentClient.ipc      |   1 +
  Services/WebContent/WebContentServer.ipc      |   1 -
- Services/WebContent/main.cpp                  |   7 +
+ Services/WebContent/main.cpp                  |   9 ++
  Services/WebWorker/ConnectionFromClient.cpp   |   7 +-
- Services/WebWorker/ConnectionFromClient.h     |   3 +-
+ Services/WebWorker/ConnectionFromClient.h     |   4 +-
  Services/WebWorker/WebWorkerClient.ipc        |   1 +
  Services/WebWorker/WebWorkerServer.ipc        |   1 -
  Services/WebWorker/main.cpp                   |   7 +
- .../LibWebView/TestImageDecoderIsolation.cpp  | 125 +++++++++++++++---
- .../LibWebView/test-webdriver-crash-report.py |  16 +++
- 23 files changed, 278 insertions(+), 87 deletions(-)
+ .../LibWebView/TestImageDecoderIsolation.cpp  | 138 +++++++++++++++---
+ .../LibWebView/test-webdriver-crash-report.py |  17 +++
+ 23 files changed, 313 insertions(+), 87 deletions(-)
 
 diff --git a/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp b/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp
-index adacd0fb3c33832726eafb58e59ba8425e725053..0ec879502fb8a424c038dadf3705d18a40bfe1eb 100644
+index adacd0fb3c33832726eafb58e59ba8425e725053..d7033b66aca939aad4a859b22c22f0b29d07fdeb 100644
 --- a/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp
 +++ b/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.cpp
-@@ -11,12 +11,21 @@
+@@ -11,12 +11,24 @@
  
  namespace Web::Platform {
  
++// A decoder is a process of its own with an IPC connection. An image's frames are all decoded within a moment of the
++// page asking for it, so a decoder that has had nothing to do for this long is closed, and the next image starts a new
++// one, which costs that image the decoder's startup.
 +static constexpr auto IDLE_TIMEOUT = AK::Duration::from_seconds(15);
 +
 +RemoteImageCodecPlugin::RemoteImageCodecPlugin() = default;
@@ -79,10 +82,11 @@ index adacd0fb3c33832726eafb58e59ba8425e725053..0ec879502fb8a424c038dadf3705d18a
  void RemoteImageCodecPlugin::set_client(NonnullRefPtr<ImageDecoderClient::Client> client)
  {
      m_client = move(client);
-@@ -27,14 +36,18 @@ void RemoteImageCodecPlugin::setup_client_callbacks()
+@@ -27,14 +39,19 @@ void RemoteImageCodecPlugin::setup_client_callbacks()
  {
      m_client->on_death = [this] {
          m_client = nullptr;
++        // The sessions were the dead decoder's, so no decoder can send their frames.
 +        m_decoder_session_ids.clear();
 +        m_session_ids_by_decoder_session_id.clear();
      };
@@ -104,7 +108,7 @@ index adacd0fb3c33832726eafb58e59ba8425e725053..0ec879502fb8a424c038dadf3705d18a
      };
  }
  
-@@ -48,29 +61,42 @@ NonnullRefPtr<Core::Promise<DecodedImage>> RemoteImageCodecPlugin::decode_image(
+@@ -48,29 +65,42 @@ NonnullRefPtr<Core::Promise<DecodedImage>> RemoteImageCodecPlugin::decode_image(
      if (on_rejected)
          promise->on_rejection = move(on_rejected);
  
@@ -150,10 +154,11 @@ index adacd0fb3c33832726eafb58e59ba8425e725053..0ec879502fb8a424c038dadf3705d18a
              promise->reject(Error::copy(error));
          });
  
-@@ -79,22 +105,54 @@ NonnullRefPtr<Core::Promise<DecodedImage>> RemoteImageCodecPlugin::decode_image(
+@@ -79,22 +109,59 @@ NonnullRefPtr<Core::Promise<DecodedImage>> RemoteImageCodecPlugin::decode_image(
  
  ErrorOr<DecodedFirstFrame> RemoteImageCodecPlugin::decode_first_frame_synchronously(ReadonlyBytes bytes)
  {
++    // NB: The decoder that decoded the frame may have gone idle and closed since.
 +    if (!m_client && m_client_needed_handler)
 +        m_client_needed_handler();
      if (!m_client)
@@ -194,6 +199,8 @@ index adacd0fb3c33832726eafb58e59ba8425e725053..0ec879502fb8a424c038dadf3705d18a
 +
 +void RemoteImageCodecPlugin::maybe_start_idle_timer()
 +{
++    // Without a way to get a new decoder, a client that is dropped can never be replaced, so the eager embedders
++    // (Android) keep theirs for the life of the process.
 +    if (!m_client_needed_handler || !m_client || m_pending_decodes > 0 || !m_decoder_session_ids.is_empty())
 +        return;
 +
@@ -201,6 +208,8 @@ index adacd0fb3c33832726eafb58e59ba8425e725053..0ec879502fb8a424c038dadf3705d18a
 +        m_idle_timer = Core::Timer::create_single_shot(IDLE_TIMEOUT, [this] {
 +            if (!m_client || m_pending_decodes > 0 || !m_decoder_session_ids.is_empty())
 +                return;
++            // Dropping the client closes the decoder's transport, and it exits once it has no client. The next image
++            // asks the Browser for a new one. Should the old client still be told of its death, it's no longer ours.
 +            m_client->on_death = nullptr;
 +            m_client = nullptr;
 +        });
@@ -210,7 +219,7 @@ index adacd0fb3c33832726eafb58e59ba8425e725053..0ec879502fb8a424c038dadf3705d18a
  
  }
 diff --git a/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.h b/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.h
-index ae1e2a98b33ae1a6153dc57bfea48159dafd5b8e..20153a8d3a3e448f8fb121772d7f3d073031f276 100644
+index ae1e2a98b33ae1a6153dc57bfea48159dafd5b8e..d9caf3d239db570d685ad228f16b744542c40f2a 100644
 --- a/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.h
 +++ b/Libraries/LibWeb/Platform/RemoteImageCodecPlugin.h
 @@ -7,7 +7,9 @@
@@ -231,10 +240,12 @@ index ae1e2a98b33ae1a6153dc57bfea48159dafd5b8e..20153a8d3a3e448f8fb121772d7f3d07
      explicit RemoteImageCodecPlugin(NonnullRefPtr<ImageDecoderClient::Client>);
      virtual ~RemoteImageCodecPlugin() override;
  
-@@ -28,12 +31,23 @@ public:
+@@ -28,12 +31,28 @@ public:
      virtual void request_animation_frames(i64 session_id, u32 start_frame_index, u32 count) override;
      virtual void stop_animation_decode(i64 session_id) override;
  
++    // A process that installs this without a client uses this to get one when an image needs decoding. It must
++    // install a client before it returns, or the image fails to decode.
 +    void set_client_needed_handler(Function<void()> handler);
 +
      void set_client(NonnullRefPtr<ImageDecoderClient::Client>);
@@ -249,6 +260,9 @@ index ae1e2a98b33ae1a6153dc57bfea48159dafd5b8e..20153a8d3a3e448f8fb121772d7f3d07
 +    RefPtr<Core::Timer> m_idle_timer;
 +    size_t m_pending_decodes { 0 };
 +
++    // Each decoder numbers its animation sessions from 1, so the session IDs handed out here are this plugin's own,
++    // mapped to the decoder's. That way the sessions of a decoder that died can be forgotten without their IDs ever
++    // naming a new decoder's sessions.
 +    HashMap<i64, i64> m_decoder_session_ids;
 +    HashMap<i64, i64> m_session_ids_by_decoder_session_id;
 +    i64 m_next_session_id { 1 };
@@ -256,10 +270,10 @@ index ae1e2a98b33ae1a6153dc57bfea48159dafd5b8e..20153a8d3a3e448f8fb121772d7f3d07
  
  }
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index ed3c2c57091c05811d390b2de9d2f95748118805..293a498ed8b5db33f3fffd43ffee5694ee824fd2 100644
+index 9b708cbff3a67dbd4ef92da3f962961ce2b6b758..c41ae2100d6da5b6745737fda19de090300f29a1 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -1257,7 +1257,6 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1270,7 +1270,6 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
  {
      // The client's WebContentClient picks up this same session when it is created.
      auto session = session_for_new_view(is_private);
@@ -267,7 +281,7 @@ index ed3c2c57091c05811d390b2de9d2f95748118805..293a498ed8b5db33f3fffd43ffee5694
  
      auto cross_process_id_allocator = allocate_cross_process_id_allocator();
      auto root_navigable_id = navigable_to_adopt.has_value() ? *navigable_to_adopt : cross_process_id_allocator.allocate();
-@@ -1294,7 +1293,6 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1307,7 +1306,6 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
          client->async_set_user_scripts_enabled(true);
      if (m_navigation_event_handler)
          client->async_set_navigation_events_enabled(true);
@@ -275,7 +289,7 @@ index ed3c2c57091c05811d390b2de9d2f95748118805..293a498ed8b5db33f3fffd43ffee5694
  
      // NB: A WebDriver BiDi session gives its state to every process hosting web content when it changes.
      if (auto* webdriver_bidi = WebDriverBiDi::the(); webdriver_bidi && webdriver_bidi->session_state().is_active)
-@@ -2300,11 +2298,6 @@ void Application::configure_request_server_control_client(Requests::RequestContr
+@@ -2315,11 +2313,6 @@ void Application::configure_request_server_control_client(Requests::RequestContr
      TabPerformanceMonitor::configure(control_client);
  }
  
@@ -287,20 +301,21 @@ index ed3c2c57091c05811d390b2de9d2f95748118805..293a498ed8b5db33f3fffd43ffee5694
  ErrorOr<void> Application::launch_devtools_server()
  {
      VERIFY(!m_devtools);
-@@ -2501,8 +2494,6 @@ void Application::process_did_exit(Process&& process, Optional<int>)
+@@ -2519,8 +2512,7 @@ void Application::process_did_exit(Process&& process, Optional<int>)
          }
          break;
      case ProcessType::ImageDecoder:
 -        if (auto handler = m_image_decoder_exit_handlers.take(process.child_id()); handler.has_value())
 -            (*handler)();
++        // Its renderer or worker asks for a new one when it next decodes an image.
          break;
      case ProcessType::MediaServer:
          // The connection's holder launches a new MediaServer when it next connects a client.
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 61ba80b93c4dba4dbc4e7a9f2540aecd7b8287c4..76b506d9546f0a190119bc265e582dce97ba4d2b 100644
+index 5f1e7c611cbca1bc659c6a16296db772165f2fc3..5f7b05114f18be55dbbd3e84ce12d37d65770ecf 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -250,8 +250,6 @@ public:
+@@ -273,8 +273,6 @@ public:
      static IPC::HandleBrokerServer& handle_broker_server() { return *the().m_handle_broker_server; }
  #endif
  
@@ -309,7 +324,7 @@ index 61ba80b93c4dba4dbc4e7a9f2540aecd7b8287c4..76b506d9546f0a190119bc265e582dce
  #if defined(AK_OS_MACOS)
      static IPC::TransportBootstrapMachServer& transport_bootstrap_server() { return the().m_transport_bootstrap_server; }
      void set_browser_process_transport_handler(Function<void(NonnullOwnPtr<IPC::Transport>)> handler);
-@@ -682,7 +680,6 @@ private:
+@@ -711,7 +709,6 @@ private:
      WebDriverSessionConfig m_webdriver_session_config;
  
      OwnPtr<RequestServerManager> m_request_server_manager;
@@ -383,10 +398,10 @@ index 5667428a736188a967c065a4687ad007cada96b3..abbc235a7bb53696daa8281930acc635
  
  ErrorOr<NonnullRefPtr<AudioServerControlClient>> launch_audio_server_process(u64 owner_child_id)
 diff --git a/Libraries/LibWebView/HelperProcess.h b/Libraries/LibWebView/HelperProcess.h
-index 0636ad4615b7d252a54fde233e42088785e75274..99425f87f800150b8af25332d643ba75afdd29a8 100644
+index 0636ad4615b7d252a54fde233e42088785e75274..efa44e3a62e78e893651f080144b7ab7fb986a77 100644
 --- a/Libraries/LibWebView/HelperProcess.h
 +++ b/Libraries/LibWebView/HelperProcess.h
-@@ -36,17 +36,8 @@ WEBVIEW_API ErrorOr<NonnullRefPtr<WebView::WebWorkerClient>> launch_web_worker_p
+@@ -36,17 +36,10 @@ WEBVIEW_API ErrorOr<NonnullRefPtr<WebView::WebWorkerClient>> launch_web_worker_p
  WEBVIEW_API ErrorOr<NonnullRefPtr<Requests::RequestControlClient>> launch_request_server_process(ByteString const& cache_path, Optional<Utf16String> const& site, bool sites_have_their_own, HTTPDiskCacheMode);
  WEBVIEW_API void apply_dns_settings(Requests::RequestControlClient&);
  
@@ -401,16 +416,18 @@ index 0636ad4615b7d252a54fde233e42088785e75274..99425f87f800150b8af25332d643ba75
 -// Hands the client its ImageDecoder. If that decoder dies while the client is still connected, the client gets a new one.
 -WEBVIEW_API void connect_to_image_decoder(WebContentClient&, ImageDecoderConnection);
 -WEBVIEW_API void connect_to_image_decoder(WebWorkerClient&, ImageDecoderConnection);
++// Launches an ImageDecoder for the given renderer or worker, when it first needs to decode an image, and gives it a
++// transport to talk to it over. Each decoder serves that one client.
 +WEBVIEW_API ErrorOr<IPC::TransportHandle> launch_image_decoder_for_client(WebContentClient&);
 +WEBVIEW_API ErrorOr<IPC::TransportHandle> launch_image_decoder_for_client(WebWorkerClient&);
  
  struct RequestServerClientConnection {
      IPC::TransportHandle handle;
 diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
-index 79ca2cbf65b1ccf427f3be7f1e57711eba651938..c9b7cc23af4f51d52029e2d7ad7436ac52543132 100644
+index fe4f313be7f5afb57e4197e732882bf7dff27f87..84387ddcb30592bfa2975aa127317fe3ad60764d 100644
 --- a/Libraries/LibWebView/WebContentClient.cpp
 +++ b/Libraries/LibWebView/WebContentClient.cpp
-@@ -1123,6 +1123,16 @@ ErrorOr<void> WebContentClient::tell_audio_server_of_playback_authorization(Audi
+@@ -1132,6 +1132,16 @@ ErrorOr<void> WebContentClient::tell_audio_server_of_playback_authorization(Audi
      return {};
  }
  
@@ -428,10 +445,10 @@ index 79ca2cbf65b1ccf427f3be7f1e57711eba651938..c9b7cc23af4f51d52029e2d7ad7436ac
  {
      auto handle = connect_audio_server_client();
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index 608e5f6bf30462c98ea52237d6e519f995b940d8..4b6afc08146b738df6ba9300cef9c6f0f20a6e67 100644
+index a35431efb3bd9bb19f36a6e0f1cb214b0448eb4d..a7861d773e595ec1f625fbb692903902c0d440a6 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
-@@ -235,6 +235,7 @@ private:
+@@ -238,6 +238,7 @@ private:
      virtual Messages::WebContentClient::DidLoseRequestServerConnectionResponse did_lose_request_server_connection(Optional<Utf16String> top_level_site) override;
      virtual Messages::WebContentClient::RequestMediaServerConnectionResponse request_media_server_connection() override;
      virtual Messages::WebContentClient::RequestAudioServerConnectionResponse request_audio_server_connection() override;
@@ -473,10 +490,10 @@ index 6727d5c3e5016da8824d44943ddcded4e18b5f40..25a50d37e8ea9808636ed4b7d3a95633
      virtual Messages::WebWorkerClient::StartWorkerAgentResponse start_worker_agent(Web::HTML::WorkerAgentStartRequest request) override;
      virtual void close_worker_agent(Web::HTML::WorkerAgentId, Web::HTML::WorkerAgentOwnerToken) override;
 diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
-index 4a8529e107f99cd9f9fa2a8b4894a61a02ab40c0..5f57a66ed80c1a684d31b4533710156a95c50b9d 100644
+index 938ca8a6fcb37d312469779dafeb21d8ef3266da..34fbf8b3bc61c5f80d81ba5f994ef406753bbfd1 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.cpp
 +++ b/Libraries/LibWebView/WorkerProcessManager.cpp
-@@ -208,8 +208,6 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
+@@ -211,8 +211,6 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
                  client->request_server_site_bindings().bind_sites_of(web_worker_owner.client->request_server_site_bindings());
              });
  
@@ -485,7 +502,7 @@ index 4a8529e107f99cd9f9fa2a8b4894a61a02ab40c0..5f57a66ed80c1a684d31b4533710156a
          // The worker's requests go through the RequestServers of its owner's sites.
          TRY(client->request_server_site_bindings().connect(*session));
          client->async_set_site_compatibility_data(Application::the().site_compatibility_data());
-@@ -223,7 +221,6 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
+@@ -226,7 +224,6 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
          client->async_set_navigator_compatibility_mode(Application::the().navigator_compatibility_mode());
          client->async_set_preferred_languages(Application::settings().languages());
          client->async_set_enable_fingerprinting_protection(Application::the().fingerprinting_protection_enabled(), Application::the().fingerprinting_session_secret());
@@ -494,7 +511,7 @@ index 4a8529e107f99cd9f9fa2a8b4894a61a02ab40c0..5f57a66ed80c1a684d31b4533710156a
          if (auto compositor_handle = Application::the().connect_new_compositor_canvas_client(); !compositor_handle.is_error())
              client->async_connect_to_compositor(compositor_handle.release_value());
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index a1ae7cdd72411b0d85d2799b905d57d26490b079..04bd2b17bf8c22153169195cfbdfdc5523e0fd7b 100644
+index fcaaad360c7875e7b10fdb0760aa09497bdf6da1..fcb5b796bc33416dafdedb42c2dd7e93d892938c 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -453,10 +453,13 @@ void ConnectionFromClient::connect_to_web_ui(Web::PageId page_id, IPC::Transport
@@ -514,19 +531,20 @@ index a1ae7cdd72411b0d85d2799b905d57d26490b079..04bd2b17bf8c22153169195cfbdfdc55
  
  void ConnectionFromClient::connect_to_compositor_process(IPC::TransportHandle handle, IPC::TransportHandle render_clock_handle)
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 131d339c4181aab57f492d74de5a10c4680f5e9d..9f5f9346162b82e9c7cf881987a5fab7b0eb4825 100644
+index 16e126390d7be7dae5df59b723acaf7dbd64c2f2..b8ec0215edb53fe75129793a098b98541409733f 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -77,6 +77,8 @@ public:
+@@ -77,6 +77,9 @@ public:
      Function<void(IPC::TransportHandle const&, Optional<int> client_id, Optional<Utf16String> const& top_level_site)> on_request_server_connection;
      Function<void(IPC::TransportHandle const&)> on_image_decoder_connection;
  
++    // Asks the Browser to launch this process's ImageDecoder, if it has none, and to connect it to this process.
 +    void request_image_decoder();
 +
      // Asks the Browser to spawn this process's MediaServer if it has none, and to connect a client to it.
      ErrorOr<NonnullOwnPtr<IPC::Transport>> request_media_server_transport();
      ErrorOr<NonnullOwnPtr<IPC::Transport>> request_audio_server_transport();
-@@ -121,7 +123,6 @@ private:
+@@ -124,7 +127,6 @@ private:
      virtual void connect_to_web_ui(Web::PageId page_id, IPC::TransportHandle handle) override;
      virtual void connect_to_request_server(IPC::TransportHandle handle, int client_id, Optional<Utf16String> top_level_site) override;
      virtual void connect_to_test_endpoint(IPC::TransportHandle handle) override;
@@ -535,10 +553,10 @@ index 131d339c4181aab57f492d74de5a10c4680f5e9d..9f5f9346162b82e9c7cf881987a5fab7
      virtual void set_site_compatibility_data(JsonValue data) override;
      virtual void set_permission_snapshot(Web::Permissions::PermissionSnapshot snapshot) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index 485b3cf4b0717e155c00a550accb0fe86f393b0d..227b8b45bb4fe96b1c5cc89a49a275f7f199ae5d 100644
+index 891924427220dfd2f9929fbba1a348cd194315a0..32ada113c6b380c50b2f23e17162d6d1b8a22be7 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
-@@ -205,6 +205,7 @@ endpoint WebContentClient routed by Web::PageId page_id
+@@ -206,6 +206,7 @@ endpoint WebContentClient routed by Web::PageId page_id
      did_lose_request_server_connection(Optional<Utf16String> top_level_site) => (Optional<IPC::TransportHandle> handle)
      request_media_server_connection() => (Optional<IPC::TransportHandle> handle)
      request_audio_server_connection() => (Optional<IPC::TransportHandle> handle)
@@ -547,7 +565,7 @@ index 485b3cf4b0717e155c00a550accb0fe86f393b0d..227b8b45bb4fe96b1c5cc89a49a275f7
  
      [NotRouted] did_request_storage_usage(Web::PageId page_id, Web::HTML::EnvironmentId environment_id) => (u64 usage)
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 4233363d73ee774c717ef01d96297b0fc873e787..bc352d9e60f6e1998654f30e0ec9b20da3b8fcd3 100644
+index 208ee874569333799ab29acd9a66a46f9e10e8b5..60ada44d338da6a14c9a395ccc32e8b93c7702c7 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -96,7 +96,6 @@ endpoint WebContentServer routed by Web::PageId page_id
@@ -559,13 +577,15 @@ index 4233363d73ee774c717ef01d96297b0fc873e787..bc352d9e60f6e1998654f30e0ec9b20d
      compositor_process_reconnected() =|
      set_site_compatibility_data(JsonValue data) =|
 diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
-index 6fe4414caec35b4181e4e44e93b4d1b7400340f0..028eea4e517f53ddbdbb4389abd387de93c7d13a 100644
+index 6fe4414caec35b4181e4e44e93b4d1b7400340f0..13b4062408703b6d0d60f428b43b1deaa8a81188 100644
 --- a/Services/WebContent/main.cpp
 +++ b/Services/WebContent/main.cpp
-@@ -312,6 +312,13 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -312,6 +312,15 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
              dbgln("Failed to connect to image decoder: {}", result.error());
      };
  
++    // A renderer decodes an image only if its page has one, so it asks the Browser for a decoder on the first decode
++    // rather than holding one from startup: a page of text or a cross-site frame never needs one at all.
 +    auto* connection = webcontent_client.ptr();
 +    auto& image_codec_plugin = *new Web::Platform::RemoteImageCodecPlugin();
 +    image_codec_plugin.set_client_needed_handler([connection] {
@@ -577,7 +597,7 @@ index 6fe4414caec35b4181e4e44e93b4d1b7400340f0..028eea4e517f53ddbdbb4389abd387de
          return webcontent_client->request_media_server_transport();
      });
 diff --git a/Services/WebWorker/ConnectionFromClient.cpp b/Services/WebWorker/ConnectionFromClient.cpp
-index 897e90ebdf4c9bc10b4e078483c026a866c1b1cd..d55e0344859c97c6107445bc2775c6ed06632c26 100644
+index 9af97bdd612f2dda8eb13a660e84308e1b1060f7..53b5c025487c59bb1964e7ee2d74653dff60ea54 100644
 --- a/Services/WebWorker/ConnectionFromClient.cpp
 +++ b/Services/WebWorker/ConnectionFromClient.cpp
 @@ -40,10 +40,13 @@ void ConnectionFromClient::simulate_request_server_connection_loss_and_reconnect
@@ -597,19 +617,20 @@ index 897e90ebdf4c9bc10b4e078483c026a866c1b1cd..d55e0344859c97c6107445bc2775c6ed
  
  ErrorOr<NonnullOwnPtr<IPC::Transport>> ConnectionFromClient::request_media_server_transport()
 diff --git a/Services/WebWorker/ConnectionFromClient.h b/Services/WebWorker/ConnectionFromClient.h
-index 39a303e7f7af17daf0c00a8ac2f482c8eae9260c..86ae40e4db2e35a01b581407cbc00340e3dddc17 100644
+index 39a303e7f7af17daf0c00a8ac2f482c8eae9260c..47122dc6b2c746c79e80921e98e1a60856593645 100644
 --- a/Services/WebWorker/ConnectionFromClient.h
 +++ b/Services/WebWorker/ConnectionFromClient.h
-@@ -47,6 +47,8 @@ public:
+@@ -47,6 +47,9 @@ public:
      Function<void(IPC::TransportHandle const&, Optional<int> client_id, Optional<Utf16String> const& top_level_site)> on_request_server_connection;
      Function<void(IPC::TransportHandle const&)> on_image_decoder_connection;
  
++    // Asks the Browser to launch this process's ImageDecoder, if it has none, and to connect it to this process.
 +    void request_image_decoder();
 +
      // Asks the Browser to spawn this process's MediaServer if it has none, and to connect a client to it.
      ErrorOr<NonnullOwnPtr<IPC::Transport>> request_media_server_transport();
  
-@@ -58,7 +60,6 @@ private:
+@@ -58,7 +61,6 @@ private:
  
      virtual void connect_to_request_server(IPC::TransportHandle handle, int client_id, Optional<Utf16String> top_level_site) override;
      virtual void simulate_request_server_connection_loss_and_reconnect_for_testing(IPC::TransportHandle replacement_handle, int client_id, Optional<Utf16String> top_level_site) override;
@@ -660,7 +681,7 @@ index 0a67011a7a3af1b1a0ac72d205265163066eb67c..b26162a2040be76a4a3dfef7995dd33f
          return client->request_media_server_transport();
      });
 diff --git a/Tests/LibWebView/TestImageDecoderIsolation.cpp b/Tests/LibWebView/TestImageDecoderIsolation.cpp
-index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d57867f4d00c 100644
+index 650050012e77f114b7937fda000b16766ba24107..4091119ffd96aa767a131113a96a56842710fe2f 100644
 --- a/Tests/LibWebView/TestImageDecoderIsolation.cpp
 +++ b/Tests/LibWebView/TestImageDecoderIsolation.cpp
 @@ -5,6 +5,7 @@
@@ -671,7 +692,7 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
  #include <AK/HashTable.h>
  #include <AK/LexicalPath.h>
  #include <LibCore/EventLoop.h>
-@@ -28,10 +29,11 @@ public:
+@@ -28,10 +29,12 @@ public:
      {
      }
  
@@ -680,14 +701,16 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
      {
          browser_options.headless_mode = WebView::HeadlessMode::Test;
          browser_options.disable_sql_database = WebView::DisableSQLDatabase::Yes;
++        // The pages discard their decoded images through internals.
 +        web_content_options.expose_internals_object = WebView::ExposeInternalsObject::Yes;
      }
  };
  
-@@ -45,10 +47,28 @@ HashTable<pid_t> processes_of_type(WebView::ProcessType type)
+@@ -45,10 +48,31 @@ HashTable<pid_t> processes_of_type(WebView::ProcessType type)
      return pids;
  }
  
++// The image decoders, by the child ID of the renderer each belongs to. A renderer never has more than one.
 +HashMap<u64, pid_t> image_decoders_by_renderer()
 +{
 +    HashTable<u64> renderers;
@@ -711,15 +734,18 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
  
  // An ImageDecoder parses untrusted images, so each renderer has one of its own, and never sees another's images. A
 -// decoder that crashes is replaced for its renderer alone.
++// renderer asks for its decoder when it first decodes an image, and a decoder that crashes is replaced for its renderer
++// alone, when that renderer next decodes one.
  
  TEST_CASE(image_decoder_isolation)
  {
-@@ -61,27 +81,98 @@ TEST_CASE(image_decoder_isolation)
+@@ -61,27 +85,107 @@ TEST_CASE(image_decoder_isolation)
  
      auto first_view = WebView::HeadlessWebView::create(theme, { 800, 600 });
      auto second_view = WebView::HeadlessWebView::create(theme, { 800, 600 });
 +    VERIFY(processes_of_type(WebView::ProcessType::WebContent).size() >= 2);
 +
++    // Wait out the initial about:blank loads; loading a page before they complete would drop it.
 +    size_t loads_finished = 0;
 +    first_view->on_load_finish = [&](auto const&) { ++loads_finished; };
 +    second_view->on_load_finish = [&](auto const&) { ++loads_finished; };
@@ -729,6 +755,7 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
 -    auto decoders = processes_of_type(WebView::ProcessType::ImageDecoder);
 -    VERIFY(renderers.size() >= 2);
 -    VERIFY(decoders.size() == renderers.size());
++    // A page without images never needs a decoder.
 +    VERIFY(processes_of_type(WebView::ProcessType::ImageDecoder).is_empty());
  
 -    auto crashed_decoder = *decoders.begin();
@@ -753,6 +780,8 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
 -    for (auto decoder : decoders) {
 -        if (decoder != crashed_decoder)
 -            VERIFY(decoders_after_crash.contains(decoder));
++    // A decode may reach the dead decoder before its renderer learns that it died, and fail, so the page tries until
++    // one works. The fragment makes each attempt a new image.
 +    auto decode_another_image = R"(
 +        (async () => {
 +            for (let attempt = 0; attempt < 100; ++attempt) {
@@ -771,6 +800,7 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
 +    second_view->run_javascript(decode_another_image);
 +    Core::EventLoop::current().spin_until([&] { return image_decoders_by_renderer().contains(crashed.key); });
 +
++    // The renderer whose decoder crashed has a new one, and the other kept its own.
 +    auto decoders_after_crash = image_decoders_by_renderer();
 +    VERIFY(decoders_after_crash.size() == 2);
 +    VERIFY(decoders_after_crash.get(crashed.key).value() != crashed.value);
@@ -780,6 +810,8 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
      }
  
 -    outln("PASS: each renderer has an image decoder of its own, which is replaced alone when it crashes");
++    // A frame that was discarded to save memory is decoded again when it is used, by a new decoder if the renderer's
++    // own has gone since, as one that crashed or went idle has.
 +    size_t discardable_images_loaded = 0;
 +    first_view->on_title_change = [&](Utf16String const& title) {
 +        if (title == "loaded"sv)
@@ -792,6 +824,7 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
 +    auto load_a_discardable_image = R"(
 +        (async () => {
 +            const source = document.createElement("canvas");
++            // NB: Only frames of at least 32 KiB can be discarded.
 +            source.width = 128;
 +            source.height = 64;
 +            source.getContext("2d").fillRect(0, 0, 128, 64);
@@ -810,6 +843,7 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
 +        TRY_OR_FAIL(Core::System::kill(decoder.value, SIGKILL));
 +    Core::EventLoop::current().spin_until([&] { return processes_of_type(WebView::ProcessType::ImageDecoder).is_empty(); });
 +
++    // A decode that reaches the dead decoder fails, and is tried again later, until the image gives up on it.
 +    auto draw_the_discarded_image = R"(
 +        (async () => {
 +            for (let attempt = 0; attempt < 100; ++attempt) {
@@ -829,14 +863,15 @@ index 650050012e77f114b7937fda000b16766ba24107..d4718f11d2603662496ac9fc2454d578
 +    outln("PASS: each renderer has an image decoder of its own, which is replaced alone when it is gone");
  }
 diff --git a/Tests/LibWebView/test-webdriver-crash-report.py b/Tests/LibWebView/test-webdriver-crash-report.py
-index 0742d08f0851358d491bc0f2eb1658f85ce484df..fd6f751eaee172558e4c68ecb7b0668d0133e1e6 100755
+index 664c487b3348b2ea5eb967c1ce2e67dfdd41e094..45b27570558fd1e0fc88271b2b06981ba4e8b3ff 100755
 --- a/Tests/LibWebView/test-webdriver-crash-report.py
 +++ b/Tests/LibWebView/test-webdriver-crash-report.py
-@@ -95,6 +95,22 @@ def run_test(webdriver_binary, process_name):
-                         },
-                     )
+@@ -108,6 +108,23 @@ def run_test(webdriver_binary, process_name):
                      assert status == 200 and payload == {"value": None}, body
+                 elif process_name == "Compositor":
+                     wait_for_compositor(port, session)
 +                elif process_name == "ImageDecoder":
++                    # A renderer launches its image decoder when it first decodes an image.
 +                    status, payload, body = webdriver_helpers.request(
 +                        port,
 +                        "POST",

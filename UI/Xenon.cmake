@@ -467,7 +467,7 @@ target_include_directories(TestXenonAllocatorRelease BEFORE PRIVATE ${XENON_SOUR
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestUserAgent.cpp" Xenon NAME TestXenonUserAgent LIBS LibWebView)
 target_include_directories(TestXenonUserAgent BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
-ladybird_test("${XENON_SOURCE_DIR}/Tests/TestContentBlockerMemory.cpp" Xenon NAME TestXenonContentBlockerMemory LIBS LibWebView LibWeb LibURL)
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestContentBlockerMemory.cpp" Xenon NAME TestXenonContentBlockerMemory LIBS LibWebView LibWeb LibURL LibGC)
 target_include_directories(TestXenonContentBlockerMemory BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestBlockingPopover.cpp" Xenon NAME TestXenonBlockingPopover LIBS LibCore LibURL)

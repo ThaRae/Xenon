@@ -37,6 +37,7 @@
 #include <UI/Application.h>
 #include <UI/ChromeStyle.h>
 #include <UI/CrashReportReviewWidget.h>
+#include <UI/Menu.h>
 #include <UI/ReportReview.h>
 #include <UI/ScreenshotViewer.h>
 #include <UI/WebCompatReportReview.h>
@@ -2117,6 +2118,19 @@ void WebContentView::prepare_page_for_navigable(WebView::WebContentPage& page)
     ViewImplementation::prepare_page_for_navigable(page);
 
     update_compositor_display_metadata(page);
+}
+
+void WebContentView::show_context_menu(WebView::Menu& menu, Gfx::IntPoint widget_position)
+{
+    auto& context_menu = replace_context_menu(m_context_menu, *this, menu);
+    if (on_context_menu_created)
+        on_context_menu_created(context_menu, menu);
+
+    // NB: Showing a menu runs a nested event loop, which may destroy whatever asked for the menu. So it runs with
+    //     nothing of the caller's on the stack.
+    QTimer::singleShot(0, &context_menu, [&context_menu, global_position = map_point_to_global_position(widget_position)] {
+        execute_context_menu(context_menu, global_position);
+    });
 }
 
 void WebContentView::update_cursor(Gfx::Cursor cursor)

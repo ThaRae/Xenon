@@ -25,10 +25,10 @@ must equal the AppID's host.
  1 file changed, 1 insertion(+), 8 deletions(-)
 
 diff --git a/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp b/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
-index 09cbe7c8d8cce45499ba13d989f1bb361a7a8a35..6b5c49f2bb0d90c496e3210b776691917f1a19e5 100644
+index 0b01a6e12a9f323b717b1c88ab06812615c0484f..0bca9b906161e9440403c9f878c716a9c7c50b0f 100644
 --- a/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
 +++ b/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
-@@ -622,14 +622,7 @@ static bool is_a_caller_s_facet_id_authorized_for_an_app_id(URL::Origin const& c
+@@ -654,14 +654,7 @@ static bool is_a_caller_s_facet_id_authorized_for_an_app_id(URL::Origin const& c
      if (caller_origin.is_opaque() || caller_origin.scheme().value_or({}) != "https"sv)
          return false;
  

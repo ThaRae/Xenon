@@ -28,15 +28,15 @@ it took, and how long each frame took to prepare.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Services/Compositor/CMakeLists.txt            |   2 +-
- Services/Compositor/CompositorState.cpp       | 155 ++++++++++++++++++
+ Services/Compositor/CompositorState.cpp       | 168 ++++++++++++++++++
  Services/Compositor/CompositorState.h         |  10 ++
  Services/Compositor/ContextState.h            |   1 +
  Services/Compositor/DisplayListPlayerSkia.cpp |   1 +
  .../Compositor/DisplayListRasterCache.cpp     |  33 ++++
- Services/Compositor/DisplayListRasterCache.h  |  20 +++
- Services/Compositor/SkiaBackendContext.cpp    |   6 +
+ Services/Compositor/DisplayListRasterCache.h  |  24 +++
+ Services/Compositor/SkiaBackendContext.cpp    |   8 +
  Services/Compositor/SkiaBackendContext.h      |   1 +
- 9 files changed, 228 insertions(+), 1 deletion(-)
+ 9 files changed, 247 insertions(+), 1 deletion(-)
 
 diff --git a/Services/Compositor/CMakeLists.txt b/Services/Compositor/CMakeLists.txt
 index 5eaf310ad9e330b21473f210a8011e0b23a84268..8d46089c601d873a58564140559f94d90cccec42 100644
@@ -52,10 +52,10 @@ index 5eaf310ad9e330b21473f210a8011e0b23a84268..8d46089c601d873a58564140559f94d9
  if (HAS_VULKAN)
      target_sources(compositorservice PRIVATE SkiaVulkanMemoryAllocator.cpp)
 diff --git a/Services/Compositor/CompositorState.cpp b/Services/Compositor/CompositorState.cpp
-index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454cd535a4c1 100644
+index 29239b6459c1d79701b2f0a52e52967bb0e2cdc5..b4edaded35e898aacb17891f42a585ca09b4c21e 100644
 --- a/Services/Compositor/CompositorState.cpp
 +++ b/Services/Compositor/CompositorState.cpp
-@@ -7,17 +7,46 @@
+@@ -7,17 +7,51 @@
  #include <AK/Math.h>
  #include <AK/Random.h>
  #include <AK/StdLibExtras.h>
@@ -79,9 +79,14 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
  
  static constexpr int gpu_completion_check_interval_ms = 1;
  
++// A context's cached rasters only save work while it paints. A hidden context paints nothing until it is shown again,
++// so its rasters go soon after. A visible one may be read for a while and then scrolled, so it keeps them for longer,
++// and keeps its text blobs, which are small and which every scroll uses.
 +static constexpr auto hidden_context_raster_release_delay = AK::Duration::from_seconds(4);
 +static constexpr auto visible_context_raster_release_delay = AK::Duration::from_seconds(30);
++// Giving free pages back walks the heaps, so it is done at most this often.
 +static constexpr auto free_page_release_interval = AK::Duration::from_seconds(4);
++// Skia can only purge a texture once the GPU work that reads it is done.
 +static constexpr auto gpu_work_retry_delay = AK::Duration::from_milliseconds(100);
 +
 +static bool idle_memory_release_is_enabled()
@@ -102,7 +107,7 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
  NonnullRefPtr<CompositorState> CompositorState::create(RefPtr<Gfx::SkiaBackendContext> skia_backend_context)
  {
      return adopt_ref(*new CompositorState(move(skia_backend_context)));
-@@ -31,12 +60,126 @@ CompositorState::CompositorState(RefPtr<Gfx::SkiaBackendContext> skia_backend_co
+@@ -31,12 +65,134 @@ CompositorState::CompositorState(RefPtr<Gfx::SkiaBackendContext> skia_backend_co
  
  CompositorState::~CompositorState()
  {
@@ -120,6 +125,7 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
 +        return;
 +    if (!m_idle_memory_release_timer)
 +        m_idle_memory_release_timer = Core::Timer::create_single_shot(AK::Duration::zero(), [this] { release_idle_memory(); });
++    // Only an earlier time moves the timer, so a context that paints every frame does not re-arm it every frame.
 +    if (m_idle_memory_release_timer->is_active() && m_idle_memory_release_time <= release_time)
 +        return;
 +    m_idle_memory_release_time = release_time;
@@ -133,6 +139,7 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
 +    schedule_idle_memory_release(MonotonicTime::now() + release_delay);
 +}
 +
++// Each context's rasters go once that context has painted nothing for a while, whatever the others paint.
 +void CompositorState::release_idle_memory()
 +{
 +    auto now = MonotonicTime::now();
@@ -191,15 +198,19 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
 +    m_last_free_page_release_time = MonotonicTime::now();
 +    auto logged = idle_memory_release_is_logged();
 +
++    // Skia keeps the textures of dropped GPU rasters for reuse until a flush trims its cache, which a context that paints
++    // nothing never does.
 +    auto start_time = MonotonicTime::now();
 +    if (m_skia_backend_context)
 +        m_skia_backend_context->purge_unlocked_scratch_resources();
 +    auto skia_purge_end_time = MonotonicTime::now();
 +
++    // AK allocates through mimalloc, whose purge on Linux only resets freed pages, which keeps them in the process.
 +    ak_kmalloc_decommit_free_pages();
 +    auto mimalloc_end_time = MonotonicTime::now();
 +
 +#if defined(AK_OS_MACOS)
++    // Skia and the GPU driver allocate through the C library.
 +    (void)malloc_zone_pressure_relief(nullptr, 0);
 +#endif
 +
@@ -210,6 +221,8 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
 +    }
 +
 +#if defined(__GLIBC__)
++    // Skia and the GPU driver allocate through the C library. glibc's trim walks every arena, which can take a while on a
++    // large heap, so it runs beside the main thread, which may have frames to paint and input to route.
 +    if (m_heap_trim_thread) {
 +        if (!m_heap_trim_thread->has_exited())
 +            return;
@@ -229,7 +242,7 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
  void CompositorState::register_presentation(CompositorStateClient& presentation, PresentationCapabilities capabilities)
  {
      m_presentations.set(&presentation, capabilities);
-@@ -1016,6 +1159,8 @@ void CompositorState::set_context_visibility(Web::CompositorContextId context_id
+@@ -1406,6 +1562,8 @@ void CompositorState::set_context_visibility(Web::CompositorContextId context_id
  
      if (visibility == Compositing::ContextVisibility::Visible)
          resume_presentation_after_becoming_visible(context_id, *context);
@@ -238,7 +251,7 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
  }
  
  void CompositorState::set_context_presents_from_cpu_memory(Web::CompositorContextId context_id, bool presents_from_cpu_memory)
-@@ -1109,7 +1254,10 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Gfx::In
+@@ -1499,7 +1657,10 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Gfx::In
  void CompositorState::present_frame(Web::CompositorContextId context_id, ContextState& context, PendingFrame pending_frame)
  {
      auto composited_context_resolver = resolver_for(context_id);
@@ -249,7 +262,7 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
      if (!prepared_frame.has_value())
          return;
  
-@@ -1125,6 +1273,9 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Context
+@@ -1515,6 +1676,9 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Context
          });
      });
      context.presenter().did_submit_prepared_frame(pending_frame.viewport_rect);
@@ -259,7 +272,7 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
  #ifdef AK_OS_MACOS
      // The window server's reads of an IOSurface wait for GPU work that is already scheduled to write it. Handing the
      // frame to the client before that work finishes keeps it ahead of the window server's deadline for the next refresh.
-@@ -1326,8 +1477,12 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
+@@ -1716,8 +1880,12 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
          return false;
  
      auto composited_context_resolver = resolver_for(context_id);
@@ -273,7 +286,7 @@ index 08abca7fa2b155aec4de3c371db91e97989fcb1d..75e988197547fdd77c80527e8d2d454c
  }
  
 diff --git a/Services/Compositor/CompositorState.h b/Services/Compositor/CompositorState.h
-index a45b87f4ff55052e67286b4a6a590e466787d1f1..398e70f2c618e59a68b872aa6e95f999e2c83b04 100644
+index 57e037fc2447ca0c25e6c39d0fe92952ceecb8d0..0f08de07dfac4032b8d397a8a944e85b98181456 100644
 --- a/Services/Compositor/CompositorState.h
 +++ b/Services/Compositor/CompositorState.h
 @@ -33,6 +33,7 @@
@@ -284,7 +297,7 @@ index a45b87f4ff55052e67286b4a6a590e466787d1f1..398e70f2c618e59a68b872aa6e95f999
  
  namespace Compositor {
  
-@@ -283,6 +284,10 @@ private:
+@@ -314,6 +315,10 @@ private:
      void cancel_pending_async_presents_for_context(Web::CompositorContextId);
      void schedule_gpu_completion_check();
      void check_gpu_completions();
@@ -295,7 +308,7 @@ index a45b87f4ff55052e67286b4a6a590e466787d1f1..398e70f2c618e59a68b872aa6e95f999
  
      HashMap<Web::CompositorContextId, OwnPtr<ContextState>> m_contexts;
  
-@@ -292,6 +297,11 @@ private:
+@@ -323,6 +328,11 @@ private:
      OwnPtr<DisplayListPlayerSkia> m_display_list_player;
      HashMap<Optional<u64>, OwnPtr<VSyncScheduler>> m_vsync_schedulers_by_display;
      RefPtr<Core::Timer> m_gpu_completion_timer;
@@ -308,10 +321,10 @@ index a45b87f4ff55052e67286b4a6a590e466787d1f1..398e70f2c618e59a68b872aa6e95f999
      HashMap<CompositorStateClient*, PresentationCapabilities> m_presentations;
      HashMap<Web::CompositorContextId, CompositorStateClient*> m_context_presentations;
 diff --git a/Services/Compositor/ContextState.h b/Services/Compositor/ContextState.h
-index 7d4f4e08819a35f6cb34cebd7aedeaa11dbce388..d365f82d9edd4080968e564250a239747cdda653 100644
+index c062b712682f12e483ea628cbb5b8f75c4644498..87a541963c24df5413fee599eba1ce243735a8dc 100644
 --- a/Services/Compositor/ContextState.h
 +++ b/Services/Compositor/ContextState.h
-@@ -145,6 +145,7 @@ public:
+@@ -178,6 +178,7 @@ public:
      Optional<Web::CompositorContextId> parent_context_id() const { return m_parent_context_id; }
      ContextPresenter& presenter() { return m_presenter; }
      ContextPresenter const& presenter() const { return m_presenter; }
@@ -320,7 +333,7 @@ index 7d4f4e08819a35f6cb34cebd7aedeaa11dbce388..d365f82d9edd4080968e564250a23974
      void apply_display_list_resource_transaction(Compositing::DisplayListResourceTransaction&&);
      void install_display_list_update(
 diff --git a/Services/Compositor/DisplayListPlayerSkia.cpp b/Services/Compositor/DisplayListPlayerSkia.cpp
-index f36dc7a8901e662b30cf99d4db594ea3fb3fc10a..c32410784afd9a6f602a506664e2b6d67970f0da 100644
+index 210977fad6af037cb849f8f244226cdcc5da4789..eed6ed863698ade3910500fe6ac202e7b5936cc2 100644
 --- a/Services/Compositor/DisplayListPlayerSkia.cpp
 +++ b/Services/Compositor/DisplayListPlayerSkia.cpp
 @@ -75,6 +75,7 @@ void DisplayListPlayerSkia::execute(
@@ -332,10 +345,10 @@ index f36dc7a8901e662b30cf99d4db594ea3fb3fc10a..c32410784afd9a6f602a506664e2b6d6
      DisplayListPlayer::execute(
          display_list,
 diff --git a/Services/Compositor/DisplayListRasterCache.cpp b/Services/Compositor/DisplayListRasterCache.cpp
-index 2948ebce231bcb3742bbf99cb25fa605f5ea6437..5f41562de1bd7f1457a8b2a119be7ba515704780 100644
+index ddce79535423c000a369bb54d7fadc7c89d48477..2189fb1a6c596cf0373013ca61f32f2fc6274913 100644
 --- a/Services/Compositor/DisplayListRasterCache.cpp
 +++ b/Services/Compositor/DisplayListRasterCache.cpp
-@@ -162,6 +162,39 @@ struct DisplayListRasterCache::ClipPath {
+@@ -163,6 +163,39 @@ struct DisplayListRasterCache::ClipPath {
  DisplayListRasterCache::DisplayListRasterCache() = default;
  DisplayListRasterCache::~DisplayListRasterCache() = default;
  
@@ -376,10 +389,10 @@ index 2948ebce231bcb3742bbf99cb25fa605f5ea6437..5f41562de1bd7f1457a8b2a119be7ba5
  {
      // Filters retain images resolved from this storage, including resources whose IDs were replaced.
 diff --git a/Services/Compositor/DisplayListRasterCache.h b/Services/Compositor/DisplayListRasterCache.h
-index 9a3d7984ddde357f36eba2b449534639b09a143d..cbe9d781c8012f6691bd32c6f9405a99a0d5f12f 100644
+index 9a3d7984ddde357f36eba2b449534639b09a143d..c2e14b5c96c6b25e5fed953a218ed8c64c7082f3 100644
 --- a/Services/Compositor/DisplayListRasterCache.h
 +++ b/Services/Compositor/DisplayListRasterCache.h
-@@ -75,6 +75,24 @@ public:
+@@ -75,6 +75,28 @@ public:
      // Drops everything made from these resources, which the storage removed or replaced.
      void evict(Compositing::DisplayListResourceSet const& removed_resources);
  
@@ -394,9 +407,13 @@ index 9a3d7984ddde357f36eba2b449534639b09a143d..cbe9d781c8012f6691bd32c6f9405a99
 +
 +        size_t total() const { return repeated_tiles + nested_display_lists + text_blobs; }
 +    };
++    // Whether there are rasters for release_cached_rasters() to drop.
 +    bool has_cached_rasters(KeepTextBlobs) const;
++    // Drops the rasters, and the text blobs unless asked to keep them, that a later frame can make again from the
++    // display list and its resources.
 +    ReleasedBytes release_cached_rasters(KeepTextBlobs);
 +
++    // Called whenever a frame or a screenshot is painted with this cache.
 +    void did_paint();
 +    MonotonicTime last_painted() const { return m_last_painted; }
 +    bool was_released_since_last_paint() const { return m_was_released_since_last_paint; }
@@ -404,7 +421,7 @@ index 9a3d7984ddde357f36eba2b449534639b09a143d..cbe9d781c8012f6691bd32c6f9405a99
      sk_sp<SkImage> image_for_image_frame(Compositing::DisplayListResourceStorage const&, Compositing::ImageFrameResourceId, RefPtr<Gfx::SkiaBackendContext> const&);
      // The image can be larger than the frame, whose visible size is the part of it to draw.
      sk_sp<SkImage> image_for_video_sink(Compositing::DisplayListResourceStorage const&, Compositing::VideoSinkResourceId, RefPtr<Gfx::SkiaBackendContext> const&, Gfx::IntSize& visible_size);
-@@ -117,6 +135,8 @@ private:
+@@ -117,6 +139,8 @@ private:
      MonotonicTime m_text_blob_cache_sweep_time { MonotonicTime::now() };
      HashMap<u64, NonnullOwnPtr<ClipPath>> m_clip_paths;
      HashMap<u64, NonnullOwnPtr<ClipPath>> m_clip_paths_from_last_frame;
@@ -414,15 +431,17 @@ index 9a3d7984ddde357f36eba2b449534639b09a143d..cbe9d781c8012f6691bd32c6f9405a99
  
  }
 diff --git a/Services/Compositor/SkiaBackendContext.cpp b/Services/Compositor/SkiaBackendContext.cpp
-index 199a5c35b3391c25fcf1d1949bb5d02654527613..3ecdefe2eec5af0a64b0c8e2eb50f629277ddf82 100644
+index 199a5c35b3391c25fcf1d1949bb5d02654527613..05b10c4b8dcf9c58a705bde1b4d822447fee303e 100644
 --- a/Services/Compositor/SkiaBackendContext.cpp
 +++ b/Services/Compositor/SkiaBackendContext.cpp
-@@ -139,6 +139,12 @@ size_t SkiaBackendContext::resource_cache_bytes() const
+@@ -139,6 +139,14 @@ size_t SkiaBackendContext::resource_cache_bytes() const
      return bytes;
  }
  
 +void SkiaBackendContext::purge_unlocked_scratch_resources()
 +{
++    // A texture that nothing refers to any more stays in the resource cache for reuse, and only a flush trims the
++    // cache, so a context with nothing to draw would keep it until its next frame.
 +    if (auto* context = sk_context())
 +        context->purgeUnlockedResources(GrPurgeResourceOptions::kScratchResourcesOnly);
 +}

@@ -63,6 +63,7 @@
 
 class QKeyEvent;
 class QLabel;
+class QMenu;
 class QPushButton;
 class QScreen;
 class QShortcut;
@@ -181,6 +182,9 @@ public:
     Function<void(WebCompatReportCapture)> on_request_web_compat_report_review;
     Function<void(Function<void(QImage)> on_selected)> on_request_web_compat_report_screenshot;
 
+    // Called with each context menu just built for showing, so extra items can be added to it.
+    Function<void(QMenu&, WebView::Menu&)> on_context_menu_created;
+
     enum class PaletteMode {
         Default,
         Dark,
@@ -212,6 +216,7 @@ signals:
 
 private:
     // ^WebView::ViewImplementation
+    virtual void show_context_menu(WebView::Menu&, Gfx::IntPoint widget_position) override;
     virtual void prepare_page_for_navigable(WebView::WebContentPage&) override;
     virtual Core::AnonymousBuffer system_theme() override;
     virtual Optional<ScreenRects> screen_rects() const override;
@@ -330,6 +335,7 @@ private:
 
     QPointer<ScreenshotSelectionOverlay> m_screenshot_selection_overlay;
     QPointer<ScreenshotViewer> m_screenshot_viewer;
+    QPointer<QMenu> m_context_menu;
     PageOverlay* m_web_compat_report_overlay { nullptr };
 
 #ifdef AK_OS_MACOS
