@@ -299,11 +299,6 @@ private:
     int m_loading_animation_frame { 0 };
 
     QMenu* m_context_menu { nullptr };
-    QMenu* m_page_context_menu { nullptr };
-    QMenu* m_link_context_menu { nullptr };
-    QMenu* m_selected_text_link_context_menu { nullptr };
-    QMenu* m_image_context_menu { nullptr };
-    QMenu* m_media_context_menu { nullptr };
     QMenu* m_select_dropdown { nullptr };
 
     QAction* m_navigate_back_action { nullptr };

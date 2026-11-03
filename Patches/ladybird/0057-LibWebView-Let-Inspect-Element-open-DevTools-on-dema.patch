@@ -26,10 +26,10 @@ coming from another tab.
  4 files changed, 99 insertions(+), 16 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 293a498ed8b5db33f3fffd43ffee5694ee824fd2..d19aecbe136a469d4fae313220a284340a9eb95c 100644
+index c41ae2100d6da5b6745737fda19de090300f29a1..e0b490568c47603e5ad494b583c438e916338ac2 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -2311,7 +2311,7 @@ ErrorOr<void> Application::launch_devtools_server()
+@@ -2326,7 +2326,7 @@ ErrorOr<void> Application::launch_devtools_server()
      return {};
  }
  
@@ -38,7 +38,7 @@ index 293a498ed8b5db33f3fffd43ffee5694ee824fd2..d19aecbe136a469d4fae313220a28434
  {
      if (!m_devtools || !m_browser_options.devtools_port.has_value())
          return Error::from_string_literal("DevTools is not currently enabled");
-@@ -2319,14 +2319,52 @@ ErrorOr<void> Application::launch_devtools_client()
+@@ -2334,14 +2334,52 @@ ErrorOr<void> Application::launch_devtools_client()
      if (m_devtools->has_active_connection())
          return Error::from_string_literal("A DevTools client is already connected");
  
@@ -93,7 +93,7 @@ index 293a498ed8b5db33f3fffd43ffee5694ee824fd2..d19aecbe136a469d4fae313220a28434
  }
  
  static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, u32 screenshot_timeout)
-@@ -3620,7 +3658,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
+@@ -3673,7 +3711,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
  {
      if (m_devtools) {
          m_devtools_client.clear();
@@ -106,7 +106,7 @@ index 293a498ed8b5db33f3fffd43ffee5694ee824fd2..d19aecbe136a469d4fae313220a28434
          on_devtools_disabled();
      } else {
          TRY(launch_devtools_server());
-@@ -4585,7 +4628,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
+@@ -4662,7 +4705,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
      if (!view.has_value())
          return;
  
@@ -115,7 +115,7 @@ index 293a498ed8b5db33f3fffd43ffee5694ee824fd2..d19aecbe136a469d4fae313220a28434
  }
  
  void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescription const& description) const
-@@ -4594,7 +4637,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
+@@ -4671,7 +4714,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
      if (!view.has_value())
          return;
  
@@ -124,7 +124,7 @@ index 293a498ed8b5db33f3fffd43ffee5694ee824fd2..d19aecbe136a469d4fae313220a28434
  }
  
  void Application::did_connect_devtools_client(DevTools::TabDescription const& description) const
-@@ -4618,6 +4661,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
+@@ -4695,6 +4738,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
  void Application::did_close_devtools_connection()
  {
      m_devtools_client.clear();
@@ -133,10 +133,10 @@ index 293a498ed8b5db33f3fffd43ffee5694ee824fd2..d19aecbe136a469d4fae313220a28434
  
  }
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 76b506d9546f0a190119bc265e582dce97ba4d2b..f5f772946f5052a88bc842d61d6bda3193396e1b 100644
+index 5f7b05114f18be55dbbd3e84ce12d37d65770ecf..e3527638f9d799fe6daa48db49c02df590e97695 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -430,7 +430,8 @@ public:
+@@ -457,7 +457,8 @@ public:
      void apply_view_options(Badge<ViewImplementation>, ViewImplementation&, WebContentPage&);
  
      ErrorOr<void> toggle_devtools_enabled();
@@ -146,7 +146,7 @@ index 76b506d9546f0a190119bc265e582dce97ba4d2b..f5f772946f5052a88bc842d61d6bda31
      void refresh_tab_list();
  
      Optional<Core::TimeZoneWatcher&> time_zone_watcher();
-@@ -792,6 +793,8 @@ private:
+@@ -822,6 +823,8 @@ private:
  
      OwnPtr<DevTools::DevToolsServer> m_devtools;
      OwnPtr<DevTools::FirefoxClient> m_devtools_client;
@@ -156,10 +156,10 @@ index 76b506d9546f0a190119bc265e582dce97ba4d2b..f5f772946f5052a88bc842d61d6bda31
      mutable HashMap<u64, u64> m_navigation_listener_ids;
  };
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 288dd7bc4dd048969a48bcc4e7a5bedbcd5f979a..fd887cd0bcaf4fdd34efe15f1101227696ea911b 100644
+index 4b6691ed747bc3a955b14ca6934356efe29412a3..b646f065f32bd8c1aa77080fd5a8f6c6221a2354 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -2014,9 +2014,8 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
+@@ -2055,9 +2055,8 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
          if (node_id != 0)
              m_inspect_element_node_id = node_id;
  
@@ -171,7 +171,7 @@ index 288dd7bc4dd048969a48bcc4e7a5bedbcd5f979a..fd887cd0bcaf4fdd34efe15f11012276
          return;
      }
  
-@@ -2612,6 +2611,42 @@ void ViewImplementation::did_disconnect_devtools_client()
+@@ -2662,6 +2661,42 @@ void ViewImplementation::did_disconnect_devtools_client()
      page().async_set_has_devtools_client(false);
  }
  
@@ -214,9 +214,9 @@ index 288dd7bc4dd048969a48bcc4e7a5bedbcd5f979a..fd887cd0bcaf4fdd34efe15f11012276
  void ViewImplementation::get_dom_node_inner_html(Web::UniqueNodeID node_id)
  {
      page().async_get_dom_node_inner_html(node_id);
-@@ -4841,13 +4876,11 @@ void ViewImplementation::initialize_context_menus()
-             on_request_screenshot();
-     });
+@@ -4925,13 +4960,11 @@ void ViewImplementation::initialize_context_menus()
+     m_copy_link_to_highlight_action->set_visible(false);
+     m_copy_link_to_highlight_action->set_enabled(false);
  
 -    // Shown only while a DevTools client is attached to this tab — the element is the one under the cursor when the
 -    // context menu opened, so a page that changes while the menu is open still has the element the user clicked on.
@@ -229,8 +229,8 @@ index 288dd7bc4dd048969a48bcc4e7a5bedbcd5f979a..fd887cd0bcaf4fdd34efe15f11012276
 +            inspect_element(*m_inspect_element_node_id);
      });
      m_inspect_element_action->set_visible(false);
- 
-@@ -5435,9 +5468,7 @@ void ViewImplementation::prepare_inspect_element_action(Gfx::IntPoint content_po
+     m_block_element_action = Action::create("Block Element..."sv, ActionID::BlockElement, [this]() {
+@@ -5465,9 +5498,7 @@ void ViewImplementation::prepare_inspect_element_action(Gfx::IntPoint content_po
      m_inspect_element_hit_test_request_id.clear();
      m_inspect_element_activated_before_hit_test = false;
  
@@ -242,20 +242,20 @@ index 288dd7bc4dd048969a48bcc4e7a5bedbcd5f979a..fd887cd0bcaf4fdd34efe15f11012276
      auto request_id = m_next_node_hit_test_request_id++;
      m_inspect_element_hit_test_request_id = request_id;
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 54fe5d48d6aa071a8cf5bc8bc085649847bde4e3..d46af48b00ffde06daaaeef7b4836859a82fd61f 100644
+index e12dd2d41b840333234a7f50792c9486d63c657a..0e35f8a628e9c28167c0f4ff160f54dfdb3055ee 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -431,6 +431,9 @@ public:
-     void set_listen_for_dom_mutations(bool);
+@@ -450,6 +450,9 @@ public:
      void did_connect_devtools_client();
      void did_disconnect_devtools_client();
+     void start_sending_console_output(bool messages, bool errors);
 +    void set_inspect_element_request(Function<void(Web::UniqueNodeID)>);
 +    void clear_inspect_element_request();
 +    void clear_pending_inspect_element();
      bool has_devtools_client() const { return m_devtools_connected; }
      void get_dom_node_inner_html(Web::UniqueNodeID node_id);
      void get_dom_node_outer_html(Web::UniqueNodeID node_id);
-@@ -952,9 +955,11 @@ protected:
+@@ -970,9 +973,11 @@ protected:
      RefPtr<Action> m_block_element_action;
  
      void prepare_inspect_element_action(Gfx::IntPoint content_position);
@@ -266,4 +266,4 @@ index 54fe5d48d6aa071a8cf5bc8bc085649847bde4e3..d46af48b00ffde06daaaeef7b4836859
 +    Optional<Web::UniqueNodeID> m_pending_inspect_element_node_id;
      bool m_inspect_element_activated_before_hit_test { false };
  
-     RefPtr<Action> m_open_in_new_tab_action;
+     struct PendingInputEvent {

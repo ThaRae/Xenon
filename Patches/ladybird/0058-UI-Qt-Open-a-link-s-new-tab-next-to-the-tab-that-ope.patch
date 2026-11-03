@@ -22,10 +22,10 @@ which both overloads share.
  2 files changed, 29 insertions(+), 23 deletions(-)
 
 diff --git a/UI/Qt/BrowserWindow.cpp b/UI/Qt/BrowserWindow.cpp
-index ccaafb08cc26d343d9bff0105511e7180378555c..01593b651e8163c1d8e882cd7de59b0ef83abf5a 100644
+index 827b827c3b69cd5905ba059bf436c553515dc815..a1074954d9d8cdbb8e58f2357edf3b87ed4aa144 100644
 --- a/UI/Qt/BrowserWindow.cpp
 +++ b/UI/Qt/BrowserWindow.cpp
-@@ -382,7 +382,7 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
+@@ -384,7 +384,7 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
      });
  
      if (parent_tab) {
@@ -34,7 +34,7 @@ index ccaafb08cc26d343d9bff0105511e7180378555c..01593b651e8163c1d8e882cd7de59b0e
      } else {
          for (size_t i = 0; i < initial_urls.size(); ++i)
              create_new_tab((i == 0) ? Web::HTML::ActivateTab::Yes : Web::HTML::ActivateTab::No, TabLocation::end());
-@@ -756,11 +756,11 @@ Tab& BrowserWindow::create_restored_tab(WebView::RestoredSessionTab const& resto
+@@ -755,11 +755,11 @@ Tab& BrowserWindow::create_restored_tab(WebView::RestoredSessionTab const& resto
      return *tab;
  }
  
@@ -48,7 +48,7 @@ index ccaafb08cc26d343d9bff0105511e7180378555c..01593b651e8163c1d8e882cd7de59b0e
  
      auto* tab = new Tab(this, traversable);
  
-@@ -769,7 +769,8 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional
+@@ -768,7 +768,8 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional
          set_current_tab(tab);
      }
  
@@ -58,7 +58,7 @@ index ccaafb08cc26d343d9bff0105511e7180378555c..01593b651e8163c1d8e882cd7de59b0e
      if (activate_tab == Web::HTML::ActivateTab::Yes)
          m_tabs_container->set_current_tab(tab);
  
-@@ -802,23 +803,7 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
+@@ -801,23 +802,7 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
          set_current_tab(tab);
      }
  
@@ -83,7 +83,7 @@ index ccaafb08cc26d343d9bff0105511e7180378555c..01593b651e8163c1d8e882cd7de59b0e
      // A new tab is unpinned, so it never lands inside the pinned group.
      m_tabs_container->insert_tab(constrain_insertion_index(insertion_index, false), tab, "New Tab");
  
-@@ -889,7 +874,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
+@@ -888,7 +873,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
              auto& window = Application::the().new_window({}, configuration, IsPopupWindow::Yes, m_is_private, tab, traversable);
              return window.current_tab()->view().handle();
          }
@@ -92,7 +92,7 @@ index ccaafb08cc26d343d9bff0105511e7180378555c..01593b651e8163c1d8e882cd7de59b0e
          return new_tab.view().handle();
      };
  }
-@@ -1122,6 +1107,26 @@ int BrowserWindow::pinned_tab_count() const
+@@ -1119,6 +1104,26 @@ int BrowserWindow::pinned_tab_count() const
      return m_tabs_container->tab_bar()->pinned_tab_count();
  }
  
@@ -120,10 +120,10 @@ index ccaafb08cc26d343d9bff0105511e7180378555c..01593b651e8163c1d8e882cd7de59b0e
  {
      auto pinned_count = pinned_tab_count();
 diff --git a/UI/Qt/BrowserWindow.h b/UI/Qt/BrowserWindow.h
-index 680e0b23f765aa6d23e331d6390cc163ebc27a98..5747e22f1b2615e5d206f9d892d809154a9d9646 100644
+index 471577a218733e386d8fba3a4611d99e9c5e674d..10f10176d8b572c8b6b5b8d6656bdaa647be25e1 100644
 --- a/UI/Qt/BrowserWindow.h
 +++ b/UI/Qt/BrowserWindow.h
-@@ -264,7 +264,7 @@ private:
+@@ -270,7 +270,7 @@ private:
      virtual void appearance_changed() override;
      virtual void config_variable_changed(WebView::ConfigVariableID) override;
  
@@ -132,7 +132,7 @@ index 680e0b23f765aa6d23e331d6390cc163ebc27a98..5747e22f1b2615e5d206f9d892d80915
      Tab& create_restored_tab(WebView::RestoredSessionTab const&, int index, bool defer);
      void initialize_tab(Tab*);
      void initialize_tab_view(Tab*);
-@@ -294,6 +294,7 @@ private:
+@@ -300,6 +300,7 @@ private:
  
      void update_chrome_style();
  

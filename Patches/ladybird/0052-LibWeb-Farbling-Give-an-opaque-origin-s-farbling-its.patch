@@ -18,14 +18,14 @@ Opaque origins carry a nonce of their own, so key the seed on that
 still sees the same values everywhere it runs, and two different
 opaque origins see unrelated ones.
 ---
- Libraries/LibWeb/Fingerprinting/Farbling.cpp | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ Libraries/LibWeb/Fingerprinting/Farbling.cpp | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fingerprinting/Farbling.cpp b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
-index 671af3e895d8f5b098641ccb91c778634c0ab574..fa9cc66b7189038831676c2d595b44e179ef858e 100644
+index 175334e7065b89902297758b59af35a712454fc6..d85cafd9ff7cfd0b60320205c25344ec2e1faef3 100644
 --- a/Libraries/LibWeb/Fingerprinting/Farbling.cpp
 +++ b/Libraries/LibWeb/Fingerprinting/Farbling.cpp
-@@ -40,21 +40,26 @@ u64 session_secret()
+@@ -47,22 +47,27 @@ u64 session_secret()
      return fallback_secret;
  }
  
@@ -33,6 +33,8 @@ index 671af3e895d8f5b098641ccb91c778634c0ab574..fa9cc66b7189038831676c2d595b44e1
 +static u64 seed_for_bytes(ReadonlyBytes bytes)
  {
      u64 state = mix64(session_secret());
+-    // FNV-1a over the host bytes, keyed by the session secret, then finalized.
++    // FNV-1a over the bytes, keyed by the session secret, then finalized.
      u64 hash = 0xCBF29CE484222325ull ^ state;
 -    for (auto byte : host.bytes()) {
 +    for (auto byte : bytes) {

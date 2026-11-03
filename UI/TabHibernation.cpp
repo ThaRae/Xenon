@@ -434,11 +434,6 @@ void Tab::hibernate()
     m_location_edit = nullptr;
     m_hover_label = nullptr;
     m_loading_animation_timer = nullptr;
-    m_page_context_menu = nullptr;
-    m_link_context_menu = nullptr;
-    m_selected_text_link_context_menu = nullptr;
-    m_image_context_menu = nullptr;
-    m_media_context_menu = nullptr;
     m_navigate_back_action = nullptr;
     m_navigate_forward_action = nullptr;
     m_reload_action = nullptr;
