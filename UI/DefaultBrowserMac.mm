@@ -5,6 +5,8 @@
  */
 
 #include <AK/Function.h>
+#include <AK/NonnullRefPtr.h>
+#include <AK/RefCounted.h>
 #include <UI/DefaultBrowser.h>
 
 #import <Cocoa/Cocoa.h>
@@ -26,23 +28,40 @@ Status status()
                                                                                          : Status::IsNotDefault;
 }
 
-static void make_default_for_scheme(NSString* scheme, NSURL* bundle_url, Function<void()> const& on_done)
+namespace {
+
+struct PendingRequest : public RefCounted<PendingRequest> {
+    explicit PendingRequest(Function<void()> on_done)
+        : on_done(move(on_done))
+    {
+    }
+
+    Function<void()> on_done;
+    int remaining { 2 };
+};
+
+}
+
+static void make_default_for_scheme(NSString* scheme, NSURL* bundle_url, NonnullRefPtr<PendingRequest> pending)
 {
     [[NSWorkspace sharedWorkspace] setDefaultApplicationAtURL:bundle_url
                                          toOpenURLsWithScheme:scheme
                                             completionHandler:^(NSError* error) {
                                                 if (error)
                                                     NSLog(@"Failed to make Xenon the default handler for %@: %@", scheme, error);
-                                                if (on_done)
-                                                    dispatch_async(dispatch_get_main_queue(), [on_done] { on_done(); });
+                                                dispatch_async(dispatch_get_main_queue(), ^{
+                                                    if (--pending->remaining == 0 && pending->on_done)
+                                                        pending->on_done();
+                                                });
                                             }];
 }
 
 void request_default(Function<void()> on_done)
 {
     auto* bundle_url = [[NSBundle mainBundle] bundleURL];
-    make_default_for_scheme(@"http", bundle_url, on_done);
-    make_default_for_scheme(@"https", bundle_url, move(on_done));
+    auto pending = adopt_ref(*new PendingRequest(move(on_done)));
+    make_default_for_scheme(@"http", bundle_url, pending);
+    make_default_for_scheme(@"https", bundle_url, pending);
 }
 
 }
