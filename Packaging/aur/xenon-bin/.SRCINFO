@@ -1,6 +1,6 @@
 pkgbase = xenon-bin
 	pkgdesc = Web browser built on the Ladybird engine, with the features of Helium
-	pkgver = 0.1.2
+	pkgver = 0.1.4
 	pkgrel = 1
 	url = https://github.com/ThaRae/Xenon
 	arch = x86_64
@@ -30,11 +30,11 @@ pkgbase = xenon-bin
 	optdepends = geoclue: geolocation
 	provides = xenon
 	conflicts = xenon
-	noextract = Xenon-0.1.2-x86_64.AppImage
+	noextract = Xenon-0.1.4-x86_64.AppImage
 	options = !strip
 	options = !debug
 	options = !emptydirs
-	source = https://github.com/ThaRae/xenon-releases/releases/download/v0.1.2/Xenon-0.1.2-x86_64.AppImage
-	sha256sums = b334845575ecb2099f51e941897bfac474e2122af774bb5d622a1bd8349121c4
+	source = https://github.com/ThaRae/xenon-releases/releases/download/v0.1.4/Xenon-0.1.4-x86_64.AppImage
+	sha256sums = 98e841565863640d9be870c3949b3bf3419158853529f25f6ae530e9745f2782
 
 pkgname = xenon-bin
