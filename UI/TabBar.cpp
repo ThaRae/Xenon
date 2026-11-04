@@ -3107,7 +3107,14 @@ void TabWidget::insert_tab(int index, Tab* widget, QString const& label)
             size_page_like(*widget, *current);
         install_event_filters();
     }
-    connect(widget, &Tab::loaded, this, install_event_filters);
+    connect(widget, &Tab::loaded, this, [this, install_event_filters] {
+        install_event_filters();
+        QTimer::singleShot(0, this, [this] {
+            update_tab_chrome_visibility();
+            update_tab_layout();
+            update_vertical_tabs_content_overlay();
+        });
+    });
 
     m_stacked_widget->insertWidget(index, widget);
     m_tab_bar->insertTab(index, label);
