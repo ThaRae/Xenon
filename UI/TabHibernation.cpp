@@ -452,7 +452,6 @@ void Tab::hibernate()
     m_downloads_button_icon.clear();
     m_downloads_button_tooltip = {};
     m_suppress_javascript_dialogs_until_navigation = false;
-    m_preserve_close_retry_state_on_dialog_dismissal = false;
 
     update_tab_title();
     update_tab_icon();
