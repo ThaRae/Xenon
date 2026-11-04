@@ -72,7 +72,7 @@ void Download::fetch(URL::URL url)
         [self = NonnullRefPtr(*this), id](u64, Requests::RequestTimingInfo const&, Optional<Requests::NetworkError> network_error) {
             if (id != self->m_request_id)
                 return;
-            self->m_request_finished = true;
+            self->m_state = State::ResponseComplete;
             if (network_error.has_value()) {
                 warnln("Unable to download {}: {}", self->m_url, Requests::network_error_to_string(*network_error));
                 self->finish(Error::from_string_literal("the download failed"));
@@ -96,7 +96,7 @@ void Download::did_receive_headers(HTTP::HeaderList const& headers, Optional<u32
         ++m_request_id;
         m_request->stop();
         Core::deferred_invoke([self = NonnullRefPtr(*this), url = url.release_value()]() mutable {
-            if (!self->m_finished)
+            if (self->m_state != State::Finished)
                 self->fetch(move(url));
         });
         return;
@@ -110,7 +110,7 @@ void Download::did_receive_headers(HTTP::HeaderList const& headers, Optional<u32
 
 void Download::did_receive_data(ReadonlyBytes data)
 {
-    if (m_finished)
+    if (m_state == State::Finished)
         return;
     if (data.size() > m_maximum_size - m_payload.size()) {
         finish(Error::from_string_literal("the file is larger than it should be"));
@@ -122,13 +122,14 @@ void Download::did_receive_data(ReadonlyBytes data)
 
 void Download::finish(ErrorOr<ByteBuffer> result)
 {
-    if (m_finished)
+    if (m_state == State::Finished)
         return;
-    m_finished = true;
+    auto request_is_running = m_state == State::Fetching;
+    m_state = State::Finished;
     m_timeout->stop();
 
     auto request = move(m_request);
-    if (request && !m_request_finished) {
+    if (request && request_is_running) {
         ++m_request_id;
         request->stop();
     }
