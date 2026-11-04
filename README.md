@@ -45,6 +45,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 - A new tab page with your most visited sites, your bookmarks bar, and the tabs you closed last
 - A settings page with the most-changed settings up top, and Xenon's own settings first
 - Updates itself on macOS, from signed releases, when you quit, or sooner from the toolbar's Update button
+- Can be the system's default browser: ask from Settings, and the AppImage registers itself with your desktop
 - Installs on Arch Linux from the AUR, as the AppImage or built from source
 
 [Documentation/Features.md](Documentation/Features.md) describes each feature: how to use it, what it does in edge

@@ -804,6 +804,8 @@ def check_https(executable: Path, xenon) -> bool:
 
 
 def test_linux_main(args):
+    data_home = tempfile.TemporaryDirectory()
+    os.environ["XDG_DATA_HOME"] = data_home.name
     xenon = load_module("xenon", XENON_SOURCE_DIR / "Meta" / "xenon.py")
     failures = []
     if args.installed:
