@@ -173,7 +173,7 @@ on memory**, on by default. The code is `UI/TabHibernation.cpp` and `UI/MemoryPr
 which saves the scroll position first. Engine patch `0038` also collects the page's JS heap when the tab is hidden.
 
 When the machine becomes short of memory, every WebContent process, the visible tab's and those of tabs that can't
-hibernate included, also collects garbage once and gives the memory it freed back to the system (engine patch `0067`,
+hibernate included, also collects garbage once and gives the memory it freed back to the system (engine patch `0071`,
 from `UI/MemoryPressureRelease.cpp`). That happens once each time memory goes from normal to short, and at most once a
 minute, not again on every check while it stays short. It doesn't depend on the hibernation settings. Tests can stand
 a file in for `/proc/meminfo` with `XENON_TEST_MEMINFO`, which the hibernation check reads too.
@@ -203,14 +203,14 @@ Besides hibernating whole tabs, Xenon doesn't keep processes that nothing is usi
 - The media server starts when a page first needs one, and stops 15 seconds after the page last used it; the audio
   server it plays through stops 15 seconds after that. A paused video or song keeps both (`0047`).
 - Four seconds after a page loads, its process collects garbage and gives the freed memory back to the system (`0044`),
-  and does again whenever its tab is hidden (`0038`, which `0066` makes decommit the free pages, as `0044` does, so
+  and does again whenever its tab is hidden (`0038`, which `0070` makes decommit the free pages, as `0044` does, so
   that they leave its RSS on Linux).
 - The compositor drops the images it keeps to redraw a page quickly (its SVG images and repeated backgrounds, drawn
   once) when the page has drawn nothing for 30 seconds, or 4 seconds after its tab is hidden, when it drops its text too.
   Each tab and frame is timed on its own, so an animation in one doesn't hold another's. The memory goes back to the
   system, and the next frame draws what it needs again (`0049`).
 - Once nothing has drawn for 5 seconds, the compositor also purges the GPU resources no frame has used in that time, and
-  gives the memory back as above (`0065`).
+  gives the memory back as above (`0069`).
 - A window's pages count as hidden while it's minimized, or, on macOS and X11, once the window system has said for a
   second that none of it can be seen (on macOS, a window entirely covered by others), so they stop drawing and their
   animations pause until it's shown again (`UI/WindowExposure.cpp`). Both panes of a split view go, and come back,
