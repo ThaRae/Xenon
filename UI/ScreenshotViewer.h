@@ -60,9 +60,12 @@ private:
     bool m_is_at_actual_size { false };
     QPointF m_offset;
 
-    Optional<QPointF> m_press_position;
-    QPointF m_press_offset;
-    bool m_is_dragging { false };
+    struct Press {
+        QPointF position;
+        QPointF offset;
+        bool is_dragging { false };
+    };
+    Optional<Press> m_press;
 
     QPushButton* m_close_button { nullptr };
     QLabel* m_caption { nullptr };

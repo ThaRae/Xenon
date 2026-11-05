@@ -73,8 +73,8 @@ public:
     // Asks every window's pages if they may unload, one window at a time. Once all of them agree, it confirms stopping
     // the downloads and quits; if a page refuses or the downloads are kept, the quit is canceled and no window closes.
     void quit();
-    bool is_quit_in_progress() const { return m_quit_in_progress; }
-    bool is_finishing_quit() const { return m_quit_is_finishing; }
+    bool is_quit_in_progress() const { return m_window_close_sequence == WindowCloseSequence::AskingWindowsToQuit || m_window_close_sequence == WindowCloseSequence::FinishingQuit; }
+    bool is_finishing_quit() const { return m_window_close_sequence == WindowCloseSequence::FinishingQuit; }
     bool confirm_stop_active_downloads(QWidget* parent = nullptr);
 
     CrashReportNotifier& crash_report_notifier() { return m_crash_report_notifier; }
@@ -211,9 +211,13 @@ private:
     OwnPtr<ProcessManagerWindow> m_process_manager_window;
     CrashReportNotifier m_crash_report_notifier;
 
-    bool m_private_session_restart_in_progress { false };
-    bool m_quit_in_progress { false };
-    bool m_quit_is_finishing { false };
+    enum class WindowCloseSequence : u8 {
+        None,
+        RestartingPrivateSession,
+        AskingWindowsToQuit,
+        FinishingQuit,
+    };
+    WindowCloseSequence m_window_close_sequence { WindowCloseSequence::None };
     Vector<QPointer<BrowserWindow>> m_windows_awaiting_quit_preflight;
 };
 
