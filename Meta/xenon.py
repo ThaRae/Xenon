@@ -106,6 +106,7 @@ NATIVE_MESSAGING_ECHO_HOST = XENON_SOURCE_DIR / "Tests" / "NativeMessaging" / "e
 
 CERTIFICATE_ERRORS_DIR = XENON_SOURCE_DIR / "Tests" / "CertificateErrors"
 CERTIFICATE_ERROR_TEST_MARKER = "XENON-CERTIFICATE-ERROR-TEST "
+SITE_SECURITY_TEST_MARKER = "XENON-SITE-SECURITY-TEST "
 
 WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
 
@@ -113,6 +114,14 @@ UPDATE_STAND_IN_VERSION = "99.0.0"
 UPDATE_BUTTON_SHOWN = "The toolbar offers to relaunch to update to Xenon "
 
 SESSION_SAVE_WAIT_SECONDS = 3
+
+PAGE_UNRESPONSIVE_PROMPT = "Page unresponsive prompt "
+PAGE_UNRESPONSIVE_STAYS_HIDDEN_SECONDS = 10
+PAGE_UNRESPONSIVE_BUSY_PAGE = b"""<!doctype html><title>Busy page</title><body style="margin: 0; height: 100vh">
+<script>
+    addEventListener("mousedown", () => { while (true) {} });
+    addEventListener("load", () => setTimeout(() => internals.clickThroughUIProcess(40, 40), 500));
+</script>"""
 
 EXTENSION_STORE_DIR = XENON_SOURCE_DIR / "Tests" / "ExtensionStore"
 PASSWORD_MANAGER_TEST_MARKER = "XENON-PASSWORD-MANAGER-TEST "
@@ -420,6 +429,10 @@ def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> lis
     if not check_certificate_errors(executable, env):
         failures.append("certificate warning")
 
+    print("==> site information for HTTPS and HTTP pages: the TLS version, cipher and certificate", flush=True)
+    if not check_site_security(executable, env):
+        failures.append("site information")
+
     print("==> extension pages and their chrome.* APIs", flush=True)
     if not check_extensions(executable, env):
         failures.append("extensions")
@@ -427,6 +440,10 @@ def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> lis
     print("==> tabs come back with their pages after a crash and after a quit", flush=True)
     if not check_session_restore(executable, env):
         failures.append("session restore")
+
+    print("==> a page that stops answering a click gets the page unresponsive prompt", flush=True)
+    if not check_page_unresponsive(executable, env):
+        failures.append("page unresponsive prompt")
 
     print("==> the toolbar offers an update that's ready", flush=True)
     if not check_update_button(executable, env):
@@ -2109,6 +2126,122 @@ def check_session_restore(executable: Path, env: dict) -> bool:
             server.shutdown()
 
 
+def check_page_unresponsive(executable: Path, env: dict) -> bool:
+    state = {"tabs": None, "commands": []}
+    changed = threading.Condition()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            path, _, query = self.path.partition("?")
+            with changed:
+                if path == "/report":
+                    state["tabs"] = json.loads(urllib.parse.parse_qs(query)["tabs"][0])
+                    body, content_type = json.dumps(state["commands"]).encode(), "application/json"
+                    state["commands"] = []
+                elif path == "/busy":
+                    body, content_type = PAGE_UNRESPONSIVE_BUSY_PAGE, "text/html"
+                else:
+                    body, content_type = f"<!doctype html><title>{path}</title><p>{path}".encode(), "text/html"
+                changed.notify_all()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    port = server.server_address[1]
+    busy_page = f"http://127.0.0.1:{port}/busy"
+    next_page = f"http://localhost:{port}/next"
+
+    with tempfile.TemporaryDirectory() as directory:
+        profile = Path(directory) / "profile"
+        (profile / "config").mkdir(parents=True)
+        (profile / "config" / "Settings.json").write_text(json.dumps({"firstRunComplete": True}))
+        extension = Path(directory) / "extension"
+        extension.mkdir()
+        (extension / "manifest.json").write_text(json.dumps(SESSION_RESTORE_EXTENSION_MANIFEST))
+        (extension / "background.js").write_text(
+            SESSION_RESTORE_EXTENSION_BACKGROUND.replace("REPORT_URL", f"http://127.0.0.1:{port}/report")
+        )
+        log_path = Path(directory) / "xenon.log"
+        with open(log_path, "w") as log:
+            process = subprocess.Popen(
+                [
+                    str(executable),
+                    "--profile-path",
+                    str(profile),
+                    f"--load-extension={extension}",
+                    "--expose-internals-object",
+                    busy_page,
+                ],
+                env=env,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+
+        def prompt_lines() -> list[str]:
+            return [
+                line for line in log_path.read_text(errors="replace").splitlines() if PAGE_UNRESPONSIVE_PROMPT in line
+            ]
+
+        def wait_for(step: str, condition, timeout: float = 60) -> bool:
+            if wait_until(lambda: condition() or process.poll() is not None, timeout) and condition():
+                print(f"    {step}")
+                return True
+            print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+            print(
+                f"    FAIL: {step} (the prompt's log was {prompt_lines()}, and the tabs {state['tabs']})",
+                file=sys.stderr,
+            )
+            return False
+
+        def busy_page_loaded() -> bool:
+            with changed:
+                tabs = state["tabs"] or []
+            return [(tab.get("url"), tab["status"]) for tab in tabs] == [(busy_page, "complete")]
+
+        try:
+            if not wait_for("the busy page loads", busy_page_loaded):
+                return False
+            loaded_at = time.monotonic()
+            if not wait_for(
+                "the prompt shows once the click has gone unanswered for 8 seconds",
+                lambda: any(f"shown for {busy_page}" in line for line in prompt_lines()),
+            ):
+                return False
+            waited = time.monotonic() - loaded_at
+            if waited < 7:
+                print(f"    FAIL: the prompt showed {waited:.1f} s after the page loaded", file=sys.stderr)
+                return False
+            with changed:
+                state["commands"] = [{"call": "update", "tab": 0, "args": [{"url": next_page}]}]
+            if not wait_for(
+                "navigating away hides it",
+                lambda: any(f"hidden for {busy_page}" in line for line in prompt_lines()),
+            ):
+                return False
+            time.sleep(PAGE_UNRESPONSIVE_STAYS_HIDDEN_SECONDS)
+            if len(prompt_lines()) != 2 or process.poll() is not None:
+                print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+                print(f"    FAIL: the prompt came back while the tab was loading ({prompt_lines()})", file=sys.stderr)
+                return False
+            print("    it stays hidden while the tab loads")
+            return True
+        finally:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            process.wait()
+            server.shutdown()
+
+
 def check_update_button(executable: Path, env: dict) -> bool:
     expected = UPDATE_BUTTON_SHOWN + UPDATE_STAND_IN_VERSION
     with tempfile.TemporaryDirectory() as directory:
@@ -2323,6 +2456,137 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
                 print(line, file=sys.stderr)
         print(output[-4000:], file=sys.stderr)
     return passed
+
+
+def check_site_security(executable: Path, env: dict) -> bool:
+    page = b"<!doctype html><title>Xenon site information test</title><link rel=stylesheet href=/style.css>"
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):
+            body = b"body { color: rgb(1, 2, 3); }" if self.path == "/style.css" else page
+            self.send_response(200)
+            self.send_header("Content-Type", "text/css" if self.path == "/style.css" else "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    class Server(http.server.ThreadingHTTPServer):
+        def handle_error(self, request, client_address):
+            pass
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(CERTIFICATE_ERRORS_DIR / "self-signed.pem", CERTIFICATE_ERRORS_DIR / "self-signed-key.pem")
+    secure_server = Server(("127.0.0.1", 0), Handler)
+    secure_server.socket = context.wrap_socket(secure_server.socket, server_side=True)
+    plain_server = Server(("127.0.0.1", 0), Handler)
+    for server in (secure_server, plain_server):
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    secure_url = f"https://127.0.0.1:{secure_server.server_address[1]}/"
+    plain_url = f"http://127.0.0.1:{plain_server.server_address[1]}/"
+
+    digest = hashlib.sha256((CERTIFICATE_ERRORS_DIR / "self-signed.der").read_bytes()).hexdigest().upper()
+    fingerprint = ":".join(digest[i : i + 2] for i in range(0, len(digest), 2))
+    report_env = {**env, "XENON_TEST_REPORT_SITE_SECURITY": "1"}
+
+    def report_for(url: str, arguments: list[str], run_env: dict) -> tuple[dict | None, str]:
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "xenon.log"
+            with open(log_path, "w") as log:
+                process = subprocess.Popen(
+                    [
+                        str(executable),
+                        "--headless=manual",
+                        "--profile-path",
+                        str(Path(directory) / "profile"),
+                        *arguments,
+                        url,
+                    ],
+                    env=run_env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+
+            def reports() -> list[dict]:
+                return site_security_reports(log_path.read_text(errors="replace"))
+
+            try:
+                wait_until(lambda: reports() or process.poll() is not None, 60)
+            finally:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+                process.wait()
+            found = reports()
+            return (found[0] if found else None), log_path.read_text(errors="replace")[-4000:]
+
+    passed = True
+
+    def expect(step: str, report: dict | None, ok: bool, output: str):
+        nonlocal passed
+        if ok:
+            print(f"    {step}")
+            return
+        print(output, file=sys.stderr)
+        print(f"    FAIL: {step} (Xenon reported {report})", file=sys.stderr)
+        passed = False
+
+    def shows_certificate(report: dict | None) -> bool:
+        return (
+            report is not None
+            and str(report.get("protocol", "")).startswith("TLS 1.")
+            and bool(report.get("cipher"))
+            and report.get("certificate", {}).get("fingerprint") == fingerprint
+            and report.get("certificate", {}).get("subject") == "127.0.0.1"
+            and report.get("chain") == ["127.0.0.1"]
+        )
+
+    try:
+        report, output = report_for(
+            secure_url, ["--certificate", str(CERTIFICATE_ERRORS_DIR / "self-signed.pem")], report_env
+        )
+        expect(
+            "a site whose certificate is trusted is secure, with its TLS version, cipher and certificate",
+            report,
+            report is not None and report.get("state") == "secure" and shows_certificate(report),
+            output,
+        )
+        report, output = report_for(secure_url, [], {**report_env, "XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS": "1"})
+        expect(
+            "a site reached past the certificate warning says its certificate was accepted, and shows it",
+            report,
+            report is not None and report.get("state") == "acceptedCertificate" and shows_certificate(report),
+            output,
+        )
+        report, output = report_for(plain_url, [], report_env)
+        expect(
+            "a plain HTTP page isn't secure",
+            report,
+            report is not None and report.get("state") == "notSecure" and "certificate" not in report,
+            output,
+        )
+    finally:
+        for server in (secure_server, plain_server):
+            server.shutdown()
+    return passed
+
+
+def site_security_reports(output: str) -> list[dict]:
+    reports = []
+    for line in output.splitlines():
+        if SITE_SECURITY_TEST_MARKER not in line:
+            continue
+        try:
+            reports.append(json.loads(line.split(SITE_SECURITY_TEST_MARKER, 1)[1].strip()))
+        except json.JSONDecodeError:
+            pass
+    return reports
 
 
 def certificate_error_reports(output: str) -> list[dict]:

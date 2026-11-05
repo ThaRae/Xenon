@@ -1,0 +1,259 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Theo Slater <theoslater1@gmail.com>
+Date: Sat, 10 Oct 2026 14:25:02 +0100
+Subject: [PATCH] LibWebView: Check that a resumed page still answers
+
+When a hidden tab is shown again, ask its WebContent process to answer
+a lightweight responsiveness check over IPC, and report the page as
+unresponsive if the answer does not come within 8 seconds. A page with
+no input waiting would otherwise only be found unresponsive once the
+user tried to use it again.
+
+The check is dropped when the view navigates or its process crashes,
+and it does not report a page that is loading, showing a dialog or
+paused in the debugger by the time it runs out.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/ViewImplementation.cpp  | 57 +++++++++++++++++---
+ Libraries/LibWebView/ViewImplementation.h    |  9 ++++
+ Libraries/LibWebView/WebContentPage.cpp      |  5 ++
+ Libraries/LibWebView/WebContentPage.h        |  1 +
+ Services/WebContent/ConnectionFromClient.cpp |  5 ++
+ Services/WebContent/ConnectionFromClient.h   |  1 +
+ Services/WebContent/WebContentClient.ipc     |  1 +
+ Services/WebContent/WebContentServer.ipc     |  1 +
+ 8 files changed, 74 insertions(+), 6 deletions(-)
+
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index e339795229f9f98660b89fd0d124cee066c8b283..eb6513db374f3c7591476060a2970a68682d135d 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -117,6 +117,14 @@ ViewImplementation::ViewImplementation(IsPrivate is_private, EnableContentBlocke
+     m_page_response_timer = Core::Timer::create_single_shot(AK::Duration::zero(), [this] {
+         update_page_response_watchdog();
+     });
++
++    m_page_responsiveness_check_timer = Core::Timer::create_single_shot(page_response_timeout, [this] {
++        m_pending_page_responsiveness_check_id.clear();
++        if (page_response_watch_is_suspended())
++            return;
++        m_check_page_unresponsive = true;
++        update_page_unresponsive_state();
++    });
+ }
+ 
+ ViewImplementation::~ViewImplementation()
+@@ -476,6 +484,13 @@ void ViewImplementation::server_did_paint(Badge<WebContentPage>, i32 bitmap_id,
+         on_ready_to_paint();
+ }
+ 
++void ViewImplementation::did_respond_to_page_responsiveness_check(Badge<WebContentPage>, u64 request_id)
++{
++    if (m_pending_page_responsiveness_check_id != request_id && !m_check_page_unresponsive)
++        return;
++    stop_page_responsiveness_check();
++}
++
+ void ViewImplementation::release_backing_store(i32 bitmap_id)
+ {
+     page().release_presented_bitmap(bitmap_id);
+@@ -505,6 +520,10 @@ void ViewImplementation::set_system_visibility_state(Web::HTML::VisibilityState
+     traversable().set_system_visibility_state(visibility_state);
+     Application::the().update_compositor_context_visibility(page().compositor_context_id(), visibility_state);
+     report_permission_presence();
++    if (visibility_state == Web::HTML::VisibilityState::Visible)
++        start_page_responsiveness_check();
++    else
++        m_page_responsiveness_check_timer->stop();
+     update_page_response_watchdog();
+ }
+ 
+@@ -1582,16 +1601,21 @@ void ViewImplementation::update_page_response_watchdog()
+             oldest_input_time = pending.enqueued_at;
+     }
+ 
+-    auto unresponsive = m_page_unresponsive && oldest_input_time.has_value();
++    m_input_page_unresponsive = m_input_page_unresponsive && oldest_input_time.has_value();
+     m_page_response_timer->stop();
+-    if (oldest_input_time.has_value() && !unresponsive && !suspended) {
++    if (oldest_input_time.has_value() && !m_input_page_unresponsive && !suspended) {
+         auto deadline = max(*oldest_input_time, m_page_response_watch_resumed_at) + page_response_timeout;
+         if (deadline <= now)
+-            unresponsive = true;
++            m_input_page_unresponsive = true;
+         else
+             m_page_response_timer->restart(deadline - now);
+     }
++    update_page_unresponsive_state();
++}
+ 
++void ViewImplementation::update_page_unresponsive_state()
++{
++    auto unresponsive = m_input_page_unresponsive || m_check_page_unresponsive;
+     if (m_page_unresponsive == unresponsive)
+         return;
+     m_page_unresponsive = unresponsive;
+@@ -1603,17 +1627,37 @@ void ViewImplementation::stop_watching_page_response()
+ {
+     for (auto& pending : m_pending_input_events)
+         pending.watches_page_response = false;
++    stop_page_responsiveness_check();
+     update_page_response_watchdog();
+ }
+ 
++void ViewImplementation::start_page_responsiveness_check()
++{
++    auto request_id = m_next_page_responsiveness_check_id++;
++    m_pending_page_responsiveness_check_id = request_id;
++    page().async_check_page_responsiveness(request_id);
++    m_page_responsiveness_check_timer->restart();
++}
++
++void ViewImplementation::stop_page_responsiveness_check()
++{
++    m_page_responsiveness_check_timer->stop();
++    m_pending_page_responsiveness_check_id.clear();
++    m_check_page_unresponsive = false;
++    update_page_unresponsive_state();
++}
++
+ void ViewImplementation::keep_waiting_for_unresponsive_page()
+ {
+     if (!m_page_unresponsive)
+         return;
+-    m_page_unresponsive = false;
++    auto was_checking = m_check_page_unresponsive;
++    m_input_page_unresponsive = false;
++    m_check_page_unresponsive = false;
+     m_page_response_watch_resumed_at = MonotonicTime::now();
+-    if (on_page_unresponsive_changed)
+-        on_page_unresponsive_changed(false);
++    update_page_unresponsive_state();
++    if (was_checking)
++        start_page_responsiveness_check();
+     update_page_response_watchdog();
+ }
+ 
+@@ -4485,6 +4529,7 @@ void ViewImplementation::handle_web_content_process_crash()
+     // for this tab are stale once its tree is abandoned or restored.
+     m_pending_input_events.clear();
+     m_page_has_open_dialog = false;
++    stop_page_responsiveness_check();
+     update_page_response_watchdog();
+ 
+     set_loading_state(false);
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index 914b3729b2d9aadfeb0f7d3de1124cc6071ac9e1..da2829fe2291f4e8b05e3f26bbcbc165b3150e31 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -197,6 +197,7 @@ public:
+     String const& handle() const { return m_window_handle; }
+ 
+     void server_did_paint(Badge<WebContentPage>, i32 bitmap_id, Gfx::IntSize size, Gfx::IntRect damage_rect, double device_pixel_ratio);
++    void did_respond_to_page_responsiveness_check(Badge<WebContentPage>, u64 request_id);
+ 
+     // What the user does in the WebAuthn prompt.
+     void web_authn_cancel();
+@@ -779,6 +780,9 @@ protected:
+     bool page_response_watch_is_suspended() const;
+     void update_page_response_watchdog();
+     void stop_watching_page_response();
++    void start_page_responsiveness_check();
++    void stop_page_responsiveness_check();
++    void update_page_unresponsive_state();
+     void did_open_page_dialog();
+     void did_close_page_dialog();
+     void complete_webdriver_navigation_completion(u64 request_id, Web::WebDriver::Response);
+@@ -1021,6 +1025,11 @@ protected:
+     MonotonicTime m_page_response_watch_resumed_at { MonotonicTime::now_coarse() };
+     bool m_page_response_watch_was_suspended { true };
+     bool m_page_has_open_dialog { false };
++    bool m_input_page_unresponsive { false };
++    RefPtr<Core::Timer> m_page_responsiveness_check_timer;
++    u64 m_next_page_responsiveness_check_id { 1 };
++    Optional<u64> m_pending_page_responsiveness_check_id;
++    bool m_check_page_unresponsive { false };
+     bool m_page_unresponsive { false };
+     void send_queued_input_events();
+     void send_input_event(size_t index);
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 5100c5d07102d4bff37eaf755000025591b85c9b..a8cff544569f8735752204ea311aec02384d7c5e 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -2712,6 +2712,11 @@ void WebContentPage::did_request_set_system_focus(bool has_system_focus)
+     traversable().set_has_system_focus(has_system_focus, *this);
+ }
+ 
++void WebContentPage::did_respond_to_page_responsiveness_check(u64 request_id)
++{
++    view().did_respond_to_page_responsiveness_check({}, request_id);
++}
++
+ void WebContentPage::did_request_set_system_visibility_state(Web::HTML::VisibilityState visibility_state)
+ {
+     if (!may_change_window(*this, "did_request_set_system_visibility_state"sv))
+diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
+index 4687760631f48f8f133373d3968a011e26ac30e7..1f18c4c27ace4c5d9732cdae8c26872b72593100 100644
+--- a/Libraries/LibWebView/WebContentPage.h
++++ b/Libraries/LibWebView/WebContentPage.h
+@@ -362,6 +362,7 @@ private:
+     virtual void did_request_writing_suggestion(u64 request_id, Utf16String text, u32 caret_offset) override;
+     virtual void did_request_set_system_focus(bool has_system_focus) override;
+     virtual void did_request_set_system_visibility_state(Web::HTML::VisibilityState visibility_state) override;
++    virtual void did_respond_to_page_responsiveness_check(u64 request_id) override;
+     virtual void did_request_navigation_start(Web::HTML::CrossProcessId navigable_id, Web::NavigationTarget target, URL::URL url, Utf16String navigation_id, Optional<Web::HTML::NavigationStartRequest> start_request) override;
+     virtual void did_complete_navigation_unload_check(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id) override;
+     virtual void did_finish_navigation_params_creation(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id, Optional<Web::HTML::NavigationPopulationResult> result) override;
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index fcb5b796bc33416dafdedb42c2dd7e93d892938c..0f739fa44cb53880ef12951fdc9c0aeb84a9f17e 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3546,6 +3546,11 @@ void ConnectionFromClient::schedule_memory_release_after_load()
+     m_memory_release_timer->start();
+ }
+ 
++void ConnectionFromClient::check_page_responsiveness(Web::PageId page_id, u64 request_id)
++{
++    async_did_respond_to_page_responsiveness_check(page_id, request_id);
++}
++
+ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState system_visibility_state)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index b8ec0215edb53fe75129793a098b98541409733f..e06e0740a0992e9d39a9f97df6ca134a72b8ac39 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -302,6 +302,7 @@ private:
+     virtual void blob_url_entry_removed(Utf16String url) override;
+     virtual void did_delete_all_cookies(Web::PageId page_id, u64 request_id) override;
+     virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
++    virtual void check_page_responsiveness(Web::PageId page_id, u64 request_id) override;
+     virtual void set_browsing_context_group(Web::PageId page_id, u64 browsing_context_group_id) override;
+     virtual void update_visibility_state(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::VisibilityState) override;
+     virtual void reset_zoom(Web::PageId page_id) override;
+diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
+index 32ada113c6b380c50b2f23e17162d6d1b8a22be7..076d33762bf14f83061e36643d0109f997d74e3a 100644
+--- a/Services/WebContent/WebContentClient.ipc
++++ b/Services/WebContent/WebContentClient.ipc
+@@ -292,6 +292,7 @@ endpoint WebContentClient routed by Web::PageId page_id
+     did_request_webdriver_mouse_event(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId local_root_id, Web::MouseEvent event) =|
+     did_request_pinch_event_for_testing(Web::PageId page_id, Web::HTML::CrossProcessId local_root_id, Web::PinchEvent event) =|
+     did_request_set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState visibility_state) =|
++    did_respond_to_page_responsiveness_check(Web::PageId page_id, u64 request_id) =|
+     request_history_operation(Web::PageId page_id, Web::HTML::CrossProcessId operation_id, Web::HistoryOperationParameters parameters) =|
+     revoke_history_operation(Web::PageId page_id, Web::HTML::CrossProcessId operation_id) =|
+     beforeunload_check_result(Web::PageId page_id, Web::HTML::CrossProcessId check_id, Web::HTML::CheckIfUnloadingIsCanceledResult result, Web::HTML::UnloadPromptShown unload_prompt_shown) =|
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 60ada44d338da6a14c9a395ccc32e8b93c7702c7..786c9b3c37280844f47323e6c59ea07f285f2520 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -305,6 +305,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     did_delete_all_cookies(Web::PageId page_id, u64 request_id) =|
+ 
+     set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState system_visibility_state) =|
++    check_page_responsiveness(Web::PageId page_id, u64 request_id) =|
+     update_visibility_state(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::VisibilityState visibility_state) =|
+ 
+     did_open_dialog_in_another_process(Web::PageId page_id, Web::PendingDialog dialog, Utf16String message) =|

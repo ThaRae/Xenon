@@ -33,8 +33,11 @@
 #endif
 #include <UI/Menu.h>
 #include <UI/NewTabPage.h>
+#include <UI/PageUnresponsivePrompt.h>
 #include <UI/Popover.h>
 #include <UI/SessionSaving.h>
+#include <UI/SiteSecurity.h>
+#include <UI/SiteSecurityPopover.h>
 #include <UI/SplitView.h>
 #include <UI/StringUtils.h>
 #include <UI/TabHibernation.h>
@@ -1057,6 +1060,12 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     m_location_edit->on_navigation = [this](auto input, auto fallback_url, auto destination_kind) {
         location_edit_return_pressed(AK::move(input), AK::move(fallback_url), destination_kind);
     };
+    m_location_edit->on_site_security_requested = [this](QToolButton& anchor) {
+        SiteSecurityPopover::toggle(*this, anchor, view());
+    };
+    m_location_edit->has_accepted_certificate_error = [this](URL::URL const& url) {
+        return SiteSecurity::has_certificate_exception(view().session(), url);
+    };
     QObject::connect(m_location_edit, &LocationEdit::focus_return_requested, this, [this] {
         view().setFocus();
     });
@@ -1234,6 +1243,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     };
 
     WebAuthnPopover::attach(view());
+    PageUnresponsivePrompt::attach(view());
 
     view().on_request_permission = [this](WebView::PermissionPromptRequest const& request, WebView::PermissionPromptCallback on_outcome) {
         auto requester = request.top_level_origin.is_opaque() ? "this page"_string : request.top_level_origin.serialize();

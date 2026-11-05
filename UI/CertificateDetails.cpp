@@ -108,13 +108,48 @@ static String fingerprint(ReadonlyBytes der_certificate)
     return MUST(builder.to_string());
 }
 
+static void describe_certificate_into(JsonObject& description, X509 const* certificate, ReadonlyBytes der_certificate)
+{
+    auto const* subject = X509_get_subject_name(certificate);
+    auto const* issuer = X509_get_issuer_name(certificate);
+    description.set("subject"sv, name_entry(subject, NID_commonName));
+    description.set("subjectOrganization"sv, name_entry(subject, NID_organizationName));
+    description.set("issuer"sv, name_entry(issuer, NID_commonName));
+    description.set("issuerOrganization"sv, name_entry(issuer, NID_organizationName));
+
+    if (auto valid_from = milliseconds_since_epoch(X509_get0_notBefore(certificate)); valid_from.has_value())
+        description.set("validFrom"sv, *valid_from);
+    if (auto valid_until = milliseconds_since_epoch(X509_get0_notAfter(certificate)); valid_until.has_value())
+        description.set("validUntil"sv, *valid_until);
+
+    description.set("names"sv, subject_alternative_names(certificate));
+    description.set("fingerprint"sv, fingerprint(der_certificate));
+}
+
+static X509* parse_certificate(ReadonlyBytes der_certificate)
+{
+    auto const* der = der_certificate.data();
+    return d2i_X509(nullptr, &der, static_cast<long>(der_certificate.size()));
+}
+
+Optional<JsonObject> describe_certificate(ReadonlyBytes der_certificate)
+{
+    auto* certificate = parse_certificate(der_certificate);
+    if (!certificate)
+        return {};
+    ScopeGuard free_certificate = [&] { X509_free(certificate); };
+
+    JsonObject description;
+    describe_certificate_into(description, certificate, der_certificate);
+    return description;
+}
+
 JsonObject describe_rejected_certificate(ReadonlyBytes der_certificate, URL::URL const& url)
 {
     JsonObject description;
     JsonArray problems;
 
-    auto const* der = der_certificate.data();
-    auto* certificate = d2i_X509(nullptr, &der, static_cast<long>(der_certificate.size()));
+    auto* certificate = parse_certificate(der_certificate);
     if (!certificate) {
         problems.must_append("untrusted"_string);
         description.set("problems"sv, move(problems));
@@ -135,20 +170,7 @@ JsonObject describe_rejected_certificate(ReadonlyBytes der_certificate, URL::URL
         problems.must_append("untrusted"_string);
     description.set("problems"sv, move(problems));
 
-    auto const* subject = X509_get_subject_name(certificate);
-    auto const* issuer = X509_get_issuer_name(certificate);
-    description.set("subject"sv, name_entry(subject, NID_commonName));
-    description.set("subjectOrganization"sv, name_entry(subject, NID_organizationName));
-    description.set("issuer"sv, name_entry(issuer, NID_commonName));
-    description.set("issuerOrganization"sv, name_entry(issuer, NID_organizationName));
-
-    if (auto valid_from = milliseconds_since_epoch(X509_get0_notBefore(certificate)); valid_from.has_value())
-        description.set("validFrom"sv, *valid_from);
-    if (auto valid_until = milliseconds_since_epoch(X509_get0_notAfter(certificate)); valid_until.has_value())
-        description.set("validUntil"sv, *valid_until);
-
-    description.set("names"sv, subject_alternative_names(certificate));
-    description.set("fingerprint"sv, fingerprint(der_certificate));
+    describe_certificate_into(description, certificate, der_certificate);
     return description;
 }
 

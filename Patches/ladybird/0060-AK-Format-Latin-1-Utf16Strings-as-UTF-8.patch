@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Theo Slater <theoslater1@gmail.com>
+Date: Tue, 3 Nov 2026 16:03:05 +0000
+Subject: [PATCH] AK: Format Latin-1 Utf16Strings as UTF-8
+
+One-byte storage now holds text up to U+00FF, but the formatter wrote
+any string without UTF-16 storage as its raw bytes. A Latin-1 string
+such as a page title with an accented letter then produced invalid
+UTF-8, and String::formatted failed. Only ASCII storage is written as
+bytes now; everything else goes through the UTF-16 view.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ AK/Utf16String.cpp           | 6 +++---
+ Tests/AK/TestUtf16String.cpp | 2 ++
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/AK/Utf16String.cpp b/AK/Utf16String.cpp
+index 8d5e14472077fdc2fb6f6dffd8ab637c4bcdaedb..d4d83e55015c974953cafa52c07c2044c09afed1 100644
+--- a/AK/Utf16String.cpp
++++ b/AK/Utf16String.cpp
+@@ -162,9 +162,9 @@ String Utf16String::to_well_formed_utf8() const
+ 
+ ErrorOr<void> Formatter<Utf16String>::format(FormatBuilder& builder, Utf16String const& utf16_string)
+ {
+-    if (utf16_string.has_long_utf16_storage())
+-        return builder.put_string(utf16_string.utf16_view());
+-    return builder.put_string(utf16_string.ascii_view());
++    if (utf16_string.has_ascii_storage())
++        return builder.put_string(utf16_string.ascii_view());
++    return builder.put_string(utf16_string.utf16_view());
+ }
+ 
+ template<Integral T>
+diff --git a/Tests/AK/TestUtf16String.cpp b/Tests/AK/TestUtf16String.cpp
+index 9c05e001dd594d76f221d3dd66e47ad2ccf5a9b3..1f7ca39a78669114036f359f9ab67ee2f903590e 100644
+--- a/Tests/AK/TestUtf16String.cpp
++++ b/Tests/AK/TestUtf16String.cpp
+@@ -1371,6 +1371,8 @@ TEST_CASE(latin1_storage)
+     builder.append(string);
+     EXPECT_EQ(builder.to_string(), utf16_string);
+ 
++    EXPECT_EQ(MUST(String::formatted("{}", string)), "crème brûlée"sv);
++
+     // Latin-1 storage whose code units are all ASCII is ASCII storage.
+     static constexpr u8 ascii_bytes[] = { 'c', 'r', 'e', 'm', 'e', ' ', 'b', 'r', 'u', 'l', 'e', 'e' };
+     auto ascii_string = Utf16String::from_utf16(Utf16View::from_latin1(ascii_bytes, false));

@@ -5,13 +5,13 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
 
 - [Setup and internal pages](#setup-and-internal-pages): welcome flow, new tab page, settings
 - [Tabs and windows](#tabs-and-windows): layouts, split view, tab groups, recently used order, hibernation, memory use,
-  restoring tabs
+  restoring tabs, unresponsive pages
 - [Search and the address bar](#search-and-the-address-bar): !bangs, quick link copy
 - [Ads and trackers](#ads-and-trackers): uBlock Origin's filters and engine features, its popup and dashboard, daily
   updates
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden, Proton Pass,
   1Password, iCloud Passwords, security keys
-- [Security](#security): certificate warnings
+- [Security](#security): certificate warnings, site information
 - [Installing and updates](#installing-and-updates): the installer, the AppImage and the AUR packages, Xenon updating
   itself, and the Update button
 - [Look](#look): palette and icon
@@ -220,6 +220,36 @@ window.
   and when Xenon quits. Xenon has it write a tab's new page, the active tab, and the tab order within a second of a
   change (`UI/SessionSaving.cpp`), so that tabs opened, reopened, or duplicated just before a crash don't come back blank.
 
+### Unresponsive pages
+
+As in Chrome, a page that has left a key press, click, or scroll unanswered for 8 seconds gets a **Page unresponsive**
+prompt at the top of its tab, naming the page by its title (or its host, if it has none), with two buttons:
+
+- **Wait** hides the prompt and gives the page another 8 seconds before asking again.
+- **Exit page** ends the process that's stuck, which shows the tab's crash screen with its **Reload page** button. When
+  the stuck process only hosts one of the page's cross-site frames, only that frame goes.
+
+The prompt goes by itself when the page catches up, or when the tab navigates, reloads, or goes back or forward. It
+belongs to its tab: a background tab's prompt only shows once that tab is selected, if the page still hasn't answered.
+Selecting a tab also asks its process to answer at once, over IPC, so a page that got stuck in the background is found
+within 8 seconds of being shown, without waiting for input.
+
+The 8 seconds only count while the page could be answering, so none of these brings the prompt up:
+
+- a hidden tab, or one that's hibernated (a hibernated tab has no process to wait on);
+- a page that's still loading;
+- a page showing an alert, confirm, prompt, or leave-this-page dialog, which holds its input until it's closed (opening
+  one also forgets the input sent before it);
+- a page paused in DevTools' debugger, likewise;
+- a crashed page, or one whose process is restarting.
+
+A navigation away from a page that's stuck still waits on that page to unload, so the tab shows it loading until the
+page answers. **Exit page** gets out of it.
+
+The engine side is patches `0062` (watching the input in `LibWebView/ViewImplementation.cpp`, reported through
+`on_page_unresponsive_changed`) and `0063` (the check when a tab is shown); the prompt is `UI/PageUnresponsivePrompt.cpp`,
+in the message popover's style.
+
 ## Search and the address bar
 
 ### !bangs
@@ -400,6 +430,38 @@ fails verification`). It learns which certificate it refused by making the reque
 `UI/CertificateErrors.cpp` keeps the certificates and serves the warning, `UI/CertificateDetails.cpp` works out what's
 wrong with one, and the page is in `UI/Resources/certificate-error`. RequestServer reports a certificate before the
 navigation that failed on it ends, so the UI process sends a tab whose page it was to the warning in its place.
+
+### Site information
+
+The address bar shows a padlock in front of an HTTPS page's address, and **Not secure** in front of an HTTP page's, or
+an HTTPS page's whose certificate the user accepted past the [certificate warning](#certificate-warnings). Pressing
+either opens a popover below it, as Chrome's and Helium's site information does:
+
+- **Connection is secure**, for an HTTPS page whose certificate was verified; **Certificate not verified**, in the
+  accent color, for one reached over a certificate the user accepted; or **Connection isn't secure**, for HTTP, with
+  nothing more.
+- **Connection**: the TLS version (`TLS 1.3`) and cipher (`TLS_AES_256_GCM_SHA384`).
+- **Certificate**: who it's issued to and by (common name and organization), when it's valid, and its SHA-256
+  fingerprint, in eight-byte lines that can be selected and copied.
+- **Certificate chain**: the certificates the server sent, from the last one down to the site's own.
+
+The popover shows what it knows straight away and fills in the connection once RequestServer answers. A page that
+came from the cache before Xenon connected to its host has no details to show, and says so.
+
+Engine patch `0064` (`RequestServer+LibRequests: Let the UI process ask how a host was reached`) has RequestServer
+remember, for each HTTPS host and port, the TLS version, cipher and peer certificates of the last connection it made
+there, and whether that connection was made over an accepted certificate, and answer the UI process's
+`retrieve_secure_connection()`. It reads them from curl's OpenSSL handle (`CURLINFO_TLS_SSL_PTR`) when a response's
+headers arrive, and only on a new connection (`CURLINFO_NUM_CONNECTS`): a reused one has nothing new to say. That
+costs a few reference counts per connection; the certificates are DER-encoded only when the popover asks for them.
+`CURLOPT_CERTINFO`, which the certificate warning uses after a failure, would make curl collect and format every
+connection's certificates, so it isn't used here. Each RequestServer keeps the 128 hosts it connected to last, and the
+UI process asks every RequestServer of the tab's session, as any of them may have made the connection.
+
+`UI/SiteSecurity.cpp` asks for the connection and describes it, with `UI/CertificateDetails.cpp` reading the
+certificates, `UI/SiteSecurityPopover.cpp` is the popover, and `UI/LocationEdit.cpp` the padlock. In a headless run
+with `XENON_TEST_REPORT_SITE_SECURITY` set, Xenon logs the description of each page it loads, which
+`Meta/xenon.py test` checks against local HTTPS and HTTP servers.
 
 ## Installing and updates
 
