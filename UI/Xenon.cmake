@@ -107,6 +107,7 @@ set(XENON_SOURCES
     WebCompatReportReview.cpp
     WebContentView.cpp
     WebUIInterfaces.cpp
+    WindowExposure.cpp
     WindowCloseCoordinator.cpp
     WindowControlButton.cpp
     WindowScreenObserver.cpp

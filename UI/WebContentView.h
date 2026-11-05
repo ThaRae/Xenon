@@ -164,6 +164,9 @@ public:
     void update_page_focus();
     virtual bool event(QEvent*) override;
 
+    void set_system_visibility_state(Web::HTML::VisibilityState);
+    void window_exposure_changed();
+
     void set_viewport_rect(Gfx::IntRect);
     void push_viewport_size();
     void set_device_pixel_ratio(double);
@@ -301,6 +304,7 @@ private:
 #endif
 
     OwnPtr<WebView::AccessibilityTreeManager> m_accessibility_manager;
+    Optional<Web::HTML::VisibilityState> m_requested_system_visibility_state;
     bool m_posted_initial_accessibility_focus { false };
     // Set once this view has asked WebContent for the tree; from then on, WebContent pushes every change on its own.
     bool m_requested_accessibility_tree { false };

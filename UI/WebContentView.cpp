@@ -41,6 +41,7 @@
 #include <UI/ReportReview.h>
 #include <UI/ScreenshotViewer.h>
 #include <UI/WebCompatReportReview.h>
+#include <UI/WindowExposure.h>
 #ifdef AK_OS_MACOS
 #    include <UI/MacWindow.h>
 #endif
@@ -1896,6 +1897,22 @@ void WebContentView::update_zoom()
 {
     ViewImplementation::update_zoom();
     update_viewport_size();
+}
+
+void WebContentView::set_system_visibility_state(Web::HTML::VisibilityState visibility_state)
+{
+    m_requested_system_visibility_state = visibility_state;
+    window_exposure_changed();
+}
+
+void WebContentView::window_exposure_changed()
+{
+    if (!has_traversable())
+        return;
+    auto requested = m_requested_system_visibility_state.value_or(traversable().system_visibility_state());
+    m_requested_system_visibility_state = requested;
+    auto shown = requested == Web::HTML::VisibilityState::Visible && !WindowExposure::hides_pages_in(window());
+    ViewImplementation::set_system_visibility_state(shown ? Web::HTML::VisibilityState::Visible : Web::HTML::VisibilityState::Hidden);
 }
 
 void WebContentView::showEvent(QShowEvent* event)
