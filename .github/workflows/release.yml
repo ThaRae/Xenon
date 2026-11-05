@@ -37,11 +37,13 @@ jobs:
             cache: macos
             suffix: ""
             appcast: appcast.xml
+            llvm: llvm@22
           - architecture: x86_64
             runner: macos-15-intel
             cache: macos-x86_64
             suffix: -x86_64
             appcast: appcast-x86_64.xml
+            llvm: ""
     name: macos (${{ matrix.architecture }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
@@ -150,10 +152,12 @@ jobs:
           xcodebuild -version
 
       - name: Install dependencies
+        env:
+          LLVM: ${{ matrix.llvm }}
         run: |
           brew update --quiet
           brew unlink openssl@3 || true
-          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool llvm@22 nasm ninja pkg-config unzip
+          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool $LLVM nasm ninja pkg-config unzip
 
       - name: Restore the build caches
         uses: actions/cache/restore@v6

@@ -177,8 +177,10 @@ CI runs on GitHub Actions, on GitHub's own runners:
 - **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
   `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
 - **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
-  (`ladybird/.github/actions/setup`). The Intel build runs on `macos-15-intel`, GitHub's last Intel image, which may
-  not have that Xcode; it then takes the newest one there.
+  (`ladybird/.github/actions/setup`). The Intel build runs on `macos-15-intel`, GitHub's last Intel image, which
+  doesn't have that Xcode, so it takes the newest one there (26.3). Homebrew no longer builds bottles for Intel Macs,
+  so a few packages compile on the runner, and the Intel jobs leave out `llvm@22`, which would mean building LLVM:
+  Xenon compiles with Xcode's clang on both Macs either way.
 - **Caches**: ccache's objects (`Build/caches`) and vcpkg's prebuilt packages (`ladybird/Build/caches`) are kept in
   GitHub's cache, one entry per platform. Builds on `main` save them, and a pull request starts from `main`'s. A pull
   request whose build misses ccache more than 500 times (a Ladybird bump, say) saves its own too, so its next push

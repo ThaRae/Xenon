@@ -55,7 +55,7 @@ jobs:
         run: |
           brew update --quiet
           brew unlink openssl@3 || true
-          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool llvm@22 nasm ninja pkg-config unzip
+          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool nasm ninja pkg-config unzip
 
       - name: Restore the build caches
         id: restore
