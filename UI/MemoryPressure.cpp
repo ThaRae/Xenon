@@ -9,6 +9,8 @@
 #include <AK/StringBuilder.h>
 #include <AK/StringConversions.h>
 #include <AK/StringView.h>
+#include <LibCore/Environment.h>
+#include <LibCore/File.h>
 #include <UI/MemoryPressure.h>
 
 #include <errno.h>
@@ -62,6 +64,18 @@ size_t tabs_to_hibernate(Level level, size_t eligible_count)
         return eligible_count;
     }
     VERIFY_NOT_REACHED();
+}
+
+bool MemoryReleaseTrigger::should_release_memory(Level level, MonotonicTime now)
+{
+    auto entered_pressure = m_previous_level == Level::Normal && level != Level::Normal;
+    m_previous_level = level;
+    if (!entered_pressure)
+        return false;
+    if (m_last_release_time.has_value() && now - *m_last_release_time < MINIMUM_TIME_BETWEEN_RELEASES)
+        return false;
+    m_last_release_time = now;
+    return true;
 }
 
 static Optional<u64> meminfo_bytes(StringView text, StringView name)
@@ -127,7 +141,7 @@ static Optional<ByteString> read_proc_file(char const* path)
     return builder.to_byte_string();
 }
 
-Sample sample()
+static Sample system_sample()
 {
     Sample sample;
     if (auto meminfo = read_proc_file("/proc/meminfo"); meminfo.has_value())
@@ -139,7 +153,7 @@ Sample sample()
 
 #elif defined(AK_OS_MACOS)
 
-Sample sample()
+static Sample system_sample()
 {
     Sample sample;
     vm_statistics64_data_t vm {};
@@ -165,11 +179,28 @@ Sample sample()
 
 #else
 
-Sample sample()
+static Sample system_sample()
 {
     return {};
 }
 
 #endif
+
+static constexpr auto TEST_MEMINFO_VARIABLE = "XENON_TEST_MEMINFO"sv;
+
+Sample sample()
+{
+    auto test_meminfo_path = Core::Environment::get(TEST_MEMINFO_VARIABLE);
+    if (!test_meminfo_path.has_value())
+        return system_sample();
+
+    auto file = Core::File::open(*test_meminfo_path, Core::File::OpenMode::Read);
+    if (file.is_error())
+        return {};
+    auto contents = file.value()->read_until_eof();
+    if (contents.is_error())
+        return {};
+    return parse_meminfo(StringView { contents.value() });
+}
 
 }

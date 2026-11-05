@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Wed, 4 Nov 2026 23:18:42 -0500
+Subject: [PATCH] WebContent: Let the UI process ask for unused memory back
+
+A browser that learns the system is short of memory has nothing to ask
+a WebContent process for short of discarding its pages. Add
+release_unused_memory(), which collects garbage once and decommits the
+allocator's free pages, as after a page loads, so that a process that
+stays, the visible tab's included, can still give back what it no
+longer uses.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Services/WebContent/ConnectionFromClient.cpp | 8 ++++++++
+ Services/WebContent/ConnectionFromClient.h   | 1 +
+ Services/WebContent/WebContentServer.ipc     | 1 +
+ 3 files changed, 10 insertions(+)
+
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index c5674c649c81d346ebf00661444e2f93ee04cfef..6a9c11cf896a4081b6ada19a700510807656f177 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -566,6 +566,14 @@ void ConnectionFromClient::set_navigation_events_enabled(bool enabled)
+     WebContent::set_embedder_wants_navigation_events(enabled);
+ }
+ 
++void ConnectionFromClient::release_unused_memory()
++{
++    Core::deferred_invoke([] {
++        Web::Bindings::main_thread_vm().heap().collect_garbage(GC::Heap::CollectionType::CollectGarbage, false);
++        ak_kmalloc_decommit_free_pages();
++    });
++}
++
+ void ConnectionFromClient::update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen)
+ {
+     if (auto page = this->page(page_id); page.has_value())
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index e06e0740a0992e9d39a9f97df6ca134a72b8ac39..8806857281189760f291fdbf46cff41be26cfe62 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -133,6 +133,7 @@ private:
+     virtual void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) override;
+     virtual void set_user_scripts_enabled(bool enabled) override;
+     virtual void set_navigation_events_enabled(bool enabled) override;
++    virtual void release_unused_memory() override;
+     virtual void compositor_process_reconnected() override;
+     virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
+     virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 786c9b3c37280844f47323e6c59ea07f285f2520..ff19ca0faa4b9b4c51c0dba69576acb667c6237d 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -103,6 +103,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+     set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) =|
+     set_user_scripts_enabled(bool enabled) =|
+     set_navigation_events_enabled(bool enabled) =|
++    release_unused_memory() =|
+ 
+     update_system_theme(Web::PageId page_id, Core::AnonymousBuffer theme_buffer) =|
+     update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen_index) =|

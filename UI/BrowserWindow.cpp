@@ -36,6 +36,7 @@
 #include <UI/TabHibernation.h>
 #include <UI/WebContentView.h>
 #include <UI/WindowControlButton.h>
+#include <UI/WindowExposure.h>
 #include <UI/XenonSettings.h>
 
 #include <QAbstractButton>
@@ -232,6 +233,7 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
     setAttribute(Qt::WA_OpaquePaintEvent);
     setWindowIcon(app_icon());
     qApp->installEventFilter(this);
+    WindowExposure::watch(*this);
     update_window_border();
 
     update_tabs_display();

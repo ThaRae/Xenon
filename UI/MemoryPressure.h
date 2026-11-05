@@ -8,6 +8,7 @@
 
 #include <AK/Optional.h>
 #include <AK/StringView.h>
+#include <AK/Time.h>
 #include <AK/Types.h>
 
 namespace Ladybird::MemoryPressure {
@@ -32,5 +33,16 @@ Sample parse_meminfo(StringView);
 Optional<double> parse_psi_some_avg10(StringView);
 
 size_t tabs_to_hibernate(Level, size_t eligible_count);
+
+class MemoryReleaseTrigger {
+public:
+    static constexpr auto MINIMUM_TIME_BETWEEN_RELEASES = AK::Duration::from_seconds(60);
+
+    bool should_release_memory(Level, MonotonicTime now);
+
+private:
+    Level m_previous_level { Level::Normal };
+    Optional<MonotonicTime> m_last_release_time;
+};
 
 }

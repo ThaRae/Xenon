@@ -74,6 +74,7 @@ set(XENON_SOURCES
     LocationEdit.cpp
     Menu.cpp
     MemoryPressure.cpp
+    MemoryPressureRelease.cpp
     NativeWindowContainer.cpp
     NativeTextEditingLineEdit.cpp
     NewTabPage.cpp
@@ -106,6 +107,7 @@ set(XENON_SOURCES
     WebCompatReportReview.cpp
     WebContentView.cpp
     WebUIInterfaces.cpp
+    WindowExposure.cpp
     WindowCloseCoordinator.cpp
     WindowControlButton.cpp
     WindowScreenObserver.cpp

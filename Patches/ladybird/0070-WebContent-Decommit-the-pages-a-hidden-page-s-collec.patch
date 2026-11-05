@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Wed, 4 Nov 2026 23:17:03 -0500
+Subject: [PATCH] WebContent: Decommit the pages a hidden page's collection
+ frees
+
+On Linux, mimalloc purges by resetting pages (MADV_FREE), which leaves
+them in the process's RSS until the kernel is short of memory, so the
+collection when a page is hidden gave little of what it freed back.
+Decommit the free pages instead, as after a page loads.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Services/WebContent/ConnectionFromClient.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 0f739fa44cb53880ef12951fdc9c0aeb84a9f17e..c5674c649c81d346ebf00661444e2f93ee04cfef 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3562,7 +3562,7 @@ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web:
+     if (system_visibility_state == Web::HTML::VisibilityState::Hidden) {
+         Core::deferred_invoke([] {
+             Web::Bindings::main_thread_vm().heap().collect_garbage(GC::Heap::CollectionType::CollectGarbage, false);
+-            ak_kmalloc_collect();
++            ak_kmalloc_decommit_free_pages();
+         });
+     }
+ }

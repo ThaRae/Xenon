@@ -19,6 +19,7 @@
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
+#include <UI/MemoryPressureRelease.h>
 #include <UI/PasswordManagers.h>
 #include <UI/SiteSecurity.h>
 #include <UI/TabHibernation.h>
@@ -173,6 +174,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
 
     Ladybird::Extensions::Registry::the().start_background_pages();
     Ladybird::TabHibernation::start();
+    Ladybird::MemoryPressureRelease::start();
 
     return app->execute();
 }
