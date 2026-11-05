@@ -33,6 +33,15 @@ static constexpr size_t READ_CHUNK_SIZE = 16 * 1024;
 static constexpr size_t MAX_READ_PER_ACTIVATION = sizeof(u32) + MAX_HOST_MESSAGE_SIZE;
 static constexpr auto HOSTS_VARIABLE = "XENON_NATIVE_MESSAGING_HOSTS"sv;
 
+static bool would_block(int error)
+{
+#if EAGAIN == EWOULDBLOCK
+    return error == EAGAIN;
+#else
+    return error == EAGAIN || error == EWOULDBLOCK;
+#endif
+}
+
 static String host_error(StringView message)
 {
     return MUST(String::from_utf8(message));
@@ -381,7 +390,7 @@ void NativeHostProcess::flush_outgoing()
     while (!m_outgoing.is_empty() && m_stdin_fd >= 0) {
         auto written = write_to_host(m_stdin_fd, m_outgoing.bytes());
         if (written < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            if (would_block(errno))
                 break;
             closed_by_host(host_error(NATIVE_HOST_COMMUNICATION_ERROR));
             return;
@@ -402,7 +411,7 @@ void NativeHostProcess::read_from_host()
     for (size_t read_so_far = 0; read_so_far < MAX_READ_PER_ACTIVATION && !m_closed;) {
         auto nread = ::read(m_stdout_fd, chunk, sizeof(chunk));
         if (nread < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            if (would_block(errno))
                 return;
             closed_by_host(host_error(NATIVE_HOST_COMMUNICATION_ERROR));
             return;
@@ -436,7 +445,7 @@ bool NativeHostProcess::host_holds_stdout() const
         if (nread == 0)
             return false;
         if (nread < 0)
-            return errno == EAGAIN || errno == EWOULDBLOCK;
+            return would_block(errno);
         read_so_far += nread;
     }
     return true;
