@@ -135,7 +135,9 @@ blocking dashboard, the certificate warning, extensions, WebAuthn, and password 
 servers it starts locally. Session restore needs Xenon's windows, since a headless run never saves its session, so that
 check opens them: it kills Xenon, and then quits it, and checks that the tabs come back with their pages. So does the
 Update button's, which runs Xenon with `XENON_TEST_UPDATE_READY` standing in for an update
-([Updates.md](Updates.md#testing)). Linux CI runs the tests under Xvfb, so the windows are real X11 ones; without a
+([Updates.md](Updates.md#testing)). So does the page unresponsive prompt's, with a page that busy-loops on a click sent
+through the UI process by Ladybird's `internals` object (`--expose-internals-object`), and an extension that navigates
+the tab away. Linux CI runs the tests under Xvfb, so the windows are real X11 ones; without a
 display, they go to Qt's offscreen platform. The unit tests that draw Xenon's popovers and buttons save how they look in
 `Build/release/smoke`, beside the welcome page's render (`XENON_SCREENSHOT_DIR`, which `Meta/xenon.py test` sets).
 

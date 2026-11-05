@@ -77,6 +77,7 @@ set(XENON_SOURCES
     NativeWindowContainer.cpp
     NativeTextEditingLineEdit.cpp
     NewTabPage.cpp
+    PageUnresponsivePrompt.cpp
     PasswordManagers.cpp
     ProcessManagerWindow.cpp
     PerformanceMonitorWidget.cpp

@@ -33,6 +33,7 @@
 #endif
 #include <UI/Menu.h>
 #include <UI/NewTabPage.h>
+#include <UI/PageUnresponsivePrompt.h>
 #include <UI/Popover.h>
 #include <UI/SessionSaving.h>
 #include <UI/SplitView.h>
@@ -1234,6 +1235,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     };
 
     WebAuthnPopover::attach(view());
+    PageUnresponsivePrompt::attach(view());
 
     view().on_request_permission = [this](WebView::PermissionPromptRequest const& request, WebView::PermissionPromptCallback on_outcome) {
         auto requester = request.top_level_origin.is_opaque() ? "this page"_string : request.top_level_origin.serialize();

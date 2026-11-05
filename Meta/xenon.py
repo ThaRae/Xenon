@@ -114,6 +114,14 @@ UPDATE_BUTTON_SHOWN = "The toolbar offers to relaunch to update to Xenon "
 
 SESSION_SAVE_WAIT_SECONDS = 3
 
+PAGE_UNRESPONSIVE_PROMPT = "Page unresponsive prompt "
+PAGE_UNRESPONSIVE_STAYS_HIDDEN_SECONDS = 10
+PAGE_UNRESPONSIVE_BUSY_PAGE = b"""<!doctype html><title>Busy page</title><body style="margin: 0; height: 100vh">
+<script>
+    addEventListener("mousedown", () => { while (true) {} });
+    addEventListener("load", () => setTimeout(() => internals.clickThroughUIProcess(40, 40), 500));
+</script>"""
+
 EXTENSION_STORE_DIR = XENON_SOURCE_DIR / "Tests" / "ExtensionStore"
 PASSWORD_MANAGER_TEST_MARKER = "XENON-PASSWORD-MANAGER-TEST "
 
@@ -427,6 +435,10 @@ def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> lis
     print("==> tabs come back with their pages after a crash and after a quit", flush=True)
     if not check_session_restore(executable, env):
         failures.append("session restore")
+
+    print("==> a page that stops answering a click gets the page unresponsive prompt", flush=True)
+    if not check_page_unresponsive(executable, env):
+        failures.append("page unresponsive prompt")
 
     print("==> the toolbar offers an update that's ready", flush=True)
     if not check_update_button(executable, env):
@@ -2106,6 +2118,122 @@ def check_session_restore(executable: Path, env: dict) -> bool:
         finally:
             if process and process.poll() is None:
                 stop(signal.SIGKILL)
+            server.shutdown()
+
+
+def check_page_unresponsive(executable: Path, env: dict) -> bool:
+    state = {"tabs": None, "commands": []}
+    changed = threading.Condition()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            path, _, query = self.path.partition("?")
+            with changed:
+                if path == "/report":
+                    state["tabs"] = json.loads(urllib.parse.parse_qs(query)["tabs"][0])
+                    body, content_type = json.dumps(state["commands"]).encode(), "application/json"
+                    state["commands"] = []
+                elif path == "/busy":
+                    body, content_type = PAGE_UNRESPONSIVE_BUSY_PAGE, "text/html"
+                else:
+                    body, content_type = f"<!doctype html><title>{path}</title><p>{path}".encode(), "text/html"
+                changed.notify_all()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    port = server.server_address[1]
+    busy_page = f"http://127.0.0.1:{port}/busy"
+    next_page = f"http://localhost:{port}/next"
+
+    with tempfile.TemporaryDirectory() as directory:
+        profile = Path(directory) / "profile"
+        (profile / "config").mkdir(parents=True)
+        (profile / "config" / "Settings.json").write_text(json.dumps({"firstRunComplete": True}))
+        extension = Path(directory) / "extension"
+        extension.mkdir()
+        (extension / "manifest.json").write_text(json.dumps(SESSION_RESTORE_EXTENSION_MANIFEST))
+        (extension / "background.js").write_text(
+            SESSION_RESTORE_EXTENSION_BACKGROUND.replace("REPORT_URL", f"http://127.0.0.1:{port}/report")
+        )
+        log_path = Path(directory) / "xenon.log"
+        with open(log_path, "w") as log:
+            process = subprocess.Popen(
+                [
+                    str(executable),
+                    "--profile-path",
+                    str(profile),
+                    f"--load-extension={extension}",
+                    "--expose-internals-object",
+                    busy_page,
+                ],
+                env=env,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+
+        def prompt_lines() -> list[str]:
+            return [
+                line for line in log_path.read_text(errors="replace").splitlines() if PAGE_UNRESPONSIVE_PROMPT in line
+            ]
+
+        def wait_for(step: str, condition, timeout: float = 60) -> bool:
+            if wait_until(lambda: condition() or process.poll() is not None, timeout) and condition():
+                print(f"    {step}")
+                return True
+            print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+            print(
+                f"    FAIL: {step} (the prompt's log was {prompt_lines()}, and the tabs {state['tabs']})",
+                file=sys.stderr,
+            )
+            return False
+
+        def busy_page_loaded() -> bool:
+            with changed:
+                tabs = state["tabs"] or []
+            return [(tab.get("url"), tab["status"]) for tab in tabs] == [(busy_page, "complete")]
+
+        try:
+            if not wait_for("the busy page loads", busy_page_loaded):
+                return False
+            loaded_at = time.monotonic()
+            if not wait_for(
+                "the prompt shows once the click has gone unanswered for 8 seconds",
+                lambda: any(f"shown for {busy_page}" in line for line in prompt_lines()),
+            ):
+                return False
+            waited = time.monotonic() - loaded_at
+            if waited < 7:
+                print(f"    FAIL: the prompt showed {waited:.1f} s after the page loaded", file=sys.stderr)
+                return False
+            with changed:
+                state["commands"] = [{"call": "update", "tab": 0, "args": [{"url": next_page}]}]
+            if not wait_for(
+                "navigating away hides it",
+                lambda: any(f"hidden for {busy_page}" in line for line in prompt_lines()),
+            ):
+                return False
+            time.sleep(PAGE_UNRESPONSIVE_STAYS_HIDDEN_SECONDS)
+            if len(prompt_lines()) != 2 or process.poll() is not None:
+                print(log_path.read_text(errors="replace")[-4000:], file=sys.stderr)
+                print(f"    FAIL: the prompt came back while the tab was loading ({prompt_lines()})", file=sys.stderr)
+                return False
+            print("    it stays hidden while the tab loads")
+            return True
+        finally:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            process.wait()
             server.shutdown()
 
 

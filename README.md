@@ -16,6 +16,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 - <kbd>Ctrl</kbd><kbd>Tab</kbd> switches tabs in the order you last used them
 - Tabs you haven't used in a while hibernate to free memory, including when the machine is short of memory, and come back when you select them
 - Hover a tab to see how much memory it uses
+- A page that stops responding offers to wait for it or exit it, in that tab only
 
 **Search**
 

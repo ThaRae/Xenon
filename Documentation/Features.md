@@ -5,7 +5,7 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
 
 - [Setup and internal pages](#setup-and-internal-pages): welcome flow, new tab page, settings
 - [Tabs and windows](#tabs-and-windows): layouts, split view, tab groups, recently used order, hibernation, memory use,
-  restoring tabs
+  restoring tabs, unresponsive pages
 - [Search and the address bar](#search-and-the-address-bar): !bangs, quick link copy
 - [Ads and trackers](#ads-and-trackers): uBlock Origin's filters and engine features, its popup and dashboard, daily
   updates
@@ -219,6 +219,36 @@ window.
 - Ladybird's session store (`LibWebView/SessionStore`, the profile's `Sessions.db`) writes the session every 30 seconds
   and when Xenon quits. Xenon has it write a tab's new page, the active tab, and the tab order within a second of a
   change (`UI/SessionSaving.cpp`), so that tabs opened, reopened, or duplicated just before a crash don't come back blank.
+
+### Unresponsive pages
+
+As in Chrome, a page that has left a key press, click, or scroll unanswered for 8 seconds gets a **Page unresponsive**
+prompt at the top of its tab, naming the page by its title (or its host, if it has none), with two buttons:
+
+- **Wait** hides the prompt and gives the page another 8 seconds before asking again.
+- **Exit page** ends the process that's stuck, which shows the tab's crash screen with its **Reload page** button. When
+  the stuck process only hosts one of the page's cross-site frames, only that frame goes.
+
+The prompt goes by itself when the page catches up, or when the tab navigates, reloads, or goes back or forward. It
+belongs to its tab: a background tab's prompt only shows once that tab is selected, if the page still hasn't answered.
+Selecting a tab also asks its process to answer at once, over IPC, so a page that got stuck in the background is found
+within 8 seconds of being shown, without waiting for input.
+
+The 8 seconds only count while the page could be answering, so none of these brings the prompt up:
+
+- a hidden tab, or one that's hibernated (a hibernated tab has no process to wait on);
+- a page that's still loading;
+- a page showing an alert, confirm, prompt, or leave-this-page dialog, which holds its input until it's closed (opening
+  one also forgets the input sent before it);
+- a page paused in DevTools' debugger, likewise;
+- a crashed page, or one whose process is restarting.
+
+A navigation away from a page that's stuck still waits on that page to unload, so the tab shows it loading until the
+page answers. **Exit page** gets out of it.
+
+The engine side is patches `0062` (watching the input in `LibWebView/ViewImplementation.cpp`, reported through
+`on_page_unresponsive_changed`) and `0063` (the check when a tab is shown); the prompt is `UI/PageUnresponsivePrompt.cpp`,
+in the message popover's style.
 
 ## Search and the address bar
 
