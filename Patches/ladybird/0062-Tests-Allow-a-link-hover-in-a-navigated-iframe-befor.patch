@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Wed, 4 Nov 2026 21:44:50 -0500
+Subject: [PATCH] Tests: Allow a link hover in a navigated iframe before the
+ next move
+
+When the iframe navigates under the resting pointer, a rendering update
+of its new document can hover the link under the pointer before the
+test checks that the outgoing document's hover ended. Accept that
+report there, as the hover the next move would otherwise give.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Tests/LibWebView/TestLinkHoverStatus.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Tests/LibWebView/TestLinkHoverStatus.cpp b/Tests/LibWebView/TestLinkHoverStatus.cpp
+index 23631c5edc88b348242cfa6bcf058d96b68d108f..5e8c3795595981e773505f486a726ec142f58273 100644
+--- a/Tests/LibWebView/TestLinkHoverStatus.cpp
++++ b/Tests/LibWebView/TestLinkHoverStatus.cpp
+@@ -160,7 +160,7 @@ function navigate_frame() { frame.srcdoc = frame.getAttribute("srcdoc") + "<!--
+     VERIFY(hovered_url->serialize() == "https://example.com/in-iframe"sv);
+     view->run_javascript("navigate_frame()"_string);
+     Core::EventLoop::current().spin_until([&]() { return unhovers_reported >= 6; });
+-    VERIFY(!hovered_url.has_value());
++    VERIFY(!hovered_url.has_value() || hovers_reported == 7);
+     Core::EventLoop::current().spin_until([&]() { return last_title == "frame load 2"sv; });
+ 
+     // The new iframe document's link is a fresh target. Then over to the page's own link: The iframe's handler hears
