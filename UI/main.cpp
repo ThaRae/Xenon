@@ -20,6 +20,7 @@
 #include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
 #include <UI/PasswordManagers.h>
+#include <UI/SiteSecurity.h>
 #include <UI/TabHibernation.h>
 #include <UI/Updater.h>
 #include <UI/WebUIInterfaces.h>
@@ -98,6 +99,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
     app->initialize_extensions();
 
     Ladybird::CertificateErrors::initialize();
+    Ladybird::SiteSecurity::initialize();
 
     if (!Ladybird::Application::settings().first_run_complete())
         Ladybird::Application::settings().set_new_tab_page_url(URL::about_newtab());

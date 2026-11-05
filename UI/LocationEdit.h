@@ -52,6 +52,8 @@ public:
     bool has_parked_editing_session() const { return m_parked_editing_session.has_value(); }
 
     Function<void(String, Optional<URL::URL>, WebView::OmniboxDestinationKind)> on_navigation;
+    Function<void(QToolButton& anchor)> on_site_security_requested;
+    Function<bool(URL::URL const&)> has_accepted_certificate_error;
 
 signals:
     void focus_return_requested();
@@ -117,6 +119,7 @@ private:
     bool m_has_pending_chrome_style_update { false };
     bool m_should_show_full_url_on_mouse_release { false };
     int m_text_leading_margin { 0 };
+    bool m_leading_icon_shows_site_security { false };
     bool m_has_bang_chip { false };
     bool m_is_bang_chip_dismissed { false };
     int m_bang_chip_prefix_length { 0 };

@@ -90,6 +90,8 @@ set(XENON_SOURCES
     SelectDropdown.cpp
     SessionSaving.cpp
     SettingsPage.cpp
+    SiteSecurity.cpp
+    SiteSecurityPopover.cpp
     SplitView.cpp
     StringUtils.cpp
     Tab.cpp
@@ -493,6 +495,24 @@ if (LINUX AND NOT ANDROID)
     target_link_libraries(TestXenonBlockingPopover PRIVATE PkgConfig::XCB_ICCCM)
 endif()
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestSiteSecurity.cpp" Xenon NAME TestXenonSiteSecurity LIBS LibCore LibURL LibRequests LibWebView)
+target_sources(TestXenonSiteSecurity PRIVATE
+    "${XENON_UI_DIR}/CertificateDetails.cpp"
+    "${XENON_UI_DIR}/ChromeStyle.cpp"
+    "${XENON_UI_DIR}/Icon.cpp"
+    "${XENON_UI_DIR}/Popover.cpp"
+    "${XENON_UI_DIR}/SiteSecurity.cpp"
+    "${XENON_UI_DIR}/SiteSecurityPopover.cpp"
+    "${XENON_UI_DIR}/StringUtils.cpp"
+)
+target_include_directories(TestXenonSiteSecurity BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_link_libraries(TestXenonSiteSecurity PRIVATE OpenSSL::Crypto Qt::Core Qt::Gui Qt::Widgets)
+target_compile_definitions(TestXenonSiteSecurity PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
+if (LINUX AND NOT ANDROID)
+    target_sources(TestXenonSiteSecurity PRIVATE "${XENON_UI_DIR}/X11Window.cpp")
+    target_link_libraries(TestXenonSiteSecurity PRIVATE PkgConfig::XCB_ICCCM)
+endif()
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestChromeStyle.cpp" Xenon NAME TestXenonChromeStyle LIBS LibCore)
 target_sources(TestXenonChromeStyle PRIVATE
     "${XENON_UI_DIR}/ChromeStyle.cpp"
@@ -519,4 +539,4 @@ if (LINUX AND NOT ANDROID)
     target_link_libraries(TestXenonUpdateButton PRIVATE PkgConfig::XCB_ICCCM)
 endif()
 
-add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonChromeStyle TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonUpdateButton TestXenonUserAgent)
+add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonChromeStyle TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonSiteSecurity TestXenonUpdateButton TestXenonUserAgent)

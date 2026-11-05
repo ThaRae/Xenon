@@ -11,7 +11,7 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
   updates
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden, Proton Pass,
   1Password, iCloud Passwords, security keys
-- [Security](#security): certificate warnings
+- [Security](#security): certificate warnings, site information
 - [Installing and updates](#installing-and-updates): the installer, the AppImage and the AUR packages, Xenon updating
   itself, and the Update button
 - [Look](#look): palette and icon
@@ -430,6 +430,38 @@ fails verification`). It learns which certificate it refused by making the reque
 `UI/CertificateErrors.cpp` keeps the certificates and serves the warning, `UI/CertificateDetails.cpp` works out what's
 wrong with one, and the page is in `UI/Resources/certificate-error`. RequestServer reports a certificate before the
 navigation that failed on it ends, so the UI process sends a tab whose page it was to the warning in its place.
+
+### Site information
+
+The address bar shows a padlock in front of an HTTPS page's address, and **Not secure** in front of an HTTP page's, or
+an HTTPS page's whose certificate the user accepted past the [certificate warning](#certificate-warnings). Pressing
+either opens a popover below it, as Chrome's and Helium's site information does:
+
+- **Connection is secure**, for an HTTPS page whose certificate was verified; **Certificate not verified**, in the
+  accent color, for one reached over a certificate the user accepted; or **Connection isn't secure**, for HTTP, with
+  nothing more.
+- **Connection**: the TLS version (`TLS 1.3`) and cipher (`TLS_AES_256_GCM_SHA384`).
+- **Certificate**: who it's issued to and by (common name and organization), when it's valid, and its SHA-256
+  fingerprint, in eight-byte lines that can be selected and copied.
+- **Certificate chain**: the certificates the server sent, from the last one down to the site's own.
+
+The popover shows what it knows straight away and fills in the connection once RequestServer answers. A page that
+came from the cache before Xenon connected to its host has no details to show, and says so.
+
+Engine patch `0064` (`RequestServer+LibRequests: Let the UI process ask how a host was reached`) has RequestServer
+remember, for each HTTPS host and port, the TLS version, cipher and peer certificates of the last connection it made
+there, and whether that connection was made over an accepted certificate, and answer the UI process's
+`retrieve_secure_connection()`. It reads them from curl's OpenSSL handle (`CURLINFO_TLS_SSL_PTR`) when a response's
+headers arrive, and only on a new connection (`CURLINFO_NUM_CONNECTS`): a reused one has nothing new to say. That
+costs a few reference counts per connection; the certificates are DER-encoded only when the popover asks for them.
+`CURLOPT_CERTINFO`, which the certificate warning uses after a failure, would make curl collect and format every
+connection's certificates, so it isn't used here. Each RequestServer keeps the 128 hosts it connected to last, and the
+UI process asks every RequestServer of the tab's session, as any of them may have made the connection.
+
+`UI/SiteSecurity.cpp` asks for the connection and describes it, with `UI/CertificateDetails.cpp` reading the
+certificates, `UI/SiteSecurityPopover.cpp` is the popover, and `UI/LocationEdit.cpp` the padlock. In a headless run
+with `XENON_TEST_REPORT_SITE_SECURITY` set, Xenon logs the description of each page it loads, which
+`Meta/xenon.py test` checks against local HTTPS and HTTP servers.
 
 ## Installing and updates
 

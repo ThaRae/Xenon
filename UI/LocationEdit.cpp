@@ -135,6 +135,10 @@ LocationEdit::LocationEdit(QWidget* parent, WebView::IsPrivate is_private)
     m_leading_icon_button->setFocusPolicy(Qt::NoFocus);
     m_leading_icon_button->setCursor(Qt::ArrowCursor);
     m_leading_icon_button->hide();
+    connect(m_leading_icon_button, &QToolButton::clicked, this, [this] {
+        if (m_leading_icon_shows_site_security && on_site_security_requested)
+            on_site_security_requested(*m_leading_icon_button);
+    });
 
     m_trailing_action_button = new LocationActionButton(this);
     m_trailing_action_button->setObjectName("LadybirdLocationAction");
@@ -781,12 +785,17 @@ void LocationEdit::update_location_icon()
         && m_url.has_value()
         && text() == display_url();
 
+    m_leading_icon_shows_site_security = false;
     if (text_matches_current_url() || is_showing_current_url_for_display) {
         auto scheme = m_url->scheme();
-        if (scheme == "http"sv)
+        auto has_certificate_error = scheme == "https"sv && has_accepted_certificate_error && has_accepted_certificate_error(*m_url);
+        if (scheme == "http"sv || has_certificate_error)
             show_not_secure_indicator();
+        else if (scheme == "https"sv)
+            show_icon(ChromeIcon::Lock, "View site information");
         else
             hide_indicator();
+        m_leading_icon_shows_site_security = scheme == "http"sv || scheme == "https"sv;
         return;
     }
 

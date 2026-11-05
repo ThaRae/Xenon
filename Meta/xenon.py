@@ -106,6 +106,7 @@ NATIVE_MESSAGING_ECHO_HOST = XENON_SOURCE_DIR / "Tests" / "NativeMessaging" / "e
 
 CERTIFICATE_ERRORS_DIR = XENON_SOURCE_DIR / "Tests" / "CertificateErrors"
 CERTIFICATE_ERROR_TEST_MARKER = "XENON-CERTIFICATE-ERROR-TEST "
+SITE_SECURITY_TEST_MARKER = "XENON-SITE-SECURITY-TEST "
 
 WEB_AUTHN_TEST_MARKER = "XENON-WEBAUTHN-TEST "
 
@@ -427,6 +428,10 @@ def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> lis
     print("==> the certificate warning, for a local HTTPS server with a self-signed certificate", flush=True)
     if not check_certificate_errors(executable, env):
         failures.append("certificate warning")
+
+    print("==> site information for HTTPS and HTTP pages: the TLS version, cipher and certificate", flush=True)
+    if not check_site_security(executable, env):
+        failures.append("site information")
 
     print("==> extension pages and their chrome.* APIs", flush=True)
     if not check_extensions(executable, env):
@@ -2451,6 +2456,137 @@ def check_certificate_errors(executable: Path, env: dict) -> bool:
                 print(line, file=sys.stderr)
         print(output[-4000:], file=sys.stderr)
     return passed
+
+
+def check_site_security(executable: Path, env: dict) -> bool:
+    page = b"<!doctype html><title>Xenon site information test</title><link rel=stylesheet href=/style.css>"
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):
+            body = b"body { color: rgb(1, 2, 3); }" if self.path == "/style.css" else page
+            self.send_response(200)
+            self.send_header("Content-Type", "text/css" if self.path == "/style.css" else "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    class Server(http.server.ThreadingHTTPServer):
+        def handle_error(self, request, client_address):
+            pass
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(CERTIFICATE_ERRORS_DIR / "self-signed.pem", CERTIFICATE_ERRORS_DIR / "self-signed-key.pem")
+    secure_server = Server(("127.0.0.1", 0), Handler)
+    secure_server.socket = context.wrap_socket(secure_server.socket, server_side=True)
+    plain_server = Server(("127.0.0.1", 0), Handler)
+    for server in (secure_server, plain_server):
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    secure_url = f"https://127.0.0.1:{secure_server.server_address[1]}/"
+    plain_url = f"http://127.0.0.1:{plain_server.server_address[1]}/"
+
+    digest = hashlib.sha256((CERTIFICATE_ERRORS_DIR / "self-signed.der").read_bytes()).hexdigest().upper()
+    fingerprint = ":".join(digest[i : i + 2] for i in range(0, len(digest), 2))
+    report_env = {**env, "XENON_TEST_REPORT_SITE_SECURITY": "1"}
+
+    def report_for(url: str, arguments: list[str], run_env: dict) -> tuple[dict | None, str]:
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "xenon.log"
+            with open(log_path, "w") as log:
+                process = subprocess.Popen(
+                    [
+                        str(executable),
+                        "--headless=manual",
+                        "--profile-path",
+                        str(Path(directory) / "profile"),
+                        *arguments,
+                        url,
+                    ],
+                    env=run_env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+
+            def reports() -> list[dict]:
+                return site_security_reports(log_path.read_text(errors="replace"))
+
+            try:
+                wait_until(lambda: reports() or process.poll() is not None, 60)
+            finally:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+                process.wait()
+            found = reports()
+            return (found[0] if found else None), log_path.read_text(errors="replace")[-4000:]
+
+    passed = True
+
+    def expect(step: str, report: dict | None, ok: bool, output: str):
+        nonlocal passed
+        if ok:
+            print(f"    {step}")
+            return
+        print(output, file=sys.stderr)
+        print(f"    FAIL: {step} (Xenon reported {report})", file=sys.stderr)
+        passed = False
+
+    def shows_certificate(report: dict | None) -> bool:
+        return (
+            report is not None
+            and str(report.get("protocol", "")).startswith("TLS 1.")
+            and bool(report.get("cipher"))
+            and report.get("certificate", {}).get("fingerprint") == fingerprint
+            and report.get("certificate", {}).get("subject") == "127.0.0.1"
+            and report.get("chain") == ["127.0.0.1"]
+        )
+
+    try:
+        report, output = report_for(
+            secure_url, ["--certificate", str(CERTIFICATE_ERRORS_DIR / "self-signed.pem")], report_env
+        )
+        expect(
+            "a site whose certificate is trusted is secure, with its TLS version, cipher and certificate",
+            report,
+            report is not None and report.get("state") == "secure" and shows_certificate(report),
+            output,
+        )
+        report, output = report_for(secure_url, [], {**report_env, "XENON_TEST_PROCEED_PAST_CERTIFICATE_ERRORS": "1"})
+        expect(
+            "a site reached past the certificate warning says its certificate was accepted, and shows it",
+            report,
+            report is not None and report.get("state") == "acceptedCertificate" and shows_certificate(report),
+            output,
+        )
+        report, output = report_for(plain_url, [], report_env)
+        expect(
+            "a plain HTTP page isn't secure",
+            report,
+            report is not None and report.get("state") == "notSecure" and "certificate" not in report,
+            output,
+        )
+    finally:
+        for server in (secure_server, plain_server):
+            server.shutdown()
+    return passed
+
+
+def site_security_reports(output: str) -> list[dict]:
+    reports = []
+    for line in output.splitlines():
+        if SITE_SECURITY_TEST_MARKER not in line:
+            continue
+        try:
+            reports.append(json.loads(line.split(SITE_SECURITY_TEST_MARKER, 1)[1].strip()))
+        except json.JSONDecodeError:
+            pass
+    return reports
 
 
 def certificate_error_reports(output: str) -> list[dict]:

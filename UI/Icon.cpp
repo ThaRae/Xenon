@@ -336,6 +336,18 @@ QPixmap create_chrome_icon_pixmap(ChromeIcon icon, QColor color, qreal device_pi
     case ChromeIcon::Globe:
         draw_globe_icon(painter, color);
         break;
+    case ChromeIcon::Lock: {
+        QPainterPath shackle;
+        shackle.moveTo(6.9, 9.0);
+        shackle.lineTo(6.9, 6.9);
+        shackle.arcTo(QRectF(6.9, 3.8, 6.2, 6.2), 180, -180);
+        shackle.lineTo(13.1, 9.0);
+        draw_stroked_icon_path(painter, shackle, color, 1.55);
+        QPainterPath body;
+        body.addRoundedRect(QRectF(5.0, 9.0, 10.0, 7.6), 1.8, 1.8);
+        draw_stroked_icon_path(painter, body, color, 1.55);
+        break;
+    }
     case ChromeIcon::Folder: {
         painter.setPen(chrome_icon_pen(color, 1.6));
         QPainterPath path;
@@ -437,7 +449,7 @@ QIcon create_chrome_icon(ChromeIcon icon, QPalette const& palette)
         normal_alpha = 172;
     else if (icon == ChromeIcon::Star)
         normal_alpha = 204;
-    else if (icon == ChromeIcon::Globe || icon == ChromeIcon::Search || icon == ChromeIcon::Menu || icon == ChromeIcon::ContentBlocking)
+    else if (icon == ChromeIcon::Globe || icon == ChromeIcon::Lock || icon == ChromeIcon::Search || icon == ChromeIcon::Menu || icon == ChromeIcon::ContentBlocking)
         normal_alpha = 188;
     normal.setAlpha(normal_alpha);
 

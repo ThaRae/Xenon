@@ -39,6 +39,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 **Security**
 
 - A warning for sites whose certificate can't be verified that says why, with a way past it for your own servers
+- A padlock in the address bar that shows how a site's connection is secured: its TLS version, cipher and certificate
 
 **Setup**
 
