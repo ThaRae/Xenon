@@ -172,6 +172,12 @@ hours, or right-click a background tab for **Hibernate Tab**. **Settings → Tab
 on memory**, on by default. The code is `UI/TabHibernation.cpp` and `UI/MemoryPressure.cpp`, with engine patch `0023`,
 which saves the scroll position first. Engine patch `0038` also collects the page's JS heap when the tab is hidden.
 
+When the machine becomes short of memory, every WebContent process, the visible tab's and those of tabs that can't
+hibernate included, also collects garbage once and gives the memory it freed back to the system (engine patch `0067`,
+from `UI/MemoryPressureRelease.cpp`). That happens once each time memory goes from normal to short, and at most once a
+minute, not again on every check while it stays short. It doesn't depend on the hibernation settings. Tests can stand
+a file in for `/proc/meminfo` with `XENON_TEST_MEMINFO`, which the hibernation check reads too.
+
 ### Memory use on hover
 
 As in Chromium's tab hover cards: hovering a tab, the current one included, shows "Memory usage: 153.8 MB".

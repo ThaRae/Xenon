@@ -7,6 +7,9 @@
 #include <LibTest/TestCase.h>
 #include <UI/MemoryPressure.h>
 
+#include <stdlib.h>
+#include <unistd.h>
+
 using namespace Ladybird::MemoryPressure;
 
 TEST_CASE(meminfo_parses_total_and_available)
@@ -61,4 +64,54 @@ TEST_CASE(critical_wins_when_both_are_set)
         .total_bytes = 100ull * 1024 * 1024,
     };
     EXPECT_EQ(level_for(sample), Level::Critical);
+}
+
+TEST_CASE(memory_is_released_once_when_pressure_starts)
+{
+    MemoryReleaseTrigger trigger;
+    auto now = MonotonicTime::now();
+    EXPECT(!trigger.should_release_memory(Level::Normal, now));
+    EXPECT(trigger.should_release_memory(Level::Low, now));
+    EXPECT(!trigger.should_release_memory(Level::Low, now + AK::Duration::from_seconds(5)));
+    EXPECT(!trigger.should_release_memory(Level::Critical, now + AK::Duration::from_seconds(10)));
+    EXPECT(!trigger.should_release_memory(Level::Low, now + AK::Duration::from_seconds(300)));
+}
+
+TEST_CASE(memory_is_released_again_after_pressure_ends_and_returns)
+{
+    MemoryReleaseTrigger trigger;
+    auto now = MonotonicTime::now();
+    EXPECT(trigger.should_release_memory(Level::Critical, now));
+    now = now + AK::Duration::from_seconds(90);
+    EXPECT(!trigger.should_release_memory(Level::Normal, now));
+    EXPECT(trigger.should_release_memory(Level::Low, now + AK::Duration::from_seconds(5)));
+}
+
+TEST_CASE(pressure_that_comes_and_goes_releases_at_most_once_a_minute)
+{
+    MemoryReleaseTrigger trigger;
+    auto now = MonotonicTime::now();
+    EXPECT(trigger.should_release_memory(Level::Low, now));
+    EXPECT(!trigger.should_release_memory(Level::Normal, now + AK::Duration::from_seconds(5)));
+    EXPECT(!trigger.should_release_memory(Level::Low, now + AK::Duration::from_seconds(10)));
+    EXPECT(!trigger.should_release_memory(Level::Normal, now + AK::Duration::from_seconds(15)));
+    EXPECT(trigger.should_release_memory(Level::Low, now + MemoryReleaseTrigger::MINIMUM_TIME_BETWEEN_RELEASES));
+}
+
+TEST_CASE(test_meminfo_stands_in_for_the_system)
+{
+    char path[] = "/tmp/xenon-test-meminfo-XXXXXX";
+    auto fd = mkstemp(path);
+    EXPECT(fd >= 0);
+    auto text = "MemTotal:       1000000 kB\nMemAvailable:     50000 kB\n"sv;
+    EXPECT_EQ(write(fd, text.characters_without_null_termination(), text.length()), static_cast<ssize_t>(text.length()));
+    close(fd);
+
+    setenv("XENON_TEST_MEMINFO", path, 1);
+    auto stand_in = sample();
+    unsetenv("XENON_TEST_MEMINFO");
+    unlink(path);
+
+    EXPECT_EQ(level_for(stand_in), Level::Critical);
+    EXPECT(!stand_in.psi_some_avg10.has_value());
 }
