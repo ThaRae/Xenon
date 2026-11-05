@@ -24,21 +24,30 @@ Each version is a GitHub release of ThaRae/xenon-releases, tagged `v<version>`, 
   [dmgbuild](https://github.com/dmgbuild/dmgbuild), which lays the window out without scripting Finder, so it works the
   same on GitHub's runners as on a Mac. It's signed with the release certificate, like the app.
 - `Xenon-<version>.tar.xz`, which holds `Xenon.app`, for Sparkle to update from.
+- `Xenon-<version>-x86_64.dmg` and `Xenon-<version>-x86_64.tar.xz`, the same for Intel Macs.
 - `Xenon-<version>-x86_64.AppImage`, Xenon for Linux, in one file ([The AppImage](#the-appimage)).
 - `Xenon-<version>-x86_64.AppImage.zsync`, which AppImage updaters read to find out what changed, and download only
   that.
 
-The repository's `main` holds `appcast.xml`, Sparkle's feed, which lists the newest release:
+The repository's `main` holds `appcast.xml`, Sparkle's feed for Apple silicon, which lists the newest release, and
+`appcast-x86_64.xml`, the feed for Intel Macs:
 
 | In the appcast | What it is |
 | --- | --- |
 | `sparkle:version`, `sparkle:shortVersionString` | The version, which is `CFBundleVersion` and `CFBundleShortVersionString` in the app |
-| `sparkle:minimumSystemVersion`, `sparkle:hardwareRequirements` | The macOS it needs (the build's deployment target), and `arm64` |
+| `sparkle:minimumSystemVersion`, `sparkle:hardwareRequirements` | The macOS it needs (the build's deployment target), and `arm64` in the Apple silicon feed |
 | `enclosure` | The archive's URL, size, and `sparkle:edSignature`, its Ed25519 signature |
 | The comment at the end | The appcast's own Ed25519 signature, from Sparkle's `sign_update` |
 
-Xenon reads the appcast from `https://raw.githubusercontent.com/ThaRae/xenon-releases/main/appcast.xml`, a URL that
-stays the same from release to release. It downloads the archive from
+Each architecture has its own build, archive and feed, rather than one universal build at twice the size. The Apple
+silicon release keeps the names it always had, since the Xenons already installed read `appcast.xml`; the Intel one
+adds `-x86_64` to each. An Intel Xenon's `SUFeedURL` is `appcast-x86_64.xml`, so it only ever updates to an Intel
+build, and an Apple silicon Mac never gets one to run under Rosetta. Sparkle's `hardwareRequirements` can only ask for
+`arm64`, so the Intel feed has none. `Meta/release.py` takes the architecture from the built `Xenon` binary's Mach-O
+header, and `publish` checks the binary in each archive against the feed that names it.
+
+Xenon reads the appcast from `https://raw.githubusercontent.com/ThaRae/xenon-releases/main/appcast.xml` (or
+`appcast-x86_64.xml`), a URL that stays the same from release to release. It downloads the archive from
 `https://github.com/ThaRae/xenon-releases/releases/download/v<version>/Xenon-<version>.tar.xz`, which GitHub redirects
 to its storage, `release-assets.githubusercontent.com`. Sparkle follows the redirect, takes any status below 400, and
 doesn't mind that GitHub serves the appcast as `text/plain`. raw.githubusercontent.com caches a file for up to five
@@ -62,17 +71,22 @@ include path, and on macOS's case-insensitive disks `#include <version>` would f
      holds the app, the link to Applications, and its window's layout;
    - `Xenon-<version>.tar.xz`, signed with the update key;
    - `appcast.xml`, which lists it, signed too.
+
+   On an Intel Mac, it writes `Xenon-<version>-x86_64.dmg`, `Xenon-<version>-x86_64.tar.xz` and
+   `appcast-x86_64.xml` instead, and the app's feed is `appcast-x86_64.xml`.
 3. Try `Build/distribution/Xenon.app`, and open the installer to see its window.
-4. Put `Xenon-<version>-x86_64.AppImage` and its `.zsync` file in `Build/distribution` too, after `package`, which
-   empties it: from `Meta/release.py package` on Linux ([The AppImage](#the-appimage)), or the `Xenon-<version>-linux`
-   artifact of a run of the release workflow on the same commit.
-5. `./Meta/release.py publish` asks, then creates the GitHub release with the installer, the archive, and the AppImage
-   and its `.zsync` file if `Build/distribution` has them (`gh release create`), commits the appcast to
-   ThaRae/xenon-releases' `main`, and tags the commit `v<version>` in ThaRae/Xenon. It publishes the appcast only once
+4. Put the other platforms' files in `Build/distribution` too, after `package`, which empties it: the Intel Mac's
+   installer, archive and appcast, from `package` on an Intel Mac or the `Xenon-<version>-macos-x86_64` artifact of a
+   run of the release workflow on the same commit; and `Xenon-<version>-x86_64.AppImage` and its `.zsync` file, from
+   `Meta/release.py package` on Linux ([The AppImage](#the-appimage)) or the `Xenon-<version>-linux` artifact.
+5. `./Meta/release.py publish` asks, then creates the GitHub release with the installer and the archive for each Mac,
+   and the AppImage and its `.zsync` file (`gh release create`), commits the appcasts to ThaRae/xenon-releases'
+   `main`, and tags the commit `v<version>` in ThaRae/Xenon. It publishes the appcast only once
    the archive it names is up. It refuses a tree with uncommitted changes, and a commit that isn't on ThaRae/Xenon's
    `main`. It pushes over HTTPS with `gh`'s credentials, whatever Xenon's `origin` is. It reads the version and the
    feed the release was packaged for from the app in the archive the appcast names, so it runs on Linux too, from those
-   files alone.
+   files alone. It needs the Apple silicon release; the Intel one and the AppImage go up when `Build/distribution` has
+   them, and it says when one is missing, before it asks. Every macOS release in it has to be the same version.
 6. Once it's up, move the AUR packages to it and push them to the AUR, then commit the bump
    ([The AUR packages](#keeping-them-current)):
 
@@ -101,17 +115,19 @@ gh workflow run release.yml --repo ThaRae/Xenon --ref main -f publish=true
 It also runs on pull requests that change it, `Meta/release.py`, the AppImage's scripts in `Meta/ci`, or `UI/Linux`.
 Its jobs:
 
-- **macos**, on a `macos-26` runner. Before it builds, it checks the secrets: the certificate's SHA-1 and the update
+- **macos**, twice: for Apple silicon on a `macos-26` runner, and for Intel on `macos-15-intel`, each checking that
+  the build is for its architecture. The Intel one starts from the caches `.github/workflows/macos-intel.yml` saves
+  on `main`. Before it builds, it checks the secrets: the certificate's SHA-1 and the update
   key's public half must be the ones [below](#setting-up-a-mac-to-release-from), so a secret holding another one stops
   the run at once. It builds Xenon as CI's macOS job does, starting from the build caches `main`'s builds saved. A cold
   build doesn't fit in one run, so with no caches to start from, it stops there. After a change to the compiler flags,
   `main`'s caches miss until CI's build of `main` saves new ones, so wait for that. It runs `Meta/release.py test` with
   the release certificate (untick **test** to skip it), then `Meta/release.py package`, and checks what that wrote:
   the archive's and the appcast's signatures, with `sign_update --verify`, the app's `SUPublicEDKey`, and the app's
-  and the installer's code signatures. `Xenon-<version>.dmg`, `Xenon-<version>.tar.xz` and `appcast.xml` are the
-  artifact `Xenon-<version>-macos`. The certificate and the update key are the repository's secrets
-  ([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The job imports the certificate into a keychain
-  of its own, and deletes the keychain and the key's file when it's done.
+  and the installer's code signatures. The installer, archive and appcast are the artifact
+  `Xenon-<version>-macos-arm64` or `Xenon-<version>-macos-x86_64`. The certificate and the update key are the
+  repository's secrets ([Releasing from GitHub's runners](#releasing-from-githubs-runners)). The job imports the
+  certificate into a keychain of its own, and deletes the keychain and the key's file when it's done.
 - **linux**, on an `ubuntu-24.04` runner, builds Xenon in Ladybird's CI image as CI's Linux job does, from `main`'s
   build caches, and runs `Meta/release.py package` there (`Meta/ci/package-appimage.sh`). The AppImage, its `.zsync`
   file and `linux-requirements.txt` (the glibc and libstdc++ it needs) are the artifact `Xenon-<version>-linux`, and
@@ -119,7 +135,8 @@ Its jobs:
 - **linux-test** runs `Meta/release.py test` against that AppImage in containers of Ubuntu 26.04, Fedora 44 and Arch
   Linux that have nothing of the build ([Testing the AppImage](#testing-the-appimage)), with each one's render of the
   welcome page as an artifact.
-- **publish**, with **publish** ticked, once the other three have passed: it downloads both artifacts into
+- **publish**, with **publish** ticked, once the others have passed, both Macs included: it downloads the three
+  artifacts into
   `Build/distribution` and runs `Meta/release.py publish --yes`, which puts up the release, the appcast and the tag as
   it does on a Mac, and the run's summary links the release. That needs the `XENON_RELEASES_TOKEN` secret, and the
   run has to be on `main`. Before it builds, the macos job checks both, and that ThaRae/xenon-releases has no release
@@ -183,7 +200,8 @@ Ubuntu 24.04 (2.39). The system also needs FUSE, as for any AppImage (`fuse3`, w
 
 The CPU has to be x86-64-v2 (SSE4.2 and POPCNT): Intel since Nehalem (2008), AMD since Bulldozer (2011). Xenon is
 built for that baseline, not for the runner that builds it ([Development.md](Development.md#building)), so it doesn't
-need AVX. The macOS release is built for the M1, and runs on any Apple silicon Mac.
+need AVX. The Apple silicon release is built for the M1, and runs on any Apple silicon Mac; the Intel one is built
+for x86-64-v2 too, which every Intel Mac that runs macOS 14 has.
 
 Building in an older image would widen that, but Xenon needs Qt 6.10, a compiler and a C++ library new enough for
 Ladybird, and Ladybird's Rust toolchain, and only Ladybird's image is tested with all of them; older distributions

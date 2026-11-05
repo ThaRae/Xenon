@@ -83,6 +83,11 @@ instructions that older machines don't have: an AppImage built on one of GitHub'
 packaged on any Mac or runner runs on the oldest machine Xenon supports, and the build that's tested is the one that
 ships. `Meta/xenon.py` reconfigures a build directory made before this, which then recompiles everything once.
 
+Intel Macs build the same way, with the same commands: Ladybird picks vcpkg's `x64-osx` triplets, and the baseline is
+x86-64-v2 there too. Each release has an Intel build beside the Apple silicon one, with its own update feed
+([Updates.md](Updates.md#the-published-releases)). The `macos-intel.yml` workflow builds and tests it on an Intel
+runner, since Ladybird's own CI covers only Apple silicon Macs.
+
 ## Tests and CI
 
 ```bash
@@ -161,17 +166,19 @@ CI runs on GitHub Actions, on GitHub's own runners:
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | pushes to `main`, pull requests, by hand | `Meta/check.py --online`, then a Linux build and a macOS build side by side, each running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test`, with the welcome page's render and the unit tests' renders as an artifact |
 | `.github/workflows/upstream.yml` | weekly, by hand | the Linux build against Ladybird's latest `master`, plus a list of what changed upstream in `UI/Qt` and the overridden pages, so a submodule bump holds no surprises |
-| `.github/workflows/release.yml` | by hand, pull requests that change it or how releases are packaged | `Meta/release.py test` and `package` on macOS, and `package` on Linux in Ladybird's CI image, from `main`'s build caches, with the installer, archive and appcast, and the AppImage, as artifacts; `Meta/release.py test` against the AppImage on Ubuntu 26.04, Fedora 44 and Arch Linux; and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases once all of that passed, then the AUR packages moved to the release, `xenon-bin` tested, and both pushed to the AUR with the `AUR_SSH_PRIVATE_KEY` secret |
+| `.github/workflows/release.yml` | by hand, pull requests that change it or how releases are packaged | `Meta/release.py test` and `package` on macOS, for Apple silicon and for Intel, and `package` on Linux in Ladybird's CI image, from `main`'s build caches, with the installer, archive and appcast, and the AppImage, as artifacts; `Meta/release.py test` against the AppImage on Ubuntu 26.04, Fedora 44 and Arch Linux; and with **publish** ticked, `Meta/release.py publish` to ThaRae/xenon-releases once all of that passed, then the AUR packages moved to the release, `xenon-bin` tested, and both pushed to the AUR with the `AUR_SSH_PRIVATE_KEY` secret |
 | `.github/workflows/aur.yml` | pull requests that change the AUR packages, by hand | `xenon-bin` built with makepkg in Arch Linux's image, checked with namcap, installed, and run through `Meta/release.py test`'s checks (`Meta/ci/test-aur-package.sh`); and the same for `xenon`, built from source, by hand with **xenon** ticked or when a pull request changes its PKGBUILD, from a cache of its own |
 | `.github/workflows/test262.yml` | pull requests and pushes to `main` that change the patches or move the submodule, by hand | `Meta/test262.py` on Linux in Ladybird's CI image, from `main`'s build caches, building only `test262-runner`; the summary has the counts beside Ladybird's and every test whose result differs |
 | `.github/workflows/sanitizer.yml` | nightly on `main` when it changed since the last run that passed, by hand, pull requests that change it | Xenon built with Ladybird's Sanitizer preset (AddressSanitizer and UndefinedBehaviorSanitizer) on Linux in Ladybird's CI image, running `Meta/xenon.py test` and then `Meta/xenon.py ladybird-test` with the options Ladybird's Sanitizer test preset sets (`Meta/ci/sanitizer.sh`); it fails if either does, or on any error the sanitizers report in Xenon's tests, and the reports are an artifact |
 | `.github/workflows/benchmarks.yml` | weekly on `main`, by hand, pull requests that change it | Ladybird's web-benchmarks in headless Xenon and its js-benchmarks in the `js` and `wasm` REPLs, on Linux and macOS, from `main`'s build caches, and BrowserBench on the weekly run (`Meta/ci/benchmarks.sh`); each job's summary compares with `main`'s last run, and the results are kept for 90 days ([Memory.md](Memory.md#benchmarks)) |
+| `.github/workflows/macos-intel.yml` | pushes to `main`, twice a week, by hand, pull requests that change it | the macOS build on an Intel Mac (`macos-15-intel`), running `Meta/xenon.py test` and checking that `Xenon.app` is x86-64, with the welcome page's render as an artifact; Ladybird's own tests are left out, as the runner is slow and Ladybird's CI doesn't run them on Intel Macs either |
 | `.github/workflows/memory.yml` | by hand | `Meta/measure.py content-blocker` on Linux and macOS, and with **browsers** ticked, a macOS build measured headless beside Chrome ([Memory.md](Memory.md)) |
 
 - **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
   `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
 - **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
-  (`ladybird/.github/actions/setup`).
+  (`ladybird/.github/actions/setup`). The Intel build runs on `macos-15-intel`, GitHub's last Intel image, which may
+  not have that Xcode; it then takes the newest one there.
 - **Caches**: ccache's objects (`Build/caches`) and vcpkg's prebuilt packages (`ladybird/Build/caches`) are kept in
   GitHub's cache, one entry per platform. Builds on `main` save them, and a pull request starts from `main`'s. A pull
   request whose build misses ccache more than 500 times (a Ladybird bump, say) saves its own too, so its next push
@@ -181,10 +188,11 @@ CI runs on GitHub Actions, on GitHub's own runners:
   vcpkg's packages. Land it on `main`, and let CI's build of `main` finish and save new caches, before running the
   release workflow, which builds from `main`'s caches and can't do a cold build in one run.
 - **The other workflows' caches**: `test262.yml` and `benchmarks.yml` start from `main`'s Linux and macOS caches and
-  save none of their own. `sanitizer.yml` keeps its own (`sanitizer-linux-…`), since its preset compiles everything,
-  dependencies included, differently. Its first runs after a change to the flags, or to the CI image, fill them, one
-  run's worth at a time, before the tests run. GitHub keeps 10 GB of caches per repository and drops the ones used
-  longest ago once there's more, so a pull request's own caches go first.
+  save none of their own. `macos-intel.yml` keeps its own (`macos-x86_64-…`), which the release workflow's Intel
+  build starts from, and runs often enough that GitHub doesn't drop it for going a week unused. `sanitizer.yml` keeps
+  its own (`sanitizer-linux-…`), since its preset compiles everything, dependencies included, differently. Its first runs after a change to the flags, or to the CI
+  image, fill them, one run's worth at a time, before the tests run. GitHub keeps 10 GB of caches per repository and
+  drops the ones used longest ago once there's more, so a pull request's own caches go first.
 
 ## Changing the engine
 
@@ -292,7 +300,7 @@ The macOS release is made on a Mac:
 
 ```bash
 ./Meta/release.py test       # a release updates itself to the next, and turns down tampered ones
-./Meta/release.py package    # builds Xenon, and writes a signed Xenon.app, its installer (a .dmg), its archive and the appcast to Build/distribution
+./Meta/release.py package    # builds Xenon, and writes a signed Xenon.app, its installer (a .dmg), its archive and the appcast to Build/distribution, for the Mac's architecture
 ./Meta/release.py publish    # publishes them, with the AppImage if Build/distribution has it, and tags the commit
 ```
 
