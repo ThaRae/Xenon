@@ -246,8 +246,8 @@ The 8 seconds only count while the page could be answering, so none of these bri
 A navigation away from a page that's stuck still waits on that page to unload, so the tab shows it loading until the
 page answers. **Exit page** gets out of it.
 
-The engine side is patches `0062` (watching the input in `LibWebView/ViewImplementation.cpp`, reported through
-`on_page_unresponsive_changed`) and `0063` (the check when a tab is shown); the prompt is `UI/PageUnresponsivePrompt.cpp`,
+The engine side is patches `0063` (watching the input in `LibWebView/ViewImplementation.cpp`, reported through
+`on_page_unresponsive_changed`) and `0065` (the check when a tab is shown); the prompt is `UI/PageUnresponsivePrompt.cpp`,
 in the message popover's style.
 
 ## Search and the address bar
@@ -448,7 +448,7 @@ either opens a popover below it, as Chrome's and Helium's site information does:
 The popover shows what it knows straight away and fills in the connection once RequestServer answers. A page that
 came from the cache before Xenon connected to its host has no details to show, and says so.
 
-Engine patch `0064` (`RequestServer+LibRequests: Let the UI process ask how a host was reached`) has RequestServer
+Engine patch `0067` (`RequestServer+LibRequests: Let the UI process ask how a host was reached`) has RequestServer
 remember, for each HTTPS host and port, the TLS version, cipher and peer certificates of the last connection it made
 there, and whether that connection was made over an accepted certificate, and answer the UI process's
 `retrieve_secure_connection()`. It reads them from curl's OpenSSL handle (`CURLINFO_TLS_SSL_PTR`) when a response's
