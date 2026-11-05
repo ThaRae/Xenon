@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Thu, 5 Nov 2026 13:35:02 -0500
+Subject: [PATCH] Tests/LibWeb: Wheel over an isolated iframe once it has drawn
+
+The iframe's document said it was ready from a script in its head,
+before it had a body to scroll or had drawn a frame. The wheel reaches
+that document through its parent's process and the UI, and the
+compositor scrolls for the step the document lets through only if its
+last frame of the iframe is of that document. When the iframe's process
+took the wheel before its first rendering update, the compositor had no
+frame of the document yet, answered that the scroller was in another
+document, and nothing scrolled. The test then waited for a scroll event
+that never came, and timed out now and then on slow runners.
+
+Say ready after two frames and a synchronization of the compositor, as
+the other tests that send input to an isolated iframe do.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../iframe/wheel-scrolls-an-isolated-iframe.html             | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/Tests/LibWeb/Text/input/SiteIsolation/iframe/wheel-scrolls-an-isolated-iframe.html b/Tests/LibWeb/Text/input/SiteIsolation/iframe/wheel-scrolls-an-isolated-iframe.html
+index b503ccf59cd28f32fd11d31fa4f281bf26d481d5..49ba843d98d68177d66e76dab52aea56a1209ca7 100644
+--- a/Tests/LibWeb/Text/input/SiteIsolation/iframe/wheel-scrolls-an-isolated-iframe.html
++++ b/Tests/LibWeb/Text/input/SiteIsolation/iframe/wheel-scrolls-an-isolated-iframe.html
+@@ -15,7 +15,10 @@
+                 headers: { "Content-Type": "text/html" },
+                 body: `<!DOCTYPE html><style>body { margin: 0; height: 3000px; }</style><script>
+                     addEventListener("scroll", () => parent.postMessage({ scrolled: scrollY > 0 }, "*"));
+-                    parent.postMessage("ready", "*");
++                    requestAnimationFrame(() => requestAnimationFrame(() => {
++                        internals.synchronizeCompositor();
++                        parent.postMessage("ready", "*");
++                    }));
+                 <\/script>`,
+             })
+         );
