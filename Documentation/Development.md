@@ -179,11 +179,13 @@ CI runs on GitHub Actions, on GitHub's own runners:
 - **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
   (`ladybird/.github/actions/setup`). The Intel build runs on `macos-15-intel`, GitHub's last Intel image, which
   doesn't have that Xcode, so it takes the newest one there (26.3). Homebrew no longer builds bottles for Intel Macs,
-  so anything it installs or upgrades there compiles on the runner, which took hours. On Intel,
-  `Meta/ci/install-macos-dependencies.sh` doesn't update Homebrew or upgrade what the runner image has, installs only
-  the packages it lacks, and leaves out `llvm@22`, which would mean building LLVM (Xenon compiles with Xcode's clang on
-  both Macs either way). The release workflow installs with it on both Macs; on Apple silicon it does what CI's macOS
-  job does.
+  so everything it installed there compiled on the runner, which took hours. On Intel,
+  `Meta/ci/install-macos-dependencies.sh` installs the build tools from MacPorts instead, which still builds binaries
+  for Intel Macs: it installs MacPorts' pinned release (checked against its SHA-256) and runs `port -b install`, which
+  takes binaries only, and fails rather than compile anything. `llvm@22` is left out, as Xenon compiles with Xcode's
+  clang on both Macs. The release workflow installs with the script on both Macs; on Apple silicon it does what CI's
+  macOS job does, from Homebrew. To move to a newer MacPorts, change the version and SHA-256 in the script (the
+  release's `MacPorts-<version>.chk.txt` lists it), and its macOS name when the Intel runner's macOS changes.
 - **Caches**: ccache's objects (`Build/caches`) and vcpkg's prebuilt packages (`ladybird/Build/caches`) are kept in
   GitHub's cache, one entry per platform. Builds on `main` save them, and a pull request starts from `main`'s. A pull
   request whose build misses ccache more than 500 times (a Ladybird bump, say) saves its own too, so its next push
