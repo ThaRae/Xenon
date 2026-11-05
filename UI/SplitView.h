@@ -116,6 +116,7 @@ private:
 
     bool handle_tab_drag(QDropEvent&, QPoint const& position);
     Optional<SplitViewSide> drop_side_at(QPoint const& position) const;
+    Optional<SplitViewSide> armed_drop_side() const;
 
     TabWidget& m_tab_widget;
     Vector<QPointer<QWidget>> m_pages;
@@ -129,9 +130,12 @@ private:
     SplitViewMiniToolbar* m_mini_toolbar { nullptr };
     SplitViewDropIndicator* m_drop_indicator { nullptr };
     QTimer* m_drop_delay_timer { nullptr };
-    Optional<SplitViewSide> m_drop_side;
+    struct DropTarget {
+        SplitViewSide side;
+        bool is_armed { false };
+    };
+    Optional<DropTarget> m_drop_target;
     QPoint m_drop_position;
-    bool m_drop_armed { false };
     bool m_split_validation_scheduled { false };
 };
 

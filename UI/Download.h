@@ -42,8 +42,12 @@ private:
     ByteBuffer m_payload;
     size_t m_request_id { 0 };
     size_t m_redirect_count { 0 };
-    bool m_request_finished { false };
-    bool m_finished { false };
+    enum class State : u8 {
+        Fetching,
+        ResponseComplete,
+        Finished,
+    };
+    State m_state { State::Fetching };
 };
 
 }
