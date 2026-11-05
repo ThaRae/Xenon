@@ -1145,8 +1145,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
             VERIFY(on_complete);
             on_complete(accepted);
             if (!accepted) {
-                if (!m_preserve_close_retry_state_on_dialog_dismissal)
-                    m_already_requested_close = false;
+                m_already_requested_close = false;
                 m_suppress_javascript_dialogs_until_navigation = false;
             }
             break;
@@ -2482,9 +2481,9 @@ void Tab::request_close()
     }
 
     m_suppress_javascript_dialogs_until_navigation = true;
-    m_preserve_close_retry_state_on_dialog_dismissal = m_already_requested_close;
+    auto already_requested_close = m_already_requested_close;
     m_javascript_dialog->dismiss();
-    m_preserve_close_retry_state_on_dialog_dismissal = false;
+    m_already_requested_close = already_requested_close;
 
     if (!view().needs_beforeunload_check()) {
         auto request_close = view().prepare_for_immediate_close();

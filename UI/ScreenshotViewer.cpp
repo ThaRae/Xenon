@@ -186,20 +186,18 @@ void ScreenshotViewer::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() != Qt::LeftButton)
         return;
-    m_press_position = event->position();
-    m_press_offset = m_offset;
-    m_is_dragging = false;
+    m_press = Press { .position = event->position(), .offset = m_offset };
     update_cursor(event->position());
 }
 
 void ScreenshotViewer::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_press_position.has_value() && m_is_at_actual_size) {
-        auto delta = event->position() - *m_press_position;
+    if (m_press.has_value() && m_is_at_actual_size) {
+        auto delta = event->position() - m_press->position;
         if (delta.manhattanLength() > DRAG_THRESHOLD)
-            m_is_dragging = true;
-        if (m_is_dragging) {
-            m_offset = m_press_offset;
+            m_press->is_dragging = true;
+        if (m_press->is_dragging) {
+            m_offset = m_press->offset;
             move_image_by(delta);
             update();
         }
@@ -211,10 +209,9 @@ void ScreenshotViewer::mouseMoveEvent(QMouseEvent* event)
 // closes the viewer.
 void ScreenshotViewer::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (event->button() != Qt::LeftButton || !m_press_position.has_value())
+    if (event->button() != Qt::LeftButton || !m_press.has_value())
         return;
-    m_press_position.clear();
-    if (exchange(m_is_dragging, false)) {
+    if (m_press.release_value().is_dragging) {
         update_cursor(event->position());
         return;
     }
@@ -265,7 +262,7 @@ void ScreenshotViewer::update_cursor(QPointF position)
     auto cursor = Qt::ArrowCursor;
     if (image_rect().contains(position)) {
         if (m_is_at_actual_size)
-            cursor = m_is_dragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor;
+            cursor = m_press.has_value() && m_press->is_dragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor;
         else if (!fits_at_actual_size())
             cursor = Qt::PointingHandCursor;
     }

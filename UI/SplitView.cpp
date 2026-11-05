@@ -527,7 +527,8 @@ TabStack::TabStack(TabWidget& tab_widget)
     m_drop_delay_timer->setSingleShot(true);
     m_drop_delay_timer->setInterval(SPLIT_VIEW_DROP_DELAY_MS);
     QObject::connect(m_drop_delay_timer, &QTimer::timeout, this, [this] {
-        m_drop_armed = m_drop_side.has_value();
+        if (m_drop_target.has_value())
+            m_drop_target->is_armed = true;
         update_drop_indicator(m_drop_position);
     });
 
@@ -1079,7 +1080,7 @@ static bool can_drop_beside_current_tab(TabStack const& stack, Tab& dragged_tab)
 Optional<SplitViewSide> TabStack::drop_side_at(QPoint const& position) const
 {
     auto edge_width = max(SPLIT_VIEW_DROP_EDGE_MIN_WIDTH, qRound(width() * SPLIT_VIEW_DROP_EDGE_FRACTION));
-    if (m_drop_armed && m_drop_side.has_value())
+    if (armed_drop_side().has_value())
         edge_width = width() / 2;
 
     if (position.x() < edge_width)
@@ -1102,9 +1103,7 @@ bool TabStack::handle_tab_drag(QDropEvent& event, QPoint const& position)
     }
 
     if (event.type() == QEvent::Drop) {
-        Optional<SplitViewSide> armed_side;
-        if (m_drop_armed)
-            armed_side = m_drop_side;
+        auto armed_side = armed_drop_side();
         hide_drop_indicator();
         if (!armed_side.has_value()) {
             event.ignore();
@@ -1117,7 +1116,7 @@ bool TabStack::handle_tab_drag(QDropEvent& event, QPoint const& position)
     }
 
     update_drop_indicator(position);
-    if (m_drop_armed) {
+    if (armed_drop_side().has_value()) {
         event.setDropAction(Qt::MoveAction);
         event.accept();
     } else {
@@ -1130,15 +1129,18 @@ void TabStack::update_drop_indicator(QPoint const& position)
 {
     m_drop_position = position;
     auto side = drop_side_at(position);
-    if (side != m_drop_side) {
-        m_drop_side = side;
-        m_drop_armed = false;
+    auto target_side = m_drop_target.has_value() ? m_drop_target->side : Optional<SplitViewSide> {};
+    if (side != target_side) {
+        m_drop_target.clear();
         m_drop_delay_timer->stop();
-        if (side.has_value())
+        if (side.has_value()) {
+            m_drop_target = DropTarget { .side = *side };
             m_drop_delay_timer->start();
+        }
     }
 
-    if (!m_drop_armed || !m_drop_side.has_value()) {
+    auto armed_side = armed_drop_side();
+    if (!armed_side.has_value()) {
         m_drop_indicator->hide();
         return;
     }
@@ -1147,7 +1149,7 @@ void TabStack::update_drop_indicator(QPoint const& position)
     if (!shown_split() && m_chrome_visible)
         area.setTop(0);
     auto half_width = (area.width() - SPLIT_VIEW_GAP) / 2;
-    auto indicator_rect = *m_drop_side == SplitViewSide::Left
+    auto indicator_rect = *armed_side == SplitViewSide::Left
         ? QRect(area.left(), area.top(), half_width, area.height())
         : QRect(area.right() + 1 - half_width, area.top(), half_width, area.height());
     m_drop_indicator->setGeometry(indicator_rect);
@@ -1158,9 +1160,15 @@ void TabStack::update_drop_indicator(QPoint const& position)
 void TabStack::hide_drop_indicator()
 {
     m_drop_delay_timer->stop();
-    m_drop_side.clear();
-    m_drop_armed = false;
+    m_drop_target.clear();
     m_drop_indicator->hide();
+}
+
+Optional<SplitViewSide> TabStack::armed_drop_side() const
+{
+    if (m_drop_target.has_value() && m_drop_target->is_armed)
+        return m_drop_target->side;
+    return {};
 }
 
 namespace SplitView {

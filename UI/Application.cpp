@@ -949,16 +949,16 @@ void Application::open_new_window(WebView::IsPrivate is_private)
 
 void Application::restart_private_browsing_session()
 {
-    if (m_private_session_restart_in_progress || m_quit_in_progress)
+    if (m_window_close_sequence != WindowCloseSequence::None)
         return;
 
-    m_private_session_restart_in_progress = true;
+    m_window_close_sequence = WindowCloseSequence::RestartingPrivateSession;
     ask_next_window_to_close_for_private_session_restart();
 }
 
 void Application::ask_next_window_to_close_for_private_session_restart()
 {
-    if (!m_private_session_restart_in_progress)
+    if (m_window_close_sequence != WindowCloseSequence::RestartingPrivateSession)
         return;
 
     for (auto* widget : QApplication::topLevelWidgets()) {
@@ -987,7 +987,7 @@ void Application::ask_next_window_to_close_for_private_session_restart()
 
 void Application::finish_private_session_restart()
 {
-    if (!m_private_session_restart_in_progress)
+    if (m_window_close_sequence != WindowCloseSequence::RestartingPrivateSession)
         return;
 
     Vector<QPointer<BrowserWindow>> windows;
@@ -1012,12 +1012,12 @@ void Application::finish_private_session_restart()
             window->close();
     }
 
-    m_private_session_restart_in_progress = false;
+    m_window_close_sequence = WindowCloseSequence::None;
 }
 
 void Application::cancel_private_session_restart()
 {
-    if (!m_private_session_restart_in_progress)
+    if (m_window_close_sequence != WindowCloseSequence::RestartingPrivateSession)
         return;
 
     for (auto* widget : QApplication::topLevelWidgets()) {
@@ -1025,7 +1025,7 @@ void Application::cancel_private_session_restart()
             window->cancel_window_close_preflight();
     }
 
-    m_private_session_restart_in_progress = false;
+    m_window_close_sequence = WindowCloseSequence::None;
 }
 
 void Application::focus_location_editor()
@@ -1151,13 +1151,12 @@ static Vector<BrowserWindow*> visible_browser_windows_active_first(BrowserWindow
 void Application::quit()
 {
     // A quit is already asking the pages, so a repeated one does nothing.
-    if (m_quit_in_progress)
+    if (is_quit_in_progress())
         return;
 
-    if (m_private_session_restart_in_progress)
-        cancel_private_session_restart();
+    cancel_private_session_restart();
 
-    m_quit_in_progress = true;
+    m_window_close_sequence = WindowCloseSequence::AskingWindowsToQuit;
     m_windows_awaiting_quit_preflight.clear();
 
     // The window the user is looking at gets asked first.
@@ -1221,7 +1220,7 @@ void Application::finish_quit()
 
     // The session store hears of the quit only once every window has agreed, so a canceled quit never reaches it. In
     // quitting mode, it keeps each window that closes as an open one, for the next launch to recover.
-    m_quit_is_finishing = true;
+    m_window_close_sequence = WindowCloseSequence::FinishingQuit;
     WebView::Application::default_session().session_store->application_quitting();
 
     // Each window's pages agreed, so it closes at once; the active window goes last, so no close activates another.
@@ -1234,7 +1233,8 @@ void Application::finish_quit()
 
 void Application::cancel_quit()
 {
-    m_quit_in_progress = false;
+    if (m_window_close_sequence == WindowCloseSequence::AskingWindowsToQuit)
+        m_window_close_sequence = WindowCloseSequence::None;
     m_windows_awaiting_quit_preflight.clear();
 
     // The windows whose pages already agreed go back to needing their own close check.
