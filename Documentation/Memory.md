@@ -153,6 +153,12 @@ To measure the idle compositor (10), run `Meta/measure.py browsers --settle 60` 
 allocator took, and every frame's preparation time, with `after_release=true` on the first frame that repaints released
 rasters. Compare that frame with the ones before it to see what a release costs the next scroll.
 
+`check_compositor_idle_memory_release` screenshots its page before and after a release and compares them. With CPU
+painting they match exactly. With GPU painting, Skia can antialias an edge of an SVG's raster a little differently the
+second time it's made: on a Linux machine with an AMD GPU, one pixel on the edge of the test page's circle came out
+differently, every run. So the check allows up to 32 pixels to differ, far fewer than a raster that's missing or
+misplaced would change.
+
 Reverted: the blocker verdict cache (6). LTO/PGO, a process cap, a shared mmap'd engine, and dropping YouTube scriptlets were considered and
 left alone: the first two need a full build and a BrowserBench score to judge, sharing the engine needs an adblock-rust
 change (#34), and dropping scriptlets would stop blocking YouTube ads. Sending a serialized engine instead of the list

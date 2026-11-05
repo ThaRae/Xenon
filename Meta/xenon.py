@@ -25,6 +25,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import wave
+import zlib
 
 from pathlib import Path
 
@@ -903,6 +904,7 @@ def check_media_server_lifecycle(executable: Path, env: dict) -> bool:
 
 
 COMPOSITOR_VISIBLE_RELEASE_DELAY = 30
+COMPOSITOR_REPAINT_MAX_DIFFERING_PIXELS = 32
 COMPOSITOR_RELEASE_PATTERN = re.compile(
     r"COMPOSITOR-IDLE-RELEASE context=(?P<context>\d+) nested=(?P<nested>true|false) visible=(?:true|false) "
     r"gpu=(?P<gpu>true|false) idle_ms=\d+ tiles=(?P<tiles>\d+) nested_lists=(?P<nested_lists>\d+) text=\d+"
@@ -1042,11 +1044,72 @@ def check_compositor_screenshots(before: tuple[bool, str, bytes], after: tuple[b
         print(after[1][-4000:], file=sys.stderr)
         return False
 
-    if before[2] != after[2]:
-        print("    the page rendered differently after the compositor released its rasters", file=sys.stderr)
+    differing_pixels = count_differing_pixels(before[2], after[2])
+    if differing_pixels is None or differing_pixels > COMPOSITOR_REPAINT_MAX_DIFFERING_PIXELS:
+        what = "a different size" if differing_pixels is None else f"{differing_pixels} pixels differing"
+        print(f"    the page rendered differently after the compositor released its rasters ({what})", file=sys.stderr)
         return False
-    print("    a page that stopped painting gave its rasters back, and was painted the same again")
+    edges = f", but for {differing_pixels} antialiased edge pixel(s)" if differing_pixels else ""
+    print(f"    a page that stopped painting gave its rasters back, and was painted the same again{edges}")
     return True
+
+
+def decode_png(data: bytes) -> tuple[int, int, int, bytes]:
+    position = 8
+    header = b""
+    compressed = bytearray()
+    while position < len(data):
+        (length,) = struct.unpack(">I", data[position : position + 4])
+        kind = data[position + 4 : position + 8]
+        body = data[position + 8 : position + 8 + length]
+        if kind == b"IHDR":
+            header = body
+        elif kind == b"IDAT":
+            compressed += body
+        position += 12 + length
+    width, height, bit_depth, color_type, _, _, interlace = struct.unpack(">IIBBBBB", header)
+    channels = {0: 1, 2: 3, 4: 2, 6: 4}[color_type]
+    if bit_depth != 8 or interlace != 0:
+        raise ValueError(f"unsupported PNG: {bit_depth}-bit, interlace {interlace}")
+    raw = zlib.decompress(bytes(compressed))
+    stride = width * channels
+    pixels = bytearray(stride * height)
+    previous = bytearray(stride)
+    for row in range(height):
+        start = row * (stride + 1)
+        filter_type = raw[start]
+        line = bytearray(raw[start + 1 : start + 1 + stride])
+        for index in range(stride):
+            left = line[index - channels] if index >= channels else 0
+            up = previous[index]
+            if filter_type == 1:
+                line[index] = (line[index] + left) & 0xFF
+            elif filter_type == 2:
+                line[index] = (line[index] + up) & 0xFF
+            elif filter_type == 3:
+                line[index] = (line[index] + (left + up) // 2) & 0xFF
+            elif filter_type == 4:
+                upper_left = previous[index - channels] if index >= channels else 0
+                estimate = left + up - upper_left
+                distances = (abs(estimate - left), abs(estimate - up), abs(estimate - upper_left))
+                line[index] = (line[index] + (left, up, upper_left)[distances.index(min(distances))]) & 0xFF
+        pixels[row * stride : (row + 1) * stride] = line
+        previous = line
+    return width, height, channels, bytes(pixels)
+
+
+def count_differing_pixels(first_png: bytes, second_png: bytes) -> int | None:
+    if first_png == second_png:
+        return 0
+    first_width, first_height, channels, first = decode_png(first_png)
+    second_width, second_height, second_channels, second = decode_png(second_png)
+    if (first_width, first_height, channels) != (second_width, second_height, second_channels):
+        return None
+    return sum(
+        1
+        for index in range(0, len(first), channels)
+        if first[index : index + channels] != second[index : index + channels]
+    )
 
 
 def run_compositor_busy_page(executable: Path, env: dict, directory: Path) -> str:
