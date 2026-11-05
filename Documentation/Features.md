@@ -203,11 +203,20 @@ Besides hibernating whole tabs, Xenon doesn't keep processes that nothing is usi
 - The media server starts when a page first needs one, and stops 15 seconds after the page last used it; the audio
   server it plays through stops 15 seconds after that. A paused video or song keeps both (`0047`).
 - Four seconds after a page loads, its process collects garbage and gives the freed memory back to the system (`0044`),
-  and does again whenever its tab is hidden (`0038`).
+  and does again whenever its tab is hidden (`0038`, which `0066` makes decommit the free pages, as `0044` does, so
+  that they leave its RSS on Linux).
 - The compositor drops the images it keeps to redraw a page quickly (its SVG images and repeated backgrounds, drawn
   once) when the page has drawn nothing for 30 seconds, or 4 seconds after its tab is hidden, when it drops its text too.
   Each tab and frame is timed on its own, so an animation in one doesn't hold another's. The memory goes back to the
   system, and the next frame draws what it needs again (`0049`).
+- Once nothing has drawn for 5 seconds, the compositor also purges the GPU resources no frame has used in that time, and
+  gives the memory back as above (`0065`).
+- A window's pages count as hidden while it's minimized, or, on macOS and X11, once the window system has said for a
+  second that none of it can be seen (on macOS, a window entirely covered by others), so they stop drawing and their
+  animations pause until it's shown again (`UI/WindowExposure.cpp`). Both panes of a split view go, and come back,
+  together. On Wayland, Xenon doesn't go by that: Qt calls a window unexposed whenever the compositor is late with a
+  frame callback, and it can stay so while the window is on screen, so a window the compositor minimizes keeps
+  drawing there. Qt already hid the pages of a window minimized on X11 and macOS.
 
 [Memory.md](Memory.md) has the measurements.
 
@@ -242,7 +251,8 @@ within 8 seconds of being shown, without waiting for input.
 
 The 8 seconds only count while the page could be answering, so none of these brings the prompt up:
 
-- a hidden tab, or one that's hibernated (a hibernated tab has no process to wait on);
+- a hidden tab, a tab in a minimized or covered window (see [Idle helper processes](#idle-helper-processes)), or one
+  that's hibernated (a hibernated tab has no process to wait on);
 - a page that's still loading;
 - a page showing an alert, confirm, prompt, or leave-this-page dialog, which holds its input until it's closed (opening
   one also forgets the input sent before it);
