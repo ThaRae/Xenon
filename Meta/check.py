@@ -358,7 +358,7 @@ def check_patch_messages(checks: Checks):
 
 def ladybird_ci_versions() -> dict[str, str]:
     dockerfile = (LADYBIRD_SOURCE_DIR / "Meta" / "Docker" / "ci" / "Dockerfile").read_text()
-    requirements = (LADYBIRD_SOURCE_DIR / "Meta" / "Linters" / "requirements.txt").read_text()
+    requirements = (LADYBIRD_SOURCE_DIR / "requirements.txt").read_text()
     return {
         "llvm": re.search(r"ARG LLVM_VERSION=(\d+)", dockerfile).group(1),
         "prettier": re.search(r"prettier@([\d.]+)", dockerfile).group(1),
