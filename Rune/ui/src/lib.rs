@@ -29,7 +29,13 @@ const FAILED_TO_START: c_int = 1;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn xenon_ui_main(argc: c_int, argv: *const *const c_char) -> c_int {
-    run(argc, argv, Vec::new())
+    run(argc, argv, rune_args_from_environment())
+}
+
+fn rune_args_from_environment() -> Vec<String> {
+    std::env::var("XENON_RUNE_ARGS")
+        .map(|args| args.split_whitespace().map(String::from).collect())
+        .unwrap_or_default()
 }
 
 pub fn run_with_rune_args(rune_args: Vec<String>) -> c_int {

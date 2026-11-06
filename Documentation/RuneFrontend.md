@@ -95,3 +95,11 @@ The mock answers each load with a URL, a title, a favicon and a drawn page. A UR
 the coloured bar on its page is a link. `--snap` without `--at` captures the first frame, before the mock has answered.
 
 Rune pins a revision of its `dev` branch, in `Rune/ui/Cargo.toml`.
+
+`XENON_RUNE_ARGS` hands Rune's own flags to `xenon-rune`, so the real engine can be rendered and scripted headless, with
+no display. Rune's headless clock is virtual and runs ahead of the engine, so give pages time with a late `--at` (each
+virtual second takes a few real milliseconds):
+
+```bash
+XENON_RUNE_ARGS="--script load.json --snap page.png --size 1280x800 --at 600" Build/release/xenon/bin/xenon-rune
+```
