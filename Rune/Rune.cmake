@@ -61,6 +61,10 @@ set(XENON_RUNE_BRIDGE_SOURCES
     "${XENON_RUNE_DIR}/Bridge/XenonBridge.cpp"
 )
 
+if (APPLE)
+    list(APPEND XENON_RUNE_BRIDGE_SOURCES "${XENON_RUNE_DIR}/Bridge/ClipboardMac.mm")
+endif()
+
 add_library(xenon-rune-bridge OBJECT ${XENON_RUNE_BRIDGE_SOURCES})
 target_link_libraries(xenon-rune-bridge PUBLIC xenon-core LibThreading)
 target_compile_definitions(xenon-rune-bridge PRIVATE XENON_VERSION="${XENON_VERSION}")

@@ -33,6 +33,13 @@ private:
     virtual Optional<WebView::ViewImplementation&> active_web_view() const override;
     virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab) const override;
 
+#ifdef AK_OS_MACOS
+    virtual Utf16String clipboard_text(ClipboardType) const override;
+    virtual void set_clipboard_text(String, ClipboardType = ClipboardType::Text) override;
+    virtual Web::Clipboard::SystemClipboardItem clipboard_item() const override;
+    virtual void insert_clipboard_item(Web::Clipboard::SystemClipboardItem) override;
+#endif
+
     void start_xenon_services();
 
     Ladybird::XenonArguments m_xenon_arguments;

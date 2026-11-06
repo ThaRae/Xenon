@@ -11,6 +11,7 @@
 #include <LibWebView/SessionStore.h>
 #include <LibWebView/UserAgent.h>
 #include <Rune/Bridge/Application.h>
+#include <Rune/Bridge/Clipboard.h>
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/View.h>
 #include <UI/BlockingDashboard.h>
@@ -145,5 +146,39 @@ Optional<WebView::ViewImplementation&> Application::open_blank_new_tab(Web::HTML
 {
     return Engine::the().open_view(0, activate_tab);
 }
+
+#ifdef AK_OS_MACOS
+Utf16String Application::clipboard_text(ClipboardType type) const
+{
+    if (type != ClipboardType::Text || browser_options().headless_mode.has_value())
+        return WebView::Application::clipboard_text(type);
+    return Clipboard::text();
+}
+
+void Application::set_clipboard_text(String text, ClipboardType type)
+{
+    if (type != ClipboardType::Text || browser_options().headless_mode.has_value()) {
+        WebView::Application::set_clipboard_text(move(text), type);
+        return;
+    }
+    Clipboard::set_text(text);
+}
+
+Web::Clipboard::SystemClipboardItem Application::clipboard_item() const
+{
+    if (browser_options().headless_mode.has_value())
+        return WebView::Application::clipboard_item();
+    return Clipboard::item();
+}
+
+void Application::insert_clipboard_item(Web::Clipboard::SystemClipboardItem item)
+{
+    if (browser_options().headless_mode.has_value()) {
+        WebView::Application::insert_clipboard_item(move(item));
+        return;
+    }
+    Clipboard::set_item(item);
+}
+#endif
 
 }
