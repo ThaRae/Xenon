@@ -122,6 +122,7 @@ pub struct Browser {
     history_menu_direction: i32,
     pub shield_popover_open: bool,
     pub accessibility: PageAccessibility,
+    pub tab_groups: crate::tab_groups::TabGroups,
 }
 
 impl Browser {
@@ -149,6 +150,7 @@ impl Browser {
             history_menu_direction: -1,
             shield_popover_open: false,
             accessibility: PageAccessibility::default(),
+            tab_groups: crate::tab_groups::TabGroups::default(),
         }
     }
 
@@ -523,7 +525,7 @@ impl Browser {
                 RecentDirection::LessRecent => 1,
                 RecentDirection::MoreRecent => -1,
             };
-            self.activate_view(self.tabs.relative_view(offset));
+            self.activate_view(crate::tab_groups::relative_shown_view(self, offset));
             return;
         }
         if let Some(window) = self.shown_window() {
@@ -566,6 +568,7 @@ impl Browser {
         let Some(closed) = self.windows.closed(window, &mut self.tabs) else {
             return;
         };
+        self.tab_groups.window_closed(window);
         for tab in closed {
             self.surfaces.close(tab.view);
         }
@@ -847,8 +850,12 @@ impl Browser {
             Shortcut::Reload => self.reload(),
             Shortcut::Back => self.go_back(),
             Shortcut::Forward => self.go_forward(),
-            Shortcut::NextTab => self.activate_view(self.tabs.relative_view(1)),
-            Shortcut::PreviousTab => self.activate_view(self.tabs.relative_view(-1)),
+            Shortcut::NextTab => {
+                self.activate_view(crate::tab_groups::relative_shown_view(self, 1))
+            }
+            Shortcut::PreviousTab => {
+                self.activate_view(crate::tab_groups::relative_shown_view(self, -1))
+            }
             Shortcut::SelectTab(index) => self.activate_view(self.tabs.view_at(index)),
             Shortcut::LastTab => self.activate_view(self.tabs.last_view()),
             Shortcut::LessRecentTab => self.cycle_recent_tabs(RecentDirection::LessRecent),

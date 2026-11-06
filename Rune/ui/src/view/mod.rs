@@ -14,6 +14,7 @@ mod page_accessibility;
 mod page_overlays;
 pub mod palette;
 mod shield;
+mod tab_groups;
 mod tabs;
 mod toolbar;
 mod window;

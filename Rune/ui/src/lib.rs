@@ -19,6 +19,7 @@ mod ffi_accessibility;
 mod ffi_location;
 #[allow(dead_code)]
 mod ffi_page;
+mod ffi_tab_groups;
 mod frame;
 mod keys;
 mod location;
@@ -30,6 +31,8 @@ mod page_bridge;
 mod page_prompts;
 mod platform;
 mod state;
+mod tab_group_bridge;
+mod tab_groups;
 mod tab_list;
 mod view;
 
@@ -85,6 +88,7 @@ fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int
     engine::Engine.set_window_viewport(None, state::PageGeometry::default().viewport());
     let _page_context = page_bridge::install(app.handle());
     let _accessibility_context = accessibility::install(app.handle());
+    let _tab_group_context = tab_group_bridge::install(app.handle());
     let location_context = ffi_location::LocationContext::new(app.handle());
     location_context.register();
     if !unsafe { ffi::xenon_engine_start(&callbacks, argc, argv) } {
@@ -113,6 +117,7 @@ fn poll(browser: &mut Browser, _: f64, tx: &mut Tx) -> bool {
     browser.track_location_focus()
         | page_prompts::poll(browser, tx)
         | accessibility::poll(browser, tx)
+        | tab_groups::poll(browser)
 }
 
 fn window_key(browser: &mut Browser, event: &KeyEvent, tx: &mut Tx) -> bool {

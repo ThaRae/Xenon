@@ -15,6 +15,7 @@ use crate::view::location::location_overlays;
 use crate::view::page::page_area;
 use crate::view::palette::Palette;
 use crate::view::shield::shield_popover;
+use crate::view::tab_groups::group_editor;
 use crate::view::tabs::{
     horizontal_tabs, hover_card, new_tab_button, sidebar_toggle, tab_strip, vertical_tab_sidebar,
 };
@@ -84,6 +85,7 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
         .children(hover_card(s, &palette, layout == ChromeLayout::Vertical))
         .children(downloads_popover(s, &palette))
         .children(shield_popover(s, &palette))
+        .children(group_editor(s, &palette, layout == ChromeLayout::Vertical))
 }
 
 fn compact_bar(s: &Browser, p: &Palette, titlebar_inset: f32, cx: &mut Cx<Browser>) -> El {

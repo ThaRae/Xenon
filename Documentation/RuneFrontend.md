@@ -119,9 +119,64 @@ from the UI thread without a deadlock. The Rust UI keeps a mirror and changes it
 - One Rune window per process for now: Rune adds windows only before `App::run`, so the single window shows the model's
   active window and switches when another is activated, and the others wait behind it. Each model window already has its
   own tab list in the mirror (`tab_list::Windows`), ready for a Rune window each.
-- Not yet: tab groups, split view, hibernation, window geometry in the session, the beforeunload checks a window close
+- Not yet: split view, hibernation, window geometry in the session, the beforeunload checks a window close
   runs (`WindowCloseCoordinator`), the bookmarks bar, extension buttons, the updater, picture-in-picture, the task
   manager.
+
+## Tab groups
+
+Tab groups follow `UI/TabGroups.cpp`, `UI/TabGroupEditor.cpp` and the group handling in `UI/TabBar.cpp`. The groups live
+in the engine's model (`BrowserModelTabGroups.cpp`, unit tested in `TestXenonBrowserModel`), and have their own slice of
+the ABI in `Rune/Bridge/XenonBridgeTabGroups.h` (`XenonBridgeTabGroups.cpp`; `ffi_tab_groups.rs`, `tab_group_bridge.rs`
+and `tab_groups.rs` on the Rust side, `view/tab_groups.rs` for the chips, headers and editor). The UI registers
+`XenonTabGroupCallbacks` with `xenon_engine_set_tab_group_callbacks` before `xenon_engine_start`.
+
+- A model tab has an optional group id; a window keeps its groups (`TabGroup`: id, title, one of nine colours,
+  collapsed, and the tabs it spans) in tab order. After every change the model keeps each group's tabs together as Qt's
+  `keep_groups_together` does: a group keeps its longest run of unpinned tabs, and the rest leave it. Pinned tabs are
+  never grouped. A new group takes the colour fewest groups in the window use.
+- The rules are Qt's: a tab inserted between two tabs of a group joins it, and so does a tab a grouped tab opens
+  (`window.open`, links, Duplicate); moving a tab between two members joins their group, and moving one away from its
+  group leaves it, unless it's the group's only tab, which carries its group along. Adding a tab to a group moves it
+  beside the group; taking a tab out of the middle moves it past the group's end. Pinning takes a tab out.
+- Collapsing the group of the active tab activates the next shown tab after the group, else before it, else a new tab
+  page. Activating a tab of a collapsed group opens the group. Closing the last shown tab opens the nearest group. The
+  tab that takes over from a closing tab is a shown one where there is one, and Ctrl+Tab (in either order) passes over
+  collapsed groups.
+- Close Group asks each tab to close as its close button does (beforeunload prompts included), after opening a new tab
+  if the group held every tab or collapsing it if it held the active one.
+- Move Group to New Window opens a model window (same privacy), moves the group's tabs into it with their title and
+  colour, and activates it. With one Rune window per process the window shows that new window, and the old one waits
+  behind it (<kbd>Ctrl</kbd><kbd>`</kbd> goes back). It's offered unless the group holds every tab of its window.
+- The model reports a window's groups as a whole with `groups_changed` (each group with its id, title, colour, collapsed
+  state and tabs, in order) whenever they differ from what it last reported, after the tab events of the same change.
+  Groups change together (one move can take several tabs out of a group), so the UI replaces a window's groups rather
+  than patching them. `edit_requested` follows Add Tab to New Group, and the UI opens the editor with its title
+  selected.
+- Groups are saved in the profile's `TabGroups.json` as the Qt frontend saves them (shared format: `"window<session
+  window id>"` to a list of `{title, color, collapsed, tabs: [session tab ids]}`), written on every change of a
+  persistent, non-private window, and read back when the session restores a window. As in Qt, the first window to open
+  schedules a pass that drops the entries of windows that didn't come back (after the startup windows are restored). Tabs
+  other than pinned ones only come back with **Restore previous session** on, so without it the groups don't either.
+- The tab menu has **Add Tab to New Group**, or **Add Tab to Group** (New Group and every other group, named by title or
+  by its first tab) when other groups exist, and **Remove from Group** for a grouped tab. Native menus can't tint their
+  images, so a group's item shows a plain dot rather than its colour.
+- The strip draws a chip (the title on the group's colour, or a dot for an untitled group) before the group's tabs and a
+  line in its colour under them; the sidebar draws a header row with the chip and a chevron above the group's tabs,
+  which are indented with a line beside them (a dot alone in the collapsed sidebar). Clicking the chip or header
+  collapses or opens the group; right-clicking it opens the editor: the title field ("Name this group", edited live,
+  Enter or Escape closes), the colour swatches, New Tab in Group, Move Group to New Window, Close Group and Ungroup.
+- Dragging a tab follows `TabBar::drop_slot_at` and `update_drop_group`: the tab goes to the slot nearest its centre (a
+  collapsed group is one slot, its chip), between two members it joins their group, and at a group's edge it joins
+  when it's a quarter of a tab past the gap's middle toward the group (or anywhere on the group's side for its own
+  group). The tab views report their rects (`on_layout`), and a drag takes a snapshot of them and of the groups when it
+  starts and measures against that, as Qt measures against the layout from before the drop: the tab moves while it's
+  dragged, and the rects of the new order only come after the next layout, so measuring against them would mix the new
+  order with old places. Each new target is one `xenon_engine_drop_tab` (the move, then Qt's `set_group_after_drop`),
+  and a cancelled drag puts the tab back.
+- The chip's tooltip is Qt's `tab_group_tooltip` ("Work (3 tabs)"), through `El::help`.
+- Not yet: Qt's animated drop preview (tabs move as the drag passes
+  them, as before), and dragging a group between windows.
 
 ## The location bar
 

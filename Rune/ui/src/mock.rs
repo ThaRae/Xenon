@@ -19,6 +19,8 @@ mod page;
 
 #[path = "mock_accessibility.rs"]
 pub(crate) mod accessibility;
+#[path = "mock_tab_groups.rs"]
+mod tab_groups;
 
 use crate::ffi::{
     XENON_CURSOR_DEFAULT, XENON_CURSOR_POINTER, XENON_MOUSE_BUTTON_MIDDLE,

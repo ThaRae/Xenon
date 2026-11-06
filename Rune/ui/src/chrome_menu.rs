@@ -126,7 +126,8 @@ pub fn show_tab_menu(s: &Browser, view: ViewId, at: PointerPress, tx: &mut Tx) {
         .item(PopupItem::new(
             "pin",
             if pinned { "Unpin Tab" } else { "Pin Tab" },
-        ))
+        ));
+    let menu = crate::tab_groups::with_tab_menu_items(s, view, menu)
         .separator()
         .submenu("Move Tab", move_menu)
         .separator()
@@ -167,6 +168,8 @@ fn run_tab_menu_item(s: &mut Browser, view: ViewId, picked: &str, tx: &mut Tx) {
             left.extend(right);
             s.close_tabs(view, left);
         }
-        _ => {}
+        _ => {
+            crate::tab_groups::run_tab_menu_item(view, picked);
+        }
     }
 }
