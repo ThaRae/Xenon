@@ -101,13 +101,27 @@ from the UI thread without a deadlock. The Rust UI keeps a mirror and changes it
   <kbd>Ctrl</kbd><kbd>N</kbd> opens a window, <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>N</kbd> a private one,
   <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>W</kbd> closes the window, <kbd>Ctrl</kbd><kbd>`</kbd> shows the next window,
   <kbd>Ctrl</kbd><kbd>Tab</kbd> walks the recently used order until <kbd>Ctrl</kbd> is let go, and
-  <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>PgUp</kbd>/<kbd>PgDn</kbd> move the tab. A right click on a tab pins or unpins it, until
-  the tab strip has a context menu. (<kbd>⌘</kbd> in place of <kbd>Ctrl</kbd> on macOS, but <kbd>Control</kbd> for Tab.)
+  <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>PgUp</kbd>/<kbd>PgDn</kbd> move the tab, as dragging it does. (<kbd>⌘</kbd> in place of
+  <kbd>Ctrl</kbd> on macOS, but <kbd>Control</kbd> for Tab.)
+- Menus (`chrome_menu.rs`, `app_menu.rs`, `Bridge/AppMenus.cpp`): a right click on the empty tab strip, toolbar or
+  sidebar opens the window menu (New Tab, Reopen Closed Tab, Always on Top, Layout, Cycle Tabs in Recently Used Order),
+  and on a tab, the tab menu (Reload, Duplicate, Pin, Move, Close, Close Multiple Tabs). The toolbar's menu button opens
+  the main menu, which the engine builds from LibWebView's menus and actions, flattens as it does page context menus,
+  and runs when one is picked; commands only the UI can do come back through `ui_command`. These menus and the macOS
+  menu bar are native AppKit menus; elsewhere Rune doesn't draw chrome menus yet.
+- Layouts: Classic, Compact (toolbar and tabs in one row) and Vertical (a sidebar that collapses to icons), read from and
+  written to `XenonSettings::chrome_layout`, which the engine reports through `chrome_settings_changed`.
+- Resting on a tab shows a hover card with its last frame, address and memory use (`Bridge/TabMemory.cpp`, a Qt-free
+  port of `UI/TabMemory.cpp`). A tab playing audio has a mute button.
+- The toolbar has the downloads button and popover (`view/downloads.rs`, from a `FileDownloaderObserver`), the content
+  blocking shield and popover (`view/shield.rs`), and a Private badge in private windows.
+- Full screen and Always on Top act on the AppKit window through `Bridge/Platform.h`; elsewhere they do nothing yet.
 - One Rune window per process for now: Rune adds windows only before `App::run`, so the single window shows the model's
   active window and switches when another is activated, and the others wait behind it. Each model window already has its
   own tab list in the mirror (`tab_list::Windows`), ready for a Rune window each.
-- Not yet: tab groups, hibernation, window geometry in the session, and the beforeunload checks a window close runs
-  (`WindowCloseCoordinator`).
+- Not yet: tab groups, split view, hibernation, window geometry in the session, the beforeunload checks a window close
+  runs (`WindowCloseCoordinator`), the bookmarks bar, extension buttons, the updater, picture-in-picture, the task
+  manager and accessibility.
 
 ## The location bar
 
@@ -140,8 +154,9 @@ side, `view/location/` for the field, the suggestion popup and the site informat
   `LibImageDecoders`, which the UI process doesn't link.
 - <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd> (<kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd>) copies the page's URL and shows
   "Copied link" under the toolbar.
-- Not yet: the Qt bar's parked editing session per tab (switching tabs ends the edit), the paste-and-go context menu,
-  and the zoom indicator.
+- The bar shows the page's zoom when it isn't 100% (a click resets it) and a star that bookmarks the page. Until Rune
+  has a bookmark dialog, `display_add_bookmark_dialog` files the bookmark straight away under the page's title.
+- Not yet: the Qt bar's parked editing session per tab (switching tabs ends the edit) and the paste-and-go context menu.
 
 ## Page interaction
 
@@ -185,8 +200,12 @@ another tab shows.
 - The mock engine (`mock_page.rs`) answers URLs containing `alert`, `confirm`, `prompt`, `permission`, `tooltip` or
   `fullscreen` with that prompt, a right click with a context menu, and a click on a `select` or `file` page with a
   dropdown or a file picker, and prints every answer the UI sends (`mock page: ...`).
-- Not yet: colour and date pickers, find's match-case and highlight-all options, filling the find bar from the
-  selection, and a tooltip delay.
+- Pages follow the system's light or dark appearance: the UI reports it with `xenon_engine_set_system_dark`, and the
+  engine gives every view a system theme with `IsDark` set, as the Qt frontend's `update_palette` does.
+- On macOS, frames are copied from their IOSurface under its read lock, and pages' copy and paste use the general
+  pasteboard (`Bridge/ClipboardMac.mm`).
+- Not yet: colour and date pickers, find's highlight-all option, filling the find bar from the selection, and a tooltip
+  delay.
 
 ## Where Rune falls short
 
