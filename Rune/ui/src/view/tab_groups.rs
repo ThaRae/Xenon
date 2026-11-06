@@ -92,7 +92,7 @@ fn with_header_events(header: El, group: &Group) -> El {
         .role("button")
         .label(group.tooltip())
         .help(group.tooltip())
-        .checked(!group.collapsed)
+        .expanded(!group.collapsed)
         .focusable(false)
         .on_press(move |s: &mut Browser| tab_groups::toggle_collapsed(s, id))
         .on_secondary_press(move |s: &mut Browser, _, _| tab_groups::show_editor(s, id))
