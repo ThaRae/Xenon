@@ -96,6 +96,7 @@ WindowId BrowserModel::open_window(WebView::IsPrivate is_private, Optional<Windo
     auto& opened = *window;
     m_windows.append(move(window));
     m_observer.window_opened(opened);
+    tab_group_did_open_window();
     activate_window(opened.id);
     return opened.id;
 }
@@ -109,6 +110,7 @@ WindowId BrowserModel::restore_window(WebView::RestoredSessionWindow const& rest
     auto& opened = *window;
     m_windows.append(move(window));
     m_observer.window_opened(opened);
+    tab_group_did_open_window();
 
     if (!restored.tabs.is_empty()) {
         auto active_index = static_cast<size_t>(clamp<i64>(restored.active_tab_index, 0, static_cast<i64>(restored.tabs.size()) - 1));
@@ -128,6 +130,7 @@ WindowId BrowserModel::restore_window(WebView::RestoredSessionWindow const& rest
         }
         if (active_view.has_value())
             set_active_tab(opened, *active_view);
+        restore_tab_groups(opened);
     }
 
     activate_window(opened.id);
@@ -186,6 +189,7 @@ void BrowserModel::forget_window(WindowId id)
     for (auto view : window->tabs)
         m_tabs.remove(view);
     m_activation_order.remove_first_matching([&](auto other) { return other == id; });
+    m_reported_tab_groups.remove(id);
     m_windows.remove_first_matching([&](auto const& other) { return other->id == id; });
 }
 
@@ -199,6 +203,7 @@ ViewId BrowserModel::insert_tab(Window& window, NonnullOwnPtr<Tab> tab, size_t i
     window.tabs.insert(index, view);
     window.recent_order.update(window.tabs);
     m_observer.tab_inserted(window, inserted, index);
+    tab_group_did_insert_tab(window, index);
     return view;
 }
 
@@ -267,6 +272,8 @@ ViewId BrowserModel::open_tab(WindowId window_id, NewTab new_tab)
     auto view = insert_tab(*window, move(tab), index);
     if (activates)
         set_active_tab(*window, view);
+    if (new_tab.opener.has_value())
+        add_opened_tab_to_group(*new_tab.opener, view);
     m_observer.session_metadata_changed();
     return view;
 }
@@ -289,6 +296,7 @@ void BrowserModel::set_active_tab(Window& window, ViewId view)
         store->active_tab_changed(*tab->session_tab_id);
 
     m_observer.tab_activated(window, *tab, previous);
+    tab_group_did_activate_tab(window, *tab);
     m_observer.session_metadata_changed();
 }
 
@@ -309,6 +317,14 @@ Optional<ViewId> BrowserModel::successor_of(Window const& window, ViewId view) c
     auto index = window.index_of(view);
     if (!index.has_value())
         return {};
+    for (auto other = *index + 1; other < window.tabs.size(); ++other) {
+        if (!is_hidden_at(window, other))
+            return window.tabs[other];
+    }
+    for (auto other = *index; other > 0; --other) {
+        if (!is_hidden_at(window, other - 1))
+            return window.tabs[other - 1];
+    }
     if (*index + 1 < window.tabs.size())
         return window.tabs[*index + 1];
     if (*index > 0)
@@ -346,6 +362,7 @@ void BrowserModel::close_tab(ViewId view)
             dbgln("Xenon: Unable to record the closed tab in the session store: {}", result.error());
     }
 
+    tab_group_will_remove_tab(*window, view);
     detach_tab(*window, view);
     m_observer.tab_removed(*window, *tab);
     m_tabs.remove(view);
@@ -354,6 +371,7 @@ void BrowserModel::close_tab(ViewId view)
         close_window(window->id);
         return;
     }
+    update_tab_groups(*window);
     m_observer.closed_tabs_changed(can_reopen_closed_tab(window->is_private));
     m_observer.session_metadata_changed();
 }
@@ -394,6 +412,7 @@ void BrowserModel::move_tab(ViewId view, WindowId target_id, size_t index)
             return;
         reorder_tab(*target, view, destination);
         m_observer.tab_moved(*tab, source->id, destination);
+        tab_group_did_move_tab(*target, destination);
         sync_session_tab_order(*target);
         return;
     }
@@ -402,11 +421,13 @@ void BrowserModel::move_tab(ViewId view, WindowId target_id, size_t index)
         return;
 
     auto destination = constrained_index(*target, index, tab->pinned, false);
+    tab_group_will_remove_tab(*source, view);
     detach_tab(*source, view);
     tab->window = target->id;
     target->tabs.insert(destination, view);
     target->recent_order.update(target->tabs);
     m_observer.tab_moved(*tab, source->id, destination);
+    tab_group_did_insert_tab(*target, destination);
 
     auto* store = store_for(*target);
     if (store && tab->session_tab_id.has_value()) {
@@ -419,6 +440,8 @@ void BrowserModel::move_tab(ViewId view, WindowId target_id, size_t index)
         }
     }
     sync_session_tab_order(*source);
+    if (!source->tabs.is_empty())
+        update_tab_groups(*source);
 
     set_active_tab(*target, view);
     if (source->tabs.is_empty())
@@ -436,6 +459,8 @@ void BrowserModel::set_tab_pinned(ViewId view, bool pinned, Optional<size_t> pin
     auto index = window->index_of(view).value();
     auto pinned_count = window->pinned_count(*this);
     auto destination = pinned ? clamp(pinned_index.value_or(pinned_count), size_t { 0 }, pinned_count) : pinned_count - 1;
+    if (pinned)
+        tab_group_will_pin_tab(*window, *tab);
     tab->pinned = pinned;
 
     if (destination != index) {
@@ -449,6 +474,7 @@ void BrowserModel::set_tab_pinned(ViewId view, bool pinned, Optional<size_t> pin
             dbgln("Xenon: Unable to record the tab's pin in the session store: {}", result.error());
     }
     m_observer.tab_pinned_changed(*tab);
+    update_tab_groups(*window);
 }
 
 bool BrowserModel::reopen_closed_tab(Optional<WindowId> target_id)
@@ -526,6 +552,8 @@ Optional<ViewId> BrowserModel::step_recent_tab(WindowId id, RecentOrder::Directi
         return {};
     window->recent_order.update(window->tabs);
     auto view = window->recent_order.step(direction);
+    for (size_t attempt = 1; view.has_value() && is_tab_hidden(*view) && attempt < window->tabs.size(); ++attempt)
+        view = window->recent_order.step(direction);
     if (view.has_value())
         set_active_tab(*window, *view);
     return view;

@@ -11,6 +11,14 @@
 #include <LibWebView/SessionStore.h>
 #include <Rune/Bridge/BrowserModel.h>
 
+template<>
+struct AK::Formatter<Xenon::TabGroupColor> : AK::Formatter<StringView> {
+    ErrorOr<void> format(FormatBuilder& builder, Xenon::TabGroupColor color)
+    {
+        return AK::Formatter<StringView>::format(builder, Xenon::tab_group_color_name(color));
+    }
+};
+
 using Xenon::BrowserModel;
 using Xenon::ViewId;
 using Xenon::WindowId;
@@ -284,4 +292,333 @@ TEST_CASE(private_windows_keep_their_closed_tabs_apart)
     auto normal_tab = fixture.open(normal);
     fixture.model.move_tab(normal_tab, incognito, 0);
     EXPECT_EQ(fixture.model.tab(normal_tab)->window, normal);
+}
+
+struct GroupFixture : Fixture {
+    Vector<ByteString> group_events;
+    Vector<Xenon::TabGroupId> edit_requests;
+    Vector<Xenon::SavedTabGroup> saved_groups;
+    WindowId window { 0 };
+
+    GroupFixture()
+    {
+        model.set_tab_group_hooks({
+            .new_tab_page_url = [] { return URL::Parser::basic_parse("about:newtab"sv).value(); },
+            .window_opened = {},
+            .groups_changed = [this](BrowserModel::Window const& changed) { group_events.append(ByteString::formatted("groups_changed {} {}", changed.id, changed.groups.size())); },
+            .edit_requested = [this](BrowserModel::Window const&, Xenon::TabGroupId group) { edit_requests.append(group); },
+            .saved_groups = [this](WebView::SessionWindowId) { return saved_groups; },
+        });
+        window = model.open_window(WebView::IsPrivate::No);
+    }
+
+    Vector<ViewId> open_tabs(size_t count)
+    {
+        Vector<ViewId> views;
+        for (size_t i = 0; i < count; ++i)
+            views.append(open(window, ByteString::formatted("https://example.com/{}", i)));
+        return views;
+    }
+
+    Optional<Xenon::TabGroupId> group_of(ViewId view) const { return model.tab(view)->group; }
+    Xenon::TabGroup const& group(Xenon::TabGroupId id) const { return *model.tab_group(id); }
+};
+
+TEST_CASE(a_new_group_takes_the_least_used_colour_and_asks_to_be_edited)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(3);
+
+    auto first = fixture.model.add_tab_to_new_group(tabs[0]);
+    auto second = fixture.model.add_tab_to_new_group(tabs[2]);
+    EXPECT_EQ(fixture.group(first).color, Xenon::TabGroupColor::Rose);
+    EXPECT_EQ(fixture.group(second).color, Xenon::TabGroupColor::Sky);
+    EXPECT_EQ(fixture.edit_requests, (Vector<Xenon::TabGroupId> { first, second }));
+    EXPECT_EQ(fixture.group(first).tabs, (Vector<ViewId> { tabs[0] }));
+    EXPECT_EQ(fixture.model.window(fixture.window)->groups.size(), 2u);
+    EXPECT(!fixture.group_events.is_empty());
+}
+
+TEST_CASE(adding_a_tab_to_a_group_moves_it_beside_the_group)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(5);
+    auto group = fixture.model.add_tab_to_new_group(tabs[2]);
+    fixture.model.add_tab_to_group(tabs[4], group);
+    EXPECT_EQ(fixture.tabs(fixture.window), (Vector<ViewId> { tabs[0], tabs[1], tabs[2], tabs[4], tabs[3] }));
+
+    fixture.model.add_tab_to_group(tabs[0], group);
+    EXPECT_EQ(fixture.tabs(fixture.window), (Vector<ViewId> { tabs[1], tabs[2], tabs[4], tabs[0], tabs[3] }));
+    EXPECT_EQ(fixture.group(group).tabs, (Vector<ViewId> { tabs[2], tabs[4], tabs[0] }));
+    EXPECT_EQ(fixture.group(group).first, 1u);
+    EXPECT_EQ(fixture.group(group).last, 3u);
+}
+
+TEST_CASE(removing_a_tab_from_the_middle_of_a_group_moves_it_past_the_group)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(4);
+    auto group = fixture.model.add_tab_to_new_group(tabs[0]);
+    fixture.model.add_tab_to_group(tabs[1], group);
+    fixture.model.add_tab_to_group(tabs[2], group);
+
+    fixture.model.remove_tab_from_group(tabs[1]);
+    EXPECT_EQ(fixture.tabs(fixture.window), (Vector<ViewId> { tabs[0], tabs[2], tabs[1], tabs[3] }));
+    EXPECT_EQ(fixture.group(group).tabs, (Vector<ViewId> { tabs[0], tabs[2] }));
+    EXPECT(!fixture.group_of(tabs[1]).has_value());
+}
+
+TEST_CASE(tabs_opened_from_a_grouped_tab_join_its_group)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(3);
+    auto group = fixture.model.add_tab_to_new_group(tabs[0]);
+    fixture.model.add_tab_to_group(tabs[1], group);
+
+    auto child = fixture.open(fixture.window, "https://example.com/child"sv, tabs[1]);
+    EXPECT_EQ(fixture.group_of(child), group);
+    EXPECT_EQ(fixture.tabs(fixture.window), (Vector<ViewId> { tabs[0], tabs[1], child, tabs[2] }));
+
+    auto between = fixture.model.open_tab(fixture.window, { .url = URL::Parser::basic_parse("https://example.com/between"sv).value(), .index = 1, .activate = Web::HTML::ActivateTab::No });
+    EXPECT_EQ(fixture.group_of(between), group);
+
+    auto outside = fixture.open(fixture.window, "https://example.com/outside"sv);
+    EXPECT(!fixture.group_of(outside).has_value());
+}
+
+TEST_CASE(moving_a_tab_between_group_members_joins_and_moving_it_away_leaves)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(4);
+    auto group = fixture.model.add_tab_to_new_group(tabs[0]);
+    fixture.model.add_tab_to_group(tabs[1], group);
+
+    fixture.model.move_tab(tabs[3], fixture.window, 1);
+    EXPECT_EQ(fixture.group_of(tabs[3]), group);
+
+    fixture.model.move_tab(tabs[3], fixture.window, 3);
+    EXPECT(!fixture.group_of(tabs[3]).has_value());
+    EXPECT_EQ(fixture.group(group).tabs, (Vector<ViewId> { tabs[0], tabs[1] }));
+
+    auto single = fixture.model.add_tab_to_new_group(tabs[2]);
+    fixture.model.move_tab(tabs[2], fixture.window, 3);
+    EXPECT_EQ(fixture.group_of(tabs[2]), single);
+}
+
+TEST_CASE(collapsing_the_active_tabs_group_activates_the_next_shown_tab)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(4);
+    auto group = fixture.model.add_tab_to_new_group(tabs[1]);
+    fixture.model.add_tab_to_group(tabs[2], group);
+    fixture.model.activate_tab(tabs[1]);
+
+    fixture.model.set_tab_group_collapsed(group, true);
+    EXPECT(fixture.group(group).collapsed);
+    EXPECT_EQ(fixture.active(fixture.window), tabs[3]);
+    EXPECT(fixture.model.is_tab_hidden(tabs[1]));
+
+    fixture.model.close_tab(tabs[3]);
+    EXPECT_EQ(fixture.active(fixture.window), tabs[0]);
+
+    fixture.model.activate_tab(tabs[2]);
+    EXPECT(!fixture.group(group).collapsed);
+}
+
+TEST_CASE(collapsing_the_only_shown_tabs_opens_a_new_tab_page)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(2);
+    auto group = fixture.model.add_tab_to_new_group(tabs[0]);
+    fixture.model.add_tab_to_group(tabs[1], group);
+
+    fixture.model.set_tab_group_collapsed(group, true);
+    auto const& window_tabs = fixture.tabs(fixture.window);
+    EXPECT_EQ(window_tabs.size(), 3u);
+    EXPECT_EQ(fixture.active(fixture.window), window_tabs[2]);
+    EXPECT_EQ(fixture.model.tab(window_tabs[2])->initial_url.serialize(), "about:newtab"sv);
+
+    fixture.model.close_tab(window_tabs[2]);
+    EXPECT(!fixture.group(group).collapsed);
+}
+
+TEST_CASE(pinning_a_grouped_tab_takes_it_out_of_its_group)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(4);
+    auto group = fixture.model.add_tab_to_new_group(tabs[1]);
+    fixture.model.add_tab_to_group(tabs[2], group);
+    fixture.model.add_tab_to_group(tabs[3], group);
+
+    fixture.model.set_tab_pinned(tabs[2], true);
+    EXPECT(!fixture.group_of(tabs[2]).has_value());
+    EXPECT_EQ(fixture.group(group).tabs, (Vector<ViewId> { tabs[1], tabs[3] }));
+
+    fixture.model.add_tab_to_group(tabs[2], group);
+    EXPECT(!fixture.model.tab(tabs[2])->pinned);
+    EXPECT_EQ(fixture.group_of(tabs[2]), group);
+}
+
+TEST_CASE(closing_a_group_holding_every_tab_opens_a_new_tab_first)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(2);
+    auto group = fixture.model.add_tab_to_new_group(tabs[0]);
+    fixture.model.add_tab_to_group(tabs[1], group);
+
+    auto closing = fixture.model.prepare_to_close_tab_group(group);
+    EXPECT_EQ(closing, (Vector<ViewId> { tabs[0], tabs[1] }));
+    EXPECT_EQ(fixture.tabs(fixture.window).size(), 3u);
+    for (auto view : closing)
+        fixture.model.close_tab(view);
+    EXPECT_EQ(fixture.model.tab_group(group), nullptr);
+    EXPECT_EQ(fixture.tabs(fixture.window).size(), 1u);
+}
+
+TEST_CASE(ungrouping_keeps_the_tabs_where_they_are)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(3);
+    auto group = fixture.model.add_tab_to_new_group(tabs[1]);
+    fixture.model.add_tab_to_group(tabs[2], group);
+    fixture.model.ungroup_tabs(group);
+    EXPECT_EQ(fixture.model.tab_group(group), nullptr);
+    EXPECT_EQ(fixture.tabs(fixture.window), tabs);
+    EXPECT(!fixture.group_of(tabs[1]).has_value());
+}
+
+TEST_CASE(a_new_tab_in_a_group_opens_at_its_end_and_is_active)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(3);
+    auto group = fixture.model.add_tab_to_new_group(tabs[0]);
+    fixture.model.set_tab_group_title(group, "Work"_string);
+    fixture.model.set_tab_group_color(group, Xenon::TabGroupColor::Moss);
+
+    auto opened = fixture.model.open_new_tab_in_group(group);
+    EXPECT(opened.has_value());
+    EXPECT_EQ(fixture.tabs(fixture.window), (Vector<ViewId> { tabs[0], *opened, tabs[1], tabs[2] }));
+    EXPECT_EQ(fixture.group_of(*opened), group);
+    EXPECT_EQ(fixture.active(fixture.window), *opened);
+    EXPECT_EQ(fixture.group(group).title, "Work"sv);
+    EXPECT_EQ(fixture.group(group).color, Xenon::TabGroupColor::Moss);
+}
+
+TEST_CASE(moving_a_group_to_a_new_window_keeps_its_title_and_colour)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(3);
+    auto group = fixture.model.add_tab_to_new_group(tabs[1]);
+    fixture.model.add_tab_to_group(tabs[2], group);
+    fixture.model.set_tab_group_title(group, "Research"_string);
+    fixture.model.set_tab_group_color(group, Xenon::TabGroupColor::Iris);
+
+    auto moved_to = fixture.model.move_tab_group_to_new_window(group);
+    EXPECT(moved_to.has_value());
+    EXPECT_EQ(fixture.model.active_window(), *moved_to);
+    EXPECT_EQ(fixture.tabs(fixture.window), (Vector<ViewId> { tabs[0] }));
+    EXPECT_EQ(fixture.tabs(*moved_to), (Vector<ViewId> { tabs[1], tabs[2] }));
+    auto const& groups = fixture.model.window(*moved_to)->groups;
+    EXPECT_EQ(groups.size(), 1u);
+    EXPECT_EQ(groups[0].title, "Research"sv);
+    EXPECT_EQ(groups[0].color, Xenon::TabGroupColor::Iris);
+    EXPECT_EQ(groups[0].tabs, (Vector<ViewId> { tabs[1], tabs[2] }));
+
+    EXPECT(!fixture.model.move_tab_group_to_new_window(groups[0].id).has_value());
+}
+
+TEST_CASE(dropping_a_tab_at_a_groups_edge_joins_or_leaves_it_as_asked)
+{
+    GroupFixture fixture;
+    auto tabs = fixture.open_tabs(4);
+    auto group = fixture.model.add_tab_to_new_group(tabs[1]);
+    fixture.model.add_tab_to_group(tabs[2], group);
+
+    fixture.model.drop_tab(tabs[3], 3, group);
+    EXPECT_EQ(fixture.group_of(tabs[3]), group);
+
+    fixture.model.drop_tab(tabs[3], 3, {});
+    EXPECT(!fixture.group_of(tabs[3]).has_value());
+
+    fixture.model.drop_tab(tabs[0], 0, group);
+    EXPECT_EQ(fixture.group_of(tabs[0]), group);
+    EXPECT_EQ(fixture.group(group).tabs, (Vector<ViewId> { tabs[0], tabs[1], tabs[2] }));
+}
+
+TEST_CASE(a_restored_window_gets_its_saved_groups_back)
+{
+    GroupFixture fixture;
+    fixture.saved_groups.append({ .title = "Saved"_string, .color = Xenon::TabGroupColor::Amber, .collapsed = true, .tabs = { 2, 3 } });
+    fixture.saved_groups.append({ .title = "Pinned"_string, .color = Xenon::TabGroupColor::Jade, .collapsed = false, .tabs = { 1 } });
+    WebView::RestoredSessionWindow restored {
+        .window_id = 42,
+        .tabs = {
+            { .tab_id = 1, .url = URL::Parser::basic_parse("https://pinned.example/"sv).value(), .pinned = true },
+            { .tab_id = 2, .url = URL::Parser::basic_parse("https://two.example/"sv).value(), .pinned = false },
+            { .tab_id = 3, .url = URL::Parser::basic_parse("https://three.example/"sv).value(), .pinned = false },
+            { .tab_id = 4, .url = URL::Parser::basic_parse("https://four.example/"sv).value(), .pinned = false },
+        },
+        .active_tab_index = 3,
+        .geometry = {},
+    };
+
+    fixture.group_events.clear();
+    auto window = fixture.model.restore_window(restored);
+    auto tabs = fixture.tabs(window);
+    auto const& groups = fixture.model.window(window)->groups;
+    EXPECT_EQ(groups.size(), 1u);
+    EXPECT_EQ(groups[0].title, "Saved"sv);
+    EXPECT_EQ(groups[0].color, Xenon::TabGroupColor::Amber);
+    EXPECT(groups[0].collapsed);
+    EXPECT_EQ(groups[0].tabs, (Vector<ViewId> { tabs[1], tabs[2] }));
+    EXPECT(fixture.group_events.contains_slow(ByteString::formatted("groups_changed {} 1", window)));
+}
+
+TEST_CASE(restoring_the_active_tabs_group_expands_it)
+{
+    GroupFixture fixture;
+    fixture.saved_groups.append({ .title = {}, .color = Xenon::TabGroupColor::Slate, .collapsed = true, .tabs = { 2 } });
+    WebView::RestoredSessionWindow restored {
+        .window_id = 43,
+        .tabs = {
+            { .tab_id = 1, .url = URL::Parser::basic_parse("https://one.example/"sv).value(), .pinned = false },
+            { .tab_id = 2, .url = URL::Parser::basic_parse("https://two.example/"sv).value(), .pinned = false },
+        },
+        .active_tab_index = 1,
+        .geometry = {},
+    };
+    auto window = fixture.model.restore_window(restored);
+    EXPECT(!fixture.model.window(window)->groups[0].collapsed);
+}
+
+TEST_CASE(tab_group_colours_have_qts_saved_names)
+{
+    EXPECT_EQ(Xenon::tab_group_color_name(Xenon::TabGroupColor::Orchid), "Orchid"sv);
+    EXPECT_EQ(Xenon::tab_group_color_from_name("ember"sv), Xenon::TabGroupColor::Ember);
+    EXPECT(!Xenon::tab_group_color_from_name("teal"sv).has_value());
+}
+
+TEST_CASE(every_new_or_restored_window_reports_that_it_opened_for_group_cleanup)
+{
+    Fixture fixture;
+    size_t windows_opened = 0;
+    fixture.model.set_tab_group_hooks({
+        .new_tab_page_url = {},
+        .window_opened = [&] { ++windows_opened; },
+        .groups_changed = {},
+        .edit_requested = {},
+        .saved_groups = {},
+    });
+
+    fixture.model.open_window(WebView::IsPrivate::No);
+    EXPECT_EQ(windows_opened, 1u);
+
+    WebView::RestoredSessionWindow restored {
+        .window_id = 44,
+        .tabs = { { .tab_id = 1, .url = URL::Parser::basic_parse("https://one.example/"sv).value(), .pinned = false } },
+        .active_tab_index = 0,
+        .geometry = {},
+    };
+    fixture.model.restore_window(restored);
+    EXPECT_EQ(windows_opened, 2u);
 }

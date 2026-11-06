@@ -16,6 +16,7 @@
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/Forward.h>
 #include <LibWebView/SessionStore.h>
+#include <Rune/Bridge/TabGroup.h>
 #include <Rune/Bridge/XenonBridge.h>
 #include <UI/RecentTabOrder.h>
 
@@ -45,6 +46,7 @@ public:
         bool deferred { false };
         bool restored_from_session { false };
         Optional<WebView::SessionHistorySnapshot> pending_history;
+        Optional<TabGroupId> group;
 
         bool has_initial_url() const { return !initial_url.scheme().is_empty(); }
     };
@@ -58,6 +60,7 @@ public:
         Optional<ViewId> active_tab;
         Optional<WebView::SessionWindowId> session_window_id;
         RecentOrder recent_order;
+        Vector<TabGroup> groups;
 
         size_t pinned_count(BrowserModel const&) const;
         Optional<size_t> index_of(ViewId view) const { return tabs.find_first_index(view); }
@@ -95,6 +98,14 @@ public:
 
     using SessionStoreProvider = Function<WebView::SessionStore*(WebView::IsPrivate)>;
 
+    struct TabGroupHooks {
+        Function<URL::URL()> new_tab_page_url;
+        Function<void()> window_opened;
+        Function<void(Window const&)> groups_changed;
+        Function<void(Window const&, TabGroupId)> edit_requested;
+        Function<Vector<SavedTabGroup>(WebView::SessionWindowId)> saved_groups;
+    };
+
     BrowserModel(Observer&, Allocators, SessionStoreProvider);
     ~BrowserModel();
 
@@ -124,6 +135,22 @@ public:
     Vector<WindowId> const& windows_by_activation() const { return m_activation_order; }
     bool can_reopen_closed_tab(WebView::IsPrivate) const;
 
+    void set_tab_group_hooks(TabGroupHooks);
+    TabGroup const* tab_group(TabGroupId) const;
+    Window const* window_of_tab_group(TabGroupId) const;
+    bool is_tab_hidden(ViewId) const;
+    TabGroupId add_tab_to_new_group(ViewId);
+    void add_tab_to_group(ViewId, TabGroupId);
+    void remove_tab_from_group(ViewId);
+    void set_tab_group_title(TabGroupId, String);
+    void set_tab_group_color(TabGroupId, TabGroupColor);
+    void set_tab_group_collapsed(TabGroupId, bool collapsed);
+    void ungroup_tabs(TabGroupId);
+    Vector<ViewId> prepare_to_close_tab_group(TabGroupId);
+    Optional<ViewId> open_new_tab_in_group(TabGroupId, Optional<ViewId> = {});
+    Optional<WindowId> move_tab_group_to_new_window(TabGroupId, Optional<WindowId> = {});
+    void drop_tab(ViewId, size_t index, Optional<TabGroupId>);
+
 private:
     Window* find_window(WindowId);
     Tab* find_tab(ViewId);
@@ -140,6 +167,26 @@ private:
     void report_closed_tabs(Window const&);
     void forget_window(WindowId);
 
+    TabGroup* find_tab_group(Window&, TabGroupId);
+    Window* find_window_of_tab_group(TabGroupId);
+    Optional<TabGroupId> group_at(Window const&, size_t index) const;
+    bool is_hidden_at(Window const&, size_t index) const;
+    size_t group_tab_count(Window const&, TabGroupId) const;
+    TabGroupColor next_tab_group_color(Window const&) const;
+    TabGroup& create_tab_group(Window&);
+    void move_tab_quietly(Window&, ViewId, size_t index);
+    void tab_group_did_open_window();
+    void tab_group_did_insert_tab(Window&, size_t index);
+    void tab_group_will_remove_tab(Window&, ViewId);
+    void tab_group_did_move_tab(Window&, size_t index);
+    void tab_group_did_activate_tab(Window&, Tab&);
+    void tab_group_will_pin_tab(Window&, Tab&);
+    void add_opened_tab_to_group(ViewId opener, ViewId opened);
+    void restore_tab_groups(Window&);
+    void keep_tab_groups_together(Window&);
+    void update_tab_groups(Window&, bool force_report = false);
+    void open_new_tab_page(Window&);
+
     Observer& m_observer;
     Allocators m_allocators;
     SessionStoreProvider m_session_store_for;
@@ -147,6 +194,11 @@ private:
     Vector<NonnullOwnPtr<Window>> m_windows;
     HashMap<ViewId, NonnullOwnPtr<Tab>> m_tabs;
     Vector<WindowId> m_activation_order;
+
+    TabGroupHooks m_tab_group_hooks;
+    HashMap<WindowId, Vector<TabGroup>> m_reported_tab_groups;
+    TabGroupId m_next_tab_group_id { 1 };
+    bool m_is_moving_tabs_for_groups { false };
 };
 
 }

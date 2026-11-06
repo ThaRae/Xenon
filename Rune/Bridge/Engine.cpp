@@ -18,6 +18,7 @@
 #include <LibWebView/PlatformColors.h>
 #include <Rune/Bridge/Application.h>
 #include <Rune/Bridge/Engine.h>
+#include <Rune/Bridge/TabGroupHooks.h>
 #include <Rune/Bridge/TabMemory.h>
 #include <Rune/Bridge/View.h>
 #include <UI/FilterLists.h>
@@ -222,6 +223,7 @@ void Engine::create_model()
         .window_id = [this] { return allocate_window_id(); },
     };
     m_model = make<BrowserModel>(*this, move(allocators), [this](WebView::IsPrivate is_private) { return session_store_for(is_private); });
+    install_tab_group_hooks(*m_model);
     m_session_save_timer = Core::Timer::create_single_shot(session_save_delay, [] {
         if (auto* store = WebView::Application::session_store(WebView::IsPrivate::No))
             store->flush_dirty_state();
