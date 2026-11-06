@@ -9,15 +9,18 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use rune::{
-    Drag, Ime, Key, KeyEvent, Phase, Pixels, PointerButton, PointerEvent, TextEdit, Tx, WheelEvent,
+    Drag, Ime, Key, KeyEvent, Modifier, Phase, Pixels, PointerButton, PointerEvent, Tx, WheelEvent,
 };
 
 use crate::bridge::PageSurfaces;
 use crate::engine::{
-    Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind, ViewId, Viewport,
+    Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind, RecentDirection,
+    TabIndex, ViewId, Viewport, WindowId,
 };
 use crate::keys::{Platform, Shortcut, page_key_event, shortcut_for};
-use crate::tab_list::{Activation, Placement, Tab, TabList};
+use crate::location::LocationBar;
+use crate::page_prompts::{self, KeyContext, PagePrompts};
+use crate::tab_list::{Activation, Tab, TabInsertion, TabList, WindowInfo, Windows};
 
 pub const NEW_TAB_URL: &str = "about:newtab";
 pub const APP_NAME: &str = "Xenon";
@@ -60,14 +63,16 @@ pub struct Browser {
     engine: Engine,
     surfaces: Arc<PageSurfaces>,
     pub tabs: TabList,
-    pub location: TextEdit,
-    location_had_focus: bool,
+    pub windows: Windows,
+    cycling_recent_tabs: bool,
+    pub location: LocationBar,
     pub engine_ready: bool,
     page_focused: bool,
     window_focused: bool,
     pressed_buttons: u32,
     forwarded_keys: HashSet<String>,
     pub page: PageGeometry,
+    pub page_prompts: PagePrompts,
 }
 
 impl Browser {
@@ -76,71 +81,51 @@ impl Browser {
             engine: Engine,
             surfaces,
             tabs: TabList::default(),
-            location: TextEdit::new(""),
-            location_had_focus: false,
+            windows: Windows::default(),
+            cycling_recent_tabs: false,
+            location: LocationBar::default(),
             engine_ready: false,
             page_focused: false,
             window_focused: true,
             pressed_buttons: 0,
             forwarded_keys: HashSet::new(),
             page: PageGeometry::default(),
+            page_prompts: PagePrompts::default(),
         }
     }
 
-    pub fn engine_ready(&mut self, tx: &mut Tx) {
+    pub fn engine_ready(&mut self, _: &mut Tx) {
         self.engine_ready = true;
-        if self.tabs.is_empty() {
-            self.new_tab(tx);
-        }
     }
 
-    pub fn new_tab(&mut self, tx: &mut Tx) {
-        self.open_tab(NEW_TAB_URL, tx);
+    pub fn shown_window(&self) -> Option<WindowId> {
+        self.windows.shown_id()
+    }
+
+    pub fn new_tab(&mut self, _: &mut Tx) {
+        self.engine
+            .new_tab(self.shown_window(), "", TabIndex::End, true);
         self.focus_location();
     }
 
-    fn open_tab(&mut self, url: &str, tx: &mut Tx) {
-        let viewport = self.page.viewport();
-        let view = self.engine.create_view(url, viewport);
-        let tab = Tab::new(view, url, self.surface(view));
-        tab.sent_viewport.set(Some(viewport));
-        let activation = self.tabs.insert(tab, Placement::End, true);
-        self.apply(activation, tx);
+    pub fn new_window(&mut self, private: bool) {
+        self.engine.new_window(private);
+    }
+
+    pub fn reopen_closed_tab(&mut self) {
+        self.engine.reopen_closed_tab(self.shown_window());
     }
 
     fn surface(&self, view: ViewId) -> Pixels {
         self.surfaces.surface(view).unwrap_or_default()
     }
 
-    pub fn view_opened(&mut self, opener: ViewId, view: ViewId, activate: bool, tx: &mut Tx) {
-        if self.tabs.get(view).is_some() {
-            return;
-        }
-        let tab = Tab::new(view, "", self.surface(view));
-        let activation = self.tabs.insert(tab, Placement::After(opener), activate);
-        if activation.is_none() && !self.tabs.is_active(view) {
-            self.engine.set_visible(view, false);
-        }
-        self.apply(activation, tx);
-        self.sync_viewport_of(view);
+    pub fn activate_tab(&mut self, view: ViewId, _: &mut Tx) {
+        self.engine.activate_tab(view);
     }
 
-    pub fn activate_tab(&mut self, view: ViewId, tx: &mut Tx) {
-        let activation = self.tabs.activate(view);
-        self.apply(activation, tx);
-    }
-
-    pub fn close_tab(&mut self, view: ViewId, tx: &mut Tx) {
-        let Some((closed, activation)) = self.tabs.remove(view) else {
-            return;
-        };
-        self.engine.close_view(closed.view);
-        self.surfaces.close(closed.view);
-        if self.tabs.is_empty() {
-            tx.quit();
-            return;
-        }
-        self.apply(activation, tx);
+    pub fn close_tab(&mut self, view: ViewId, _: &mut Tx) {
+        self.engine.request_close_tab(view);
     }
 
     pub fn close_active_tab(&mut self, tx: &mut Tx) {
@@ -149,15 +134,205 @@ impl Browser {
         }
     }
 
+    pub fn toggle_tab_pinned(&mut self, view: ViewId) {
+        if let Some(tab) = self.tabs.get(view) {
+            self.engine.set_tab_pinned(view, !tab.pinned);
+        }
+    }
+
+    pub fn move_tab(&mut self, view: ViewId, index: usize) {
+        if let Some(window) = self.shown_window() {
+            self.engine.move_tab(view, window, TabIndex::At(index));
+        }
+    }
+
+    fn move_active_tab(&mut self, offset: isize) {
+        let Some(view) = self.tabs.active_view() else {
+            return;
+        };
+        let Some(index) = self
+            .tabs
+            .position(view)
+            .and_then(|index| index.checked_add_signed(offset))
+        else {
+            return;
+        };
+        self.move_tab(view, index);
+    }
+
+    fn close_shown_window(&mut self) {
+        if let Some(window) = self.shown_window() {
+            self.engine.close_window(window);
+        }
+    }
+
+    fn show_next_window(&mut self) {
+        if let Some(window) = self.windows.least_recently_active_hidden() {
+            self.engine.activate_window(window);
+        }
+    }
+
+    fn cycle_recent_tabs(&mut self, direction: RecentDirection) {
+        if let Some(window) = self.shown_window() {
+            self.cycling_recent_tabs = true;
+            self.engine.cycle_recent_tabs(window, direction);
+        }
+    }
+
+    fn end_recent_tab_cycle(&mut self) {
+        if !self.cycling_recent_tabs {
+            return;
+        }
+        self.cycling_recent_tabs = false;
+        if let Some(window) = self.shown_window() {
+            self.engine.end_recent_tab_cycle(window);
+        }
+    }
+
+    fn observe_cycle_modifier(&mut self, key: &Key) {
+        if let Key::Modifier {
+            modifier: Modifier::ControlLeft | Modifier::ControlRight,
+            pressed: false,
+        } = key
+        {
+            self.end_recent_tab_cycle();
+        }
+    }
+
+    pub fn window_opened(&mut self, window: WindowId, private: bool) {
+        self.windows.opened(WindowInfo {
+            id: window,
+            private,
+        });
+        self.engine
+            .set_window_viewport(Some(window), self.page.viewport());
+    }
+
+    pub fn window_closed(&mut self, window: WindowId, tx: &mut Tx) {
+        let previous = self.tabs.active_view();
+        let Some(closed) = self.windows.closed(window, &mut self.tabs) else {
+            return;
+        };
+        for tab in closed {
+            self.surfaces.close(tab.view);
+        }
+        if self.windows.is_empty() {
+            tx.quit();
+            return;
+        }
+        self.shown_tabs_changed(previous, tx);
+    }
+
+    pub fn window_activated(&mut self, window: WindowId, tx: &mut Tx) {
+        let previous = self.tabs.active_view();
+        if self.windows.activated(window, &mut self.tabs) {
+            self.end_recent_tab_cycle();
+            self.shown_tabs_changed(previous, tx);
+        }
+    }
+
+    fn shown_tabs_changed(&mut self, previous: Option<ViewId>, tx: &mut Tx) {
+        let current = self.tabs.active_view();
+        if previous == current {
+            return;
+        }
+        match current {
+            Some(current) => self.apply(
+                Some(Activation {
+                    previous: previous.filter(|view| self.tabs.get(*view).is_none()),
+                    current,
+                }),
+                tx,
+            ),
+            None => {
+                self.reset_location();
+                self.refresh_title(tx);
+            }
+        }
+    }
+
+    pub fn tab_inserted(&mut self, insertion: TabInsertion) {
+        let tab = Tab::from_insertion(&insertion, self.surface(insertion.view));
+        if !self.windows.contains(insertion.window) {
+            self.window_opened(insertion.window, insertion.private);
+        }
+        if let Some(tabs) = self.windows.tabs_mut(insertion.window, &mut self.tabs) {
+            tabs.insert(tab, insertion.index);
+        }
+    }
+
+    pub fn tab_removed(&mut self, window: WindowId, view: ViewId, tx: &mut Tx) {
+        let was_active = self.tabs.is_active(view);
+        if let Some(tabs) = self.windows.tabs_mut(window, &mut self.tabs) {
+            tabs.remove(view);
+        }
+        self.surfaces.close(view);
+        if was_active {
+            self.reset_location();
+            self.refresh_title(tx);
+        }
+    }
+
+    pub fn tab_moved(&mut self, view: ViewId, from: WindowId, to: WindowId, index: usize) {
+        if from == to {
+            if let Some(tabs) = self.windows.tabs_mut(to, &mut self.tabs) {
+                tabs.move_to(view, index);
+            }
+            return;
+        }
+        let Some(tab) = self
+            .windows
+            .tabs_mut(from, &mut self.tabs)
+            .and_then(|tabs| tabs.remove(view))
+        else {
+            return;
+        };
+        if let Some(tabs) = self.windows.tabs_mut(to, &mut self.tabs) {
+            tabs.insert(tab, index);
+        }
+    }
+
+    pub fn tab_activated(&mut self, window: WindowId, view: ViewId, tx: &mut Tx) {
+        let Some(tabs) = self.windows.tabs_mut(window, &mut self.tabs) else {
+            return;
+        };
+        let activation = tabs.activate(view);
+        if self.shown_window() != Some(window) {
+            return;
+        }
+        self.apply(activation, tx);
+        if let Some(tab) = self.tabs.get_mut(view)
+            && std::mem::take(&mut tab.focus_location_when_shown)
+        {
+            self.focus_location();
+        }
+    }
+
+    pub fn tab_pinned_changed(&mut self, view: ViewId, pinned: bool) {
+        let Some(window) = self.windows.window_of(view, &self.tabs) else {
+            return;
+        };
+        if let Some(tab) = self
+            .windows
+            .tabs_mut(window, &mut self.tabs)
+            .and_then(|tabs| tabs.get_mut(view))
+        {
+            tab.pinned = pinned;
+        }
+    }
+
+    pub fn closed_tabs_changed(&mut self, can_reopen: bool) {
+        self.windows.can_reopen_closed_tab = can_reopen;
+    }
+
     fn apply(&mut self, activation: Option<Activation>, tx: &mut Tx) {
         let Some(Activation { previous, current }) = activation else {
             return;
         };
         if let Some(previous) = previous {
+            self.release_forwarded_keys_of(previous);
             self.engine.set_focused(previous, false);
-            self.engine.set_visible(previous, false);
         }
-        self.engine.set_visible(current, true);
         self.sync_viewport_of(current);
         self.engine.set_focused(current, self.page_has_keyboard());
         self.reset_location();
@@ -166,17 +341,6 @@ impl Browser {
 
     fn refresh_title(&self, tx: &mut Tx) {
         tx.set_title(self.tabs.active().map_or(APP_NAME, Tab::display_title));
-    }
-
-    fn reset_location(&mut self) {
-        let shown = self
-            .tabs
-            .active()
-            .map(|tab| location_text(&tab.url))
-            .unwrap_or_default();
-        if self.location.text != shown || !self.location.is_pristine() {
-            self.location.replace_text(shown);
-        }
     }
 
     pub fn page_has_keyboard(&self) -> bool {
@@ -199,7 +363,7 @@ impl Browser {
         };
         tab.url = url;
         if self.tabs.is_active(view) {
-            if !self.location.focused {
+            if !self.location.edit.focused {
                 self.reset_location();
             }
             self.refresh_title(tx);
@@ -275,55 +439,7 @@ impl Browser {
         }
     }
 
-    pub fn focus_location(&mut self) {
-        self.location.focused = true;
-        self.select_location();
-        self.blur_page();
-    }
-
-    fn select_location(&mut self) {
-        let end = self.location.text.len();
-        self.location.set_selection(0, end);
-    }
-
-    pub fn submit_location(&mut self, tx: &mut Tx) {
-        let input = self.location.text.trim().to_owned();
-        if input.is_empty() {
-            return;
-        }
-        match self.tabs.active_view() {
-            Some(view) => self.engine.load(view, &input),
-            None => self.open_tab(&input, tx),
-        }
-        tx.blur();
-        self.location.focused = false;
-        self.location_had_focus = false;
-        self.focus_page();
-    }
-
-    pub fn revert_location(&mut self, tx: &mut Tx) {
-        self.reset_location();
-        tx.blur();
-        self.location.focused = false;
-        self.location_had_focus = false;
-        self.focus_page();
-    }
-
-    pub fn track_location_focus(&mut self) -> bool {
-        if self.location.focused == self.location_had_focus {
-            return false;
-        }
-        self.location_had_focus = self.location.focused;
-        if self.location.focused {
-            self.select_location();
-            self.blur_page();
-        } else {
-            self.reset_location();
-        }
-        true
-    }
-
-    fn focus_page(&mut self) {
+    pub(crate) fn focus_page(&mut self) {
         if self.page_focused {
             return;
         }
@@ -333,7 +449,7 @@ impl Browser {
         }
     }
 
-    fn blur_page(&mut self) {
+    pub(crate) fn blur_page(&mut self) {
         if !self.page_focused {
             return;
         }
@@ -348,6 +464,7 @@ impl Browser {
         self.window_focused = focused;
         if !focused {
             self.release_forwarded_keys();
+            self.end_recent_tab_cycle();
         }
         if let Some(view) = self.tabs.active_view() {
             self.engine.set_focused(view, self.page_has_keyboard());
@@ -362,26 +479,36 @@ impl Browser {
             Shortcut::Reload => self.reload(),
             Shortcut::Back => self.go_back(),
             Shortcut::Forward => self.go_forward(),
-            Shortcut::NextTab => {
-                let activation = self.tabs.activate_relative(1);
-                self.apply(activation, tx);
-            }
-            Shortcut::PreviousTab => {
-                let activation = self.tabs.activate_relative(-1);
-                self.apply(activation, tx);
-            }
-            Shortcut::SelectTab(index) => {
-                let activation = self.tabs.activate_index(index);
-                self.apply(activation, tx);
-            }
-            Shortcut::LastTab => {
-                let activation = self.tabs.activate_last();
-                self.apply(activation, tx);
-            }
+            Shortcut::NextTab => self.activate_view(self.tabs.relative_view(1)),
+            Shortcut::PreviousTab => self.activate_view(self.tabs.relative_view(-1)),
+            Shortcut::SelectTab(index) => self.activate_view(self.tabs.view_at(index)),
+            Shortcut::LastTab => self.activate_view(self.tabs.last_view()),
+            Shortcut::LessRecentTab => self.cycle_recent_tabs(RecentDirection::LessRecent),
+            Shortcut::MoreRecentTab => self.cycle_recent_tabs(RecentDirection::MoreRecent),
+            Shortcut::ReopenClosedTab => self.reopen_closed_tab(),
+            Shortcut::NewWindow => self.new_window(false),
+            Shortcut::NewPrivateWindow => self.new_window(true),
+            Shortcut::CloseWindow => self.close_shown_window(),
+            Shortcut::NextWindow => self.show_next_window(),
+            Shortcut::MoveTabLeft => self.move_active_tab(-1),
+            Shortcut::MoveTabRight => self.move_active_tab(1),
+        }
+    }
+
+    fn activate_view(&mut self, view: Option<ViewId>) {
+        if let Some(view) = view {
+            self.engine.activate_tab(view);
         }
     }
 
     pub fn window_key(&mut self, event: &KeyEvent, tx: &mut Tx) -> bool {
+        self.observe_cycle_modifier(&event.key);
+        if self.location_shortcut(event, tx) {
+            return true;
+        }
+        if page_prompts::key(self, event, tx, KeyContext::Window) {
+            return true;
+        }
         if let Some(shortcut) = shortcut_for(&event.key, event.mods, Platform::CURRENT) {
             self.run_shortcut(shortcut, tx);
             return true;
@@ -393,6 +520,13 @@ impl Browser {
     }
 
     pub fn page_key(&mut self, event: &KeyEvent, tx: &mut Tx) -> bool {
+        self.observe_cycle_modifier(&event.key);
+        if self.location_shortcut(event, tx) {
+            return true;
+        }
+        if page_prompts::key(self, event, tx, KeyContext::Page) {
+            return true;
+        }
         if let Some(shortcut) = shortcut_for(&event.key, event.mods, Platform::CURRENT) {
             self.run_shortcut(shortcut, tx);
             return true;
@@ -402,15 +536,15 @@ impl Browser {
     }
 
     pub fn location_key(&mut self, event: &KeyEvent, tx: &mut Tx) -> bool {
+        self.observe_cycle_modifier(&event.key);
+        if page_prompts::key(self, event, tx, KeyContext::Location) {
+            return true;
+        }
         if let Some(shortcut) = shortcut_for(&event.key, event.mods, Platform::CURRENT) {
             self.run_shortcut(shortcut, tx);
             return true;
         }
-        if event.key == Key::Escape {
-            self.revert_location(tx);
-            return true;
-        }
-        false
+        self.location_field_key(event, tx)
     }
 
     fn page_key_down(&mut self, event: &KeyEvent, tx: &Tx) -> bool {
@@ -459,6 +593,10 @@ impl Browser {
             self.forwarded_keys.clear();
             return;
         };
+        self.release_forwarded_keys_of(view);
+    }
+
+    fn release_forwarded_keys_of(&mut self, view: ViewId) {
         for code in self.forwarded_keys.drain() {
             let key = crate::engine::KeyEvent {
                 kind: KeyEventKind::Up,
@@ -485,13 +623,24 @@ impl Browser {
     pub fn observe_scale(&self, scale: f32) {
         if self.page.scale.get() != scale {
             self.page.scale.set(scale);
+            self.send_window_viewport();
             self.sync_active_viewport();
         }
     }
 
     pub fn page_laid_out(&mut self, [_, _, width, height]: [f32; 4]) {
-        self.page.size.set((width, height));
+        if self.page.size.get() != (width, height) {
+            self.page.size.set((width, height));
+            self.send_window_viewport();
+        }
         self.sync_active_viewport();
+    }
+
+    fn send_window_viewport(&self) {
+        if let Some(window) = self.shown_window() {
+            self.engine
+                .set_window_viewport(Some(window), self.page.viewport());
+        }
     }
 
     fn sync_active_viewport(&self) {
@@ -536,6 +685,7 @@ impl Browser {
         let button = mouse_button(tx.button());
         let kind = match drag.phase {
             Phase::Down => {
+                self.end_recent_tab_cycle();
                 self.focus_page();
                 self.pressed_buttons |= button.bit();
                 if drag.clicks == 2 {
@@ -605,14 +755,6 @@ impl Browser {
             ..MouseEvent::new(MouseEventKind::Wheel, x, y)
         };
         self.engine.mouse_event(view, &event);
-    }
-}
-
-fn location_text(url: &str) -> String {
-    if url == NEW_TAB_URL {
-        String::new()
-    } else {
-        url.to_owned()
     }
 }
 

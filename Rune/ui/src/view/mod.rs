@@ -5,7 +5,9 @@
  */
 
 mod icons;
+mod location;
 mod page;
+mod page_overlays;
 pub mod palette;
 mod tabs;
 mod toolbar;

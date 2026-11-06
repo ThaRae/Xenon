@@ -8,10 +8,19 @@ mod bridge;
 mod engine;
 #[allow(dead_code)]
 mod ffi;
+#[allow(dead_code)]
+mod ffi_location;
+#[allow(dead_code)]
+mod ffi_page;
 mod frame;
 mod keys;
+mod location;
 #[cfg(feature = "mock-engine")]
 mod mock;
+#[cfg(feature = "mock-engine")]
+mod mock_location;
+mod page_bridge;
+mod page_prompts;
 mod state;
 mod tab_list;
 mod view;
@@ -63,6 +72,10 @@ fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int
         .on_ime(ime);
     let ui = Arc::new(UiContext::new(app.handle(), surfaces));
     let callbacks = ui.callbacks();
+    engine::Engine.set_window_viewport(None, state::PageGeometry::default().viewport());
+    let _page_context = page_bridge::install(app.handle());
+    let location_context = ffi_location::LocationContext::new(app.handle());
+    location_context.register();
     if !unsafe { ffi::xenon_engine_start(&callbacks, argc, argv) } {
         return FAILED_TO_START;
     }
@@ -85,8 +98,8 @@ fn detached_browser() -> Browser {
     Browser::new(Arc::default())
 }
 
-fn poll(browser: &mut Browser, _: f64, _: &mut Tx) -> bool {
-    browser.track_location_focus()
+fn poll(browser: &mut Browser, _: f64, tx: &mut Tx) -> bool {
+    browser.track_location_focus() | page_prompts::poll(browser, tx)
 }
 
 fn window_key(browser: &mut Browser, event: &KeyEvent, tx: &mut Tx) -> bool {

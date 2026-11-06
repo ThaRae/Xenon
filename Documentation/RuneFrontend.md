@@ -54,13 +54,139 @@ main() -> xenon_ui_main()
   composes; sending typed characters through it as well would insert them twice.
 - Wheel deltas follow the DOM: a positive `y` scrolls down.
 - The second press of a double click is sent as `XENON_MOUSE_EVENT_DOUBLE_CLICK` in place of `DOWN`, not beside it.
-- `view_opened` arrives before the new view exists. Commands sent for it from inside the callback wait until it does.
-- The UI opens the first tab itself, on `engine_ready`. If another Xenon already runs with the same profile, the engine
-  hands it the URLs and sends `engine_exited(0)`.
+- If another Xenon already runs with the same profile, the engine hands it the URLs and sends `engine_exited(0)`.
 - `xenon_engine_start` can be called once per process: LibCore ties its signal pipe to the first thread that registers a
   signal.
-- Page dialogs (alert, confirm, prompt, beforeunload, select, file and colour pickers) are dismissed for now, until the
-  ABI carries them.
+- Colour and date pickers are dismissed for now. Everything else a page asks of the UI goes through the page ABI below.
+
+## Windows and tabs
+
+The engine thread owns the browser's windows and tabs, in `Xenon::BrowserModel` (`Rune/Bridge/BrowserModel.*`, Qt-free
+and unit tested by `TestXenonBrowserModel`). Session restore, and later the extensions' `chrome.tabs`/`windows`,
+hibernation and tab groups, run on that thread and need to read windows and tabs synchronously, which they couldn't do
+from the UI thread without a deadlock. The Rust UI keeps a mirror and changes it only when the model says so.
+
+- A window is an ordered list of tabs, with an active tab, a privacy, a recently used order (`UI/RecentTabOrder.h`) and
+  the `SessionStore` window it's saved as. A tab is a view id plus whether it's pinned, the view that opened it, its
+  `SessionStore` tab and, until it first loads, the URL or history it starts from.
+- The rules are the Qt frontend's: pinned tabs stay together at the start of a window; a new or moved unpinned tab never
+  lands inside them; a tab a page opens goes right of its opener and of the opener's earlier tabs; closing the active tab
+  activates its right neighbour, or its left one at the end; a window whose last tab closes closes; closing the active
+  window activates the one used before it.
+- The UI asks with intents, each posted to the engine thread: `xenon_engine_new_window`, `_new_tab` (empty input opens
+  the new tab page, anything else goes through `load_user_input`), `_activate_tab`, `_close_tab`, `_move_tab`,
+  `_set_tab_pinned`, `_reopen_closed_tab`, `_activate_window`, `_close_window`, `_cycle_recent_tabs` and
+  `_end_recent_tab_cycle`. `_new_window` and `_new_tab` return the new id at once, as views did before.
+- The model answers with events: `window_opened`, `window_closed`, `window_activated`, `tab_inserted` (a `XenonTabInfo`:
+  window, view, index, pinned, privacy, URL, a title from history for a tab that hasn't loaded, whether it's the new tab
+  page), `tab_removed`, `tab_moved`, `tab_activated`, `tab_pinned_changed` and `closed_tabs_changed`. Events rather than
+  snapshots: each maps onto one change of the mirror, the UI keeps its per-tab state (title, favicon, frames) without
+  diffing, and a move between windows stays a move rather than a close and an open.
+- Closing the active tab sends `tab_activated` for its successor before `tab_removed`, so the UI is never without an
+  active tab. A tab's view exists by the time its `tab_inserted` or `tab_activated` reaches the UI.
+- The engine creates and destroys views as the model's events say, shows only each window's active tab, and gives a new
+  view the window's last page size (`xenon_engine_set_window_viewport`, and every `set_viewport`). A view that a page opens
+  (`window.open`, a link with a target) becomes a tab the model places; a page's `window.close()` closes its tab.
+- Session restore follows the Qt frontend. `Engine::launch_restore_policy()` (what Rune's `Application` returns) is
+  `Everything` with **Restore previous session** set, else `PinnedOnly`. At startup the engine takes the `SessionStore`'s
+  launch plan, restores each window with its active and pinned tabs loaded and the rest loading when first selected, and
+  then opens the startup URLs (the new tab page by default) in the frontmost window unless the whole session came back
+  and no URL was given. With nothing to restore it opens a window with the startup URLs. The UI no longer opens a tab
+  itself.
+- Every tab registers with the `SessionStore` as it opens; its view reports history to it. Activation and order changes
+  flush after a second (a `Core::Timer`), closes write through, and quitting the UI calls `application_quitting()` before
+  the views go, so the windows stay open in the store for the next launch to recover. `--headless` and WebDriver runs get a
+  transient store, but a Rune run under `XENON_RUNE_ARGS` is an ordinary run and saves.
+- <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>T</kbd> reopens the last closed tab or window (at its old place, with its history),
+  <kbd>Ctrl</kbd><kbd>N</kbd> opens a window, <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>N</kbd> a private one,
+  <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>W</kbd> closes the window, <kbd>Ctrl</kbd><kbd>`</kbd> shows the next window,
+  <kbd>Ctrl</kbd><kbd>Tab</kbd> walks the recently used order until <kbd>Ctrl</kbd> is let go, and
+  <kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>PgUp</kbd>/<kbd>PgDn</kbd> move the tab. A right click on a tab pins or unpins it, until
+  the tab strip has a context menu. (<kbd>⌘</kbd> in place of <kbd>Ctrl</kbd> on macOS, but <kbd>Control</kbd> for Tab.)
+- One Rune window per process for now: Rune adds windows only before `App::run`, so the single window shows the model's
+  active window and switches when another is activated, and the others wait behind it. Each model window already has its
+  own tab list in the mirror (`tab_list::Windows`), ready for a Rune window each.
+- Not yet: tab groups, hibernation, window geometry in the session, and the beforeunload checks a window close runs
+  (`WindowCloseCoordinator`).
+
+## The location bar
+
+The address bar runs on LibWebView's `WebView::Omnibox`, the same model the Qt bar uses, through its own slice of the
+ABI in `Rune/Bridge/XenonBridgeLocation.h` (`XenonBridgeLocation.cpp`; `ffi_location.rs` and `location.rs` on the Rust
+side, `view/location/` for the field, the suggestion popup and the site information popover).
+
+- The engine keeps one `Omnibox` per view, made when the bar first edits for it and dropped once the view is gone. The UI
+  registers `XenonLocationCallbacks` with `xenon_engine_set_location_callbacks` before `xenon_engine_start`.
+- The field stays a Rune `text_input`. Each frame the UI compares it with what it last sent and reports a change of text
+  (`text_edited`) or of whether the caret is at the end (`cursor_moved`). Arrow keys, Enter, Escape, Right/End over an
+  inline completion, Backspace and Delete go through `xenon_engine_location_command`/`_submit`.
+- Every text or caret change carries a new generation. The engine stamps `display_changed` (inline completions and
+  previews of the selected row) and `input_changed` with the generation it last saw, and the UI drops one that isn't its
+  current generation, so a completion computed for older text never overwrites newer typing. Suggestion lists and the
+  selection are applied whatever their generation, since they don't touch the text.
+- A commit (Enter, or a click on a row) resolves on the engine thread as the Qt bar does: a leading or trailing !bang
+  (unless its chip was taken away with Backspace), then a search or `load_from_user_input`, with Ctrl (Cmd on macOS)
+  adding `.com`. `committed` then tells the UI to give the page the keyboard.
+- `input_changed` says whether the typed text looks like an address or a search, and names the site of a leading
+  !bang, which the field shows as a chip over the hidden trigger.
+- For each address it shows, the UI asks `xenon_engine_location_describe_url` for its parts (`break_url_into_parts`),
+  whether it's hidden (the new tab page, `NewTabPage::should_hide_url`'s rule), its security state (padlock, **Not
+  secure** for HTTP or an accepted certificate, nothing for internal pages) and the search engine for the placeholder.
+  Out of focus the field shows the address without its scheme, `www.` and root slash, with the site's registrable
+  domain at full strength and the rest dimmed (`location::display_for`, unit tested); focused, the whole URL, selected.
+- Pressing the padlock or **Not secure** asks `xenon_engine_location_request_site_security`, which answers at once with
+  what it knows and again once RequestServer reports the connection (`SiteSecurity::request_description`).
+- Suggestion favicons cross as PNG bytes and are decoded by Rune's `ImageCache`, since LibGfx's decoders live in
+  `LibImageDecoders`, which the UI process doesn't link.
+- <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd> (<kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd>) copies the page's URL and shows
+  "Copied link" under the toolbar.
+- Not yet: the Qt bar's parked editing session per tab (switching tabs ends the edit), the paste-and-go context menu,
+  and the zoom indicator.
+
+## Page interaction
+
+Dialogs, menus, pickers, find, tooltips, fullscreen and permission prompts have their own slice of the ABI in
+`Rune/Bridge/XenonBridgePage.h` (`XenonBridgePage.cpp`, with the engine side in `View.cpp`; `ffi_page.rs`,
+`page_bridge.rs` and `page_prompts.rs` on the Rust side, `view/page_overlays/` for what's drawn over the page). The UI
+registers `XenonPageCallbacks` with `xenon_engine_set_page_callbacks` before `xenon_engine_start`. The UI keeps each
+view's prompts in `PagePrompts`, keyed by view, so a dialog, find bar or permission request stays with its tab while
+another tab shows.
+
+- Every request carries an id (`XenonPromptId`) that its answer repeats, and the engine drops an answer whose id isn't
+  the one it waits for, so an answer to a dialog the page has since dismissed never reaches the next one.
+- **JavaScript dialogs** (alert, confirm, prompt, beforeunload, and the external-application confirmation) show as a
+  sheet over the page, not the window, so the tab strip and toolbar still work. The engine sends the title (the
+  page's origin, as the Qt chrome does), the message, the prompt's default text and the button labels (**Leave** and
+  **Stay** for beforeunload). Enter accepts, Escape cancels. `on_request_accept_dialog`/`_dismiss_dialog` (WebDriver)
+  and a browser-initiated navigation complete the dialog on the engine side and tell the UI with `dialog_closed`; a
+  browser-initiated navigation also keeps further dialogs from showing until the next one commits, as `UI/Tab.cpp`
+  does.
+- `xenon_engine_request_close` closes a tab the way the Qt chrome's close button does: it asks the page first when it
+  has a beforeunload handler, and a second request closes it anyway.
+- **Context menus**: `show_context_menu` flattens LibWebView's `Menu` (skipping hidden actions and empty submenus,
+  collapsing separators) into `XenonMenuItem`s, with `SUBMENU_BEGIN`/`_END` around submenus, and the UI picks an item
+  with `xenon_engine_activate_menu_item`, which runs the `Action` on the engine thread. Where
+  `rune::popup_menu_supported()` (macOS) the menu is native; elsewhere it's drawn in the window, modal, at the
+  pointer, with submenus opening on hover.
+- **`<select>`** uses the same menu items (option groups become a heading and indented options) and the same two
+  presentations; `xenon_engine_close_select_dropdown` answers with the option's id or none.
+- **File inputs** open Rune's file dialog (the `native-file-dialog` feature: the XDG desktop portal on Linux, rfd on
+  macOS and Windows), filtered by the input's `accept`. Rune's dialog picks one file, so `multiple` inputs get one too.
+  Headless runs answer it from a script (`{"type": "file-dialog", "path": ...}`).
+- **Find in page**: <kbd>Ctrl</kbd><kbd>F</kbd> (<kbd>⌘</kbd><kbd>F</kbd>) opens a find bar at the page's top right.
+  It searches as you type (case-insensitively, as the Qt bar does by default); Enter and Shift+Enter step through the
+  matches, Escape closes it and ends the search.
+- **Tooltips** (`title` attributes) show beside the pointer, which the engine reports from the last mouse event.
+- **Fullscreen**: Rune can't make its window fullscreen yet, so a page's fullscreen request hides the tab strip and
+  toolbar and gives the page the whole window. Escape, or switching tabs, leaves it.
+- **Permission prompts** (`on_request_permission`) show as a bubble at the page's top left with **Allow**, **Allow this
+  time** and **Block**; a request the engine withdraws (`on_cancel_permission_prompt`) or a crash takes it away.
+- A crash drops every prompt of the view without answering it, as `UI/Tab.cpp` does.
+- The mock engine (`mock_page.rs`) answers URLs containing `alert`, `confirm`, `prompt`, `permission`, `tooltip` or
+  `fullscreen` with that prompt, a right click with a context menu, and a click on a `select` or `file` page with a
+  dropdown or a file picker, and prints every answer the UI sends (`mock page: ...`).
+- Not yet: colour and date pickers, find's match-case and highlight-all options, filling the find bar from the
+  selection, and a tooltip delay.
 
 ## Where Rune falls short
 
@@ -80,7 +206,8 @@ expects every crate to bring Ladybird's panic and demangling hooks. `Rune/ui/Car
 stops without it.
 
 `TestXenonRuneBridge` drives the engine through the C ABI alone, with no Rust: it loads a page and checks the colour of
-the frame the UI would get. It is part of `xenon-tests`.
+the frame the UI would get. `TestXenonRunePage` does the same for the page ABI: it answers a confirm and a prompt,
+picks a `<select>` option, opens a context menu and counts find matches. Both are part of `xenon-tests`.
 
 The UI also builds on its own, against a mock engine on a thread of its own, for Rune's headless tools:
 
@@ -91,7 +218,7 @@ Rune/ui/target/debug/xenon-ui-preview --snap window.png --size 1280x800 --theme 
 Rune/ui/target/debug/xenon-ui-preview --script two-tabs.json --snap end.png --at mark:end --tree tree.json
 ```
 
-The mock answers each load with a URL, a title, a favicon and a drawn page. A URL with `slow` in it keeps loading, and
+The mock answers each load with a URL, a title, a favicon and a drawn page. It keeps windows and tabs as the engine's model does (`mock_model.rs`), opening one window with the new tab page at start. A URL with `slow` in it keeps loading, and
 the coloured bar on its page is a link. `--snap` without `--at` captures the first frame, before the mock has answered.
 
 Rune pins a revision of its `dev` branch, in `Rune/ui/Cargo.toml`.

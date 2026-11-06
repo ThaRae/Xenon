@@ -50,21 +50,16 @@ xenon_import_rune_ui_crate(MANIFEST_PATH "${XENON_RUNE_UI_MANIFEST}" CRATE_NAME 
 set(XENON_RUNE_BRIDGE_SOURCES
     "${XENON_RUNE_DIR}/Bridge/Application.cpp"
     "${XENON_RUNE_DIR}/Bridge/Engine.cpp"
+    "${XENON_RUNE_DIR}/Bridge/ExtensionsBrowser.cpp"
     "${XENON_RUNE_DIR}/Bridge/Input.cpp"
+    "${XENON_RUNE_DIR}/Bridge/Updater.cpp"
     "${XENON_RUNE_DIR}/Bridge/View.cpp"
     "${XENON_RUNE_DIR}/Bridge/XenonBridge.cpp"
-    "${XENON_RUNE_DIR}/Bridge/XenonSettings.cpp"
-    "${XENON_UI_DIR}/Bangs.cpp"
-    "${XENON_UI_DIR}/FilterLists.cpp"
-    "${XENON_UI_DIR}/MemoryPressure.cpp"
-    "${XENON_UI_DIR}/MemoryPressureRelease.cpp"
 )
 
-add_library(xenon-rune-bridge STATIC ${XENON_RUNE_BRIDGE_SOURCES})
-target_include_directories(xenon-rune-bridge BEFORE PUBLIC ${XENON_SOURCE_DIR})
-target_include_directories(xenon-rune-bridge PUBLIC ${LADYBIRD_SOURCE_DIR} ${LADYBIRD_SOURCE_DIR}/Services/ ${XENON_GENERATED_DIR})
-target_link_libraries(xenon-rune-bridge PUBLIC AK LibCore LibFileSystem LibGfx LibIPC LibThreading LibURL LibWebView)
-add_dependencies(xenon-rune-bridge xenon_generate_bang_table)
+add_library(xenon-rune-bridge OBJECT ${XENON_RUNE_BRIDGE_SOURCES})
+target_link_libraries(xenon-rune-bridge PUBLIC xenon-core LibThreading)
+target_compile_definitions(xenon-rune-bridge PRIVATE XENON_VERSION="${XENON_VERSION}")
 
 add_executable(xenon-rune "${XENON_RUNE_DIR}/Bridge/main.cpp")
 target_link_libraries(xenon-rune PRIVATE xenon_ui xenon-rune-bridge)
@@ -89,3 +84,20 @@ if (TARGET ladybird_build_resource_files)
     add_dependencies(TestXenonRuneBridge ladybird_build_resource_files)
 endif()
 add_dependencies(xenon-tests TestXenonRuneBridge)
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgePage.cpp")
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/BrowserModel.cpp")
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonBrowserModel.cpp" Xenon NAME TestXenonBrowserModel LIBS xenon-rune-bridge)
+add_dependencies(xenon-tests TestXenonBrowserModel)
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgeLocation.cpp")
+
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonRunePage.cpp" Xenon NAME TestXenonRunePage LIBS xenon-rune-bridge)
+if (TARGET ladybird-helper-processes)
+    add_dependencies(TestXenonRunePage ladybird-helper-processes)
+endif()
+if (TARGET ladybird_build_resource_files)
+    add_dependencies(TestXenonRunePage ladybird_build_resource_files)
+endif()
+add_dependencies(xenon-tests TestXenonRunePage)
