@@ -539,3 +539,5 @@ if (LINUX AND NOT ANDROID)
 endif()
 
 add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonChromeStyle TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonSiteSecurity TestXenonUpdateButton TestXenonUserAgent)
+
+include("${XENON_SOURCE_DIR}/Rune/Rune.cmake")

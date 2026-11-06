@@ -50,17 +50,48 @@ main() -> xenon_ui_main()
 - Mouse positions are in device pixels from the page area's top-left. Wheel deltas are in device pixels.
 - Key events carry the UI Events `code` (`"KeyA"`, `"ArrowLeft"`, `"Enter"`) and `key` (the character typed, or the key's
   name: `"a"`, `"A"`, `"ArrowLeft"`). The bridge maps them onto Ladybird's `Web::UIEvents::KeyCode`.
-- `xenon_engine_insert_text` commits text from an input method.
+- A key-down whose `key` is one character types it. `xenon_engine_insert_text` is only for what an input method
+  composes; sending typed characters through it as well would insert them twice.
+- Wheel deltas follow the DOM: a positive `y` scrolls down.
+- The second press of a double click is sent as `XENON_MOUSE_EVENT_DOUBLE_CLICK` in place of `DOWN`, not beside it.
+- `view_opened` arrives before the new view exists. Commands sent for it from inside the callback wait until it does.
+- The UI opens the first tab itself, on `engine_ready`. If another Xenon already runs with the same profile, the engine
+  hands it the URLs and sends `engine_exited(0)`.
+- `xenon_engine_start` can be called once per process: LibCore ties its signal pipe to the first thread that registers a
+  signal.
+- Page dialogs (alert, confirm, prompt, beforeunload, select, file and colour pickers) are dismissed for now, until the
+  ABI carries them.
+
+## Where Rune falls short
+
+- Rune has no secondary-button press: `on_secondary_press_local` fires on release, so a right click reaches the page as
+  a down and an up together, and a right drag doesn't reach it at all.
+- Primary, middle, back and forward presses come from `on_drag`, so there is no triple click.
+- Rune has no wait, progress, help, diagonal resize or zoom cursors; those show the default cursor.
+- Input methods show no composition yet, and the candidate window sits at the page's corner rather than at the caret.
 
 ## Building
 
-`Meta/xenon.py build` builds `xenon-rune` beside `xenon`. `ninja -C Build/release xenon-rune` rebuilds it alone: CMake
-runs cargo for `Rune/ui` (through Ladybird's `import_rust_crate`), then links the static library into the executable
-with LibWebView. During development, the UI also builds on its own, against a mock engine:
+`Meta/xenon.py build` builds `xenon-rune` beside `xenon`, as `Build/release/xenon/bin/xenon-rune` on Linux, sharing the
+Qt build's helper processes and resources. `ninja -C Build/release xenon-rune` rebuilds it alone: CMake runs cargo for
+`Rune/ui` with `-Dwarnings`, into `Build/release/cargo/xenon_ui`, then links the static library into the executable
+with LibWebView. `Rune.cmake` builds the crate with Ladybird's cargo helpers rather than `import_rust_crate`, which
+expects every crate to bring Ladybird's panic and demangling hooks. `Rune/ui/Cargo.lock` is checked in, and the build
+stops without it.
+
+`TestXenonRuneBridge` drives the engine through the C ABI alone, with no Rust: it loads a page and checks the colour of
+the frame the UI would get. It is part of `xenon-tests`.
+
+The UI also builds on its own, against a mock engine on a thread of its own, for Rune's headless tools:
 
 ```bash
-cargo build --manifest-path Rune/ui/Cargo.toml --features mock-engine --bin xenon-ui-preview
-Rune/ui/target/debug/xenon-ui-preview --snap window.png --size 1280x800
+cargo +1.98.0 test --manifest-path Rune/ui/Cargo.toml --features mock-engine
+cargo +1.98.0 build --manifest-path Rune/ui/Cargo.toml --features mock-engine
+Rune/ui/target/debug/xenon-ui-preview --snap window.png --size 1280x800 --theme dark --at 0.5
+Rune/ui/target/debug/xenon-ui-preview --script two-tabs.json --snap end.png --at mark:end --tree tree.json
 ```
+
+The mock answers each load with a URL, a title, a favicon and a drawn page. A URL with `slow` in it keeps loading, and
+the coloured bar on its page is a link. `--snap` without `--at` captures the first frame, before the mock has answered.
 
 Rune pins a revision of its `dev` branch, in `Rune/ui/Cargo.toml`.
