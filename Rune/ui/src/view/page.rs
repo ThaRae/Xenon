@@ -11,6 +11,7 @@ use crate::ffi;
 use crate::state::Browser;
 use crate::tab_list::Tab;
 use crate::view::icons;
+use crate::view::page_overlays::page_overlays;
 use crate::view::palette::Palette;
 
 const STATUS_FONT: TextStyle = TextStyle::new(12.0, 400.0);
@@ -37,7 +38,7 @@ pub fn page_area(s: &Browser, p: &Palette) -> El {
     if tab.crashed {
         area = area.child(crashed_notice(p));
     }
-    area
+    area.children(page_overlays(s, tab.view, p))
 }
 
 fn page_surface(s: &Browser, tab: &Tab) -> El {
