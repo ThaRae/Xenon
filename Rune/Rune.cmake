@@ -27,7 +27,10 @@ function(xenon_import_rune_ui_crate)
     if (APPLE)
         target_link_libraries(${ARG_CRATE_NAME} INTERFACE
             "-framework AppKit"
+            "-framework AVFoundation"
+            "-framework Carbon"
             "-framework CoreFoundation"
+            "-framework CoreMedia"
             "-framework CoreGraphics"
             "-framework CoreText"
             "-framework CoreVideo"
