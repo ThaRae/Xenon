@@ -236,10 +236,10 @@ index fb50da3b57bb8e7c7dcad70ff7e6283d0593008c..711ae1b410af039625ecd1f62f448934
          Stopped,
          Transferred,
 diff --git a/Libraries/LibRequests/RequestClient.cpp b/Libraries/LibRequests/RequestClient.cpp
-index 338247d43d60c500a3f01986c825652b684c91be..34bf14aecde21743cccfd1f38ca9c377d5954b25 100644
+index ec94ef226b46dd0ad383e761bbae3d56720dfd05..bc47b4088ae5b2593ad0110584594d3cce3a3de1 100644
 --- a/Libraries/LibRequests/RequestClient.cpp
 +++ b/Libraries/LibRequests/RequestClient.cpp
-@@ -79,7 +79,7 @@ void RequestClient::die()
+@@ -83,7 +83,7 @@ void RequestClient::die()
      }
  }
  
@@ -248,7 +248,7 @@ index 338247d43d60c500a3f01986c825652b684c91be..34bf14aecde21743cccfd1f38ca9c377
  {
      auto request_id = m_next_request_id++;
      auto headers = request_headers.map([](auto const& headers) { return headers.headers().span(); }).value_or({});
-@@ -87,7 +87,7 @@ RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL
+@@ -91,7 +91,7 @@ RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL
      auto transfer_lease_key = transfer_lease == TransferLease::Yes
          ? Optional<RequestTransferLeaseKey> { { m_request_server_client_id, request_id } }
          : Optional<RequestTransferLeaseKey> {};
@@ -257,8 +257,8 @@ index 338247d43d60c500a3f01986c825652b684c91be..34bf14aecde21743cccfd1f38ca9c377
      auto request = Request::create_from_id({}, *this, request_id, move(transfer_lease_key));
      m_requests.set(request_id, request);
      return request;
-@@ -182,6 +182,20 @@ void RequestClient::ensure_connection(URL::URL const& url, RequestServer::CacheL
-     async_ensure_connection(request_id, url, cache_level);
+@@ -199,6 +199,20 @@ void RequestClient::host_resolved(u64 lookup_id, Vector<ByteString> addresses)
+         (*on_resolved)(move(addresses));
  }
  
 +void RequestClient::continue_request_after_alias_check(Badge<Request>, Request& request, bool block)
@@ -279,7 +279,7 @@ index 338247d43d60c500a3f01986c825652b684c91be..34bf14aecde21743cccfd1f38ca9c377
  {
      if (auto request = m_requests.get(request_id); request.has_value()) {
 diff --git a/Libraries/LibRequests/RequestClient.h b/Libraries/LibRequests/RequestClient.h
-index 3c8217040df8066515288ba945f07ea6d523c843..ff025eaf220b97cb5363154b4148c2de58a24c66 100644
+index 3f383254ae1c803f9102ba7a514abf1ea4849133..74d39198c5a5574022ec75bf00338906361955db 100644
 --- a/Libraries/LibRequests/RequestClient.h
 +++ b/Libraries/LibRequests/RequestClient.h
 @@ -51,7 +51,14 @@ public:
@@ -306,7 +306,7 @@ index 3c8217040df8066515288ba945f07ea6d523c843..ff025eaf220b97cb5363154b4148c2de
      void release_request_transfer_lease(Badge<Request>, Request&, RequestTransferLeaseKey);
      void release_request_transfer_lease(RequestTransferLeaseKey);
      void ensure_connection(URL::URL const&, RequestServer::CacheLevel);
-@@ -77,6 +85,7 @@ private:
+@@ -79,6 +87,7 @@ private:
      virtual void die() override;
  
      virtual void request_requires_network(u64 request_id) override;
@@ -400,7 +400,7 @@ index 6f5261583ab11e2b666311121f3b071c0d1c4188..f3b823c95f240a69a7e5fc993cd4d9bc
          Optional<String> initiator_type_string;
          if (request.initiator_type().has_value())
 diff --git a/Services/RequestServer/ConnectionFromClient.cpp b/Services/RequestServer/ConnectionFromClient.cpp
-index 5b5d1fce24cda14c871516029e6fa3a0e9499f0c..65208daa0c0d402417fc9b485b7abba23c42fef3 100644
+index bdd829975ab1fb7c7ce8547d89933a29f990f015..304e48b733c544668e354c16bf42478294fdc060 100644
 --- a/Services/RequestServer/ConnectionFromClient.cpp
 +++ b/Services/RequestServer/ConnectionFromClient.cpp
 @@ -297,7 +297,7 @@ bool ConnectionFromClient::is_live_request_id(u64 request_id) const
@@ -435,7 +435,7 @@ index 5b5d1fce24cda14c871516029e6fa3a0e9499f0c..65208daa0c0d402417fc9b485b7abba2
  {
      auto request = m_active_requests.take(request_id);
 diff --git a/Services/RequestServer/ConnectionFromClient.h b/Services/RequestServer/ConnectionFromClient.h
-index 675be55f1a3d74b84ca9d6e412fa9768662e7163..fde1688c4baed69c89157c02f44fb338cd09b788 100644
+index f176441328c542842942deb5e605a22043f837c8..bcffdb623b4b5ff23e56096dcadc8c48e781a15e 100644
 --- a/Services/RequestServer/ConnectionFromClient.h
 +++ b/Services/RequestServer/ConnectionFromClient.h
 @@ -86,7 +86,8 @@ private:
@@ -556,7 +556,7 @@ index b6bedba0d3654ce589a4d22b9a500667e14c7032..f88a4b08123ded49b3f5fcfc5a0a515a
      RefPtr<ConnectionFromClient> m_network_connection_keep_alive;
  
 diff --git a/Services/RequestServer/RequestClient.ipc b/Services/RequestServer/RequestClient.ipc
-index 088004dcd2e175b43f5fdaf70557ae0c16162482..b1f5033b99347f10bee0edea7eb959df2e3fce89 100644
+index 0b89380d0ef7cab20e0356579f4713cfe2a019be..7f06376f1a02a3f3d8c37d530d9515dd984297fb 100644
 --- a/Services/RequestServer/RequestClient.ipc
 +++ b/Services/RequestServer/RequestClient.ipc
 @@ -9,6 +9,9 @@
@@ -570,7 +570,7 @@ index 088004dcd2e175b43f5fdaf70557ae0c16162482..b1f5033b99347f10bee0edea7eb959df
      request_body_file_available(u64 request_id, IPC::File fd, u64 offset, u64 size) =|
      request_cached_body_file_available(u64 request_id, IPC::File fd, u64 offset, u64 size) =|
 diff --git a/Services/RequestServer/RequestServer.ipc b/Services/RequestServer/RequestServer.ipc
-index b7e3d7825a577799e8dfc9ac41a3eafb8565370e..9b860509edac80dedd96ef2c5c5c73ef54df8684 100644
+index c66176ed836676c1c7fffa3019c4c3b3c3cd72f0..4b46e530b3fe99c83db829bc86360256223bf02a 100644
 --- a/Services/RequestServer/RequestServer.ipc
 +++ b/Services/RequestServer/RequestServer.ipc
 @@ -17,7 +17,9 @@ endpoint RequestServer

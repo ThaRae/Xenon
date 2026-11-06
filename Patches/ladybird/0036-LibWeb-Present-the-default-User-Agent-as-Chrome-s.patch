@@ -25,9 +25,9 @@ Ladybird token set a User-Agent that has one.
  .../Text/expected/Fetch/user-agent-client-hints.txt    |  5 +++--
  ...e-compatibility-user-agent-change-during-fetch.html |  5 +++++
  .../Fetch/site-compatibility-user-agent-redirects.html |  5 +++++
- .../Text/input/Fetch/user-agent-client-hints.html      |  5 +++--
+ .../Text/input/Fetch/user-agent-client-hints.html      |  6 +++---
  .../HTML/navigator-useragent-frozen-platform.html      |  3 ++-
- 10 files changed, 35 insertions(+), 10 deletions(-)
+ 10 files changed, 35 insertions(+), 11 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 index 608ec4ba6829e987e4e98fd8cbad2a48848a197b..d7bf54aee88c889f2ed8a9715d15f9e59d8541a4 100644
@@ -45,10 +45,10 @@ index 608ec4ba6829e987e4e98fd8cbad2a48848a197b..d7bf54aee88c889f2ed8a9715d15f9e5
      StringBuilder brands;
      bool first = true;
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 51be4c1d573ce86f23845b636dd4d5a108f0eec8..a67d926c9960767422242862123912f219c7f0b9 100644
+index cba143703bf66cf156df0e4c75eaaa402d133060..acd91f565158826aa46af2279e09345357e8779a 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1491,6 +1491,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
+@@ -1490,6 +1490,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
      return {};
  }
  
@@ -62,7 +62,7 @@ index 51be4c1d573ce86f23845b636dd4d5a108f0eec8..a67d926c9960767422242862123912f2
  {
      page().set_content_blocking_policy(enabled, {});
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index bb9e6d2ec1bd799250aa66e39ff5c51aefa2442a..c62d8ad1f4413a1c56370d41320e8f2b585f00bd 100644
+index ae8af510a27ec94edc2d617634360de58c69c64d..97bf918ce0adc47b54ee4ac3a6c47be59ceb77c2 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
 @@ -179,6 +179,7 @@ public:
@@ -74,10 +74,10 @@ index bb9e6d2ec1bd799250aa66e39ff5c51aefa2442a..c62d8ad1f4413a1c56370d41320e8f2b
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
      WebIDL::UnsignedLongLong partial_layout_count();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 98e187ea709fe2e1940b67b0c93a76c327796191..53d95deafcef16d25d9655715ac478f2d3e94aa1 100644
+index 68f61b392b23e480c816349921d603945c78a7f7..118cfc315fec4b9180a992504e11646d3806d529 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -176,6 +176,7 @@ interface Internals {
+@@ -177,6 +177,7 @@ interface Internals {
      undefined sendBadIpcMessageForTesting(DOMString kind);
      undefined setContentBlockers(DOMString patterns);
      undefined setSiteCompatibilityData(DOMString source);
@@ -86,12 +86,12 @@ index 98e187ea709fe2e1940b67b0c93a76c327796191..53d95deafcef16d25d9655715ac478f2
      DOMString? cosmeticFilterForElement(Element element);
      unsigned long long partialLayoutCount();
 diff --git a/Libraries/LibWebCommon/Loader/UserAgent.h b/Libraries/LibWebCommon/Loader/UserAgent.h
-index d223988917a8384763533bbfc878293f86e8a2fa..32c98d9ae1c03232cfe9bc23e66b527b9ce315a8 100644
+index eb9ee082370d15d9f7a57b03d6521f4430770f7a..5799b6902b4fc4bb090eb4bbf68200faf64bcc96 100644
 --- a/Libraries/LibWebCommon/Loader/UserAgent.h
 +++ b/Libraries/LibWebCommon/Loader/UserAgent.h
 @@ -64,10 +64,10 @@ namespace Web {
+ 
  #define BROWSER_NAME "Ladybird"
- #define BROWSER_VERSION "1.0"
  
 -// NB: Some web servers treat us very badly unless we pretend to be one of the major browsers.
 -//     This token is appended to the User-Agent string to improve compatibility.
@@ -179,20 +179,21 @@ index 48995797403d93d6589bf2d01edadf6005286850..f56ea5d642e7541be7b744ade15a32c6
      });
  </script>
 diff --git a/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html b/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
-index 460165ae2fb4cdd15d8afcc8284b325c1550eefa..1cde70014628a3a2c633d93582bb208604802b36 100644
+index 2814440d7a09552452351cda7d99c2a2e6479428..1cde70014628a3a2c633d93582bb208604802b36 100644
 --- a/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
 +++ b/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
-@@ -31,7 +31,8 @@
+@@ -31,8 +31,8 @@
              // The build's own Chrome token, whatever this platform reports.
              const version = navigator.userAgent.match(/Chrome\/(\d+)/)?.[1];
              println(`own brands name Chromium at the User-Agent's version: ${brands.includes(`"Chromium";v="${version}"`) ? "PASS" : `FAIL (${brands})`}`);
--            println(`own brands name Ladybird: ${brands.includes('"Ladybird";v="1"') ? "PASS" : `FAIL (${brands})`}`);
+-            const ladybirdVersion = navigator.userAgent.match(/Ladybird\/(\d+)/)?.[1];
+-            println(`own brands name Ladybird: ${brands.includes(`"Ladybird";v="${ladybirdVersion}"`) ? "PASS" : `FAIL (${brands})`}`);
 +            println(`own brands name Google Chrome: ${brands.includes(`"Google Chrome";v="${version}"`) ? "PASS" : `FAIL (${brands})`}`);
 +            println(`own brands don't name Ladybird: ${brands.includes("Ladybird") ? `FAIL (${brands})` : "PASS"}`);
              println(`own mobile hint is a boolean: ${["?0", "?1"].includes(own("Sec-CH-UA-Mobile")) ? "PASS" : `FAIL (${own("Sec-CH-UA-Mobile")})`}`);
              println(`own platform hint is quoted: ${/^".+"$/.test(own("Sec-CH-UA-Platform") ?? "") ? "PASS" : `FAIL (${own("Sec-CH-UA-Platform")})`}`);
  
-@@ -40,7 +41,7 @@
+@@ -41,7 +41,7 @@
              println(`Chrome + Ladybird mobile: ${chrome("Sec-CH-UA-Mobile")}`);
              println(`Chrome + Ladybird platform: ${chrome("Sec-CH-UA-Platform")}`);
  

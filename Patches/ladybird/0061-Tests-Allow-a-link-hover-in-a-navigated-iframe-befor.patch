@@ -15,10 +15,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Tests/LibWebView/TestLinkHoverStatus.cpp b/Tests/LibWebView/TestLinkHoverStatus.cpp
-index 23631c5edc88b348242cfa6bcf058d96b68d108f..5e8c3795595981e773505f486a726ec142f58273 100644
+index 7770db591a96f885839dad18f9921011f517bf29..cd7e3a12038cbe0b32b9d37e0581f74b7c46a86d 100644
 --- a/Tests/LibWebView/TestLinkHoverStatus.cpp
 +++ b/Tests/LibWebView/TestLinkHoverStatus.cpp
-@@ -160,7 +160,7 @@ function navigate_frame() { frame.srcdoc = frame.getAttribute("srcdoc") + "<!--
+@@ -158,7 +158,7 @@ function navigate_frame() { frame.srcdoc = frame.getAttribute("srcdoc") + "<!--
      VERIFY(hovered_url->serialize() == "https://example.com/in-iframe"sv);
      view->run_javascript("navigate_frame()"_string);
      Core::EventLoop::current().spin_until([&]() { return unhovers_reported >= 6; });

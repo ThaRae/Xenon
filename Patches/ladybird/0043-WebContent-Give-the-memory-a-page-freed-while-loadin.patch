@@ -19,10 +19,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 21 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index dced490ebe4be78fa5627eb7138f49f6401e1c7f..fcaaad360c7875e7b10fdb0760aa09497bdf6da1 100644
+index 28c2d7414c2c0a4deda0c52e976346a24ffc9d25..85b971412662d2b53b67f32d61fb1c04f290f839 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3529,6 +3529,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+@@ -3613,6 +3613,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
          Web::FileAPI::remove_entry_from_blob_url_store(*url_record);
  }
  
@@ -44,7 +44,7 @@ index dced490ebe4be78fa5627eb7138f49f6401e1c7f..fcaaad360c7875e7b10fdb0760aa0949
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 97e65b0f69a3ef155ecb07a9327d0a1f4d00f197..16e126390d7be7dae5df59b723acaf7dbd64c2f2 100644
+index 09ad2b0e25d5172835cc12e5827291c8c3b33e90..10509578d28cf7818784eaa0fdc26bb76794e9c8 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -16,6 +16,7 @@
@@ -55,7 +55,7 @@ index 97e65b0f69a3ef155ecb07a9327d0a1f4d00f197..16e126390d7be7dae5df59b723acaf7d
  #include <LibGC/Root.h>
  #include <LibIPC/ConnectionFromClient.h>
  #include <LibJS/Forward.h>
-@@ -88,6 +89,10 @@ public:
+@@ -89,6 +90,10 @@ public:
  
      void pump_and_dispatch_gamepad_events();
  
@@ -66,7 +66,7 @@ index 97e65b0f69a3ef155ecb07a9327d0a1f4d00f197..16e126390d7be7dae5df59b723acaf7d
      // Whether the UI process has user scripts for documents, which they ask it for as they become ready for scripts.
      bool user_scripts_enabled() const { return m_user_scripts_enabled; }
  
-@@ -387,6 +392,7 @@ private:
+@@ -391,6 +396,7 @@ private:
  
      RefPtr<TestConnection> m_test_connection;
      RefPtr<Web::Compositor::CompositorConnection> m_compositor_connection;
@@ -75,10 +75,10 @@ index 97e65b0f69a3ef155ecb07a9327d0a1f4d00f197..16e126390d7be7dae5df59b723acaf7d
      OwnPtr<DevToolsDebugger> m_devtools_debugger;
  
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 1ce059a681b85ab74f45642f0b6e9483e053ebb6..3340733514d18be51071741f16834768debd047f 100644
+index d6ff23d1d6942fb47eaec028f553d2439f25725b..590b9b153c95dd54ffd6cdc1de2b537649f215fc 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -1059,6 +1059,7 @@ GC::Ptr<WebContentConsoleClient> PageClient::attach_js_console(Web::DOM::Documen
+@@ -1071,6 +1071,7 @@ GC::Ptr<WebContentConsoleClient> PageClient::attach_js_console(Web::DOM::Documen
  void PageClient::page_did_finish_loading(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id)
  {
      client().async_did_finish_loading(m_id, navigable_id, document_id);

@@ -24,7 +24,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 26 insertions(+)
 
 diff --git a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
-index 7d4e4a6cbd353b318081fce44391abb5b8300236..d2afdda7bc24968368263a9df93e1b621a26da8e 100644
+index c15c7ff571de5fd1a866bdcd847a0238ec630cf5..096bc3e386c958c17c15897d71d7077038ea7ec8 100644
 --- a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 +++ b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 @@ -6,6 +6,7 @@
@@ -35,7 +35,7 @@ index 7d4e4a6cbd353b318081fce44391abb5b8300236..d2afdda7bc24968368263a9df93e1b62
  #include <LibWeb/Bindings/PrincipalHostDefined.h>
  #include <LibWeb/ContentSecurityPolicy/BlockingAlgorithms.h>
  #include <LibWeb/ContentSecurityPolicy/Directives/DirectiveOperations.h>
-@@ -123,6 +124,12 @@ void report_a_violation_found_in_another_process(HTML::EnvironmentSettingsObject
+@@ -125,6 +126,12 @@ void report_a_violation_found_in_another_process(HTML::EnvironmentSettingsObject
  // https://w3c.github.io/webappsec-csp/#should-block-navigation-request
  Directives::Directive::Result should_navigation_request_of_type_be_blocked_by_content_security_policy(NonnullRefPtr<Fetch::Infrastructure::Request> navigation_request, Directives::Directive::NavigationType navigation_type, Page& page)
  {

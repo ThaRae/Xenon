@@ -26,10 +26,10 @@ coming from another tab.
  4 files changed, 99 insertions(+), 16 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index c41ae2100d6da5b6745737fda19de090300f29a1..e0b490568c47603e5ad494b583c438e916338ac2 100644
+index c5ea940163bb991b80cebbeba6bb4221fdde113e..cdf3632f2e8e05db8b7cda389727db227997bda9 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -2326,7 +2326,7 @@ ErrorOr<void> Application::launch_devtools_server()
+@@ -2327,7 +2327,7 @@ ErrorOr<void> Application::launch_devtools_server()
      return {};
  }
  
@@ -38,7 +38,7 @@ index c41ae2100d6da5b6745737fda19de090300f29a1..e0b490568c47603e5ad494b583c438e9
  {
      if (!m_devtools || !m_browser_options.devtools_port.has_value())
          return Error::from_string_literal("DevTools is not currently enabled");
-@@ -2334,14 +2334,52 @@ ErrorOr<void> Application::launch_devtools_client()
+@@ -2335,14 +2335,52 @@ ErrorOr<void> Application::launch_devtools_client()
      if (m_devtools->has_active_connection())
          return Error::from_string_literal("A DevTools client is already connected");
  
@@ -93,7 +93,7 @@ index c41ae2100d6da5b6745737fda19de090300f29a1..e0b490568c47603e5ad494b583c438e9
  }
  
  static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, u32 screenshot_timeout)
-@@ -3673,7 +3711,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
+@@ -3690,7 +3728,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
  {
      if (m_devtools) {
          m_devtools_client.clear();
@@ -106,7 +106,7 @@ index c41ae2100d6da5b6745737fda19de090300f29a1..e0b490568c47603e5ad494b583c438e9
          on_devtools_disabled();
      } else {
          TRY(launch_devtools_server());
-@@ -4662,7 +4705,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
+@@ -4679,7 +4722,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
      if (!view.has_value())
          return;
  
@@ -115,7 +115,7 @@ index c41ae2100d6da5b6745737fda19de090300f29a1..e0b490568c47603e5ad494b583c438e9
  }
  
  void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescription const& description) const
-@@ -4671,7 +4714,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
+@@ -4688,7 +4731,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
      if (!view.has_value())
          return;
  
@@ -124,7 +124,7 @@ index c41ae2100d6da5b6745737fda19de090300f29a1..e0b490568c47603e5ad494b583c438e9
  }
  
  void Application::did_connect_devtools_client(DevTools::TabDescription const& description) const
-@@ -4695,6 +4738,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
+@@ -4712,6 +4755,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
  void Application::did_close_devtools_connection()
  {
      m_devtools_client.clear();
@@ -133,10 +133,10 @@ index c41ae2100d6da5b6745737fda19de090300f29a1..e0b490568c47603e5ad494b583c438e9
  
  }
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 5f7b05114f18be55dbbd3e84ce12d37d65770ecf..e3527638f9d799fe6daa48db49c02df590e97695 100644
+index 428cbb48ed46aa72f37504f6bfa9beaccf7ba472..3798b45c92cc549ff11962e4ae89400f18442e10 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -457,7 +457,8 @@ public:
+@@ -458,7 +458,8 @@ public:
      void apply_view_options(Badge<ViewImplementation>, ViewImplementation&, WebContentPage&);
  
      ErrorOr<void> toggle_devtools_enabled();
@@ -146,7 +146,7 @@ index 5f7b05114f18be55dbbd3e84ce12d37d65770ecf..e3527638f9d799fe6daa48db49c02df5
      void refresh_tab_list();
  
      Optional<Core::TimeZoneWatcher&> time_zone_watcher();
-@@ -822,6 +823,8 @@ private:
+@@ -825,6 +826,8 @@ private:
  
      OwnPtr<DevTools::DevToolsServer> m_devtools;
      OwnPtr<DevTools::FirefoxClient> m_devtools_client;
@@ -156,10 +156,10 @@ index 5f7b05114f18be55dbbd3e84ce12d37d65770ecf..e3527638f9d799fe6daa48db49c02df5
      mutable HashMap<u64, u64> m_navigation_listener_ids;
  };
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 4b6691ed747bc3a955b14ca6934356efe29412a3..b646f065f32bd8c1aa77080fd5a8f6c6221a2354 100644
+index 14d8bf4f1ab3c13dcbc3b28612fd0b737fe282e9..16b6c5cb176230f7c0e3461c7ab938e55fd5d255 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -2055,9 +2055,8 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
+@@ -2082,9 +2082,8 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
          if (node_id != 0)
              m_inspect_element_node_id = node_id;
  
@@ -171,7 +171,7 @@ index 4b6691ed747bc3a955b14ca6934356efe29412a3..b646f065f32bd8c1aa77080fd5a8f6c6
          return;
      }
  
-@@ -2662,6 +2661,42 @@ void ViewImplementation::did_disconnect_devtools_client()
+@@ -2689,6 +2688,42 @@ void ViewImplementation::did_disconnect_devtools_client()
      page().async_set_has_devtools_client(false);
  }
  
@@ -214,7 +214,7 @@ index 4b6691ed747bc3a955b14ca6934356efe29412a3..b646f065f32bd8c1aa77080fd5a8f6c6
  void ViewImplementation::get_dom_node_inner_html(Web::UniqueNodeID node_id)
  {
      page().async_get_dom_node_inner_html(node_id);
-@@ -4925,13 +4960,11 @@ void ViewImplementation::initialize_context_menus()
+@@ -5046,13 +5081,11 @@ void ViewImplementation::initialize_context_menus()
      m_copy_link_to_highlight_action->set_visible(false);
      m_copy_link_to_highlight_action->set_enabled(false);
  
@@ -230,7 +230,7 @@ index 4b6691ed747bc3a955b14ca6934356efe29412a3..b646f065f32bd8c1aa77080fd5a8f6c6
      });
      m_inspect_element_action->set_visible(false);
      m_block_element_action = Action::create("Block Element..."sv, ActionID::BlockElement, [this]() {
-@@ -5465,9 +5498,7 @@ void ViewImplementation::prepare_inspect_element_action(Gfx::IntPoint content_po
+@@ -5586,9 +5619,7 @@ void ViewImplementation::prepare_inspect_element_action(Gfx::IntPoint content_po
      m_inspect_element_hit_test_request_id.clear();
      m_inspect_element_activated_before_hit_test = false;
  
@@ -242,10 +242,10 @@ index 4b6691ed747bc3a955b14ca6934356efe29412a3..b646f065f32bd8c1aa77080fd5a8f6c6
      auto request_id = m_next_node_hit_test_request_id++;
      m_inspect_element_hit_test_request_id = request_id;
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index e12dd2d41b840333234a7f50792c9486d63c657a..0e35f8a628e9c28167c0f4ff160f54dfdb3055ee 100644
+index 83ca94dfc42eb0621d613a88a5b235468e1128eb..1bd47fd94697d7f6c8aff1af4a9545c148969099 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -450,6 +450,9 @@ public:
+@@ -477,6 +477,9 @@ public:
      void did_connect_devtools_client();
      void did_disconnect_devtools_client();
      void start_sending_console_output(bool messages, bool errors);
@@ -255,7 +255,7 @@ index e12dd2d41b840333234a7f50792c9486d63c657a..0e35f8a628e9c28167c0f4ff160f54df
      bool has_devtools_client() const { return m_devtools_connected; }
      void get_dom_node_inner_html(Web::UniqueNodeID node_id);
      void get_dom_node_outer_html(Web::UniqueNodeID node_id);
-@@ -970,9 +973,11 @@ protected:
+@@ -996,9 +999,11 @@ protected:
      RefPtr<Action> m_block_element_action;
  
      void prepare_inspect_element_action(Gfx::IntPoint content_position);

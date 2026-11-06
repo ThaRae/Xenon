@@ -22,10 +22,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 3 insertions(+)
 
 diff --git a/Libraries/LibWeb/Rust/src/render_state/document_host.rs b/Libraries/LibWeb/Rust/src/render_state/document_host.rs
-index ea91dff46096bfc757104c3d1841005df8ad0a09..1110c91e321e1c77917c989310a0bf6d467c653d 100644
+index 5a921c1a02ec66fc0e0ecda73cb65dbe82a4d722..90b6b13597ced267cad8f99985bfdbb6ba747050 100644
 --- a/Libraries/LibWeb/Rust/src/render_state/document_host.rs
 +++ b/Libraries/LibWeb/Rust/src/render_state/document_host.rs
-@@ -939,6 +939,9 @@ impl DocumentHost {
+@@ -982,6 +982,9 @@ impl DocumentHost {
          if input_event_id < self.newest_pointer_input_event.get() {
              return true;
          }
@@ -33,5 +33,5 @@ index ea91dff46096bfc757104c3d1841005df8ad0a09..1110c91e321e1c77917c989310a0bf6d
 +            self.hover_events_owed.set(None);
 +        }
          self.newest_pointer_input_event.set(input_event_id);
-         false
-     }
+         // NB: Lanes may tick beside a task that handles a press, and no tick hovers a move older than this event.
+         self.ticks.note_input_handled(input_event_id);

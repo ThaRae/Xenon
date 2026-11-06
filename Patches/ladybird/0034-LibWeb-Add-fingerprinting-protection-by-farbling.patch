@@ -53,12 +53,12 @@ since test output has to be deterministic.
  create mode 100644 Libraries/LibWeb/Fingerprinting/Farbling.h
 
 diff --git a/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs b/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
-index 8633f55fc71ac4123be95cb090b5fc416d9c741a..f5d5606a1556aaf39e188a2b41e0e4bf05ba747b 100644
+index 49ecc22dfb7982df5eb4ed822394eda0d405e67c..509cdb1783af5d193406f6702b06309ce8ffe47f 100644
 --- a/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
 +++ b/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
-@@ -35,6 +35,10 @@ unsafe extern "C" {
-     /// Whether the global object of the realm is a Window.
+@@ -49,6 +49,10 @@ unsafe extern "C" {
      pub(crate) fn web_bindings_realm_is_window(realm: *mut c_void) -> bool;
+     pub(crate) fn web_bindings_realm_is_secure_context(realm: *mut c_void) -> bool;
  
 +    /// If fingerprinting protection is enabled, farbles the RGBA8888 pixels in place with the seed of the realm's
 +    /// origin (Web::Fingerprinting::perturb_pixels()).
@@ -89,10 +89,10 @@ index 94d8734923cece5a43cd5c3ba4a6710bc572fd56..86670d95d33ac114566daa0a7d58328f
          Ok(image_data)
      }
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index 2915582291425976a373d766f45e8538c08f0df3..6e7aa9932e9cc29323d410cfb93bf74ca35ebd43 100644
+index e84b615d5096ae0a0b7e376c2853846af6fbc244..4b1d625b88d6918982cd99a75e3ffdab2029423d 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-@@ -27,6 +27,7 @@
+@@ -31,6 +31,7 @@
  #include <LibWeb/Platform/EventLoopPlugin.h>
  #include <LibWeb/WebIDL/AbstractOperations.h>
  #include <LibWeb/WebIDL/CallbackType.h>
@@ -100,15 +100,15 @@ index 2915582291425976a373d766f45e8538c08f0df3..6e7aa9932e9cc29323d410cfb93bf74c
  #include <LibWeb/WebIDL/DOMException.h>
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
-@@ -112,6 +113,7 @@ DOM::Document* web_bindings_window_associated_document(HTML::Window*);
- bool web_bindings_document_is_fully_active(DOM::Document*);
- HTML::WorkerGlobalScope* web_bindings_worker_global_scope_from_global_object(JSObject* global_object);
+@@ -127,6 +128,7 @@ HTML::EnvironmentSettingsObject* web_bindings_relevant_settings_object(JSObject*
+ JSObject* web_bindings_environment_settings_object_global_object(HTML::EnvironmentSettingsObject*);
+ void web_bindings_environment_settings_object_id(HTML::EnvironmentSettingsObject*, void* ctx, void (*on_id)(void*, ReadonlyBytes));
  bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope*);
 +void web_bindings_farble_image_data(void* realm, u8* pixels, size_t length);
  void web_bindings_with_temporary_execution_context(void* realm, bool callbacks_enabled, void* context, void (*steps)(void*));
  bool web_bindings_object_implements_interface(JSObject* object, u16 interface_name);
  JSObject* web_bindings_create_dom_exception(void* realm, ReadonlyBytes name, FlatPtr message);
-@@ -186,6 +188,14 @@ bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope* worker
+@@ -276,6 +278,14 @@ bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope* worker
      return worker_global_scope->is_closing();
  }
  
@@ -124,10 +124,10 @@ index 2915582291425976a373d766f45e8538c08f0df3..6e7aa9932e9cc29323d410cfb93bf74c
  {
      HTML::TemporaryExecutionContext execution_context { *static_cast<JS::Realm*>(realm), callbacks_enabled ? HTML::TemporaryExecutionContext::CallbacksEnabled::Yes : HTML::TemporaryExecutionContext::CallbacksEnabled::No };
 diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
-index 03e8c7a8b359db0652af79ea0de8f1a1e219681b..0da31a9988f7f94948d771f34e357d24edb5fec9 100644
+index 8d05454b88f66e74c121340236e813322e62c03d..ead797fec73c71e7e471e073ab8c92248ef5c342 100644
 --- a/Libraries/LibWeb/CMakeLists.txt
 +++ b/Libraries/LibWeb/CMakeLists.txt
-@@ -397,6 +397,7 @@ set(SOURCES
+@@ -342,6 +342,7 @@ set(SOURCES
      FileAPI/BlobURLStore.cpp
      FileAPI/File.cpp
      FileAPI/FileList.cpp
@@ -503,7 +503,7 @@ index 7e1ec77b5ac90d0f1d80b6a3e146c9ec9a5bc2a8..1e7a6e379b867191af4fa86b3f636612
  
  }
 diff --git a/Libraries/LibWeb/WebAudio/AnalyserNode.cpp b/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
-index adbfc7d4753346974d3d55d91bf73f98b6b6b83b..8dd757225432f57e7b5572e78d806c31b59a3c2e 100644
+index 6bb382f3d54b2dcdfc415aad0f316fc53d9f7aff..98b53ce4797c9acf1427fc77100a009cbb9d7b4a 100644
 --- a/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
 +++ b/Libraries/LibWeb/WebAudio/AnalyserNode.cpp
 @@ -12,6 +12,7 @@
@@ -642,7 +642,7 @@ index c00e7f9f031b9e122368da9d3a3144dd1de34258..eebd63c421b66cd6608393078211b58f
      String user_agent_for_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_url(url, user_agent); }
      String user_agent_for_websocket_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_websocket_url(url, user_agent); }
 diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
-index 11af65a6ae09cd64a3a6506662c3606db277e390..6fe4414caec35b4181e4e44e93b4d1b7400340f0 100644
+index 5645f67adeb231c5be69825b5692e60fdbb5a768..67a2082c74b174a7d4ba4b29db0a5398e6cf9eed 100644
 --- a/Services/WebContent/main.cpp
 +++ b/Services/WebContent/main.cpp
 @@ -37,6 +37,7 @@
@@ -653,7 +653,7 @@ index 11af65a6ae09cd64a3a6506662c3606db277e390..6fe4414caec35b4181e4e44e93b4d1b7
  #include <LibWeb/Loader/ResourceLoader.h>
  #include <LibWeb/Painting/BoxViews.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
-@@ -280,6 +281,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -281,6 +282,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
      OPENSSL_TRY(OSSL_set_max_threads(nullptr, Core::System::hardware_concurrency()));
  
      Web::HTML::Window::set_enable_test_mode(enable_test_mode);
