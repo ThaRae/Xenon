@@ -26,6 +26,13 @@ pub static RELOAD: Icon = stroked!("xenon-reload", "M20 12a8 8 0 1 1-2.34-5.66M2
 pub static STOP: Icon = stroked!("xenon-stop", "M6 6l12 12M18 6L6 18");
 pub static CLOSE: Icon = stroked!("xenon-close", "M7 7l10 10M17 7L7 17");
 pub static PLUS: Icon = stroked!("xenon-plus", "M12 5v14M5 12h14");
+pub static DOWNLOAD: Icon = stroked!("xenon-download", "M12 4v11M7 10l5 5 5-5M5 20h14");
+pub static FOLDER: Icon = stroked!(
+    "xenon-folder",
+    "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+);
+pub static PAUSE: Icon = stroked!("xenon-pause", "M9 6v12M15 6v12");
+pub static PLAY: Icon = stroked!("xenon-play", "M8 5l11 7-11 7z");
 pub static MENU: Icon = stroked!("xenon-menu", "M4 7h16M4 12h16M4 17h16");
 pub static STAR: Icon = stroked!(
     "xenon-star",

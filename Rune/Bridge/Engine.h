@@ -24,6 +24,7 @@
 #include <LibWebCommon/HTML/ActivateTab.h>
 #include <LibWebCommon/HTML/VisibilityState.h>
 #include <LibWebCommon/PixelUnits.h>
+#include <LibWebView/FileDownloader.h>
 #include <LibWebView/Forward.h>
 #include <LibWebView/SessionStore.h>
 #include <Rune/Bridge/AppMenus.h>
@@ -77,6 +78,8 @@ public:
     void new_tab_in_active_window();
     void reopen_closed_tab_in_active_window();
     AppMenus& app_menus() { return m_app_menus; }
+    void run_download_action(u64 download, u32 action);
+    void report_downloads_soon();
 
     void set_focused_view(XenonViewId, bool focused);
     View* focused_view();
@@ -150,6 +153,18 @@ private:
     };
     OwnPtr<SettingsObserver> m_settings_observer;
     AppMenus m_app_menus;
+
+    class DownloadsObserver final : public WebView::FileDownloaderObserver {
+        AK_ALLOC_WITH_KMALLOC;
+
+    public:
+        virtual void download_added(WebView::FileDownloader::Download const&) override { Engine::the().report_downloads_soon(); }
+        virtual void download_updated(WebView::FileDownloader::Download const&) override { Engine::the().report_downloads_soon(); }
+        virtual void download_removed(u64, WebView::IsPrivate) override { Engine::the().report_downloads_soon(); }
+    };
+    OwnPtr<DownloadsObserver> m_downloads_observer;
+    bool m_downloads_report_pending { false };
+    void report_downloads();
 
     Core::AnonymousBuffer m_theme;
     bool m_system_dark { false };

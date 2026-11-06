@@ -32,6 +32,9 @@ private:
 
     virtual Optional<WebView::ViewImplementation&> active_web_view() const override;
     virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab) const override;
+    virtual void open_download(WebView::FileDownloader::Download const&) const override;
+    virtual void show_download_in_folder(WebView::FileDownloader::Download const&) const override;
+    virtual void display_download_confirmation_dialog(StringView, LexicalPath const&) const override { }
     virtual NonnullRefPtr<BookmarkPromise> display_add_bookmark_dialog(Optional<String const&> target_folder_id = {}) const override;
 
 #ifdef AK_OS_MACOS

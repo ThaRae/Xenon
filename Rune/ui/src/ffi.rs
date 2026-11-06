@@ -221,7 +221,32 @@ pub struct XenonUiCallbacks {
         Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, percent: u32)>,
     pub view_bookmarked_changed:
         Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, bookmarked: bool)>,
+    pub downloads_changed: Option<
+        unsafe extern "C" fn(context: *mut c_void, downloads: *const XenonDownload, count: usize),
+    >,
 }
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct XenonDownload {
+    pub id: u64,
+    pub file_name: XenonStr,
+    pub status_text: XenonStr,
+    pub status: u32,
+    pub progress: f64,
+    pub can_resume: bool,
+    pub is_private: bool,
+}
+
+pub const XENON_DOWNLOAD_IN_PROGRESS: u32 = 0;
+pub const XENON_DOWNLOAD_PAUSED: u32 = 1;
+pub const XENON_DOWNLOAD_COMPLETED: u32 = 2;
+
+pub const XENON_DOWNLOAD_ACTION_OPEN: u32 = 0;
+pub const XENON_DOWNLOAD_ACTION_SHOW_IN_FOLDER: u32 = 1;
+pub const XENON_DOWNLOAD_ACTION_CANCEL: u32 = 2;
+pub const XENON_DOWNLOAD_ACTION_PAUSE: u32 = 3;
+pub const XENON_DOWNLOAD_ACTION_RESUME: u32 = 4;
 
 unsafe extern "C" {
     pub fn xenon_engine_start(
@@ -243,6 +268,7 @@ unsafe extern "C" {
     pub fn xenon_engine_activate_action(action: u32);
     pub fn xenon_engine_request_app_menu(which: u32);
     pub fn xenon_engine_activate_app_menu_item(menu: u64, item: u32);
+    pub fn xenon_engine_download_action(download: u64, action: u32);
     pub fn xenon_engine_new_window(is_private: bool) -> XenonWindowId;
     pub fn xenon_engine_activate_window(window: XenonWindowId);
     pub fn xenon_engine_close_window(window: XenonWindowId);

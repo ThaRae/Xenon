@@ -12,6 +12,7 @@
 #include <LibURL/InternalURLs.h>
 #include <LibWebCommon/WebView/Utilities.h>
 #include <LibWebView/BrowserProcess.h>
+#include <LibWebView/DownloadPresentation.h>
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/HistoryStore.h>
 #include <LibWebView/PlatformColors.h>
@@ -182,6 +183,7 @@ int Engine::run_application()
     Ladybird::MemoryPressureRelease::start();
 
     m_settings_observer = make<SettingsObserver>();
+    m_downloads_observer = make<DownloadsObserver>();
 
     accept_commands();
     notify(&XenonUiCallbacks::engine_ready);
@@ -192,6 +194,7 @@ int Engine::run_application()
 
     stop_accepting_commands();
     m_settings_observer = nullptr;
+    m_downloads_observer = nullptr;
     m_focused_view.clear();
     m_views.clear();
     m_model = nullptr;
@@ -568,6 +571,72 @@ void Engine::reopen_closed_tab_in_active_window()
 {
     if (m_model)
         m_model->reopen_closed_tab(m_model->active_window());
+}
+
+void Engine::report_downloads_soon()
+{
+    if (m_downloads_report_pending)
+        return;
+    m_downloads_report_pending = true;
+    Core::deferred_invoke([this] {
+        m_downloads_report_pending = false;
+        report_downloads();
+    });
+}
+
+void Engine::report_downloads()
+{
+    auto const& downloads = WebView::Application::the().file_downloader().downloads();
+    Vector<ByteString> file_names;
+    Vector<String> status_texts;
+    file_names.ensure_capacity(downloads.size());
+    status_texts.ensure_capacity(downloads.size());
+    Vector<XenonDownload> items;
+    items.ensure_capacity(downloads.size());
+    for (size_t i = downloads.size(); i > 0; --i) {
+        auto const& download = downloads[i - 1];
+        file_names.append(download.destination.basename());
+        status_texts.append(WebView::download_status_text(download));
+        auto progress = download.progress();
+        items.append({
+            .id = download.id,
+            .file_name = xenon_str(file_names.last()),
+            .status_text = xenon_str(status_texts.last()),
+            .status = static_cast<u32>(download.status),
+            .progress = progress.value_or(-1),
+            .can_resume = download.can_resume,
+            .is_private = download.is_private == WebView::IsPrivate::Yes,
+        });
+    }
+    notify(&XenonUiCallbacks::downloads_changed, static_cast<XenonDownload const*>(items.data()), items.size());
+}
+
+void Engine::run_download_action(u64 id, u32 action)
+{
+    auto& application = WebView::Application::the();
+    auto& downloader = application.file_downloader();
+    auto download = downloader.download(id);
+    if (!download.has_value())
+        return;
+    switch (action) {
+    case XENON_DOWNLOAD_ACTION_OPEN:
+        application.open_download(*download);
+        break;
+    case XENON_DOWNLOAD_ACTION_SHOW_IN_FOLDER:
+        application.show_download_in_folder(*download);
+        break;
+    case XENON_DOWNLOAD_ACTION_CANCEL:
+        downloader.cancel_download(id);
+        break;
+    case XENON_DOWNLOAD_ACTION_PAUSE:
+        downloader.pause_download(id);
+        break;
+    case XENON_DOWNLOAD_ACTION_RESUME:
+        downloader.resume_download(id);
+        break;
+    default:
+        break;
+    }
 }
 
 void Engine::report_chrome_settings()

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+mod downloads;
 mod icons;
 mod location;
 mod page;

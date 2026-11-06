@@ -80,6 +80,24 @@ pub struct HoverCard {
     pub memory: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Download {
+    pub id: u64,
+    pub file_name: String,
+    pub status_text: String,
+    pub status: u32,
+    pub progress: Option<f32>,
+    pub can_resume: bool,
+    pub private: bool,
+}
+
+impl Download {
+    pub fn is_active(&self) -> bool {
+        self.status == crate::ffi::XENON_DOWNLOAD_IN_PROGRESS
+            || self.status == crate::ffi::XENON_DOWNLOAD_PAUSED
+    }
+}
+
 pub struct Browser {
     engine: Engine,
     surfaces: Arc<PageSurfaces>,
@@ -98,6 +116,8 @@ pub struct Browser {
     pub chrome: ChromeSettings,
     pub hover_card: Option<HoverCard>,
     pub vertical_tabs_expanded: bool,
+    pub downloads: Vec<Download>,
+    pub downloads_popover_open: bool,
 }
 
 impl Browser {
@@ -120,6 +140,8 @@ impl Browser {
             chrome: ChromeSettings::default(),
             hover_card: None,
             vertical_tabs_expanded: true,
+            downloads: Vec::new(),
+            downloads_popover_open: false,
         }
     }
 
@@ -287,6 +309,38 @@ impl Browser {
 
     pub fn toggle_fullscreen(&mut self, _: &mut Tx) {
         crate::platform::set_fullscreen(!crate::platform::is_fullscreen());
+    }
+
+    pub fn downloads_changed(&mut self, downloads: Vec<Download>) {
+        let started = downloads.iter().any(|download| {
+            download.is_active() && !self.downloads.iter().any(|known| known.id == download.id)
+        });
+        self.downloads = downloads;
+        if started {
+            self.downloads_popover_open = true;
+        }
+        if self.downloads.is_empty() {
+            self.downloads_popover_open = false;
+        }
+    }
+
+    pub fn shown_downloads(&self) -> impl Iterator<Item = &Download> {
+        let private = self.windows.shown_is_private();
+        self.downloads
+            .iter()
+            .filter(move |download| download.private == private)
+    }
+
+    pub fn toggle_downloads_popover(&mut self) {
+        self.downloads_popover_open = !self.downloads_popover_open;
+    }
+
+    pub fn close_downloads_popover(&mut self) {
+        self.downloads_popover_open = false;
+    }
+
+    pub fn download_action(&mut self, download: u64, action: u32) {
+        self.engine.download_action(download, action);
     }
 
     pub fn zoom_changed(&mut self, view: ViewId, percent: u32) {

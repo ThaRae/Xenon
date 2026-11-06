@@ -163,6 +163,33 @@ typedef struct XenonTabInfo {
 
 struct XenonMenu;
 
+enum {
+    XENON_DOWNLOAD_IN_PROGRESS = 0,
+    XENON_DOWNLOAD_PAUSED,
+    XENON_DOWNLOAD_COMPLETED,
+    XENON_DOWNLOAD_CANCELED,
+    XENON_DOWNLOAD_FAILED,
+};
+
+enum {
+    XENON_DOWNLOAD_ACTION_OPEN = 0,
+    XENON_DOWNLOAD_ACTION_SHOW_IN_FOLDER,
+    XENON_DOWNLOAD_ACTION_CANCEL,
+    XENON_DOWNLOAD_ACTION_PAUSE,
+    XENON_DOWNLOAD_ACTION_RESUME,
+};
+
+typedef struct XenonDownload {
+    uint64_t id;
+    XenonStr file_name;
+    XenonStr status_text;
+    uint32_t status;
+    // From 0 to 1, or negative when the size isn't known.
+    double progress;
+    bool can_resume;
+    bool is_private;
+} XenonDownload;
+
 typedef struct XenonUiCallbacks {
     void* context;
     void (*engine_ready)(void* context);
@@ -191,6 +218,7 @@ typedef struct XenonUiCallbacks {
     void (*app_menu)(void* context, uint32_t which, struct XenonMenu const*);
     void (*view_zoom_changed)(void* context, XenonViewId, uint32_t percent);
     void (*view_bookmarked_changed)(void* context, XenonViewId, bool bookmarked);
+    void (*downloads_changed)(void* context, XenonDownload const*, size_t count);
 } XenonUiCallbacks;
 
 int xenon_ui_main(int argc, char const* const* argv);
@@ -205,6 +233,7 @@ void xenon_engine_set_cycle_tabs_in_recently_used_order(bool);
 void xenon_engine_activate_action(uint32_t action);
 void xenon_engine_request_app_menu(uint32_t which);
 void xenon_engine_activate_app_menu_item(uint64_t menu, uint32_t item);
+void xenon_engine_download_action(uint64_t download, uint32_t action);
 XenonWindowId xenon_engine_new_window(bool is_private);
 void xenon_engine_activate_window(XenonWindowId);
 void xenon_engine_close_window(XenonWindowId);

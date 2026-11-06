@@ -151,6 +151,13 @@ void xenon_engine_activate_app_menu_item(uint64_t menu, uint32_t item)
     });
 }
 
+void xenon_engine_download_action(uint64_t download, uint32_t action)
+{
+    Engine::the().post([download, action] {
+        Engine::the().run_download_action(download, action);
+    });
+}
+
 XenonViewId xenon_engine_duplicate_tab(XenonViewId source)
 {
     auto& engine = Engine::the();

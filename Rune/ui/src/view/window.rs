@@ -10,6 +10,7 @@ use crate::chrome_menu;
 use crate::engine::ChromeLayout;
 use crate::page_prompts::chrome_hidden;
 use crate::state::Browser;
+use crate::view::downloads::downloads_popover;
 use crate::view::location::location_overlays;
 use crate::view::page::page_area;
 use crate::view::palette::Palette;
@@ -78,7 +79,9 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
     if chrome_hidden(s) {
         return window;
     }
-    window.children(hover_card(s, &palette, layout == ChromeLayout::Vertical))
+    window
+        .children(hover_card(s, &palette, layout == ChromeLayout::Vertical))
+        .children(downloads_popover(s, &palette))
 }
 
 fn compact_bar(s: &Browser, p: &Palette, titlebar_inset: f32, cx: &mut Cx<Browser>) -> El {

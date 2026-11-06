@@ -142,6 +142,26 @@ Optional<WebView::ViewImplementation&> Application::active_web_view() const
     return {};
 }
 
+void Application::open_download(WebView::FileDownloader::Download const& download) const
+{
+    auto path = download_file_path_for_frontend_action(download);
+    if (path.is_error()) {
+        warnln("Xenon: Unable to open the downloaded file: {}", path.error());
+        return;
+    }
+    open_with_system_handler({ path.release_value().to_byte_string() });
+}
+
+void Application::show_download_in_folder(WebView::FileDownloader::Download const& download) const
+{
+    auto path = download_file_path_for_frontend_action(download);
+    if (path.is_error()) {
+        warnln("Xenon: Unable to show the downloaded file: {}", path.error());
+        return;
+    }
+    reveal_file(path.release_value().to_byte_string());
+}
+
 // FIXME: Show a dialog to name the bookmark and pick its folder, as the Qt frontend's BookmarkDialog does. Until
 //        then, the bookmark is added straight away with the page's title, where Bookmarks keeps new bookmarks.
 NonnullRefPtr<Application::BookmarkPromise> Application::display_add_bookmark_dialog(Optional<String const&> target_folder_id) const

@@ -213,6 +213,10 @@ pub struct Windows {
 }
 
 impl Windows {
+    pub fn shown_is_private(&self) -> bool {
+        self.shown.as_ref().is_some_and(|window| window.private)
+    }
+
     pub fn shown_id(&self) -> Option<WindowId> {
         self.shown.map(|info| info.id)
     }

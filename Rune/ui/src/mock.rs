@@ -165,6 +165,9 @@ pub extern "C" fn xenon_engine_request_app_menu(_which: u32) {}
 pub extern "C" fn xenon_engine_activate_app_menu_item(_menu: u64, _item: u32) {}
 
 #[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_download_action(_download: u64, _action: u32) {}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn xenon_engine_new_window(is_private: bool) -> XenonWindowId {
     let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
     send(Command::NewWindow(window, is_private));

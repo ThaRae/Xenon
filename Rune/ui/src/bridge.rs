@@ -104,6 +104,7 @@ impl UiContext {
             app_menu: Some(app_menu),
             view_zoom_changed: Some(view_zoom_changed),
             view_bookmarked_changed: Some(view_bookmarked_changed),
+            downloads_changed: Some(downloads_changed),
         }
     }
 }
@@ -330,6 +331,32 @@ unsafe extern "C" fn app_menu(
     unsafe { ui(context) }
         .handle
         .update(move |browser, tx| browser.show_main_menu(id, entries, tx));
+}
+
+unsafe extern "C" fn downloads_changed(
+    context: *mut c_void,
+    downloads: *const crate::ffi::XenonDownload,
+    count: usize,
+) {
+    let downloads = if downloads.is_null() || count == 0 {
+        Vec::new()
+    } else {
+        unsafe { std::slice::from_raw_parts(downloads, count) }
+            .iter()
+            .map(|download| crate::state::Download {
+                id: download.id,
+                file_name: unsafe { download.file_name.to_string_lossy() },
+                status_text: unsafe { download.status_text.to_string_lossy() },
+                status: download.status,
+                progress: (download.progress >= 0.0).then_some(download.progress as f32),
+                can_resume: download.can_resume,
+                private: download.is_private,
+            })
+            .collect()
+    };
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.downloads_changed(downloads));
 }
 
 unsafe extern "C" fn view_zoom_changed(context: *mut c_void, view: ViewId, percent: u32) {

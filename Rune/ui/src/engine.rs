@@ -237,6 +237,10 @@ impl Engine {
         unsafe { ffi::xenon_engine_activate_action(action as u32) }
     }
 
+    pub fn download_action(self, download: u64, action: u32) {
+        unsafe { ffi::xenon_engine_download_action(download, action) }
+    }
+
     pub fn request_main_menu(self) {
         unsafe { ffi::xenon_engine_request_app_menu(ffi::XENON_APP_MENU_MAIN) }
     }

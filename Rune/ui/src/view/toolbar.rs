@@ -9,6 +9,7 @@ use rune::{Color, Cx, El, Icon, col, el, icon, row};
 use crate::chrome_menu;
 
 use crate::state::{Browser, TOOLBAR_HEIGHT};
+use crate::view::downloads::downloads_button;
 use crate::view::icons;
 use crate::view::location::location_field;
 use crate::view::palette::Palette;
@@ -61,6 +62,7 @@ pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
         ))
         .child(reload)
         .child(location_field(s, p, dark, cx))
+        .children(downloads_button(s, p))
         .child(nav_button(
             "menu-button",
             "Menu",
