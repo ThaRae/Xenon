@@ -20,6 +20,15 @@ pub enum Shortcut {
     PreviousTab,
     SelectTab(usize),
     LastTab,
+    LessRecentTab,
+    MoreRecentTab,
+    ReopenClosedTab,
+    NewWindow,
+    NewPrivateWindow,
+    CloseWindow,
+    NextWindow,
+    MoveTabLeft,
+    MoveTabRight,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,7 +48,13 @@ impl Platform {
 pub fn shortcut_for(key: &Key, mods: Mods, platform: Platform) -> Option<Shortcut> {
     let primary_only = mods.cmd && !mods.alt && !mods.shift;
     let alt_only = mods.alt && !mods.cmd && !mods.ctrl && !mods.shift && !mods.logo;
+    let primary_shift = mods.cmd && mods.shift && !mods.alt;
     match key {
+        Key::Command('t') if primary_shift => Some(Shortcut::ReopenClosedTab),
+        Key::Command('n') if primary_only => Some(Shortcut::NewWindow),
+        Key::Command('n') if primary_shift => Some(Shortcut::NewPrivateWindow),
+        Key::Command('w') if primary_shift => Some(Shortcut::CloseWindow),
+        Key::Command('`') if primary_only => Some(Shortcut::NextWindow),
         Key::Command('t') if primary_only => Some(Shortcut::NewTab),
         Key::Command('w') if primary_only => Some(Shortcut::CloseTab),
         Key::Command('l') if primary_only => Some(Shortcut::FocusLocation),
@@ -55,10 +70,12 @@ pub fn shortcut_for(key: &Key, mods: Mods, platform: Platform) -> Option<Shortcu
         Key::Left if alt_only && platform == Platform::Other => Some(Shortcut::Back),
         Key::Right if alt_only && platform == Platform::Other => Some(Shortcut::Forward),
         Key::Tab if mods.ctrl && !mods.alt && !mods.logo => Some(if mods.shift {
-            Shortcut::PreviousTab
+            Shortcut::MoreRecentTab
         } else {
-            Shortcut::NextTab
+            Shortcut::LessRecentTab
         }),
+        Key::PageDown if mods.ctrl && mods.shift && !mods.alt => Some(Shortcut::MoveTabRight),
+        Key::PageUp if mods.ctrl && mods.shift && !mods.alt => Some(Shortcut::MoveTabLeft),
         Key::PageDown if mods.ctrl && !mods.shift && !mods.alt => Some(Shortcut::NextTab),
         Key::PageUp if mods.ctrl && !mods.shift && !mods.alt => Some(Shortcut::PreviousTab),
         _ => None,
@@ -243,7 +260,7 @@ mod tests {
             m.shift = true;
         });
         assert_eq!(
-            shortcut_for(&Key::Command('t'), shifted, Platform::Other),
+            shortcut_for(&Key::Command('l'), shifted, Platform::Other),
             None
         );
     }
@@ -295,7 +312,7 @@ mod tests {
     }
 
     #[test]
-    fn control_tab_cycles_tabs() {
+    fn control_tab_cycles_tabs_in_recently_used_order() {
         let ctrl = mods(|m| m.ctrl = true);
         let ctrl_shift = mods(|m| {
             m.ctrl = true;
@@ -303,15 +320,55 @@ mod tests {
         });
         assert_eq!(
             shortcut_for(&Key::Tab, ctrl, Platform::Mac),
-            Some(Shortcut::NextTab)
+            Some(Shortcut::LessRecentTab)
         );
         assert_eq!(
             shortcut_for(&Key::Tab, ctrl_shift, Platform::Other),
-            Some(Shortcut::PreviousTab)
+            Some(Shortcut::MoreRecentTab)
         );
         assert_eq!(
             shortcut_for(&Key::Tab, Mods::default(), Platform::Other),
             None
+        );
+    }
+
+    #[test]
+    fn shifted_shortcuts_reopen_tabs_and_open_windows() {
+        let primary_shift = mods(|m| {
+            m.cmd = true;
+            m.shift = true;
+        });
+        assert_eq!(
+            shortcut_for(&Key::Command('t'), primary_shift, Platform::Other),
+            Some(Shortcut::ReopenClosedTab)
+        );
+        assert_eq!(
+            shortcut_for(&Key::Command('n'), primary(), Platform::Other),
+            Some(Shortcut::NewWindow)
+        );
+        assert_eq!(
+            shortcut_for(&Key::Command('n'), primary_shift, Platform::Other),
+            Some(Shortcut::NewPrivateWindow)
+        );
+        assert_eq!(
+            shortcut_for(&Key::Command('w'), primary_shift, Platform::Other),
+            Some(Shortcut::CloseWindow)
+        );
+        assert_eq!(
+            shortcut_for(&Key::Command('`'), primary(), Platform::Mac),
+            Some(Shortcut::NextWindow)
+        );
+        let ctrl_shift = mods(|m| {
+            m.ctrl = true;
+            m.shift = true;
+        });
+        assert_eq!(
+            shortcut_for(&Key::PageUp, ctrl_shift, Platform::Other),
+            Some(Shortcut::MoveTabLeft)
+        );
+        assert_eq!(
+            shortcut_for(&Key::PageDown, ctrl_shift, Platform::Other),
+            Some(Shortcut::MoveTabRight)
         );
     }
 

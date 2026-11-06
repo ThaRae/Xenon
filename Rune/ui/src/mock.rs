@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#[path = "mock_model.rs"]
+mod model;
+
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -11,12 +14,16 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Mutex, MutexGuard};
 use std::thread::JoinHandle;
 
+#[path = "mock_page.rs"]
+mod page;
+
 use crate::ffi::{
     XENON_CURSOR_DEFAULT, XENON_CURSOR_POINTER, XENON_MOUSE_BUTTON_MIDDLE,
     XENON_MOUSE_BUTTON_PRIMARY, XENON_MOUSE_EVENT_LEAVE, XENON_MOUSE_EVENT_MOVE,
-    XENON_MOUSE_EVENT_UP, XenonFrame, XenonKeyEvent, XenonMouseEvent, XenonStr, XenonUiCallbacks,
-    XenonViewId,
+    XENON_MOUSE_EVENT_UP, XENON_WINDOW_NONE, XenonFrame, XenonKeyEvent, XenonMouseEvent, XenonStr,
+    XenonTabInfo, XenonUiCallbacks, XenonViewId, XenonWindowId,
 };
+use model::{MockModel, ModelEvent};
 
 const NEW_TAB_URL: &str = "about:newtab";
 const STILL_LOADING_MARKER: &str = "slow";
@@ -24,14 +31,29 @@ const ROW_PADDING_BYTES: usize = 32;
 
 enum Command {
     Ready,
-    Create {
-        view: XenonViewId,
-        url: String,
+    WindowViewport {
+        window: XenonWindowId,
         width: u32,
         height: u32,
         scale: f64,
     },
-    Close(XenonViewId),
+    NewWindow(XenonWindowId, bool),
+    ActivateWindow(XenonWindowId),
+    CloseWindow(XenonWindowId),
+    NewTab {
+        window: XenonWindowId,
+        view: XenonViewId,
+        input: String,
+        index: Option<usize>,
+        activate: bool,
+    },
+    ActivateTab(XenonViewId),
+    CloseTab(XenonViewId),
+    MoveTab(XenonViewId, XenonWindowId, Option<usize>),
+    SetPinned(XenonViewId, bool),
+    ReopenClosedTab(XenonWindowId),
+    CycleRecentTabs(XenonWindowId, bool),
+    EndRecentTabCycle(XenonWindowId),
     Load(XenonViewId, String),
     Back(XenonViewId),
     Forward(XenonViewId),
@@ -58,6 +80,7 @@ struct Running {
 
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 static NEXT_VIEW: AtomicU64 = AtomicU64::new(1);
+static NEXT_WINDOW: AtomicU64 = AtomicU64::new(1);
 
 fn running() -> MutexGuard<'static, Option<Running>> {
     RUNNING
@@ -104,28 +127,93 @@ pub extern "C" fn xenon_engine_shutdown() {
     }
 }
 
+fn tab_index(index: i64) -> Option<usize> {
+    usize::try_from(index).ok()
+}
+
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn xenon_engine_create_view(
-    url: XenonStr,
+pub extern "C" fn xenon_engine_set_window_viewport(
+    window: XenonWindowId,
     width: u32,
     height: u32,
     scale: f64,
-) -> XenonViewId {
-    let view = NEXT_VIEW.fetch_add(1, Ordering::Relaxed);
-    let url = unsafe { url.to_string_lossy() };
-    send(Command::Create {
-        view,
-        url,
+) {
+    send(Command::WindowViewport {
+        window,
         width,
         height,
         scale,
+    });
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_new_window(is_private: bool) -> XenonWindowId {
+    let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
+    send(Command::NewWindow(window, is_private));
+    window
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_activate_window(window: XenonWindowId) {
+    send(Command::ActivateWindow(window));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_close_window(window: XenonWindowId) {
+    send(Command::CloseWindow(window));
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn xenon_engine_new_tab(
+    window: XenonWindowId,
+    url: XenonStr,
+    index: i64,
+    activate: bool,
+) -> XenonViewId {
+    let view = NEXT_VIEW.fetch_add(1, Ordering::Relaxed);
+    send(Command::NewTab {
+        window,
+        view,
+        input: unsafe { url.to_string_lossy() },
+        index: tab_index(index),
+        activate,
     });
     view
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn xenon_engine_close_view(view: XenonViewId) {
-    send(Command::Close(view));
+pub extern "C" fn xenon_engine_activate_tab(view: XenonViewId) {
+    send(Command::ActivateTab(view));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_close_tab(view: XenonViewId) {
+    send(Command::CloseTab(view));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_move_tab(view: XenonViewId, window: XenonWindowId, index: i64) {
+    send(Command::MoveTab(view, window, tab_index(index)));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_tab_pinned(view: XenonViewId, pinned: bool) {
+    send(Command::SetPinned(view, pinned));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_reopen_closed_tab(window: XenonWindowId) {
+    send(Command::ReopenClosedTab(window));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_cycle_recent_tabs(window: XenonWindowId, toward_less_recent: bool) {
+    send(Command::CycleRecentTabs(window, toward_less_recent));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_end_recent_tab_cycle(window: XenonWindowId) {
+    send(Command::EndRecentTabCycle(window));
 }
 
 #[unsafe(no_mangle)]
@@ -229,6 +317,9 @@ impl MockView {
 struct MockEngine {
     callbacks: XenonUiCallbacks,
     views: HashMap<XenonViewId, MockView>,
+    model: MockModel,
+    viewports: HashMap<XenonWindowId, (u32, u32, f64)>,
+    default_viewport: (u32, u32, f64),
 }
 
 impl MockEngine {
@@ -236,6 +327,9 @@ impl MockEngine {
         MockEngine {
             callbacks: callbacks.0,
             views: HashMap::new(),
+            model: MockModel::default(),
+            viewports: HashMap::new(),
+            default_viewport: (800, 600, 1.0),
         }
     }
 
@@ -256,17 +350,90 @@ impl MockEngine {
                 if let Some(ready) = self.callbacks.engine_ready {
                     unsafe { ready(self.callbacks.context) };
                 }
+                let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
+                self.open_window(window, false);
             }
-            Command::Create {
-                view,
-                url,
+            Command::WindowViewport {
+                window,
                 width,
                 height,
                 scale,
-            } => self.create(view, &url, width, height, scale),
-            Command::Close(view) => {
-                self.views.remove(&view);
+            } => {
+                self.default_viewport = (width, height, scale);
+                if window != XENON_WINDOW_NONE {
+                    self.viewports.insert(window, (width, height, scale));
+                }
             }
+            Command::NewWindow(window, private) => self.open_window(window, private),
+            Command::ActivateWindow(window) => {
+                self.model.activate_window(window);
+                self.dispatch();
+            }
+            Command::CloseWindow(window) => {
+                for view in self.model.close_window(window) {
+                    self.views.remove(&view);
+                }
+                self.dispatch();
+            }
+            Command::NewTab {
+                window,
+                view,
+                input,
+                index,
+                activate,
+            } => {
+                let window = Some(window)
+                    .filter(|w| self.model.has_window(*w))
+                    .or(self.model.active_window());
+                let window = window.unwrap_or_else(|| {
+                    let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
+                    self.model.open_window(window, false);
+                    window
+                });
+                let url = if input.trim().is_empty() {
+                    NEW_TAB_URL.to_owned()
+                } else {
+                    normalized_url(&input)
+                };
+                self.model
+                    .open_tab(window, view, &url, index, None, activate);
+                self.dispatch();
+            }
+            Command::ActivateTab(view) => {
+                self.model.activate_tab(view);
+                self.dispatch();
+            }
+            Command::CloseTab(view) => {
+                let url = self
+                    .views
+                    .get(&view)
+                    .map(|state| state.url().to_owned())
+                    .unwrap_or_default();
+                self.model.close_tab(view, &url);
+                self.dispatch();
+            }
+            Command::MoveTab(view, window, index) => {
+                let index = index.unwrap_or(usize::MAX);
+                self.model.move_tab(view, window, index);
+                self.dispatch();
+            }
+            Command::SetPinned(view, pinned) => {
+                self.model.set_pinned(view, pinned);
+                self.dispatch();
+            }
+            Command::ReopenClosedTab(window) => {
+                self.model.reopen_closed_tab(
+                    Some(window),
+                    || NEXT_VIEW.fetch_add(1, Ordering::Relaxed),
+                    || NEXT_WINDOW.fetch_add(1, Ordering::Relaxed),
+                );
+                self.dispatch();
+            }
+            Command::CycleRecentTabs(window, toward_less_recent) => {
+                self.model.cycle_recent(window, toward_less_recent);
+                self.dispatch();
+            }
+            Command::EndRecentTabCycle(window) => self.model.end_recent_cycle(window),
             Command::Load(view, input) => self.load(view, &normalized_url(&input)),
             Command::Back(view) => self.traverse(view, -1),
             Command::Forward(view) => self.traverse(view, 1),
@@ -278,6 +445,9 @@ impl MockEngine {
                 height,
                 scale,
             } => {
+                if let Some(window) = self.model.window_of(view) {
+                    self.viewports.insert(window, (width, height, scale));
+                }
                 if let Some(state) = self.views.get_mut(&view) {
                     (state.width, state.height, state.scale) = (width, height, scale);
                     self.paint(view);
@@ -285,6 +455,103 @@ impl MockEngine {
             }
             Command::Mouse(view, event) => self.mouse(view, event),
             Command::Shutdown => self.views.clear(),
+        }
+    }
+
+    fn open_window(&mut self, window: XenonWindowId, private: bool) {
+        self.model.open_window(window, private);
+        let view = NEXT_VIEW.fetch_add(1, Ordering::Relaxed);
+        self.model
+            .open_tab(window, view, NEW_TAB_URL, None, None, true);
+        self.dispatch();
+    }
+
+    fn dispatch(&mut self) {
+        for event in self.model.take_events() {
+            self.notify(event);
+        }
+    }
+
+    fn notify(&mut self, event: ModelEvent) {
+        let context = self.callbacks.context;
+        let callbacks = self.callbacks;
+        match event {
+            ModelEvent::WindowOpened(window, private) => {
+                if let Some(opened) = callbacks.window_opened {
+                    unsafe { opened(context, window, private) };
+                }
+            }
+            ModelEvent::WindowClosed(window) => {
+                if let Some(closed) = callbacks.window_closed {
+                    unsafe { closed(context, window) };
+                }
+            }
+            ModelEvent::WindowActivated(window) => {
+                if let Some(activated) = callbacks.window_activated {
+                    unsafe { activated(context, window) };
+                }
+            }
+            ModelEvent::TabInserted {
+                window,
+                view,
+                index,
+                opener,
+                pinned,
+                url,
+            } => {
+                let info = XenonTabInfo {
+                    window,
+                    view,
+                    opener: opener.unwrap_or(0),
+                    index: index as u32,
+                    pinned,
+                    is_private: false,
+                    loaded: true,
+                    is_new_tab_page: url == NEW_TAB_URL,
+                    url: XenonStr::borrowed(&url),
+                    title: XenonStr::borrowed(""),
+                };
+                if let Some(inserted) = callbacks.tab_inserted {
+                    unsafe { inserted(context, &info) };
+                }
+                let (width, height, scale) = self
+                    .viewports
+                    .get(&window)
+                    .copied()
+                    .unwrap_or(self.default_viewport);
+                self.create(view, &url, width, height, scale);
+            }
+            ModelEvent::TabRemoved(window, view) => {
+                self.views.remove(&view);
+                if let Some(removed) = callbacks.tab_removed {
+                    unsafe { removed(context, window, view) };
+                }
+            }
+            ModelEvent::TabMoved {
+                view,
+                from,
+                to,
+                index,
+            } => {
+                if let Some(moved) = callbacks.tab_moved {
+                    unsafe { moved(context, view, from, to, index as u32) };
+                }
+            }
+            ModelEvent::TabActivated(window, view) => {
+                if let Some(activated) = callbacks.tab_activated {
+                    unsafe { activated(context, window, view) };
+                }
+            }
+            ModelEvent::PinnedChanged(view, pinned) => {
+                if let Some(changed) = callbacks.tab_pinned_changed {
+                    unsafe { changed(context, view, pinned) };
+                }
+            }
+            ModelEvent::ClosedTabsChanged(can_reopen) => {
+                if let Some(changed) = callbacks.closed_tabs_changed {
+                    unsafe { changed(context, can_reopen) };
+                }
+            }
         }
     }
 
@@ -342,6 +609,7 @@ impl MockEngine {
         self.string(self.callbacks.view_title_changed, view, &title_for(&url));
         self.favicon(view, &url);
         self.paint(view);
+        page::navigated(view, &url);
         if !url.contains(STILL_LOADING_MARKER) {
             self.loading(view, false);
         }
@@ -414,6 +682,7 @@ impl MockEngine {
         let over_link =
             event.r#type != XENON_MOUSE_EVENT_LEAVE && state.link.contains(event.x, event.y);
         let link = state.link_url();
+        page::mouse(view, state.url(), &event);
         if (event.r#type == XENON_MOUSE_EVENT_MOVE || event.r#type == XENON_MOUSE_EVENT_LEAVE)
             && over_link != state.hovering_link
         {
@@ -443,15 +712,13 @@ impl MockEngine {
     }
 
     fn open_in_background(&mut self, opener: XenonViewId, url: &str) {
-        let Some(state) = self.views.get(&opener) else {
+        let Some(window) = self.model.window_of(opener) else {
             return;
         };
-        let (width, height, scale) = (state.width, state.height, state.scale);
         let view = NEXT_VIEW.fetch_add(1, Ordering::Relaxed);
-        if let Some(opened) = self.callbacks.view_opened {
-            unsafe { opened(self.callbacks.context, opener, view, false) };
-        }
-        self.create(view, url, width, height, scale);
+        self.model
+            .open_tab(window, view, url, None, Some(opener), false);
+        self.dispatch();
     }
 }
 

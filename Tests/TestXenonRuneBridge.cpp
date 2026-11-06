@@ -36,6 +36,9 @@ struct EngineEvents {
     size_t frame_count { 0 };
     bool loaded { false };
     bool loading { false };
+    Vector<XenonViewId> inserted_tabs;
+    Vector<XenonWindowId> opened_windows;
+    XenonViewId active_tab { 0 };
 };
 
 static ByteString byte_string_from(XenonStr string)
@@ -94,6 +97,18 @@ static XenonUiCallbacks callbacks_for(EngineEvents& events)
             events.loading = is_loading;
         });
     };
+    callbacks.window_opened = [](void* context, XenonWindowId window, bool) {
+        update(context, [&](EngineEvents& events) { events.opened_windows.append(window); });
+    };
+    callbacks.tab_inserted = [](void* context, XenonTabInfo const* tab) {
+        update(context, [&](EngineEvents& events) { events.inserted_tabs.append(tab->view); });
+    };
+    callbacks.tab_activated = [](void* context, XenonWindowId, XenonViewId view) {
+        update(context, [&](EngineEvents& events) {
+            if (view == events.expected_view)
+                events.active_tab = view;
+        });
+    };
     return callbacks;
 }
 
@@ -132,11 +147,14 @@ TEST_CASE(engine_paints_a_page_into_frames_for_the_ui)
     static constexpr auto page = "data:text/html,<title>Rune bridge</title><body style=\"margin:0;background:%23ff0050\"></body>"sv;
     {
         MutexLocker locker(events.mutex);
-        events.expected_view = xenon_engine_create_view({ page.characters_without_null_termination(), page.length() }, viewport_width, viewport_height, 1.0);
+        xenon_engine_set_window_viewport(XENON_WINDOW_NONE, viewport_width, viewport_height, 1.0);
+        events.expected_view = xenon_engine_new_tab(XENON_WINDOW_NONE, { page.characters_without_null_termination(), page.length() }, XENON_TAB_INDEX_END, true);
     }
     EXPECT_NE(events.expected_view, 0u);
 
     EXPECT(wait_until(events, [](auto& events) { return events.engine_ready; }));
+    EXPECT(wait_until(events, [](auto& events) { return events.inserted_tabs.contains_slow(events.expected_view) && events.active_tab == events.expected_view; }));
+    EXPECT(wait_until(events, [](auto& events) { return events.inserted_tabs.size() >= 2 && !events.opened_windows.is_empty(); }));
     EXPECT(wait_until(events, [](auto& events) { return events.loaded && events.titles.contains_slow("Rune bridge"sv); }));
     EXPECT(wait_until(events, [](auto& events) { return shows_page_color(events.center_pixel_of_full_frame); }));
 

@@ -11,10 +11,11 @@ use std::sync::{Arc, Mutex};
 
 use rune::{AppHandle, Pixels};
 
-use crate::engine::ViewId;
-use crate::ffi::{XenonFrame, XenonStr, XenonUiCallbacks};
+use crate::engine::{ViewId, WindowId};
+use crate::ffi::{XenonFrame, XenonStr, XenonTabInfo, XenonUiCallbacks};
 use crate::frame::straight_rgba_from_premultiplied_bgra;
 use crate::state::Browser;
+use crate::tab_list::TabInsertion;
 
 #[derive(Default)]
 pub struct PageSurfaces {
@@ -87,9 +88,16 @@ impl UiContext {
             view_favicon_changed: Some(view_favicon_changed),
             view_cursor_changed: Some(view_cursor_changed),
             view_link_hovered: Some(view_link_hovered),
-            view_opened: Some(view_opened),
-            view_close_requested: Some(view_close_requested),
             view_crashed: Some(view_crashed),
+            window_opened: Some(window_opened),
+            window_closed: Some(window_closed),
+            window_activated: Some(window_activated),
+            tab_inserted: Some(tab_inserted),
+            tab_removed: Some(tab_removed),
+            tab_moved: Some(tab_moved),
+            tab_activated: Some(tab_activated),
+            tab_pinned_changed: Some(tab_pinned_changed),
+            closed_tabs_changed: Some(closed_tabs_changed),
         }
     }
 }
@@ -197,27 +205,87 @@ unsafe extern "C" fn view_link_hovered(context: *mut c_void, view: ViewId, url: 
         .update(move |browser, _| browser.link_hovered(view, url));
 }
 
-unsafe extern "C" fn view_opened(
-    context: *mut c_void,
-    opener: ViewId,
-    view: ViewId,
-    activate: bool,
-) {
-    unsafe { ui(context) }
-        .handle
-        .update(move |browser, tx| browser.view_opened(opener, view, activate, tx));
-}
-
-unsafe extern "C" fn view_close_requested(context: *mut c_void, view: ViewId) {
-    unsafe { ui(context) }
-        .handle
-        .update(move |browser, tx| browser.close_tab(view, tx));
-}
-
 unsafe extern "C" fn view_crashed(context: *mut c_void, view: ViewId) {
     unsafe { ui(context) }
         .handle
         .update(move |browser, _| browser.crashed(view));
+}
+
+unsafe extern "C" fn window_opened(context: *mut c_void, window: WindowId, is_private: bool) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.window_opened(window, is_private));
+}
+
+unsafe extern "C" fn window_closed(context: *mut c_void, window: WindowId) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, tx| browser.window_closed(window, tx));
+}
+
+unsafe extern "C" fn window_activated(context: *mut c_void, window: WindowId) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, tx| browser.window_activated(window, tx));
+}
+
+pub fn tab_insertion_from(info: &XenonTabInfo) -> TabInsertion {
+    TabInsertion {
+        window: info.window,
+        view: info.view,
+        index: info.index as usize,
+        pinned: info.pinned,
+        private: info.is_private,
+        is_new_tab_page: info.is_new_tab_page,
+        url: unsafe { info.url.to_string_lossy() },
+        title: unsafe { info.title.to_string_lossy() },
+    }
+}
+
+unsafe extern "C" fn tab_inserted(context: *mut c_void, info: *const XenonTabInfo) {
+    let Some(info) = (unsafe { info.as_ref() }) else {
+        return;
+    };
+    let insertion = tab_insertion_from(info);
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.tab_inserted(insertion));
+}
+
+unsafe extern "C" fn tab_removed(context: *mut c_void, window: WindowId, view: ViewId) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, tx| browser.tab_removed(window, view, tx));
+}
+
+unsafe extern "C" fn tab_moved(
+    context: *mut c_void,
+    view: ViewId,
+    from: WindowId,
+    to: WindowId,
+    index: u32,
+) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.tab_moved(view, from, to, index as usize));
+}
+
+unsafe extern "C" fn tab_activated(context: *mut c_void, window: WindowId, view: ViewId) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, tx| browser.tab_activated(window, view, tx));
+}
+
+unsafe extern "C" fn tab_pinned_changed(context: *mut c_void, view: ViewId, pinned: bool) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.tab_pinned_changed(view, pinned));
+}
+
+unsafe extern "C" fn closed_tabs_changed(context: *mut c_void, can_reopen: bool) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.closed_tabs_changed(can_reopen));
 }
 
 #[cfg(test)]
@@ -232,5 +300,26 @@ mod tests {
         assert_eq!(surfaces.surface(7).unwrap().size(), (1, 1));
         surfaces.close(7);
         assert!(surfaces.surface(7).is_none());
+    }
+
+    #[test]
+    fn tab_info_crosses_into_an_owned_insertion() {
+        let url = "https://example.com/";
+        let info = XenonTabInfo {
+            window: 3,
+            view: 9,
+            opener: 0,
+            index: 2,
+            pinned: true,
+            is_private: false,
+            loaded: true,
+            is_new_tab_page: false,
+            url: XenonStr::borrowed(url),
+            title: XenonStr::borrowed(""),
+        };
+        let insertion = tab_insertion_from(&info);
+        assert_eq!(insertion.index, 2);
+        assert_eq!(insertion.url, url);
+        assert!(insertion.title.is_empty() && insertion.pinned);
     }
 }

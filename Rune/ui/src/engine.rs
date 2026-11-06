@@ -7,6 +7,28 @@
 use crate::ffi::{self, XenonStr};
 
 pub type ViewId = ffi::XenonViewId;
+pub type WindowId = ffi::XenonWindowId;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TabIndex {
+    End,
+    At(usize),
+}
+
+impl TabIndex {
+    fn raw(self) -> i64 {
+        match self {
+            TabIndex::End => ffi::XENON_TAB_INDEX_END,
+            TabIndex::At(index) => i64::try_from(index).unwrap_or(i64::MAX),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecentDirection {
+    LessRecent,
+    MoreRecent,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Viewport {
@@ -144,10 +166,10 @@ pub struct KeyEvent {
 pub struct Engine;
 
 impl Engine {
-    pub fn create_view(self, url: &str, viewport: Viewport) -> ViewId {
+    pub fn set_window_viewport(self, window: Option<WindowId>, viewport: Viewport) {
         unsafe {
-            ffi::xenon_engine_create_view(
-                XenonStr::borrowed(url),
+            ffi::xenon_engine_set_window_viewport(
+                window.unwrap_or(ffi::XENON_WINDOW_NONE),
                 viewport.width,
                 viewport.height,
                 viewport.scale,
@@ -155,12 +177,63 @@ impl Engine {
         }
     }
 
-    pub fn close_view(self, view: ViewId) {
-        unsafe { ffi::xenon_engine_close_view(view) }
+    pub fn new_window(self, private: bool) -> WindowId {
+        unsafe { ffi::xenon_engine_new_window(private) }
     }
 
-    pub fn load(self, view: ViewId, input: &str) {
-        unsafe { ffi::xenon_engine_load(view, XenonStr::borrowed(input)) }
+    pub fn activate_window(self, window: WindowId) {
+        unsafe { ffi::xenon_engine_activate_window(window) }
+    }
+
+    pub fn close_window(self, window: WindowId) {
+        unsafe { ffi::xenon_engine_close_window(window) }
+    }
+
+    pub fn new_tab(
+        self,
+        window: Option<WindowId>,
+        input: &str,
+        index: TabIndex,
+        activate: bool,
+    ) -> ViewId {
+        unsafe {
+            ffi::xenon_engine_new_tab(
+                window.unwrap_or(ffi::XENON_WINDOW_NONE),
+                XenonStr::borrowed(input),
+                index.raw(),
+                activate,
+            )
+        }
+    }
+
+    pub fn activate_tab(self, view: ViewId) {
+        unsafe { ffi::xenon_engine_activate_tab(view) }
+    }
+
+    pub fn request_close_tab(self, view: ViewId) {
+        unsafe { crate::ffi_page::xenon_engine_request_close(view) }
+    }
+
+    pub fn move_tab(self, view: ViewId, window: WindowId, index: TabIndex) {
+        unsafe { ffi::xenon_engine_move_tab(view, window, index.raw()) }
+    }
+
+    pub fn set_tab_pinned(self, view: ViewId, pinned: bool) {
+        unsafe { ffi::xenon_engine_set_tab_pinned(view, pinned) }
+    }
+
+    pub fn reopen_closed_tab(self, window: Option<WindowId>) {
+        unsafe { ffi::xenon_engine_reopen_closed_tab(window.unwrap_or(ffi::XENON_WINDOW_NONE)) }
+    }
+
+    pub fn cycle_recent_tabs(self, window: WindowId, direction: RecentDirection) {
+        unsafe {
+            ffi::xenon_engine_cycle_recent_tabs(window, direction == RecentDirection::LessRecent)
+        }
+    }
+
+    pub fn end_recent_tab_cycle(self, window: WindowId) {
+        unsafe { ffi::xenon_engine_end_recent_tab_cycle(window) }
     }
 
     pub fn go_back(self, view: ViewId) {
@@ -183,10 +256,6 @@ impl Engine {
         unsafe {
             ffi::xenon_engine_set_viewport(view, viewport.width, viewport.height, viewport.scale)
         }
-    }
-
-    pub fn set_visible(self, view: ViewId, visible: bool) {
-        unsafe { ffi::xenon_engine_set_visible(view, visible) }
     }
 
     pub fn set_focused(self, view: ViewId, focused: bool) {

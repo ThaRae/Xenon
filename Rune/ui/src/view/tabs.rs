@@ -65,7 +65,7 @@ fn tab_button(tab: &Tab, active: bool, p: &Palette) -> El {
         .role("tab")
         .label(tab.display_title())
         .checked(active)
-        .w(TAB_WIDTH)
+        .w(if tab.pinned { TAB_MIN_WIDTH } else { TAB_WIDTH })
         .shrink()
         .min_w(TAB_MIN_WIDTH)
         .h(TAB_HEIGHT)
@@ -83,9 +83,13 @@ fn tab_button(tab: &Tab, active: bool, p: &Palette) -> El {
                 s.activate_tab(view, tx);
             }
         })
-        .child(tab_icon(tab, p))
-        .child(title)
-        .child(close_button(view, p));
+        .on_secondary_press(move |s: &mut Browser, _, _| s.toggle_tab_pinned(view))
+        .child(tab_icon(tab, p));
+    let tab_el = if tab.pinned {
+        tab_el
+    } else {
+        tab_el.child(title).child(close_button(view, p))
+    };
     if active {
         tab_el.fill(p.surface).child(
             el().key("indicator")

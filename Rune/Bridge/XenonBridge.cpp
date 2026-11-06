@@ -50,20 +50,111 @@ void xenon_engine_shutdown(void)
     Engine::the().shutdown();
 }
 
-XenonViewId xenon_engine_create_view(XenonStr url, uint32_t width, uint32_t height, double device_pixel_ratio)
+static Optional<size_t> tab_index_from(int64_t index)
+{
+    if (index < 0)
+        return {};
+    return static_cast<size_t>(index);
+}
+
+static void post_to_model(Function<void(Xenon::BrowserModel&)> command)
+{
+    Engine::the().post([command = move(command)] {
+        if (auto* model = Engine::the().model())
+            command(*model);
+    });
+}
+
+void xenon_engine_set_window_viewport(XenonWindowId window, uint32_t width, uint32_t height, double device_pixel_ratio)
+{
+    Engine::the().post([window, size = viewport_size_from(width, height), device_pixel_ratio = device_pixel_ratio_from(device_pixel_ratio)] {
+        Engine::the().set_window_viewport(window, size, device_pixel_ratio);
+    });
+}
+
+XenonWindowId xenon_engine_new_window(bool is_private)
 {
     auto& engine = Engine::the();
-    auto id = engine.allocate_view_id();
-    engine.post([&engine, id, input = ByteString { string_view_from(url) }, size = viewport_size_from(width, height), device_pixel_ratio = device_pixel_ratio_from(device_pixel_ratio)] {
-        engine.create_view(id, size, device_pixel_ratio, input);
+    auto id = engine.allocate_window_id();
+    engine.post([&engine, id, is_private] {
+        engine.new_window(id, is_private ? WebView::IsPrivate::Yes : WebView::IsPrivate::No);
     });
     return id;
 }
 
-void xenon_engine_close_view(XenonViewId id)
+void xenon_engine_activate_window(XenonWindowId window)
 {
-    Engine::the().post([id] {
-        Engine::the().close_view(id);
+    post_to_model([window](auto& model) {
+        model.activate_window(window);
+    });
+}
+
+void xenon_engine_close_window(XenonWindowId window)
+{
+    post_to_model([window](auto& model) {
+        model.close_window(window);
+    });
+}
+
+XenonViewId xenon_engine_new_tab(XenonWindowId window, XenonStr url, int64_t index, bool activate)
+{
+    auto& engine = Engine::the();
+    auto id = engine.allocate_view_id();
+    engine.post([&engine, window, id, input = ByteString { string_view_from(url) }, index = tab_index_from(index), activate] {
+        engine.new_tab(window, id, input, index, activate ? Web::HTML::ActivateTab::Yes : Web::HTML::ActivateTab::No);
+    });
+    return id;
+}
+
+void xenon_engine_activate_tab(XenonViewId view)
+{
+    post_to_model([view](auto& model) {
+        model.activate_tab(view);
+    });
+}
+
+void xenon_engine_close_tab(XenonViewId view)
+{
+    post_to_model([view](auto& model) {
+        model.close_tab(view);
+    });
+}
+
+void xenon_engine_move_tab(XenonViewId view, XenonWindowId window, int64_t index)
+{
+    post_to_model([view, window, index = tab_index_from(index)](auto& model) {
+        auto const* target = model.window(window);
+        if (!target)
+            return;
+        model.move_tab(view, window, index.value_or(target->tabs.size()));
+    });
+}
+
+void xenon_engine_set_tab_pinned(XenonViewId view, bool pinned)
+{
+    post_to_model([view, pinned](auto& model) {
+        model.set_tab_pinned(view, pinned);
+    });
+}
+
+void xenon_engine_reopen_closed_tab(XenonWindowId window)
+{
+    post_to_model([window](auto& model) {
+        model.reopen_closed_tab(window != XENON_WINDOW_NONE ? Optional<XenonWindowId> { window } : Optional<XenonWindowId> {});
+    });
+}
+
+void xenon_engine_cycle_recent_tabs(XenonWindowId window, bool toward_less_recent)
+{
+    post_to_model([window, toward_less_recent](auto& model) {
+        (void)model.step_recent_tab(window, toward_less_recent ? Xenon::BrowserModel::RecentOrder::Direction::LessRecent : Xenon::BrowserModel::RecentOrder::Direction::MoreRecent);
+    });
+}
+
+void xenon_engine_end_recent_tab_cycle(XenonWindowId window)
+{
+    post_to_model([window](auto& model) {
+        model.end_recent_tab_cycle(window);
     });
 }
 
@@ -104,7 +195,8 @@ void xenon_engine_stop(XenonViewId id)
 
 void xenon_engine_set_viewport(XenonViewId id, uint32_t width, uint32_t height, double device_pixel_ratio)
 {
-    post_to_view(id, [size = viewport_size_from(width, height), device_pixel_ratio = device_pixel_ratio_from(device_pixel_ratio)](View& view) {
+    post_to_view(id, [id, size = viewport_size_from(width, height), device_pixel_ratio = device_pixel_ratio_from(device_pixel_ratio)](View& view) {
+        Engine::the().record_view_viewport(id, size, device_pixel_ratio);
         view.set_viewport(size, device_pixel_ratio);
     });
 }

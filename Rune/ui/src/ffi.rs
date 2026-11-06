@@ -7,6 +7,10 @@
 use std::ffi::{c_char, c_int, c_void};
 
 pub type XenonViewId = u64;
+pub type XenonWindowId = u64;
+
+pub const XENON_WINDOW_NONE: XenonWindowId = 0;
+pub const XENON_TAB_INDEX_END: i64 = -1;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -110,6 +114,21 @@ pub struct XenonFrame {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct XenonTabInfo {
+    pub window: XenonWindowId,
+    pub view: XenonViewId,
+    pub opener: XenonViewId,
+    pub index: u32,
+    pub pinned: bool,
+    pub is_private: bool,
+    pub loaded: bool,
+    pub is_new_tab_page: bool,
+    pub url: XenonStr,
+    pub title: XenonStr,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct XenonUiCallbacks {
     pub context: *mut c_void,
@@ -145,16 +164,30 @@ pub struct XenonUiCallbacks {
         Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, cursor: u32)>,
     pub view_link_hovered:
         Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, url: XenonStr)>,
-    pub view_opened: Option<
+    pub view_crashed: Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId)>,
+    pub window_opened:
+        Option<unsafe extern "C" fn(context: *mut c_void, window: XenonWindowId, is_private: bool)>,
+    pub window_closed: Option<unsafe extern "C" fn(context: *mut c_void, window: XenonWindowId)>,
+    pub window_activated: Option<unsafe extern "C" fn(context: *mut c_void, window: XenonWindowId)>,
+    pub tab_inserted: Option<unsafe extern "C" fn(context: *mut c_void, tab: *const XenonTabInfo)>,
+    pub tab_removed: Option<
+        unsafe extern "C" fn(context: *mut c_void, window: XenonWindowId, view: XenonViewId),
+    >,
+    pub tab_moved: Option<
         unsafe extern "C" fn(
             context: *mut c_void,
-            opener: XenonViewId,
             view: XenonViewId,
-            activate: bool,
+            from: XenonWindowId,
+            to: XenonWindowId,
+            index: u32,
         ),
     >,
-    pub view_close_requested: Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId)>,
-    pub view_crashed: Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId)>,
+    pub tab_activated: Option<
+        unsafe extern "C" fn(context: *mut c_void, window: XenonWindowId, view: XenonViewId),
+    >,
+    pub tab_pinned_changed:
+        Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, pinned: bool)>,
+    pub closed_tabs_changed: Option<unsafe extern "C" fn(context: *mut c_void, can_reopen: bool)>,
 }
 
 unsafe extern "C" {
@@ -165,13 +198,28 @@ unsafe extern "C" {
     ) -> bool;
     pub fn xenon_engine_shutdown();
 
-    pub fn xenon_engine_create_view(
-        url: XenonStr,
+    pub fn xenon_engine_set_window_viewport(
+        window: XenonWindowId,
         width: u32,
         height: u32,
         device_pixel_ratio: f64,
+    );
+    pub fn xenon_engine_new_window(is_private: bool) -> XenonWindowId;
+    pub fn xenon_engine_activate_window(window: XenonWindowId);
+    pub fn xenon_engine_close_window(window: XenonWindowId);
+    pub fn xenon_engine_new_tab(
+        window: XenonWindowId,
+        url: XenonStr,
+        index: i64,
+        activate: bool,
     ) -> XenonViewId;
-    pub fn xenon_engine_close_view(view: XenonViewId);
+    pub fn xenon_engine_activate_tab(view: XenonViewId);
+    pub fn xenon_engine_close_tab(view: XenonViewId);
+    pub fn xenon_engine_move_tab(view: XenonViewId, window: XenonWindowId, index: i64);
+    pub fn xenon_engine_set_tab_pinned(view: XenonViewId, pinned: bool);
+    pub fn xenon_engine_reopen_closed_tab(window: XenonWindowId);
+    pub fn xenon_engine_cycle_recent_tabs(window: XenonWindowId, toward_less_recent: bool);
+    pub fn xenon_engine_end_recent_tab_cycle(window: XenonWindowId);
     pub fn xenon_engine_load(view: XenonViewId, input: XenonStr);
     pub fn xenon_engine_go_back(view: XenonViewId);
     pub fn xenon_engine_go_forward(view: XenonViewId);

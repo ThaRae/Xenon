@@ -15,6 +15,15 @@ extern "C" {
 #endif
 
 typedef uint64_t XenonViewId;
+typedef uint64_t XenonWindowId;
+
+enum {
+    XENON_WINDOW_NONE = 0,
+};
+
+enum {
+    XENON_TAB_INDEX_END = -1,
+};
 
 typedef struct XenonStr {
     char const* data;
@@ -102,6 +111,19 @@ typedef struct XenonFrame {
     double device_pixel_ratio;
 } XenonFrame;
 
+typedef struct XenonTabInfo {
+    XenonWindowId window;
+    XenonViewId view;
+    XenonViewId opener;
+    uint32_t index;
+    bool pinned;
+    bool is_private;
+    bool loaded;
+    bool is_new_tab_page;
+    XenonStr url;
+    XenonStr title;
+} XenonTabInfo;
+
 typedef struct XenonUiCallbacks {
     void* context;
     void (*engine_ready)(void* context);
@@ -114,9 +136,16 @@ typedef struct XenonUiCallbacks {
     void (*view_favicon_changed)(void* context, XenonViewId, uint32_t width, uint32_t height, uint8_t const* rgba);
     void (*view_cursor_changed)(void* context, XenonViewId, uint32_t cursor);
     void (*view_link_hovered)(void* context, XenonViewId, XenonStr url);
-    void (*view_opened)(void* context, XenonViewId opener, XenonViewId view, bool activate);
-    void (*view_close_requested)(void* context, XenonViewId);
     void (*view_crashed)(void* context, XenonViewId);
+    void (*window_opened)(void* context, XenonWindowId, bool is_private);
+    void (*window_closed)(void* context, XenonWindowId);
+    void (*window_activated)(void* context, XenonWindowId);
+    void (*tab_inserted)(void* context, XenonTabInfo const*);
+    void (*tab_removed)(void* context, XenonWindowId, XenonViewId);
+    void (*tab_moved)(void* context, XenonViewId, XenonWindowId from, XenonWindowId to, uint32_t index);
+    void (*tab_activated)(void* context, XenonWindowId, XenonViewId);
+    void (*tab_pinned_changed)(void* context, XenonViewId, bool pinned);
+    void (*closed_tabs_changed)(void* context, bool can_reopen);
 } XenonUiCallbacks;
 
 int xenon_ui_main(int argc, char const* const* argv);
@@ -124,8 +153,19 @@ int xenon_ui_main(int argc, char const* const* argv);
 bool xenon_engine_start(XenonUiCallbacks const*, int argc, char const* const* argv);
 void xenon_engine_shutdown(void);
 
-XenonViewId xenon_engine_create_view(XenonStr url, uint32_t width, uint32_t height, double device_pixel_ratio);
-void xenon_engine_close_view(XenonViewId);
+void xenon_engine_set_window_viewport(XenonWindowId, uint32_t width, uint32_t height, double device_pixel_ratio);
+XenonWindowId xenon_engine_new_window(bool is_private);
+void xenon_engine_activate_window(XenonWindowId);
+void xenon_engine_close_window(XenonWindowId);
+XenonViewId xenon_engine_new_tab(XenonWindowId, XenonStr url, int64_t index, bool activate);
+void xenon_engine_activate_tab(XenonViewId);
+void xenon_engine_close_tab(XenonViewId);
+void xenon_engine_move_tab(XenonViewId, XenonWindowId, int64_t index);
+void xenon_engine_set_tab_pinned(XenonViewId, bool pinned);
+void xenon_engine_reopen_closed_tab(XenonWindowId);
+void xenon_engine_cycle_recent_tabs(XenonWindowId, bool toward_less_recent);
+void xenon_engine_end_recent_tab_cycle(XenonWindowId);
+
 void xenon_engine_load(XenonViewId, XenonStr input);
 void xenon_engine_go_back(XenonViewId);
 void xenon_engine_go_forward(XenonViewId);
