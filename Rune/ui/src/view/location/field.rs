@@ -63,7 +63,12 @@ fn text_spans(bar: &LocationBar, colors: &LocationColors, chip: Option<&ChipLayo
     spans
 }
 
-fn indicator(indicator: LeadingIndicator, p: &Palette, colors: &LocationColors) -> El {
+fn indicator(
+    indicator: LeadingIndicator,
+    site_info_open: bool,
+    p: &Palette,
+    colors: &LocationColors,
+) -> El {
     let glyph = match indicator {
         LeadingIndicator::NotSecure => {
             return row()
@@ -71,6 +76,7 @@ fn indicator(indicator: LeadingIndicator, p: &Palette, colors: &LocationColors) 
                 .role("button")
                 .label("Not secure")
                 .help("Not secure")
+                .expanded(site_info_open)
                 .h(PILL_HEIGHT)
                 .px(PILL_PADDING)
                 .mr(INDICATOR_PADDING)
@@ -106,6 +112,7 @@ fn indicator(indicator: LeadingIndicator, p: &Palette, colors: &LocationColors) 
             .role("button")
             .label("View site information")
             .help("View site information")
+            .expanded(site_info_open)
             .hover(p.hover)
             .press(p.press)
             .cursor(Cursor::Default)
@@ -180,7 +187,7 @@ pub fn location_field(s: &Browser, p: &Palette, dark: bool, cx: &mut Cx<Browser>
         .center_y()
         .radius(FIELD_HEIGHT / 2.0);
     if let Some(leading) = leading {
-        field = field.child(indicator(leading, p, &colors));
+        field = field.child(indicator(leading, bar.site_info.is_some(), p, &colors));
     }
     field = field.child(input);
     if let Some(chip) = &chip {

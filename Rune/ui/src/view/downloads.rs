@@ -42,7 +42,7 @@ pub fn downloads_button(s: &Browser, p: &Palette) -> Option<El> {
         .key("downloads-button")
         .role("button")
         .label("Downloads")
-        .checked(s.downloads_popover_open)
+        .expanded(s.downloads_popover_open)
         .size(32.0, 32.0)
         .radius(8.0)
         .center()

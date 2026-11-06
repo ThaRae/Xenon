@@ -40,6 +40,7 @@ pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
     row()
         .key("toolbar")
         .role("toolbar")
+        .label("Navigation")
         .h(TOOLBAR_HEIGHT - p.hairline)
         .gap(2.0)
         .center_y()

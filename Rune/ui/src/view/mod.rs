@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#[cfg(all(test, feature = "mock-engine"))]
+mod chrome_accessibility_tests;
 mod downloads;
 mod icons;
 mod location;

@@ -273,6 +273,13 @@ the Rust side). The UI registers `XenonAccessibilityCallbacks` with `xenon_engin
   sets in a field (it moves the hidden field's selection but not the page's), and telling whether an assistive
   technology runs on Windows.
 
+The chrome's own elements carry roles and names too: tabs report `selected` rather than `checked`; the downloads and
+content blocking buttons, the site information button and the sidebar toggle report whether what they open is
+`expanded`; the content blocking button describes how many requests it blocked; the toolbar is named `Navigation`;
+and a crashed tab's notice is an `alert`. `view/chrome_accessibility_tests.rs` renders the window in each layout and
+checks that every control a reader can press has a name, that the tabs are a tab list with the active one selected,
+and that the page is a `document` named after its tab.
+
 ## Where Rune falls short
 
 - Rune has no secondary-button press: `on_secondary_press_local` fires on release, so a right click reaches the page as

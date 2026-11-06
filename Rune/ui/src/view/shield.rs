@@ -39,7 +39,8 @@ pub fn shield_button(s: &Browser, p: &Palette) -> Option<El> {
         .key("shield-button")
         .role("button")
         .label("Content blocking")
-        .checked(s.shield_popover_open)
+        .description(shield_description(tab, on))
+        .expanded(s.shield_popover_open)
         .size(32.0, 32.0)
         .radius(8.0)
         .center()
@@ -84,6 +85,14 @@ pub fn shield_button(s: &Browser, p: &Palette) -> Option<El> {
         );
     }
     Some(button)
+}
+
+fn shield_description(tab: &Tab, on: bool) -> String {
+    match tab.blocked_requests {
+        _ if !on => "Off for this site".to_owned(),
+        1 => "1 request blocked".to_owned(),
+        count => format!("{count} requests blocked"),
+    }
 }
 
 fn action_row(key: &'static str, label: &'static str, action: u32, p: &Palette) -> El {
