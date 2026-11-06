@@ -14,6 +14,7 @@ use rune::{
 
 use crate::accessibility::PageAccessibility;
 use crate::bridge::PageSurfaces;
+use crate::chrome_popup::{self, DrawnMenu, PopupMenu};
 use crate::engine::{
     Action, ChromeLayout, Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind,
     RecentDirection, TabIndex, ViewId, Viewport, WindowId,
@@ -125,6 +126,7 @@ pub struct Browser {
     pub tab_groups: crate::tab_groups::TabGroups,
     pub hibernation: crate::hibernation::TabHibernation,
     pub task_manager: crate::task_manager::TaskManager,
+    pub chrome_menu: Option<DrawnMenu>,
 }
 
 impl Browser {
@@ -155,6 +157,7 @@ impl Browser {
             tab_groups: crate::tab_groups::TabGroups::default(),
             hibernation: Default::default(),
             task_manager: Default::default(),
+            chrome_menu: None,
         }
     }
 
@@ -262,15 +265,13 @@ impl Browser {
         entries: Vec<page_prompts::MenuEntry>,
         tx: &mut Tx,
     ) {
-        if entries.is_empty() {
-            return;
-        }
-        self.hover_card = None;
-        tx.popup_menu(
-            page_prompts::popup_menu_for(&entries),
+        chrome_popup::open(
+            self,
+            tx,
+            PopupMenu::from_entries(entries),
             "menu-button",
-            move |s: &mut Browser, picked: Option<&str>, _: &mut Tx| {
-                if let Some(item) = picked.and_then(|picked| picked.parse::<u32>().ok()) {
+            move |s, picked, _| {
+                if let Ok(item) = picked.parse::<u32>() {
                     s.engine.activate_app_menu_item(menu, item);
                 }
             },
@@ -430,11 +431,13 @@ impl Browser {
         } else {
             "forward"
         };
-        tx.popup_menu(
-            page_prompts::popup_menu_for(&entries),
+        chrome_popup::open(
+            self,
+            tx,
+            PopupMenu::from_entries(entries),
             anchor,
-            move |s: &mut Browser, picked: Option<&str>, _: &mut Tx| {
-                if let Some(step) = picked.and_then(|picked| picked.parse::<u32>().ok()) {
+            move |s, picked, _| {
+                if let Ok(step) = picked.parse::<u32>() {
                     s.engine.traverse_history_to_step(view, step as i32);
                 }
             },
@@ -838,6 +841,7 @@ impl Browser {
     pub fn window_focus_changed(&mut self, focused: bool) {
         self.window_focused = focused;
         if !focused {
+            chrome_popup::dismiss(self);
             self.release_forwarded_keys();
             self.end_recent_tab_cycle();
         }

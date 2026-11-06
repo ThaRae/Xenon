@@ -10,6 +10,7 @@ mod app_menu;
 mod at_spi;
 mod bridge;
 mod chrome_menu;
+mod chrome_popup;
 mod engine;
 #[allow(dead_code)]
 mod ffi;

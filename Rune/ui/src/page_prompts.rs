@@ -417,6 +417,10 @@ pub fn show_menu(
 }
 
 pub fn popup_menu_for(entries: &[MenuEntry]) -> PopupMenu {
+    popup_menu_named(entries, &|id| id.to_string())
+}
+
+pub fn popup_menu_named(entries: &[MenuEntry], name: &dyn Fn(u32) -> String) -> PopupMenu {
     let mut popup = PopupMenu::new();
     for entry in entries {
         popup = match entry {
@@ -434,7 +438,7 @@ pub fn popup_menu_for(entries: &[MenuEntry]) -> PopupMenu {
                     title.clone()
                 };
                 popup.item(
-                    PopupItem::new(id.to_string(), title)
+                    PopupItem::new(name(*id), title)
                         .enabled(*enabled)
                         .checked(*checked),
                 )
@@ -444,7 +448,7 @@ pub fn popup_menu_for(entries: &[MenuEntry]) -> PopupMenu {
                 popup.item(PopupItem::new(String::new(), title.clone()).enabled(false))
             }
             MenuEntry::Submenu { title, entries } => {
-                popup.submenu(title.clone(), popup_menu_for(entries))
+                popup.submenu(title.clone(), popup_menu_named(entries, name))
             }
         };
     }

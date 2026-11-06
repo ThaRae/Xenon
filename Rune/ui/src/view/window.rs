@@ -13,6 +13,7 @@ use crate::state::Browser;
 use crate::view::downloads::downloads_popover;
 use crate::view::location::location_overlays;
 use crate::view::page::page_area;
+use crate::view::page_overlays::menu::chrome_menu_layers;
 use crate::view::palette::Palette;
 use crate::view::shield::shield_popover;
 use crate::view::tab_groups::group_editor;
@@ -80,14 +81,25 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
     };
     let window = window.children(location_overlays(s, &palette, cx));
     if chrome_hidden(s) {
-        return window;
+        return window.children(chrome_menu(s, &palette));
     }
     window
         .children(hover_card(s, &palette, layout == ChromeLayout::Vertical))
         .children(downloads_popover(s, &palette))
         .children(shield_popover(s, &palette))
+<<<<<<< HEAD
         .children(group_editor(s, &palette, layout == ChromeLayout::Vertical))
         .children(task_manager_overlay(s, &palette))
+=======
+        .children(chrome_menu(s, &palette))
+}
+
+fn chrome_menu(s: &Browser, p: &Palette) -> Vec<El> {
+    s.chrome_menu
+        .as_ref()
+        .map(|menu| chrome_menu_layers(menu, p))
+        .unwrap_or_default()
+>>>>>>> a450868 (Rune: Draw chrome menus in the window where there are no native ones)
 }
 
 fn compact_bar(s: &Browser, p: &Palette, titlebar_inset: f32, cx: &mut Cx<Browser>) -> El {

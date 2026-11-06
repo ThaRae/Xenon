@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-use rune::{PointerPress, PopupItem, PopupMenu, Tx};
+use rune::{PointerPress, Tx};
+
+use crate::chrome_popup::{self, PopupItem, PopupMenu};
 
 use crate::engine::{ChromeLayout, ViewId};
 use crate::hibernation;
@@ -16,7 +18,7 @@ const LAYOUTS: [(ChromeLayout, &str, &str); 3] = [
     (ChromeLayout::Vertical, "layout-vertical", "Vertical Tabs"),
 ];
 
-pub fn show_window_menu(s: &Browser, at: PointerPress, tx: &mut Tx) {
+pub fn show_window_menu(s: &mut Browser, at: PointerPress, tx: &mut Tx) {
     let mut layouts = PopupMenu::new();
     for (layout, id, title) in LAYOUTS {
         layouts = layouts.item(PopupItem::new(id, title).checked(s.chrome.layout == layout));
@@ -42,15 +44,7 @@ pub fn show_window_menu(s: &Browser, at: PointerPress, tx: &mut Tx) {
             "Tab Hibernation",
             hibernation::settings_menu(&s.hibernation.settings),
         );
-    tx.popup_menu(
-        menu,
-        at,
-        |s: &mut Browser, picked: Option<&str>, tx: &mut Tx| {
-            if let Some(picked) = picked {
-                run_window_menu_item(s, picked, tx);
-            }
-        },
-    );
+    chrome_popup::open(s, tx, menu, at, run_window_menu_item);
 }
 
 fn run_window_menu_item(s: &mut Browser, picked: &str, tx: &mut Tx) {
@@ -94,7 +88,7 @@ fn unpinned_neighbours(s: &Browser, view: ViewId) -> TabNeighbours {
     neighbours
 }
 
-pub fn show_tab_menu(s: &Browser, view: ViewId, at: PointerPress, tx: &mut Tx) {
+pub fn show_tab_menu(s: &mut Browser, view: ViewId, at: PointerPress, tx: &mut Tx) {
     let Some(tab) = s.tabs.get(view) else {
         return;
     };
@@ -141,15 +135,9 @@ pub fn show_tab_menu(s: &Browser, view: ViewId, at: PointerPress, tx: &mut Tx) {
         .separator()
         .item(PopupItem::new("close", "Close Tab"))
         .submenu("Close Multiple Tabs", close_menu);
-    tx.popup_menu(
-        menu,
-        at,
-        move |s: &mut Browser, picked: Option<&str>, tx: &mut Tx| {
-            if let Some(picked) = picked {
-                run_tab_menu_item(s, view, picked, tx);
-            }
-        },
-    );
+    chrome_popup::open(s, tx, menu, at, move |s, picked, tx| {
+        run_tab_menu_item(s, view, picked, tx)
+    });
 }
 
 fn run_tab_menu_item(s: &mut Browser, view: ViewId, picked: &str, tx: &mut Tx) {

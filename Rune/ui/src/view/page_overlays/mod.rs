@@ -8,7 +8,7 @@ mod bubbles;
 mod controls;
 mod dialog;
 mod find_bar;
-mod menu;
+pub(crate) mod menu;
 
 use rune::El;
 
