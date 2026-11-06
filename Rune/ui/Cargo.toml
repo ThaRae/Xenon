@@ -10,3 +10,11 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 rune = { git = "https://github.com/anomalyco/rune", rev = "781e2b6d87cd5f32d6f4365956fad4baaf24ee50" }
+
+[features]
+mock-engine = []
+
+[[bin]]
+name = "xenon-ui-preview"
+path = "src/bin/xenon-ui-preview.rs"
+required-features = ["mock-engine"]

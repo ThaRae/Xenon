@@ -1,0 +1,218 @@
+/*
+ * Copyright (c) 2026, the Xenon developers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+use crate::ffi::{self, XenonStr};
+
+pub type ViewId = ffi::XenonViewId;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Viewport {
+    pub width: u32,
+    pub height: u32,
+    pub scale: f64,
+}
+
+impl Viewport {
+    pub fn from_points(width: f32, height: f32, scale: f32) -> Viewport {
+        let device = |points: f32| (points * scale).round().max(1.0) as u32;
+        Viewport {
+            width: device(width),
+            height: device(height),
+            scale: f64::from(scale),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MouseEventKind {
+    Down,
+    Up,
+    Move,
+    Wheel,
+    DoubleClick,
+    Leave,
+}
+
+impl MouseEventKind {
+    fn raw(self) -> u32 {
+        match self {
+            MouseEventKind::Down => ffi::XENON_MOUSE_EVENT_DOWN,
+            MouseEventKind::Up => ffi::XENON_MOUSE_EVENT_UP,
+            MouseEventKind::Move => ffi::XENON_MOUSE_EVENT_MOVE,
+            MouseEventKind::Wheel => ffi::XENON_MOUSE_EVENT_WHEEL,
+            MouseEventKind::DoubleClick => ffi::XENON_MOUSE_EVENT_DOUBLE_CLICK,
+            MouseEventKind::Leave => ffi::XENON_MOUSE_EVENT_LEAVE,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MouseButton {
+    Primary,
+    Secondary,
+    Middle,
+    Backward,
+    Forward,
+}
+
+impl MouseButton {
+    pub fn bit(self) -> u32 {
+        match self {
+            MouseButton::Primary => ffi::XENON_MOUSE_BUTTON_PRIMARY,
+            MouseButton::Secondary => ffi::XENON_MOUSE_BUTTON_SECONDARY,
+            MouseButton::Middle => ffi::XENON_MOUSE_BUTTON_MIDDLE,
+            MouseButton::Backward => ffi::XENON_MOUSE_BUTTON_BACKWARD,
+            MouseButton::Forward => ffi::XENON_MOUSE_BUTTON_FORWARD,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Modifiers(pub u32);
+
+impl Modifiers {
+    pub fn from_rune(mods: rune::Mods) -> Modifiers {
+        let bit = |held: bool, bit: u32| if held { bit } else { 0 };
+        Modifiers(
+            bit(mods.shift, ffi::XENON_MODIFIER_SHIFT)
+                | bit(mods.ctrl, ffi::XENON_MODIFIER_CTRL)
+                | bit(mods.alt, ffi::XENON_MODIFIER_ALT)
+                | bit(mods.logo, ffi::XENON_MODIFIER_SUPER),
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MouseEvent {
+    pub kind: MouseEventKind,
+    pub x: f32,
+    pub y: f32,
+    pub button: Option<MouseButton>,
+    pub buttons: u32,
+    pub modifiers: Modifiers,
+    pub wheel_delta: (f32, f32),
+}
+
+impl MouseEvent {
+    pub fn new(kind: MouseEventKind, x: f32, y: f32) -> MouseEvent {
+        MouseEvent {
+            kind,
+            x,
+            y,
+            button: None,
+            buttons: 0,
+            modifiers: Modifiers::default(),
+            wheel_delta: (0.0, 0.0),
+        }
+    }
+
+    fn raw(&self) -> ffi::XenonMouseEvent {
+        ffi::XenonMouseEvent {
+            r#type: self.kind.raw(),
+            x: self.x,
+            y: self.y,
+            button: self
+                .button
+                .map_or(ffi::XENON_MOUSE_BUTTON_NONE, MouseButton::bit),
+            buttons: self.buttons,
+            modifiers: self.modifiers.0,
+            wheel_delta_x: self.wheel_delta.0,
+            wheel_delta_y: self.wheel_delta.1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyEventKind {
+    Down,
+    Up,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeyEvent {
+    pub kind: KeyEventKind,
+    pub code: String,
+    pub key: String,
+    pub modifiers: Modifiers,
+    pub repeat: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Engine;
+
+impl Engine {
+    pub fn create_view(self, url: &str, viewport: Viewport) -> ViewId {
+        unsafe {
+            ffi::xenon_engine_create_view(
+                XenonStr::borrowed(url),
+                viewport.width,
+                viewport.height,
+                viewport.scale,
+            )
+        }
+    }
+
+    pub fn close_view(self, view: ViewId) {
+        unsafe { ffi::xenon_engine_close_view(view) }
+    }
+
+    pub fn load(self, view: ViewId, input: &str) {
+        unsafe { ffi::xenon_engine_load(view, XenonStr::borrowed(input)) }
+    }
+
+    pub fn go_back(self, view: ViewId) {
+        unsafe { ffi::xenon_engine_go_back(view) }
+    }
+
+    pub fn go_forward(self, view: ViewId) {
+        unsafe { ffi::xenon_engine_go_forward(view) }
+    }
+
+    pub fn reload(self, view: ViewId) {
+        unsafe { ffi::xenon_engine_reload(view) }
+    }
+
+    pub fn stop(self, view: ViewId) {
+        unsafe { ffi::xenon_engine_stop(view) }
+    }
+
+    pub fn set_viewport(self, view: ViewId, viewport: Viewport) {
+        unsafe {
+            ffi::xenon_engine_set_viewport(view, viewport.width, viewport.height, viewport.scale)
+        }
+    }
+
+    pub fn set_visible(self, view: ViewId, visible: bool) {
+        unsafe { ffi::xenon_engine_set_visible(view, visible) }
+    }
+
+    pub fn set_focused(self, view: ViewId, focused: bool) {
+        unsafe { ffi::xenon_engine_set_focused(view, focused) }
+    }
+
+    pub fn mouse_event(self, view: ViewId, event: &MouseEvent) {
+        let raw = event.raw();
+        unsafe { ffi::xenon_engine_mouse_event(view, &raw) }
+    }
+
+    pub fn key_event(self, view: ViewId, event: &KeyEvent) {
+        let raw = ffi::XenonKeyEvent {
+            r#type: match event.kind {
+                KeyEventKind::Down => ffi::XENON_KEY_EVENT_DOWN,
+                KeyEventKind::Up => ffi::XENON_KEY_EVENT_UP,
+            },
+            code: XenonStr::borrowed(&event.code),
+            key: XenonStr::borrowed(&event.key),
+            modifiers: event.modifiers.0,
+            repeat: event.repeat,
+        };
+        unsafe { ffi::xenon_engine_key_event(view, &raw) }
+    }
+
+    pub fn insert_text(self, view: ViewId, text: &str) {
+        unsafe { ffi::xenon_engine_insert_text(view, XenonStr::borrowed(text)) }
+    }
+}
