@@ -154,6 +154,7 @@ bool xenon_engine_start(XenonUiCallbacks const*, int argc, char const* const* ar
 void xenon_engine_shutdown(void);
 
 void xenon_engine_set_window_viewport(XenonWindowId, uint32_t width, uint32_t height, double device_pixel_ratio);
+void xenon_engine_set_system_dark(bool dark);
 XenonWindowId xenon_engine_new_window(bool is_private);
 void xenon_engine_activate_window(XenonWindowId);
 void xenon_engine_close_window(XenonWindowId);

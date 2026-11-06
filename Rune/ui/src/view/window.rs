@@ -17,6 +17,7 @@ use crate::view::toolbar::toolbar;
 pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
     let scale = cx.env().scale;
     s.observe_scale(scale);
+    s.observe_system_dark(cx.system_dark());
     let palette = Palette::new(cx.system_dark(), scale);
     let titlebar_inset = cx.titlebar_inset();
     col()

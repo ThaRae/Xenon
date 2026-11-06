@@ -147,6 +147,9 @@ pub extern "C" fn xenon_engine_set_window_viewport(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_system_dark(_dark: bool) {}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn xenon_engine_new_window(is_private: bool) -> XenonWindowId {
     let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
     send(Command::NewWindow(window, is_private));

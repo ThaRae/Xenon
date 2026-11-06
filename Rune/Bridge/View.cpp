@@ -61,7 +61,7 @@ View::View(XenonViewId id, Web::DevicePixelSize viewport_size, double device_pix
     m_device_pixel_ratio = device_pixel_ratio;
     m_window_size = viewport_size.to_type<int>();
     m_presents_from_cpu_memory = true;
-    set_page_background_color_to_system_canvas(false);
+    set_page_background_color_to_system_canvas(Engine::the().system_dark());
     install_callbacks();
 }
 
@@ -382,7 +382,7 @@ void View::insert_text(StringView text)
 
 void View::apply_system_theme()
 {
-    set_page_background_color_to_system_canvas(false);
+    set_page_background_color_to_system_canvas(Engine::the().system_dark());
     update_system_theme(Engine::the().theme());
 }
 

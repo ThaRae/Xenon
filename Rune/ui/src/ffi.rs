@@ -204,6 +204,7 @@ unsafe extern "C" {
         height: u32,
         device_pixel_ratio: f64,
     );
+    pub fn xenon_engine_set_system_dark(dark: bool);
     pub fn xenon_engine_new_window(is_private: bool) -> XenonWindowId;
     pub fn xenon_engine_activate_window(window: XenonWindowId);
     pub fn xenon_engine_close_window(window: XenonWindowId);

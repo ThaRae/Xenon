@@ -73,6 +73,7 @@ pub struct Browser {
     forwarded_keys: HashSet<String>,
     pub page: PageGeometry,
     pub page_prompts: PagePrompts,
+    system_dark: Cell<Option<bool>>,
 }
 
 impl Browser {
@@ -91,6 +92,7 @@ impl Browser {
             forwarded_keys: HashSet::new(),
             page: PageGeometry::default(),
             page_prompts: PagePrompts::default(),
+            system_dark: Cell::new(None),
         }
     }
 
@@ -618,6 +620,13 @@ impl Browser {
         }
         self.engine.insert_text(view, text);
         true
+    }
+
+    pub fn observe_system_dark(&self, dark: bool) {
+        if self.system_dark.get() != Some(dark) {
+            self.system_dark.set(Some(dark));
+            self.engine.set_system_dark(dark);
+        }
     }
 
     pub fn observe_scale(&self, scale: f32) {

@@ -177,6 +177,10 @@ impl Engine {
         }
     }
 
+    pub fn set_system_dark(self, dark: bool) {
+        unsafe { ffi::xenon_engine_set_system_dark(dark) }
+    }
+
     pub fn new_window(self, private: bool) -> WindowId {
         unsafe { ffi::xenon_engine_new_window(private) }
     }

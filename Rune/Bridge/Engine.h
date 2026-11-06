@@ -54,6 +54,8 @@ public:
     }
 
     Core::AnonymousBuffer const& theme() const { return m_theme; }
+    bool system_dark() const { return m_system_dark; }
+    void set_system_dark(bool);
 
     BrowserModel* model() { return m_model.ptr(); }
 
@@ -131,6 +133,7 @@ private:
     Atomic<XenonWindowId> m_next_window_id { 1 };
 
     Core::AnonymousBuffer m_theme;
+    bool m_system_dark { false };
     OwnPtr<BrowserModel> m_model;
     HashMap<XenonViewId, NonnullOwnPtr<View>> m_views;
     Optional<XenonViewId> m_focused_view;

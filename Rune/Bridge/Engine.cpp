@@ -6,6 +6,7 @@
 
 #include <AK/LexicalPath.h>
 #include <LibCore/Timer.h>
+#include <LibGfx/Palette.h>
 #include <LibGfx/SystemTheme.h>
 #include <LibMain/Main.h>
 #include <LibURL/InternalURLs.h>
@@ -13,6 +14,7 @@
 #include <LibWebView/BrowserProcess.h>
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/HistoryStore.h>
+#include <LibWebView/PlatformColors.h>
 #include <Rune/Bridge/Application.h>
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/View.h>
@@ -24,6 +26,28 @@ namespace Xenon {
 
 static constexpr size_t engine_thread_stack_size = 8 * MiB;
 static constexpr auto session_save_delay = AK::Duration::from_seconds(1);
+
+static Core::AnonymousBuffer make_system_theme(bool dark)
+{
+    auto theme_path = LexicalPath::join(WebView::s_ladybird_resource_root, "themes"sv, "Default.ini"sv);
+    auto theme_or_error = Gfx::load_system_theme(theme_path.string());
+    if (theme_or_error.is_error()) {
+        warnln("Xenon: Unable to load the system theme from {}: {}", theme_path, theme_or_error.error());
+        return {};
+    }
+    auto theme = theme_or_error.release_value();
+
+    auto palette = Gfx::Palette(Gfx::PaletteImpl::create_with_anonymous_buffer(theme));
+#ifdef AK_OS_MACOS
+    palette.set_color(Gfx::ColorRole::Selection, WebView::macos_web_selection_color());
+    palette.set_color(Gfx::ColorRole::InactiveSelection, WebView::macos_web_inactive_selection_color());
+    palette.set_color(Gfx::ColorRole::InactiveSelectionText, WebView::macos_web_inactive_selection_text_color());
+#else
+    palette.set_color(Gfx::ColorRole::InactiveSelection, dark ? Gfx::Color(0x60, 0x60, 0x60) : Gfx::Color(0xd4, 0xd4, 0xd4));
+#endif
+    palette.set_flag(Gfx::FlagRole::IsDark, dark);
+    return theme;
+}
 
 Engine& Engine::the()
 {
@@ -146,11 +170,7 @@ int Engine::run_application()
     if (application->should_exit_after_profile_coordination())
         return 0;
 
-    auto theme_path = LexicalPath::join(WebView::s_ladybird_resource_root, "themes"sv, "Default.ini"sv);
-    if (auto theme = Gfx::load_system_theme(theme_path.string()); !theme.is_error())
-        m_theme = theme.release_value();
-    else
-        warnln("Xenon: Unable to load the system theme from {}: {}", theme_path, theme.error());
+    m_theme = make_system_theme(m_system_dark);
 
     auto& browser_process = application->browser_process();
     browser_process.on_new_tab = [this](auto const& urls) { open_urls_in_new_tabs(urls); };
@@ -530,6 +550,16 @@ void Engine::closed_tabs_changed(bool can_reopen)
 void Engine::session_metadata_changed()
 {
     save_session_soon();
+}
+
+void Engine::set_system_dark(bool dark)
+{
+    if (m_system_dark == dark)
+        return;
+    m_system_dark = dark;
+    m_theme = make_system_theme(dark);
+    for (auto& it : m_views)
+        it.value->apply_system_theme();
 }
 
 void Engine::set_focused_view(XenonViewId id, bool focused)

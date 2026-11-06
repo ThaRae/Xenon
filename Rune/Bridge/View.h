@@ -46,6 +46,7 @@ public:
     void go_forward();
     void set_viewport(Web::DevicePixelSize, double device_pixel_ratio);
     void set_visible(bool);
+    void apply_system_theme();
     void set_focused(bool);
     void handle_mouse_event(XenonMouseEvent const&);
     void handle_key_event(Web::KeyEvent);
