@@ -48,10 +48,10 @@ index 1cc7153f562fe17030ad54a8d0880649dea85ae8..29f02a28055a8a3c4b9f2c32b30d2b69
                          return {};
                      RefPtr<Gfx::Bitmap> poster_frame;
 diff --git a/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp b/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
-index db5af897992a2fd10abe96e7368fc8a3258a8eb4..055c4b67c57d8b4674a15be7af3dc19e787309e1 100644
+index ca65cf962a2a638723471ecac06bd17936a8a36e..d1302d959acfdac313150a45e489bc241f32af03 100644
 --- a/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
 +++ b/Libraries/LibWeb/HTML/WindowOrWorkerGlobalScope.cpp
-@@ -611,6 +611,9 @@ void WindowOrWorkerGlobalScopeMixin::create_image_bitmap_impl(JS::Realm& realm,
+@@ -612,6 +612,9 @@ void WindowOrWorkerGlobalScopeMixin::create_image_bitmap_impl(JS::Realm& realm,
                  };
  
                  auto on_successful_decode = [p = GC::Root(*p), sx, sy, sw, sh, options](Web::Platform::DecodedImage& result) -> ErrorOr<void> {

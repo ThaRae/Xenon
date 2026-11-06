@@ -31,7 +31,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Libraries/LibRequests/RequestControlClient.h  |   2 +
  Libraries/LibWebView/BrowsingSession.h        |  12 +++
  Libraries/LibWebView/RequestServerManager.cpp |  23 ++++
- Libraries/LibWebView/RequestServerManager.h   |  11 ++
+ Libraries/LibWebView/RequestServerManager.h   |  10 ++
  Services/RequestServer/CMakeLists.txt         |   1 +
  .../RequestServer/CertificateExceptions.cpp   | 100 ++++++++++++++++++
  .../RequestServer/CertificateExceptions.h     |  28 +++++
@@ -42,7 +42,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  .../RequestServer/RequestServerControl.ipc    |   5 +
  .../RequestServerControlClient.ipc            |   4 +
  Services/RequestServer/WebSocketImplCurl.cpp  |  10 ++
- 15 files changed, 288 insertions(+), 1 deletion(-)
+ 15 files changed, 287 insertions(+), 1 deletion(-)
  create mode 100644 Services/RequestServer/CertificateExceptions.cpp
  create mode 100644 Services/RequestServer/CertificateExceptions.h
 
@@ -118,10 +118,10 @@ index 0e3a3b149460e48c0514b55e92cafb11d463ab3f..e5dfc074558fe9d17a28ccca2de1952e
      explicit BrowsingSession(IsPrivate);
  
 diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
-index 18dcda0309dbd11ae30b221c2c3063e6fcc8f2dd..c36c8810a214a417a2f2d8b7ac7e46509d8d5a6d 100644
+index bbca43b39c4d1d65431735f90ba96af0cb6d771b..06e521ff1f91da34871f55a254a0817bfc568e91 100644
 --- a/Libraries/LibWebView/RequestServerManager.cpp
 +++ b/Libraries/LibWebView/RequestServerManager.cpp
-@@ -135,6 +135,13 @@ ErrorOr<void> RequestServerManager::launch_process(RequestServerInstance& instan
+@@ -150,6 +150,13 @@ ErrorOr<void> RequestServerManager::launch_process(RequestServerInstance& instan
          if (auto instance = weak_instance.strong_ref())
              the().disk_cache_size_changed(*instance, size);
      };
@@ -135,7 +135,7 @@ index 18dcda0309dbd11ae30b221c2c3063e6fcc8f2dd..c36c8810a214a417a2f2d8b7ac7e4650
      Application::the().configure_request_server_control_client(*control_client);
  
      instance.m_control_client = move(control_client);
-@@ -249,6 +256,22 @@ void RequestServerManager::disk_cache_settings_changed()
+@@ -264,6 +271,22 @@ void RequestServerManager::disk_cache_settings_changed()
      evict_least_recently_used_cache_entries_if_needed();
  }
  
@@ -159,19 +159,18 @@ index 18dcda0309dbd11ae30b221c2c3063e6fcc8f2dd..c36c8810a214a417a2f2d8b7ac7e4650
  {
      for (auto& instance : m_instances)
 diff --git a/Libraries/LibWebView/RequestServerManager.h b/Libraries/LibWebView/RequestServerManager.h
-index b7134c33cf8d6bedcde3302140a4cdd87d396d60..6d253ef5daf16bfd4080dbbcbebccd911f098753 100644
+index b5a075d24a66c5752fc1345cdffc2e914650fee7..fa3ddd31d0c4dfd8f9fda1cffc6c6a4d14780494 100644
 --- a/Libraries/LibWebView/RequestServerManager.h
 +++ b/Libraries/LibWebView/RequestServerManager.h
-@@ -6,6 +6,8 @@
- 
+@@ -7,6 +7,7 @@
  #pragma once
  
-+#include <AK/ByteBuffer.h>
+ #include <AK/ByteBuffer.h>
 +#include <AK/Function.h>
  #include <AK/HashMap.h>
  #include <AK/HashTable.h>
  #include <AK/Optional.h>
-@@ -19,6 +21,7 @@
+@@ -20,6 +21,7 @@
  #include <LibRequests/CacheSizes.h>
  #include <LibRequests/RequestClient.h>
  #include <LibRequests/RequestControlClient.h>
@@ -179,7 +178,7 @@ index b7134c33cf8d6bedcde3302140a4cdd87d396d60..6d253ef5daf16bfd4080dbbcbebccd91
  #include <LibWebView/BrowsingSession.h>
  #include <LibWebView/Forward.h>
  #include <RequestServer/SiteBinding.h>
-@@ -100,6 +103,14 @@ public:
+@@ -101,6 +103,14 @@ public:
  
      bool uses_site_request_servers() const { return m_maximum_site_instances > 0; }
  

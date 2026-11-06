@@ -35,10 +35,10 @@ index 14b25f7d6c87ca622b382e8ecd3430a813ba6845..453226322131f5347869bb7697e83d5f
      bool enabled() const { return state == ContentBlockingState::Enabled || state == ContentBlockingState::NoRules; }
      bool can_toggle() const { return site.has_value() && (enabled() || state == ContentBlockingState::SiteDisabled); }
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 39e0c54296ec3ae098a25439851b38fe4d85e792..8a5960fb6a5de1712e1c33181cc309e5792356d2 100644
+index a403844e74976f10d836c0718aced3e5141e143a..83043972631972d844b833496ead40d7658b3157 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -2741,22 +2741,21 @@ static StringView known_blocked_resource_kind(StringView kind)
+@@ -2768,22 +2768,21 @@ static StringView known_blocked_resource_kind(StringView kind)
  
  void ViewImplementation::did_block_resource(Badge<WebContentPage>, URL::URL const& url, StringView kind)
  {
@@ -65,7 +65,7 @@ index 39e0c54296ec3ae098a25439851b38fe4d85e792..8a5960fb6a5de1712e1c33181cc309e5
      notify_content_blocking_changed();
  }
  
-@@ -2770,6 +2769,7 @@ ContentBlockingSnapshot ViewImplementation::content_blocking_snapshot() const
+@@ -2797,6 +2796,7 @@ ContentBlockingSnapshot ViewImplementation::content_blocking_snapshot() const
  {
      ContentBlockingSnapshot snapshot;
      snapshot.blocked_resources = m_blocked_resources;
@@ -74,10 +74,10 @@ index 39e0c54296ec3ae098a25439851b38fe4d85e792..8a5960fb6a5de1712e1c33181cc309e5
      if (m_crash_state.has_value() || !traversable().active_document().host())
          return snapshot;
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 9001dfbaa6e2d638eeda88e0377c6d5c98c6ee41..80f2c568409838c623791c8bc90ecf0c8cfc7bd4 100644
+index 50599c87682fae02252b3f22b55b34268579a885..262ede18931e3cfec7c4c7a3ba4577589f7658f5 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -1229,6 +1229,7 @@ protected:
+@@ -1262,6 +1262,7 @@ protected:
      u64 m_next_navigation_listener_id { 1 };
  
      Vector<BlockedResource> m_blocked_resources;

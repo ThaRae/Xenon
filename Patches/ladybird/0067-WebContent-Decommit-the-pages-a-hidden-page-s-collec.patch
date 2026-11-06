@@ -15,10 +15,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 0f739fa44cb53880ef12951fdc9c0aeb84a9f17e..c5674c649c81d346ebf00661444e2f93ee04cfef 100644
+index dffa9d0a39736aaf72eb07fb3a259d8b14ff4281..908796b70084352d2bd5a0b1622847b616c50993 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3562,7 +3562,7 @@ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web:
+@@ -3646,7 +3646,7 @@ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web:
      if (system_visibility_state == Web::HTML::VisibilityState::Hidden) {
          Core::deferred_invoke([] {
              Web::Bindings::main_thread_vm().heap().collect_garbage(GC::Heap::CollectionType::CollectGarbage, false);

@@ -41,7 +41,7 @@ index e57a7113283fed6a2ddcc292671031f7f854772e..47d69519229e8741c89b7d969e53d2a6
  static NeverDestroyed<Client::TransportFactory> s_transport_factory;
  static NeverDestroyed<RefPtr<Client>> s_client;
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index a9e7a856132464e102899af3a4fee2310e74ff2c..0db7ccf18e32d996ceeaa778f859bf7991b8fc3d 100644
+index 08913d235a5876232df894463637d3d8e98e6e54..1f76d6185be52798081f5af60722ef0a877708ee 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
 @@ -197,8 +197,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
@@ -64,10 +64,10 @@ index a9e7a856132464e102899af3a4fee2310e74ff2c..0db7ccf18e32d996ceeaa778f859bf79
      if (connection.is_error()) {
          warnln("Unable to connect a MediaServer client: {}", connection.error());
 diff --git a/Services/AudioServer/Tabs.cpp b/Services/AudioServer/Tabs.cpp
-index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3929ccf08 100644
+index 04a08dedc2f4098dd0d6abe6d4bf0a022fbbe9ee..8f03a7ee87c2432cc3095741d352cb18918fc245 100644
 --- a/Services/AudioServer/Tabs.cpp
 +++ b/Services/AudioServer/Tabs.cpp
-@@ -13,6 +13,8 @@
+@@ -14,6 +14,8 @@
  #include <LibAudio/PlaybackStream.h>
  #include <LibAudio/RecordStream.h>
  #include <LibCore/EventLoop.h>
@@ -76,7 +76,7 @@ index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3
  #include <LibIPC/Transport.h>
  
  namespace AudioServer {
-@@ -20,6 +22,8 @@ namespace AudioServer {
+@@ -21,6 +23,8 @@ namespace AudioServer {
  // The device never underruns, since the mix is silence where no client has frames, so its own buffer can stay well
  // below the lookahead the clients keep in their rings.
  static constexpr u32 DEVICE_TARGET_LATENCY_MS = 40;
@@ -85,7 +85,7 @@ index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3
  
  Tabs& Tabs::the()
  {
-@@ -105,6 +109,9 @@ Audio::CaptureDevices& Tabs::capture_devices()
+@@ -137,6 +141,9 @@ Audio::CaptureDevices& Tabs::capture_devices()
  
  ErrorOr<IPC::TransportHandle> Tabs::connect_client(u64 tab_id)
  {
@@ -95,7 +95,7 @@ index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3
      auto paired_transports = TRY(IPC::Transport::create_paired());
      auto handle = move(paired_transports.remote_handle);
  
-@@ -203,6 +210,20 @@ void Tabs::connection_died(u64 tab_id, int client_id)
+@@ -232,6 +239,20 @@ void Tabs::connection_died(u64 tab_id, int client_id)
          return;
      tab->mixer->report_every_group_inaudible();
      m_tabs.remove(tab_id);
@@ -117,7 +117,7 @@ index fe5163b244f57917d8f4bcb3f7cd5061ef46af4e..378ae86fa78c89cd418d4b8c47f8f5d3
  
  }
 diff --git a/Services/AudioServer/Tabs.h b/Services/AudioServer/Tabs.h
-index d84cb55afb02ff09a904e6fae553d5687be65419..1665860f776477bda74f243422aa45543fae694b 100644
+index 5c6b2c6ea6468f72762bcf6bc6ab9eb8ff53ec18..2f725dd4f8f6b26c194813fbef9868aeb0da3274 100644
 --- a/Services/AudioServer/Tabs.h
 +++ b/Services/AudioServer/Tabs.h
 @@ -18,6 +18,7 @@

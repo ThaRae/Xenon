@@ -19,10 +19,10 @@ connects before then keeps it the usual while.
  2 files changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
-index c36c8810a214a417a2f2d8b7ac7e46509d8d5a6d..61b2851b7ce196356f47889cdbf729cc8f61dbad 100644
+index 06e521ff1f91da34871f55a254a0817bfc568e91..ca2306e6fd6dcbe33eafc5ba726a70f180122a15 100644
 --- a/Libraries/LibWebView/RequestServerManager.cpp
 +++ b/Libraries/LibWebView/RequestServerManager.cpp
-@@ -173,6 +173,7 @@ ErrorOr<RequestServerClientConnection> RequestServerManager::connect_new_client(
+@@ -188,6 +188,7 @@ ErrorOr<RequestServerClientConnection> RequestServerManager::connect_new_client(
          if (site_binding == RequestServer::SiteBinding::Bound) {
              instance.m_client_ids.set(client_id);
              instance.m_idle_timer = nullptr;
@@ -30,7 +30,7 @@ index c36c8810a214a417a2f2d8b7ac7e46509d8d5a6d..61b2851b7ce196356f47889cdbf729cc
          }
          return RequestServerClientConnection { .handle = response->take_handle(), .client_id = client_id };
      }
-@@ -188,7 +189,8 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
+@@ -203,7 +204,8 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
          return;
  
      auto weak_instance = instance.make_weak_ptr();
@@ -40,7 +40,7 @@ index c36c8810a214a417a2f2d8b7ac7e46509d8d5a6d..61b2851b7ce196356f47889cdbf729cc
          auto instance = weak_instance.strong_ref();
          if (instance && instance->m_client_ids.is_empty())
              the().retire(*instance);
-@@ -196,6 +198,17 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
+@@ -211,6 +213,17 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
      instance.m_idle_timer->start();
  }
  
@@ -59,7 +59,7 @@ index c36c8810a214a417a2f2d8b7ac7e46509d8d5a6d..61b2851b7ce196356f47889cdbf729cc
  {
      if (Core::EventLoop::current().was_exit_requested())
 diff --git a/Libraries/LibWebView/RequestServerManager.h b/Libraries/LibWebView/RequestServerManager.h
-index 6d253ef5daf16bfd4080dbbcbebccd911f098753..e0dc02102abd28693e3d16d30857684e28115126 100644
+index fa3ddd31d0c4dfd8f9fda1cffc6c6a4d14780494..94a3b540593cb522f1779e33f33cab3583797fc2 100644
 --- a/Libraries/LibWebView/RequestServerManager.h
 +++ b/Libraries/LibWebView/RequestServerManager.h
 @@ -63,6 +63,7 @@ private:

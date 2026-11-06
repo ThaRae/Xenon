@@ -199,10 +199,10 @@ index 0000000000000000000000000000000000000000..e2893f0ef38fed8f8e513193ffad2597
 +    bool allow_destination_subdomains;
 +}
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 4ae323c5a1003b7d3d958c2cd57d7c960259e11d..ebaa66a849871def93335c1b84297720dfe202ae 100644
+index d52b32b74744bffe67c50b19a42e7f39984507b9..568034a161fb19b348f9cb5cce91fe08c1ea730f 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -1201,6 +1201,8 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1202,6 +1202,8 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
      client->async_set_site_compatibility_data(m_site_compatibility_data);
      // A process learns a site's permissions only when it shows that site and asks; at launch, just the defaults.
      client->async_set_permission_snapshot(client->session().permission_manager->snapshot_for({}));
@@ -211,7 +211,7 @@ index 4ae323c5a1003b7d3d958c2cd57d7c960259e11d..ebaa66a849871def93335c1b84297720
      connect_to_image_decoder(*client, move(image_decoder));
  
      // NB: A WebDriver BiDi session gives its state to every process hosting web content when it changes.
-@@ -1227,6 +1229,17 @@ ErrorOr<void> Application::reload_site_compatibility_data()
+@@ -1228,6 +1230,17 @@ ErrorOr<void> Application::reload_site_compatibility_data()
      return {};
  }
  
@@ -230,7 +230,7 @@ index 4ae323c5a1003b7d3d958c2cd57d7c960259e11d..ebaa66a849871def93335c1b84297720
  {
      VERIFY(m_next_page_or_compositor_context_id > 0);
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index a9ae3343563366f3c69187fc989f469da006e277..7bf9c011a6a0bce131cc24801ae1181682602a4f 100644
+index 28206dfc508d6e4f1ed0c300dfa8f7ac6bf0c0a1..19841bdf9721f0abb23f390c1ae6054e0532bf9b 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
 @@ -36,6 +36,7 @@
@@ -241,7 +241,7 @@ index a9ae3343563366f3c69187fc989f469da006e277..7bf9c011a6a0bce131cc24801ae11816
  #include <LibWebCommon/HTML/ActivateTab.h>
  #include <LibWebCommon/HTML/CrossProcessId.h>
  #include <LibWebCommon/HTML/PreparedNavigationDescriptor.h>
-@@ -111,6 +112,11 @@ public:
+@@ -112,6 +113,11 @@ public:
      bool blocks_pop_ups() const;
      ErrorOr<void> reload_site_compatibility_data();
  
@@ -253,7 +253,7 @@ index a9ae3343563366f3c69187fc989f469da006e277..7bf9c011a6a0bce131cc24801ae11816
      bool claim_cpu_profiler(ProcessType);
      void set_cpu_profiler_process(Core::Process, OwnPtr<Core::File> control_socket);
  
-@@ -644,6 +650,7 @@ private:
+@@ -646,6 +652,7 @@ private:
      RefPtr<FontService> m_font_service;
      OwnPtr<FontServiceHost> m_font_service_host;
      JsonValue m_site_compatibility_data;
@@ -262,7 +262,7 @@ index a9ae3343563366f3c69187fc989f469da006e277..7bf9c011a6a0bce131cc24801ae11816
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
 diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
-index 235b21b77ee15e572c60a64439bb2defbdbaeaa6..e24e83b04d277872a241913c2ca7aa47c7b9d481 100644
+index 140d45a67354f89c1752e1f4ba749ceec967236b..d1227181339dc5fd8546d46c5d039cdaefc0bd7f 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.cpp
 +++ b/Libraries/LibWebView/WorkerProcessManager.cpp
 @@ -217,6 +217,8 @@ Web::HTML::WorkerAgentId WorkerProcessManager::start_worker_agent(Owner owner, O
@@ -288,7 +288,7 @@ index 235b21b77ee15e572c60a64439bb2defbdbaeaa6..e24e83b04d277872a241913c2ca7aa47
  {
      for (auto const& agent : m_agents)
 diff --git a/Libraries/LibWebView/WorkerProcessManager.h b/Libraries/LibWebView/WorkerProcessManager.h
-index 590a0bffd52f67aa9944132d583b767b8fb82b8d..19565a8a5c846cf42d7049e39c63f6df8c59c1b9 100644
+index cc14512cdfddfd04bc23efd58de21c6978f73ff0..2c6cdf48089b7a958362787de9cc86f467dcaa32 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.h
 +++ b/Libraries/LibWebView/WorkerProcessManager.h
 @@ -19,6 +19,7 @@
@@ -308,10 +308,10 @@ index 590a0bffd52f67aa9944132d583b767b8fb82b8d..19565a8a5c846cf42d7049e39c63f6df
      // reaches every live worker too.
      void update_user_agent(String const&);
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 39a6454e482c0317f99f10cd32cce0970f8c0f8d..86230d4ea81bfc7f54b0049c2ab55cba02b235ba 100644
+index 10a9af1989588dd5ca91f463b9e7ee5f94cf6df9..ad78760902c7db0c1d912fec54c90779a1690bd2 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -546,6 +546,11 @@ void ConnectionFromClient::set_permission_snapshot(Web::Permissions::PermissionS
+@@ -555,6 +555,11 @@ void ConnectionFromClient::set_permission_snapshot(Web::Permissions::PermissionS
      Web::PermissionsAPI::PermissionStore::the().apply_snapshot(move(snapshot));
  }
  
@@ -324,10 +324,10 @@ index 39a6454e482c0317f99f10cd32cce0970f8c0f8d..86230d4ea81bfc7f54b0049c2ab55cba
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 563bf7d2795c616aa8282778047d99cc35bd1dc5..15be5430e6b5e481e3d7cd2b5f25f6f3067c1765 100644
+index cc537b583b063e95ebef418eed7a579b9f353752..dc0a12da544b3ee3bc1677ba0e704aa20f32db39 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -120,6 +120,7 @@ private:
+@@ -122,6 +122,7 @@ private:
      virtual void connect_to_compositor_process(IPC::TransportHandle handle, IPC::TransportHandle render_clock_handle) override;
      virtual void set_site_compatibility_data(JsonValue data) override;
      virtual void set_permission_snapshot(Web::Permissions::PermissionSnapshot snapshot) override;
@@ -336,7 +336,7 @@ index 563bf7d2795c616aa8282778047d99cc35bd1dc5..15be5430e6b5e481e3d7cd2b5f25f6f3
      virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 27e6a802c2082655656b88bd1e17578dee4de5ac..0b19b8d631d8cc981f9e0f144b9974bb6b7e65f8 100644
+index 4bf0b080d5ff60120973786f92a25a17826ecf98..c2eef8ace18678e9083faac37e56cc36e70390a1 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -16,6 +16,7 @@
@@ -356,10 +356,10 @@ index 27e6a802c2082655656b88bd1e17578dee4de5ac..0b19b8d631d8cc981f9e0f144b9974bb
      update_system_theme(Web::PageId page_id, Core::AnonymousBuffer theme_buffer) =|
      update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect> rects, Vector<Web::DevicePixelRect> available_rects, u32 main_screen_index) =|
 diff --git a/Services/WebWorker/ConnectionFromClient.cpp b/Services/WebWorker/ConnectionFromClient.cpp
-index c6ff14a172da7d36c646e69d48c51d26cbf7564a..a20464474c8fe5d753290ce9bd637d48e3a60f51 100644
+index 05182e75de449fe92bbd84eb3a0e54d65561cba6..4bffb4e70ea9cc1080efef7bd05b6e74f2395d8d 100644
 --- a/Services/WebWorker/ConnectionFromClient.cpp
 +++ b/Services/WebWorker/ConnectionFromClient.cpp
-@@ -92,6 +92,11 @@ void ConnectionFromClient::set_permission_snapshot(Web::Permissions::PermissionS
+@@ -109,6 +109,11 @@ void ConnectionFromClient::set_permission_snapshot(Web::Permissions::PermissionS
      Web::PermissionsAPI::PermissionStore::the().apply_snapshot(move(snapshot));
  }
  
@@ -372,10 +372,10 @@ index c6ff14a172da7d36c646e69d48c51d26cbf7564a..a20464474c8fe5d753290ce9bd637d48
  {
      Web::update_loader_config([&](auto& config) { config.user_agent = move(user_agent); });
 diff --git a/Services/WebWorker/ConnectionFromClient.h b/Services/WebWorker/ConnectionFromClient.h
-index af20b91bf49b6dd2fb16a9369bfcfc1fd416601f..a205fd29f77aa75a4acc0eaa764b0673f7cc467a 100644
+index 9a9cd6bcf54254c16c2364e0280a0afbe09830a6..c38d84ea866ae4011c436535491d31f0e164058d 100644
 --- a/Services/WebWorker/ConnectionFromClient.h
 +++ b/Services/WebWorker/ConnectionFromClient.h
-@@ -62,6 +62,7 @@ private:
+@@ -64,6 +64,7 @@ private:
      virtual void connect_to_compositor(IPC::TransportHandle handle) override;
      virtual void set_site_compatibility_data(JsonValue data) override;
      virtual void set_permission_snapshot(Web::Permissions::PermissionSnapshot snapshot) override;
@@ -384,7 +384,7 @@ index af20b91bf49b6dd2fb16a9369bfcfc1fd416601f..a205fd29f77aa75a4acc0eaa764b0673
      virtual void set_navigator_compatibility_mode(Web::NavigatorCompatibilityMode mode) override;
      virtual void set_preferred_languages(Vector<String> preferred_languages) override;
 diff --git a/Services/WebWorker/WebWorkerServer.ipc b/Services/WebWorker/WebWorkerServer.ipc
-index 744a9f8b8d13df26a7bc7ff71672b3b2668dc895..6bf67a14a1ec2b9b9898bc1dcfd206d94a2f3d9e 100644
+index 8bb41f0ec44ddb32d2b50fb90c6566917dd12029..875247ec2b0c889ad279f891c3996d96ce40a384 100644
 --- a/Services/WebWorker/WebWorkerServer.ipc
 +++ b/Services/WebWorker/WebWorkerServer.ipc
 @@ -3,6 +3,7 @@
