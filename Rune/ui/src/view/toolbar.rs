@@ -4,18 +4,17 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-use rune::tok::TextStyle;
-use rune::{Color, El, Icon, col, el, icon, row, text_input};
+use rune::{Cx, El, Icon, col, el, icon, row};
 
 use crate::state::{Browser, TOOLBAR_HEIGHT};
 use crate::view::icons;
+use crate::view::location::location_field;
 use crate::view::palette::Palette;
 
 const BUTTON_SIZE: f32 = 32.0;
-const FIELD_HEIGHT: f32 = 32.0;
-const LOCATION_FONT: TextStyle = TextStyle::new(13.5, 400.0);
 
-pub fn toolbar(s: &Browser, p: &Palette) -> El {
+pub fn toolbar(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
+    let dark = cx.system_dark();
     let active = s.tabs.active();
     let can_go_back = active.is_some_and(|tab| tab.can_go_back);
     let can_go_forward = active.is_some_and(|tab| tab.can_go_forward);
@@ -59,7 +58,7 @@ pub fn toolbar(s: &Browser, p: &Palette) -> El {
             |s| s.go_forward(),
         ))
         .child(reload)
-        .child(location_field(s, p));
+        .child(location_field(s, p, dark, cx));
     col()
         .key("toolbar-band")
         .w_full()
@@ -99,40 +98,5 @@ fn nav_button(
         button.hover(p.hover).press(p.press).on_press(action)
     } else {
         button.disabled(true)
-    }
-}
-
-fn location_field(s: &Browser, p: &Palette) -> El {
-    let focused = s.location.focused;
-    let input = text_input(&s.location, LOCATION_FONT)
-        .key("location-input")
-        .label("Address")
-        .single_line()
-        .grow(1.0)
-        .shrink()
-        .color(p.text)
-        .placeholder("Search or enter address", p.text_muted)
-        .caret(p.accent, p.selection)
-        .on_edit(|s: &mut Browser| &mut s.location)
-        .on_input_key(|s: &mut Browser, event, tx| s.location_key(event, tx))
-        .on_submit(|s: &mut Browser, tx| s.submit_location(tx));
-    let field = row()
-        .key("location")
-        .grow(1.0)
-        .shrink()
-        .h(FIELD_HEIGHT)
-        .ml(6.0)
-        .mr(4.0)
-        .px(14.0)
-        .center_y()
-        .radius(FIELD_HEIGHT / 2.0)
-        .child(input);
-    if focused {
-        field
-            .fill(p.field_focused)
-            .border(1.5, p.focus_ring)
-            .outline(3.0, 0.0, p.focus_glow)
-    } else {
-        field.fill(p.field).border(p.hairline, Color::TRANSPARENT)
     }
 }
