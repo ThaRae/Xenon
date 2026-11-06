@@ -112,3 +112,7 @@ if (TARGET ladybird_build_resource_files)
     add_dependencies(TestXenonRunePage ladybird_build_resource_files)
 endif()
 add_dependencies(xenon-tests TestXenonRunePage)
+
+if (NOT APPLE)
+    set_target_properties(TestXenonRuneBridge TestXenonRunePage PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
+endif()
