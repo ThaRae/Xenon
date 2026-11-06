@@ -97,7 +97,8 @@ with **Search settings** at the top.
   that doesn't match.
 
 The page is Xenon's `UI/Resources/about-pages/settings.*`. It runs Ladybird's own settings scripts, by their element
-ids, for Ladybird's settings. `UI/SettingsPage.cpp` answers it about Xenon's (`UI/XenonSettings`), through engine patch
+ids, for Ladybird's settings. `UI/SettingsPage.cpp` answers it about Xenon's (`UI/XenonSettings`, a JSON file both
+frontends share, imported once from the QSettings store older versions used), through engine patch
 `0025` (`LibWebView: Let the embedder add interfaces to its WebUI pages`), which lets the browser give WebUI pages
 interfaces of its own (`UI/WebUIInterfaces.cpp`). Ladybird's scripts look their elements up when they load and stop at
 the first one that's missing, so the page has to keep every id they use, including ones for settings Xenon lays out

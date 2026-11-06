@@ -34,13 +34,6 @@ namespace TabHibernation {
 
 static constexpr auto AUDIO_PROTECTION_TIME = AK::Duration::from_seconds(60);
 
-static constexpr i64 TIMEOUT_CHOICES_IN_MINUTES[] = { 15, 30, 60, 2 * 60, 4 * 60, 6 * 60 };
-
-ReadonlySpan<i64> timeout_choices_in_minutes()
-{
-    return TIMEOUT_CHOICES_IN_MINUTES;
-}
-
 class Hibernator final
     : public QObject
     , public XenonSettings::Observer {
@@ -304,7 +297,7 @@ QMenu* create_settings_menu(QWidget& parent)
     };
 
     Vector<QAction*> timeout_actions;
-    for (auto minutes : TIMEOUT_CHOICES_IN_MINUTES)
+    for (auto minutes : XenonSettings::tab_hibernation_timeout_choices_in_minutes())
         timeout_actions.append(add_timeout_action(AK::Duration::from_seconds(minutes * 60)));
 
     auto* other_timeout_action = menu->addAction(QString {});
@@ -322,7 +315,7 @@ QMenu* create_settings_menu(QWidget& parent)
         auto timeout = XenonSettings::tab_hibernation_timeout();
         auto* checked_action = other_timeout_action;
         for (size_t i = 0; i < timeout_actions.size(); ++i) {
-            if (timeout.to_seconds() == TIMEOUT_CHOICES_IN_MINUTES[i] * 60)
+            if (timeout.to_seconds() == XenonSettings::tab_hibernation_timeout_choices_in_minutes()[i] * 60)
                 checked_action = timeout_actions[i];
         }
         other_timeout_action->setVisible(checked_action == other_timeout_action);

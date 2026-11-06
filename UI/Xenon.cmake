@@ -23,48 +23,71 @@ if (LINUX AND NOT ANDROID)
     pkg_check_modules(XCB_ICCCM REQUIRED IMPORTED_TARGET xcb-icccm)
 endif()
 
-set(XENON_SOURCES
-    main.cpp
-    Application.cpp
-    Autocomplete.cpp
+set(XENON_CORE_SOURCES
     Bangs.cpp
-    Blocking.cpp
     BlockingDashboard.cpp
-    BlockingPopover.cpp
-    BookmarkDialog.cpp
-    BookmarksBar.cpp
-    BrowserWindow.cpp
     CertificateDetails.cpp
     CertificateErrors.cpp
-    ChromeStyle.cpp
-    ContentBlockingButton.cpp
-    ContentBlockingPopover.cpp
-    CrashReportReviewWidget.cpp
-    DevToolsBanner.cpp
     Download.cpp
-    ElementPicker.cpp
-    EventLoopImplementationQt.cpp
-    EventLoopImplementationQtEventTarget.cpp
     Extensions/Alarms.cpp
-    Extensions/Browser.cpp
     Extensions/CRX.cpp
     Extensions/ContentScripts.cpp
-    Extensions/Dialog.cpp
     Extensions/Extension.cpp
     Extensions/Locales.cpp
     Extensions/Manifest.cpp
     Extensions/MatchPattern.cpp
     Extensions/NativeMessaging.cpp
-    Extensions/Popup.cpp
     Extensions/Registry.cpp
     Extensions/Router.cpp
     Extensions/Scripting.cpp
     Extensions/Storage.cpp
-    Extensions/Toolbar.cpp
     Extensions/WebStore.cpp
     FilterListBundle.cpp
     FilterListUpdates.cpp
     FilterLists.cpp
+    MemoryPressure.cpp
+    MemoryPressureRelease.cpp
+    NewTabPage.cpp
+    PasswordManagers.cpp
+    SessionSaving.cpp
+    SettingsPage.cpp
+    SiteSecurity.cpp
+    WebUIInterfaces.cpp
+    WindowCloseCoordinator.cpp
+    XenonArguments.cpp
+    XenonSettings.cpp
+    XenonSettingsStore.cpp
+)
+
+if (APPLE)
+    list(APPEND XENON_CORE_SOURCES DefaultBrowserMac.mm)
+elseif (LINUX AND NOT ANDROID)
+    list(APPEND XENON_CORE_SOURCES DefaultBrowserLinux.cpp)
+else()
+    list(APPEND XENON_CORE_SOURCES DefaultBrowserOther.cpp)
+endif()
+
+set(XENON_SOURCES
+    main.cpp
+    Application.cpp
+    Autocomplete.cpp
+    Blocking.cpp
+    BlockingPopover.cpp
+    BookmarkDialog.cpp
+    BookmarksBar.cpp
+    BrowserWindow.cpp
+    ChromeStyle.cpp
+    ContentBlockingButton.cpp
+    ContentBlockingPopover.cpp
+    CrashReportReviewWidget.cpp
+    DevToolsBanner.cpp
+    ElementPicker.cpp
+    EventLoopImplementationQt.cpp
+    EventLoopImplementationQtEventTarget.cpp
+    Extensions/Browser.cpp
+    Extensions/Dialog.cpp
+    Extensions/Popup.cpp
+    Extensions/Toolbar.cpp
     FindInPageWidget.cpp
     Icon.cpp
     HiddenPageSizing.cpp
@@ -72,13 +95,9 @@ set(XENON_SOURCES
     JavaScriptDialog.cpp
     LocationEdit.cpp
     Menu.cpp
-    MemoryPressure.cpp
-    MemoryPressureRelease.cpp
     NativeWindowContainer.cpp
     NativeTextEditingLineEdit.cpp
-    NewTabPage.cpp
     PageUnresponsivePrompt.cpp
-    PasswordManagers.cpp
     ProcessManagerWindow.cpp
     PerformanceMonitorWidget.cpp
     PictureInPictureWindow.cpp
@@ -88,9 +107,7 @@ set(XENON_SOURCES
     ScreenshotSelectionOverlay.cpp
     ScreenshotViewer.cpp
     SelectDropdown.cpp
-    SessionSaving.cpp
-    SettingsPage.cpp
-    SiteSecurity.cpp
+    SettingsPageHost.cpp
     SiteSecurityPopover.cpp
     SplitView.cpp
     StringUtils.cpp
@@ -105,25 +122,14 @@ set(XENON_SOURCES
     WebAuthnPopover.cpp
     WebCompatReportReview.cpp
     WebContentView.cpp
-    WebUIInterfaces.cpp
     WindowExposure.cpp
-    WindowCloseCoordinator.cpp
     WindowControlButton.cpp
     WindowScreenObserver.cpp
-    XenonSettings.cpp
     xenon.qrc
 )
 
 if (NOT APPLE AND NOT WIN32 AND NOT ANDROID)
     list(APPEND XENON_SOURCES AccessibilityInterface.cpp)
-endif()
-
-if (APPLE)
-    list(APPEND XENON_SOURCES DefaultBrowserMac.mm)
-elseif (LINUX AND NOT ANDROID)
-    list(APPEND XENON_SOURCES DefaultBrowserLinux.cpp)
-else()
-    list(APPEND XENON_SOURCES DefaultBrowserOther.cpp)
 endif()
 
 if (Qt6Positioning_FOUND)
@@ -193,6 +199,7 @@ if (NOT APPLE AND USE_VULKAN_DMABUF_IMAGES)
 endif()
 
 list(TRANSFORM XENON_SOURCES PREPEND "${XENON_UI_DIR}/")
+list(TRANSFORM XENON_CORE_SOURCES PREPEND "${XENON_UI_DIR}/")
 list(TRANSFORM XENON_ARC_SOURCES PREPEND "${XENON_UI_DIR}/")
 
 set(XENON_GENERATED_DIR "${CMAKE_BINARY_DIR}/Xenon")
@@ -201,8 +208,8 @@ embed_as_string(xenon_background_page "${XENON_UI_DIR}/Resources/extensions/back
 embed_as_string(xenon_worker_bridge "${XENON_UI_DIR}/Resources/extensions/worker-bridge.js" "${XENON_GENERATED_DIR}/WorkerBridge.cpp" worker_bridge_source NAMESPACE "Ladybird::Extensions")
 embed_as_string(xenon_externally_connectable "${XENON_UI_DIR}/Resources/extensions/externally-connectable.js" "${XENON_GENERATED_DIR}/ExternallyConnectable.cpp" externally_connectable_source NAMESPACE "Ladybird::Extensions")
 embed_as_string(xenon_externally_connectable_relay "${XENON_UI_DIR}/Resources/extensions/externally-connectable-relay.js" "${XENON_GENERATED_DIR}/ExternallyConnectableRelay.cpp" externally_connectable_relay_source NAMESPACE "Ladybird::Extensions")
-list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" "${XENON_GENERATED_DIR}/WorkerBridge.cpp")
-list(APPEND XENON_SOURCES "${XENON_GENERATED_DIR}/ExternallyConnectable.cpp" "${XENON_GENERATED_DIR}/ExternallyConnectableRelay.cpp")
+list(APPEND XENON_CORE_SOURCES "${XENON_GENERATED_DIR}/ChromeAPI.cpp" "${XENON_GENERATED_DIR}/BackgroundPage.cpp" "${XENON_GENERATED_DIR}/WorkerBridge.cpp")
+list(APPEND XENON_CORE_SOURCES "${XENON_GENERATED_DIR}/ExternallyConnectable.cpp" "${XENON_GENERATED_DIR}/ExternallyConnectableRelay.cpp")
 
 set(XENON_BANG_TABLE "${XENON_GENERATED_DIR}/UI/BangTable.h")
 add_custom_command(
@@ -213,10 +220,24 @@ add_custom_command(
 )
 add_custom_target(xenon_generate_bang_table DEPENDS "${XENON_BANG_TABLE}")
 
+add_library(xenon-core STATIC ${XENON_CORE_SOURCES})
+target_include_directories(xenon-core BEFORE PUBLIC ${XENON_SOURCE_DIR})
+target_include_directories(xenon-core PUBLIC ${LADYBIRD_SOURCE_DIR} ${LADYBIRD_SOURCE_DIR}/Services/ ${XENON_GENERATED_DIR})
+target_link_libraries(xenon-core PUBLIC AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibRequests LibURL LibWebView LibXML)
+target_link_libraries(xenon-core PUBLIC OpenSSL::Crypto OpenSSL::SSL ZLIB::ZLIB)
+add_dependencies(xenon-core xenon_generate_bang_table)
+if (LINUX AND NOT ANDROID)
+    target_link_libraries(xenon-core PUBLIC PkgConfig::GIO)
+endif()
+if (APPLE)
+    target_link_libraries(xenon-core PUBLIC "-framework Cocoa" "-framework CoreFoundation")
+endif()
+
 qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
+target_link_libraries(xenon PRIVATE xenon-core)
 target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibRequests LibWebView LibURL LibWakeLock LibXML)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL ZLIB::ZLIB)
 target_include_directories(xenon BEFORE PRIVATE ${XENON_SOURCE_DIR})
@@ -464,6 +485,10 @@ ladybird_test("${XENON_SOURCE_DIR}/Tests/TestNewTabPage.cpp" Xenon NAME TestXeno
 target_sources(TestXenonNewTabPage PRIVATE "${XENON_UI_DIR}/NewTabPage.cpp")
 target_include_directories(TestXenonNewTabPage BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonSettings.cpp" Xenon NAME TestXenonSettings LIBS LibCore LibFileSystem)
+target_sources(TestXenonSettings PRIVATE "${XENON_UI_DIR}/XenonSettingsStore.cpp")
+target_include_directories(TestXenonSettings BEFORE PRIVATE ${XENON_SOURCE_DIR})
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestRecentTabOrder.cpp" Xenon NAME TestXenonRecentTabOrder)
 target_include_directories(TestXenonRecentTabOrder BEFORE PRIVATE ${XENON_SOURCE_DIR})
 
@@ -538,6 +563,6 @@ if (LINUX AND NOT ANDROID)
     target_link_libraries(TestXenonUpdateButton PRIVATE PkgConfig::XCB_ICCCM)
 endif()
 
-add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonChromeStyle TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonSiteSecurity TestXenonUpdateButton TestXenonUserAgent)
+add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonChromeStyle TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonSettings TestXenonSiteSecurity TestXenonUpdateButton TestXenonUserAgent)
 
 include("${XENON_SOURCE_DIR}/Rune/Rune.cmake")

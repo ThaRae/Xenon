@@ -1057,15 +1057,28 @@ def bundle_version(app: Path) -> str | None:
         return None
 
 
+def automatic_updates_enabled() -> bool:
+    config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / "Library" / "Preferences")
+    try:
+        return (
+            json.loads((config / "Xenon" / "XenonSettings.json").read_text()).get("updates/automatic", True)
+            is not False
+        )
+    except FileNotFoundError:
+        automatic = subprocess.run(
+            ["defaults", "read", "com.xenon.Xenon", "updates.automatic"], capture_output=True, text=True
+        ).stdout.strip()
+        return automatic != "0"
+    except (OSError, ValueError, AttributeError):
+        return True
+
+
 def test_main(args):
     check_signing_identity(args.sign)
     if not args.no_build:
         build()
 
-    automatic = subprocess.run(
-        ["defaults", "read", "com.xenon.Xenon", "updates.automatic"], capture_output=True, text=True
-    ).stdout.strip()
-    if automatic == "0":
+    if not automatic_updates_enabled():
         sys.exit(
             "Turn on Update Xenon automatically (Settings, Updates) first: the test needs Xenon to check by itself."
         )

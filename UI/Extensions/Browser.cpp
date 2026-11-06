@@ -22,6 +22,7 @@
 #include <UI/WebContentView.h>
 
 #include <QApplication>
+#include <QColor>
 #include <QGuiApplication>
 #include <QKeySequence>
 #include <QLabel>
@@ -40,8 +41,8 @@ namespace {
 
 struct ActionProperties {
     Optional<String> badge_text;
-    Optional<QColor> badge_background_color;
-    Optional<QColor> badge_text_color;
+    Optional<Gfx::Color> badge_background_color;
+    Optional<Gfx::Color> badge_text_color;
     Optional<String> title;
     Optional<String> icon_path;
     Optional<String> popup;
@@ -885,7 +886,12 @@ static ErrorOr<JsonValue, String> handle_windows_call(Extension const& extension
     return MUST(String::formatted("{} isn't supported yet.", name));
 }
 
-static Optional<QColor> color_from_json(JsonValue const& value)
+static Gfx::Color gfx_color_from_qcolor(QColor const& color)
+{
+    return Gfx::Color(color.red(), color.green(), color.blue(), color.alpha());
+}
+
+static Optional<Gfx::Color> color_from_json(JsonValue const& value)
 {
     if (value.is_string()) {
         auto string = value.as_string().bytes_as_string_view();
@@ -893,20 +899,20 @@ static Optional<QColor> color_from_json(JsonValue const& value)
             auto rgba = string.substring_view(1).to_number<u32>(TrimWhitespace::No, 16);
             if (!rgba.has_value())
                 return {};
-            return QColor((*rgba >> 24) & 0xff, (*rgba >> 16) & 0xff, (*rgba >> 8) & 0xff, *rgba & 0xff);
+            return Gfx::Color((*rgba >> 24) & 0xff, (*rgba >> 16) & 0xff, (*rgba >> 8) & 0xff, *rgba & 0xff);
         }
         QColor color(qstring_from_ak_string(string));
-        return color.isValid() ? Optional<QColor> { color } : Optional<QColor> {};
+        return color.isValid() ? Optional<Gfx::Color> { gfx_color_from_qcolor(color) } : Optional<Gfx::Color> {};
     }
     if (value.is_array() && value.as_array().size() == 4) {
         auto const& values = value.as_array();
-        auto component = [&](size_t i) { return clamp(static_cast<int>(values.at(i).get_double_with_precision_loss().value_or(0)), 0, 255); };
-        return QColor(component(0), component(1), component(2), component(3));
+        auto component = [&](size_t i) { return static_cast<u8>(clamp(static_cast<int>(values.at(i).get_double_with_precision_loss().value_or(0)), 0, 255)); };
+        return Gfx::Color(component(0), component(1), component(2), component(3));
     }
     return {};
 }
 
-static JsonArray color_to_json(QColor const& color)
+static JsonArray color_to_json(Gfx::Color color)
 {
     JsonArray array;
     array.must_append(color.red());
@@ -916,9 +922,9 @@ static JsonArray color_to_json(QColor const& color)
     return array;
 }
 
-static QColor default_badge_background_color()
+static Gfx::Color default_badge_background_color()
 {
-    return ChromeStyle::chrome_accent();
+    return gfx_color_from_qcolor(ChromeStyle::chrome_accent());
 }
 
 ActionAppearance action_appearance(Extension const& extension, Tab* tab)
@@ -1093,7 +1099,7 @@ static ErrorOr<JsonValue, String> handle_action_call(Extension const& extension,
     if (name == "action.getBadgeBackgroundColor"sv)
         return JsonValue { color_to_json(appearance.badge_background_color) };
     if (name == "action.getBadgeTextColor"sv)
-        return JsonValue { color_to_json(appearance.badge_text_color.value_or(Qt::white)) };
+        return JsonValue { color_to_json(appearance.badge_text_color.value_or(Gfx::Color::White)) };
 
     if (name == "action.setTitle"sv) {
         properties.title = details.get_string("title"sv).copy();

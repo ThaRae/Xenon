@@ -27,7 +27,9 @@ the architecture and workflow, and `Documentation/Features.md` what each feature
   where possible, and keep edits to copied files small.
 - Includes are `<UI/Foo.h>`, never `<UI/Qt/Foo.h>`, which would resolve to Ladybird's copy of the header.
 - Settings that Ladybird already has stay in `WebView::Application::settings()`. Xenon-only settings go through
-  `UI/XenonSettings`, which is backed by QSettings.
+  `UI/XenonSettings`, a JSON file both frontends share (`UI/XenonSettingsStore`), never QSettings.
+- Engine-side logic that both frontends use (settings, bangs, filter lists, extensions' engine side, the internal
+  pages' interfaces) goes in the Qt-free `xenon-core` library in `UI/Xenon.cmake`; only Qt chrome goes in `XENON_SOURCES`.
 - New source files go in `UI/Xenon.cmake`.
 - The app icon's PNGs (`UI/Icons/xenon.png`, `UI/Icons/macos/app_icon.iconset`, and `UI/Resources/icons`, which take
   the place of Ladybird's logo) are generated. Change `UI/Icons/xenon.svg` (or `xenon-small.svg`, used at 32px and
