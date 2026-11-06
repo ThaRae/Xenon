@@ -211,6 +211,7 @@ pub struct PagePrompts {
     views: HashMap<ViewId, ViewPrompts>,
     pub menu: Option<ShownMenu>,
     fullscreen: Option<ViewId>,
+    window_fullscreen_for_page: bool,
 }
 
 impl PagePrompts {
@@ -413,7 +414,7 @@ pub fn show_menu(
     );
 }
 
-fn popup_menu_for(entries: &[MenuEntry]) -> PopupMenu {
+pub fn popup_menu_for(entries: &[MenuEntry]) -> PopupMenu {
     let mut popup = PopupMenu::new();
     for entry in entries {
         popup = match entry {
@@ -639,15 +640,27 @@ pub fn fullscreen_requested(s: &mut Browser, view: ViewId, fullscreen: bool) {
             return;
         }
         s.page_prompts.fullscreen = Some(view);
+        if !crate::platform::is_fullscreen() {
+            s.page_prompts.window_fullscreen_for_page = true;
+            crate::platform::set_fullscreen(true);
+        }
         PageEngine.set_fullscreen(view, true);
     } else if s.page_prompts.fullscreen == Some(view) {
         s.page_prompts.fullscreen = None;
+        leave_window_fullscreen_for_page(s);
         PageEngine.set_fullscreen(view, false);
+    }
+}
+
+fn leave_window_fullscreen_for_page(s: &mut Browser) {
+    if std::mem::take(&mut s.page_prompts.window_fullscreen_for_page) {
+        crate::platform::set_fullscreen(false);
     }
 }
 
 pub fn exit_fullscreen(s: &mut Browser) {
     if let Some(view) = s.page_prompts.fullscreen.take() {
+        leave_window_fullscreen_for_page(s);
         PageEngine.set_fullscreen(view, false);
     }
 }

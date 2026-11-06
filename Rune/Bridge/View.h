@@ -20,6 +20,9 @@
 
 namespace Xenon {
 
+void flatten_menu(WebView::Menu&, Vector<XenonMenuItem>&, Vector<WeakPtr<WebView::Action>>&);
+void drop_trailing_separator(Vector<XenonMenuItem>&);
+
 void set_page_callbacks(XenonPageCallbacks const&);
 XenonPageCallbacks const& page_callbacks();
 
@@ -94,6 +97,8 @@ private:
     void show_tooltip(StringView text, Gfx::FloatPoint);
     void present_current_frame();
     void report_history_state();
+    void report_zoom();
+    void report_bookmarked();
     int click_count_for_press(XenonMouseEvent const&);
 
     virtual Core::AnonymousBuffer system_theme() override;
@@ -105,6 +110,8 @@ private:
 
     Optional<bool> m_reported_can_go_back;
     Optional<bool> m_reported_can_go_forward;
+    u32 m_reported_zoom_percent { 100 };
+    bool m_reported_bookmarked { false };
 
     int m_click_count { 0 };
     MonotonicTime m_last_press_time { MonotonicTime::now_coarse() };

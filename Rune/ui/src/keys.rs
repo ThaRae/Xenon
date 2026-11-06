@@ -29,6 +29,24 @@ pub enum Shortcut {
     NextWindow,
     MoveTabLeft,
     MoveTabRight,
+    ZoomIn,
+    ZoomOut,
+    ResetZoom,
+    HardReload,
+    ToggleBookmark,
+    BookmarkAllTabs,
+    ToggleBookmarksBar,
+    OpenSettings,
+    ShowHistory,
+    ShowDownloads,
+    ClearBrowsingData,
+    ViewSource,
+    ToggleDevTools,
+    OpenFile,
+    FindNext,
+    FindPrevious,
+    ToggleFullscreen,
+    Quit,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,7 +67,46 @@ pub fn shortcut_for(key: &Key, mods: Mods, platform: Platform) -> Option<Shortcu
     let primary_only = mods.cmd && !mods.alt && !mods.shift;
     let alt_only = mods.alt && !mods.cmd && !mods.ctrl && !mods.shift && !mods.logo;
     let primary_shift = mods.cmd && mods.shift && !mods.alt;
+    let mac = platform == Platform::Mac;
+    let primary_alt = mods.cmd && mods.alt && !mods.shift;
     match key {
+        Key::Command('=' | '+') if mods.cmd && !mods.alt => Some(Shortcut::ZoomIn),
+        Key::Command('-' | '_') if mods.cmd && !mods.alt => Some(Shortcut::ZoomOut),
+        Key::Command('0') if primary_only => Some(Shortcut::ResetZoom),
+        Key::Command('r') if primary_shift => Some(Shortcut::HardReload),
+        Key::Command('r') if primary_alt && mac => Some(Shortcut::HardReload),
+        Key::Function(5) if (mods.ctrl || mods.shift) && !mods.alt => Some(Shortcut::HardReload),
+        Key::Command('d') if primary_only => Some(Shortcut::ToggleBookmark),
+        Key::Command('d') if primary_shift => Some(Shortcut::BookmarkAllTabs),
+        Key::Command('b') if primary_shift => Some(Shortcut::ToggleBookmarksBar),
+        Key::Command(',') if primary_only => Some(Shortcut::OpenSettings),
+        Key::Command('y') if primary_only && mac => Some(Shortcut::ShowHistory),
+        Key::Command('h') if primary_only && !mac => Some(Shortcut::ShowHistory),
+        Key::Command('j') if primary_only && !mac => Some(Shortcut::ShowDownloads),
+        Key::Command('j') if primary_shift && mac => Some(Shortcut::ShowDownloads),
+        Key::Command('u') if primary_only && !mac => Some(Shortcut::ViewSource),
+        Key::Command('u') if primary_alt && mac => Some(Shortcut::ViewSource),
+        Key::Command('i') if primary_shift && !mac => Some(Shortcut::ToggleDevTools),
+        Key::Command('i') if primary_alt && mac => Some(Shortcut::ToggleDevTools),
+        Key::Function(12) if !mods.cmd && !mods.alt && !mods.shift => {
+            Some(Shortcut::ToggleDevTools)
+        }
+        Key::Command('o') if primary_only => Some(Shortcut::OpenFile),
+        Key::Command('g') if primary_only => Some(Shortcut::FindNext),
+        Key::Command('g') if primary_shift => Some(Shortcut::FindPrevious),
+        Key::Function(3) if !mods.cmd && !mods.alt && !mods.shift => Some(Shortcut::FindNext),
+        Key::Function(3) if mods.shift && !mods.cmd && !mods.alt => Some(Shortcut::FindPrevious),
+        Key::Command('f') if mac && mods.cmd && mods.ctrl && !mods.shift && !mods.alt => {
+            Some(Shortcut::ToggleFullscreen)
+        }
+        Key::Function(11) if !mac && !mods.cmd && !mods.alt && !mods.shift => {
+            Some(Shortcut::ToggleFullscreen)
+        }
+        Key::Command('q') if primary_only && !mac => Some(Shortcut::Quit),
+        Key::Command(']') if primary_shift => Some(Shortcut::NextTab),
+        Key::Command('}') if mods.cmd && !mods.alt => Some(Shortcut::NextTab),
+        Key::Command('[') if primary_shift => Some(Shortcut::PreviousTab),
+        Key::Command('{') if mods.cmd && !mods.alt => Some(Shortcut::PreviousTab),
         Key::Command('t') if primary_shift => Some(Shortcut::ReopenClosedTab),
         Key::Command('n') if primary_only => Some(Shortcut::NewWindow),
         Key::Command('n') if primary_shift => Some(Shortcut::NewPrivateWindow),

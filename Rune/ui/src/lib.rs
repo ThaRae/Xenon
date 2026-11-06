@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+mod app_menu;
 mod bridge;
 mod chrome_menu;
 mod engine;
@@ -22,6 +23,7 @@ mod mock;
 mod mock_location;
 mod page_bridge;
 mod page_prompts;
+mod platform;
 mod state;
 mod tab_list;
 mod view;
@@ -66,11 +68,13 @@ fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int
             view::browser_view,
         )
     };
-    let app = App::new(spec)
+    let mut app = App::new(spec)
         .init(move || Browser::new(state_surfaces))
-        .args(rune_args)
-        .modifier_keys()
-        .on_ime(ime);
+        .standard_menus();
+    for item in app_menu::menu_bar() {
+        app = app.menu_item(item);
+    }
+    let app = app.args(rune_args).modifier_keys().on_ime(ime);
     let ui = Arc::new(UiContext::new(app.handle(), surfaces));
     let callbacks = ui.callbacks();
     engine::Engine.set_window_viewport(None, state::PageGeometry::default().viewport());

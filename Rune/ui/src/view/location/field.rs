@@ -6,6 +6,7 @@
 
 use rune::{Color, Cursor, Cx, El, Span, el, icon, row, text, text_input};
 
+use crate::engine::Action;
 use crate::location::{BangChip, LeadingIndicator, LocationBar};
 use crate::state::Browser;
 use crate::view::icons;
@@ -185,6 +186,14 @@ pub fn location_field(s: &Browser, p: &Palette, dark: bool, cx: &mut Cx<Browser>
     if let Some(chip) = &chip {
         field = field.child(bang_chip(chip, &colors));
     }
+    if let Some(tab) = s.tabs.active() {
+        if tab.zoom_percent != 100 {
+            field = field.child(zoom_indicator(tab.zoom_percent, p));
+        }
+        if !focused {
+            field = field.child(bookmark_star(tab.bookmarked, p));
+        }
+    }
     if focused {
         field
             .fill(p.field_focused)
@@ -193,4 +202,58 @@ pub fn location_field(s: &Browser, p: &Palette, dark: bool, cx: &mut Cx<Browser>
     } else {
         field.fill(p.field).border(p.hairline, Color::TRANSPARENT)
     }
+}
+
+fn zoom_indicator(percent: u32, p: &Palette) -> El {
+    let label = format!("{percent}%");
+    row()
+        .key("location-zoom")
+        .role("button")
+        .label(format!("Zoom {label}, reset"))
+        .h(24.0)
+        .px(8.0)
+        .ml(4.0)
+        .radius(12.0)
+        .center()
+        .focusable(false)
+        .hover(p.hover)
+        .press(p.press)
+        .on_press(|s: &mut Browser| s.activate_action(Action::ResetZoom))
+        .child(
+            text(label)
+                .font(rune::tok::TextStyle::new(12.0, 500.0))
+                .color(p.text_muted)
+                .a11y_hidden(),
+        )
+}
+
+fn bookmark_star(bookmarked: bool, p: &Palette) -> El {
+    el().key("location-bookmark")
+        .role("button")
+        .label(if bookmarked {
+            "Edit bookmark"
+        } else {
+            "Bookmark this page"
+        })
+        .checked(bookmarked)
+        .size(28.0, 28.0)
+        .ml(2.0)
+        .radius(14.0)
+        .center()
+        .focusable(false)
+        .hover(p.hover)
+        .press(p.press)
+        .on_press(|s: &mut Browser| s.activate_action(Action::ToggleBookmark))
+        .child(
+            icon(
+                if bookmarked {
+                    &icons::STAR_FILLED
+                } else {
+                    &icons::STAR
+                },
+                16.0,
+            )
+            .color(if bookmarked { p.accent } else { p.icon })
+            .a11y_hidden(),
+        )
 }

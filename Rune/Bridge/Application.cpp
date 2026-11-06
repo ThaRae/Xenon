@@ -142,6 +142,29 @@ Optional<WebView::ViewImplementation&> Application::active_web_view() const
     return {};
 }
 
+// FIXME: Show a dialog to name the bookmark and pick its folder, as the Qt frontend's BookmarkDialog does. Until
+//        then, the bookmark is added straight away with the page's title, where Bookmarks keeps new bookmarks.
+NonnullRefPtr<Application::BookmarkPromise> Application::display_add_bookmark_dialog(Optional<String const&> target_folder_id) const
+{
+    auto promise = BookmarkPromise::construct();
+    auto view = active_web_view();
+    if (!view.has_value()) {
+        promise->reject(Error::from_string_literal("There is no page to bookmark"));
+        return promise;
+    }
+    auto title = view->title().to_utf8();
+    BookmarkDialogResult result {
+        .data = WebView::BookmarkItem::Bookmark {
+            .url = view->displayed_url(),
+            .title = title.is_empty() ? Optional<String> {} : Optional<String> { move(title) },
+            .favicon_hash = view->favicon_hash(),
+        },
+        .target_folder_id = target_folder_id.map([](auto const& id) { return id; }),
+    };
+    promise->resolve(move(result));
+    return promise;
+}
+
 Optional<WebView::ViewImplementation&> Application::open_blank_new_tab(Web::HTML::ActivateTab activate_tab) const
 {
     return Engine::the().open_view(0, activate_tab);

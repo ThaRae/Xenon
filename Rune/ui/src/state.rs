@@ -14,7 +14,7 @@ use rune::{
 
 use crate::bridge::PageSurfaces;
 use crate::engine::{
-    ChromeLayout, Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind,
+    Action, ChromeLayout, Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind,
     RecentDirection, TabIndex, ViewId, Viewport, WindowId,
 };
 use crate::keys::{Platform, Shortcut, page_key_event, shortcut_for};
@@ -211,6 +211,94 @@ impl Browser {
     pub fn toggle_vertical_tabs_expanded(&mut self) {
         self.vertical_tabs_expanded = !self.vertical_tabs_expanded;
         self.hover_card = None;
+    }
+
+    pub fn activate_action(&mut self, action: Action) {
+        self.engine.activate_action(action);
+    }
+
+    pub fn open_main_menu(&mut self) {
+        self.engine.request_main_menu();
+    }
+
+    pub fn show_main_menu(
+        &mut self,
+        menu: u64,
+        entries: Vec<page_prompts::MenuEntry>,
+        tx: &mut Tx,
+    ) {
+        if entries.is_empty() {
+            return;
+        }
+        self.hover_card = None;
+        tx.popup_menu(
+            page_prompts::popup_menu_for(&entries),
+            "menu-button",
+            move |s: &mut Browser, picked: Option<&str>, _: &mut Tx| {
+                if let Some(item) = picked.and_then(|picked| picked.parse::<u32>().ok()) {
+                    s.engine.activate_app_menu_item(menu, item);
+                }
+            },
+        );
+    }
+
+    pub fn run_ui_command(&mut self, command: u32, tx: &mut Tx) {
+        match command {
+            crate::ffi::XENON_UI_COMMAND_FIND => page_prompts::open_find(self, tx),
+            crate::ffi::XENON_UI_COMMAND_QUIT => tx.quit(),
+            crate::ffi::XENON_UI_COMMAND_OPEN_FILE => self.open_file(tx),
+            crate::ffi::XENON_UI_COMMAND_TOGGLE_FULLSCREEN => self.toggle_fullscreen(tx),
+            _ => {}
+        }
+    }
+
+    pub fn open_file(&mut self, tx: &mut Tx) {
+        let options = rune::FileDialogOptions {
+            title: "Open File".to_owned(),
+            directory: std::env::var_os("HOME").map(std::path::PathBuf::from),
+            ..rune::FileDialogOptions::default()
+        };
+        tx.open_file(
+            options,
+            |s: &mut Browser, result: rune::FileDialogResult, _: &mut Tx| {
+                if let Ok(Some(path)) = result {
+                    let url = format!("file://{}", path.to_string_lossy());
+                    s.engine
+                        .new_tab(s.shown_window(), &url, TabIndex::End, true);
+                }
+            },
+        );
+    }
+
+    pub fn find_step(&mut self, forward: bool, tx: &mut Tx) {
+        let Some(view) = self.tabs.active_view() else {
+            return;
+        };
+        if self
+            .page_prompts
+            .of(view)
+            .is_some_and(|prompts| prompts.find.is_some())
+        {
+            page_prompts::find_step(self, view, forward);
+        } else {
+            page_prompts::open_find(self, tx);
+        }
+    }
+
+    pub fn toggle_fullscreen(&mut self, _: &mut Tx) {
+        crate::platform::set_fullscreen(!crate::platform::is_fullscreen());
+    }
+
+    pub fn zoom_changed(&mut self, view: ViewId, percent: u32) {
+        if let Some(tab) = self.tabs.get_mut(view) {
+            tab.zoom_percent = percent;
+        }
+    }
+
+    pub fn bookmarked_changed(&mut self, view: ViewId, bookmarked: bool) {
+        if let Some(tab) = self.tabs.get_mut(view) {
+            tab.bookmarked = bookmarked;
+        }
     }
 
     pub fn tab_hover_changed(&mut self, view: ViewId, hovered: bool) {
@@ -618,6 +706,24 @@ impl Browser {
             Shortcut::NextWindow => self.show_next_window(),
             Shortcut::MoveTabLeft => self.move_active_tab(-1),
             Shortcut::MoveTabRight => self.move_active_tab(1),
+            Shortcut::ZoomIn => self.activate_action(Action::ZoomIn),
+            Shortcut::ZoomOut => self.activate_action(Action::ZoomOut),
+            Shortcut::ResetZoom => self.activate_action(Action::ResetZoom),
+            Shortcut::HardReload => self.activate_action(Action::ReloadBypassingCache),
+            Shortcut::ToggleBookmark => self.activate_action(Action::ToggleBookmark),
+            Shortcut::BookmarkAllTabs => self.activate_action(Action::BookmarkAllTabs),
+            Shortcut::ToggleBookmarksBar => self.activate_action(Action::ToggleBookmarksBar),
+            Shortcut::OpenSettings => self.activate_action(Action::OpenSettings),
+            Shortcut::ShowHistory => self.activate_action(Action::ViewHistory),
+            Shortcut::ShowDownloads => self.activate_action(Action::OpenDownloads),
+            Shortcut::ClearBrowsingData => self.activate_action(Action::ClearBrowsingData),
+            Shortcut::ViewSource => self.activate_action(Action::ViewSource),
+            Shortcut::ToggleDevTools => self.activate_action(Action::ToggleDevTools),
+            Shortcut::OpenFile => self.open_file(tx),
+            Shortcut::FindNext => self.find_step(true, tx),
+            Shortcut::FindPrevious => self.find_step(false, tx),
+            Shortcut::ToggleFullscreen => self.toggle_fullscreen(tx),
+            Shortcut::Quit => tx.quit(),
         }
     }
 

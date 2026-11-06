@@ -100,6 +100,10 @@ impl UiContext {
             closed_tabs_changed: Some(closed_tabs_changed),
             chrome_settings_changed: Some(chrome_settings_changed),
             tab_memory: Some(tab_memory),
+            ui_command: Some(ui_command),
+            app_menu: Some(app_menu),
+            view_zoom_changed: Some(view_zoom_changed),
+            view_bookmarked_changed: Some(view_bookmarked_changed),
         }
     }
 }
@@ -305,6 +309,39 @@ unsafe extern "C" fn tab_memory(context: *mut c_void, view: ViewId, description:
     unsafe { ui(context) }
         .handle
         .update(move |browser, _| browser.tab_memory_reported(view, description));
+}
+
+unsafe extern "C" fn ui_command(context: *mut c_void, command: u32) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, tx| browser.run_ui_command(command, tx));
+}
+
+unsafe extern "C" fn app_menu(
+    context: *mut c_void,
+    _which: u32,
+    menu: *const crate::ffi_page::XenonMenu,
+) {
+    let Some(menu) = (unsafe { menu.as_ref() }) else {
+        return;
+    };
+    let id = menu.id;
+    let entries = crate::page_prompts::menu_entries(&crate::page_bridge::raw_menu_items(menu));
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, tx| browser.show_main_menu(id, entries, tx));
+}
+
+unsafe extern "C" fn view_zoom_changed(context: *mut c_void, view: ViewId, percent: u32) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.zoom_changed(view, percent));
+}
+
+unsafe extern "C" fn view_bookmarked_changed(context: *mut c_void, view: ViewId, bookmarked: bool) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.bookmarked_changed(view, bookmarked));
 }
 
 #[cfg(test)]

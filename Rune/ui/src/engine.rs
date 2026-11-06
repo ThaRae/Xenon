@@ -173,6 +173,28 @@ pub enum ChromeLayout {
     Vertical,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Action {
+    ZoomIn = 0,
+    ZoomOut,
+    ResetZoom,
+    ReloadBypassingCache,
+    ViewSource,
+    ToggleDevTools,
+    OpenSettings,
+    OpenAbout,
+    OpenDownloads,
+    ViewHistory,
+    ClearBrowsingData,
+    ToggleBookmark,
+    ManageBookmarks,
+    BookmarkAllTabs,
+    ToggleBookmarksBar,
+    ReportWebsiteIssue,
+    ForceDark,
+}
+
 impl ChromeLayout {
     pub fn from_raw(raw: u8) -> ChromeLayout {
         match raw {
@@ -209,6 +231,18 @@ impl Engine {
 
     pub fn set_cycle_tabs_in_recently_used_order(self, enabled: bool) {
         unsafe { ffi::xenon_engine_set_cycle_tabs_in_recently_used_order(enabled) }
+    }
+
+    pub fn activate_action(self, action: Action) {
+        unsafe { ffi::xenon_engine_activate_action(action as u32) }
+    }
+
+    pub fn request_main_menu(self) {
+        unsafe { ffi::xenon_engine_request_app_menu(ffi::XENON_APP_MENU_MAIN) }
+    }
+
+    pub fn activate_app_menu_item(self, menu: u64, item: u32) {
+        unsafe { ffi::xenon_engine_activate_app_menu_item(menu, item) }
     }
 
     pub fn duplicate_tab(self, view: ViewId) -> ViewId {

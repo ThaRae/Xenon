@@ -26,6 +26,37 @@ enum {
 };
 
 enum {
+    XENON_UI_COMMAND_FIND = 0,
+    XENON_UI_COMMAND_QUIT = 1,
+    XENON_UI_COMMAND_OPEN_FILE = 2,
+    XENON_UI_COMMAND_TOGGLE_FULLSCREEN = 3,
+};
+
+enum {
+    XENON_ACTION_ZOOM_IN = 0,
+    XENON_ACTION_ZOOM_OUT,
+    XENON_ACTION_RESET_ZOOM,
+    XENON_ACTION_RELOAD_BYPASSING_CACHE,
+    XENON_ACTION_VIEW_SOURCE,
+    XENON_ACTION_TOGGLE_DEVTOOLS,
+    XENON_ACTION_OPEN_SETTINGS,
+    XENON_ACTION_OPEN_ABOUT,
+    XENON_ACTION_OPEN_DOWNLOADS,
+    XENON_ACTION_VIEW_HISTORY,
+    XENON_ACTION_CLEAR_BROWSING_DATA,
+    XENON_ACTION_TOGGLE_BOOKMARK,
+    XENON_ACTION_MANAGE_BOOKMARKS,
+    XENON_ACTION_BOOKMARK_ALL_TABS,
+    XENON_ACTION_TOGGLE_BOOKMARKS_BAR,
+    XENON_ACTION_REPORT_WEBSITE_ISSUE,
+    XENON_ACTION_FORCE_DARK,
+};
+
+enum {
+    XENON_APP_MENU_MAIN = 0,
+};
+
+enum {
     XENON_CHROME_LAYOUT_CLASSIC = 0,
     XENON_CHROME_LAYOUT_COMPACT = 1,
     XENON_CHROME_LAYOUT_VERTICAL = 2,
@@ -130,6 +161,8 @@ typedef struct XenonTabInfo {
     XenonStr title;
 } XenonTabInfo;
 
+struct XenonMenu;
+
 typedef struct XenonUiCallbacks {
     void* context;
     void (*engine_ready)(void* context);
@@ -154,6 +187,10 @@ typedef struct XenonUiCallbacks {
     void (*closed_tabs_changed)(void* context, bool can_reopen);
     void (*chrome_settings_changed)(void* context, uint8_t layout, bool cycle_tabs_in_recently_used_order);
     void (*tab_memory)(void* context, XenonViewId, XenonStr description);
+    void (*ui_command)(void* context, uint32_t command);
+    void (*app_menu)(void* context, uint32_t which, struct XenonMenu const*);
+    void (*view_zoom_changed)(void* context, XenonViewId, uint32_t percent);
+    void (*view_bookmarked_changed)(void* context, XenonViewId, bool bookmarked);
 } XenonUiCallbacks;
 
 int xenon_ui_main(int argc, char const* const* argv);
@@ -165,6 +202,9 @@ void xenon_engine_set_window_viewport(XenonWindowId, uint32_t width, uint32_t he
 void xenon_engine_set_system_dark(bool dark);
 void xenon_engine_set_chrome_layout(uint8_t layout);
 void xenon_engine_set_cycle_tabs_in_recently_used_order(bool);
+void xenon_engine_activate_action(uint32_t action);
+void xenon_engine_request_app_menu(uint32_t which);
+void xenon_engine_activate_app_menu_item(uint64_t menu, uint32_t item);
 XenonWindowId xenon_engine_new_window(bool is_private);
 void xenon_engine_activate_window(XenonWindowId);
 void xenon_engine_close_window(XenonWindowId);

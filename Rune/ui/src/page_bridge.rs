@@ -166,7 +166,7 @@ unsafe extern "C" fn dialog_closed(context: *mut c_void, view: ViewId, dialog: P
         .update(move |browser, _| page_prompts::dialog_closed(browser, view, dialog));
 }
 
-fn raw_menu_items(menu: &XenonMenu) -> Vec<RawMenuItem> {
+pub fn raw_menu_items(menu: &XenonMenu) -> Vec<RawMenuItem> {
     if menu.items.is_null() || menu.item_count == 0 {
         return Vec::new();
     }

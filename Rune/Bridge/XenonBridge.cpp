@@ -130,6 +130,27 @@ XenonViewId xenon_engine_new_tab(XenonWindowId window, XenonStr url, int64_t ind
     return id;
 }
 
+void xenon_engine_activate_action(uint32_t action)
+{
+    Engine::the().post([action] {
+        Engine::the().app_menus().activate_action(action);
+    });
+}
+
+void xenon_engine_request_app_menu(uint32_t which)
+{
+    Engine::the().post([which] {
+        Engine::the().app_menus().show(which);
+    });
+}
+
+void xenon_engine_activate_app_menu_item(uint64_t menu, uint32_t item)
+{
+    Engine::the().post([menu, item] {
+        Engine::the().app_menus().activate_item(menu, item);
+    });
+}
+
 XenonViewId xenon_engine_duplicate_tab(XenonViewId source)
 {
     auto& engine = Engine::the();

@@ -26,6 +26,16 @@ pub static RELOAD: Icon = stroked!("xenon-reload", "M20 12a8 8 0 1 1-2.34-5.66M2
 pub static STOP: Icon = stroked!("xenon-stop", "M6 6l12 12M18 6L6 18");
 pub static CLOSE: Icon = stroked!("xenon-close", "M7 7l10 10M17 7L7 17");
 pub static PLUS: Icon = stroked!("xenon-plus", "M12 5v14M5 12h14");
+pub static MENU: Icon = stroked!("xenon-menu", "M4 7h16M4 12h16M4 17h16");
+pub static STAR: Icon = stroked!(
+    "xenon-star",
+    "M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"
+);
+pub static STAR_FILLED: Icon = Icon {
+    name: "xenon-star-filled",
+    view: 24.0,
+    body: r#"<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>"#,
+};
 pub static SIDEBAR: Icon = stroked!("xenon-sidebar", "M4 5h16v14H4zM10 5v14");
 pub static GLOBE: Icon = stroked!(
     "xenon-globe",

@@ -32,6 +32,7 @@ private:
 
     virtual Optional<WebView::ViewImplementation&> active_web_view() const override;
     virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab) const override;
+    virtual NonnullRefPtr<BookmarkPromise> display_add_bookmark_dialog(Optional<String const&> target_folder_id = {}) const override;
 
 #ifdef AK_OS_MACOS
     virtual Utf16String clipboard_text(ClipboardType) const override;

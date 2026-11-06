@@ -12,6 +12,13 @@ pub type XenonWindowId = u64;
 pub const XENON_WINDOW_NONE: XenonWindowId = 0;
 pub const XENON_TAB_INDEX_END: i64 = -1;
 
+pub const XENON_UI_COMMAND_FIND: u32 = 0;
+pub const XENON_UI_COMMAND_QUIT: u32 = 1;
+pub const XENON_UI_COMMAND_OPEN_FILE: u32 = 2;
+pub const XENON_UI_COMMAND_TOGGLE_FULLSCREEN: u32 = 3;
+
+pub const XENON_APP_MENU_MAIN: u32 = 0;
+
 pub const XENON_CHROME_LAYOUT_CLASSIC: u8 = 0;
 pub const XENON_CHROME_LAYOUT_COMPACT: u8 = 1;
 pub const XENON_CHROME_LAYOUT_VERTICAL: u8 = 2;
@@ -202,6 +209,18 @@ pub struct XenonUiCallbacks {
     pub tab_memory: Option<
         unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, description: XenonStr),
     >,
+    pub ui_command: Option<unsafe extern "C" fn(context: *mut c_void, command: u32)>,
+    pub app_menu: Option<
+        unsafe extern "C" fn(
+            context: *mut c_void,
+            which: u32,
+            menu: *const crate::ffi_page::XenonMenu,
+        ),
+    >,
+    pub view_zoom_changed:
+        Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, percent: u32)>,
+    pub view_bookmarked_changed:
+        Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, bookmarked: bool)>,
 }
 
 unsafe extern "C" {
@@ -221,6 +240,9 @@ unsafe extern "C" {
     pub fn xenon_engine_set_system_dark(dark: bool);
     pub fn xenon_engine_set_chrome_layout(layout: u8);
     pub fn xenon_engine_set_cycle_tabs_in_recently_used_order(enabled: bool);
+    pub fn xenon_engine_activate_action(action: u32);
+    pub fn xenon_engine_request_app_menu(which: u32);
+    pub fn xenon_engine_activate_app_menu_item(menu: u64, item: u32);
     pub fn xenon_engine_new_window(is_private: bool) -> XenonWindowId;
     pub fn xenon_engine_activate_window(window: XenonWindowId);
     pub fn xenon_engine_close_window(window: XenonWindowId);
@@ -255,4 +277,11 @@ unsafe extern "C" {
     pub fn xenon_engine_mouse_event(view: XenonViewId, event: *const XenonMouseEvent);
     pub fn xenon_engine_key_event(view: XenonViewId, event: *const XenonKeyEvent);
     pub fn xenon_engine_insert_text(view: XenonViewId, text: XenonStr);
+}
+
+unsafe extern "C" {
+    pub fn xenon_platform_is_fullscreen() -> bool;
+    pub fn xenon_platform_set_fullscreen(fullscreen: bool);
+    pub fn xenon_platform_is_always_on_top() -> bool;
+    pub fn xenon_platform_set_always_on_top(always_on_top: bool);
 }

@@ -51,6 +51,7 @@ endfunction()
 xenon_import_rune_ui_crate(MANIFEST_PATH "${XENON_RUNE_UI_MANIFEST}" CRATE_NAME xenon_ui)
 
 set(XENON_RUNE_BRIDGE_SOURCES
+    "${XENON_RUNE_DIR}/Bridge/AppMenus.cpp"
     "${XENON_RUNE_DIR}/Bridge/Application.cpp"
     "${XENON_RUNE_DIR}/Bridge/Engine.cpp"
     "${XENON_RUNE_DIR}/Bridge/ExtensionsBrowser.cpp"
@@ -62,7 +63,9 @@ set(XENON_RUNE_BRIDGE_SOURCES
 )
 
 if (APPLE)
-    list(APPEND XENON_RUNE_BRIDGE_SOURCES "${XENON_RUNE_DIR}/Bridge/ClipboardMac.mm")
+    list(APPEND XENON_RUNE_BRIDGE_SOURCES "${XENON_RUNE_DIR}/Bridge/ClipboardMac.mm" "${XENON_RUNE_DIR}/Bridge/PlatformMac.mm")
+else()
+    list(APPEND XENON_RUNE_BRIDGE_SOURCES "${XENON_RUNE_DIR}/Bridge/PlatformOther.cpp")
 endif()
 
 add_library(xenon-rune-bridge OBJECT ${XENON_RUNE_BRIDGE_SOURCES})

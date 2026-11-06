@@ -25,6 +25,8 @@ pub struct Tab {
     pub sent_viewport: Cell<Option<Viewport>>,
     pub pinned: bool,
     pub focus_location_when_shown: bool,
+    pub zoom_percent: u32,
+    pub bookmarked: bool,
 }
 
 impl Tab {
@@ -44,6 +46,8 @@ impl Tab {
             sent_viewport: Cell::new(None),
             pinned: false,
             focus_location_when_shown: false,
+            zoom_percent: 100,
+            bookmarked: false,
         }
     }
 

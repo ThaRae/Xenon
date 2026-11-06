@@ -61,6 +61,14 @@ pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
         ))
         .child(reload)
         .child(location_field(s, p, dark, cx))
+        .child(nav_button(
+            "menu-button",
+            "Menu",
+            &icons::MENU,
+            true,
+            p,
+            |s| s.open_main_menu(),
+        ))
 }
 
 pub fn toolbar(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {

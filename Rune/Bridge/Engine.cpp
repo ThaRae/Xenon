@@ -557,6 +557,19 @@ void Engine::session_metadata_changed()
     save_session_soon();
 }
 
+void Engine::new_tab_in_active_window()
+{
+    if (!m_model)
+        return;
+    new_tab(m_model->active_window().value_or(XENON_WINDOW_NONE), allocate_view_id(), {}, {}, Web::HTML::ActivateTab::Yes);
+}
+
+void Engine::reopen_closed_tab_in_active_window()
+{
+    if (m_model)
+        m_model->reopen_closed_tab(m_model->active_window());
+}
+
 void Engine::report_chrome_settings()
 {
     auto layout = static_cast<u8>(Ladybird::XenonSettings::chrome_layout());

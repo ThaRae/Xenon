@@ -44,6 +44,22 @@ private:
     Function<void()> m_on_change;
 };
 
+class ActionStateObserver final : public WebView::Action::Observer {
+public:
+    explicit ActionStateObserver(Function<void()> on_change)
+        : m_on_change(move(on_change))
+    {
+    }
+
+    virtual void on_text_changed(WebView::Action&) override { m_on_change(); }
+    virtual void on_visible_state_changed(WebView::Action&) override { m_on_change(); }
+    virtual void on_checked_state_changed(WebView::Action&) override { m_on_change(); }
+    virtual void on_engaged_state_changed(WebView::Action&) override { m_on_change(); }
+
+private:
+    Function<void()> m_on_change;
+};
+
 NonnullOwnPtr<View> View::create(XenonViewId id, Web::DevicePixelSize viewport_size, double device_pixel_ratio, WebView::IsPrivate is_private, Web::HTML::VisibilityState visibility_state, Optional<WebView::CanonicalTraversable&> traversable)
 {
     auto view = adopt_own(*new View(id, viewport_size, device_pixel_ratio, is_private));
@@ -171,6 +187,15 @@ void View::install_callbacks()
     observe_history_action(navigate_back_action());
     observe_history_action(navigate_forward_action());
 
+    reset_zoom_action().add_observer(make<ActionStateObserver>([weak_this = make_weak_ptr<View>()] {
+        if (weak_this)
+            weak_this->report_zoom();
+    }));
+    toggle_bookmark_action().add_observer(make<ActionStateObserver>([weak_this = make_weak_ptr<View>()] {
+        if (weak_this)
+            weak_this->report_bookmarked();
+    }));
+
     install_page_callbacks();
 }
 
@@ -221,6 +246,24 @@ void View::present_current_frame()
         .device_pixel_ratio = device_pixel_ratio,
     };
     Engine::the().notify(&XenonUiCallbacks::view_frame, m_id, static_cast<XenonFrame const*>(&frame));
+}
+
+void View::report_zoom()
+{
+    auto percent = static_cast<u32>(round_to<int>(zoom_level() * 100));
+    if (m_reported_zoom_percent == percent)
+        return;
+    m_reported_zoom_percent = percent;
+    Engine::the().notify(&XenonUiCallbacks::view_zoom_changed, m_id, percent);
+}
+
+void View::report_bookmarked()
+{
+    auto bookmarked = toggle_bookmark_action().engaged();
+    if (m_reported_bookmarked == bookmarked)
+        return;
+    m_reported_bookmarked = bookmarked;
+    Engine::the().notify(&XenonUiCallbacks::view_bookmarked_changed, m_id, bookmarked);
 }
 
 void View::report_history_state()
@@ -408,7 +451,7 @@ static bool begins_group(Vector<XenonMenuItem> const& items)
     return items.is_empty() || items.last().kind == XENON_MENU_ITEM_SEPARATOR || items.last().kind == XENON_MENU_ITEM_SUBMENU_BEGIN;
 }
 
-static void drop_trailing_separator(Vector<XenonMenuItem>& items)
+void drop_trailing_separator(Vector<XenonMenuItem>& items)
 {
     if (!items.is_empty() && items.last().kind == XENON_MENU_ITEM_SEPARATOR)
         items.take_last();
@@ -419,7 +462,7 @@ static XenonMenuItem menu_item(XenonMenuItemKind kind, StringView title = {}, u3
     return { .kind = static_cast<u32>(kind), .id = id, .title = xenon_str(title), .enabled = true, .checkable = false, .checked = false, .indented = false };
 }
 
-static void flatten_menu(WebView::Menu& menu, Vector<XenonMenuItem>& items, Vector<WeakPtr<WebView::Action>>& actions)
+void flatten_menu(WebView::Menu& menu, Vector<XenonMenuItem>& items, Vector<WeakPtr<WebView::Action>>& actions)
 {
     for (auto& item : menu.items()) {
         item.visit(

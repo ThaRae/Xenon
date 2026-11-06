@@ -156,6 +156,15 @@ pub extern "C" fn xenon_engine_set_chrome_layout(_layout: u8) {}
 pub extern "C" fn xenon_engine_set_cycle_tabs_in_recently_used_order(_enabled: bool) {}
 
 #[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_activate_action(_action: u32) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_request_app_menu(_which: u32) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_activate_app_menu_item(_menu: u64, _item: u32) {}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn xenon_engine_new_window(is_private: bool) -> XenonWindowId {
     let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
     send(Command::NewWindow(window, is_private));
@@ -983,3 +992,19 @@ mod tests {
         );
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_platform_is_fullscreen() -> bool {
+    false
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_platform_set_fullscreen(_fullscreen: bool) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_platform_is_always_on_top() -> bool {
+    false
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_platform_set_always_on_top(_always_on_top: bool) {}

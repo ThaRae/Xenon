@@ -26,6 +26,7 @@
 #include <LibWebCommon/PixelUnits.h>
 #include <LibWebView/Forward.h>
 #include <LibWebView/SessionStore.h>
+#include <Rune/Bridge/AppMenus.h>
 #include <Rune/Bridge/BrowserModel.h>
 #include <Rune/Bridge/XenonBridge.h>
 #include <UI/XenonSettings.h>
@@ -73,6 +74,9 @@ public:
     void duplicate_tab(XenonViewId source, XenonViewId duplicate);
     void report_tab_memory(XenonViewId);
     void report_chrome_settings();
+    void new_tab_in_active_window();
+    void reopen_closed_tab_in_active_window();
+    AppMenus& app_menus() { return m_app_menus; }
 
     void set_focused_view(XenonViewId, bool focused);
     View* focused_view();
@@ -145,6 +149,7 @@ private:
         virtual void xenon_chrome_layout_changed() override { Engine::the().report_chrome_settings(); }
     };
     OwnPtr<SettingsObserver> m_settings_observer;
+    AppMenus m_app_menus;
 
     Core::AnonymousBuffer m_theme;
     bool m_system_dark { false };
