@@ -15,6 +15,7 @@ on:
     paths:
       - .github/workflows/release.yml
       - Meta/release.py
+      - Meta/ci/install-macos-dependencies.sh
       - Meta/ci/package-appimage.sh
       - Meta/ci/test-appimage.sh
       - UI/Linux/**
@@ -28,9 +29,27 @@ permissions:
 
 jobs:
   macos:
-    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: arm64
+            runner: macos-26
+            cache: macos
+            suffix: ""
+            appcast: appcast.xml
+          - architecture: x86_64
+            runner: macos-15-intel
+            cache: macos-x86_64
+            suffix: -x86_64
+            appcast: appcast-x86_64.xml
+    name: macos (${{ matrix.architecture }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
     env:
+      ARCHITECTURE: ${{ matrix.architecture }}
+      SUFFIX: ${{ matrix.suffix }}
+      APPCAST: ${{ matrix.appcast }}
       CCACHE_DIR: ${{ github.workspace }}/Build/caches/ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
       CCACHE_MAXSIZE: 3G
@@ -111,7 +130,7 @@ jobs:
         env:
           XENON_UPDATE_KEY: ${{ secrets.XENON_UPDATE_KEY }}
         run: |
-          openssl=/opt/homebrew/opt/openssl@3/bin/openssl
+          openssl=$(brew --prefix openssl@3)/bin/openssl
           public_key=$({ printf 302e020100300506032b657004220420 | xxd -r -p; printf '%s' "$XENON_UPDATE_KEY" | base64 --decode; } |
             "$openssl" pkey -inform DER -pubout -outform DER | tail -c 32 | base64)
           if [ "$public_key" != "$UPDATE_PUBLIC_KEY" ]; then
@@ -132,10 +151,8 @@ jobs:
           xcodebuild -version
 
       - name: Install dependencies
-        run: |
-          brew update --quiet
-          brew unlink openssl@3 || true
-          brew install --quiet autoconf autoconf-archive automake bash ccache coreutils libtool llvm@22 nasm ninja pkg-config unzip
+        timeout-minutes: 30
+        run: Meta/ci/install-macos-dependencies.sh
 
       - name: Restore the build caches
         uses: actions/cache/restore@v6
@@ -143,8 +160,8 @@ jobs:
           path: |
             Build/caches
             ladybird/Build/caches
-          key: macos-${{ env.XCODE_VERSION }}-${{ github.sha }}
-          restore-keys: macos-${{ env.XCODE_VERSION }}-
+          key: ${{ matrix.cache }}-${{ env.XCODE_VERSION }}-${{ github.sha }}
+          restore-keys: ${{ matrix.cache }}-${{ env.XCODE_VERSION }}-
           fail-on-cache-miss: true
 
       - name: Build Xenon
@@ -153,6 +170,11 @@ jobs:
           ccache --zero-stats > /dev/null
           time ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" build
           ccache --show-stats
+          architectures=$(lipo -archs Build/release/bin/Xenon.app/Contents/MacOS/Xenon)
+          if [ "$architectures" != "$ARCHITECTURE" ]; then
+            echo "::error::Xenon was built for $architectures, not $ARCHITECTURE"
+            exit 1
+          fi
 
       - name: Meta/release.py test
         if: github.event_name != 'workflow_dispatch' || inputs.test
@@ -168,9 +190,9 @@ jobs:
       - name: Verify the release
         run: |
           app=Build/distribution/Xenon.app
-          archive=Build/distribution/Xenon-$VERSION.tar.xz
-          installer=Build/distribution/Xenon-$VERSION.dmg
-          appcast=Build/distribution/appcast.xml
+          archive=Build/distribution/Xenon-$VERSION$SUFFIX.tar.xz
+          installer=Build/distribution/Xenon-$VERSION$SUFFIX.dmg
+          appcast=Build/distribution/$APPCAST
           public_key=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$app/Contents/Info.plist")
           if [ "$public_key" != "$UPDATE_PUBLIC_KEY" ]; then
             echo "::error::XENON_UPDATE_KEY isn't Xenon's update key: its public half is $public_key"
@@ -195,11 +217,11 @@ jobs:
       - name: Upload the release
         uses: actions/upload-artifact@v7
         with:
-          name: Xenon-${{ env.VERSION }}-macos
+          name: Xenon-${{ env.VERSION }}-macos-${{ matrix.architecture }}
           path: |
-            Build/distribution/Xenon-${{ env.VERSION }}.dmg
-            Build/distribution/Xenon-${{ env.VERSION }}.tar.xz
-            Build/distribution/appcast.xml
+            Build/distribution/Xenon-${{ env.VERSION }}${{ matrix.suffix }}.dmg
+            Build/distribution/Xenon-${{ env.VERSION }}${{ matrix.suffix }}.tar.xz
+            Build/distribution/${{ matrix.appcast }}
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
@@ -216,10 +238,10 @@ jobs:
         if: always()
         run: |
           {
-            echo "### macOS"
+            echo "### macOS, $ARCHITECTURE"
             echo
             echo "Built from \`$(git rev-parse --short HEAD)\`, with Ladybird \`$(git -C ladybird rev-parse --short HEAD)\` and $XCODE_VERSION"
-            for file in Build/distribution/Xenon-$VERSION.dmg Build/distribution/Xenon-$VERSION.tar.xz; do
+            for file in "Build/distribution/Xenon-$VERSION$SUFFIX.dmg" "Build/distribution/Xenon-$VERSION$SUFFIX.tar.xz"; do
               if [ -f "$file" ]; then
                 echo
                 echo "\`$(basename "$file")\`: $(stat -f '%z' "$file") bytes, SHA-256 \`$(shasum -a 256 "$file" | cut -d ' ' -f 1)\`"
@@ -363,10 +385,11 @@ jobs:
           git submodule update --init --depth 1 ladybird
           echo "VERSION=$(cat VERSION.txt)" >> "$GITHUB_ENV"
 
-      - name: Download the macOS release
+      - name: Download the macOS releases
         uses: actions/download-artifact@v8
         with:
-          name: Xenon-${{ env.VERSION }}-macos
+          pattern: Xenon-${{ env.VERSION }}-macos-*
+          merge-multiple: true
           path: Build/distribution
 
       - name: Download the AppImage

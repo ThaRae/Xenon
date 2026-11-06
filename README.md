@@ -59,9 +59,9 @@ support for security keys.
 ## Installing it
 
 Each release on [ThaRae/xenon-releases](https://github.com/ThaRae/xenon-releases/releases) has a
-`Xenon-<version>.dmg`. Open it and drag Xenon into Applications. Releases aren't notarized yet, so the first time,
-macOS asks you to allow it in **System Settings → Privacy & Security → Open Anyway**. After that, Xenon updates
-itself.
+`Xenon-<version>.dmg` for Apple silicon Macs, and `Xenon-<version>-x86_64.dmg` for Intel Macs. Open it and drag
+Xenon into Applications. Releases aren't notarized yet, so the first time, macOS asks you to allow it in **System
+Settings → Privacy & Security → Open Anyway**. After that, Xenon updates itself.
 
 On Linux, download `Xenon-<version>-x86_64.AppImage`, make it executable, and run it:
 
@@ -84,7 +84,7 @@ yay -S xenon-bin
 
 ## Building it
 
-On macOS, with Xcode, CMake 3.30+, and Rust (via rustup) installed:
+On macOS (Apple silicon or Intel), with Xcode, CMake 3.30+, and Rust (via rustup) installed:
 
 ```bash
 brew install autoconf autoconf-archive automake ccache cmake libtool nasm ninja pkg-config

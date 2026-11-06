@@ -1,0 +1,130 @@
+name: macOS Intel
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 3 * * 2,5"
+  workflow_dispatch:
+  pull_request:
+    paths: [.github/workflows/macos-intel.yml, Meta/ci/install-macos-dependencies.sh]
+
+concurrency:
+  group: macos-intel-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-15-intel
+    timeout-minutes: 360
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/Build/caches/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 3G
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Check out Ladybird (the pinned submodule)
+        run: git submodule update --init --depth 1 ladybird
+
+      - name: Check that the runner is an Intel Mac
+        run: |
+          architecture=$(uname -m)
+          if [ "$architecture" != x86_64 ]; then
+            echo "::error::macos-15-intel ran on $architecture, not x86_64"
+            exit 1
+          fi
+
+      - name: Select Xcode
+        run: |
+          version=$(sed -n "s/.*xcode-version: *'\{0,1\}\([0-9.]*\)'\{0,1\}.*/\1/p" ladybird/.github/actions/setup/action.yml)
+          xcode=/Applications/Xcode_$version.app
+          if [ ! -d "$xcode" ]; then
+            echo "::warning::Xcode $version isn't on this runner; using the newest one"
+            xcode=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          fi
+          sudo xcode-select --switch "$xcode"
+          echo "XCODE_VERSION=$(xcodebuild -version | head -n 1)" >> "$GITHUB_ENV"
+          xcodebuild -version
+
+      - name: Install dependencies
+        timeout-minutes: 30
+        run: Meta/ci/install-macos-dependencies.sh
+
+      - name: Restore the build caches
+        id: restore
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: macos-x86_64-${{ env.XCODE_VERSION }}-${{ github.sha }}
+          restore-keys: macos-x86_64-${{ env.XCODE_VERSION }}-
+
+      - name: Build Xenon and run its tests
+        timeout-minutes: 320
+        run: |
+          mkdir -p "$CCACHE_DIR"
+          ccache --zero-stats > /dev/null
+          status=0
+          time ./Meta/xenon.py --jobs "$(sysctl -n hw.ncpu)" test || status=$?
+          ccache --show-stats > Build/release/ccache-stats.txt 2>&1 || true
+          exit $status
+
+      - name: Check that Xenon was built for x86-64
+        run: |
+          architectures=$(lipo -archs Build/release/bin/Xenon.app/Contents/MacOS/Xenon)
+          if [ "$architectures" != x86_64 ]; then
+            echo "::error::Xenon was built for $architectures, not x86_64"
+            exit 1
+          fi
+
+      - name: Save the build caches
+        if: always() && steps.restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            Build/caches
+            ladybird/Build/caches
+          key: macos-x86_64-${{ env.XCODE_VERSION }}-${{ github.sha }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### macOS, Intel"
+            echo
+            echo "Ladybird \`$(git -C ladybird rev-parse --short HEAD)\`, $XCODE_VERSION, $(sysctl -n machdep.cpu.brand_string)"
+            if [ -f Build/release/smoke/welcome.png ]; then
+              echo
+              echo "Headless render of about:welcome: $(stat -f '%z bytes' Build/release/smoke/welcome.png) (artifact \`renders-macos-intel\`)"
+            fi
+            if [ -f Build/release/ccache-stats.txt ]; then
+              echo
+              echo '```'
+              cat Build/release/ccache-stats.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the dependency build logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vcpkg-build-logs-macos-intel
+          path: Build/vcpkg-release/buildtrees/*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the renders
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: renders-macos-intel
+          path: Build/release/smoke/*.png
+          if-no-files-found: ignore
+          retention-days: 14

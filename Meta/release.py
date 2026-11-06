@@ -23,6 +23,7 @@ import threading
 import time
 import urllib.request
 
+from dataclasses import dataclass
 from pathlib import Path
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape
@@ -36,7 +37,9 @@ DISTRIBUTION_DIR = XENON_SOURCE_DIR / "Build" / "distribution"
 XENON_REPOSITORY = "ThaRae/Xenon"
 RELEASES_REPOSITORY = "ThaRae/xenon-releases"
 RELEASES_URL = f"https://github.com/{RELEASES_REPOSITORY}"
-FEED_URL = f"https://raw.githubusercontent.com/{RELEASES_REPOSITORY}/main/appcast.xml"
+MAC_ARCHITECTURES = ("arm64", "x86_64")
+MACH_O_CPU_TYPES = {0x0100000C: "arm64", 0x01000007: "x86_64"}
+SPARKLE_NAMESPACE = "http://www.andymatuschak.org/xml-namespaces/sparkle"
 GIT_WITH_GITHUB_CREDENTIALS = ("git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential")
 
 SIGNING_IDENTITY = "Xenon Release"
@@ -130,7 +133,9 @@ def main():
     package_parser.add_argument(
         "--update-key", type=Path, help="a file with the update key, rather than the keychain's (macOS)"
     )
-    package_parser.add_argument("--feed-url", default=FEED_URL, help="where the release looks for updates (macOS)")
+    package_parser.add_argument(
+        "--feed-url", help="where the release looks for updates, rather than its architecture's feed (macOS)"
+    )
     package_parser.add_argument("--notes", type=Path, help="a file with the release notes, in plain text (macOS)")
 
     publish_parser = subparsers.add_parser("publish", help="publish Build/distribution to ThaRae/xenon-releases")
@@ -459,7 +464,7 @@ def make_archive(app: Path, archive: Path):
 def write_appcast(path: Path, app: Path, archive: Path, archive_url: str, signature: str, link: str, notes: str | None):
     info = plistlib.loads((app / "Contents" / "Info.plist").read_bytes())
     version = info["CFBundleVersion"]
-    architectures = run("lipo", "-archs", app / "Contents" / "MacOS" / "Xenon").split()
+    architectures = mach_o_architectures((app / "Contents" / "MacOS" / "Xenon").read_bytes()[:4096])
 
     lines = [
         f"            <title>Xenon {escape(info['CFBundleShortVersionString'])}</title>",
@@ -480,7 +485,7 @@ def write_appcast(path: Path, app: Path, archive: Path, archive_url: str, signat
 
     item = "\n".join(lines)
     path.write_text(f"""<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+<rss version="2.0" xmlns:sparkle="{SPARKLE_NAMESPACE}">
     <channel>
         <title>Xenon</title>
         <link>{escape(RELEASES_URL)}</link>
@@ -496,12 +501,47 @@ def release_link(version: str) -> str:
     return f"{RELEASES_URL}/releases/tag/v{version}"
 
 
-def archive_name(version: str) -> str:
-    return f"Xenon-{version}.tar.xz"
+def mac_suffix(architecture: str) -> str:
+    return "" if architecture == "arm64" else f"-{architecture}"
 
 
-def installer_name(version: str) -> str:
-    return f"Xenon-{version}.dmg"
+def feed_name(architecture: str) -> str:
+    return f"appcast{mac_suffix(architecture)}.xml"
+
+
+def feed_url(architecture: str) -> str:
+    return f"https://raw.githubusercontent.com/{RELEASES_REPOSITORY}/main/{feed_name(architecture)}"
+
+
+def archive_name(version: str, architecture: str) -> str:
+    return f"Xenon-{version}{mac_suffix(architecture)}.tar.xz"
+
+
+def installer_name(version: str, architecture: str) -> str:
+    return f"Xenon-{version}{mac_suffix(architecture)}.dmg"
+
+
+def mach_o_architectures(header: bytes) -> list[str]:
+    if int.from_bytes(header[:4], "big") == 0xCAFEBABE:
+        count = int.from_bytes(header[4:8], "big")
+        cpu_types = [int.from_bytes(header[8 + 20 * index : 12 + 20 * index], "big") for index in range(count)]
+    elif int.from_bytes(header[:4], "little") == 0xFEEDFACF:
+        cpu_types = [int.from_bytes(header[4:8], "little")]
+    else:
+        return []
+    return [MACH_O_CPU_TYPES.get(cpu_type, hex(cpu_type)) for cpu_type in cpu_types]
+
+
+def built_architecture() -> str:
+    executable = BUILD_DIR / "bin" / APP_NAME / "Contents" / "MacOS" / "Xenon"
+    if not executable.is_file():
+        sys.exit(f"No Xenon at {executable}. Build it first.")
+    architectures = mach_o_architectures(executable.read_bytes()[:4096])
+    if len(architectures) != 1 or architectures[0] not in MAC_ARCHITECTURES:
+        sys.exit(
+            f"Xenon is built for {', '.join(architectures) or 'nothing it knows'}, not one of {MAC_ARCHITECTURES}."
+        )
+    return architectures[0]
 
 
 def appimage_name(version: str) -> str:
@@ -522,28 +562,29 @@ def package_main(args):
     public_key = key.public_key()
     notes = args.notes.read_text().strip() if args.notes else None
 
-    print(f"==> Packaging Xenon {version}", flush=True)
+    architecture = built_architecture()
+    print(f"==> Packaging Xenon {version} for {architecture}", flush=True)
     if DISTRIBUTION_DIR.exists():
         shutil.rmtree(DISTRIBUTION_DIR)
     app = DISTRIBUTION_DIR / APP_NAME
     make_bundle(app)
-    configure_bundle(app, version, args.feed_url, public_key, BUNDLE_IDENTIFIER)
+    configure_bundle(app, version, args.feed_url or feed_url(architecture), public_key, BUNDLE_IDENTIFIER)
 
     print(f"==> Signing it as {'ad hoc' if args.sign == '-' else args.sign}", flush=True)
     sign_bundle(app, args.sign)
 
     print("==> Making the installer", flush=True)
-    installer = DISTRIBUTION_DIR / installer_name(version)
+    installer = DISTRIBUTION_DIR / installer_name(version, architecture)
     make_installer(app, installer, args.sign)
     if problems := check_installer(installer):
         sys.exit(f"The installer isn't right: {'; '.join(problems)}")
 
     print("==> Archiving it, and signing the archive and the appcast", flush=True)
-    archive = DISTRIBUTION_DIR / archive_name(version)
+    archive = DISTRIBUTION_DIR / archive_name(version, architecture)
     make_archive(app, archive)
     signature = key.sign(archive)
     archive_url = f"{RELEASES_URL}/releases/download/v{version}/{archive.name}"
-    appcast = DISTRIBUTION_DIR / "appcast.xml"
+    appcast = DISTRIBUTION_DIR / feed_name(architecture)
     write_appcast(appcast, app, archive, archive_url, signature, release_link(version), notes)
     key.sign(appcast)
     if notes:
@@ -841,26 +882,50 @@ def test_linux_main(args):
     print("All passed.")
 
 
-def publish_main(args):
-    appcast = DISTRIBUTION_DIR / "appcast.xml"
+@dataclass
+class MacRelease:
+    architecture: str
+    version: str
+    appcast: Path
+    archive: Path
+    installer: Path
+
+
+def packaged_mac_release(architecture: str) -> MacRelease | None:
+    appcast = DISTRIBUTION_DIR / feed_name(architecture)
     if not appcast.is_file():
-        sys.exit("Nothing to publish. Run Meta/release.py package first, on a Mac.")
+        return None
     enclosure = ElementTree.parse(appcast).find("channel/item/enclosure")
     archive_url = enclosure.get("url", "") if enclosure is not None else ""
     archive = DISTRIBUTION_DIR / archive_url.rsplit("/", 1)[-1]
     if not archive_url or not archive.is_file():
-        sys.exit("Build/distribution has no archive that its appcast names. Package it again.")
+        sys.exit(f"Build/distribution has no archive that {appcast.name} names. Package it again.")
     with tarfile.open(archive) as tar:
         info = plistlib.load(tar.extractfile(f"{APP_NAME}/Contents/Info.plist"))
+        built_for = mach_o_architectures(tar.extractfile(f"{APP_NAME}/Contents/MacOS/Xenon").read(4096))
+    if built_for != [architecture]:
+        sys.exit(f"{archive.name} is built for {', '.join(built_for)}, but {appcast.name} is the {architecture} feed.")
     version = info["CFBundleShortVersionString"]
-    installer = DISTRIBUTION_DIR / installer_name(version)
-    if info["SUFeedURL"] != FEED_URL or archive.name != archive_name(version):
-        sys.exit(f"Build/distribution isn't a release for {RELEASES_REPOSITORY}. Package it again.")
+    if info["SUFeedURL"] != feed_url(architecture) or archive.name != archive_name(version, architecture):
+        sys.exit(f"{archive.name} isn't a release for {RELEASES_REPOSITORY}. Package it again.")
+    installer = DISTRIBUTION_DIR / installer_name(version, architecture)
     if not installer.is_file():
         sys.exit(f"Build/distribution has no {installer.name}. Package it again.")
+    return MacRelease(architecture, version, appcast, archive, installer)
+
+
+def publish_main(args):
+    mac_releases = [release for release in map(packaged_mac_release, MAC_ARCHITECTURES) if release]
+    if not any(release.architecture == "arm64" for release in mac_releases):
+        sys.exit("Nothing to publish for Apple silicon. Run Meta/release.py package first, on an Apple silicon Mac.")
+    versions = sorted({release.version for release in mac_releases})
+    if len(versions) != 1:
+        sys.exit(f"Build/distribution has macOS releases of more than one version: {', '.join(versions)}.")
+    version = versions[0]
     appimage = DISTRIBUTION_DIR / appimage_name(version)
     linux_files = [path for path in (appimage, zsync_path(appimage)) if appimage.is_file() and path.is_file()]
-    files = [installer, archive, *linux_files]
+    mac_files = [path for release in mac_releases for path in (release.installer, release.archive)]
+    files = [*mac_files, *linux_files]
     if subprocess.run(["gh", "auth", "status"], capture_output=True).returncode != 0:
         sys.exit("gh isn't logged in to GitHub: gh auth login")
 
@@ -881,6 +946,8 @@ def publish_main(args):
             signing = subprocess.run(["codesign", "-dvv", app], capture_output=True, text=True).stderr
             authority = re.search(r"^Authority=(.+)$", signing, re.MULTILINE)
             print(f"The app is signed {f'as {authority.group(1)}' if authority else 'ad hoc'}.")
+        if len(mac_releases) < len(MAC_ARCHITECTURES):
+            print("There's no Intel release in Build/distribution, so Intel Macs won't get this version.")
         if not linux_files:
             print(f"There's no {appimage.name} in Build/distribution, so the release has nothing for Linux.")
         answer = input(f"Publish it to {RELEASES_REPOSITORY}, and tag it {tag}? [y/N] ")
@@ -897,11 +964,12 @@ def publish_main(args):
         "--title", f"Xenon {version}", "--notes", notes,
     )  # fmt: skip
 
-    print("==> Publishing the appcast", flush=True)
+    print(f"==> Publishing {', '.join(release.appcast.name for release in mac_releases)}", flush=True)
     with tempfile.TemporaryDirectory() as checkout:
         run(*GIT_WITH_GITHUB_CREDENTIALS, "clone", "--depth", "1", f"{RELEASES_URL}.git", checkout)
-        shutil.copy2(appcast, Path(checkout) / "appcast.xml")
-        run("git", "-C", checkout, "add", "appcast.xml")
+        for release in mac_releases:
+            shutil.copy2(release.appcast, Path(checkout) / release.appcast.name)
+            run("git", "-C", checkout, "add", release.appcast.name)
         run("git", "-C", checkout, "commit", "-m", f"Xenon {version}")
         run(*GIT_WITH_GITHUB_CREDENTIALS, "-C", checkout, "push", "origin", "HEAD:main")
 
@@ -1050,7 +1118,7 @@ def test_main(args):
             first, second, third = TEST_VERSIONS
 
             print(f"==> {first}'s installer", flush=True)
-            installer = root / "releases" / first / installer_name(first)
+            installer = root / "releases" / first / installer_name(first, built_architecture())
             make_installer(root / "releases" / first / APP_NAME, installer, args.sign)
             problems = check_installer(installer)
             expect("the installer has the app, a link to Applications, and its window's layout", not problems,

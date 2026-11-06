@@ -46,7 +46,7 @@
                 if (event.origin === `chrome-extension://${chrome.runtime.id}` && event.data === "accessible-loaded")
                     resolve(true);
             });
-            setTimeout(() => resolve(false), 5000);
+            setTimeout(() => resolve(false), 30000);
         });
         const frame = document.createElement("iframe");
         frame.src = chrome.runtime.getURL("accessible.html");
