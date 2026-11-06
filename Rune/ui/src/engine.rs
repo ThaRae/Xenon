@@ -237,6 +237,10 @@ impl Engine {
         unsafe { ffi::xenon_engine_activate_action(action as u32) }
     }
 
+    pub fn blocking_action(self, view: ViewId, action: u32) {
+        unsafe { ffi::xenon_engine_blocking_action(view, action) }
+    }
+
     pub fn toggle_mute(self, view: ViewId) {
         unsafe { ffi::xenon_engine_toggle_mute(view) }
     }

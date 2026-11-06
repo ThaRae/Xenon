@@ -119,6 +119,7 @@ pub struct Browser {
     pub downloads: Vec<Download>,
     pub downloads_popover_open: bool,
     history_menu_direction: i32,
+    pub shield_popover_open: bool,
 }
 
 impl Browser {
@@ -144,6 +145,7 @@ impl Browser {
             downloads: Vec::new(),
             downloads_popover_open: false,
             history_menu_direction: -1,
+            shield_popover_open: false,
         }
     }
 
@@ -343,6 +345,35 @@ impl Browser {
 
     pub fn download_action(&mut self, download: u64, action: u32) {
         self.engine.download_action(download, action);
+    }
+
+    pub fn blocking_changed(
+        &mut self,
+        view: ViewId,
+        state: u32,
+        site: String,
+        blocked_requests: u64,
+    ) {
+        if let Some(tab) = self.tabs.get_mut(view) {
+            tab.blocking_state = state;
+            tab.blocking_site = site;
+            tab.blocked_requests = blocked_requests;
+        }
+    }
+
+    pub fn toggle_shield_popover(&mut self) {
+        self.shield_popover_open = !self.shield_popover_open;
+    }
+
+    pub fn close_shield_popover(&mut self) {
+        self.shield_popover_open = false;
+    }
+
+    pub fn blocking_action(&mut self, action: u32) {
+        self.shield_popover_open = false;
+        if let Some(view) = self.tabs.active_view() {
+            self.engine.blocking_action(view, action);
+        }
     }
 
     pub fn audio_changed(&mut self, view: ViewId, playing_audio: bool, muted: bool) {

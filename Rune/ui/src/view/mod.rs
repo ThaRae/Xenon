@@ -10,6 +10,7 @@ mod location;
 mod page;
 mod page_overlays;
 pub mod palette;
+mod shield;
 mod tabs;
 mod toolbar;
 mod window;

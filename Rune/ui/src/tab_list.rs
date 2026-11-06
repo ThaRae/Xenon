@@ -30,6 +30,9 @@ pub struct Tab {
     pub playing_audio: bool,
     pub muted: bool,
     pub unresponsive: bool,
+    pub blocking_state: u32,
+    pub blocking_site: String,
+    pub blocked_requests: u64,
 }
 
 impl Tab {
@@ -54,6 +57,9 @@ impl Tab {
             playing_audio: false,
             muted: false,
             unresponsive: false,
+            blocking_state: 0,
+            blocking_site: String::new(),
+            blocked_requests: 0,
         }
     }
 

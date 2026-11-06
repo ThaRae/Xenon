@@ -171,6 +171,9 @@ pub extern "C" fn xenon_engine_download_action(_download: u64, _action: u32) {}
 pub extern "C" fn xenon_engine_toggle_mute(_view: XenonViewId) {}
 
 #[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_blocking_action(_view: XenonViewId, _action: u32) {}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn xenon_engine_answer_unresponsive_page(_view: XenonViewId, _keep_waiting: bool) {}
 
 #[unsafe(no_mangle)]

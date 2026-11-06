@@ -241,7 +241,24 @@ pub struct XenonUiCallbacks {
             menu: *const crate::ffi_page::XenonMenu,
         ),
     >,
+    pub view_blocking_changed: Option<
+        unsafe extern "C" fn(
+            context: *mut c_void,
+            view: XenonViewId,
+            state: u32,
+            site: XenonStr,
+            blocked_requests: u64,
+        ),
+    >,
 }
+
+pub const XENON_BLOCKING_SITE_DISABLED: u32 = 2;
+pub const XENON_BLOCKING_ENABLED: u32 = 3;
+pub const XENON_BLOCKING_NO_RULES: u32 = 4;
+
+pub const XENON_BLOCKING_ACTION_TOGGLE_SITE: u32 = 0;
+pub const XENON_BLOCKING_ACTION_PICK_ELEMENT: u32 = 1;
+pub const XENON_BLOCKING_ACTION_OPEN_DASHBOARD: u32 = 2;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -287,6 +304,7 @@ unsafe extern "C" {
     pub fn xenon_engine_activate_app_menu_item(menu: u64, item: u32);
     pub fn xenon_engine_download_action(download: u64, action: u32);
     pub fn xenon_engine_toggle_mute(view: XenonViewId);
+    pub fn xenon_engine_blocking_action(view: XenonViewId, action: u32);
     pub fn xenon_engine_answer_unresponsive_page(view: XenonViewId, keep_waiting: bool);
     pub fn xenon_engine_request_history_menu(view: XenonViewId, direction: i32);
     pub fn xenon_engine_traverse_history_to_step(view: XenonViewId, step: i32);

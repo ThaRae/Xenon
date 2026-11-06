@@ -164,6 +164,20 @@ typedef struct XenonTabInfo {
 struct XenonMenu;
 
 enum {
+    XENON_BLOCKING_UNAVAILABLE = 0,
+    XENON_BLOCKING_DISABLED,
+    XENON_BLOCKING_SITE_DISABLED,
+    XENON_BLOCKING_ENABLED,
+    XENON_BLOCKING_NO_RULES,
+};
+
+enum {
+    XENON_BLOCKING_ACTION_TOGGLE_SITE = 0,
+    XENON_BLOCKING_ACTION_PICK_ELEMENT,
+    XENON_BLOCKING_ACTION_OPEN_DASHBOARD,
+};
+
+enum {
     XENON_DOWNLOAD_IN_PROGRESS = 0,
     XENON_DOWNLOAD_PAUSED,
     XENON_DOWNLOAD_COMPLETED,
@@ -222,6 +236,7 @@ typedef struct XenonUiCallbacks {
     void (*view_audio_changed)(void* context, XenonViewId, bool playing_audio, bool muted);
     void (*view_unresponsive_changed)(void* context, XenonViewId, bool unresponsive);
     void (*history_menu)(void* context, XenonViewId, struct XenonMenu const*);
+    void (*view_blocking_changed)(void* context, XenonViewId, uint32_t state, XenonStr site, uint64_t blocked_requests);
 } XenonUiCallbacks;
 
 int xenon_ui_main(int argc, char const* const* argv);
@@ -238,6 +253,7 @@ void xenon_engine_request_app_menu(uint32_t which);
 void xenon_engine_activate_app_menu_item(uint64_t menu, uint32_t item);
 void xenon_engine_download_action(uint64_t download, uint32_t action);
 void xenon_engine_toggle_mute(XenonViewId);
+void xenon_engine_blocking_action(XenonViewId, uint32_t action);
 void xenon_engine_request_history_menu(XenonViewId, int32_t direction);
 void xenon_engine_traverse_history_to_step(XenonViewId, int32_t step);
 void xenon_engine_answer_unresponsive_page(XenonViewId, bool keep_waiting);

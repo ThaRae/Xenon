@@ -19,6 +19,7 @@
 #include <Rune/Bridge/Input.h>
 #include <Rune/Bridge/View.h>
 #include <UI/Bangs.h>
+#include <UI/BlockingDashboard.h>
 #include <UI/XenonSettings.h>
 
 namespace Xenon {
@@ -173,6 +174,15 @@ void View::install_callbacks()
         engine.notify(&XenonUiCallbacks::view_crashed, m_id);
     };
 
+    on_content_blocking_change = [this](WebView::ContentBlockingSnapshot const& snapshot) {
+        report_content_blocking(snapshot);
+    };
+
+    // FIXME: Let the user edit the filter before it's added, as the Qt frontend's ElementPicker does.
+    on_element_picker_filter = [](String const& filter) {
+        WebView::Application::settings().add_custom_content_blocker_filter(filter);
+    };
+
     on_tab_indicator_change = [this](WebView::TabIndicator, bool) {
         report_audio();
     };
@@ -276,6 +286,43 @@ void View::show_history_menu(int direction)
         .item_count = items.size(),
     };
     Engine::the().notify(&XenonUiCallbacks::history_menu, m_id, static_cast<XenonMenu const*>(&menu));
+}
+
+void View::report_content_blocking(WebView::ContentBlockingSnapshot const& snapshot)
+{
+    auto site = snapshot.site.value_or({});
+    Engine::the().notify(&XenonUiCallbacks::view_blocking_changed, m_id, static_cast<u32>(snapshot.state), xenon_str(site), snapshot.blocked_request_count);
+}
+
+void View::run_blocking_action(u32 action)
+{
+    switch (action) {
+    case XENON_BLOCKING_ACTION_TOGGLE_SITE: {
+        auto snapshot = content_blocking_snapshot();
+        if (!snapshot.can_toggle())
+            return;
+        auto enable = snapshot.state == WebView::ContentBlockingState::SiteDisabled;
+        if (auto result = WebView::Application::settings().set_content_blocker_enabled_for_site(*snapshot.site, enable); result.is_error()) {
+            warnln("Xenon: Unable to change content blocking for {}: {}", *snapshot.site, result.error());
+            return;
+        }
+        reload();
+        report_content_blocking(content_blocking_snapshot());
+        break;
+    }
+    case XENON_BLOCKING_ACTION_PICK_ELEMENT:
+        start_element_picker([weak_this = make_weak_ptr<View>()](Optional<String> filter) {
+            if (weak_this && filter.has_value() && weak_this->on_element_picker_filter)
+                weak_this->on_element_picker_filter(*filter);
+        });
+        break;
+    case XENON_BLOCKING_ACTION_OPEN_DASHBOARD:
+        Engine::the().new_tab(Engine::the().model() && Engine::the().model()->window_of(m_id) ? Engine::the().model()->window_of(m_id)->id : XENON_WINDOW_NONE,
+            Engine::the().allocate_view_id(), Ladybird::BlockingDashboard::url().serialize().bytes_as_string_view(), {}, Web::HTML::ActivateTab::Yes);
+        break;
+    default:
+        break;
+    }
 }
 
 void View::toggle_mute()

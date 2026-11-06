@@ -51,6 +51,8 @@ public:
     void set_visible(bool);
     void apply_system_theme();
     void toggle_mute();
+    void run_blocking_action(u32 action);
+    void report_content_blocking(WebView::ContentBlockingSnapshot const&);
     void show_history_menu(int direction);
     void set_focused(bool);
     void handle_mouse_event(XenonMouseEvent const&);

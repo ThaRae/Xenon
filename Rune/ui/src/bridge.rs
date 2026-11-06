@@ -108,6 +108,7 @@ impl UiContext {
             view_audio_changed: Some(view_audio_changed),
             view_unresponsive_changed: Some(view_unresponsive_changed),
             history_menu: Some(history_menu),
+            view_blocking_changed: Some(view_blocking_changed),
         }
     }
 }
@@ -395,6 +396,19 @@ unsafe extern "C" fn history_menu(
     unsafe { ui(context) }
         .handle
         .update(move |browser, tx| browser.show_history_menu(view, entries, tx));
+}
+
+unsafe extern "C" fn view_blocking_changed(
+    context: *mut c_void,
+    view: ViewId,
+    state: u32,
+    site: XenonStr,
+    blocked_requests: u64,
+) {
+    let site = unsafe { site.to_string_lossy() };
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.blocking_changed(view, state, site, blocked_requests));
 }
 
 unsafe extern "C" fn view_zoom_changed(context: *mut c_void, view: ViewId, percent: u32) {

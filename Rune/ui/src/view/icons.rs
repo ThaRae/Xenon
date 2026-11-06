@@ -41,6 +41,14 @@ pub static SPEAKER_MUTED: Icon = stroked!(
     "xenon-speaker-muted",
     "M4 9v6h4l5 4V5L8 9zM16 9.5l5 5M21 9.5l-5 5"
 );
+pub static SHIELD: Icon = stroked!(
+    "xenon-shield",
+    "M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"
+);
+pub static SHIELD_OFF: Icon = stroked!(
+    "xenon-shield-off",
+    "M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6zM4 4l16 16"
+);
 pub static MENU: Icon = stroked!("xenon-menu", "M4 7h16M4 12h16M4 17h16");
 pub static STAR: Icon = stroked!(
     "xenon-star",

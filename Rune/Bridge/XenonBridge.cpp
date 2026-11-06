@@ -165,6 +165,13 @@ void xenon_engine_traverse_history_to_step(XenonViewId id, int32_t step)
     });
 }
 
+void xenon_engine_blocking_action(XenonViewId id, uint32_t action)
+{
+    post_to_view(id, [action](View& view) {
+        view.run_blocking_action(action);
+    });
+}
+
 void xenon_engine_toggle_mute(XenonViewId id)
 {
     post_to_view(id, [](View& view) {
