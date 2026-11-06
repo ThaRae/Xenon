@@ -64,8 +64,10 @@ set(XENON_RUNE_BRIDGE_SOURCES
 
 if (APPLE)
     list(APPEND XENON_RUNE_BRIDGE_SOURCES "${XENON_RUNE_DIR}/Bridge/ClipboardMac.mm" "${XENON_RUNE_DIR}/Bridge/PlatformMac.mm")
+    list(APPEND XENON_RUNE_BRIDGE_SOURCES "${XENON_RUNE_DIR}/Bridge/AccessibilityMac.mm")
 else()
     list(APPEND XENON_RUNE_BRIDGE_SOURCES "${XENON_RUNE_DIR}/Bridge/PlatformOther.cpp")
+    list(APPEND XENON_RUNE_BRIDGE_SOURCES "${XENON_RUNE_DIR}/Bridge/AccessibilityOther.cpp")
 endif()
 
 add_library(xenon-rune-bridge OBJECT ${XENON_RUNE_BRIDGE_SOURCES})
@@ -115,4 +117,18 @@ add_dependencies(xenon-tests TestXenonRunePage)
 
 if (NOT APPLE)
     set_target_properties(TestXenonRuneBridge TestXenonRunePage PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
+endif()
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgeAccessibility.cpp")
+
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonRuneAccessibility.cpp" Xenon NAME TestXenonRuneAccessibility LIBS xenon-rune-bridge)
+if (TARGET ladybird-helper-processes)
+    add_dependencies(TestXenonRuneAccessibility ladybird-helper-processes)
+endif()
+if (TARGET ladybird_build_resource_files)
+    add_dependencies(TestXenonRuneAccessibility ladybird_build_resource_files)
+endif()
+add_dependencies(xenon-tests TestXenonRuneAccessibility)
+if (NOT APPLE)
+    set_target_properties(TestXenonRuneAccessibility PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
 endif()

@@ -14,6 +14,7 @@
 #include <LibWebView/HistoryVisitTransition.h>
 #include <LibWebView/Menu.h>
 #include <LibWebView/Utilities.h>
+#include <Rune/Bridge/Accessibility.h>
 #include <Rune/Bridge/Application.h>
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/Input.h>
@@ -215,6 +216,7 @@ void View::install_callbacks()
     }));
 
     install_page_callbacks();
+    install_accessibility(*this);
 }
 
 void View::present_current_frame()

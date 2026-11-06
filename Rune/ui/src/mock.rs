@@ -17,6 +17,9 @@ use std::thread::JoinHandle;
 #[path = "mock_page.rs"]
 mod page;
 
+#[path = "mock_accessibility.rs"]
+pub(crate) mod accessibility;
+
 use crate::ffi::{
     XENON_CURSOR_DEFAULT, XENON_CURSOR_POINTER, XENON_MOUSE_BUTTON_MIDDLE,
     XENON_MOUSE_BUTTON_PRIMARY, XENON_MOUSE_EVENT_LEAVE, XENON_MOUSE_EVENT_MOVE,
@@ -662,6 +665,20 @@ impl MockEngine {
         self.favicon(view, &url);
         self.paint(view);
         page::navigated(view, &url);
+        if let Some(state) = self.views.get(&view) {
+            let scale = state.scale.max(1.0) as f32;
+            let link = &state.link;
+            accessibility::navigated(
+                view,
+                &title_for(&url),
+                [
+                    link.x / scale,
+                    link.y / scale,
+                    link.width / scale,
+                    link.height / scale,
+                ],
+            );
+        }
         if !url.contains(STILL_LOADING_MARKER) {
             self.loading(view, false);
         }

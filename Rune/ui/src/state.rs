@@ -12,6 +12,7 @@ use rune::{
     Drag, Ime, Key, KeyEvent, Modifier, Phase, Pixels, PointerButton, PointerEvent, Tx, WheelEvent,
 };
 
+use crate::accessibility::PageAccessibility;
 use crate::bridge::PageSurfaces;
 use crate::engine::{
     Action, ChromeLayout, Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -120,6 +121,7 @@ pub struct Browser {
     pub downloads_popover_open: bool,
     history_menu_direction: i32,
     pub shield_popover_open: bool,
+    pub accessibility: PageAccessibility,
 }
 
 impl Browser {
@@ -146,6 +148,7 @@ impl Browser {
             downloads_popover_open: false,
             history_menu_direction: -1,
             shield_popover_open: false,
+            accessibility: PageAccessibility::default(),
         }
     }
 

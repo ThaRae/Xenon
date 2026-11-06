@@ -8,6 +8,7 @@ mod downloads;
 mod icons;
 mod location;
 mod page;
+mod page_accessibility;
 mod page_overlays;
 pub mod palette;
 mod shield;

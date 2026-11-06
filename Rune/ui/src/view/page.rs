@@ -11,6 +11,7 @@ use crate::ffi;
 use crate::state::Browser;
 use crate::tab_list::Tab;
 use crate::view::icons;
+use crate::view::page_accessibility::page_accessibility_layer;
 use crate::view::page_overlays::page_overlays;
 use crate::view::palette::Palette;
 
@@ -45,18 +46,13 @@ pub fn page_area(s: &Browser, p: &Palette) -> El {
 
 fn page_surface(s: &Browser, tab: &Tab) -> El {
     let surface = el()
-        .key("page")
-        .role("document")
-        .label(tab.display_title())
-        .w_full()
-        .grow(1.0)
-        .min_h(0.0)
+        .key("page-surface")
+        .role("none")
+        .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .pixels_fit(&tab.page, SurfaceFit::Fill)
         .surface_anchor(Align::Start, Align::Start)
         .surface_unscaled(true)
         .cursor(cursor_for(tab.cursor))
-        .focusable(true)
-        .no_focus_ring()
         .pointer_buttons([
             PointerButton::Middle,
             PointerButton::Back,
@@ -78,16 +74,39 @@ fn page_surface(s: &Browser, tab: &Tab) -> El {
         })
         .on_wheel(|s: &mut Browser, wheel, tx| {
             s.page_wheel(wheel);
+            s.accessibility.page_input(s.tabs.active_view());
             tx.live_only();
             true
+        });
+    let page = el()
+        .key("page")
+        .role("document")
+        .label(tab.display_title())
+        .w_full()
+        .grow(1.0)
+        .min_h(0.0)
+        .focusable(true)
+        .no_focus_ring()
+        .on_key(|s: &mut Browser, event, tx| {
+            let handled = s.page_key(event, tx);
+            s.accessibility.page_input(s.tabs.active_view());
+            handled
         })
-        .on_key(|s: &mut Browser, event, tx| s.page_key(event, tx))
         .on_key_up(|s: &mut Browser, event, tx| s.page_key_up(event, tx));
-    if s.page_has_keyboard() {
-        surface.ime_cursor()
+    let page = if s.page_has_keyboard() {
+        page.ime_cursor()
     } else {
-        surface
-    }
+        page
+    };
+    let Some(tree) = s.accessibility.tree(tab.view) else {
+        return page.child(surface);
+    };
+    let page = match tree.focused_key() {
+        Some(key) => page.active_descendant(key),
+        None => page,
+    };
+    page.child(page_accessibility_layer(tab.view, tree))
+        .child(surface)
 }
 
 fn status_bubble(url: &str, p: &Palette) -> El {
@@ -214,6 +233,8 @@ fn crashed_notice(p: &Palette) -> El {
         );
     col()
         .key("crashed")
+        .role("alert")
+        .label("This tab crashed")
         .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .center()
         .gap(8.0)

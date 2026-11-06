@@ -121,7 +121,7 @@ from the UI thread without a deadlock. The Rust UI keeps a mirror and changes it
   own tab list in the mirror (`tab_list::Windows`), ready for a Rune window each.
 - Not yet: tab groups, split view, hibernation, window geometry in the session, the beforeunload checks a window close
   runs (`WindowCloseCoordinator`), the bookmarks bar, extension buttons, the updater, picture-in-picture, the task
-  manager and accessibility.
+  manager.
 
 ## The location bar
 
@@ -207,6 +207,72 @@ another tab shows.
 - Not yet: colour and date pickers, find's highlight-all option, filling the find bar from the selection, and a tooltip
   delay.
 
+## Page accessibility
+
+Pages reach screen readers (VoiceOver, and AT-SPI and UI Automation through the same code) through their own slice of
+the ABI in `Rune/Bridge/XenonBridgeAccessibility.h` (`XenonBridgeAccessibility.cpp`, hooked into each view by
+`install_accessibility` from `View.cpp`; `ffi_accessibility.rs`, `accessibility.rs` and `view/page_accessibility.rs` on
+the Rust side). The UI registers `XenonAccessibilityCallbacks` with `xenon_engine_set_accessibility_callbacks` before
+`xenon_engine_start`.
+
+- Nothing is built until an assistive technology runs, as in the Qt frontend: each `poll` (every two seconds at least)
+  asks whether one does and tells the engine with `xenon_engine_set_accessibility_enabled`. On Linux that's the
+  question Qt and Gecko ask of AT-SPI: whether the accessibility bus's `org.a11y.Status` reports `IsEnabled` or
+  `ScreenReaderEnabled` (`at_spi.rs`, reading both properties over the session bus with zbus, the D-Bus crate Rune's
+  AccessKit adapter already uses, on a thread of its own every two seconds, so the UI thread never waits on D-Bus).
+  On macOS it's `xenon_accessibility_assistive_technology_running()` (VoiceOver or Switch Control); Windows can't tell
+  yet. `XENON_ACCESSIBILITY=1` turns it on regardless, for headless runs. Turning it off drops every tree.
+- While enabled, the engine asks each view's WebContent for its tree (`ViewImplementation::request_accessibility_tree`),
+  again when a page finishes loading and when the zoom changes. WebContent then pushes a new tree itself after DOM
+  mutations, focus changes and actions (200 ms apart at most). A page's scrolling isn't a mutation, so the UI calls
+  `xenon_engine_request_accessibility_tree` after each wheel or key it gives the page, and the engine coalesces those
+  into one request 150 ms later.
+- `tree_changed` carries the whole tree as `XenonAccessibilityNode`s (LibWebView's `AccessibilityNodeData`: role, name,
+  description, value, live region, key binding, bounds in CSS pixels from the viewport's top-left, flags for focused,
+  disabled, selected, editable, multi-line, password, read-only, required, invalid, checked/pressed and expanded states,
+  heading or outline level, numeric value and range, caret and selection) plus the root, the focused node and the
+  zoom. `focus_changed` reports focus moves as WebContent sends them.
+- Rune builds the OS accessibility tree only from its own elements, and has no way to host a foreign subtree. So the UI
+  mirrors the page's tree as invisible elements: `page_accessibility_layer` makes one element per node, keyed `ax<id>`,
+  with the node's role (LibWebView's ARIA role names map onto Rune's, `text leaf` onto `text`, anything Rune doesn't
+  know onto `group`), name, description, value, states and level, pinned at the node's bounds times the zoom, so their
+  boxes are the page's in window points. Unnamed `generic` nodes that aren't live regions, blank text and `none` are
+  left out and their children join their parent, as the Qt bridges do. Paragraphs stay, named or not, for the reason the Qt AT-SPI bridge
+  keeps them: Orca reads a paragraph as one text block in Say All. The layer sits under the page's `document` element (`page`),
+  behind the surface that draws the page (`page-surface`), and clips to it, so pointer input still reaches the page.
+  It's built inside a `memo`, again only when a tree or a field changes.
+- Actions go through the handlers Rune runs for an assistive client: a press (VoiceOver's VO-Space) on a button, link,
+  checkbox, radio, switch, tab, menu item, option, tree item, combobox or anything expandable sends
+  `XENON_ACCESSIBILITY_ACTION_PRESS` (`press`). Text fields are mirrored as transparent Rune `text_input`s, since only
+  Rune's editors are text fields to the OS: they get the text field role, the field's value, caret and selection, and
+  setting the value (VoiceOver, Voice Control, dictation) edits the hidden field, which the UI sends on with
+  `xenon_engine_accessibility_set_value` (WebContent's `insert_text` over the whole value, so the page sees an `input`
+  event). Focusing or pressing one sends `XENON_ACCESSIBILITY_ACTION_FOCUS` and gives the page the keyboard. Keys still
+  go to the page, since the page element's `on_key` hears them first.
+- The page's focus reaches the reader as the page element's active descendant (`El::active_descendant`), which
+  AccessKit reports as the focused element while the page has the keyboard. A focus left on a hidden field when the page
+  moves its focus elsewhere is handed back to the page element: the field's key changes (`ax<id>.<n>`) and its
+  `focus_return("page")` moves Rune's focus there.
+- Live regions are mirrored as `El::live_region`, so AccessKit announces their changes.
+- WebContent puts a `<details>` element's open state on the details node (a `group`), where readers expect it on the
+  `<summary>` button that toggles it. `PageTree::apply` hands it over: a `group` with an expanded state whose first
+  child is a `button` loses the state, and the button gets it, so pressing, expanding or collapsing the summary is one
+  `press` on it.
+- `xenon-rune` with `XENON_ACCESSIBILITY=1` and Rune's `--tree` shows the mirror on a real page without a desktop
+  session: every page node appears under the `page` document with its role, name, value, states and bounds, the
+  summary's state flips when it's clicked, and the page's `activeDescendant` follows Tab.
+- The mock engine (`mock_accessibility.rs`) answers with a small tree (a heading, the page's link, text inside an
+  unnamed box, a search field, a checkbox and a button) and prints each action it gets (`mock accessibility: ...`).
+- `TestXenonRuneAccessibility` drives the ABI alone: it enables accessibility, checks a page's roles, names, values,
+  states and bounds, focuses a field, sets its value (the page's `input` handler sees it), presses a button and checks a
+  navigation brings a new tree. The `page_accessibility` unit tests render the mirror in a Rune `Runtime` and check its
+  accessibility tree and actions.
+- Not yet: incrementing sliders and spin buttons (the engine has no such action), scroll into view (Rune only scrolls
+  its own scroll views for it), links' URLs and tables' row and column counts (Rune elements have neither), text markers
+  and per-character geometry for reading by line or word (the Qt macOS bridge's `AXTextMarker`s), a selection a reader
+  sets in a field (it moves the hidden field's selection but not the page's), and telling whether an assistive
+  technology runs on Windows.
+
 ## Where Rune falls short
 
 - Rune has no secondary-button press: `on_secondary_press_local` fires on release, so a right click reaches the page as
@@ -214,6 +280,12 @@ another tab shows.
 - Primary, middle, back and forward presses come from `on_drag`, so there is no triple click.
 - Rune has no wait, progress, help, diagonal resize or zoom cursors; those show the default cursor.
 - Input methods show no composition yet, and the candidate window sits at the page's corner rather than at the caret.
+- Accessibility: Rune can't host an external accessibility subtree (`Runtime::a11y_walk` builds AccessKit nodes only from
+  elements, and the AccessKit adapter is private), has no programmatic focus for elements other than text fields and no
+  focus-change callback, routes a reader's actions only to element handlers (`on_press`, `on_step`, a text field's
+  editor, its own scroll views), and has no public way to tell whether an assistive client is listening. Hence the
+  mirror of invisible elements, the active descendant for the page's focus, hidden text fields for values, and the
+  platform checks (AT-SPI's status on Linux, VoiceOver on macOS).
 
 ## Building
 
@@ -226,7 +298,8 @@ stops without it.
 
 `TestXenonRuneBridge` drives the engine through the C ABI alone, with no Rust: it loads a page and checks the colour of
 the frame the UI would get. `TestXenonRunePage` does the same for the page ABI: it answers a confirm and a prompt,
-picks a `<select>` option, opens a context menu and counts find matches. Both are part of `xenon-tests`.
+picks a `<select>` option, opens a context menu and counts find matches. `TestXenonRuneAccessibility` does it for the
+accessibility ABI. All three are part of `xenon-tests`.
 
 The UI also builds on its own, against a mock engine on a thread of its own, for Rune's headless tools:
 

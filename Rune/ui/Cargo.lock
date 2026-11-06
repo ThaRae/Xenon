@@ -4077,6 +4077,8 @@ name = "xenon_ui"
 version = "0.0.0"
 dependencies = [
  "rune",
+ "serde_json",
+ "zbus 5.19.0",
 ]
 
 [[package]]

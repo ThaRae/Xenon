@@ -4,12 +4,17 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+mod accessibility;
 mod app_menu;
+#[cfg(all(target_os = "linux", not(feature = "mock-engine")))]
+mod at_spi;
 mod bridge;
 mod chrome_menu;
 mod engine;
 #[allow(dead_code)]
 mod ffi;
+#[allow(dead_code)]
+mod ffi_accessibility;
 #[allow(dead_code)]
 mod ffi_location;
 #[allow(dead_code)]
@@ -79,6 +84,7 @@ fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int
     let callbacks = ui.callbacks();
     engine::Engine.set_window_viewport(None, state::PageGeometry::default().viewport());
     let _page_context = page_bridge::install(app.handle());
+    let _accessibility_context = accessibility::install(app.handle());
     let location_context = ffi_location::LocationContext::new(app.handle());
     location_context.register();
     if !unsafe { ffi::xenon_engine_start(&callbacks, argc, argv) } {
@@ -104,7 +110,9 @@ fn detached_browser() -> Browser {
 }
 
 fn poll(browser: &mut Browser, _: f64, tx: &mut Tx) -> bool {
-    browser.track_location_focus() | page_prompts::poll(browser, tx)
+    browser.track_location_focus()
+        | page_prompts::poll(browser, tx)
+        | accessibility::poll(browser, tx)
 }
 
 fn window_key(browser: &mut Browser, event: &KeyEvent, tx: &mut Tx) -> bool {
