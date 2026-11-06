@@ -14,13 +14,18 @@ mod engine;
 #[allow(dead_code)]
 mod ffi;
 #[allow(dead_code)]
+<<<<<<< HEAD
 mod ffi_accessibility;
+=======
+mod ffi_hibernation;
+>>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
 #[allow(dead_code)]
 mod ffi_location;
 #[allow(dead_code)]
 mod ffi_page;
 mod ffi_tab_groups;
 mod frame;
+mod hibernation;
 mod keys;
 mod location;
 #[cfg(feature = "mock-engine")]
@@ -87,8 +92,12 @@ fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int
     let callbacks = ui.callbacks();
     engine::Engine.set_window_viewport(None, state::PageGeometry::default().viewport());
     let _page_context = page_bridge::install(app.handle());
+<<<<<<< HEAD
     let _accessibility_context = accessibility::install(app.handle());
     let _tab_group_context = tab_group_bridge::install(app.handle());
+=======
+    let _hibernation_context = hibernation::install(app.handle());
+>>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
     let location_context = ffi_location::LocationContext::new(app.handle());
     location_context.register();
     if !unsafe { ffi::xenon_engine_start(&callbacks, argc, argv) } {

@@ -119,7 +119,7 @@ from the UI thread without a deadlock. The Rust UI keeps a mirror and changes it
 - One Rune window per process for now: Rune adds windows only before `App::run`, so the single window shows the model's
   active window and switches when another is activated, and the others wait behind it. Each model window already has its
   own tab list in the mirror (`tab_list::Windows`), ready for a Rune window each.
-- Not yet: split view, hibernation, window geometry in the session, the beforeunload checks a window close
+- Not yet: split view, window geometry in the session, the beforeunload checks a window close
   runs (`WindowCloseCoordinator`), the bookmarks bar, extension buttons, the updater, picture-in-picture, the task
   manager.
 
@@ -177,6 +177,36 @@ and `tab_groups.rs` on the Rust side, `view/tab_groups.rs` for the chips, header
 - The chip's tooltip is Qt's `tab_group_tooltip` ("Work (3 tabs)"), through `El::help`.
 - Not yet: Qt's animated drop preview (tabs move as the drag passes
   them, as before), and dragging a group between windows.
+## Tab hibernation
+
+Hibernation has its own slice of the ABI, `Rune/Bridge/XenonBridgeHibernation.h` (`TabHibernation.cpp`,
+`XenonBridgeHibernation.cpp`; `ffi_hibernation.rs` and `hibernation.rs`). The UI registers its callbacks with
+`xenon_engine_set_hibernation_callbacks` before `xenon_engine_start`.
+
+- `Xenon::TabHibernation` is a Qt-free port of `UI/TabHibernation.cpp`, owned by the engine. Its timer checks every tab
+  (a quarter of the timeout, between 1 and 30 seconds, at most 5 seconds when **Hibernate on memory pressure** is on)
+  and hibernates a background tab once it has gone unused for `XenonSettings::tab_hibernation_timeout`, and, under
+  memory pressure (`UI/MemoryPressure.cpp`), the least recently used tabs: one at the low level, all of them at the
+  critical one. On Linux the level comes from `/proc/meminfo` (MemAvailable against MemTotal) and the `some avg10` line
+  of `/proc/pressure/memory`; on macOS from the VM statistics. `XENON_TEST_MEMINFO` names a file to read in place of
+  `/proc/meminfo` (and skips the pressure stall line). `MemoryPressureRelease` asks WebContent to drop what it doesn't
+  use, as in Qt. Settings changed anywhere, about:settings included, apply at once through `XenonSettings::Observer`.
+- A tab may hibernate under Qt's rules: it is loaded, not any window's active tab (Qt also spares a tab shown in split
+  view, which Rune doesn't have yet), not pinned or loading, not playing audio and hasn't for a minute, has no developer
+  tools or picture-in-picture window, and has no dialog, picker, permission prompt, pending close or page fullscreen
+  open (`View::can_hibernate`). The engine asks the page with `prepare_for_discard`, keeps the tab if it has unsubmitted
+  input, and checks the rules again before it hibernates.
+- Hibernating is `BrowserModel::hibernate_tab`: the tab becomes deferred again, with the view's session history as its
+  pending history, and the engine closes its view. Selecting the tab creates a new view with the same id, which
+  restores that history, as a tab restored from the session loads when first selected.
+- The engine tells the UI each tab's load state with `tab_load_state_changed`: not loaded (a deferred tab from the
+  session), hibernated (with the favicon in greyscale, `hibernated_tab_icon`) or loaded again. The UI swaps the tab's
+  favicon for the grey one until the tab loads, and the hover card shows no thumbnail for a tab that isn't loaded and
+  says "Hibernated, using no memory (freed …)" or "Not loaded yet, using no memory", as `UI/TabMemory.cpp` does.
+- The tab menu's **Hibernate Tab** is enabled by what the UI knows (not the active tab, not pinned, loading or playing
+  audio, loaded, no dialog or permission prompt); the engine checks the rest before it acts. The window menu's **Tab
+  Hibernation** submenu offers Off and the timeout choices, with the current timeout as a disabled item of its own when
+  it isn't one of them (`settings_changed` carries the choices).
 
 ## The location bar
 

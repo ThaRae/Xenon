@@ -7,6 +7,7 @@
 use rune::{PointerPress, PopupItem, PopupMenu, Tx};
 
 use crate::engine::{ChromeLayout, ViewId};
+use crate::hibernation;
 use crate::state::Browser;
 
 const LAYOUTS: [(ChromeLayout, &str, &str); 3] = [
@@ -36,6 +37,10 @@ pub fn show_window_menu(s: &Browser, at: PointerPress, tx: &mut Tx) {
         .item(
             PopupItem::new("cycle-recently-used", "Cycle Tabs in Recently Used Order")
                 .checked(s.chrome.cycle_tabs_in_recently_used_order),
+        )
+        .submenu(
+            "Tab Hibernation",
+            hibernation::settings_menu(&s.hibernation.settings),
         );
     tx.popup_menu(
         menu,
@@ -57,6 +62,8 @@ fn run_window_menu_item(s: &mut Browser, picked: &str, tx: &mut Tx) {
         _ => {
             if let Some((layout, _, _)) = LAYOUTS.iter().find(|(_, id, _)| *id == picked) {
                 s.set_chrome_layout(*layout);
+            } else {
+                hibernation::run_settings_menu_item(picked);
             }
         }
     }
@@ -126,7 +133,8 @@ pub fn show_tab_menu(s: &Browser, view: ViewId, at: PointerPress, tx: &mut Tx) {
         .item(PopupItem::new(
             "pin",
             if pinned { "Unpin Tab" } else { "Pin Tab" },
-        ));
+        ))
+        .item(hibernation::hibernate_item(s, view));
     let menu = crate::tab_groups::with_tab_menu_items(s, view, menu)
         .separator()
         .submenu("Move Tab", move_menu)
@@ -152,6 +160,7 @@ fn run_tab_menu_item(s: &mut Browser, view: ViewId, picked: &str, tx: &mut Tx) {
         "reload" => s.reload_tab(view),
         "duplicate" => s.duplicate_tab(view),
         "pin" => s.toggle_tab_pinned(view),
+        hibernation::HIBERNATE_TAB_ITEM => hibernation::hibernate_tab(s, view),
         "move-start" => s.move_tab(view, 0),
         "move-end" => s.move_tab_to_end(view),
         "close" => s.close_tab(view, tx),

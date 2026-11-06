@@ -17,10 +17,15 @@ use std::thread::JoinHandle;
 #[path = "mock_page.rs"]
 mod page;
 
+<<<<<<< HEAD
 #[path = "mock_accessibility.rs"]
 pub(crate) mod accessibility;
 #[path = "mock_tab_groups.rs"]
 mod tab_groups;
+=======
+#[path = "mock_hibernation.rs"]
+mod hibernation;
+>>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
 
 use crate::ffi::{
     XENON_CURSOR_DEFAULT, XENON_CURSOR_POINTER, XENON_MOUSE_BUTTON_MIDDLE,

@@ -45,6 +45,7 @@ public:
         URL::URL initial_url;
         bool deferred { false };
         bool restored_from_session { false };
+        bool hibernated { false };
         Optional<WebView::SessionHistorySnapshot> pending_history;
         Optional<TabGroupId> group;
 
@@ -80,6 +81,7 @@ public:
         virtual void tab_pinned_changed(Tab const&) { }
         virtual void closed_tabs_changed(bool) { }
         virtual void session_metadata_changed() { }
+        virtual void tab_hibernated(Tab const&) { }
     };
 
     struct NewTab {
@@ -125,6 +127,7 @@ public:
     void end_recent_tab_cycle(WindowId);
 
     void mark_tab_loaded(ViewId);
+    bool hibernate_tab(ViewId, URL::URL, WebView::SessionHistorySnapshot);
     Optional<WebView::SessionHistorySnapshot> take_history_for_load(ViewId);
     void application_quitting();
 

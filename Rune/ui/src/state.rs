@@ -121,8 +121,12 @@ pub struct Browser {
     pub downloads_popover_open: bool,
     history_menu_direction: i32,
     pub shield_popover_open: bool,
+<<<<<<< HEAD
     pub accessibility: PageAccessibility,
     pub tab_groups: crate::tab_groups::TabGroups,
+=======
+    pub hibernation: crate::hibernation::TabHibernation,
+>>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
 }
 
 impl Browser {
@@ -149,8 +153,12 @@ impl Browser {
             downloads_popover_open: false,
             history_menu_direction: -1,
             shield_popover_open: false,
+<<<<<<< HEAD
             accessibility: PageAccessibility::default(),
             tab_groups: crate::tab_groups::TabGroups::default(),
+=======
+            hibernation: Default::default(),
+>>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
         }
     }
 

@@ -68,6 +68,14 @@ public:
     void answer_permission(XenonPromptId, u32 outcome);
     void request_close_with_prompt();
 
+    struct Favicon {
+        u32 width { 0 };
+        u32 height { 0 };
+        Vector<u8> rgba;
+    };
+    Optional<Favicon> const& favicon() const { return m_favicon; }
+    bool can_hibernate() const;
+
     virtual Web::DevicePixelSize viewport_size() const override { return m_viewport_size; }
     virtual Gfx::IntPoint to_content_position(Gfx::IntPoint widget_position) const override { return widget_position; }
     virtual Gfx::IntPoint to_widget_position(Gfx::IntPoint content_position) const override { return content_position; }
@@ -141,6 +149,7 @@ private:
     XenonPromptId m_file_picker_id { 0 };
     Vector<PendingPermission> m_pending_permissions;
     bool m_fullscreen_requested { false };
+    Optional<Favicon> m_favicon;
 };
 
 }

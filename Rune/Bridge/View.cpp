@@ -123,6 +123,7 @@ void View::install_callbacks()
 
     on_favicon_change = [this, &engine](Optional<Gfx::Bitmap const&> favicon) {
         if (!favicon.has_value()) {
+            m_favicon.clear();
             engine.notify(&XenonUiCallbacks::view_favicon_changed, m_id, 0u, 0u, static_cast<u8 const*>(nullptr));
             return;
         }
@@ -147,6 +148,7 @@ void View::install_callbacks()
             }
         }
         engine.notify(&XenonUiCallbacks::view_favicon_changed, m_id, static_cast<u32>(bitmap.width()), static_cast<u32>(bitmap.height()), static_cast<u8 const*>(rgba.data()));
+        m_favicon = Favicon { .width = static_cast<u32>(bitmap.width()), .height = static_cast<u32>(bitmap.height()), .rgba = move(rgba) };
     };
 
     on_cursor_change = [this, &engine](Gfx::Cursor const& cursor) {
@@ -1125,6 +1127,15 @@ void View::request_close_with_prompt()
     m_suppress_dialogs_until_navigation = true;
     dismiss_page_dialog();
     request_close();
+}
+
+bool View::can_hibernate() const
+{
+    if (handle().is_empty() || !page().is_open())
+        return false;
+    if (m_page_dialog != PageDialog::None || m_select_dropdown_id != 0 || m_file_picker_id != 0)
+        return false;
+    return m_pending_permissions.is_empty() && !m_close_requested && !m_fullscreen_requested;
 }
 
 }

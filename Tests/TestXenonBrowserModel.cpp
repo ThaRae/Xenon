@@ -34,6 +34,7 @@ struct Recorder final : public BrowserModel::Observer {
     virtual void tab_moved(BrowserModel::Tab const& tab, WindowId from, size_t index) override { events.append(ByteString::formatted("tab_moved {} {} {} {}", tab.view, from, tab.window, index)); }
     virtual void tab_activated(BrowserModel::Window const& window, BrowserModel::Tab const& tab, Optional<ViewId>) override { events.append(ByteString::formatted("tab_activated {} {}", window.id, tab.view)); }
     virtual void tab_pinned_changed(BrowserModel::Tab const& tab) override { events.append(ByteString::formatted("tab_pinned_changed {} {}", tab.view, tab.pinned)); }
+    virtual void tab_hibernated(BrowserModel::Tab const& tab) override { events.append(ByteString::formatted("tab_hibernated {}", tab.view)); }
 };
 
 struct Fixture {
@@ -253,6 +254,42 @@ TEST_CASE(a_restored_window_loads_only_its_active_and_pinned_tabs)
 
     fixture.model.mark_tab_loaded(tabs[1]);
     EXPECT(!fixture.model.tab(tabs[1])->deferred);
+}
+
+TEST_CASE(a_hibernated_tab_keeps_its_history_until_it_loads_again)
+{
+    Fixture fixture;
+    auto window = fixture.model.open_window(WebView::IsPrivate::No);
+    auto active = fixture.open(window);
+    auto background = fixture.open(window);
+    auto session_tab_id = fixture.model.tab(background)->session_tab_id;
+
+    WebView::SessionHistorySnapshot history;
+    history.used_steps = { 0, 1 };
+    history.current_used_step_index = 1;
+    auto later_url = URL::Parser::basic_parse("https://example.com/later"sv).value();
+
+    EXPECT(!fixture.model.hibernate_tab(active, later_url, history));
+    EXPECT(!fixture.model.tab(active)->deferred);
+
+    fixture.recorder.events.clear();
+    EXPECT(fixture.model.hibernate_tab(background, later_url, history));
+    EXPECT_EQ(fixture.recorder.events, (Vector<ByteString> { ByteString::formatted("tab_hibernated {}", background) }));
+    auto const* hibernated = fixture.model.tab(background);
+    EXPECT(hibernated->deferred);
+    EXPECT(hibernated->hibernated);
+    EXPECT_EQ(hibernated->initial_url, later_url);
+    EXPECT_EQ(hibernated->session_tab_id, session_tab_id);
+    EXPECT(!fixture.model.hibernate_tab(background, later_url, history));
+
+    fixture.model.mark_tab_loaded(background);
+    EXPECT(!hibernated->deferred);
+    EXPECT(!hibernated->hibernated);
+    auto restored = fixture.model.take_history_for_load(background);
+    EXPECT(restored.has_value());
+    EXPECT_EQ(restored->used_steps, (Vector<i32> { 0, 1 }));
+    EXPECT_EQ(restored->current_used_step_index, 1u);
+    EXPECT(!fixture.model.take_history_for_load(background).has_value());
 }
 
 TEST_CASE(recent_order_cycles_back_through_the_last_used_tabs)

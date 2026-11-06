@@ -570,8 +570,29 @@ void BrowserModel::end_recent_tab_cycle(WindowId id)
 
 void BrowserModel::mark_tab_loaded(ViewId view)
 {
-    if (auto* tab = find_tab(view))
+    if (auto* tab = find_tab(view)) {
         tab->deferred = false;
+        tab->hibernated = false;
+    }
+}
+
+bool BrowserModel::hibernate_tab(ViewId view, URL::URL url, WebView::SessionHistorySnapshot history)
+{
+    auto* tab = find_tab(view);
+    if (!tab || tab->deferred)
+        return false;
+    auto const* owner = window(tab->window);
+    if (!owner || owner->active_tab == view)
+        return false;
+
+    tab->deferred = true;
+    tab->hibernated = true;
+    tab->restored_from_session = false;
+    if (!url.scheme().is_empty())
+        tab->initial_url = move(url);
+    tab->pending_history = move(history);
+    m_observer.tab_hibernated(*tab);
+    return true;
 }
 
 Optional<WebView::SessionHistorySnapshot> BrowserModel::take_history_for_load(ViewId view)

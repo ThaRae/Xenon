@@ -12,13 +12,14 @@
 #include <LibURL/InternalURLs.h>
 #include <LibWebCommon/WebView/Utilities.h>
 #include <LibWebView/BrowserProcess.h>
-#include <LibWebView/DownloadPresentation.h>
 #include <LibWebView/BrowsingSession.h>
+#include <LibWebView/DownloadPresentation.h>
 #include <LibWebView/HistoryStore.h>
 #include <LibWebView/PlatformColors.h>
 #include <Rune/Bridge/Application.h>
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/TabGroupHooks.h>
+#include <Rune/Bridge/TabHibernation.h>
 #include <Rune/Bridge/TabMemory.h>
 #include <Rune/Bridge/View.h>
 #include <UI/FilterLists.h>
@@ -182,6 +183,8 @@ int Engine::run_application()
 
     create_model();
     Ladybird::MemoryPressureRelease::start();
+    m_tab_hibernation = make<TabHibernation>();
+    m_tab_hibernation->start();
 
     m_settings_observer = make<SettingsObserver>();
     m_downloads_observer = make<DownloadsObserver>();
@@ -194,6 +197,7 @@ int Engine::run_application()
     auto result = application->execute();
 
     stop_accepting_commands();
+    m_tab_hibernation = nullptr;
     m_settings_observer = nullptr;
     m_downloads_observer = nullptr;
     m_focused_view.clear();
@@ -418,10 +422,13 @@ View& Engine::create_view_for_tab(BrowserModel::Tab const& tab, Web::HTML::Visib
     m_views.set(tab.view, move(created));
     if (tab.session_tab_id.has_value())
         view.set_session_tab_id(*tab.session_tab_id);
+    auto was_unloaded = tab.deferred;
     m_model->mark_tab_loaded(tab.view);
 
     if (!traversable.has_value())
         load_tab(view, tab);
+    if (was_unloaded && m_tab_hibernation)
+        m_tab_hibernation->tab_loaded(tab.view);
     return view;
 }
 
@@ -495,8 +502,11 @@ void Engine::window_opened(BrowserModel::Window const& window)
 
 void Engine::window_closed(BrowserModel::Window const& window)
 {
-    for (auto view : window.tabs)
+    for (auto view : window.tabs) {
         close_view(view);
+        if (m_tab_hibernation)
+            m_tab_hibernation->tab_removed(view);
+    }
     m_window_viewports.remove(window.id);
     notify(&XenonUiCallbacks::window_closed, window.id);
 
@@ -522,11 +532,15 @@ void Engine::tab_inserted(BrowserModel::Window const& window, BrowserModel::Tab 
     notify_tab_inserted(window, tab, index);
     if (!tab.deferred)
         create_view_for_tab(tab, Web::HTML::VisibilityState::Hidden);
+    else if (m_tab_hibernation)
+        m_tab_hibernation->tab_inserted_unloaded(tab.view);
 }
 
 void Engine::tab_removed(BrowserModel::Window const& window, BrowserModel::Tab const& tab)
 {
     close_view(tab.view);
+    if (m_tab_hibernation)
+        m_tab_hibernation->tab_removed(tab.view);
     notify(&XenonUiCallbacks::tab_removed, window.id, tab.view);
 }
 
@@ -544,6 +558,8 @@ void Engine::tab_activated(BrowserModel::Window const& window, BrowserModel::Tab
     ensure_view_for_tab(tab);
     if (auto* activated = view(tab.view))
         activated->set_visible(true);
+    if (m_tab_hibernation)
+        m_tab_hibernation->tab_activated(previous, tab.view);
     notify(&XenonUiCallbacks::tab_activated, window.id, tab.view);
 }
 
@@ -560,6 +576,11 @@ void Engine::closed_tabs_changed(bool can_reopen)
 void Engine::session_metadata_changed()
 {
     save_session_soon();
+}
+
+void Engine::tab_hibernated(BrowserModel::Tab const& tab)
+{
+    close_view(tab.view);
 }
 
 void Engine::open_url_in_new_window(URL::URL const& url, WebView::IsPrivate is_private)
@@ -688,8 +709,7 @@ void Engine::report_tab_memory(XenonViewId id)
     auto const* tab = m_model ? m_model->tab(id) : nullptr;
     if (!tab)
         return;
-    auto* tab_view = tab->deferred ? nullptr : view(id);
-    auto description = TabMemory::description(tab_view);
+    auto description = tab->deferred && m_tab_hibernation ? m_tab_hibernation->unloaded_tab_description(id) : TabMemory::description(view(id));
     notify(&XenonUiCallbacks::tab_memory, id, xenon_str(description));
 }
 

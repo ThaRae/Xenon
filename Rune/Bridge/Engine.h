@@ -34,6 +34,7 @@
 
 namespace Xenon {
 
+class TabHibernation;
 class View;
 
 class Engine final : public BrowserModel::Observer {
@@ -61,6 +62,7 @@ public:
     void set_system_dark(bool);
 
     BrowserModel* model() { return m_model.ptr(); }
+    TabHibernation* tab_hibernation() { return m_tab_hibernation.ptr(); }
 
     View* view(XenonViewId);
     View& open_view(XenonViewId opener, Web::HTML::ActivateTab, Optional<WebView::CanonicalTraversable&> = {});
@@ -123,6 +125,7 @@ private:
     virtual void tab_pinned_changed(BrowserModel::Tab const&) override;
     virtual void closed_tabs_changed(bool) override;
     virtual void session_metadata_changed() override;
+    virtual void tab_hibernated(BrowserModel::Tab const&) override;
 
     enum class State : u8 {
         Idle,
@@ -170,6 +173,7 @@ private:
     Core::AnonymousBuffer m_theme;
     bool m_system_dark { false };
     OwnPtr<BrowserModel> m_model;
+    OwnPtr<TabHibernation> m_tab_hibernation;
     HashMap<XenonViewId, NonnullOwnPtr<View>> m_views;
     Optional<XenonViewId> m_focused_view;
     HashMap<XenonWindowId, Viewport> m_window_viewports;

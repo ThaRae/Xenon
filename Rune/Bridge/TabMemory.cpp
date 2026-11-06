@@ -23,11 +23,6 @@ namespace Xenon::TabMemory {
 
 static constexpr auto USAGE_LIFETIME = AK::Duration::from_seconds(1);
 
-struct Usage {
-    u64 bytes { 0 };
-    bool is_estimate { false };
-};
-
 struct SampledUsage {
     u64 view_id { 0 };
     MonotonicTime sampled_at;
@@ -86,8 +81,9 @@ static HashMap<pid_t, HashTable<u64>> tabs_by_process()
     return tabs;
 }
 
-static Usage usage(u64 view_id)
+Usage usage(WebView::ViewImplementation const& view)
 {
+    auto view_id = view.view_id();
     auto now = MonotonicTime::now();
     if (s_last_usage.has_value() && s_last_usage->view_id == view_id && now - s_last_usage->sampled_at < USAGE_LIFETIME)
         return s_last_usage->usage;
@@ -114,10 +110,17 @@ ByteString description(WebView::ViewImplementation const* view)
     if (!view)
         return "Not loaded yet, using no memory"sv;
 
-    auto tab_usage = usage(view->view_id());
+    auto tab_usage = usage(*view);
     if (tab_usage.bytes == 0)
         return {};
     return ByteString::formatted("Memory usage: {}{}", tab_usage.is_estimate ? "about "sv : ""sv, WebView::format_performance_bytes(tab_usage.bytes));
+}
+
+ByteString hibernated_description(Optional<u64> memory_freed)
+{
+    if (memory_freed.has_value())
+        return ByteString::formatted("Hibernated, using no memory (freed {})", WebView::format_performance_bytes(*memory_freed));
+    return "Hibernated, using no memory"sv;
 }
 
 }

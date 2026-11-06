@@ -357,7 +357,8 @@ pub fn hover_card(s: &Browser, p: &Palette, vertical: bool) -> Option<El> {
     let tab = s.tabs.get(card.view)?;
     let active = s.tabs.is_active(card.view);
     let (frame_width, frame_height) = tab.page.size();
-    let thumbnail = (!active && frame_width > 0 && frame_height > 0).then(|| {
+    let loaded = s.hibernation.is_loaded(card.view);
+    let thumbnail = (!active && loaded && frame_width > 0 && frame_height > 0).then(|| {
         el().key("thumbnail")
             .w_full()
             .h(HOVER_CARD_THUMBNAIL_HEIGHT)

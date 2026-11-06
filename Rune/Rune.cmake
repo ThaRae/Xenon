@@ -107,6 +107,11 @@ add_dependencies(xenon-tests TestXenonBrowserModel)
 
 target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgeLocation.cpp")
 
+target_sources(xenon-rune-bridge PRIVATE
+    "${XENON_RUNE_DIR}/Bridge/TabHibernation.cpp"
+    "${XENON_RUNE_DIR}/Bridge/XenonBridgeHibernation.cpp"
+)
+
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonRunePage.cpp" Xenon NAME TestXenonRunePage LIBS xenon-rune-bridge)
 if (TARGET ladybird-helper-processes)
     add_dependencies(TestXenonRunePage ladybird-helper-processes)
