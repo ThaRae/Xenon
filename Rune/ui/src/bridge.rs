@@ -105,6 +105,9 @@ impl UiContext {
             view_zoom_changed: Some(view_zoom_changed),
             view_bookmarked_changed: Some(view_bookmarked_changed),
             downloads_changed: Some(downloads_changed),
+            view_audio_changed: Some(view_audio_changed),
+            view_unresponsive_changed: Some(view_unresponsive_changed),
+            history_menu: Some(history_menu),
         }
     }
 }
@@ -357,6 +360,41 @@ unsafe extern "C" fn downloads_changed(
     unsafe { ui(context) }
         .handle
         .update(move |browser, _| browser.downloads_changed(downloads));
+}
+
+unsafe extern "C" fn view_audio_changed(
+    context: *mut c_void,
+    view: ViewId,
+    playing_audio: bool,
+    muted: bool,
+) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.audio_changed(view, playing_audio, muted));
+}
+
+unsafe extern "C" fn view_unresponsive_changed(
+    context: *mut c_void,
+    view: ViewId,
+    unresponsive: bool,
+) {
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.unresponsive_changed(view, unresponsive));
+}
+
+unsafe extern "C" fn history_menu(
+    context: *mut c_void,
+    view: ViewId,
+    menu: *const crate::ffi_page::XenonMenu,
+) {
+    let Some(menu) = (unsafe { menu.as_ref() }) else {
+        return;
+    };
+    let entries = crate::page_prompts::menu_entries(&crate::page_bridge::raw_menu_items(menu));
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, tx| browser.show_history_menu(view, entries, tx));
 }
 
 unsafe extern "C" fn view_zoom_changed(context: *mut c_void, view: ViewId, percent: u32) {

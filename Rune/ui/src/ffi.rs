@@ -224,6 +224,23 @@ pub struct XenonUiCallbacks {
     pub downloads_changed: Option<
         unsafe extern "C" fn(context: *mut c_void, downloads: *const XenonDownload, count: usize),
     >,
+    pub view_audio_changed: Option<
+        unsafe extern "C" fn(
+            context: *mut c_void,
+            view: XenonViewId,
+            playing_audio: bool,
+            muted: bool,
+        ),
+    >,
+    pub view_unresponsive_changed:
+        Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, unresponsive: bool)>,
+    pub history_menu: Option<
+        unsafe extern "C" fn(
+            context: *mut c_void,
+            view: XenonViewId,
+            menu: *const crate::ffi_page::XenonMenu,
+        ),
+    >,
 }
 
 #[repr(C)]
@@ -269,6 +286,10 @@ unsafe extern "C" {
     pub fn xenon_engine_request_app_menu(which: u32);
     pub fn xenon_engine_activate_app_menu_item(menu: u64, item: u32);
     pub fn xenon_engine_download_action(download: u64, action: u32);
+    pub fn xenon_engine_toggle_mute(view: XenonViewId);
+    pub fn xenon_engine_answer_unresponsive_page(view: XenonViewId, keep_waiting: bool);
+    pub fn xenon_engine_request_history_menu(view: XenonViewId, direction: i32);
+    pub fn xenon_engine_traverse_history_to_step(view: XenonViewId, step: i32);
     pub fn xenon_engine_new_window(is_private: bool) -> XenonWindowId;
     pub fn xenon_engine_activate_window(window: XenonWindowId);
     pub fn xenon_engine_close_window(window: XenonWindowId);

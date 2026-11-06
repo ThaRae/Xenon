@@ -142,6 +142,17 @@ Optional<WebView::ViewImplementation&> Application::active_web_view() const
     return {};
 }
 
+void Application::open_url_in_new_window(URL::URL const& url, WebView::IsPrivate is_private)
+{
+    Engine::the().open_url_in_new_window(url, is_private);
+}
+
+// FIXME: Carry the navigation's method, body and referrer into the new window, as open_navigation_in_new_tab does.
+void Application::open_navigation_in_new_window(Web::HTML::PreparedNavigationDescriptor navigation, WebView::IsPrivate is_private)
+{
+    Engine::the().open_url_in_new_window(navigation.url, is_private);
+}
+
 void Application::open_download(WebView::FileDownloader::Download const& download) const
 {
     auto path = download_file_path_for_frontend_action(download);

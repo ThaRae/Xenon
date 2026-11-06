@@ -48,8 +48,10 @@ impl PageEngine {
         }
     }
 
-    pub fn find_in_page(self, view: ViewId, query: &str) {
-        unsafe { ffi_page::xenon_engine_find_in_page(view, XenonStr::borrowed(query), false) }
+    pub fn find_in_page(self, view: ViewId, query: &str, case_sensitive: bool) {
+        unsafe {
+            ffi_page::xenon_engine_find_in_page(view, XenonStr::borrowed(query), case_sensitive)
+        }
     }
 
     pub fn find_next(self, view: ViewId) {

@@ -173,6 +173,14 @@ void View::install_callbacks()
         engine.notify(&XenonUiCallbacks::view_crashed, m_id);
     };
 
+    on_tab_indicator_change = [this](WebView::TabIndicator, bool) {
+        report_audio();
+    };
+
+    on_page_unresponsive_changed = [this, &engine](bool unresponsive) {
+        engine.notify(&XenonUiCallbacks::view_unresponsive_changed, m_id, unresponsive);
+    };
+
     on_browser_history_traversal_complete = [this] {
         m_suppress_dialogs_until_navigation = false;
         report_history_state();
@@ -246,6 +254,41 @@ void View::present_current_frame()
         .device_pixel_ratio = device_pixel_ratio,
     };
     Engine::the().notify(&XenonUiCallbacks::view_frame, m_id, static_cast<XenonFrame const*>(&frame));
+}
+
+void View::show_history_menu(int direction)
+{
+    auto entries = session_history_traversal_menu_items(direction);
+    if (entries.is_empty())
+        return;
+    Vector<XenonMenuItem> items;
+    items.ensure_capacity(entries.size());
+    for (auto const& entry : entries) {
+        auto title = entry.title.is_empty() ? entry.url.bytes_as_string_view() : entry.title.bytes_as_string_view();
+        items.append({ .kind = XENON_MENU_ITEM_ACTION, .id = static_cast<u32>(entry.step), .title = xenon_str(title), .enabled = true, .checkable = false, .checked = false, .indented = false });
+    }
+    XenonMenu menu {
+        .id = next_prompt_id(),
+        .x = 0,
+        .y = 0,
+        .minimum_width = 0,
+        .items = items.data(),
+        .item_count = items.size(),
+    };
+    Engine::the().notify(&XenonUiCallbacks::history_menu, m_id, static_cast<XenonMenu const*>(&menu));
+}
+
+void View::toggle_mute()
+{
+    toggle_page_mute_state();
+    report_audio();
+}
+
+void View::report_audio()
+{
+    auto playing_audio = tab_indicator_visible(WebView::TabIndicator::PlayingAudio);
+    auto muted = page_mute_state() == Web::HTML::MuteState::Muted;
+    Engine::the().notify(&XenonUiCallbacks::view_audio_changed, m_id, playing_audio, muted);
 }
 
 void View::report_zoom()

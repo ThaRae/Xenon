@@ -118,6 +118,7 @@ pub struct Browser {
     pub vertical_tabs_expanded: bool,
     pub downloads: Vec<Download>,
     pub downloads_popover_open: bool,
+    history_menu_direction: i32,
 }
 
 impl Browser {
@@ -142,6 +143,7 @@ impl Browser {
             vertical_tabs_expanded: true,
             downloads: Vec::new(),
             downloads_popover_open: false,
+            history_menu_direction: -1,
         }
     }
 
@@ -341,6 +343,62 @@ impl Browser {
 
     pub fn download_action(&mut self, download: u64, action: u32) {
         self.engine.download_action(download, action);
+    }
+
+    pub fn audio_changed(&mut self, view: ViewId, playing_audio: bool, muted: bool) {
+        if let Some(tab) = self.tabs.get_mut(view) {
+            tab.playing_audio = playing_audio;
+            tab.muted = muted;
+        }
+    }
+
+    pub fn toggle_mute(&mut self, view: ViewId) {
+        self.engine.toggle_mute(view);
+    }
+
+    pub fn unresponsive_changed(&mut self, view: ViewId, unresponsive: bool) {
+        if let Some(tab) = self.tabs.get_mut(view) {
+            tab.unresponsive = unresponsive;
+        }
+    }
+
+    pub fn answer_unresponsive_page(&mut self, view: ViewId, keep_waiting: bool) {
+        if let Some(tab) = self.tabs.get_mut(view) {
+            tab.unresponsive = false;
+        }
+        self.engine.answer_unresponsive_page(view, keep_waiting);
+    }
+
+    pub fn open_history_menu(&mut self, direction: i32) {
+        self.history_menu_direction = direction;
+        if let Some(view) = self.tabs.active_view() {
+            self.engine.request_history_menu(view, direction);
+        }
+    }
+
+    pub fn show_history_menu(
+        &mut self,
+        view: ViewId,
+        entries: Vec<page_prompts::MenuEntry>,
+        tx: &mut Tx,
+    ) {
+        if self.tabs.active_view() != Some(view) || entries.is_empty() {
+            return;
+        }
+        let anchor = if self.history_menu_direction < 0 {
+            "back"
+        } else {
+            "forward"
+        };
+        tx.popup_menu(
+            page_prompts::popup_menu_for(&entries),
+            anchor,
+            move |s: &mut Browser, picked: Option<&str>, _: &mut Tx| {
+                if let Some(step) = picked.and_then(|picked| picked.parse::<u32>().ok()) {
+                    s.engine.traverse_history_to_step(view, step as i32);
+                }
+            },
+        );
     }
 
     pub fn zoom_changed(&mut self, view: ViewId, percent: u32) {
@@ -608,7 +666,15 @@ impl Browser {
     }
 
     fn refresh_title(&self, tx: &mut Tx) {
-        tx.set_title(self.tabs.active().map_or(APP_NAME, Tab::display_title));
+        let private = if self.windows.shown_is_private() {
+            " (Private Browsing)"
+        } else {
+            ""
+        };
+        match self.tabs.active() {
+            Some(tab) => tx.set_title(format!("{} - {APP_NAME}{private}", tab.display_title())),
+            None => tx.set_title(format!("{APP_NAME}{private}")),
+        }
     }
 
     pub fn page_has_keyboard(&self) -> bool {

@@ -37,6 +37,8 @@ pub fn page_area(s: &Browser, p: &Palette) -> El {
     }
     if tab.crashed {
         area = area.child(crashed_notice(p));
+    } else if tab.unresponsive {
+        area = area.child(unresponsive_prompt(tab, p));
     }
     area.children(page_overlays(s, tab.view, p))
 }
@@ -109,6 +111,85 @@ fn status_bubble(url: &str, p: &Palette) -> El {
                 .truncate()
                 .shrink(),
         )
+}
+
+fn prompt_button(key: &'static str, label: &'static str, primary: bool, p: &Palette) -> El {
+    let button = row()
+        .key(key)
+        .role("button")
+        .label(label)
+        .h(30.0)
+        .px(14.0)
+        .radius(8.0)
+        .center()
+        .focusable(false)
+        .child(
+            text(label)
+                .font(BUTTON_FONT)
+                .color(if primary { Color::WHITE } else { p.text })
+                .a11y_hidden(),
+        );
+    if primary {
+        button
+            .fill(p.accent)
+            .hover(Color::WHITE.alpha(0.12))
+            .press(Color::BLACK.alpha(0.12))
+    } else {
+        button.fill(p.field).hover(p.hover).press(p.press)
+    }
+}
+
+fn unresponsive_prompt(tab: &Tab, p: &Palette) -> El {
+    let view = tab.view;
+    let name = if tab.title.is_empty() {
+        "This page".to_owned()
+    } else {
+        format!("“{}”", tab.title)
+    };
+    let card = col()
+        .key("unresponsive")
+        .role("alertdialog")
+        .label("Page unresponsive")
+        .w(380.0)
+        .padding(16.0)
+        .gap(10.0)
+        .radius(12.0)
+        .fill(p.surface)
+        .border(p.hairline, p.bubble_border)
+        .shadow(8.0, 24.0, Color::BLACK.alpha(0.25))
+        .child(
+            text("Page unresponsive")
+                .font(NOTICE_TITLE_FONT)
+                .color(p.text),
+        )
+        .child(
+            text(format!(
+                "{name} isn't responding. You can wait for it, or exit the page."
+            ))
+            .font(NOTICE_BODY_FONT)
+            .color(p.text_muted)
+            .wrap(),
+        )
+        .child(
+            row()
+                .key("unresponsive-buttons")
+                .w_full()
+                .gap(8.0)
+                .justify_end()
+                .child(
+                    prompt_button("unresponsive-exit", "Exit page", false, p)
+                        .on_press(move |s: &mut Browser| s.answer_unresponsive_page(view, false)),
+                )
+                .child(
+                    prompt_button("unresponsive-wait", "Wait", true, p)
+                        .on_press(move |s: &mut Browser| s.answer_unresponsive_page(view, true)),
+                ),
+        );
+    row()
+        .key("unresponsive-row")
+        .pin(Some(0.0), Some(16.0), Some(0.0), None)
+        .justify_center()
+        .child(card)
 }
 
 fn crashed_notice(p: &Palette) -> El {

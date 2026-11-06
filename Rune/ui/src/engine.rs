@@ -237,6 +237,22 @@ impl Engine {
         unsafe { ffi::xenon_engine_activate_action(action as u32) }
     }
 
+    pub fn toggle_mute(self, view: ViewId) {
+        unsafe { ffi::xenon_engine_toggle_mute(view) }
+    }
+
+    pub fn answer_unresponsive_page(self, view: ViewId, keep_waiting: bool) {
+        unsafe { ffi::xenon_engine_answer_unresponsive_page(view, keep_waiting) }
+    }
+
+    pub fn request_history_menu(self, view: ViewId, direction: i32) {
+        unsafe { ffi::xenon_engine_request_history_menu(view, direction) }
+    }
+
+    pub fn traverse_history_to_step(self, view: ViewId, step: i32) {
+        unsafe { ffi::xenon_engine_traverse_history_to_step(view, step) }
+    }
+
     pub fn download_action(self, download: u64, action: u32) {
         unsafe { ffi::xenon_engine_download_action(download, action) }
     }

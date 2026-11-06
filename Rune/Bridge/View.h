@@ -50,6 +50,8 @@ public:
     void set_viewport(Web::DevicePixelSize, double device_pixel_ratio);
     void set_visible(bool);
     void apply_system_theme();
+    void toggle_mute();
+    void show_history_menu(int direction);
     void set_focused(bool);
     void handle_mouse_event(XenonMouseEvent const&);
     void handle_key_event(Web::KeyEvent);
@@ -98,6 +100,7 @@ private:
     void present_current_frame();
     void report_history_state();
     void report_zoom();
+    void report_audio();
     void report_bookmarked();
     int click_count_for_press(XenonMouseEvent const&);
 

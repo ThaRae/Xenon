@@ -44,24 +44,26 @@ pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
         .center_y()
         .window_drag()
         .on_secondary_press(|s: &mut Browser, at, tx| chrome_menu::show_window_menu(s, at, tx))
-        .child(nav_button(
-            "back",
-            "Back",
-            &icons::BACK,
-            can_go_back,
-            p,
-            |s| s.go_back(),
-        ))
-        .child(nav_button(
-            "forward",
-            "Forward",
-            &icons::FORWARD,
-            can_go_forward,
-            p,
-            |s| s.go_forward(),
-        ))
+        .child(
+            nav_button("back", "Back", &icons::BACK, can_go_back, p, |s| {
+                s.go_back()
+            })
+            .on_secondary_press(|s: &mut Browser, _, _| s.open_history_menu(-1)),
+        )
+        .child(
+            nav_button(
+                "forward",
+                "Forward",
+                &icons::FORWARD,
+                can_go_forward,
+                p,
+                |s| s.go_forward(),
+            )
+            .on_secondary_press(|s: &mut Browser, _, _| s.open_history_menu(1)),
+        )
         .child(reload)
         .child(location_field(s, p, dark, cx))
+        .children(s.windows.shown_is_private().then(|| private_badge(p)))
         .children(downloads_button(s, p))
         .child(nav_button(
             "menu-button",
@@ -126,4 +128,22 @@ fn nav_button(
     } else {
         button.disabled(true)
     }
+}
+
+fn private_badge(p: &Palette) -> El {
+    row()
+        .key("private-badge")
+        .role("status")
+        .label("Private browsing")
+        .h(26.0)
+        .px(10.0)
+        .radius(13.0)
+        .center()
+        .fill(p.accent.alpha(0.16))
+        .child(
+            rune::text("Private")
+                .font(rune::tok::TextStyle::new(12.0, 600.0))
+                .color(p.accent)
+                .a11y_hidden(),
+        )
 }

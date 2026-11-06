@@ -76,6 +76,7 @@ public:
     void report_tab_memory(XenonViewId);
     void report_chrome_settings();
     void new_tab_in_active_window();
+    void open_url_in_new_window(URL::URL const&, WebView::IsPrivate);
     void reopen_closed_tab_in_active_window();
     AppMenus& app_menus() { return m_app_menus; }
     void run_download_action(u64 download, u32 action);

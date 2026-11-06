@@ -33,6 +33,14 @@ pub static FOLDER: Icon = stroked!(
 );
 pub static PAUSE: Icon = stroked!("xenon-pause", "M9 6v12M15 6v12");
 pub static PLAY: Icon = stroked!("xenon-play", "M8 5l11 7-11 7z");
+pub static SPEAKER: Icon = stroked!(
+    "xenon-speaker",
+    "M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"
+);
+pub static SPEAKER_MUTED: Icon = stroked!(
+    "xenon-speaker-muted",
+    "M4 9v6h4l5 4V5L8 9zM16 9.5l5 5M21 9.5l-5 5"
+);
 pub static MENU: Icon = stroked!("xenon-menu", "M4 7h16M4 12h16M4 17h16");
 pub static STAR: Icon = stroked!(
     "xenon-star",

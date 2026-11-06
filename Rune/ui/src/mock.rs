@@ -168,6 +168,18 @@ pub extern "C" fn xenon_engine_activate_app_menu_item(_menu: u64, _item: u32) {}
 pub extern "C" fn xenon_engine_download_action(_download: u64, _action: u32) {}
 
 #[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_toggle_mute(_view: XenonViewId) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_answer_unresponsive_page(_view: XenonViewId, _keep_waiting: bool) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_request_history_menu(_view: XenonViewId, _direction: i32) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_traverse_history_to_step(_view: XenonViewId, _step: i32) {}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn xenon_engine_new_window(is_private: bool) -> XenonWindowId {
     let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
     send(Command::NewWindow(window, is_private));

@@ -219,6 +219,9 @@ typedef struct XenonUiCallbacks {
     void (*view_zoom_changed)(void* context, XenonViewId, uint32_t percent);
     void (*view_bookmarked_changed)(void* context, XenonViewId, bool bookmarked);
     void (*downloads_changed)(void* context, XenonDownload const*, size_t count);
+    void (*view_audio_changed)(void* context, XenonViewId, bool playing_audio, bool muted);
+    void (*view_unresponsive_changed)(void* context, XenonViewId, bool unresponsive);
+    void (*history_menu)(void* context, XenonViewId, struct XenonMenu const*);
 } XenonUiCallbacks;
 
 int xenon_ui_main(int argc, char const* const* argv);
@@ -234,6 +237,10 @@ void xenon_engine_activate_action(uint32_t action);
 void xenon_engine_request_app_menu(uint32_t which);
 void xenon_engine_activate_app_menu_item(uint64_t menu, uint32_t item);
 void xenon_engine_download_action(uint64_t download, uint32_t action);
+void xenon_engine_toggle_mute(XenonViewId);
+void xenon_engine_request_history_menu(XenonViewId, int32_t direction);
+void xenon_engine_traverse_history_to_step(XenonViewId, int32_t step);
+void xenon_engine_answer_unresponsive_page(XenonViewId, bool keep_waiting);
 XenonWindowId xenon_engine_new_window(bool is_private);
 void xenon_engine_activate_window(XenonWindowId);
 void xenon_engine_close_window(XenonWindowId);

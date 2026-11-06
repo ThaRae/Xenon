@@ -8,7 +8,8 @@ use std::time::Duration;
 
 use rune::tok::TextStyle;
 use rune::{
-    Align, El, LoopSpec, PointerButton, ScrollSpec, Side, SurfaceFit, col, el, icon, row, text,
+    Align, El, LoopSpec, Phase, PointerButton, ScrollSpec, Side, SurfaceFit, col, el, icon, row,
+    text,
 };
 
 use crate::chrome_menu;
@@ -128,11 +129,13 @@ fn tab_button(tab: &Tab, active: bool, p: &Palette) -> El {
         .corners([TAB_RADIUS, TAB_RADIUS, 0.0, 0.0])
         .child(tab_icon(tab, p));
     let tab_el = with_tab_events(tab_el, view);
+    let tab_el = with_tab_drag(tab_el, view, Axis::Horizontal);
     let tab_el = if tab.pinned {
-        tab_el
+        tab_el.children(audio_button(tab, p))
     } else {
         tab_el
             .child(tab_title(tab, active, p))
+            .children(audio_button(tab, p))
             .child(close_button(view, p))
     };
     if active {
@@ -242,8 +245,11 @@ fn vertical_tab(tab: &Tab, active: bool, expanded: bool, p: &Palette) -> El {
         .child(tab_icon(tab, p));
     let tab_el = if expanded { tab_el } else { tab_el.center() };
     let tab_el = with_tab_events(tab_el, view);
+    let tab_el = with_tab_drag(tab_el, view, Axis::Vertical);
     let tab_el = if expanded {
-        let tab_el = tab_el.child(tab_title(tab, active, p));
+        let tab_el = tab_el
+            .child(tab_title(tab, active, p))
+            .children(audio_button(tab, p));
         if tab.pinned {
             tab_el
         } else {
@@ -348,6 +354,69 @@ pub fn hover_card(s: &Browser, p: &Palette, vertical: bool) -> Option<El> {
                     .px(4.0)
             }))
             .anchored(tab_key(card.view), side, align, 6.0),
+    )
+}
+
+#[derive(Clone, Copy)]
+enum Axis {
+    Horizontal,
+    Vertical,
+}
+
+const TAB_GAP: f32 = 2.0;
+
+fn with_tab_drag(tab_el: El, view: ViewId, axis: Axis) -> El {
+    tab_el.on_drag(move |s: &mut Browser, drag, tx| match drag.phase {
+        Phase::Down => {
+            drag.data = s.tabs.position(view).map_or(-1.0, |index| index as f32);
+        }
+        Phase::Move => {
+            if drag.data < 0.0 {
+                return;
+            }
+            let (travel, extent) = match axis {
+                Axis::Horizontal => (drag.dx, drag.w),
+                Axis::Vertical => (drag.dy, drag.h),
+            };
+            let steps = (travel / (extent + TAB_GAP)).round() as isize;
+            let target = (drag.data as isize + steps).max(0) as usize;
+            if s.tabs.position(view) != Some(target) {
+                s.move_tab(view, target);
+            }
+            tx.live_only();
+        }
+        _ => {}
+    })
+}
+
+fn audio_button(tab: &Tab, p: &Palette) -> Option<El> {
+    if !tab.playing_audio && !tab.muted {
+        return None;
+    }
+    let view = tab.view;
+    Some(
+        el().key("audio")
+            .role("button")
+            .label(if tab.muted { "Unmute tab" } else { "Mute tab" })
+            .size(20.0, 20.0)
+            .radius(6.0)
+            .center()
+            .focusable(false)
+            .hover(p.hover)
+            .press(p.press)
+            .on_press(move |s: &mut Browser| s.toggle_mute(view))
+            .child(
+                icon(
+                    if tab.muted {
+                        &icons::SPEAKER_MUTED
+                    } else {
+                        &icons::SPEAKER
+                    },
+                    13.0,
+                )
+                .color(if tab.muted { p.text_muted } else { p.icon })
+                .a11y_hidden(),
+            ),
     )
 }
 

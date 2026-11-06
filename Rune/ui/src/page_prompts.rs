@@ -164,6 +164,7 @@ pub struct FindBar {
     pub query: TextEdit,
     sent_query: Option<String>,
     pub result: Option<FindResult>,
+    pub case_sensitive: bool,
 }
 
 pub struct PermissionPrompt {
@@ -254,6 +255,7 @@ impl FindBar {
             query: TextEdit::new(""),
             sent_query: None,
             result: None,
+            case_sensitive: false,
         }
     }
 }
@@ -567,6 +569,18 @@ pub fn close_find(s: &mut Browser, view: ViewId, tx: &mut Tx) {
     PageEngine.end_find(view);
 }
 
+pub fn toggle_find_case_sensitive(s: &mut Browser, view: ViewId) {
+    if let Some(find) = s
+        .page_prompts
+        .views
+        .get_mut(&view)
+        .and_then(|prompts| prompts.find.as_mut())
+    {
+        find.case_sensitive = !find.case_sensitive;
+        find.sent_query = None;
+    }
+}
+
 pub fn find_step(s: &mut Browser, view: ViewId, forward: bool) {
     let Some(find) = s
         .page_prompts
@@ -582,7 +596,7 @@ pub fn find_step(s: &mut Browser, view: ViewId, forward: bool) {
     if find.sent_query.as_deref() != Some(find.query.text.as_str()) {
         find.sent_query = Some(find.query.text.clone());
         find.result = Some(FindResult::Searching);
-        PageEngine.find_in_page(view, &find.query.text);
+        PageEngine.find_in_page(view, &find.query.text, find.case_sensitive);
         return;
     }
     if forward {
@@ -779,7 +793,7 @@ pub fn poll(s: &mut Browser, _: &mut Tx) -> bool {
     {
         find.sent_query = Some(find.query.text.clone());
         find.result = (!find.query.text.is_empty()).then_some(FindResult::Searching);
-        PageEngine.find_in_page(view, &find.query.text);
+        PageEngine.find_in_page(view, &find.query.text, find.case_sensitive);
         changed = true;
     }
     changed

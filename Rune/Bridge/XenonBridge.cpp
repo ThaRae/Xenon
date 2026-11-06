@@ -151,6 +151,37 @@ void xenon_engine_activate_app_menu_item(uint64_t menu, uint32_t item)
     });
 }
 
+void xenon_engine_request_history_menu(XenonViewId id, int32_t direction)
+{
+    post_to_view(id, [direction](View& view) {
+        view.show_history_menu(direction);
+    });
+}
+
+void xenon_engine_traverse_history_to_step(XenonViewId id, int32_t step)
+{
+    post_to_view(id, [step](View& view) {
+        view.traverse_the_history_to_step(step);
+    });
+}
+
+void xenon_engine_toggle_mute(XenonViewId id)
+{
+    post_to_view(id, [](View& view) {
+        view.toggle_mute();
+    });
+}
+
+void xenon_engine_answer_unresponsive_page(XenonViewId id, bool keep_waiting)
+{
+    post_to_view(id, [keep_waiting](View& view) {
+        if (keep_waiting)
+            view.keep_waiting_for_unresponsive_page();
+        else
+            view.terminate_unresponsive_page();
+    });
+}
+
 void xenon_engine_download_action(uint64_t download, uint32_t action)
 {
     Engine::the().post([download, action] {

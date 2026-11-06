@@ -59,6 +59,34 @@ pub fn find_bar(view: ViewId, find: &FindBar, p: &Palette) -> El {
                 .mr(4.0),
         );
     }
+    let match_case = row()
+        .key("find-match-case")
+        .role("button")
+        .label("Match case")
+        .checked(find.case_sensitive)
+        .h(28.0)
+        .px(7.0)
+        .radius(6.0)
+        .center()
+        .focusable(false)
+        .hover(p.hover)
+        .press(p.press)
+        .on_press(move |s: &mut Browser| page_prompts::toggle_find_case_sensitive(s, view))
+        .child(
+            text("Aa")
+                .font(SMALL_FONT)
+                .color(if find.case_sensitive {
+                    p.accent
+                } else {
+                    p.text_muted
+                })
+                .a11y_hidden(),
+        );
+    let bar = bar.child(if find.case_sensitive {
+        match_case.fill(p.hover)
+    } else {
+        match_case
+    });
     panel_shadow(
         bar.child(icon_button(
             "find-previous",

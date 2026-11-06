@@ -27,6 +27,9 @@ pub struct Tab {
     pub focus_location_when_shown: bool,
     pub zoom_percent: u32,
     pub bookmarked: bool,
+    pub playing_audio: bool,
+    pub muted: bool,
+    pub unresponsive: bool,
 }
 
 impl Tab {
@@ -48,6 +51,9 @@ impl Tab {
             focus_location_when_shown: false,
             zoom_percent: 100,
             bookmarked: false,
+            playing_audio: false,
+            muted: false,
+            unresponsive: false,
         }
     }
 

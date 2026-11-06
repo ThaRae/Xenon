@@ -32,6 +32,9 @@ private:
 
     virtual Optional<WebView::ViewImplementation&> active_web_view() const override;
     virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab) const override;
+    virtual bool supports_private_browsing_windows() const override { return true; }
+    virtual void open_url_in_new_window(URL::URL const&, WebView::IsPrivate) override;
+    virtual void open_navigation_in_new_window(Web::HTML::PreparedNavigationDescriptor, WebView::IsPrivate) override;
     virtual void open_download(WebView::FileDownloader::Download const&) const override;
     virtual void show_download_in_folder(WebView::FileDownloader::Download const&) const override;
     virtual void display_download_confirmation_dialog(StringView, LexicalPath const&) const override { }

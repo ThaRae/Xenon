@@ -560,6 +560,15 @@ void Engine::session_metadata_changed()
     save_session_soon();
 }
 
+void Engine::open_url_in_new_window(URL::URL const& url, WebView::IsPrivate is_private)
+{
+    if (!m_model)
+        return;
+    auto id = allocate_window_id();
+    m_model->open_window(is_private, id);
+    open_startup_tabs(id, { url });
+}
+
 void Engine::new_tab_in_active_window()
 {
     if (!m_model)
