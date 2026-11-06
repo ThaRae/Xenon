@@ -27,6 +27,9 @@ mod tab_groups;
 mod hibernation;
 >>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
 
+#[path = "mock_task_manager.rs"]
+mod task_manager;
+
 use crate::ffi::{
     XENON_CURSOR_DEFAULT, XENON_CURSOR_POINTER, XENON_MOUSE_BUTTON_MIDDLE,
     XENON_MOUSE_BUTTON_PRIMARY, XENON_MOUSE_EVENT_LEAVE, XENON_MOUSE_EVENT_MOVE,

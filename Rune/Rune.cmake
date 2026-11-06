@@ -110,6 +110,7 @@ target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgeLo
 target_sources(xenon-rune-bridge PRIVATE
     "${XENON_RUNE_DIR}/Bridge/TabHibernation.cpp"
     "${XENON_RUNE_DIR}/Bridge/XenonBridgeHibernation.cpp"
+    "${XENON_RUNE_DIR}/Bridge/XenonBridgeTaskManager.cpp"
 )
 
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonRunePage.cpp" Xenon NAME TestXenonRunePage LIBS xenon-rune-bridge)

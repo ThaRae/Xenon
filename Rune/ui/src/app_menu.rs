@@ -164,6 +164,9 @@ pub fn menu_bar() -> Vec<MenuItem<Browser>> {
         item("Window", "Always on Top", None, |_, _| {
             crate::platform::set_always_on_top(!crate::platform::is_always_on_top())
         }),
+        item("Window", "Task Manager", Some("cmd+shift+m"), |s, tx| {
+            s.run_shortcut(BrowserShortcut::OpenTaskManager, tx)
+        }),
         item("Develop", "View Page Source", Some("alt+cmd+u"), |s, tx| {
             s.run_shortcut(BrowserShortcut::ViewSource, tx)
         }),

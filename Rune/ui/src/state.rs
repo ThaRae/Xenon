@@ -121,12 +121,10 @@ pub struct Browser {
     pub downloads_popover_open: bool,
     history_menu_direction: i32,
     pub shield_popover_open: bool,
-<<<<<<< HEAD
     pub accessibility: PageAccessibility,
     pub tab_groups: crate::tab_groups::TabGroups,
-=======
     pub hibernation: crate::hibernation::TabHibernation,
->>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
+    pub task_manager: crate::task_manager::TaskManager,
 }
 
 impl Browser {
@@ -153,12 +151,10 @@ impl Browser {
             downloads_popover_open: false,
             history_menu_direction: -1,
             shield_popover_open: false,
-<<<<<<< HEAD
             accessibility: PageAccessibility::default(),
             tab_groups: crate::tab_groups::TabGroups::default(),
-=======
             hibernation: Default::default(),
->>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
+            task_manager: Default::default(),
         }
     }
 
@@ -893,6 +889,7 @@ impl Browser {
             Shortcut::FindPrevious => self.find_step(false, tx),
             Shortcut::ToggleFullscreen => self.toggle_fullscreen(tx),
             Shortcut::Quit => tx.quit(),
+            Shortcut::OpenTaskManager => crate::task_manager::open(self),
         }
     }
 

@@ -16,6 +16,7 @@ pub mod palette;
 mod shield;
 mod tab_groups;
 mod tabs;
+mod task_manager;
 mod toolbar;
 mod window;
 

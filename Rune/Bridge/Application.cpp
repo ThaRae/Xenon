@@ -13,6 +13,7 @@
 #include <Rune/Bridge/Application.h>
 #include <Rune/Bridge/Clipboard.h>
 #include <Rune/Bridge/Engine.h>
+#include <Rune/Bridge/TaskManager.h>
 #include <Rune/Bridge/View.h>
 #include <UI/BlockingDashboard.h>
 #include <UI/CertificateErrors.h>
@@ -93,6 +94,7 @@ void Application::create_platform_options(WebView::BrowserOptions& browser_optio
 
 void Application::create_platform_actions()
 {
+    TaskManager::add_open_action();
     start_xenon_services();
 }
 

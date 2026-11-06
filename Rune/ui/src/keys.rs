@@ -47,6 +47,7 @@ pub enum Shortcut {
     FindPrevious,
     ToggleFullscreen,
     Quit,
+    OpenTaskManager,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -108,6 +109,7 @@ pub fn shortcut_for(key: &Key, mods: Mods, platform: Platform) -> Option<Shortcu
         Key::Command('[') if primary_shift => Some(Shortcut::PreviousTab),
         Key::Command('{') if mods.cmd && !mods.alt => Some(Shortcut::PreviousTab),
         Key::Command('t') if primary_shift => Some(Shortcut::ReopenClosedTab),
+        Key::Command('m') if primary_shift => Some(Shortcut::OpenTaskManager),
         Key::Command('n') if primary_only => Some(Shortcut::NewWindow),
         Key::Command('n') if primary_shift => Some(Shortcut::NewPrivateWindow),
         Key::Command('w') if primary_shift => Some(Shortcut::CloseWindow),
@@ -318,6 +320,31 @@ mod tests {
         });
         assert_eq!(
             shortcut_for(&Key::Command('l'), shifted, Platform::Other),
+            None
+        );
+    }
+
+    #[test]
+    fn primary_shift_m_opens_the_task_manager() {
+        let shifted = mods(|m| {
+            m.cmd = true;
+            m.shift = true;
+        });
+        assert_eq!(
+            shortcut_for(&Key::Command('m'), shifted, Platform::Mac),
+            Some(Shortcut::OpenTaskManager)
+        );
+        let ctrl_shift = mods(|m| {
+            m.cmd = true;
+            m.ctrl = true;
+            m.shift = true;
+        });
+        assert_eq!(
+            shortcut_for(&Key::Command('m'), ctrl_shift, Platform::Other),
+            Some(Shortcut::OpenTaskManager)
+        );
+        assert_eq!(
+            shortcut_for(&Key::Command('m'), primary(), Platform::Other),
             None
         );
     }
