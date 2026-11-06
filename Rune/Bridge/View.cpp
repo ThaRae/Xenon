@@ -316,10 +316,13 @@ void View::run_blocking_action(u32 action)
                 weak_this->on_element_picker_filter(*filter);
         });
         break;
-    case XENON_BLOCKING_ACTION_OPEN_DASHBOARD:
-        Engine::the().new_tab(Engine::the().model() && Engine::the().model()->window_of(m_id) ? Engine::the().model()->window_of(m_id)->id : XENON_WINDOW_NONE,
-            Engine::the().allocate_view_id(), Ladybird::BlockingDashboard::url().serialize().bytes_as_string_view(), {}, Web::HTML::ActivateTab::Yes);
+    case XENON_BLOCKING_ACTION_OPEN_DASHBOARD: {
+        XenonWindowId window = XENON_WINDOW_NONE;
+        if (auto const* model = Engine::the().model(); model && model->window_of(m_id))
+            window = model->window_of(m_id)->id;
+        Engine::the().new_tab(window, Engine::the().allocate_view_id(), Ladybird::BlockingDashboard::url().serialize().bytes_as_string_view(), {}, Web::HTML::ActivateTab::Yes);
         break;
+    }
     default:
         break;
     }
