@@ -18,6 +18,7 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
     let scale = cx.env().scale;
     s.observe_scale(scale);
     let palette = Palette::new(cx.system_dark(), scale);
+    let titlebar_inset = cx.titlebar_inset();
     col()
         .key("window")
         .role("window")
@@ -25,7 +26,7 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
         .h_full()
         .fill(palette.chrome)
         .on_window_focus(|s: &mut Browser, focused, _| s.window_focus_changed(focused))
-        .children((!chrome_hidden(s)).then(|| tab_strip(s, &palette)))
+        .children((!chrome_hidden(s)).then(|| tab_strip(s, &palette, titlebar_inset)))
         .children((!chrome_hidden(s)).then(|| toolbar(s, &palette, cx)))
         .child(page_area(s, &palette))
         .children(location_overlays(s, &palette, cx))

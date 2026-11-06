@@ -18,11 +18,12 @@ const TAB_MIN_WIDTH: f32 = 44.0;
 const TAB_TOP_INSET: f32 = 6.0;
 const TAB_HEIGHT: f32 = TAB_STRIP_HEIGHT - TAB_TOP_INSET;
 const TAB_RADIUS: f32 = 9.0;
+const STRIP_PADDING: f32 = 8.0;
 const ICON_SIZE: f32 = 16.0;
 const TITLE_FONT: TextStyle = TextStyle::new(12.5, 450.0);
 const ACTIVE_TITLE_FONT: TextStyle = TextStyle::new(12.5, 550.0);
 
-pub fn tab_strip(s: &Browser, p: &Palette) -> El {
+pub fn tab_strip(s: &Browser, p: &Palette, titlebar_inset: f32) -> El {
     let mut tabs = row()
         .key("tabs")
         .role("tablist")
@@ -38,7 +39,8 @@ pub fn tab_strip(s: &Browser, p: &Palette) -> El {
         .key("tab-strip")
         .w_full()
         .h(TAB_STRIP_HEIGHT)
-        .px(8.0)
+        .pl(titlebar_inset + STRIP_PADDING)
+        .pr(STRIP_PADDING)
         .pt(TAB_TOP_INSET)
         .items_end()
         .gap(4.0)
