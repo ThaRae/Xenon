@@ -5,6 +5,7 @@
  */
 
 #include <AK/Math.h>
+#include <AK/ScopeGuard.h>
 #include <AK/Utf16String.h>
 #include <LibCore/EventLoop.h>
 #include <LibGfx/Bitmap.h>
@@ -203,6 +204,15 @@ void View::present_current_frame()
     if (width <= 0 || height <= 0)
         return;
 
+#ifdef AK_OS_MACOS
+    auto const& iosurface = shared_image_buffer->iosurface_handle();
+    if (!iosurface.lock_read_only()) {
+        dbgln("Xenon: Couldn't lock the IOSurface of view {}'s frame for reading", m_id);
+        return;
+    }
+    ScopeGuard unlock_iosurface = [&] { iosurface.unlock_read_only(); };
+#endif
+
     XenonFrame frame {
         .width = static_cast<u32>(width),
         .height = static_cast<u32>(height),
@@ -368,6 +378,12 @@ void View::insert_text(StringView text)
     if (utf8_text.is_error() || utf8_text.value().is_empty())
         return;
     commit_text_from_input_method(Utf16String::from_utf8(utf8_text.value()));
+}
+
+void View::apply_system_theme()
+{
+    set_page_background_color_to_system_canvas(false);
+    update_system_theme(Engine::the().theme());
 }
 
 Core::AnonymousBuffer View::system_theme()
