@@ -12,6 +12,10 @@ pub type XenonWindowId = u64;
 pub const XENON_WINDOW_NONE: XenonWindowId = 0;
 pub const XENON_TAB_INDEX_END: i64 = -1;
 
+pub const XENON_CHROME_LAYOUT_CLASSIC: u8 = 0;
+pub const XENON_CHROME_LAYOUT_COMPACT: u8 = 1;
+pub const XENON_CHROME_LAYOUT_VERTICAL: u8 = 2;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct XenonStr {
@@ -188,6 +192,16 @@ pub struct XenonUiCallbacks {
     pub tab_pinned_changed:
         Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, pinned: bool)>,
     pub closed_tabs_changed: Option<unsafe extern "C" fn(context: *mut c_void, can_reopen: bool)>,
+    pub chrome_settings_changed: Option<
+        unsafe extern "C" fn(
+            context: *mut c_void,
+            layout: u8,
+            cycle_tabs_in_recently_used_order: bool,
+        ),
+    >,
+    pub tab_memory: Option<
+        unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, description: XenonStr),
+    >,
 }
 
 unsafe extern "C" {
@@ -205,6 +219,8 @@ unsafe extern "C" {
         device_pixel_ratio: f64,
     );
     pub fn xenon_engine_set_system_dark(dark: bool);
+    pub fn xenon_engine_set_chrome_layout(layout: u8);
+    pub fn xenon_engine_set_cycle_tabs_in_recently_used_order(enabled: bool);
     pub fn xenon_engine_new_window(is_private: bool) -> XenonWindowId;
     pub fn xenon_engine_activate_window(window: XenonWindowId);
     pub fn xenon_engine_close_window(window: XenonWindowId);
@@ -219,6 +235,8 @@ unsafe extern "C" {
     pub fn xenon_engine_move_tab(view: XenonViewId, window: XenonWindowId, index: i64);
     pub fn xenon_engine_set_tab_pinned(view: XenonViewId, pinned: bool);
     pub fn xenon_engine_reopen_closed_tab(window: XenonWindowId);
+    pub fn xenon_engine_duplicate_tab(view: XenonViewId) -> XenonViewId;
+    pub fn xenon_engine_request_tab_memory(view: XenonViewId);
     pub fn xenon_engine_cycle_recent_tabs(window: XenonWindowId, toward_less_recent: bool);
     pub fn xenon_engine_end_recent_tab_cycle(window: XenonWindowId);
     pub fn xenon_engine_load(view: XenonViewId, input: XenonStr);

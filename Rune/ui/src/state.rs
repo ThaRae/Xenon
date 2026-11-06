@@ -14,8 +14,8 @@ use rune::{
 
 use crate::bridge::PageSurfaces;
 use crate::engine::{
-    Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind, RecentDirection,
-    TabIndex, ViewId, Viewport, WindowId,
+    ChromeLayout, Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind,
+    RecentDirection, TabIndex, ViewId, Viewport, WindowId,
 };
 use crate::keys::{Platform, Shortcut, page_key_event, shortcut_for};
 use crate::location::LocationBar;
@@ -59,6 +59,27 @@ impl PageGeometry {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChromeSettings {
+    pub layout: ChromeLayout,
+    pub cycle_tabs_in_recently_used_order: bool,
+}
+
+impl Default for ChromeSettings {
+    fn default() -> ChromeSettings {
+        ChromeSettings {
+            layout: ChromeLayout::Classic,
+            cycle_tabs_in_recently_used_order: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HoverCard {
+    pub view: ViewId,
+    pub memory: Option<String>,
+}
+
 pub struct Browser {
     engine: Engine,
     surfaces: Arc<PageSurfaces>,
@@ -74,6 +95,9 @@ pub struct Browser {
     pub page: PageGeometry,
     pub page_prompts: PagePrompts,
     system_dark: Cell<Option<bool>>,
+    pub chrome: ChromeSettings,
+    pub hover_card: Option<HoverCard>,
+    pub vertical_tabs_expanded: bool,
 }
 
 impl Browser {
@@ -93,6 +117,9 @@ impl Browser {
             page: PageGeometry::default(),
             page_prompts: PagePrompts::default(),
             system_dark: Cell::new(None),
+            chrome: ChromeSettings::default(),
+            hover_card: None,
+            vertical_tabs_expanded: true,
         }
     }
 
@@ -123,11 +150,93 @@ impl Browser {
     }
 
     pub fn activate_tab(&mut self, view: ViewId, _: &mut Tx) {
+        self.hover_card = None;
         self.engine.activate_tab(view);
     }
 
     pub fn close_tab(&mut self, view: ViewId, _: &mut Tx) {
+        self.hover_card = None;
         self.engine.request_close_tab(view);
+    }
+
+    pub fn duplicate_tab(&mut self, view: ViewId) {
+        self.engine.duplicate_tab(view);
+    }
+
+    pub fn reload_tab(&mut self, view: ViewId) {
+        self.engine.reload(view);
+    }
+
+    pub fn move_tab_to_end(&mut self, view: ViewId) {
+        if let Some(window) = self.shown_window() {
+            self.engine.move_tab(view, window, TabIndex::End);
+        }
+    }
+
+    pub fn close_tabs(&mut self, keep: ViewId, views: Vec<ViewId>) {
+        if views.is_empty() {
+            return;
+        }
+        if self
+            .tabs
+            .active_view()
+            .is_some_and(|active| views.contains(&active))
+        {
+            self.engine.activate_tab(keep);
+        }
+        self.hover_card = None;
+        for view in views {
+            self.engine.request_close_tab(view);
+        }
+    }
+
+    pub fn chrome_settings_changed(&mut self, layout: u8, cycle_tabs_in_recently_used_order: bool) {
+        self.chrome = ChromeSettings {
+            layout: ChromeLayout::from_raw(layout),
+            cycle_tabs_in_recently_used_order,
+        };
+    }
+
+    pub fn set_chrome_layout(&mut self, layout: ChromeLayout) {
+        self.chrome.layout = layout;
+        self.engine.set_chrome_layout(layout);
+    }
+
+    pub fn toggle_cycle_tabs_in_recently_used_order(&mut self) {
+        let enabled = !self.chrome.cycle_tabs_in_recently_used_order;
+        self.chrome.cycle_tabs_in_recently_used_order = enabled;
+        self.engine.set_cycle_tabs_in_recently_used_order(enabled);
+    }
+
+    pub fn toggle_vertical_tabs_expanded(&mut self) {
+        self.vertical_tabs_expanded = !self.vertical_tabs_expanded;
+        self.hover_card = None;
+    }
+
+    pub fn tab_hover_changed(&mut self, view: ViewId, hovered: bool) {
+        if hovered {
+            if self
+                .hover_card
+                .as_ref()
+                .is_some_and(|card| card.view == view)
+            {
+                return;
+            }
+            self.hover_card = Some(HoverCard { view, memory: None });
+            self.engine.request_tab_memory(view);
+        } else if self
+            .hover_card
+            .as_ref()
+            .is_some_and(|card| card.view == view)
+        {
+            self.hover_card = None;
+        }
+    }
+
+    pub fn tab_memory_reported(&mut self, view: ViewId, description: String) {
+        if let Some(card) = self.hover_card.as_mut().filter(|card| card.view == view) {
+            card.memory = (!description.is_empty()).then_some(description);
+        }
     }
 
     pub fn close_active_tab(&mut self, tx: &mut Tx) {
@@ -175,6 +284,14 @@ impl Browser {
     }
 
     fn cycle_recent_tabs(&mut self, direction: RecentDirection) {
+        if !self.chrome.cycle_tabs_in_recently_used_order {
+            let offset = match direction {
+                RecentDirection::LessRecent => 1,
+                RecentDirection::MoreRecent => -1,
+            };
+            self.activate_view(self.tabs.relative_view(offset));
+            return;
+        }
         if let Some(window) = self.shown_window() {
             self.cycling_recent_tabs = true;
             self.engine.cycle_recent_tabs(window, direction);
@@ -265,6 +382,13 @@ impl Browser {
 
     pub fn tab_removed(&mut self, window: WindowId, view: ViewId, tx: &mut Tx) {
         let was_active = self.tabs.is_active(view);
+        if self
+            .hover_card
+            .as_ref()
+            .is_some_and(|card| card.view == view)
+        {
+            self.hover_card = None;
+        }
         if let Some(tabs) = self.windows.tabs_mut(window, &mut self.tabs) {
             tabs.remove(view);
         }
@@ -635,6 +759,10 @@ impl Browser {
             self.send_window_viewport();
             self.sync_active_viewport();
         }
+    }
+
+    pub fn page_width(&self) -> f32 {
+        self.page.size.get().0
     }
 
     pub fn page_laid_out(&mut self, [_, _, width, height]: [f32; 4]) {

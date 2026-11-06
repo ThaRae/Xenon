@@ -55,6 +55,7 @@ set(XENON_RUNE_BRIDGE_SOURCES
     "${XENON_RUNE_DIR}/Bridge/Engine.cpp"
     "${XENON_RUNE_DIR}/Bridge/ExtensionsBrowser.cpp"
     "${XENON_RUNE_DIR}/Bridge/Input.cpp"
+    "${XENON_RUNE_DIR}/Bridge/TabMemory.cpp"
     "${XENON_RUNE_DIR}/Bridge/Updater.cpp"
     "${XENON_RUNE_DIR}/Bridge/View.cpp"
     "${XENON_RUNE_DIR}/Bridge/XenonBridge.cpp"

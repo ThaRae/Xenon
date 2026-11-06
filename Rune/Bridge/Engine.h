@@ -28,6 +28,7 @@
 #include <LibWebView/SessionStore.h>
 #include <Rune/Bridge/BrowserModel.h>
 #include <Rune/Bridge/XenonBridge.h>
+#include <UI/XenonSettings.h>
 
 namespace Xenon {
 
@@ -68,6 +69,10 @@ public:
     void record_view_viewport(XenonViewId, Web::DevicePixelSize, double device_pixel_ratio);
     XenonWindowId new_window(XenonWindowId, WebView::IsPrivate);
     void new_tab(XenonWindowId, XenonViewId, StringView input, Optional<size_t> index, Web::HTML::ActivateTab);
+
+    void duplicate_tab(XenonViewId source, XenonViewId duplicate);
+    void report_tab_memory(XenonViewId);
+    void report_chrome_settings();
 
     void set_focused_view(XenonViewId, bool focused);
     View* focused_view();
@@ -131,6 +136,15 @@ private:
 
     Atomic<XenonViewId> m_next_view_id { 1 };
     Atomic<XenonWindowId> m_next_window_id { 1 };
+
+    class SettingsObserver final : public Ladybird::XenonSettings::Observer {
+        AK_ALLOC_WITH_KMALLOC;
+
+    public:
+        virtual void xenon_settings_changed() override { Engine::the().report_chrome_settings(); }
+        virtual void xenon_chrome_layout_changed() override { Engine::the().report_chrome_settings(); }
+    };
+    OwnPtr<SettingsObserver> m_settings_observer;
 
     Core::AnonymousBuffer m_theme;
     bool m_system_dark { false };

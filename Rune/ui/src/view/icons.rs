@@ -26,6 +26,7 @@ pub static RELOAD: Icon = stroked!("xenon-reload", "M20 12a8 8 0 1 1-2.34-5.66M2
 pub static STOP: Icon = stroked!("xenon-stop", "M6 6l12 12M18 6L6 18");
 pub static CLOSE: Icon = stroked!("xenon-close", "M7 7l10 10M17 7L7 17");
 pub static PLUS: Icon = stroked!("xenon-plus", "M12 5v14M5 12h14");
+pub static SIDEBAR: Icon = stroked!("xenon-sidebar", "M4 5h16v14H4zM10 5v14");
 pub static GLOBE: Icon = stroked!(
     "xenon-globe",
     "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9M12 3c-2.5 2.6-3.8 5.6-3.8 9s1.3 6.4 3.8 9"

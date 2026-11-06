@@ -150,6 +150,12 @@ pub extern "C" fn xenon_engine_set_window_viewport(
 pub extern "C" fn xenon_engine_set_system_dark(_dark: bool) {}
 
 #[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_chrome_layout(_layout: u8) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_cycle_tabs_in_recently_used_order(_enabled: bool) {}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn xenon_engine_new_window(is_private: bool) -> XenonWindowId {
     let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
     send(Command::NewWindow(window, is_private));
@@ -208,6 +214,22 @@ pub extern "C" fn xenon_engine_set_tab_pinned(view: XenonViewId, pinned: bool) {
 pub extern "C" fn xenon_engine_reopen_closed_tab(window: XenonWindowId) {
     send(Command::ReopenClosedTab(window));
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_duplicate_tab(_view: XenonViewId) -> XenonViewId {
+    let view = NEXT_VIEW.fetch_add(1, Ordering::Relaxed);
+    send(Command::NewTab {
+        window: crate::ffi::XENON_WINDOW_NONE,
+        view,
+        input: String::new(),
+        index: None,
+        activate: true,
+    });
+    view
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_request_tab_memory(_view: XenonViewId) {}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn xenon_engine_cycle_recent_tabs(window: XenonWindowId, toward_less_recent: bool) {

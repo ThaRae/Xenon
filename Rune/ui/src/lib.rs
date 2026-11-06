@@ -5,6 +5,7 @@
  */
 
 mod bridge;
+mod chrome_menu;
 mod engine;
 #[allow(dead_code)]
 mod ffi;

@@ -17,6 +17,7 @@
 #include <LibWebView/PlatformColors.h>
 #include <Rune/Bridge/Application.h>
 #include <Rune/Bridge/Engine.h>
+#include <Rune/Bridge/TabMemory.h>
 #include <Rune/Bridge/View.h>
 #include <UI/FilterLists.h>
 #include <UI/MemoryPressureRelease.h>
@@ -180,13 +181,17 @@ int Engine::run_application()
     create_model();
     Ladybird::MemoryPressureRelease::start();
 
+    m_settings_observer = make<SettingsObserver>();
+
     accept_commands();
     notify(&XenonUiCallbacks::engine_ready);
+    report_chrome_settings();
     Core::deferred_invoke([this] { open_startup_windows(); });
 
     auto result = application->execute();
 
     stop_accepting_commands();
+    m_settings_observer = nullptr;
     m_focused_view.clear();
     m_views.clear();
     m_model = nullptr;
@@ -550,6 +555,49 @@ void Engine::closed_tabs_changed(bool can_reopen)
 void Engine::session_metadata_changed()
 {
     save_session_soon();
+}
+
+void Engine::report_chrome_settings()
+{
+    auto layout = static_cast<u8>(Ladybird::XenonSettings::chrome_layout());
+    notify(&XenonUiCallbacks::chrome_settings_changed, layout, Ladybird::XenonSettings::cycle_tabs_in_recently_used_order());
+}
+
+void Engine::duplicate_tab(XenonViewId source_id, XenonViewId duplicate_id)
+{
+    if (!m_model)
+        return;
+    auto const* source = m_model->tab(source_id);
+    auto const* window = m_model->window_of(source_id);
+    if (!source || !window)
+        return;
+
+    Optional<WebView::SessionHistorySnapshot> history;
+    URL::URL url = source->initial_url;
+    if (auto* source_view = view(source_id); source_view && !source->deferred) {
+        history = source_view->session_history_snapshot();
+        url = source_view->url();
+    } else if (source->pending_history.has_value()) {
+        history = source->pending_history;
+    } else if (source->session_tab_id.has_value()) {
+        if (auto* store = session_store_for(window->is_private))
+            history = store->load_tab_history(*source->session_tab_id);
+    }
+    if (history.has_value() && history->used_steps.is_empty())
+        history.clear();
+
+    auto index = window->index_of(source_id).map([](auto index) { return index + 1; });
+    m_model->open_tab(window->id, { .view = duplicate_id, .url = url, .index = index, .opener = source_id, .history = move(history) });
+}
+
+void Engine::report_tab_memory(XenonViewId id)
+{
+    auto const* tab = m_model ? m_model->tab(id) : nullptr;
+    if (!tab)
+        return;
+    auto* tab_view = tab->deferred ? nullptr : view(id);
+    auto description = TabMemory::description(tab_view);
+    notify(&XenonUiCallbacks::tab_memory, id, xenon_str(description));
 }
 
 void Engine::set_system_dark(bool dark)

@@ -98,6 +98,8 @@ impl UiContext {
             tab_activated: Some(tab_activated),
             tab_pinned_changed: Some(tab_pinned_changed),
             closed_tabs_changed: Some(closed_tabs_changed),
+            chrome_settings_changed: Some(chrome_settings_changed),
+            tab_memory: Some(tab_memory),
         }
     }
 }
@@ -286,6 +288,23 @@ unsafe extern "C" fn closed_tabs_changed(context: *mut c_void, can_reopen: bool)
     unsafe { ui(context) }
         .handle
         .update(move |browser, _| browser.closed_tabs_changed(can_reopen));
+}
+
+unsafe extern "C" fn chrome_settings_changed(
+    context: *mut c_void,
+    layout: u8,
+    cycle_tabs_in_recently_used_order: bool,
+) {
+    unsafe { ui(context) }.handle.update(move |browser, _| {
+        browser.chrome_settings_changed(layout, cycle_tabs_in_recently_used_order)
+    });
+}
+
+unsafe extern "C" fn tab_memory(context: *mut c_void, view: ViewId, description: XenonStr) {
+    let description = unsafe { description.to_string_lossy() };
+    unsafe { ui(context) }
+        .handle
+        .update(move |browser, _| browser.tab_memory_reported(view, description));
 }
 
 #[cfg(test)]

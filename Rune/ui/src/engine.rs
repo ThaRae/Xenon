@@ -165,6 +165,32 @@ pub struct KeyEvent {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Engine;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ChromeLayout {
+    #[default]
+    Classic,
+    Compact,
+    Vertical,
+}
+
+impl ChromeLayout {
+    pub fn from_raw(raw: u8) -> ChromeLayout {
+        match raw {
+            ffi::XENON_CHROME_LAYOUT_COMPACT => ChromeLayout::Compact,
+            ffi::XENON_CHROME_LAYOUT_VERTICAL => ChromeLayout::Vertical,
+            _ => ChromeLayout::Classic,
+        }
+    }
+
+    pub fn raw(self) -> u8 {
+        match self {
+            ChromeLayout::Classic => ffi::XENON_CHROME_LAYOUT_CLASSIC,
+            ChromeLayout::Compact => ffi::XENON_CHROME_LAYOUT_COMPACT,
+            ChromeLayout::Vertical => ffi::XENON_CHROME_LAYOUT_VERTICAL,
+        }
+    }
+}
+
 impl Engine {
     pub fn set_window_viewport(self, window: Option<WindowId>, viewport: Viewport) {
         unsafe {
@@ -175,6 +201,22 @@ impl Engine {
                 viewport.scale,
             )
         }
+    }
+
+    pub fn set_chrome_layout(self, layout: ChromeLayout) {
+        unsafe { ffi::xenon_engine_set_chrome_layout(layout.raw()) }
+    }
+
+    pub fn set_cycle_tabs_in_recently_used_order(self, enabled: bool) {
+        unsafe { ffi::xenon_engine_set_cycle_tabs_in_recently_used_order(enabled) }
+    }
+
+    pub fn duplicate_tab(self, view: ViewId) -> ViewId {
+        unsafe { ffi::xenon_engine_duplicate_tab(view) }
+    }
+
+    pub fn request_tab_memory(self, view: ViewId) {
+        unsafe { ffi::xenon_engine_request_tab_memory(view) }
     }
 
     pub fn set_system_dark(self, dark: bool) {

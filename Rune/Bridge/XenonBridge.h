@@ -25,6 +25,12 @@ enum {
     XENON_TAB_INDEX_END = -1,
 };
 
+enum {
+    XENON_CHROME_LAYOUT_CLASSIC = 0,
+    XENON_CHROME_LAYOUT_COMPACT = 1,
+    XENON_CHROME_LAYOUT_VERTICAL = 2,
+};
+
 typedef struct XenonStr {
     char const* data;
     size_t length;
@@ -146,6 +152,8 @@ typedef struct XenonUiCallbacks {
     void (*tab_activated)(void* context, XenonWindowId, XenonViewId);
     void (*tab_pinned_changed)(void* context, XenonViewId, bool pinned);
     void (*closed_tabs_changed)(void* context, bool can_reopen);
+    void (*chrome_settings_changed)(void* context, uint8_t layout, bool cycle_tabs_in_recently_used_order);
+    void (*tab_memory)(void* context, XenonViewId, XenonStr description);
 } XenonUiCallbacks;
 
 int xenon_ui_main(int argc, char const* const* argv);
@@ -155,6 +163,8 @@ void xenon_engine_shutdown(void);
 
 void xenon_engine_set_window_viewport(XenonWindowId, uint32_t width, uint32_t height, double device_pixel_ratio);
 void xenon_engine_set_system_dark(bool dark);
+void xenon_engine_set_chrome_layout(uint8_t layout);
+void xenon_engine_set_cycle_tabs_in_recently_used_order(bool);
 XenonWindowId xenon_engine_new_window(bool is_private);
 void xenon_engine_activate_window(XenonWindowId);
 void xenon_engine_close_window(XenonWindowId);
@@ -164,6 +174,8 @@ void xenon_engine_close_tab(XenonViewId);
 void xenon_engine_move_tab(XenonViewId, XenonWindowId, int64_t index);
 void xenon_engine_set_tab_pinned(XenonViewId, bool pinned);
 void xenon_engine_reopen_closed_tab(XenonWindowId);
+XenonViewId xenon_engine_duplicate_tab(XenonViewId);
+void xenon_engine_request_tab_memory(XenonViewId);
 void xenon_engine_cycle_recent_tabs(XenonWindowId, bool toward_less_recent);
 void xenon_engine_end_recent_tab_cycle(XenonWindowId);
 

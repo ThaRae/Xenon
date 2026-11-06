@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-use rune::{Cx, El, Icon, col, el, icon, row};
+use rune::{Color, Cx, El, Icon, col, el, icon, row};
+
+use crate::chrome_menu;
 
 use crate::state::{Browser, TOOLBAR_HEIGHT};
 use crate::view::icons;
@@ -13,7 +15,7 @@ use crate::view::palette::Palette;
 
 const BUTTON_SIZE: f32 = 32.0;
 
-pub fn toolbar(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
+pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
     let dark = cx.system_dark();
     let active = s.tabs.active();
     let can_go_back = active.is_some_and(|tab| tab.can_go_back);
@@ -33,14 +35,14 @@ pub fn toolbar(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
             |s| s.reload_or_stop(),
         )
     };
-    let bar = row()
+    row()
         .key("toolbar")
         .role("toolbar")
-        .w_full()
         .h(TOOLBAR_HEIGHT - p.hairline)
-        .px(8.0)
         .gap(2.0)
         .center_y()
+        .window_drag()
+        .on_secondary_press(|s: &mut Browser, at, tx| chrome_menu::show_window_menu(s, at, tx))
         .child(nav_button(
             "back",
             "Back",
@@ -58,12 +60,27 @@ pub fn toolbar(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
             |s| s.go_forward(),
         ))
         .child(reload)
-        .child(location_field(s, p, dark, cx));
+        .child(location_field(s, p, dark, cx))
+}
+
+pub fn toolbar(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
+    toolbar_band(
+        row()
+            .key("toolbar-row")
+            .w_full()
+            .px(8.0)
+            .child(toolbar_controls(s, p, cx).grow(1.0).shrink()),
+        p.surface,
+        p,
+    )
+}
+
+pub fn toolbar_band(content: El, fill: Color, p: &Palette) -> El {
     col()
         .key("toolbar-band")
         .w_full()
-        .fill(p.surface)
-        .child(bar)
+        .fill(fill)
+        .child(content)
         .child(
             el().key("toolbar-edge")
                 .w_full()

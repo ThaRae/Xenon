@@ -9,6 +9,7 @@
 #include <Rune/Bridge/Input.h>
 #include <Rune/Bridge/View.h>
 #include <Rune/Bridge/XenonBridge.h>
+#include <UI/XenonSettings.h>
 
 using Xenon::Engine;
 using Xenon::View;
@@ -79,6 +80,22 @@ void xenon_engine_set_system_dark(bool dark)
     });
 }
 
+void xenon_engine_set_chrome_layout(uint8_t layout)
+{
+    if (layout > XENON_CHROME_LAYOUT_VERTICAL)
+        return;
+    Engine::the().post([layout] {
+        Ladybird::XenonSettings::set_chrome_layout(static_cast<Ladybird::XenonSettings::ChromeLayout>(layout));
+    });
+}
+
+void xenon_engine_set_cycle_tabs_in_recently_used_order(bool enabled)
+{
+    Engine::the().post([enabled] {
+        Ladybird::XenonSettings::set_cycle_tabs_in_recently_used_order(enabled);
+    });
+}
+
 XenonWindowId xenon_engine_new_window(bool is_private)
 {
     auto& engine = Engine::the();
@@ -111,6 +128,23 @@ XenonViewId xenon_engine_new_tab(XenonWindowId window, XenonStr url, int64_t ind
         engine.new_tab(window, id, input, index, activate ? Web::HTML::ActivateTab::Yes : Web::HTML::ActivateTab::No);
     });
     return id;
+}
+
+XenonViewId xenon_engine_duplicate_tab(XenonViewId source)
+{
+    auto& engine = Engine::the();
+    auto id = engine.allocate_view_id();
+    engine.post([&engine, source, id] {
+        engine.duplicate_tab(source, id);
+    });
+    return id;
+}
+
+void xenon_engine_request_tab_memory(XenonViewId view)
+{
+    Engine::the().post([view] {
+        Engine::the().report_tab_memory(view);
+    });
 }
 
 void xenon_engine_activate_tab(XenonViewId view)
