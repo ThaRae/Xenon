@@ -14,6 +14,8 @@
 #include <LibWebView/Application.h>
 #include <LibWebView/BrowsingSession.h>
 #include <UI/BrowserWindow.h>
+#include <UI/XenonArguments.h>
+#include <UI/XenonSettings.h>
 
 #include <QApplication>
 #include <QPointer>
@@ -40,7 +42,9 @@ enum class ShowWindow {
     Yes,
 };
 
-class Application final : public WebView::Application {
+class Application final
+    : public WebView::Application
+    , public XenonSettings::Observer {
     WEB_VIEW_APPLICATION(Application)
 
 public:
@@ -57,7 +61,7 @@ public:
     void open_startup_tabs(BrowserWindow&, Vector<URL::URL> const&);
     virtual WebView::SessionLaunchPolicy launch_restore_policy() const override;
 
-    Optional<ByteString> const& password_manager_choice() const { return m_password_manager_choice; }
+    Optional<ByteString> const& password_manager_choice() const { return m_xenon_arguments.password_manager_choice; }
 
     void initialize_extensions();
 
@@ -186,6 +190,7 @@ private:
     virtual Vector<u64> platform_presentation_drm_format_modifiers() const override;
 
     virtual void update_tabs_display() const override;
+    virtual void xenon_chrome_layout_changed() override { update_tabs_display(); }
 
     virtual void rebuild_bookmarks_menu() const override;
     virtual void show_bookmark_context_menu(Gfx::IntPoint, Optional<WebView::BookmarkItem const&>, Optional<String const&> target_folder_id, Optional<String const&> parent_folder_id) override;
@@ -200,8 +205,7 @@ private:
     virtual void on_recently_closed_entries_changed() const override;
 
     OwnPtr<QApplication> m_application;
-    Vector<ByteString> m_extensions_to_load;
-    Optional<ByteString> m_password_manager_choice;
+    XenonArguments m_xenon_arguments;
     BrowserWindow* m_active_window { nullptr };
     OwnPtr<ProcessManagerWindow> m_process_manager_window;
 

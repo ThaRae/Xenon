@@ -78,8 +78,9 @@ void ActionButton::update_appearance()
     setEnabled(appearance.enabled);
 
     m_badge_text = qstring_from_ak_string(appearance.badge_text);
-    m_badge_background_color = appearance.badge_background_color;
-    m_badge_text_color = appearance.badge_text_color;
+    auto qcolor = [](Gfx::Color color) { return QColor(color.red(), color.green(), color.blue(), color.alpha()); };
+    m_badge_background_color = qcolor(appearance.badge_background_color);
+    m_badge_text_color = appearance.badge_text_color.map(qcolor);
     update();
 }
 

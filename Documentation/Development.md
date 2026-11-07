@@ -19,7 +19,8 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 | --- | --- |
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good upstream commit. |
 | `Patches/ladybird/` | Xenon's changes to the engine, as a patch series applied to the pinned commit at build time. |
-| `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
+| `Patches/rune/` | Xenon's changes to Rune, applied to the checkout `Meta/rune.py` prepares under `Build/rune`. |
+| `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. Its Qt-free files (Xenon's settings, bangs, filter lists, the blocking dashboard, certificate errors, extensions' engine side, password managers, the new tab and settings pages' interfaces) build into the `xenon-core` static library, which the Qt `xenon` target and the Rune host (`Rune/`) both link. |
 | `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon's artwork. |
 | `UI/Linux/` | The Linux AppImage's desktop file and entry point. |
@@ -28,11 +29,25 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 | `Meta/xenon.py` | Builds, runs, and tests Xenon. |
 | `Meta/check.py` | Fast checks: formatting, and the mistakes that break Xenon quietly. |
 | `Meta/patches.py` | Applies and exports the engine patch series. |
+| `Meta/rune.py` | Prepares Rune's source tree, patched by `Patches/rune`, for the Rune frontend. |
 | `Meta/release.py` | Packages, publishes and tests releases: the macOS app on a Mac, the AppImage on Linux. |
 | `Meta/aur.py` | Moves the AUR packages to a release, and pushes them to the AUR. |
 | `VERSION.txt` | Xenon's version. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 | `Documentation/` | This file, the [feature notes](Features.md), and the deeper write-ups on extensions, WebAuthn, filter list updates, and releases. |
+
+`xenon-core` doesn't depend on a frontend, so what it needs from one is handed to it: `SettingsPage::set_host` takes how
+to open a directory, reveal a file, show the extensions manager and install an update, and the frontend calls
+`SettingsPage::application_did_become_active()` so the settings page refreshes. Each frontend also provides the
+`Updater` and `Extensions::Browser` functions (`UI/Updater.cpp` and `UI/Extensions/Browser.cpp` for Qt, stand-ins in
+`Rune/Bridge` for now). A layout change reaches the windows through `XenonSettings::Observer::xenon_chrome_layout_changed`.
+
+Xenon's own settings (`UI/XenonSettings`) live in `XenonSettings.json` in the `Xenon` folder of the config directory
+(`~/.config/Xenon` on Linux, `~/Library/Preferences/Xenon` on macOS), whichever frontend runs. Xenon used to keep them
+with QSettings; the first time a build without QSettings starts and finds no JSON file, it imports the old values,
+from `~/.config/Xenon/Xenon.conf` on Linux and, through CFPreferences, from the `com.xenon.Xenon` domain on macOS, and
+leaves the old store in place. `TestXenonSettings` covers the store and the INI import; the macOS import is untested off
+a Mac.
 
 The submodule always points at an upstream commit. Xenon's engine changes live in `Patches/ladybird` as
 `git format-patch` files, which `Meta/xenon.py` applies with `git am` on a local `xenon-patches` branch before it

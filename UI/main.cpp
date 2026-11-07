@@ -20,6 +20,7 @@
 #include <UI/FilterLists.h>
 #include <UI/MemoryPressureRelease.h>
 #include <UI/PasswordManagers.h>
+#include <UI/SettingsPageHost.h>
 #include <UI/SiteSecurity.h>
 #include <UI/TabHibernation.h>
 #include <UI/Updater.h>
@@ -94,6 +95,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
     }
 
     app->initialize_extensions();
+    Ladybird::install_settings_page_host();
 
     Ladybird::CertificateErrors::initialize();
     Ladybird::SiteSecurity::initialize();

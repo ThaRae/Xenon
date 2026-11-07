@@ -6,7 +6,11 @@
 
 #pragma once
 
+#include <LibURL/URL.h>
+
 namespace Ladybird::BlockingDashboard {
+
+URL::URL url();
 
 void register_url_scheme();
 

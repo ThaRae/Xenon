@@ -7,7 +7,6 @@
 #pragma once
 
 #include <AK/Optional.h>
-#include <AK/Span.h>
 #include <AK/Types.h>
 
 class QAction;
@@ -24,8 +23,6 @@ class Tab;
 namespace Ladybird::TabHibernation {
 
 void start();
-
-ReadonlySpan<i64> timeout_choices_in_minutes();
 
 QMenu* create_settings_menu(QWidget& parent);
 

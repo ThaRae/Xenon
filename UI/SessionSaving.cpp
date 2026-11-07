@@ -4,17 +4,15 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <LibCore/Timer.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/SessionStore.h>
 #include <UI/SessionSaving.h>
 
-#include <QApplication>
-#include <QTimer>
-
 namespace Ladybird::SessionSaving {
 
-static constexpr int SAVE_DELAY_MILLISECONDS = 1000;
+static constexpr auto SAVE_DELAY = AK::Duration::from_milliseconds(1000);
 
 void save_soon()
 {
@@ -22,18 +20,12 @@ void save_soon()
     if (!session_store.is_persistent())
         return;
 
-    static auto* timer = [] {
-        auto* save_timer = new QTimer(QApplication::instance());
-        save_timer->setSingleShot(true);
-        save_timer->setInterval(SAVE_DELAY_MILLISECONDS);
-        QObject::connect(save_timer, &QTimer::timeout, save_timer, [] {
-            WebView::Application::default_session().session_store->flush_dirty_state();
-        });
-        return save_timer;
-    }();
+    static auto& timer = Core::Timer::create_single_shot(SAVE_DELAY, [] {
+        WebView::Application::default_session().session_store->flush_dirty_state();
+    }).leak_ref();
 
-    if (!timer->isActive())
-        timer->start();
+    if (!timer.is_active())
+        timer.start();
 }
 
 }

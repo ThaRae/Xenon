@@ -8,6 +8,7 @@
 
 #include <AK/ByteString.h>
 #include <AK/HashTable.h>
+#include <AK/Span.h>
 #include <AK/String.h>
 #include <AK/Time.h>
 #include <AK/Types.h>
@@ -37,6 +38,7 @@ bool tab_hibernation_enabled();
 void set_tab_hibernation_enabled(bool);
 AK::Duration tab_hibernation_timeout();
 void set_tab_hibernation_timeout(AK::Duration);
+ReadonlySpan<i64> tab_hibernation_timeout_choices_in_minutes();
 bool hibernate_on_memory_pressure();
 void set_hibernate_on_memory_pressure(bool);
 
@@ -69,7 +71,8 @@ public:
     Observer();
     virtual ~Observer();
 
-    virtual void xenon_settings_changed() = 0;
+    virtual void xenon_settings_changed() { }
+    virtual void xenon_chrome_layout_changed() { }
 };
 
 }
