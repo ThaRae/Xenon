@@ -485,6 +485,24 @@ function renderProfile() {
     }
 }
 
+const crashReportSending = document.querySelector("#crash-report-sending");
+const crashReportsWaitingRow = document.querySelector("#crash-reports-waiting-row");
+const crashReportsStatus = document.querySelector("#crash-reports-status");
+
+crashReportSending.addEventListener("change", () =>
+    ladybird.sendMessage("setCrashReportSending", crashReportSending.value)
+);
+document.querySelector("#review-crash-reports").addEventListener("click", () => (location.href = "about:crashes"));
+document.querySelector("#open-crash-reports").addEventListener("click", () => {
+    crashReportsStatus.hidden = true;
+    ladybird.sendMessage("showCrashReports");
+});
+
+function renderCrashReportsWaiting(count) {
+    document.querySelector("#crash-reports-waiting").textContent = `${count} ${count === 1 ? "report" : "reports"}`;
+    crashReportsWaitingRow.hidden = count === 0;
+}
+
 for (const button of document.querySelectorAll("[data-show-location]")) {
     button.addEventListener("click", () => ladybird.sendMessage("xenon/showLocation", button.dataset.showLocation));
 }
@@ -753,6 +771,7 @@ document.addEventListener("WebUILoaded", () => {
     ladybird.sendMessage("loadCurrentSettings");
     ladybird.sendMessage("xenon/loadSettings");
     ladybird.sendMessage("loadPasswordManagers");
+    ladybird.sendMessage("loadCrashReportsWaiting");
 });
 
 document.addEventListener("WebUIMessage", event => {
@@ -767,7 +786,13 @@ document.addEventListener("WebUIMessage", event => {
         PASSWORD_MANAGERS = data;
         renderPasswordManagers();
         if (findSetting.value) applyFind();
+    } else if (name === "crashReportsWaiting") {
+        renderCrashReportsWaiting(data);
+    } else if (name === "crashReportsStatus") {
+        crashReportsStatus.textContent = data;
+        crashReportsStatus.hidden = !data;
     } else if (name === "loadSettings") {
+        if (Object.hasOwn(data, "crashReportSending")) crashReportSending.value = data.crashReportSending;
         if (Object.hasOwn(data, "tabs")) {
             TAB_SETTINGS = data.tabs;
             verticalTabsPosition.value = TAB_SETTINGS.verticalTabsPosition || "left";

@@ -42,10 +42,10 @@ index 29f3cab80d12c5a7280145f57851eaab00ce34cf..0b5bc6d988baf5001186956a628358dd
  
  struct URLSchemeResponse {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index ea195a6445f25b61fb607753de6ae6e463512f4f..7bcecfbfc1d028c9a338a4821dd7c017e8e021cd 100644
+index 058d731cb8a654273b7813e09c1230224d8bc5f2..bb3d1cf99c029464ae4083cb9ef1652b09a8e1c9 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1640,7 +1640,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1649,7 +1649,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return;
      }
  
@@ -54,7 +54,7 @@ index ea195a6445f25b61fb607753de6ae6e463512f4f..7bcecfbfc1d028c9a338a4821dd7c017
      traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
          auto navigation = navigable.uncommitted_navigation();
          if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
-@@ -1652,6 +1652,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1661,6 +1661,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return IterationDecision::Break;
      });
  
@@ -71,10 +71,10 @@ index ea195a6445f25b61fb607753de6ae6e463512f4f..7bcecfbfc1d028c9a338a4821dd7c017
      if (response.is_error()) {
          async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
 diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
-index d1227181339dc5fd8546d46c5d039cdaefc0bd7f..3c3f31f2002e6a0c776607b295a320822c8d8ee7 100644
+index f9012a1113ed5f0b63f5eb153b28307af2b20857..7e464b341e645df1d632199bc2a1acc86834f798 100644
 --- a/Libraries/LibWebView/WorkerProcessManager.cpp
 +++ b/Libraries/LibWebView/WorkerProcessManager.cpp
-@@ -758,6 +758,7 @@ void WorkerProcessManager::worker_did_request_embedder_resource(Web::HTML::Worke
+@@ -757,6 +757,7 @@ void WorkerProcessManager::worker_did_request_embedder_resource(Web::HTML::Worke
          .from_same_origin_process = agent.inside_settings->origin().is_same_origin(url.origin()),
          .is_navigation = false,
          .navigation_initiator = {},

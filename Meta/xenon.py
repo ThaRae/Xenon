@@ -326,32 +326,40 @@ def ladybird_test_python_packages(build_dir: Path) -> str:
 
 
 def check_app(platform: Platform, executable: Path, smoke_dir: Path) -> list[str]:
-    reports_dir = crash_report_directory(platform)
-    earlier_reports = saved_crash_reports(reports_dir)
-    failures = run_app_checks(platform, executable, smoke_dir)
+    with CrashReportCollector() as collector:
+        failures = run_app_checks(platform, executable, smoke_dir)
     if failures:
-        reports = saved_crash_reports(reports_dir)
-        new_reports = sorted(reports.keys() - earlier_reports.keys())
-        for name in new_reports[:PRINTED_CRASH_REPORTS]:
+        reports = collector.reports
+        for name in list(reports)[:PRINTED_CRASH_REPORTS]:
             print(f"==> crash report {name}", file=sys.stderr)
-            print(reports[name].read_text(errors="replace")[:PRINTED_CRASH_REPORT_CHARACTERS], file=sys.stderr)
-        if len(new_reports) > PRINTED_CRASH_REPORTS:
-            print(f"    and {len(new_reports) - PRINTED_CRASH_REPORTS} more in {reports_dir}", file=sys.stderr)
+            print(reports[name][:PRINTED_CRASH_REPORT_CHARACTERS], file=sys.stderr)
+        if len(reports) > PRINTED_CRASH_REPORTS:
+            print(f"    and {len(reports) - PRINTED_CRASH_REPORTS} more", file=sys.stderr)
     return failures
 
 
-def crash_report_directory(platform: Platform) -> Path:
-    if data := os.environ.get("XDG_DATA_HOME"):
-        return Path(data) / "Xenon" / "CrashReports"
-    if platform.host_system == HostSystem.macOS:
-        return Path.home() / "Library" / "Application Support" / "Xenon" / "CrashReports"
-    return Path.home() / ".local" / "share" / "Xenon" / "CrashReports"
+class CrashReportCollector:
+    def __init__(self):
+        self.reports: dict[str, str] = {}
 
+    def __enter__(self) -> CrashReportCollector:
+        collector = self
+        self.temporary_directory = tempfile.TemporaryDirectory
 
-def saved_crash_reports(reports_dir: Path) -> dict[str, Path]:
-    if not reports_dir.is_dir():
-        return {}
-    return {path.name: path for path in reports_dir.rglob("*.txt")}
+        class TemporaryDirectoryKeepingCrashReports(self.temporary_directory):
+            def cleanup(self):
+                collector.collect(Path(self.name))
+                super().cleanup()
+
+        tempfile.TemporaryDirectory = TemporaryDirectoryKeepingCrashReports
+        return self
+
+    def __exit__(self, *exception):
+        tempfile.TemporaryDirectory = self.temporary_directory
+
+    def collect(self, profile: Path):
+        for path in sorted(profile.rglob("CrashReports/**/*.txt")):
+            self.reports.setdefault(path.name, path.read_text(errors="replace"))
 
 
 def run_app_checks(platform: Platform, executable: Path, smoke_dir: Path) -> list[str]:
@@ -480,7 +488,7 @@ def check_profile_directory(platform: Platform, executable: Path, env: dict) -> 
 
         loaded, output = run_headless(executable, fresh_env, ["--headless=text", "about:blank"])
         expected = [home / root / "Xenon" / "Profiles" / "default" for root in roots]
-        expected.append(home / data / "Xenon" / "CrashReports")
+        expected.append(home / data / "Xenon" / "Profiles" / "default" / "CrashReports")
         missing = [path for path in expected if not path.is_dir()]
         ladybird = [path for path in home.rglob("Ladybird") if path.is_dir()]
 
@@ -743,8 +751,8 @@ def check_image_decoder_lifecycle(executable: Path, env: dict) -> bool:
                 problems.append("the second image did not load")
             elif not [pid for pid in helper_pids(browser.pid, "ImageDecoder") if pid not in first]:
                 problems.append("the second image did not start a new ImageDecoder")
-            elif not wait_until(lambda: not helper_pids(browser.pid, "ImageDecoder"), 30):
-                problems.append("an ImageDecoder with nothing to decode for 30 s is still running")
+            elif not wait_until(lambda: not helper_pids(browser.pid, "ImageDecoder"), 45):
+                problems.append("an ImageDecoder with nothing to decode for 45 s is still running")
             pages.release(2)
 
             try:

@@ -26,7 +26,7 @@ LINUX_ICON_NAME = "org.xenon.Xenon.png"
 LINUX_ICON_SIZES = (16, 24, 32, 48, 64, 128, 256, 512)
 
 LADYBIRD_ICONS_DIR = XENON_SOURCE_DIR / "UI" / "Resources" / "icons"
-LADYBIRD_ICONS = {"48x48/app-browser.png": 48, "128x128/app-browser.png": 128, "128x128/app-browser-dark.png": 128}
+LADYBIRD_ICONS = {"48x48/app-browser.png": 48}
 
 INSTALLER_BACKGROUND = ICONS_DIR / "macos" / "installer-background.svg"
 INSTALLER_BACKGROUND_WIDTH = 640

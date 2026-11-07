@@ -39,7 +39,6 @@ set(XENON_SOURCES
     ChromeStyle.cpp
     ContentBlockingButton.cpp
     ContentBlockingPopover.cpp
-    CrashReportNotifier.cpp
     CrashReportReviewWidget.cpp
     DevToolsBanner.cpp
     Download.cpp
@@ -344,8 +343,6 @@ endforeach()
 
 set(XENON_ICON_OVERRIDES
     48x48/app-browser.png
-    128x128/app-browser.png
-    128x128/app-browser-dark.png
 )
 foreach (icon IN LISTS XENON_ICON_OVERRIDES)
     get_filename_component(icon_size "${icon}" DIRECTORY)

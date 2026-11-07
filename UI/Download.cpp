@@ -57,7 +57,7 @@ void Download::fetch(URL::URL url)
 
     auto id = ++m_request_id;
     m_request->set_unbuffered_request_callbacks(
-        [self = NonnullRefPtr(*this), id](NonnullRefPtr<HTTP::HeaderList> response_headers, Optional<u32> response_code, Optional<String> const&, Optional<Core::ImmutableBytes>, Optional<u64>, Requests::CacheState) {
+        [self = NonnullRefPtr(*this), id](NonnullRefPtr<HTTP::HeaderList> response_headers, Optional<u32> response_code, Optional<String> const&, Requests::CacheState) {
             if (id == self->m_request_id)
                 self->did_receive_headers(*response_headers, response_code);
         },

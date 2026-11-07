@@ -173,7 +173,7 @@ on memory**, on by default. The code is `UI/TabHibernation.cpp` and `UI/MemoryPr
 which saves the scroll position first. Engine patch `0038` also collects the page's JS heap when the tab is hidden.
 
 When the machine becomes short of memory, every WebContent process, the visible tab's and those of tabs that can't
-hibernate included, also collects garbage once and gives the memory it freed back to the system (engine patch `0068`,
+hibernate included, also collects garbage once and gives the memory it freed back to the system (engine patch `0063`,
 from `UI/MemoryPressureRelease.cpp`). That happens once each time memory goes from normal to short, and at most once a
 minute, not again on every check while it stays short. It doesn't depend on the hibernation settings. Tests can stand
 a file in for `/proc/meminfo` with `XENON_TEST_MEMINFO`, which the hibernation check reads too.
@@ -198,19 +198,19 @@ Besides hibernating whole tabs, Xenon doesn't keep processes that nothing is usi
 - There's no spare WebContent process waiting for the next tab, as Ladybird keeps: a tab's process starts when the tab
   opens (`UI/Application.cpp`, engine patch `0042`). A new tab waits for that launch, a fraction of a second.
 - A page's image decoder starts with its first image rather than with the page, and stops once it has had nothing to
-  decode for 15 seconds; the next image starts a new one, as does an image after a decoder crash (`0045`). Images used
-  as one frame, such as an animated favicon, let the decoder go (`0044`).
+  decode for 30 seconds; the next image starts a new one, as does an image after a decoder crash. The processes of one
+  site share a decoder. Ladybird does this itself, as Xenon's patches used to.
 - The media server starts when a page first needs one, and stops 15 seconds after the page last used it; the audio
-  server it plays through stops 15 seconds after that. A paused video or song keeps both (`0046`).
+  server it plays through stops 15 seconds after that. A paused video or song keeps both (`0044`).
 - Four seconds after a page loads, its process collects garbage and gives the freed memory back to the system (`0043`),
-  and does again whenever its tab is hidden (`0038`, which `0067` makes decommit the free pages, as `0043` does, so
+  and does again whenever its tab is hidden (`0038`, which `0062` makes decommit the free pages, as `0043` does, so
   that they leave its RSS on Linux).
 - The compositor drops the images it keeps to redraw a page quickly (its SVG images and repeated backgrounds, drawn
   once) when the page has drawn nothing for 30 seconds, or 4 seconds after its tab is hidden, when it drops its text too.
   Each tab and frame is timed on its own, so an animation in one doesn't hold another's. The memory goes back to the
-  system, and the next frame draws what it needs again (`0048`).
+  system, and the next frame draws what it needs again (`0046`).
 - Once nothing has drawn for 5 seconds, the compositor also purges the GPU resources no frame has used in that time, and
-  gives the memory back as above (`0066`).
+  gives the memory back as above (`0061`).
 - A window's pages count as hidden while it's minimized, or, on macOS and X11, once the window system has said for a
   second that none of it can be seen (on macOS, a window entirely covered by others), so they stop drawing and their
   animations pause until it's shown again (`UI/WindowExposure.cpp`). Both panes of a split view go, and come back,
@@ -262,8 +262,8 @@ The 8 seconds only count while the page could be answering, so none of these bri
 A navigation away from a page that's stuck still waits on that page to unload, so the tab shows it loading until the
 page answers. **Exit page** gets out of it.
 
-The engine side is patches `0060` (watching the input in `LibWebView/ViewImplementation.cpp`, reported through
-`on_page_unresponsive_changed`) and `0062` (the check when a tab is shown); the prompt is `UI/PageUnresponsivePrompt.cpp`,
+The engine side is patches `0057` (watching the input in `LibWebView/ViewImplementation.cpp`, reported through
+`on_page_unresponsive_changed`) and `0058` (the check when a tab is shown); the prompt is `UI/PageUnresponsivePrompt.cpp`,
 in the message popover's style.
 
 ## Search and the address bar
@@ -464,7 +464,7 @@ either opens a popover below it, as Chrome's and Helium's site information does:
 The popover shows what it knows straight away and fills in the connection once RequestServer answers. A page that
 came from the cache before Xenon connected to its host has no details to show, and says so.
 
-Engine patch `0064` (`RequestServer+LibRequests: Let the UI process ask how a host was reached`) has RequestServer
+Engine patch `0059` (`RequestServer+LibRequests: Let the UI process ask how a host was reached`) has RequestServer
 remember, for each HTTPS host and port, the TLS version, cipher and peer certificates of the last connection it made
 there, and whether that connection was made over an accepted certificate, and answer the UI process's
 `retrieve_secure_connection()`. It reads them from curl's OpenSSL handle (`CURLINFO_TLS_SSL_PTR`) when a response's

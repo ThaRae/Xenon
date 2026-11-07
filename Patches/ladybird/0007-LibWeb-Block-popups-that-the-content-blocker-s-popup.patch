@@ -23,10 +23,10 @@ navigates, and closed if a filter matches.
  6 files changed, 28 insertions(+), 5 deletions(-)
 
 diff --git a/Libraries/LibWeb/DOM/Element.cpp b/Libraries/LibWeb/DOM/Element.cpp
-index 634cafb7f09f0b3c930ebd57a65b770671e922bb..dec763227dee48ceaa76fb4b5e52e348a50444be 100644
+index f9074120296a9fd8da1110d322b57d4dec412d20..2a4d533c0138b09bd99a17627e93db738ddda3d3 100644
 --- a/Libraries/LibWeb/DOM/Element.cpp
 +++ b/Libraries/LibWeb/DOM/Element.cpp
-@@ -666,7 +666,7 @@ void Element::follow_the_hyperlink(Optional<Utf16String> hyperlink_suffix, HTML:
+@@ -670,7 +670,7 @@ void Element::follow_the_hyperlink(Optional<Utf16String> hyperlink_suffix, HTML:
  
      // 7. Let targetNavigable be the first return value of applying the rules for choosing a navigable given
      //    targetAttributeValue, subject's node navigable, and noopener.
@@ -49,10 +49,10 @@ index e8747f2a18dadeac26ccaac496302966d79b237e..66b9c80ebd56f49fe4021fb963dd2117
      // 23. If targetNavigable is null, then return.
      if (!target_navigable) {
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index 4878f2755eb451f994f390f756a28c6b970df81c..0b6517bddfeb239db747c2502282eada3651bdcc 100644
+index 85dd557651efc266414e490ad7589bbc7ced0db3..f06cb42ba61e0338851e69426e23d3ae6d0ac759 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-@@ -1826,7 +1826,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
+@@ -1835,7 +1835,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
  }
  
  // https://html.spec.whatwg.org/multipage/document-sequences.html#the-rules-for-choosing-a-navigable
@@ -61,7 +61,7 @@ index 4878f2755eb451f994f390f756a28c6b970df81c..0b6517bddfeb239db747c2502282eada
  {
      // 1. Let chosen be null.
      GC::Ptr<Navigable> chosen;
-@@ -1888,6 +1888,13 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
+@@ -1897,6 +1897,13 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
              dbgln("Pop-up blocked!");
          }
  
@@ -76,7 +76,7 @@ index 4878f2755eb451f994f390f756a28c6b970df81c..0b6517bddfeb239db747c2502282eada
          else if (auto new_web_view = request_new_web_view(); new_web_view.page) {
              // 1. Consume user activation of currentNavigable's active window.
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.h b/Libraries/LibWeb/HTML/LocalNavigable.h
-index 0470a2d247ae7f123841c020a7c9eb3ebc1aa861..917ddf007d668c0d2fd6a634b2e0af818820f51b 100644
+index 8675c5cda49d4e004e1540c1a54f13b6208c3e92..4fa1df3a8da165848afa38cf912cb77d8993d80c 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.h
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.h
 @@ -178,7 +178,8 @@ public:
@@ -129,10 +129,10 @@ index fb09ba493ac7ff5aa65d66ca37505e5e9596c897..4286fcb7a8c53a9d430a480e619d9da1
  
      // AD-HOC: Nothing the browser process can see names this URL's blob URL entry until the navigation commits, so
 diff --git a/Libraries/LibWeb/HTML/Window.cpp b/Libraries/LibWeb/HTML/Window.cpp
-index f0c5ed651008520bdf7b1800304045bb2c8a1057..e756c0a420930e7241d5fb7cc63a6a9145aaf818 100644
+index be742ee15461579709f3db71d4400afd022ebe58..11b77a6f55e846e38166f17fd104744c84bc932e 100644
 --- a/Libraries/LibWeb/HTML/Window.cpp
 +++ b/Libraries/LibWeb/HTML/Window.cpp
-@@ -513,7 +513,7 @@ WebIDL::ExceptionOr<Window::OpenedWindow> Window::window_open_steps_internal(Utf
+@@ -514,7 +514,7 @@ WebIDL::ExceptionOr<Window::OpenedWindow> Window::window_open_steps_internal(Utf
          : UserNavigationInvolvement::None;
      // 13. Let targetNavigable and windowType be the result of applying the rules for choosing a navigable given target, sourceDocument's node navigable, and noopener.
      VERIFY(source_document.navigable());

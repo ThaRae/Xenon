@@ -40,10 +40,10 @@ Internals exposes the filter generator for tests.
  16 files changed, 226 insertions(+)
 
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 2257c0739b37b91c9a8f2235db08568575421665..b707d02b7520bfcf436fdd3e4f27d444ee5b3bfe 100644
+index b215349da5f998f2cff3ec4bad4788352a013399..6a41891b9ec4b81e5ab7feae7cba31a28ce1b75d 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1495,6 +1495,11 @@ void Internals::set_content_blocking_enabled(bool enabled)
+@@ -1533,6 +1533,11 @@ void Internals::set_content_blocking_enabled(bool enabled)
      page().set_content_blocking_policy(enabled, {});
  }
  
@@ -56,10 +56,10 @@ index 2257c0739b37b91c9a8f2235db08568575421665..b707d02b7520bfcf436fdd3e4f27d444
  {
      return window().associated_document().partial_layout_count();
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index e82300aea898eda50bea36c9673b2f42d3f4789a..072d8798ec709989816bdbe64e81522bba86c2d2 100644
+index 91e6ee826049436bd333d91d5c8653642576d32a..f29f026f83fb0a064249fe0f5449fc18c8a1b552 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -180,6 +180,7 @@ public:
+@@ -186,6 +186,7 @@ public:
      WebIDL::ExceptionOr<void> set_content_blockers(Utf16String const& patterns);
      WebIDL::ExceptionOr<void> set_site_compatibility_data(Utf16String const& source);
      void set_content_blocking_enabled(bool enabled);
@@ -68,10 +68,10 @@ index e82300aea898eda50bea36c9673b2f42d3f4789a..072d8798ec709989816bdbe64e81522b
      WebIDL::UnsignedLongLong full_layout_count();
      void begin_layout_trace();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index ce7ccca82b100189f3c76c9984a5998da6d1238e..683f99f204fcedd09588b242888096416f29a99f 100644
+index aa09ba083cbca4a7a7caa2de5d1a0a20133cf48c..02bd13948b4493c86a8da918883b041ea96eecae 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -178,6 +178,7 @@ interface Internals {
+@@ -188,6 +188,7 @@ interface Internals {
      undefined setContentBlockers(DOMString patterns);
      undefined setSiteCompatibilityData(DOMString source);
      undefined setContentBlockingEnabled(boolean enabled);
@@ -217,7 +217,7 @@ index f8eb77c9d68e5336ed2da73d01fe929a59ee1c06..8ab045ece224d7e15b0c9a583fcaf9dd
      // scripts can run, once per Window.
      void run_page_script(DOM::Document&) const;
 diff --git a/Libraries/LibWebView/Menu.h b/Libraries/LibWebView/Menu.h
-index 8988c4926742d9b71004d06a6b9749f430963cea..b61a7c8b8394eae205e29a854f890b78000d986f 100644
+index daaa7b2b73765579093f605536d5cd7e91b7a6fc..685b3309f2179917d8e6b4928c43499442ee9d87 100644
 --- a/Libraries/LibWebView/Menu.h
 +++ b/Libraries/LibWebView/Menu.h
 @@ -49,6 +49,7 @@ enum class ActionID {
@@ -229,10 +229,10 @@ index 8988c4926742d9b71004d06a6b9749f430963cea..b61a7c8b8394eae205e29a854f890b78
      ToggleVerticalTabsExpanded,
  
 diff --git a/Libraries/LibWebView/Settings.cpp b/Libraries/LibWebView/Settings.cpp
-index d7e5a92189c2e6416e571ad87b1f6799aec4a70a..1aa724785d4dcd54e0f5bbcc1c6b4ae19609ba72 100644
+index 2383e143e69c959f278b20d37a5d873df92b3709..96c07c523f7e6e3262474700ca8742ba0b30d8e4 100644
 --- a/Libraries/LibWebView/Settings.cpp
 +++ b/Libraries/LibWebView/Settings.cpp
-@@ -1342,6 +1342,30 @@ bool Settings::remove_content_blocker_list(StringView identifier)
+@@ -1382,6 +1382,30 @@ bool Settings::remove_content_blocker_list(StringView identifier)
      return true;
  }
  
@@ -264,10 +264,10 @@ index d7e5a92189c2e6416e571ad87b1f6799aec4a70a..1aa724785d4dcd54e0f5bbcc1c6b4ae1
  {
      if (m_custom_content_blocker_filters == filters)
 diff --git a/Libraries/LibWebView/Settings.h b/Libraries/LibWebView/Settings.h
-index e1a5ccb21e9f3857487a17d6d46e3467286137b6..dd3ed4ae379a8911a1bfb19dd1b90a14b5d31920 100644
+index 2e4bf4772c202d92ef9c2a014826da665fa76529..157f6ab9844e831e92b99ca7c3504ed69d42a76e 100644
 --- a/Libraries/LibWebView/Settings.h
 +++ b/Libraries/LibWebView/Settings.h
-@@ -271,6 +271,8 @@ public:
+@@ -284,6 +284,8 @@ public:
      bool remove_content_blocker_list(StringView identifier);
      String const& custom_content_blocker_filters() const { return m_custom_content_blocker_filters; }
      void set_custom_content_blocker_filters(String);
@@ -277,10 +277,10 @@ index e1a5ccb21e9f3857487a17d6d46e3467286137b6..dd3ed4ae379a8911a1bfb19dd1b90a14
      static DNSSettings parse_dns_settings(JsonValue const&);
      DNSSettings const& dns_settings() const { return m_dns_settings; }
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index fa9edf7cbfb46de63d4df3daceeb6bf8f5a2c317..a11066978755ec355509f6486e35e2617d1c0379 100644
+index 0dd3e38b831fb3e21cdc32640ae47d9bbce63b75..c6a381a805cc22dd90e41d4b434e2b67c5a7dbb6 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -2046,6 +2046,44 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
+@@ -2051,6 +2051,44 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
      did_receive_node_picker_hit_test(request_id, node_id);
  }
  
@@ -325,7 +325,7 @@ index fa9edf7cbfb46de63d4df3daceeb6bf8f5a2c317..a11066978755ec355509f6486e35e261
  void ViewImplementation::did_receive_node_picker_hit_test(u64 request_id, Web::UniqueNodeID node_id)
  {
      auto request_type = m_pending_node_picker_requests.take(request_id);
-@@ -4947,6 +4985,16 @@ void ViewImplementation::initialize_context_menus()
+@@ -4955,6 +4993,16 @@ void ViewImplementation::initialize_context_menus()
              on_inspect_element_request(*m_inspect_element_node_id);
      });
      m_inspect_element_action->set_visible(false);
@@ -342,7 +342,7 @@ index fa9edf7cbfb46de63d4df3daceeb6bf8f5a2c317..a11066978755ec355509f6486e35e261
  
      auto add_bookmark_action = Action::create("Add Bookmark…"sv, ActionID::AddBookmark, []() {
          auto& application = Application::the();
-@@ -5138,6 +5186,7 @@ NonnullRefPtr<Menu> ViewImplementation::create_page_context_menu(bool is_editabl
+@@ -5146,6 +5194,7 @@ NonnullRefPtr<Menu> ViewImplementation::create_page_context_menu(bool is_editabl
      if (is_about_page)
          menu->add_action(application.view_source_action());
      menu->add_action(application.report_website_issue_action());
@@ -350,8 +350,8 @@ index fa9edf7cbfb46de63d4df3daceeb6bf8f5a2c317..a11066978755ec355509f6486e35e261
      menu->add_separator();
      if (is_about_page) {
          menu->add_action(Action::create("Take Screenshot..."sv, ActionID::TakeScreenshot, [this]() {
-@@ -5597,6 +5646,8 @@ void ViewImplementation::did_request_image_context_menu(Badge<WebContentPage>, G
-         download_url(url, PromptForPath::Yes);
+@@ -5616,6 +5665,8 @@ void ViewImplementation::did_request_image_context_menu(Badge<WebContentPage>, G
+         download_url(url, PromptForPath::Yes, image_mime_type);
      }));
      menu->add_separator();
 +    menu->add_action(*m_block_element_action);
@@ -360,10 +360,10 @@ index fa9edf7cbfb46de63d4df3daceeb6bf8f5a2c317..a11066978755ec355509f6486e35e261
      open_context_menu(move(menu), content_position);
  }
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 9ddf06cb9607ea0390da3262584505dd3f8c1516..ba222df9cce8af0f32888f4e80edb5b7e01cb5bd 100644
+index b40814251522fef664de27f88122501793c57b5e..10e7ae46d31bf2814878c66521ac9bb5f51cf8af 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -413,6 +413,15 @@ public:
+@@ -412,6 +412,15 @@ public:
      void node_picker_preview(Web::DevicePixelPoint);
      void node_picker_cancel();
  
@@ -379,7 +379,7 @@ index 9ddf06cb9607ea0390da3262584505dd3f8c1516..ba222df9cce8af0f32888f4e80edb5b7
      void inspect_dom_node(Web::UniqueNodeID node_id, DOMNodeProperties::Type, Optional<Web::CSS::PseudoElement> pseudo_element, JsonValue options = {});
      void inspect_grid_layouts(Web::UniqueNodeID root_node_id);
      void inspect_current_grid(Web::UniqueNodeID node_id);
-@@ -951,6 +960,8 @@ protected:
+@@ -955,6 +964,8 @@ protected:
      HashMap<u64, NonnullRefPtr<Core::Promise<bool>>> m_pending_select_word_for_dictionary_lookup_requests;
      HashMap<u64, NonnullRefPtr<Core::Promise<ByteString>>> m_pending_cut_selected_text_requests;
  
@@ -388,7 +388,7 @@ index 9ddf06cb9607ea0390da3262584505dd3f8c1516..ba222df9cce8af0f32888f4e80edb5b7
      void prepare_inspect_element_action(Gfx::IntPoint content_position);
      RefPtr<Action> m_inspect_element_action;
      Optional<u64> m_inspect_element_hit_test_request_id;
-@@ -1232,6 +1243,7 @@ protected:
+@@ -1236,6 +1247,7 @@ protected:
      void request_node_picker_hit_test(NodePickerRequestType, Web::DevicePixelPoint);
      void did_receive_node_hit_test(u64 request_id, Web::UniqueNodeID);
      void did_receive_node_picker_hit_test(u64 request_id, Web::UniqueNodeID);
@@ -396,7 +396,7 @@ index 9ddf06cb9607ea0390da3262584505dd3f8c1516..ba222df9cce8af0f32888f4e80edb5b7
      void did_receive_indexed_database_inspection(u64 request_id, JsonObject);
  
      bool m_node_picker_active { false };
-@@ -1240,6 +1252,9 @@ protected:
+@@ -1244,6 +1256,9 @@ protected:
      HashMap<u64, NodePickerRequestType> m_pending_node_picker_requests;
      DevTools::DevToolsDelegate::OnNodePickerEvent m_on_node_picker_event;
  
@@ -407,10 +407,10 @@ index 9ddf06cb9607ea0390da3262584505dd3f8c1516..ba222df9cce8af0f32888f4e80edb5b7
      bool m_devtools_takes_console_messages { false };
      bool m_devtools_takes_console_errors { false };
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 8b873f623f2d085ec2c944086f0433ee6366ea2c..9fafbf57d2fdeb79b4b6b56efe2ed997d676ddcc 100644
+index d7bb301f9adab3cd58780f2e92919704ea0ff9ec..b2132b63c3c287e76fa2a2aa76733a46e0248489 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1175,6 +1175,12 @@ void WebContentPage::did_get_hovered_node_id(Web::UniqueNodeID node_id)
+@@ -1184,6 +1184,12 @@ void WebContentPage::did_get_hovered_node_id(Web::UniqueNodeID node_id)
      }
  }
  
@@ -424,10 +424,10 @@ index 8b873f623f2d085ec2c944086f0433ee6366ea2c..9fafbf57d2fdeb79b4b6b56efe2ed997
  {
      if (displays_tab()) {
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 27d7f184dc9969c1cf8896073f4a4f9d4e86edf8..138645130e3f189170c6f2fb79d7070c4224a495 100644
+index 819d47f98066ac048f735c7eba4495f1a902da58..6b10c3bd915c1dc8a34cdbbd0f33adbe87e9b382 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -237,6 +237,7 @@ private:
+@@ -238,6 +238,7 @@ private:
      virtual void did_accessibility_focus_change(i64 focused_node_id) override;
      virtual void did_get_hovered_node_id(Web::UniqueNodeID node_id) override;
      virtual void did_get_node_id_at_position(u64 request_id, Web::UniqueNodeID node_id) override;
@@ -436,10 +436,10 @@ index 27d7f184dc9969c1cf8896073f4a4f9d4e86edf8..138645130e3f189170c6f2fb79d7070c
      virtual void did_get_style_sheet_source(Web::CSS::StyleSheetIdentifier identifier, URL::URL base_url, Utf16String source) override;
      virtual void did_list_devtools_sources(u64 request_id, Vector<Web::HTML::ScriptRegistryDescription> sources) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 925e5fda9b70caaefd201681ac15c2db029173f3..615d16b41dbaff0ab350bf7e51e2578c37d34c44 100644
+index 6d21ef39d01b3cf37db6687c439f76a1f96a6f3f..43ac81cfa65110a05025058efa2ee465397eb56d 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -2173,6 +2173,20 @@ void ConnectionFromClient::get_node_id_at_position(Web::PageId page_id, u64 requ
+@@ -2174,6 +2174,20 @@ void ConnectionFromClient::get_node_id_at_position(Web::PageId page_id, u64 requ
      async_did_get_node_id_at_position(page_id, request_id, page->page().node_id_at_position(position));
  }
  
@@ -461,7 +461,7 @@ index 925e5fda9b70caaefd201681ac15c2db029173f3..615d16b41dbaff0ab350bf7e51e2578c
  {
      auto page = this->page(page_id);
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index be8e2f82ca805c9f3882a9fbfea2dcfb5a6ce477..a47d7d6e5daff9327f6ac86325c4da85918f83f3 100644
+index 1f9364964625673639eb64dbf4ed138cfa4ce574..4b6b180b5be23243dab30223eec13311e14333f4 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -214,6 +214,7 @@ private:
@@ -473,10 +473,10 @@ index be8e2f82ca805c9f3882a9fbfea2dcfb5a6ce477..a47d7d6e5daff9327f6ac86325c4da85
      virtual void list_style_sheets(Web::PageId page_id) override;
      virtual void request_style_sheet_source(Web::PageId page_id, Web::CSS::StyleSheetIdentifier identifier) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index 83f9532378a567f1120567198eeb929ffb77eef4..0a0424078b727a3e3a3bef33c7fef8444467e98c 100644
+index bb0db34c849a48a6765e678644294ae8775360ca..61af472e9749fd0887ab8bab2b097311f2b3541f 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
-@@ -158,6 +158,7 @@ endpoint WebContentClient routed by Web::PageId page_id
+@@ -160,6 +160,7 @@ endpoint WebContentClient routed by Web::PageId page_id
      did_accessibility_focus_change(Web::PageId page_id, i64 focused_node_id) =|
      did_get_hovered_node_id(Web::PageId page_id, Web::UniqueNodeID node_id) =|
      did_get_node_id_at_position(Web::PageId page_id, u64 request_id, Web::UniqueNodeID node_id) =|
@@ -485,10 +485,10 @@ index 83f9532378a567f1120567198eeb929ffb77eef4..0a0424078b727a3e3a3bef33c7fef844
      did_mutate_dom(Web::PageId page_id, WebView::Mutation mutation) =|
      did_get_dom_node_html(Web::PageId page_id, String html) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 9a294b790ec41325260e91ff6e6cb8820c582fdb..1833d012333da10d66e3cee90450c29e94eec5fd 100644
+index 1686b2690fd4fea0dd90babdff950201d7255582..f0188450eff7ec3185a6a60965fedc8a5121069e 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -194,6 +194,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -195,6 +195,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      perform_accessibility_text_action(Web::PageId page_id, i64 node_id, String action, i32 offset_start, i32 offset_end, String text) =|
      get_hovered_node_id(Web::PageId page_id) =|
      get_node_id_at_position(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) =|

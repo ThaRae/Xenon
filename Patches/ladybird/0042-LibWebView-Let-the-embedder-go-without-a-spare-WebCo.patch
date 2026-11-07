@@ -17,10 +17,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index d25b928ea996d7687a5d7f74bcd4c203868f5261..ace58df7e1d5b1660798b746afb127edfb80f8d2 100644
+index b985dd5e8b5681cee8e36a445cfcd87f504851f0..50f5e6abdc71cea119414dd2fbb82ca75570c28e 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -1795,6 +1795,10 @@ ErrorOr<Application::ChildFrameWebContentProcess> Application::launch_child_fram
+@@ -1818,6 +1818,10 @@ ErrorOr<Application::ChildFrameWebContentProcess> Application::launch_child_fram
  
  void Application::launch_spare_web_content_process()
  {

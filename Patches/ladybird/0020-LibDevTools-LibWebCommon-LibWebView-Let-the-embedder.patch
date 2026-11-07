@@ -27,7 +27,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  6 files changed, 52 insertions(+), 7 deletions(-)
 
 diff --git a/Libraries/LibDevTools/FirefoxClient.cpp b/Libraries/LibDevTools/FirefoxClient.cpp
-index 8e31417547fa06ab1759fab4c782acee19753f0b..64cf5b83c6b1c83d112e50aa44c9239ece8dfa5d 100644
+index d84b9989978cca42c8747c2f2a53e870036069b0..973b4c80edb282f532ff0248b5ed9ae1a8e6b5cd 100644
 --- a/Libraries/LibDevTools/FirefoxClient.cpp
 +++ b/Libraries/LibDevTools/FirefoxClient.cpp
 @@ -20,6 +20,7 @@
@@ -87,18 +87,18 @@ index bd493c671915852725945e10d7f303da57dcafb0..d532b1ed5292251633c18bc6877b7e89
 +
  }
 diff --git a/Libraries/LibWebView/CrashReportStore.cpp b/Libraries/LibWebView/CrashReportStore.cpp
-index 81da143c75179d1df241625c145a816b78b4da06..5410c6b68641d4a5060d662886bb77d133c266f3 100644
+index 0b9732cc9c4d57cef539be8f443252d8036ca8ed..3601aa9b3e6b55dac9af5c678bab9c561ac79b91 100644
 --- a/Libraries/LibWebView/CrashReportStore.cpp
 +++ b/Libraries/LibWebView/CrashReportStore.cpp
-@@ -20,6 +20,7 @@
- #include <LibCore/Process.h>
+@@ -21,6 +21,7 @@
  #include <LibCore/StandardPaths.h>
  #include <LibCore/System.h>
+ #include <LibFileSystem/FileSystem.h>
 +#include <LibWebCommon/WebView/Utilities.h>
  #include <LibWebView/CrashReport.h>
  #include <LibWebView/CrashReportStore.h>
  #include <LibWebView/ProcessManager.h>
-@@ -38,7 +39,7 @@ using namespace Core::CrashReportData;
+@@ -39,7 +40,7 @@ using namespace Core::CrashReportData;
  
  ByteString CrashReportStore::default_directory()
  {
@@ -106,7 +106,7 @@ index 81da143c75179d1df241625c145a816b78b4da06..5410c6b68641d4a5060d662886bb77d1
 +    return LexicalPath::join(Core::StandardPaths::user_data_directory(), WebView::application_name(), "CrashReports"sv).string();
  }
  
- // The browser's own store lives under the user data directory.
+ // The browser's own store. It moves into the profile once the profile is known.
 diff --git a/Libraries/LibWebView/Profile.cpp b/Libraries/LibWebView/Profile.cpp
 index 5407a6cded5ecd9384e3fd581922a34cbaa435b1..674f5df9edc38fa1b664b83ad21ed3d8f65c52d7 100644
 --- a/Libraries/LibWebView/Profile.cpp
@@ -144,10 +144,10 @@ index 5407a6cded5ecd9384e3fd581922a34cbaa435b1..674f5df9edc38fa1b664b83ad21ed3d8
  
      TRY(create_profile_directories(paths));
 diff --git a/Tests/LibWebView/TestProfile.cpp b/Tests/LibWebView/TestProfile.cpp
-index 5df347c1321154bf3a2ee287becffa7a4040b99a..91deb0d4db1d2e086b2ed53a9f086476037f3afc 100644
+index e980437a580df0827a4c56ada0836270d5fc867b..5751812cd246dea5b138bc24b0f2bb42f1a55ab6 100644
 --- a/Tests/LibWebView/TestProfile.cpp
 +++ b/Tests/LibWebView/TestProfile.cpp
-@@ -19,6 +19,7 @@
+@@ -20,6 +20,7 @@
  #include <LibHTTP/NetworkIsolationKey.h>
  #include <LibTest/TestCase.h>
  #include <LibURL/Parser.h>
@@ -155,7 +155,7 @@ index 5df347c1321154bf3a2ee287becffa7a4040b99a..91deb0d4db1d2e086b2ed53a9f086476
  #include <LibWebView/BookmarkStore.h>
  #include <LibWebView/CookieJar.h>
  #include <LibWebView/FaviconStore.h>
-@@ -125,6 +126,28 @@ TEST_CASE(legacy_layout)
+@@ -126,6 +127,28 @@ TEST_CASE(legacy_layout)
      remove_test_root();
  }
  

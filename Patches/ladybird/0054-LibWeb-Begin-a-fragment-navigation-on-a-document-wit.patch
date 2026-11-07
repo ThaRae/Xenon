@@ -21,10 +21,10 @@ the same-document navigation it expects.
  1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index 6aca110a15b29264e47b2b8e35351a0ef42bf40b..dba9cdab7235954242956eee1a34b7e3b8900855 100644
+index 28c9ed1d5695960564b2fba7ebb4200ef1843d01..621746339e088ce5b6eb787a4a298c22557416d8 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-@@ -4027,8 +4027,11 @@ void LocalNavigable::navigate_to_a_fragment(URL::URL const& url, HistoryHandling
+@@ -4033,8 +4033,11 @@ void LocalNavigable::navigate_to_a_fragment(URL::URL const& url, HistoryHandling
      //         https://github.com/whatwg/html/issues/13041
      //         So instead, we set its latest entry to the entry it's displayed by — as the URL and history update steps
      //         would have. The update then runs as a same-document navigation — which fires popstate and hashchange.

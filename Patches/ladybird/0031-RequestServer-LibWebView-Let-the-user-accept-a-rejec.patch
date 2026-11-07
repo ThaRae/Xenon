@@ -383,7 +383,7 @@ index f56316405830e2b7c61db7d39cd878415047c221..a9b941df418e3083a77f389bbe4fb7b6
      virtual void remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) override;
      virtual void retrieve_cache_access_profile(u64 access_profile_request_id, AK::Duration granularity) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index 40608ffd5b3901917e7ce4f3114d017f44bdecb3..2c071d6ba5d79f25404b0259a922b43007347e15 100644
+index 6afdc8e0cb74da3a9275733f7ab47bc041392142..1722f09afa548c4f3735a3fcf2707ddadada83e2 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -21,6 +21,7 @@
@@ -394,7 +394,7 @@ index 40608ffd5b3901917e7ce4f3114d017f44bdecb3..2c071d6ba5d79f25404b0259a922b430
  #include <RequestServer/ConnectionFromClient.h>
  #include <RequestServer/ControlConnectionFromClient.h>
  #include <RequestServer/Request.h>
-@@ -739,8 +740,9 @@ bool Request::defer_until_response_cookies_and_hsts_policy_are_stored(Function<v
+@@ -738,8 +739,9 @@ bool Request::defer_until_response_cookies_and_hsts_policy_are_stored(Function<v
      // If an HTTP response, received over a secure transport, includes an STS header field, conforming to the grammar
      // specified in Section 6.1, and there are no underlying secure transport errors or warnings, the UA MUST either
      // note the host as a Known HSTS Host or update the UA's cached information for the Known HSTS Host.
@@ -405,7 +405,7 @@ index 40608ffd5b3901917e7ce4f3114d017f44bdecb3..2c071d6ba5d79f25404b0259a922b430
          // If a UA receives more than one STS header field in an HTTP response message over secure transport, then the
          // UA MUST process only the first such header field.
          for (auto const& [name, value] : *m_response_headers) {
-@@ -1007,6 +1009,41 @@ void Request::retry_after_aia(Badge<ConnectionFromClient>)
+@@ -1012,6 +1014,41 @@ void Request::retry_after_aia(Badge<ConnectionFromClient>)
      transition_to_state(State::Fetch);
  }
  
@@ -447,7 +447,7 @@ index 40608ffd5b3901917e7ce4f3114d017f44bdecb3..2c071d6ba5d79f25404b0259a922b430
  void Request::transition_to_state(State state)
  {
      // Let clients stop waiting for a cache-only result before DNS or a stalled cache writer can delay the response.
-@@ -1558,6 +1595,21 @@ void Request::handle_fetch_state()
+@@ -1563,6 +1600,21 @@ void Request::handle_fetch_state()
      set_option(CURLOPT_SSL_CTX_DATA, m_aia_collector.ptr());
  #endif
  
@@ -469,7 +469,7 @@ index 40608ffd5b3901917e7ce4f3114d017f44bdecb3..2c071d6ba5d79f25404b0259a922b430
      if (m_content_decoding_disabled) {
          set_option(CURLOPT_ACCEPT_ENCODING, "identity");
          set_option(CURLOPT_HTTP_CONTENT_DECODING, 0L);
-@@ -1744,7 +1796,24 @@ void Request::handle_complete_state()
+@@ -1750,7 +1802,24 @@ void Request::handle_complete_state()
              return;
          }
  
@@ -495,10 +495,10 @@ index 40608ffd5b3901917e7ce4f3114d017f44bdecb3..2c071d6ba5d79f25404b0259a922b430
  
              if (m_network_error == Requests::NetworkError::Unknown) {
 diff --git a/Services/RequestServer/Request.h b/Services/RequestServer/Request.h
-index f88a4b08123ded49b3f5fcfc5a0a515ab484c315..b70668a7bb2df26546bedecff473e8808e186844 100644
+index 5dfaa488580bd5c6628353165bd2a1930efbdddf..5d58e28ae733ddccc978c8334d0dd37f75e0fc45 100644
 --- a/Services/RequestServer/Request.h
 +++ b/Services/RequestServer/Request.h
-@@ -259,6 +259,10 @@ private:
+@@ -262,6 +262,10 @@ private:
      ErrorOr<void> inform_client_request_started();
      bool should_retry_after_fetching_aia_intermediate(int curl_result_code) const;
      void start_aia_fetch_and_retry();
@@ -509,7 +509,7 @@ index f88a4b08123ded49b3f5fcfc5a0a515ab484c315..b70668a7bb2df26546bedecff473e880
      ErrorOr<void> send_request_pipe_to_client();
      ErrorOr<void> send_transferred_body_file_to_client();
      void transfer_headers_to_client_if_needed();
-@@ -329,6 +333,10 @@ private:
+@@ -339,6 +343,10 @@ private:
  
      RefPtr<AIACollector> m_aia_collector;
      size_t m_aia_fetch_count { 0 };
