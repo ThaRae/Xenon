@@ -47,6 +47,7 @@ public:
     Optional<WebView::SessionWindowGeometry> geometry_of(WindowId window) const { return m_geometries.get(window); }
 
     void install_page_window_requests(View&);
+    void request_window_frame(WindowId, u32 request, Gfx::IntPoint = {}, Gfx::IntSize = {});
 
     void request_close(WindowId);
     void request_quit();

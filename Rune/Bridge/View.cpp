@@ -17,6 +17,7 @@
 #include <Rune/Bridge/Accessibility.h>
 #include <Rune/Bridge/Application.h>
 #include <Rune/Bridge/Engine.h>
+#include <Rune/Bridge/ExtensionsHost.h>
 #include <Rune/Bridge/Input.h>
 #include <Rune/Bridge/View.h>
 #include <UI/Bangs.h>
@@ -62,17 +63,17 @@ private:
     Function<void()> m_on_change;
 };
 
-NonnullOwnPtr<View> View::create(XenonViewId id, Web::DevicePixelSize viewport_size, double device_pixel_ratio, WebView::IsPrivate is_private, Web::HTML::VisibilityState visibility_state, Optional<WebView::CanonicalTraversable&> traversable)
+NonnullOwnPtr<View> View::create(XenonViewId id, Web::DevicePixelSize viewport_size, double device_pixel_ratio, WebView::IsPrivate is_private, Web::HTML::VisibilityState visibility_state, Optional<WebView::CanonicalTraversable&> traversable, WebView::EnableContentBlocker enable_content_blocker)
 {
-    auto view = adopt_own(*new View(id, viewport_size, device_pixel_ratio, is_private));
+    auto view = adopt_own(*new View(id, viewport_size, device_pixel_ratio, is_private, enable_content_blocker));
     view->initialize_tab(visibility_state, traversable);
     view->report_history_state();
     Application::the().did_create_view(*view);
     return view;
 }
 
-View::View(XenonViewId id, Web::DevicePixelSize viewport_size, double device_pixel_ratio, WebView::IsPrivate is_private)
-    : ViewImplementation(is_private)
+View::View(XenonViewId id, Web::DevicePixelSize viewport_size, double device_pixel_ratio, WebView::IsPrivate is_private, WebView::EnableContentBlocker enable_content_blocker)
+    : ViewImplementation(is_private, enable_content_blocker)
     , m_id(id)
     , m_viewport_size(viewport_size)
 {
@@ -108,6 +109,7 @@ void View::install_callbacks()
     on_title_change = [this, &engine](Utf16String const& title) {
         auto utf8_title = title.to_utf8();
         engine.notify(&XenonUiCallbacks::view_title_changed, m_id, xenon_str(utf8_title));
+        ExtensionsHost::view_title_changed(*this);
     };
 
     on_url_change = [this, &engine](URL::URL const& url) {
@@ -119,6 +121,7 @@ void View::install_callbacks()
 
     on_loading_state_change = [this, &engine](bool is_loading) {
         engine.notify(&XenonUiCallbacks::view_loading_changed, m_id, is_loading);
+        ExtensionsHost::view_loading_changed(*this, is_loading);
     };
 
     on_favicon_change = [this, &engine](Optional<Gfx::Bitmap const&> favicon) {

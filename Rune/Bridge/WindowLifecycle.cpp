@@ -152,7 +152,12 @@ void WindowLifecycle::request_frame(ViewId view, u32 request, Gfx::IntPoint posi
     auto const* window = model ? model->window_of(view) : nullptr;
     if (!window)
         return;
-    notify(&XenonWindowCallbacks::window_frame_requested, window->id, request, position.x(), position.y(), size.width(), size.height());
+    request_window_frame(window->id, request, position, size);
+}
+
+void WindowLifecycle::request_window_frame(WindowId window, u32 request, Gfx::IntPoint position, Gfx::IntSize size)
+{
+    notify(&XenonWindowCallbacks::window_frame_requested, window, request, position.x(), position.y(), size.width(), size.height());
 }
 
 void WindowLifecycle::install_page_window_requests(View& view)

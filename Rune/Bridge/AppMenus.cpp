@@ -8,6 +8,7 @@
 #include <LibWebView/ViewImplementation.h>
 #include <Rune/Bridge/AppMenus.h>
 #include <Rune/Bridge/Engine.h>
+#include <Rune/Bridge/ExtensionsHost.h>
 #include <Rune/Bridge/View.h>
 #include <Rune/Bridge/XenonBridgePage.h>
 
@@ -56,6 +57,9 @@ WebView::Menu& AppMenus::main_menu()
     menu.add_separator();
 
     menu.add_action(application.open_settings_page_action());
+    menu.add_action(WebView::Action::create("Extensions"sv, WebView::ActionID::OpenSettingsPage, [] {
+        ExtensionsHost::show_extensions();
+    }));
     menu.add_submenu(application.inspect_menu());
     menu.add_submenu(application.debug_menu());
     menu.add_separator();

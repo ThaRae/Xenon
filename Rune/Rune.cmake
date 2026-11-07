@@ -48,7 +48,16 @@ function(xenon_import_rune_ui_crate)
     endif()
 endfunction()
 
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+add_custom_target(xenon-rune-vendor
+    COMMAND ${Python3_EXECUTABLE} "${XENON_SOURCE_DIR}/Meta/rune.py" prepare
+    COMMENT "Preparing the patched Rune source tree"
+    VERBATIM
+)
+
 xenon_import_rune_ui_crate(MANIFEST_PATH "${XENON_RUNE_UI_MANIFEST}" CRATE_NAME xenon_ui)
+add_dependencies(xenon_ui-build xenon-rune-vendor)
 
 set(XENON_RUNE_BRIDGE_SOURCES
     "${XENON_RUNE_DIR}/Bridge/AppMenus.cpp"
@@ -57,7 +66,6 @@ set(XENON_RUNE_BRIDGE_SOURCES
     "${XENON_RUNE_DIR}/Bridge/ExtensionsBrowser.cpp"
     "${XENON_RUNE_DIR}/Bridge/Input.cpp"
     "${XENON_RUNE_DIR}/Bridge/TabMemory.cpp"
-    "${XENON_RUNE_DIR}/Bridge/Updater.cpp"
     "${XENON_RUNE_DIR}/Bridge/View.cpp"
     "${XENON_RUNE_DIR}/Bridge/XenonBridge.cpp"
 )
@@ -99,6 +107,36 @@ endif()
 add_dependencies(xenon-tests TestXenonRuneBridge)
 
 target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgePage.cpp")
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgePrompts.cpp")
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/Drop.cpp")
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/PictureInPicture.cpp" "${XENON_RUNE_DIR}/Bridge/ViewMedia.cpp")
+target_link_libraries(xenon-rune-bridge PUBLIC LibWakeLock)
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/Screenshots.cpp")
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/CrashReports.cpp")
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/UpdaterBridge.cpp")
+if (APPLE)
+    target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/UpdaterMac.mm")
+    set_source_files_properties("${XENON_RUNE_DIR}/Bridge/UpdaterMac.mm" PROPERTIES COMPILE_FLAGS "-fobjc-arc -F${XENON_SPARKLE_DIR}")
+    target_link_options(xenon-rune-bridge PUBLIC "-F${XENON_SPARKLE_DIR}" "-Wl,-rpath,@executable_path/../Frameworks")
+    target_link_libraries(xenon-rune-bridge PUBLIC "-framework Sparkle")
+else()
+    target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/Updater.cpp")
+endif()
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/PlatformServices.cpp")
+if (APPLE)
+    target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/PlatformServicesMac.mm" "${XENON_UI_DIR}/DictionaryLookup.mm" "${XENON_UI_DIR}/SpellCheckerMac.mm")
+    set_source_files_properties("${XENON_RUNE_DIR}/Bridge/PlatformServicesMac.mm" "${XENON_UI_DIR}/SpellCheckerMac.mm" PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+elseif (LINUX AND NOT ANDROID)
+    target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/PlatformServicesOther.cpp" "${XENON_RUNE_DIR}/Bridge/ExternalURLActivationToken.cpp" "${XENON_UI_DIR}/ExternalURLHandler.cpp")
+else()
+    target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/PlatformServicesOther.cpp")
+endif()
 
 target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/BrowserModel.cpp")
 target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/BrowserModelTabGroups.cpp" "${XENON_RUNE_DIR}/Bridge/XenonBridgeTabGroups.cpp")
@@ -111,7 +149,11 @@ target_sources(xenon-rune-bridge PRIVATE
     "${XENON_RUNE_DIR}/Bridge/TabHibernation.cpp"
     "${XENON_RUNE_DIR}/Bridge/XenonBridgeHibernation.cpp"
     "${XENON_RUNE_DIR}/Bridge/XenonBridgeTaskManager.cpp"
+    "${XENON_RUNE_DIR}/Bridge/XenonBridgeBookmarks.cpp"
+    "${XENON_RUNE_DIR}/Bridge/XenonBridgeElementPicker.cpp"
+    "${XENON_RUNE_DIR}/Bridge/XenonBridgeLocationMenu.cpp"
 )
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgeExtensions.cpp")
 
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonRunePage.cpp" Xenon NAME TestXenonRunePage LIBS xenon-rune-bridge)
 if (TARGET ladybird-helper-processes)
@@ -139,8 +181,17 @@ if (TARGET ladybird_build_resource_files)
 endif()
 add_dependencies(xenon-tests TestXenonRuneWindows)
 
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonRuneBookmarks.cpp" Xenon NAME TestXenonRuneBookmarks LIBS xenon-rune-bridge)
+if (TARGET ladybird-helper-processes)
+    add_dependencies(TestXenonRuneBookmarks ladybird-helper-processes)
+endif()
+if (TARGET ladybird_build_resource_files)
+    add_dependencies(TestXenonRuneBookmarks ladybird_build_resource_files)
+endif()
+add_dependencies(xenon-tests TestXenonRuneBookmarks)
+
 if (NOT APPLE)
-    set_target_properties(TestXenonRuneBridge TestXenonRunePage TestXenonRuneWindows PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
+    set_target_properties(TestXenonRuneBridge TestXenonRunePage TestXenonRuneWindows TestXenonRuneBookmarks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
 endif()
 
 target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgeAccessibility.cpp")
@@ -155,4 +206,33 @@ endif()
 add_dependencies(xenon-tests TestXenonRuneAccessibility)
 if (NOT APPLE)
     set_target_properties(TestXenonRuneAccessibility PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
+endif()
+
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonRuneExtensions.cpp" Xenon NAME TestXenonRuneExtensions LIBS xenon-rune-bridge)
+target_compile_definitions(TestXenonRuneExtensions PRIVATE XENON_SOURCE_DIR="${XENON_SOURCE_DIR}")
+if (TARGET ladybird-helper-processes)
+    add_dependencies(TestXenonRuneExtensions ladybird-helper-processes)
+endif()
+if (TARGET ladybird_build_resource_files)
+    add_dependencies(TestXenonRuneExtensions ladybird_build_resource_files)
+endif()
+add_dependencies(xenon-tests TestXenonRuneExtensions)
+if (NOT APPLE)
+    set_target_properties(TestXenonRuneExtensions PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
+endif()
+
+target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/SplitViews.cpp" "${XENON_RUNE_DIR}/Bridge/XenonBridgeSplitView.cpp")
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonSplitViews.cpp" Xenon NAME TestXenonSplitViews LIBS xenon-rune-bridge)
+add_dependencies(xenon-tests TestXenonSplitViews)
+
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonRunePrompts.cpp" Xenon NAME TestXenonRunePrompts LIBS xenon-rune-bridge)
+if (TARGET ladybird-helper-processes)
+    add_dependencies(TestXenonRunePrompts ladybird-helper-processes)
+endif()
+if (TARGET ladybird_build_resource_files)
+    add_dependencies(TestXenonRunePrompts ladybird_build_resource_files)
+endif()
+add_dependencies(xenon-tests TestXenonRunePrompts)
+if (NOT APPLE)
+    set_target_properties(TestXenonRunePrompts PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
 endif()

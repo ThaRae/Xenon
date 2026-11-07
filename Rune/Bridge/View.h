@@ -38,7 +38,7 @@ class View final : public WebView::ViewImplementation {
 public:
     AK_ALLOC_WITH_KMALLOC;
 
-    static NonnullOwnPtr<View> create(XenonViewId, Web::DevicePixelSize, double device_pixel_ratio, WebView::IsPrivate, Web::HTML::VisibilityState, Optional<WebView::CanonicalTraversable&> = {});
+    static NonnullOwnPtr<View> create(XenonViewId, Web::DevicePixelSize, double device_pixel_ratio, WebView::IsPrivate, Web::HTML::VisibilityState, Optional<WebView::CanonicalTraversable&> = {}, WebView::EnableContentBlocker = WebView::EnableContentBlocker::Yes);
 
     virtual ~View() override;
 
@@ -81,7 +81,7 @@ public:
     virtual Gfx::IntPoint to_widget_position(Gfx::IntPoint content_position) const override { return content_position; }
 
 private:
-    View(XenonViewId, Web::DevicePixelSize, double device_pixel_ratio, WebView::IsPrivate);
+    View(XenonViewId, Web::DevicePixelSize, double device_pixel_ratio, WebView::IsPrivate, WebView::EnableContentBlocker);
 
     enum class PageDialog : u8 {
         None,

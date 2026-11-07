@@ -68,6 +68,8 @@ public:
     View& open_view(XenonViewId opener, Web::HTML::ActivateTab, Optional<WebView::CanonicalTraversable&> = {});
     View& open_view_for_new_tab_or_window(XenonViewId opener, WebView::IsPrivate);
     void close_tab(XenonViewId);
+    View& add_detached_view(NonnullOwnPtr<View>);
+    void close_detached_view(XenonViewId);
 
     void set_window_viewport(XenonWindowId, Web::DevicePixelSize, double device_pixel_ratio);
     void record_view_viewport(XenonViewId, Web::DevicePixelSize, double device_pixel_ratio);

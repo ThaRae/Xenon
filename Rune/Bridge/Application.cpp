@@ -8,11 +8,17 @@
 #include <LibCore/EventLoop.h>
 #include <LibCore/Process.h>
 #include <LibURL/InternalURLs.h>
+#include <LibWebView/PictureInPictureWindow.h>
 #include <LibWebView/SessionStore.h>
 #include <LibWebView/UserAgent.h>
 #include <Rune/Bridge/Application.h>
+#include <Rune/Bridge/Bookmarks.h>
 #include <Rune/Bridge/Clipboard.h>
 #include <Rune/Bridge/Engine.h>
+#include <Rune/Bridge/ExtensionsHost.h>
+#include <Rune/Bridge/PictureInPicture.h>
+#include <Rune/Bridge/PlatformServices.h>
+#include <Rune/Bridge/SaveLocation.h>
 #include <Rune/Bridge/TaskManager.h>
 #include <Rune/Bridge/View.h>
 #include <Rune/Bridge/WindowLifecycle.h>
@@ -63,12 +69,57 @@ Application::Application()
     Ladybird::SettingsPage::set_host({
         .open_directory = [](ByteString const& directory) { open_with_system_handler({ directory }); },
         .reveal_file = [](ByteString const& file) { reveal_file(file); },
-        .show_extensions = [] { },
+        .show_extensions = [] { ExtensionsHost::show_extensions(); },
         .install_update = [] { Ladybird::Updater::install_and_relaunch(); },
     });
 }
 
 Application::~Application() = default;
+
+Optional<String> Application::ui_font_family() const
+{
+    return platform_ui_font_family();
+}
+
+Optional<String> Application::system_font_family() const
+{
+#if defined(AK_OS_MACOS)
+    return {};
+#else
+    return ui_font_family();
+#endif
+}
+
+void Application::resolve_external_url_handler(URL::URL const& url, WebView::ExternalURLHandlerCallback callback) const
+{
+    if (browser_options().headless_mode.has_value()) {
+        WebView::Application::resolve_external_url_handler(url, move(callback));
+        return;
+    }
+    resolve_platform_external_url_handler(url, move(callback));
+}
+
+void Application::display_crash_report_notification(ByteString const& report_name)
+{
+    Xenon::offer_crash_report(report_name);
+}
+
+NonnullRefPtr<Core::Promise<ByteString>> Application::ask_user_for_download_path(ByteString const& file) const
+{
+    return ask_ui_for_save_location(file);
+}
+
+bool Application::supports_picture_in_picture() const
+{
+    return !browser_options().headless_mode.has_value() || WebView::Application::supports_picture_in_picture();
+}
+
+OwnPtr<WebView::PictureInPictureWindow> Application::create_picture_in_picture_window(WebView::WebContentPage& requesting_page, WebView::CanonicalTraversable& traversable, Gfx::IntSize video_size)
+{
+    if (browser_options().headless_mode.has_value())
+        return WebView::Application::create_picture_in_picture_window(requesting_page, traversable, video_size);
+    return create_picture_in_picture_window_for(traversable, static_cast<View const&>(requesting_page.view()), video_size);
+}
 
 void Application::create_platform_arguments(Core::ArgsParser& args_parser)
 {
@@ -124,7 +175,12 @@ void Application::start_xenon_services()
         settings().set_new_tab_page_url(URL::about_newtab());
 
     Ladybird::FilterLists::Updater::initialize();
+    if (!browser_options().headless_mode.has_value()) {
+        initialize_platform_external_url_handler(Core::EventLoop::current());
+        Ladybird::Updater::initialize();
+    }
     Ladybird::PasswordManagers::the().initialize(m_xenon_arguments.password_manager_choice);
+    ExtensionsHost::start();
 
     Core::deferred_invoke([] {
         Ladybird::Extensions::Registry::the().start_background_pages();
@@ -188,27 +244,71 @@ void Application::show_download_in_folder(WebView::FileDownloader::Download cons
     reveal_file(path.release_value().to_byte_string());
 }
 
-// FIXME: Show a dialog to name the bookmark and pick its folder, as the Qt frontend's BookmarkDialog does. Until
-//        then, the bookmark is added straight away with the page's title, where Bookmarks keeps new bookmarks.
 NonnullRefPtr<Application::BookmarkPromise> Application::display_add_bookmark_dialog(Optional<String const&> target_folder_id) const
 {
-    auto promise = BookmarkPromise::construct();
-    auto view = active_web_view();
-    if (!view.has_value()) {
-        promise->reject(Error::from_string_literal("There is no page to bookmark"));
-        return promise;
+    Optional<URL::URL> current_url;
+    Optional<String> current_title;
+    Optional<String> current_favicon_hash;
+    if (auto view = active_web_view(); view.has_value()) {
+        current_url = view->displayed_url();
+        current_title = view->title().to_utf8();
+        current_favicon_hash = view->favicon_hash();
     }
-    auto title = view->title().to_utf8();
-    BookmarkDialogResult result {
-        .data = WebView::BookmarkItem::Bookmark {
-            .url = view->displayed_url(),
-            .title = title.is_empty() ? Optional<String> {} : Optional<String> { move(title) },
-            .favicon_hash = view->favicon_hash(),
-        },
-        .target_folder_id = target_folder_id.map([](auto const& id) { return id; }),
-    };
-    promise->resolve(move(result));
-    return promise;
+    return Bookmarks::show_dialog({
+        .kind = Bookmarks::DialogKind::AddBookmark,
+        .url = move(current_url),
+        .title = move(current_title),
+        .favicon_hash = move(current_favicon_hash),
+        .selected_folder_id = target_folder_id.copy(),
+        .excluded_folder_id = {},
+    });
+}
+
+NonnullRefPtr<Application::BookmarkPromise> Application::display_edit_bookmark_dialog(WebView::BookmarkItem const& current_bookmark, Optional<String const&> parent_folder_id) const
+{
+    auto const& bookmark = current_bookmark.bookmark();
+    return Bookmarks::show_dialog({
+        .kind = Bookmarks::DialogKind::EditBookmark,
+        .url = bookmark.url,
+        .title = bookmark.title,
+        .favicon_hash = bookmark.favicon_hash,
+        .selected_folder_id = parent_folder_id.copy(),
+        .excluded_folder_id = {},
+    });
+}
+
+NonnullRefPtr<Application::BookmarkPromise> Application::display_add_bookmark_folder_dialog(Optional<String const&> default_title, Optional<String const&> target_folder_id) const
+{
+    return Bookmarks::show_dialog({
+        .kind = Bookmarks::DialogKind::AddFolder,
+        .url = {},
+        .title = default_title.copy(),
+        .favicon_hash = {},
+        .selected_folder_id = target_folder_id.copy(),
+        .excluded_folder_id = {},
+    });
+}
+
+NonnullRefPtr<Application::BookmarkPromise> Application::display_edit_bookmark_folder_dialog(WebView::BookmarkItem const& current_folder, Optional<String const&> parent_folder_id) const
+{
+    return Bookmarks::show_dialog({
+        .kind = Bookmarks::DialogKind::EditFolder,
+        .url = {},
+        .title = current_folder.folder().title,
+        .favicon_hash = {},
+        .selected_folder_id = parent_folder_id.copy(),
+        .excluded_folder_id = current_folder.id,
+    });
+}
+
+void Application::show_bookmark_context_menu(Gfx::IntPoint position, Optional<WebView::BookmarkItem const&> item, Optional<String const&> target_folder_id, Optional<String const&> parent_folder_id)
+{
+    Bookmarks::show_context_menu_at_page_position(position, item, target_folder_id, parent_folder_id);
+}
+
+Optional<Application::BookmarkID> Application::bookmark_item_id_for_context_menu() const
+{
+    return Bookmarks::item_for_context_menu();
 }
 
 Optional<WebView::ViewImplementation&> Application::open_blank_new_tab(Web::HTML::ActivateTab activate_tab) const
