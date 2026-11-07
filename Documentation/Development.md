@@ -210,7 +210,9 @@ CI runs on GitHub Actions, on GitHub's own runners:
   build takes a few hours, so the build step stops itself in time to save the caches, and the next run carries on from
   there. A change to the flags every file compiles with (the baseline CPU, say) misses all of ccache, though not
   vcpkg's packages. Land it on `main`, and let CI's build of `main` finish and save new caches, before running the
-  release workflow, which builds from `main`'s caches and can't do a cold build in one run.
+  release workflow by hand, which builds from `main`'s caches and can't do a cold build in one run. Its pull request
+  runs need no exact-commit cache, as a packaging change may be tested before `main` has built that commit: they start
+  from whatever cache matches and do a cold build when none does.
 - **The other workflows' caches**: `test262.yml` and `benchmarks.yml` start from `main`'s Linux and macOS caches and
   save none of their own. `macos-intel.yml` keeps its own (`macos-x86_64-…`), which the release workflow's Intel
   build starts from, and runs often enough that GitHub doesn't drop it for going a week unused. `sanitizer.yml` keeps
