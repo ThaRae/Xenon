@@ -103,7 +103,7 @@ def state(base: str | None = None) -> State:
     if commits is None or int(commits) != len(patches):
         return State.OTHER
 
-    applied = patch_ids(git("log", "--reverse", "-p", "--format=From %H", f"{base}..HEAD"))
+    applied = patch_ids(git("log", "--reverse", "-p", "--binary", "--format=From %H", f"{base}..HEAD"))
     expected = patch_ids("".join(path.read_text() for path in patches))
     return State.PATCHED if applied == expected else State.OTHER
 

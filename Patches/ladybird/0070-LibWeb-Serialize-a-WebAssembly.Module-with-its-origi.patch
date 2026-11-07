@@ -1,0 +1,198 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 07:35:01 -0500
+Subject: [PATCH] LibWeb: Serialize a WebAssembly.Module with its original
+ bytes
+
+A Module's [[Bytes]] were read from the compiled module's copy of the
+bytes, but validation rewrites the code in that copy into quickened
+forms only LibWasm's own interpreter and JIT accept. Serializing a
+Module with code that validation quickened, such as an i32.const with
+a multi-byte immediate, then wrote bytes that no longer compile, so
+structuredClone threw and postMessage fired messageerror instead.
+
+Google Maps compiles its map renderer's module on the page and posts it
+to the worker that draws the map. The worker waited for it forever, so
+searching for a place never moved the map or opened the place's panel.
+
+Keep the bytes a Module was compiled from in its own [[Bytes]] slot.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../Bindings/Rust/src/web_assembly/module.rs  | 19 +++++---
+ .../Rust/src/web_assembly/module_record.rs    |  4 +-
+ .../Rust/src/web_assembly/web_assembly.rs     |  8 ++--
+ ...-structured-clone-keeps-original-bytes.txt |  4 ++
+ ...structured-clone-keeps-original-bytes.html | 44 +++++++++++++++++++
+ 5 files changed, 69 insertions(+), 10 deletions(-)
+ create mode 100644 Tests/LibWeb/Text/expected/Wasm/WebAssembly-Module-structured-clone-keeps-original-bytes.txt
+ create mode 100644 Tests/LibWeb/Text/input/Wasm/WebAssembly-Module-structured-clone-keeps-original-bytes.html
+
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_assembly/module.rs b/Libraries/LibWeb/Bindings/Rust/src/web_assembly/module.rs
+index a864199a9ad427a7513fd669941b45fd443c1831..e7fbe50f56301da3e355991f675c637f777dc8e4 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_assembly/module.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_assembly/module.rs
+@@ -89,9 +89,12 @@ fn kind_of_import(description: &ImportDescription) -> ExternalKind {
+ #[derive(Trace)]
+ #[gc(crate = libjs_rust)]
+ pub(crate) struct Module {
+-    // [[Module]], which keeps the bytes it was compiled from: [[Bytes]].
++    // [[Module]]
+     #[gc(untraced)]
+     module: CompiledModule,
++    // [[Bytes]]
++    #[gc(untraced)]
++    bytes: Box<[u8]>,
+     // [[BuiltinSets]]
+     #[gc(untraced)]
+     builtin_sets: Vec<UsvString>,
+@@ -106,18 +109,19 @@ impl Module {
+     /// https://webassembly.github.io/spec/js-api/#construct-a-webassembly-module-object
+     pub(crate) fn new(
+         module: CompiledModule,
++        bytes: Box<[u8]>,
+         builtin_sets: Vec<UsvString>,
+         imported_string_module: Option<UsvString>,
+     ) -> Self {
+         // 1. Let moduleObject be a new Module.
+         // 2. Set moduleObject.[[Module]] to module.
+         // 3. Set moduleObject.[[Bytes]] to bytes.
+-        // NB: The compiled module keeps the bytes it was compiled from.
+         // 4. Set moduleObject.[[BuiltinSets]] to builtinSetNames.
+         // 5. Set moduleObject.[[ImportedStringModule]] to importedStringModule.
+         // 6. Return moduleObject.
+         Self {
+             module,
++            bytes,
+             builtin_sets,
+             imported_string_module,
+         }
+@@ -163,12 +167,17 @@ impl Module {
+         // 8. Set this.[[Bytes]] to stableBytes.
+         // 9. Set this.[[BuiltinSets]] to builtinSetNames.
+         // 10. Set this.[[ImportedStringModule]] to importedStringModule.
+-        Ok(Self::new(module, builtin_set_names, imported_string_module))
++        Ok(Self::new(
++            module,
++            stable_bytes.into_boxed_slice(),
++            builtin_set_names,
++            imported_string_module,
++        ))
+     }
+ 
+     /// [[Bytes]]: the bytes the module was compiled from.
+     fn bytes(&self) -> &[u8] {
+-        &self.module.bytes
++        &self.bytes
+     }
+ 
+     pub(crate) fn from_value(value: Value) -> Option<Ref<Self>> {
+@@ -332,6 +341,6 @@ impl Serializable for Module {
+ 
+         // 4. Compile a WebAssembly module from bytes and set value.[[Module]] to the result.
+         let module = compile_a_webassembly_module(cx.vm(), cx.realm(), &bytes)?;
+-        Ok(Self::new(module, Vec::new(), None))
++        Ok(Self::new(module, bytes.into_boxed_slice(), Vec::new(), None))
+     }
+ }
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_assembly/module_record.rs b/Libraries/LibWeb/Bindings/Rust/src/web_assembly/module_record.rs
+index 470c9a0ec126f4305b2953e4ce78e3dde01b61df..a3ec87298e267aa7a944f7e93c2805b5ab006ccc 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_assembly/module_record.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_assembly/module_record.rs
+@@ -174,7 +174,9 @@ fn parse_a_webassembly_module(
+         .collect();
+ 
+     // 4. Construct a WebAssembly module object from module and bytes, and let module be the result.
+-    let module_source = allocate(vm, |_| Module::new(module, Vec::new(), None));
++    let module_source = allocate(vm, |_| {
++        Module::new(module, stable_bytes.into_boxed_slice(), Vec::new(), None)
++    });
+ 
+     // 8. Let moduleRecord be { [[Instance]]: ~empty~, [[Realm]]: realm, [[Environment]]: ~empty~,
+     //                          [[Namespace]]: ~empty~, [[ModuleSource]]: module, [[HostDefined]]: hostDefined,
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_assembly/web_assembly.rs b/Libraries/LibWeb/Bindings/Rust/src/web_assembly/web_assembly.rs
+index 2454264765fbfe7483b81442c27943de45b64fc1..6d9b7f81f5fe401bdf910242218dab748eb13910 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_assembly/web_assembly.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_assembly/web_assembly.rs
+@@ -121,8 +121,6 @@ fn asynchronously_compile_a_webassembly_module(
+             let realm = vm.current_realm().expect("the steps run in the realm of the promise");
+             let result = compile_a_webassembly_module(vm, realm, &job.bytes.borrow()).map_err(|throw| throw.value());
+             *job.result.borrow_mut() = Some(result);
+-            // NB: The compiled module keeps the bytes it was compiled from.
+-            job.bytes.take();
+ 
+             // 2. Queue a task on taskSource, if provided, to perform the following steps:
+             queue_a_task(vm, realm, task_source, (promise, job), |vm, (promise, job)| {
+@@ -165,8 +163,10 @@ fn asynchronously_compile_a_webassembly_module(
+                 else {
+                     // 1. Construct a WebAssembly module object from module, bytes, builtinSetNames, importedStringModule, and
+                     //    let moduleObject be the result.
+-                    let module_object =
+-                        allocate(vm, |_| Module::new(module, builtin_set_names, imported_string_module));
++                    let bytes = job.bytes.take().into_boxed_slice();
++                    let module_object = allocate(vm, |_| {
++                        Module::new(module, bytes, builtin_set_names, imported_string_module)
++                    });
+ 
+                     // 2. Resolve promise with moduleObject.
+                     let cx = CallContext::new(vm, realm);
+diff --git a/Tests/LibWeb/Text/expected/Wasm/WebAssembly-Module-structured-clone-keeps-original-bytes.txt b/Tests/LibWeb/Text/expected/Wasm/WebAssembly-Module-structured-clone-keeps-original-bytes.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..95ea2b47975dc79a268a7837a5f590cc49ad538e
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/Wasm/WebAssembly-Module-structured-clone-keeps-original-bytes.txt
+@@ -0,0 +1,4 @@
++Original: 1000000
++structuredClone: 1000000
++MessageChannel: 1000000
++Dedicated worker: 1000000
+diff --git a/Tests/LibWeb/Text/input/Wasm/WebAssembly-Module-structured-clone-keeps-original-bytes.html b/Tests/LibWeb/Text/input/Wasm/WebAssembly-Module-structured-clone-keeps-original-bytes.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..f242a784b8e1a0c063d7e124693461701d18450b
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/Wasm/WebAssembly-Module-structured-clone-keeps-original-bytes.html
+@@ -0,0 +1,44 @@
++<!doctype html>
++<script src="../include.js"></script>
++<script>
++    // (module
++    //   (func (export "f") (result i32)
++    //     (i32.const 1000000)))
++    const bytes = new Uint8Array([
++        0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x01, 0x60, 0x00, 0x01, 0x7f, 0x03,
++        0x02, 0x01, 0x00, 0x07, 0x05, 0x01, 0x01, 0x66, 0x00, 0x00, 0x0a, 0x08, 0x01, 0x06, 0x00, 0x41,
++        0xc0, 0x84, 0x3d, 0x0b,
++    ]);
++
++    const call = module => new WebAssembly.Instance(module).exports.f();
++
++    const receive = target =>
++        new Promise(resolve => {
++            target.onmessage = event => resolve(event.data);
++            target.onmessageerror = () => resolve("messageerror");
++        });
++
++    asyncTest(async done => {
++        const module = new WebAssembly.Module(bytes);
++        println(`Original: ${call(module)}`);
++
++        println(`structuredClone: ${call(structuredClone(module))}`);
++
++        const channel = new MessageChannel();
++        const received = receive(channel.port2);
++        channel.port1.postMessage(module);
++        const viaChannel = await received;
++        println(`MessageChannel: ${viaChannel instanceof WebAssembly.Module ? call(viaChannel) : viaChannel}`);
++
++        const workerSource = `
++            self.onmessage = event => postMessage(new WebAssembly.Instance(event.data).exports.f());
++            self.onmessageerror = () => postMessage("messageerror");
++        `;
++        const worker = new Worker(URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" })));
++        const fromWorker = receive(worker);
++        worker.postMessage(module);
++        println(`Dedicated worker: ${await fromWorker}`);
++
++        done();
++    });
++</script>
