@@ -297,6 +297,7 @@ fn select_from_engine(edit: &mut TextEdit, node: &AxNode) {
 pub struct PageAccessibility {
     pub enabled: bool,
     forced: Option<bool>,
+    next_check: Option<f64>,
     trees: HashMap<ViewId, PageTree>,
     scratch: TextEdit,
 }
@@ -365,18 +366,23 @@ pub fn focus_changed(s: &mut Browser, view: ViewId, node: i64) {
     tree.return_focus_from_fields(node);
 }
 
-pub fn poll(s: &mut Browser, tx: &mut Tx) -> bool {
-    let wanted = s.accessibility.forced() || AccessibilityEngine.assistive_technology_running();
+pub fn poll(s: &mut Browser, now: f64, tx: &mut Tx) -> bool {
     let mut changed = false;
-    if wanted != s.accessibility.enabled {
-        s.accessibility.enabled = wanted;
-        if !wanted {
-            s.accessibility.trees.clear();
+    if s.accessibility.next_check.is_none_or(|next| {
+        now >= next || next - now > ASSISTIVE_TECHNOLOGY_CHECK_INTERVAL.as_secs_f64()
+    }) {
+        s.accessibility.next_check = Some(now + ASSISTIVE_TECHNOLOGY_CHECK_INTERVAL.as_secs_f64());
+        tx.wake_after(ASSISTIVE_TECHNOLOGY_CHECK_INTERVAL);
+        let wanted = s.accessibility.forced() || AccessibilityEngine.assistive_technology_running();
+        if wanted != s.accessibility.enabled {
+            s.accessibility.enabled = wanted;
+            if !wanted {
+                s.accessibility.trees.clear();
+            }
+            AccessibilityEngine.set_enabled(wanted);
+            changed = true;
         }
-        AccessibilityEngine.set_enabled(wanted);
-        changed = true;
     }
-    tx.wake_after(ASSISTIVE_TECHNOLOGY_CHECK_INTERVAL);
     if !s.accessibility.enabled {
         return changed;
     }
