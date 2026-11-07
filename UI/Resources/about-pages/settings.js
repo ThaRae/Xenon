@@ -117,6 +117,8 @@ for (const shortcut of document.querySelectorAll("kbd[data-other]")) {
 const layoutRadios = [...document.querySelectorAll('input[name="layout"]')];
 const verticalTabsPosition = document.querySelector("#vertical-tabs-position");
 const verticalTabsExpandOnHover = document.querySelector("#vertical-tabs-expand-on-hover");
+const framedPages = document.querySelector("#framed-pages");
+const framedPagesRow = document.querySelector("#framed-pages-row");
 
 let XENON = null;
 let TAB_SETTINGS = null;
@@ -132,7 +134,12 @@ function renderLayout() {
     const vertical = layout === "vertical";
     document.querySelector("#vertical-tabs-position-row").hidden = !vertical;
     document.querySelector("#vertical-tabs-expand-on-hover-row").hidden = !vertical;
+
+    framedPagesRow.hidden = typeof XENON?.framedPages !== "boolean";
+    framedPages.checked = !!XENON?.framedPages;
 }
+
+framedPages.addEventListener("change", () => ladybird.sendMessage("xenon/setFramedPages", framedPages.checked));
 
 for (const radio of layoutRadios) {
     radio.addEventListener("change", () => {

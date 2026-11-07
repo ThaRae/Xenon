@@ -1665,7 +1665,7 @@ void Tab::update_web_view_frame(bool chrome_visible, Optional<WebView::VerticalT
     if (!is_loaded())
         return;
 
-    if (!chrome_visible || m_in_split_view) {
+    if (!chrome_visible || m_in_split_view || !XenonSettings::framed_pages()) {
         m_view_layout->setContentsMargins(0, 0, 0, 0);
         m_view->set_has_rounded_corners(m_in_split_view);
         return;
@@ -1881,6 +1881,9 @@ void Tab::xenon_settings_changed()
         return;
 
     m_content_blocking_button->set_show_count_badge(XenonSettings::show_blocked_request_count());
+#ifdef AK_OS_MACOS
+    update_web_view_frame(m_web_view_chrome_visible, m_web_view_sidebar_position);
+#endif
 }
 
 void Tab::set_loading(bool is_loading)
@@ -1945,7 +1948,7 @@ void Tab::paintEvent(QPaintEvent*)
     auto const& palette = window()->palette();
     painter.fillRect(rect(), ChromeStyle::chrome_background(palette));
 
-    if (!m_web_view_chrome_visible || !m_web_view_sidebar_position.has_value() || !is_loaded() || m_in_split_view)
+    if (!m_web_view_chrome_visible || !m_web_view_sidebar_position.has_value() || !is_loaded() || m_in_split_view || !XenonSettings::framed_pages())
         return;
 
     auto radius = m_view->viewport_corner_radius() + WEB_VIEW_SIDEBAR_INSET;

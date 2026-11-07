@@ -18,6 +18,7 @@ namespace Ladybird::XenonSettings {
 
 static constexpr auto COMPACT_TOOLBAR_KEY = "layout/compactToolbar";
 static constexpr auto RECENTLY_USED_TAB_ORDER_KEY = "tabs/cycleInRecentlyUsedOrder";
+static constexpr auto FRAMED_PAGES_KEY = "layout/framedPages";
 
 static QSettings& settings()
 {
@@ -125,6 +126,17 @@ bool hibernate_on_memory_pressure()
 void set_hibernate_on_memory_pressure(bool enabled)
 {
     settings().setValue(TAB_HIBERNATION_ON_MEMORY_PRESSURE_KEY, enabled);
+    notify_observers();
+}
+
+bool framed_pages()
+{
+    return settings().value(FRAMED_PAGES_KEY, true).toBool();
+}
+
+void set_framed_pages(bool framed)
+{
+    settings().setValue(FRAMED_PAGES_KEY, framed);
     notify_observers();
 }
 

@@ -11,6 +11,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 **Tabs and windows**
 
 - Three layouts: tabs above the toolbar, tabs and toolbar in one row, or tabs in a sidebar
+- Pages in a rounded frame, or edge to edge if you'd rather (macOS)
 - Split view: two tabs side by side in one window
 - Tab groups, with names and colors, that collapse
 - <kbd>Ctrl</kbd><kbd>Tab</kbd> switches tabs in the order you last used them

@@ -110,6 +110,11 @@ Right-click the tab strip or window frame and pick **Layout → Classic / Compac
 - **Compact**: the toolbar and the tabs in one row.
 - **Vertical**: tabs in a collapsible, resizable sidebar (from Ladybird).
 
+On macOS the page sits in a frame inset from the window, with rounded corners and, in light mode, a thin border.
+**Settings → Look and layout → Show pages in a rounded frame** turns that off so pages run edge to edge
+(`XenonSettings::framed_pages`, applied in `Tab::update_web_view_frame`). Split view keeps its own frame either way.
+The switch only appears on macOS, since the other platforms draw pages edge to edge already.
+
 ### Split view
 
 Two tabs side by side in one window, each with its own page and history (`UI/SplitView.cpp`).
