@@ -234,6 +234,8 @@ void xenon_engine_move_tab(XenonViewId view, XenonWindowId window, int64_t index
         if (!target)
             return;
         model.move_tab(view, window, index.value_or(target->tabs.size()));
+        if (auto* split_views = Engine::the().split_views())
+            split_views->splits().keep_together(view);
     });
 }
 

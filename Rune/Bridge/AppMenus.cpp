@@ -32,6 +32,10 @@ WebView::Menu& AppMenus::main_menu()
     menu.add_action(WebView::Action::create("New Tab"sv, WebView::ActionID::OpenInNewTab, [&engine] {
         engine.new_tab_in_active_window();
     }));
+    menu.add_action(WebView::Action::create("New Split View"sv, WebView::ActionID::OpenInNewTab, [&engine] {
+        if (auto* split_views = engine.split_views())
+            split_views->open_new_split_view_in_active_window();
+    }));
     menu.add_action(WebView::Action::create("New Window"sv, WebView::ActionID::OpenInNewWindow, [&engine] {
         engine.new_window(engine.allocate_window_id(), WebView::IsPrivate::No);
     }));

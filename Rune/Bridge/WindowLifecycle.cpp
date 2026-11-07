@@ -121,12 +121,7 @@ void WindowLifecycle::set_exposed(WindowId id, bool exposed)
     else
         m_unexposed_windows.set(id);
 
-    auto* model = Engine::the().model();
-    auto const* window = model ? model->window(id) : nullptr;
-    if (!window || !window->active_tab.has_value())
-        return;
-    if (auto* view = Engine::the().view(*window->active_tab))
-        view->set_visible(exposed);
+    Engine::the().sync_shown_tabs(id);
 }
 
 void WindowLifecycle::geometry_reported(WindowId id, WebView::SessionWindowGeometry geometry)

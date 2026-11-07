@@ -1034,12 +1034,15 @@ void View::show_tooltip(StringView text, Gfx::FloatPoint position)
     notify_page(&XenonPageCallbacks::tooltip_changed, m_id, xenon_str(normalized), position.x(), position.y());
 }
 
-void View::show_context_menu(WebView::Menu& menu, Gfx::IntPoint widget_position)
+void View::show_context_menu(WebView::Menu& source_menu, Gfx::IntPoint widget_position)
 {
+    NonnullRefPtr<WebView::Menu> menu = source_menu;
+    if (auto* split_views = Engine::the().split_views())
+        menu = split_views->context_menu_for(m_id, source_menu);
     m_shown_context_menu = menu;
     m_context_menu_actions.clear();
     Vector<XenonMenuItem> items;
-    flatten_menu(menu, items, m_context_menu_actions);
+    flatten_menu(*menu, items, m_context_menu_actions);
     drop_trailing_separator(items);
     if (items.is_empty())
         return;

@@ -10,6 +10,7 @@
 #include <AK/ByteString.h>
 #include <AK/Function.h>
 #include <AK/HashMap.h>
+#include <AK/HashTable.h>
 #include <AK/Mutex.h>
 #include <AK/NonnullOwnPtr.h>
 #include <AK/Optional.h>
@@ -29,6 +30,7 @@
 #include <LibWebView/SessionStore.h>
 #include <Rune/Bridge/AppMenus.h>
 #include <Rune/Bridge/BrowserModel.h>
+#include <Rune/Bridge/SplitViewHost.h>
 #include <Rune/Bridge/XenonBridge.h>
 #include <UI/XenonSettings.h>
 
@@ -63,6 +65,8 @@ public:
 
     BrowserModel* model() { return m_model.ptr(); }
     TabHibernation* tab_hibernation() { return m_tab_hibernation.ptr(); }
+    SplitViewHost* split_views() { return m_split_view_host.ptr(); }
+    void sync_shown_tabs(XenonWindowId);
 
     View* view(XenonViewId);
     View& open_view(XenonViewId opener, Web::HTML::ActivateTab, Optional<WebView::CanonicalTraversable&> = {});
@@ -72,6 +76,8 @@ public:
     void close_detached_view(XenonViewId);
 
     void set_window_viewport(XenonWindowId, Web::DevicePixelSize, double device_pixel_ratio);
+    void set_window_surface(XenonWindowId, void* display, void* surface);
+    bool window_has_native_surface(XenonWindowId window) const { return m_native_surface_windows.contains(window); }
     void record_view_viewport(XenonViewId, Web::DevicePixelSize, double device_pixel_ratio);
     XenonWindowId new_window(XenonWindowId, WebView::IsPrivate);
     void new_tab(XenonWindowId, XenonViewId, StringView input, Optional<size_t> index, Web::HTML::ActivateTab);
@@ -176,7 +182,10 @@ private:
     bool m_system_dark { false };
     OwnPtr<BrowserModel> m_model;
     OwnPtr<TabHibernation> m_tab_hibernation;
+    OwnPtr<SplitViewHost> m_split_view_host;
+    HashMap<XenonWindowId, Vector<XenonViewId>> m_shown_tabs;
     HashMap<XenonViewId, NonnullOwnPtr<View>> m_views;
+    HashTable<XenonWindowId> m_native_surface_windows;
     Optional<XenonViewId> m_focused_view;
     HashMap<XenonWindowId, Viewport> m_window_viewports;
     Viewport m_default_viewport;
