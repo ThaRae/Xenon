@@ -1,0 +1,625 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 14:47:27 -0500
+Subject: [PATCH] LibWeb: Implement HTMLCanvasElement.captureStream()
+
+A captureStream() call returns a MediaStream with a video track that
+reads the canvas's current frame. A media element assigned the stream
+through srcObject reports the canvas's size, paints the frame, and
+passes it to drawImage(), createPattern(), and WebGL's texImage2D().
+The video frame callbacks run once per rendering update for such a
+stream.
+---
+ .../Bindings/Rust/src/canvas_2d/canvas.rs     |  7 ++
+ .../Rust/src/html/canvas_draw_image.rs        | 21 ++++-
+ .../Bindings/Rust/src/html/canvas_pattern.rs  |  5 +-
+ .../HTML/Canvas/Canvas2DContextBase.cpp       | 10 +++
+ Libraries/LibWeb/HTML/HTMLCanvasElement.cpp   | 19 +++++
+ Libraries/LibWeb/HTML/HTMLCanvasElement.h     |  2 +
+ Libraries/LibWeb/HTML/HTMLCanvasElement.idl   |  1 +
+ Libraries/LibWeb/HTML/HTMLMediaElement.cpp    | 14 +++
+ Libraries/LibWeb/HTML/HTMLMediaElement.h      |  1 +
+ Libraries/LibWeb/HTML/HTMLVideoElement.cpp    | 85 +++++++++++++------
+ Libraries/LibWeb/HTML/HTMLVideoElement.h      |  2 +
+ .../LibWeb/MediaCapture/MediaStreamTrack.cpp  | 17 ++++
+ .../LibWeb/MediaCapture/MediaStreamTrack.h    |  4 +
+ Libraries/LibWeb/Painting/PaintFacts.cpp      | 10 ++-
+ .../WebGL/WebGLRenderingContextBase.cpp       |  8 +-
+ .../Text/expected/canvas/capture-stream.txt   |  8 ++
+ .../Text/input/canvas/capture-stream.html     | 48 +++++++++++
+ 17 files changed, 230 insertions(+), 32 deletions(-)
+ create mode 100644 Tests/LibWeb/Text/expected/canvas/capture-stream.txt
+ create mode 100644 Tests/LibWeb/Text/input/canvas/capture-stream.html
+
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/canvas_2d/canvas.rs b/Libraries/LibWeb/Bindings/Rust/src/canvas_2d/canvas.rs
+index a1ace4f7af678fc03f11449e8a1faaf7f0ac21b3..ba262468123fb2053942c26ff33bde17632d1cd2 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/canvas_2d/canvas.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/canvas_2d/canvas.rs
+@@ -100,6 +100,7 @@ unsafe extern "C" {
+         raster_height: i32,
+         out_rasterized: *mut bool,
+     ) -> *mut c_void;
++    fn web_canvas_2d_canvas_capture_frame(source_wrapper: *mut c_void) -> *mut c_void;
+     fn web_canvas_2d_capture_video_frame(source_wrapper: *mut c_void, out_frame: *mut CapturedVideoFrameAbi) -> bool;
+     fn web_canvas_2d_video_transport(source_wrapper: *mut c_void) -> *mut c_void;
+     fn web_canvas_2d_video_frame_hold_unref(hold: *mut c_void);
+@@ -495,6 +496,12 @@ impl CanvasImageSourceKind {
+     }
+ }
+ 
++pub(crate) fn canvas_capture_frame(video: CppInterface) -> Option<ImageFrameHandle> {
++    // SAFETY: The wrapper is a live HTMLVideoElement, and LibWeb hands over a frame that it allocated with new.
++    let frame = unsafe { web_canvas_2d_canvas_capture_frame(video.wrapper().as_ptr().cast()) };
++    (!frame.is_null()).then(|| unsafe { ImageFrameHandle::adopt(frame) })
++}
++
+ /// The frame of the video that its element shows, if it shows one.
+ pub(crate) fn capture_video_frame(video: CppInterface) -> Option<CapturedVideoFrame> {
+     let mut frame = CapturedVideoFrameAbi {
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_draw_image.rs b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_draw_image.rs
+index bc1dd87da4b24e355b02ceb5f71adf887e8ee05b..1f767fa9551813ef90dcc74644ab335de92544c1 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_draw_image.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_draw_image.rs
+@@ -17,7 +17,7 @@ use super::image_bitmap::ImageBitmap;
+ use crate::bindings::conversions::CppInterface;
+ use crate::bindings::interface::Ref;
+ use crate::bindings::{CallContext, Exception, WebIdlResult};
+-use crate::canvas_2d::canvas::{CanvasImageSourceKind, Usability, capture_video_frame};
++use crate::canvas_2d::canvas::{CanvasImageSourceKind, Usability, canvas_capture_frame, capture_video_frame};
+ use crate::canvas_2d::context::{CanvasKind, ContextState, RenderingContext2D};
+ use crate::canvas_2d::float;
+ use crate::canvas_2d::host::{LentImageFrame, LentVideoFrameHold};
+@@ -287,6 +287,25 @@ impl ContextState {
+         }
+ 
+         if let CanvasImageSource::HTMLVideoElement(video) = image {
++            if let Some(frame) = canvas_capture_frame(video) {
++                if self.recorder_is_ready() {
++                    let state = self.drawing_state();
++                    let frame = LentImageFrame(NonNull::new(frame.as_raw().cast_mut()).expect("an image frame has a frame"));
++                    self.record(|recorder| {
++                        recorder.draw_image_frame(
++                            &frame,
++                            destination_rect,
++                            source_rect,
++                            scaling_mode,
++                            &Self::compositing(&state),
++                        );
++                    });
++                    drop(state);
++                    self.did_draw();
++                }
++                update_origin_clean();
++                return Ok(());
++            }
+             let Some(captured_frame) = capture_video_frame(video) else {
+                 return Ok(());
+             };
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_pattern.rs b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_pattern.rs
+index a79fea929a7abf37cef51b3ef90fc60fc43ef2d5..6f9d38b7109437625b694b8c10612031800a666c 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_pattern.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_pattern.rs
+@@ -20,7 +20,7 @@ use super::canvas_draw_image::CanvasImageSource;
+ use crate::bindings::conversions::CppInterface;
+ use crate::bindings::interface::{Ref, Wrappable, allocate};
+ use crate::bindings::{CallContext, Exception, WebIdlResult};
+-use crate::canvas_2d::canvas::{CanvasImageSourceKind, capture_video_frame, video_transport};
++use crate::canvas_2d::canvas::{CanvasImageSourceKind, canvas_capture_frame, capture_video_frame, video_transport};
+ use crate::canvas_2d::host::LentVideoFrameHold;
+ use crate::geometry::dictionaries::{DOMMatrix2DInit, validate_and_fixup_2d};
+ 
+@@ -40,6 +40,9 @@ fn parse_repetition(repetition: &Utf16String) -> Option<Canvas2DPatternRepetitio
+ /// A copy of the frame of the video at its current playback position, in the color space, which it keeps. A pattern or
+ /// an ImageBitmap outlives any one video frame, so it reads the frame back instead of holding it.
+ pub(crate) fn read_back_current_video_frame(video: CppInterface, color_space: ColorSpace) -> Option<ImageFrameHandle> {
++    if let Some(frame) = canvas_capture_frame(video) {
++        return Some(frame);
++    }
+     let captured_frame = capture_video_frame(video)?;
+     let transport = video_transport(video)?;
+     let mut recorder = Recorder::new(transport);
+diff --git a/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp b/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
+index fbe7d8923c1ef541c6ab8250effce6d226bd05b4..a94980372c773b3b5d40b5021d25cc0d8d057866 100644
+--- a/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
++++ b/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
+@@ -177,6 +177,7 @@ void web_canvas_2d_image_source_size(void* source_wrapper, CanvasImageSourceKind
+ bool web_canvas_2d_image_is_not_origin_clean(void* source_wrapper, CanvasImageSourceKind);
+ bool web_canvas_2d_image_source_canvas_id(void* source_wrapper, CanvasImageSourceKind, u64* out_canvas_id, bool* out_source_is_2d);
+ Gfx::DecodedImageFrame* web_canvas_2d_image_source_frame(void* source_wrapper, CanvasImageSourceKind, i32 raster_width, i32 raster_height, bool* out_rasterized);
++Gfx::DecodedImageFrame* web_canvas_2d_canvas_capture_frame(void* source_wrapper);
+ bool web_canvas_2d_capture_video_frame(void* source_wrapper, CapturedVideoFrame* out_frame);
+ void* web_canvas_2d_video_transport(void* source_wrapper);
+ void web_canvas_2d_video_frame_hold_unref(Compositing::VideoFrameHold*);
+@@ -845,6 +846,15 @@ Gfx::DecodedImageFrame* web_canvas_2d_image_source_frame(void* source_wrapper, C
+     return new Gfx::DecodedImageFrame { frame.release_value() };
+ }
+ 
++Gfx::DecodedImageFrame* web_canvas_2d_canvas_capture_frame(void* source_wrapper)
++{
++    auto& video = Bindings::impl_from<HTMLVideoElement>(*static_cast<JS::Object*>(source_wrapper));
++    auto frame = video.current_canvas_capture_frame();
++    if (!frame.has_value())
++        return nullptr;
++    return new Gfx::DecodedImageFrame { frame.release_value() };
++}
++
+ bool web_canvas_2d_capture_video_frame(void* source_wrapper, CapturedVideoFrame* out_frame)
+ {
+     auto& video = Bindings::impl_from<HTMLVideoElement>(*static_cast<JS::Object*>(source_wrapper));
+diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
+index 9a753a1056b3adb5adf1f54e7b24fb959f431484..4d0bc88587eef1e14a2380fcfcd659732c60d4e5 100644
+--- a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
++++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
+@@ -35,6 +35,8 @@
+ #include <LibWeb/HTML/Window.h>
+ #include <LibWeb/Infra/SerializedURL.h>
+ #include <LibWeb/Layout/Box.h>
++#include <LibWeb/MediaCapture/MediaStream.h>
++#include <LibWeb/MediaCapture/MediaStreamTrack.h>
+ #include <LibWeb/Page/Page.h>
+ #include <LibWeb/Painting/PaintFacts.h>
+ #include <LibWeb/Platform/EventLoopPlugin.h>
+@@ -477,6 +479,23 @@ WebIDL::ExceptionOr<void> HTMLCanvasElement::to_blob(GC::Ref<WebIDL::CallbackTyp
+     return {};
+ }
+ 
++// https://html.spec.whatwg.org/multipage/canvas.html#dom-canvas-capturestream
++GC::Ref<MediaCapture::MediaStream> HTMLCanvasElement::capture_stream(Optional<double>)
++{
++    // 1. Let stream be a new MediaStream.
++    auto stream = MediaCapture::MediaStream::create();
++
++    // 2. Let track be the result of creating a CanvasCaptureMediaStreamTrack with this as its canvas and frameRate as
++    //    its frame rate.
++    auto track = MediaCapture::MediaStreamTrack::create_for_canvas_capture(GC::Ref(*this));
++
++    // 3. Add track to stream.
++    stream->append_track(track);
++
++    // 4. Return stream.
++    return stream;
++}
++
+ Optional<Compositing::CanvasId> HTMLCanvasElement::canvas_id() const
+ {
+     if (m_is_placeholder)
+diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.h b/Libraries/LibWeb/HTML/HTMLCanvasElement.h
+index f712af68f30205e95c38fe793713e91c021645e1..3679bfde42c083d3a734a393fb566eaf0e87516b 100644
+--- a/Libraries/LibWeb/HTML/HTMLCanvasElement.h
++++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.h
+@@ -71,6 +71,8 @@ public:
+     WebIDL::ExceptionOr<Utf16String> to_data_url(Utf16View type, Optional<JS::Value> quality);
+     WebIDL::ExceptionOr<void> to_blob(GC::Ref<WebIDL::CallbackType> callback, Utf16View type, Optional<JS::Value> quality);
+ 
++    GC::Ref<MediaCapture::MediaStream> capture_stream(Optional<double> frame_rate);
++
+     void prepare_for_compositing();
+     bool has_unpresented_content() const { return m_canvas_content_dirty; }
+     void notify_compositor_backing_storage_lost();
+diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.idl b/Libraries/LibWeb/HTML/HTMLCanvasElement.idl
+index c62337437fc126000902d3d9abef26ae1c96cff6..88e2f4c88d4a3cc829c2c8ffc381f12706db78c6 100644
+--- a/Libraries/LibWeb/HTML/HTMLCanvasElement.idl
++++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.idl
+@@ -13,6 +13,7 @@ interface HTMLCanvasElement : HTMLElement {
+ 
+     USVString toDataURL(optional DOMString type = "image/png", optional any quality);
+     undefined toBlob(BlobCallback _callback, optional DOMString type = "image/png", optional any quality);
++    [NewObject] MediaStream captureStream(optional double frameRate);
+     OffscreenCanvas transferControlToOffscreen();
+ };
+ 
+diff --git a/Libraries/LibWeb/HTML/HTMLMediaElement.cpp b/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
+index 27e6309ec518e3e562544f5e3e9f48ac682a6bf8..153921eca72294b7f73412d582d1e6fa6863b240 100644
+--- a/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
++++ b/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
+@@ -41,6 +41,7 @@
+ #include <LibWeb/HTML/CORSSettingAttribute.h>
+ #include <LibWeb/HTML/EventLoop/EventLoop.h>
+ #include <LibWeb/HTML/HTMLAudioElement.h>
++#include <LibWeb/HTML/HTMLCanvasElement.h>
+ #include <LibWeb/HTML/HTMLMediaElement.h>
+ #include <LibWeb/HTML/HTMLSourceElement.h>
+ #include <LibWeb/HTML/HTMLTrackElement.h>
+@@ -63,6 +64,7 @@
+ #include <LibWeb/InvalidateDisplayList.h>
+ #include <LibWeb/Layout/Node.h>
+ #include <LibWeb/MediaCapture/MediaStream.h>
++#include <LibWeb/MediaCapture/MediaStreamTrack.h>
+ #include <LibWeb/MediaSourceExtensions/MediaSource.h>
+ #include <LibWeb/Page/Page.h>
+ #include <LibWeb/Page/ScreenWakeLockHandle.h>
+@@ -2078,6 +2080,18 @@ Optional<Compositing::VideoSinkResourceId> HTMLMediaElement::video_sink_resource
+ }
+ 
+ // https://html.spec.whatwg.org/multipage/media.html#media-data
++GC::Ptr<HTMLCanvasElement> HTMLMediaElement::canvas_capture_source() const
++{
++    auto const* stream = m_assigned_media_provider_object.get_pointer<GC::Ref<MediaCapture::MediaStream>>();
++    if (!stream)
++        return {};
++    for (auto const& track : (*stream)->get_video_tracks()) {
++        if (auto canvas = track->canvas_capture_source())
++            return canvas;
++    }
++    return {};
++}
++
+ bool HTMLMediaElement::media_data_is_cors_cross_origin() const
+ {
+     // NB: Media data from a MediaSource or a MediaStream is provided by the page itself.
+diff --git a/Libraries/LibWeb/HTML/HTMLMediaElement.h b/Libraries/LibWeb/HTML/HTMLMediaElement.h
+index b516901b22aa747a99d56c0d96fd073ac970b344..6a955f818b9111c4b931454b9ec6ef909658ef56 100644
+--- a/Libraries/LibWeb/HTML/HTMLMediaElement.h
++++ b/Libraries/LibWeb/HTML/HTMLMediaElement.h
+@@ -201,6 +201,7 @@ public:
+ 
+     Optional<Media::VideoSinkHandle> video_sink_handle() const;
+     Optional<Compositing::CapturedVideoFrame> capture_current_video_frame() const;
++    GC::Ptr<HTMLCanvasElement> canvas_capture_source() const;
+     bool media_data_is_cors_cross_origin() const;
+ 
+     struct VideoFrameCounts {
+diff --git a/Libraries/LibWeb/HTML/HTMLVideoElement.cpp b/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
+index a55ae405009ebc9ca33cc6954c074e9195f8d60b..4b38ea040116a8bf8da198c5b1ec340203c11b0d 100644
+--- a/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
++++ b/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
+@@ -25,6 +25,7 @@
+ #include <LibWeb/Fetch/Infrastructure/HTTP/ResponseView.h>
+ #include <LibWeb/HTML/AudioTrackList.h>
+ #include <LibWeb/HTML/EventNames.h>
++#include <LibWeb/HTML/HTMLCanvasElement.h>
+ #include <LibWeb/HTML/HTMLVideoElement.h>
+ #include <LibWeb/HTML/Scripting/Environments.h>
+ #include <LibWeb/HTML/Scripting/ExceptionReporter.h>
+@@ -187,6 +188,8 @@ u32 HTMLVideoElement::video_width() const
+     // is HAVE_NOTHING, then the attributes must return 0.
+     if (ready_state() == ReadyState::HaveNothing)
+         return 0;
++    if (auto canvas = canvas_capture_source())
++        return canvas->width();
+     if (m_intrinsic_video_dimensions.has_value())
+         return m_intrinsic_video_dimensions->width();
+     // AD-HOC: If the natural dimensions are not available, return 0. The non-normative text says that it should
+@@ -203,6 +206,8 @@ u32 HTMLVideoElement::video_height() const
+     // is HAVE_NOTHING, then the attributes must return 0.
+     if (ready_state() == ReadyState::HaveNothing)
+         return 0;
++    if (auto canvas = canvas_capture_source())
++        return canvas->height();
+     if (m_intrinsic_video_dimensions.has_value())
+         return m_intrinsic_video_dimensions->height();
+     // AD-HOC: If the natural dimensions is not available, return 0. The non-normative text says that it should
+@@ -223,7 +228,7 @@ void HTMLVideoElement::update_representation()
+     // The natural height of a video element's playback area is the natural height of the poster frame, if that is
+     // available and the element currently represents its poster frame; otherwise it is the natural height of the video
+     // resource, if that is available; otherwise the natural height is missing.
+-    auto natural_dimensions = m_intrinsic_video_dimensions.map([](Gfx::Size<u32> size) { return size.to_type<CSSPixels>(); });
++    auto natural_dimensions = natural_media_size().map([](Gfx::Size<u32> size) { return size.to_type<CSSPixels>(); });
+ 
+     Optional<u64> poster_frame_id;
+     if (representation == Representation::PosterFrame && m_poster_frame.has_value()) {
+@@ -246,9 +251,20 @@ void HTMLVideoElement::update_representation()
+ 
+ Optional<Gfx::Size<u32>> HTMLVideoElement::natural_media_size() const
+ {
++    if (auto canvas = canvas_capture_source())
++        return Gfx::Size<u32> { canvas->width(), canvas->height() };
+     return m_intrinsic_video_dimensions;
+ }
+ 
++Optional<Gfx::DecodedImageFrame> HTMLVideoElement::current_canvas_capture_frame() const
++{
++    auto canvas = canvas_capture_source();
++    if (!canvas)
++        return {};
++    auto& canvas_element = const_cast<HTMLCanvasElement&>(*canvas);
++    return canvas_element.get_frame_from_surface();
++}
++
+ Optional<CSSPixelSize> HTMLVideoElement::natural_element_size() const
+ {
+     return m_natural_dimensions;
+@@ -385,6 +401,9 @@ HTMLVideoElement::Representation HTMLVideoElement::current_representation() cons
+     // https://html.spec.whatwg.org/multipage/media.html#the-video-element:the-video-element-7
+     // A video element represents what is given for the first matching condition in the list below:
+ 
++    if (canvas_capture_source())
++        return Representation::VideoFrame;
++
+     // -> When no video data is available (the element's readyState attribute is either HAVE_NOTHING, or HAVE_METADATA
+     //    but no video data has yet been obtained at all, or the element's readyState attribute is any subsequent value
+     //    but the media resource does not have a video channel)
+@@ -613,35 +632,47 @@ void HTMLVideoElement::run_the_video_frame_request_callbacks(HighResolutionTime:
+     if (ready_state() < ReadyState::HaveCurrentData)
+         return;
+ 
+-    // 2. Let metadata be the VideoFrameCallbackMetadata dictionary built from video's latest presented frame.
+-    // AD-HOC: The frame stays held until the rendering update has run its animation frame callbacks, so that the
+-    //         callbacks capture the frame that metadata describes.
+-    auto presented_frame = hold_presented_video_frame_for_callbacks();
+-    if (!presented_frame.has_value())
+-        return;
++    auto& realm = relevant_realm(*this);
++    auto& global = relevant_global_object(*this);
++    auto metadata = JS::Object::create(realm, realm.intrinsics().object_prototype());
++    u64 presented_frames = 0;
++
++    if (auto canvas = canvas_capture_source()) {
++        presented_frames = ++m_canvas_capture_presented_frames;
++        MUST(metadata->create_data_property_or_throw("presentationTime"_utf16_fly_string, JS::Value(max(0.0, now))));
++        MUST(metadata->create_data_property_or_throw("expectedDisplayTime"_utf16_fly_string, JS::Value(now + document().page().client().rendering_frame_interval_in_milliseconds())));
++        MUST(metadata->create_data_property_or_throw("width"_utf16_fly_string, JS::Value(canvas->width())));
++        MUST(metadata->create_data_property_or_throw("height"_utf16_fly_string, JS::Value(canvas->height())));
++        MUST(metadata->create_data_property_or_throw("mediaTime"_utf16_fly_string, JS::Value(current_playback_position())));
++        MUST(metadata->create_data_property_or_throw("presentedFrames"_utf16_fly_string, JS::Value(static_cast<double>(presented_frames))));
++    } else {
++        // 2. Let metadata be the VideoFrameCallbackMetadata dictionary built from video's latest presented frame.
++        // AD-HOC: The frame stays held until the rendering update has run its animation frame callbacks, so that the
++        //         callbacks capture the frame that metadata describes.
++        auto presented_frame = hold_presented_video_frame_for_callbacks();
++        if (!presented_frame.has_value())
++            return;
+ 
+-    // 3. Let presentedFrames be the value of metadata's presentedFrames field.
+-    auto presented_frames = presented_frame->presented_frames;
++        // 3. Let presentedFrames be the value of metadata's presentedFrames field.
++        presented_frames = presented_frame->presented_frames;
+ 
+-    // 4. If the last presented frame identifier is equal to presentedFrames, abort these steps.
+-    if (m_last_presented_frame_identifier == presented_frames) {
+-        release_presented_video_frame_held_for_callbacks();
+-        return;
+-    }
++        // 4. If the last presented frame identifier is equal to presentedFrames, abort these steps.
++        if (m_last_presented_frame_identifier == presented_frames) {
++            release_presented_video_frame_held_for_callbacks();
++            return;
++        }
+ 
+-    // 5. Set the last presented frame identifier to presentedFrames.
+-    m_last_presented_frame_identifier = presented_frames;
++        // 5. Set the last presented frame identifier to presentedFrames.
++        m_last_presented_frame_identifier = presented_frames;
+ 
+-    auto& realm = relevant_realm(*this);
+-    auto& global = relevant_global_object(*this);
+-    auto metadata = JS::Object::create(realm, realm.intrinsics().object_prototype());
+-    auto presentation_time = HighResolutionTime::relative_high_resolution_time(presented_frame->presentation_time.to_seconds_f64() * 1000.0, global);
+-    MUST(metadata->create_data_property_or_throw("presentationTime"_utf16_fly_string, JS::Value(max(0.0, presentation_time))));
+-    MUST(metadata->create_data_property_or_throw("expectedDisplayTime"_utf16_fly_string, JS::Value(now + document().page().client().rendering_frame_interval_in_milliseconds())));
+-    MUST(metadata->create_data_property_or_throw("width"_utf16_fly_string, JS::Value(presented_frame->width)));
+-    MUST(metadata->create_data_property_or_throw("height"_utf16_fly_string, JS::Value(presented_frame->height)));
+-    MUST(metadata->create_data_property_or_throw("mediaTime"_utf16_fly_string, JS::Value(presented_frame->media_time.to_seconds_f64())));
+-    MUST(metadata->create_data_property_or_throw("presentedFrames"_utf16_fly_string, JS::Value(static_cast<double>(presented_frames))));
++        auto presentation_time = HighResolutionTime::relative_high_resolution_time(presented_frame->presentation_time.to_seconds_f64() * 1000.0, global);
++        MUST(metadata->create_data_property_or_throw("presentationTime"_utf16_fly_string, JS::Value(max(0.0, presentation_time))));
++        MUST(metadata->create_data_property_or_throw("expectedDisplayTime"_utf16_fly_string, JS::Value(now + document().page().client().rendering_frame_interval_in_milliseconds())));
++        MUST(metadata->create_data_property_or_throw("width"_utf16_fly_string, JS::Value(presented_frame->width)));
++        MUST(metadata->create_data_property_or_throw("height"_utf16_fly_string, JS::Value(presented_frame->height)));
++        MUST(metadata->create_data_property_or_throw("mediaTime"_utf16_fly_string, JS::Value(presented_frame->media_time.to_seconds_f64())));
++        MUST(metadata->create_data_property_or_throw("presentedFrames"_utf16_fly_string, JS::Value(static_cast<double>(presented_frames))));
++    }
+ 
+     // 6. Let callbacks be the list of video frame request callbacks.
+     // 7. Set video's list of video frame request callbacks to be empty.
+@@ -670,7 +701,7 @@ void HTMLVideoElement::request_rendering_update_for_video_frame_callbacks()
+ {
+     if (m_list_of_video_frame_request_callbacks.is_empty())
+         return;
+-    auto may_present_a_frame = potentially_playing() || seeking() || ready_state() < ReadyState::HaveCurrentData;
++    auto may_present_a_frame = canvas_capture_source() || potentially_playing() || seeking() || ready_state() < ReadyState::HaveCurrentData;
+     if (may_present_a_frame)
+         document().page().client().request_frame();
+ }
+diff --git a/Libraries/LibWeb/HTML/HTMLVideoElement.h b/Libraries/LibWeb/HTML/HTMLVideoElement.h
+index abd8532f63202d6152577af7487ba390a2dd254b..90d82d2dab572f254c75ea007d00078e0a2a9d04 100644
+--- a/Libraries/LibWeb/HTML/HTMLVideoElement.h
++++ b/Libraries/LibWeb/HTML/HTMLVideoElement.h
+@@ -36,6 +36,7 @@ public:
+     virtual void update_representation() override;
+     Optional<Gfx::Size<u32>> natural_media_size() const;
+     Optional<CSSPixelSize> natural_element_size() const;
++    Optional<Gfx::DecodedImageFrame> current_canvas_capture_frame() const;
+ 
+     Optional<Gfx::DecodedImageFrame> const& poster_frame() const { return m_poster_frame; }
+ 
+@@ -131,6 +132,7 @@ private:
+     Vector<VideoFrameRequestCallback> m_running_video_frame_request_callbacks;
+     // https://wicg.github.io/video-rvfc/#last-presented-frame-identifier
+     u64 m_last_presented_frame_identifier { 0 };
++    u64 m_canvas_capture_presented_frames { 0 };
+ };
+ 
+ }
+diff --git a/Libraries/LibWeb/MediaCapture/MediaStreamTrack.cpp b/Libraries/LibWeb/MediaCapture/MediaStreamTrack.cpp
+index 9989f49241afe640f530ee93109ff54724ccf6fe..e348b6ccb25864a7227e21455baf8f45d3f19fea 100644
+--- a/Libraries/LibWeb/MediaCapture/MediaStreamTrack.cpp
++++ b/Libraries/LibWeb/MediaCapture/MediaStreamTrack.cpp
+@@ -13,6 +13,7 @@
+ #include <LibWeb/Crypto/Crypto.h>
+ #include <LibWeb/DOM/Event.h>
+ #include <LibWeb/HTML/EventNames.h>
++#include <LibWeb/HTML/HTMLCanvasElement.h>
+ #include <LibWeb/HighResolutionTime/TimeOrigin.h>
+ #include <LibWeb/MediaCapture/MediaDevices.h>
+ #include <LibWeb/MediaCapture/MediaStreamTrack.h>
+@@ -129,6 +130,20 @@ GC::Ref<MediaStreamTrack> MediaStreamTrack::create(MediaStreamTrackKind kind, Op
+     return track;
+ }
+ 
++GC::Ref<MediaStreamTrack> MediaStreamTrack::create_for_canvas_capture(GC::Ref<HTML::HTMLCanvasElement> canvas)
++{
++    auto track = create(MediaStreamTrackKind::Video, "Canvas"_utf16);
++    track->m_canvas_capture_source = canvas;
++    return track;
++}
++
++GC::Ptr<HTML::HTMLCanvasElement> MediaStreamTrack::canvas_capture_source() const
++{
++    if (m_state == MediaStreamTrackState::Ended)
++        return {};
++    return m_canvas_capture_source.ptr();
++}
++
+ void MediaStreamTrack::set_settings(MediaTrackSettings settings)
+ {
+     m_settings = move(settings);
+@@ -206,6 +221,8 @@ GC::Ref<MediaStreamTrack> MediaStreamTrack::clone() const
+         media_devices->track_was_cloned({}, track_clone);
+         track_clone->m_media_devices = m_media_devices;
+     }
++    if (auto canvas = m_canvas_capture_source.ptr())
++        track_clone->m_canvas_capture_source = canvas;
+ 
+     // 9. Return trackClone.
+     return track_clone;
+diff --git a/Libraries/LibWeb/MediaCapture/MediaStreamTrack.h b/Libraries/LibWeb/MediaCapture/MediaStreamTrack.h
+index b09b05cb7a82bc622e7d9824955fb484a7040372..884ccf7cf17755bf079c502c41ba341440a1fc07 100644
+--- a/Libraries/LibWeb/MediaCapture/MediaStreamTrack.h
++++ b/Libraries/LibWeb/MediaCapture/MediaStreamTrack.h
+@@ -97,6 +97,7 @@ class MediaStreamTrack final : public DOM::EventTarget {
+ 
+ public:
+     static GC::Ref<MediaStreamTrack> create(MediaStreamTrackKind, Optional<Utf16String> label = {}, bool muted = false);
++    static GC::Ref<MediaStreamTrack> create_for_canvas_capture(GC::Ref<HTML::HTMLCanvasElement>);
+ 
+     // Out-of-line: destroying RefPtr<Audio::RecordStream> requires the complete type.
+     virtual ~MediaStreamTrack() override;
+@@ -126,6 +127,8 @@ public:
+     bool is_audio() const;
+     bool is_video() const;
+ 
++    GC::Ptr<HTML::HTMLCanvasElement> canvas_capture_source() const;
++
+     MediaTrackCapabilities get_capabilities() const { return {}; }
+     MediaTrackConstraints const& get_constraints() const;
+     MediaTrackSettings const& get_settings() const;
+@@ -169,6 +172,7 @@ private:
+ 
+     u64 m_provider_id { 0 };
+     GC::Weak<MediaDevices> m_media_devices;
++    GC::Weak<HTML::HTMLCanvasElement> m_canvas_capture_source;
+ 
+     NonnullRefPtr<AudioFrameFanout> m_audio_fanout;
+     RefPtr<Audio::RecordStream> m_audio_capture_stream;
+diff --git a/Libraries/LibWeb/Painting/PaintFacts.cpp b/Libraries/LibWeb/Painting/PaintFacts.cpp
+index b2ea7586caba2544274e8cc68882386dfefbb709..dd06139ad27fbe071e2579f42b0d3200b3d373b9 100644
+--- a/Libraries/LibWeb/Painting/PaintFacts.cpp
++++ b/Libraries/LibWeb/Painting/PaintFacts.cpp
+@@ -235,9 +235,15 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
+         : video_element.current_representation();
+ 
+     Layout::RustFFI::FfiVideoPaintFacts facts {};
++    auto canvas_capture_frame = video_element.current_canvas_capture_frame();
+     switch (representation) {
+     case HTML::HTMLVideoElement::Representation::FirstVideoFrame:
+     case HTML::HTMLVideoElement::Representation::VideoFrame: {
++        if (canvas_capture_frame.has_value()) {
++            facts.representation = Layout::RustFFI::FfiVideoRepresentation::PosterFrame;
++            facts.poster_frame = &canvas_capture_frame.value();
++            break;
++        }
+         facts.representation = Layout::RustFFI::FfiVideoRepresentation::VideoFrame;
+         auto sink_handle = video_element.video_sink_handle();
+         if (sink_handle.has_value() && video_element.natural_media_size().has_value()) {
+@@ -252,7 +258,9 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
+     }
+     case HTML::HTMLVideoElement::Representation::PosterFrame:
+         facts.representation = Layout::RustFFI::FfiVideoRepresentation::PosterFrame;
+-        if (auto const& poster_frame = video_element.poster_frame(); poster_frame.has_value())
++        if (canvas_capture_frame.has_value())
++            facts.poster_frame = &canvas_capture_frame.value();
++        else if (auto const& poster_frame = video_element.poster_frame(); poster_frame.has_value())
+             facts.poster_frame = &poster_frame.value();
+         break;
+     case HTML::HTMLVideoElement::Representation::TransparentBlack:
+diff --git a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
+index 2399ffd193db0655da5a9037b2a1e34838964f8a..e32a3b83ca19631fbaa845811601b731d99d3504 100644
+--- a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
++++ b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
+@@ -420,11 +420,15 @@ TexImageSourceResult web_webgl_read_tex_image_source(void* source_wrapper, TexIm
+         if (auto bitmap = Bindings::impl_from<HTML::OffscreenCanvas>(wrapper).get_bitmap_from_surface())
+             frame = Gfx::DecodedImageFrame { *bitmap };
+         break;
+-    case TexImageSourceKind::HTMLVideoElement:
+-        if (auto captured_frame = Bindings::impl_from<HTML::HTMLVideoElement>(wrapper).capture_current_video_frame(); captured_frame.has_value())
++    case TexImageSourceKind::HTMLVideoElement: {
++        auto& video = Bindings::impl_from<HTML::HTMLVideoElement>(wrapper);
++        if (auto canvas_frame = video.current_canvas_capture_frame(); canvas_frame.has_value())
++            frame = canvas_frame.release_value();
++        else if (auto captured_frame = video.capture_current_video_frame(); captured_frame.has_value())
+             frame = captured_frame.release_value();
+         break;
+     }
++    }
+     return tex_image_source_frame(move(frame), format, type, out_frame);
+ }
+ 
+diff --git a/Tests/LibWeb/Text/expected/canvas/capture-stream.txt b/Tests/LibWeb/Text/expected/canvas/capture-stream.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..352c914b94fd9df66fea9f0120946f55e041504d
+--- /dev/null
++++ b/Tests/LibWeb/Text/expected/canvas/capture-stream.txt
+@@ -0,0 +1,8 @@
++tracks: 1
++kind: video
++state: live
++stream active: true
++size: 4x2
++pixel: 255,0,0,255
++frame callback: true
++state after stop: ended
+diff --git a/Tests/LibWeb/Text/input/canvas/capture-stream.html b/Tests/LibWeb/Text/input/canvas/capture-stream.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..193f75807dab149900a38619680ee451bf125cf1
+--- /dev/null
++++ b/Tests/LibWeb/Text/input/canvas/capture-stream.html
+@@ -0,0 +1,48 @@
++<!DOCTYPE html>
++<script src="../include.js"></script>
++<script>
++promiseTest(async () => {
++    let canvas = document.createElement("canvas");
++    canvas.width = 4;
++    canvas.height = 2;
++    let context = canvas.getContext("2d");
++    context.fillStyle = "rgb(255, 0, 0)";
++    context.fillRect(0, 0, 4, 2);
++
++    let stream = canvas.captureStream(30);
++    let tracks = stream.getVideoTracks();
++
++    let video = document.createElement("video");
++    video.muted = true;
++    video.srcObject = stream;
++    await waitForCondition(() => video.readyState >= 2);
++
++    context.fillStyle = "rgb(255, 0, 0)";
++    context.fillRect(0, 0, 4, 2);
++    let target = document.createElement("canvas");
++    target.width = 4;
++    target.height = 2;
++    let target_context = target.getContext("2d");
++    target_context.drawImage(video, 0, 0);
++    let pixel = Array.from(target_context.getImageData(0, 0, 1, 1).data).join(",");
++
++    println(`tracks: ${tracks.length}`);
++    println(`kind: ${tracks[0].kind}`);
++    println(`state: ${tracks[0].readyState}`);
++    println(`stream active: ${stream.active}`);
++    println(`size: ${video.videoWidth}x${video.videoHeight}`);
++    println(`pixel: ${pixel}`);
++
++    let callback_fired = false;
++    await new Promise(resolve => {
++        video.requestVideoFrameCallback(() => {
++            callback_fired = true;
++            resolve();
++        });
++    });
++    println(`frame callback: ${callback_fired}`);
++
++    tracks[0].stop();
++    println(`state after stop: ${tracks[0].readyState}`);
++});
++</script>

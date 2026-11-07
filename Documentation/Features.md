@@ -9,6 +9,7 @@ version. Xenon brings over [Helium](https://helium.computer)'s feature set, meas
 - [Search and the address bar](#search-and-the-address-bar): !bangs, quick link copy
 - [Ads and trackers](#ads-and-trackers): uBlock Origin's filters and engine features, its popup and dashboard, daily
   updates
+- [Pages](#pages): canvas capture streams
 - [Password managers and extensions](#password-managers-and-extensions): Chrome extensions, Bitwarden, Proton Pass,
   1Password, iCloud Passwords, security keys
 - [Security](#security): certificate warnings, site information
@@ -378,6 +379,18 @@ It's on by default. **Settings → Privacy and data → Fingerprinting protectio
 alike. `navigator.webdriver` is false unless WebDriver is driving the browser. The code is in
 `ladybird/Libraries/LibWeb/Fingerprinting/`, carried as engine patches `0034`–`0037`. See
 [Fingerprinting.md](Fingerprinting.md).
+
+## Pages
+
+### Canvas capture streams
+
+Pages can turn a canvas into a video with `canvas.captureStream()` and use that video as a texture. Xenon's engine
+returns a `MediaStream` with a video track that reads the canvas's current frame, a video element assigned it through
+`srcObject` reports the canvas's size, and that frame reaches `drawImage()`, `createPattern()`, and WebGL's
+`texImage2D()`. `requestVideoFrameCallback()` runs once per rendering update while the video has callbacks, so a page
+that redraws from the canvas keeps up. The frame rate argument is accepted, but frames are read when the page asks for
+one rather than delivered on a clock. machina.how's landing page, whose animation and CRT effect run through this, is
+the site this was added for (engine patch `0064`).
 
 ## Password managers and extensions
 
