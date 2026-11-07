@@ -119,7 +119,10 @@ TabHibernation::TabState& TabHibernation::state_for(XenonViewId id)
 bool TabHibernation::is_in_use(XenonViewId id) const
 {
     auto const* window = Engine::the().model() ? Engine::the().model()->window_of(id) : nullptr;
-    return !window || window->active_tab == id;
+    if (!window || window->active_tab == id)
+        return true;
+    auto* split_views = Engine::the().split_views();
+    return split_views && split_views->splits().is_shown(id);
 }
 
 bool TabHibernation::may_hibernate(XenonViewId id)
