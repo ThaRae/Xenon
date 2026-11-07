@@ -39,6 +39,9 @@ pub fn menu_bar() -> Vec<MenuItem<Browser>> {
         item("File", "New Tab", Some("cmd+t"), |s, tx| {
             s.run_shortcut(BrowserShortcut::NewTab, tx)
         }),
+        item("File", "New Split View", Some("alt+cmd+n"), |s, tx| {
+            s.run_shortcut(BrowserShortcut::NewSplitView, tx)
+        }),
         item("File", "New Window", Some("cmd+n"), |s, tx| {
             s.run_shortcut(BrowserShortcut::NewWindow, tx)
         }),

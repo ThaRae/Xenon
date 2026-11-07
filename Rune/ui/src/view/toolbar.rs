@@ -64,6 +64,7 @@ pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
             .on_secondary_press(|s: &mut Browser, _, _| s.open_history_menu(1)),
         )
         .child(reload)
+        .children(crate::view::split_view::toolbar_button(s, p))
         .child(location_field(s, p, dark, cx))
         .children(crate::view::extensions::action_buttons(s, p))
         .children(s.windows.shown_is_private().then(|| private_badge(p)))

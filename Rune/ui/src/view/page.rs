@@ -8,12 +8,16 @@ use rune::tok::TextStyle;
 use rune::{Align, Color, Cursor, El, PointerButton, SurfaceFit, col, el, icon, row, text};
 
 use crate::ffi;
+use crate::page_prompts::chrome_hidden;
+use crate::split_view;
 use crate::state::Browser;
 use crate::tab_list::Tab;
 use crate::view::icons;
 use crate::view::page_accessibility::page_accessibility_layer;
 use crate::view::page_overlays::page_overlays;
 use crate::view::palette::Palette;
+use crate::view::picture_in_picture::picture_in_picture_windows;
+use crate::view::split_view::{drop_indicator, split_page_area};
 
 const STATUS_FONT: TextStyle = TextStyle::new(12.0, 400.0);
 const NOTICE_TITLE_FONT: TextStyle = TextStyle::new(15.0, 600.0);
@@ -27,29 +31,52 @@ pub fn page_area(s: &Browser, p: &Palette) -> El {
         .grow(1.0)
         .w_full()
         .min_h(0.0)
-        .fill(p.page)
         .on_layout(|s: &mut Browser, rect| s.page_laid_out(rect));
+    let area = if s.tabs.active().is_none_or(|tab| tab.page.size() == (0, 0)) {
+        area.fill(p.page)
+    } else {
+        area
+    };
+    if !chrome_hidden(s)
+        && let Some((split, layout)) = split_view::shown_layout(s)
+    {
+        return split_page_area(s, area.fill(p.chrome), split, layout, p)
+            .children(picture_in_picture_windows(s));
+    }
     let Some(tab) = s.tabs.active() else {
         return area;
     };
-    let mut area = area.child(page_surface(s, tab));
-    if !tab.hovered_link.is_empty() {
-        area = area.child(status_bubble(&tab.hovered_link, p));
-    }
-    if tab.crashed {
-        area = area.child(crashed_notice(p));
-    } else if tab.unresponsive {
-        area = area.child(unresponsive_prompt(tab, p));
-    }
-    area.children(page_overlays(s, tab.view, p))
+    area.children(page_content(s, tab, p))
+        .children(picture_in_picture_windows(s))
+        .children(drop_indicator(s, false, p))
 }
 
-fn page_surface(s: &Browser, tab: &Tab) -> El {
-    let surface = el()
-        .key("page-surface")
-        .role("none")
-        .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
-        .pixels_fit(&tab.page, SurfaceFit::Fill)
+pub fn page_content(s: &Browser, tab: &Tab, p: &Palette) -> Vec<El> {
+    let mut content = vec![page_surface(s, tab, !s.native_page_active())];
+    if !tab.hovered_link.is_empty() {
+        content.push(status_bubble(&tab.hovered_link, p));
+    }
+    if tab.crashed {
+        content.push(crashed_notice(tab.view, p));
+    } else if tab.unresponsive {
+        content.push(unresponsive_prompt(tab, p));
+    }
+    content.extend(page_overlays(s, tab.view, p));
+    content
+}
+
+fn page_surface(s: &Browser, tab: &Tab, draw_pixels: bool) -> El {
+    let view = tab.view;
+    let surface =
+        el().key("page-surface")
+            .role("none")
+            .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0));
+    let surface = if draw_pixels {
+        surface.pixels_fit(&tab.page, SurfaceFit::Fill)
+    } else {
+        surface
+    };
+    let surface = surface
         .surface_anchor(Align::Start, Align::Start)
         .surface_unscaled(true)
         .cursor(cursor_for(tab.cursor))
@@ -58,25 +85,38 @@ fn page_surface(s: &Browser, tab: &Tab) -> El {
             PointerButton::Back,
             PointerButton::Forward,
         ])
-        .on_drag(|s: &mut Browser, drag, tx| {
-            s.page_drag(drag, tx);
+        .on_drag(move |s: &mut Browser, drag, tx| {
+            s.page_drag(view, drag, tx);
             if drag.phase == rune::Phase::Move {
                 tx.live_only();
             }
         })
-        .on_pointer_move_local(|s: &mut Browser, pointer, tx| {
-            s.page_pointer_moved(pointer, tx);
-            tx.live_only();
+        .on_pointer_move_local(move |s: &mut Browser, pointer, tx| {
+            if !s.page_pointer_moved(view, pointer, tx) {
+                tx.live_only();
+            }
         })
-        .on_hover_change(|s: &mut Browser, hovered, tx| s.page_hover_changed(hovered, tx))
-        .on_secondary_press_local(|s: &mut Browser, pointer, tx| {
-            s.page_secondary_click(pointer, tx)
+        .on_hover_change(move |s: &mut Browser, hovered, tx| {
+            s.page_hover_changed(view, hovered, tx)
         })
-        .on_wheel(|s: &mut Browser, wheel, tx| {
-            s.page_wheel(wheel);
-            s.accessibility.page_input(s.tabs.active_view());
+        .on_secondary_press_local(move |s: &mut Browser, pointer, tx| {
+            s.page_secondary_click(view, pointer, tx)
+        })
+        .on_wheel(move |s: &mut Browser, wheel, tx| {
+            s.page_wheel(view, wheel);
+            s.accessibility.page_input(Some(view));
             tx.live_only();
             true
+        })
+        .on_drop_files(move |s: &mut Browser, files, tx| {
+            crate::page_drop::dropped(s, view, files, tx)
+        })
+        .accepts_files(crate::page_drop::accepts)
+        .on_drop_hover(move |s: &mut Browser, over, tx| {
+            crate::page_drop::hover_changed(s, view, over, tx)
+        })
+        .on_drop_move(move |s: &mut Browser, point, tx| {
+            crate::page_drop::moved(s, view, point, tx)
         });
     let page = el()
         .key("page")
@@ -93,7 +133,7 @@ fn page_surface(s: &Browser, tab: &Tab) -> El {
             handled
         })
         .on_key_up(|s: &mut Browser, event, tx| s.page_key_up(event, tx));
-    let page = if s.page_has_keyboard() {
+    let page = if s.page_has_keyboard() && s.tabs.is_active(view) {
         page.ime_cursor()
     } else {
         page
@@ -211,7 +251,7 @@ fn unresponsive_prompt(tab: &Tab, p: &Palette) -> El {
         .child(card)
 }
 
-fn crashed_notice(p: &Palette) -> El {
+fn crashed_notice(view: crate::engine::ViewId, p: &Palette) -> El {
     let reload = row()
         .key("crash-reload")
         .role("button")
@@ -224,7 +264,7 @@ fn crashed_notice(p: &Palette) -> El {
         .fill(p.accent)
         .hover(Color::WHITE.alpha(0.12))
         .press(Color::BLACK.alpha(0.12))
-        .on_press(|s: &mut Browser| s.reload())
+        .on_press(move |s: &mut Browser| s.reload_view(view))
         .child(
             text("Reload")
                 .font(BUTTON_FONT)

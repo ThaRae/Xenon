@@ -11,6 +11,7 @@ use crate::engine::{KeyEvent, KeyEventKind, Modifiers};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Shortcut {
     NewTab,
+    NewSplitView,
     CloseTab,
     FocusLocation,
     Reload,
@@ -111,6 +112,7 @@ pub fn shortcut_for(key: &Key, mods: Mods, platform: Platform) -> Option<Shortcu
         Key::Command('t') if primary_shift => Some(Shortcut::ReopenClosedTab),
         Key::Command('m') if primary_shift => Some(Shortcut::OpenTaskManager),
         Key::Command('n') if primary_only => Some(Shortcut::NewWindow),
+        Key::Command('n') if primary_alt => Some(Shortcut::NewSplitView),
         Key::Command('n') if primary_shift => Some(Shortcut::NewPrivateWindow),
         Key::Command('w') if primary_shift => Some(Shortcut::CloseWindow),
         Key::Command('`') if primary_only => Some(Shortcut::NextWindow),
@@ -310,6 +312,20 @@ mod tests {
         assert_eq!(at('l'), Some(Shortcut::FocusLocation));
         assert_eq!(at('r'), Some(Shortcut::Reload));
         assert_eq!(at('x'), None);
+    }
+
+    #[test]
+    fn primary_alt_n_opens_a_split_view() {
+        let primary_alt = mods(|m| {
+            m.cmd = true;
+            m.alt = true;
+        });
+        for platform in [Platform::Mac, Platform::Other] {
+            assert_eq!(
+                shortcut_for(&Key::Command('n'), primary_alt, platform),
+                Some(Shortcut::NewSplitView)
+            );
+        }
     }
 
     #[test]

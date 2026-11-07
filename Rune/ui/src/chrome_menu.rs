@@ -126,7 +126,8 @@ pub fn show_tab_menu(s: &mut Browser, view: ViewId, at: PointerPress, tx: &mut T
             if pinned { "Unpin Tab" } else { "Pin Tab" },
         ))
         .item(hibernation::hibernate_item(s, view));
-    let menu = crate::tab_groups::with_tab_menu_items(s, view, menu)
+    let menu = crate::tab_groups::with_tab_menu_items(s, view, menu);
+    let menu = crate::split_view::tab_menu_items(s, view, menu)
         .separator()
         .submenu("Move Tab", move_menu)
         .separator()
@@ -163,7 +164,9 @@ fn run_tab_menu_item(s: &mut Browser, view: ViewId, picked: &str, tx: &mut Tx) {
             s.close_tabs(view, left);
         }
         _ => {
-            crate::tab_groups::run_tab_menu_item(view, picked);
+            if !crate::split_view::run_menu_item(s, view, picked, tx) {
+                crate::tab_groups::run_tab_menu_item(view, picked);
+            }
         }
     }
 }

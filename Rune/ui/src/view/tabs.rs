@@ -8,16 +8,19 @@ use std::time::Duration;
 
 use rune::tok::TextStyle;
 use rune::{
-    Align, El, LoopSpec, PointerButton, ScrollSpec, Side, SurfaceFit, col, el, icon, row, text,
+    Align, El, LoopSpec, Phase, PointerButton, ScrollSpec, Side, SurfaceFit, col, el, icon, row,
+    text,
 };
 
 use crate::chrome_menu;
 use crate::engine::ViewId;
+use crate::split_view;
 use crate::state::{Browser, TAB_STRIP_HEIGHT};
 use crate::tab_groups::{self, Group, StripEntry, StripKey};
 use crate::tab_list::Tab;
 use crate::view::icons;
 use crate::view::palette::Palette;
+use crate::view::split_view::pair_split_tabs;
 use crate::view::tab_groups as group_views;
 
 const TAB_WIDTH: f32 = 232.0;
@@ -48,6 +51,7 @@ pub fn tab_strip(s: &Browser, p: &Palette, titlebar_inset: f32) -> El {
         .key("tab-strip")
         .w_full()
         .h(TAB_STRIP_HEIGHT)
+        .fill(p.chrome)
         .pl(titlebar_inset + STRIP_PADDING)
         .pr(STRIP_PADDING)
         .pt(TAB_TOP_INSET)
@@ -60,7 +64,7 @@ pub fn tab_strip(s: &Browser, p: &Palette, titlebar_inset: f32) -> El {
 }
 
 pub fn horizontal_tabs(s: &Browser, p: &Palette) -> El {
-    let mut tabs = row()
+    let tabs = row()
         .key("tabs")
         .role("tablist")
         .label("Tabs")
@@ -69,11 +73,12 @@ pub fn horizontal_tabs(s: &Browser, p: &Palette) -> El {
         .gap(2.0)
         .shrink();
     let groups = s.tab_groups.groups(s.shown_window());
+    let mut entries = Vec::new();
     for entry in tab_groups::strip_entries(s.tabs.iter().map(|tab| tab.view), groups) {
         match entry {
             StripEntry::Header(id) => {
                 if let Some(group) = groups.iter().find(|group| group.id == id) {
-                    tabs = tabs.child(group_views::horizontal_header(group, TAB_HEIGHT, p));
+                    entries.push((None, group_views::horizontal_header(group, TAB_HEIGHT, p)));
                 }
             }
             StripEntry::Tab {
@@ -83,18 +88,22 @@ pub fn horizontal_tabs(s: &Browser, p: &Palette) -> El {
             } => {
                 if let Some(tab) = s.tabs.get(view) {
                     let group = group.and_then(|id| groups.iter().find(|g| g.id == id));
-                    tabs = tabs.child(tab_button(
-                        tab,
-                        s.tabs.is_active(view),
-                        group,
-                        last_in_group,
-                        p,
+                    entries.push((
+                        Some(view),
+                        tab_button(
+                            tab,
+                            s.tabs.is_active(view),
+                            s.window_focused,
+                            group,
+                            last_in_group,
+                            p,
+                        ),
                     ));
                 }
             }
         }
     }
-    tabs
+    tabs.children(pair_split_tabs(s, entries, false, TAB_RADIUS, p))
 }
 
 fn tab_key(view: ViewId) -> String {
@@ -104,6 +113,7 @@ fn tab_key(view: ViewId) -> String {
 fn with_tab_events(tab_el: El, view: ViewId) -> El {
     tab_el
         .focusable(false)
+        .preserve_focus_on_press(true)
         .pointer_buttons([PointerButton::Middle])
         .on_press_tx(move |s: &mut Browser, tx| {
             if tx.button() == PointerButton::Middle {
@@ -138,6 +148,7 @@ fn tab_title(tab: &Tab, active: bool, p: &Palette) -> El {
 fn tab_button(
     tab: &Tab,
     active: bool,
+    window_focused: bool,
     group: Option<&Group>,
     last_in_group: bool,
     p: &Palette,
@@ -157,7 +168,7 @@ fn tab_button(
         .gap(8.0)
         .center_y()
         .corners([TAB_RADIUS, TAB_RADIUS, 0.0, 0.0])
-        .child(tab_icon(tab, p));
+        .child(tab_icon(tab, active && window_focused, p));
     let tab_el = with_tab_events(tab_el, view);
     let tab_el = with_tab_drag(tab_el, view, tab_groups::Axis::Horizontal).children(
         group_views::horizontal_line(group, last_in_group, TAB_RADIUS, p),
@@ -199,12 +210,20 @@ pub fn vertical_tab_sidebar(s: &Browser, p: &Palette) -> El {
         .gap(2.0);
     let mut previous_pinned = None;
     let groups = s.tab_groups.groups(s.shown_window());
+    let mut entries = Vec::new();
     for entry in tab_groups::strip_entries(s.tabs.iter().map(|tab| tab.view), groups) {
         let pinned = match entry {
             StripEntry::Tab { view, .. } => s.tabs.get(view).is_some_and(|tab| tab.pinned),
             StripEntry::Header(_) => false,
         };
         if previous_pinned == Some(true) && !pinned {
+            tabs = tabs.children(pair_split_tabs(
+                s,
+                std::mem::take(&mut entries),
+                true,
+                8.0,
+                p,
+            ));
             tabs = tabs.child(
                 el().key("pinned-separator")
                     .w_full()
@@ -218,7 +237,7 @@ pub fn vertical_tab_sidebar(s: &Browser, p: &Palette) -> El {
         match entry {
             StripEntry::Header(id) => {
                 if let Some(group) = groups.iter().find(|group| group.id == id) {
-                    tabs = tabs.child(group_views::vertical_header(group, expanded, p));
+                    entries.push((None, group_views::vertical_header(group, expanded, p)));
                 }
             }
             StripEntry::Tab {
@@ -228,18 +247,28 @@ pub fn vertical_tab_sidebar(s: &Browser, p: &Palette) -> El {
             } => {
                 if let Some(tab) = s.tabs.get(view) {
                     let group = group.and_then(|id| groups.iter().find(|g| g.id == id));
-                    tabs = tabs.child(group_views::vertical_member(
-                        view,
-                        vertical_tab(tab, s.tabs.is_active(view), expanded, p),
-                        group,
-                        last_in_group,
-                        expanded,
-                        p,
+                    entries.push((
+                        Some(view),
+                        group_views::vertical_member(
+                            view,
+                            vertical_tab(
+                                tab,
+                                s.tabs.is_active(view),
+                                s.window_focused,
+                                expanded,
+                                p,
+                            ),
+                            group,
+                            last_in_group,
+                            expanded,
+                            p,
+                        ),
                     ));
                 }
             }
         }
     }
+    tabs = tabs.children(pair_split_tabs(s, entries, true, 8.0, p));
     let new_tab = row()
         .key("new-tab")
         .role("button")
@@ -289,7 +318,7 @@ pub fn vertical_tab_sidebar(s: &Browser, p: &Palette) -> El {
         )
 }
 
-fn vertical_tab(tab: &Tab, active: bool, expanded: bool, p: &Palette) -> El {
+fn vertical_tab(tab: &Tab, active: bool, window_focused: bool, expanded: bool, p: &Palette) -> El {
     let view = tab.view;
     let tab_el = row()
         .key(tab_key(view))
@@ -302,7 +331,7 @@ fn vertical_tab(tab: &Tab, active: bool, expanded: bool, p: &Palette) -> El {
         .gap(8.0)
         .center_y()
         .radius(8.0)
-        .child(tab_icon(tab, p));
+        .child(tab_icon(tab, active && window_focused, p));
     let tab_el = if expanded { tab_el } else { tab_el.center() };
     let tab_el = with_tab_events(tab_el, view);
     let tab_el = with_tab_drag(tab_el, view, tab_groups::Axis::Vertical);
@@ -420,8 +449,18 @@ pub fn hover_card(s: &Browser, p: &Palette, vertical: bool) -> Option<El> {
 }
 
 fn with_tab_drag(tab_el: El, view: ViewId, axis: tab_groups::Axis) -> El {
-    group_views::track_layout(tab_el, StripKey::Tab(view))
-        .on_drag(move |s: &mut Browser, drag, tx| tab_groups::drag_tab(s, view, axis, drag, tx))
+    let origin =
+        rune::memo::window_layout_with(&tab_key(view), |[x, y, _, _]| [x.round(), y.round()]);
+    group_views::track_layout(tab_el, StripKey::Tab(view)).on_drag(
+        move |s: &mut Browser, drag, tx| {
+            let over_page = split_view::tab_drag(s, view, origin, drag);
+            if over_page && drag.phase == Phase::Move {
+                split_view::wake_for_drop(s, tx);
+                return;
+            }
+            tab_groups::drag_tab(s, view, axis, drag, tx)
+        },
+    )
 }
 
 fn audio_button(tab: &Tab, p: &Palette) -> Option<El> {
@@ -455,7 +494,7 @@ fn audio_button(tab: &Tab, p: &Palette) -> Option<El> {
     )
 }
 
-fn tab_icon(tab: &Tab, p: &Palette) -> El {
+fn tab_icon(tab: &Tab, animate: bool, p: &Palette) -> El {
     let slot = el()
         .key("icon")
         .size(ICON_SIZE, ICON_SIZE)
@@ -465,18 +504,20 @@ fn tab_icon(tab: &Tab, p: &Palette) -> El {
         return slot.child(icon(&icons::CRASHED, ICON_SIZE).color(p.text_muted));
     }
     if tab.loading {
+        let spinner = icon(&icons::SPINNER, ICON_SIZE)
+            .color(p.accent)
+            .absolute(0.0, 0.0);
         return slot
             .child(
                 icon(&icons::SPINNER_TRACK, ICON_SIZE)
                     .color(p.separator)
                     .absolute(0.0, 0.0),
             )
-            .child(
-                icon(&icons::SPINNER, ICON_SIZE)
-                    .color(p.accent)
-                    .absolute(0.0, 0.0)
-                    .looping(LoopSpec::rotation(0.9)),
-            );
+            .child(if animate {
+                spinner.looping(LoopSpec::rotation(0.9))
+            } else {
+                spinner
+            });
     }
     match &tab.favicon {
         Some(favicon) => slot.child(el().size(ICON_SIZE, ICON_SIZE).radius(3.0).pixels(favicon)),
