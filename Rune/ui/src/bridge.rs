@@ -154,20 +154,26 @@ unsafe extern "C" fn view_title_changed(context: *mut c_void, view: ViewId, titl
     let title = unsafe { title.to_string_lossy() };
     unsafe { ui(context) }
         .handle
-        .update(move |browser, tx| browser.title_changed(view, title.clone(), tx));
+        .update_showing(view, move |browser, tx| {
+            browser.title_changed(view, title.clone(), tx)
+        });
 }
 
 unsafe extern "C" fn view_url_changed(context: *mut c_void, view: ViewId, url: XenonStr) {
     let url = unsafe { url.to_string_lossy() };
     unsafe { ui(context) }
         .handle
-        .update(move |browser, tx| browser.url_changed(view, url.clone(), tx));
+        .update_showing(view, move |browser, tx| {
+            browser.url_changed(view, url.clone(), tx)
+        });
 }
 
 unsafe extern "C" fn view_loading_changed(context: *mut c_void, view: ViewId, is_loading: bool) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.loading_changed(view, is_loading));
+        .update_showing(view, move |browser, _| {
+            browser.loading_changed(view, is_loading)
+        });
 }
 
 unsafe extern "C" fn view_history_changed(
@@ -178,7 +184,9 @@ unsafe extern "C" fn view_history_changed(
 ) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.history_changed(view, can_go_back, can_go_forward));
+        .update_showing(view, move |browser, _| {
+            browser.history_changed(view, can_go_back, can_go_forward)
+        });
 }
 
 unsafe extern "C" fn view_favicon_changed(
@@ -200,26 +208,30 @@ unsafe extern "C" fn view_favicon_changed(
     });
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.favicon_changed(view, favicon.clone()));
+        .update_showing(view, move |browser, _| {
+            browser.favicon_changed(view, favicon.clone())
+        });
 }
 
 unsafe extern "C" fn view_cursor_changed(context: *mut c_void, view: ViewId, cursor: u32) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.cursor_changed(view, cursor));
+        .update_showing(view, move |browser, _| browser.cursor_changed(view, cursor));
 }
 
 unsafe extern "C" fn view_link_hovered(context: *mut c_void, view: ViewId, url: XenonStr) {
     let url = unsafe { url.to_string_lossy() };
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.link_hovered(view, url.clone()));
+        .update_showing(view, move |browser, _| {
+            browser.link_hovered(view, url.clone())
+        });
 }
 
 unsafe extern "C" fn view_crashed(context: *mut c_void, view: ViewId) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.crashed(view));
+        .update_showing(view, move |browser, _| browser.crashed(view));
 }
 
 unsafe extern "C" fn window_opened(context: *mut c_void, window: WindowId, is_private: bool) {
@@ -286,7 +298,9 @@ unsafe extern "C" fn tab_activated(context: *mut c_void, window: WindowId, view:
 unsafe extern "C" fn tab_pinned_changed(context: *mut c_void, view: ViewId, pinned: bool) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.tab_pinned_changed(view, pinned));
+        .update_showing(view, move |browser, _| {
+            browser.tab_pinned_changed(view, pinned)
+        });
 }
 
 unsafe extern "C" fn closed_tabs_changed(context: *mut c_void, can_reopen: bool) {
@@ -309,7 +323,9 @@ unsafe extern "C" fn tab_memory(context: *mut c_void, view: ViewId, description:
     let description = unsafe { description.to_string_lossy() };
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.tab_memory_reported(view, description.clone()));
+        .update_showing(view, move |browser, _| {
+            browser.tab_memory_reported(view, description.clone())
+        });
 }
 
 unsafe extern "C" fn ui_command(context: *mut c_void, command: u32) {
@@ -367,7 +383,9 @@ unsafe extern "C" fn view_audio_changed(
 ) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.audio_changed(view, playing_audio, muted));
+        .update_showing(view, move |browser, _| {
+            browser.audio_changed(view, playing_audio, muted)
+        });
 }
 
 unsafe extern "C" fn view_unresponsive_changed(
@@ -377,7 +395,9 @@ unsafe extern "C" fn view_unresponsive_changed(
 ) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.unresponsive_changed(view, unresponsive));
+        .update_showing(view, move |browser, _| {
+            browser.unresponsive_changed(view, unresponsive)
+        });
 }
 
 unsafe extern "C" fn history_menu(
@@ -404,21 +424,25 @@ unsafe extern "C" fn view_blocking_changed(
     blocked_requests: u64,
 ) {
     let site = unsafe { site.to_string_lossy() };
-    unsafe { ui(context) }.handle.update(move |browser, _| {
-        browser.blocking_changed(view, state, site.clone(), blocked_requests)
-    });
+    unsafe { ui(context) }
+        .handle
+        .update_showing(view, move |browser, _| {
+            browser.blocking_changed(view, state, site.clone(), blocked_requests)
+        });
 }
 
 unsafe extern "C" fn view_zoom_changed(context: *mut c_void, view: ViewId, percent: u32) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.zoom_changed(view, percent));
+        .update_showing(view, move |browser, _| browser.zoom_changed(view, percent));
 }
 
 unsafe extern "C" fn view_bookmarked_changed(context: *mut c_void, view: ViewId, bookmarked: bool) {
     unsafe { ui(context) }
         .handle
-        .update(move |browser, _| browser.bookmarked_changed(view, bookmarked));
+        .update_showing(view, move |browser, _| {
+            browser.bookmarked_changed(view, bookmarked)
+        });
 }
 
 #[cfg(test)]

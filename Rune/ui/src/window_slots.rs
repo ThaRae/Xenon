@@ -229,6 +229,21 @@ impl Slots {
         }
     }
 
+    pub fn update_showing(
+        &self,
+        view: ViewId,
+        f: impl Fn(&mut Browser, &mut Tx) + Send + Sync + 'static,
+    ) {
+        let f = Arc::new(f);
+        for handle in &self.handles {
+            let f = f.clone();
+            handle.update_if(move |browser, tx| {
+                f(browser, tx);
+                browser.shows_view(view)
+            });
+        }
+    }
+
     pub fn update_view(
         &self,
         view: ViewId,

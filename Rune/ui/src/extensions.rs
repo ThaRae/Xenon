@@ -1131,4 +1131,24 @@ mod tests {
         assert_eq!(managers.shown(), "proton-pass");
         assert_eq!(managers.name_of("bitwarden"), Some("Bitwarden"));
     }
+
+    #[test]
+    fn a_popups_view_is_shown_by_the_window_drawing_it() {
+        let mut browser = Browser::new(Arc::default());
+        browser.windows.opened(crate::tab_list::WindowInfo {
+            id: 1,
+            private: false,
+        });
+        browser.extensions.popup = Some(Popup {
+            tab: 7,
+            extension_id: String::new(),
+            view: 9,
+            size: (0.0, 0.0),
+            pixels: Pixels::new(),
+            cursor: 0,
+            sent_viewport: Cell::new(None),
+            pressed_buttons: 0,
+        });
+        assert!(browser.shows_view(9));
+    }
 }
