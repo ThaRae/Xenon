@@ -101,9 +101,35 @@ impl Palette {
     }
 }
 
+impl Palette {
+    pub fn for_window(self, active: bool) -> Palette {
+        if active {
+            return self;
+        }
+        Palette {
+            chrome: self.chrome.mix(self.surface, INACTIVE_CHROME_MIX),
+            ..self
+        }
+    }
+}
+
+const INACTIVE_CHROME_MIX: f32 = 0.4;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_inactive_window_moves_its_tab_strip_toward_the_toolbar() {
+        let active = Palette::new(false, 1.0);
+        let inactive = active.for_window(false);
+        assert_eq!(active.for_window(true).chrome.hex(), active.chrome.hex());
+        assert_ne!(inactive.chrome.hex(), active.chrome.hex());
+        assert_eq!(
+            inactive.chrome.hex(),
+            active.chrome.mix(active.surface, 0.4).hex()
+        );
+    }
 
     #[test]
     fn brand_accent_is_xenon_rose() {
