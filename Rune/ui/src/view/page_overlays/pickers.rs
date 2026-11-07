@@ -33,6 +33,7 @@ const WEEKDAYS: [&str; 7] = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 fn scrim(key: &'static str, panel: El) -> El {
     col()
         .key(key)
+        .role("none")
         .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .center()
         .padding(24.0)

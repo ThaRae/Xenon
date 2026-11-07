@@ -359,6 +359,7 @@ pub fn crash_review(view: ViewId, review: &CrashReview, p: &Palette) -> El {
     }
     col()
         .key("crash-review-backdrop")
+        .role("none")
         .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .center()
         .padding(24.0)

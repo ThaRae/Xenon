@@ -179,3 +179,137 @@ fn the_bookmarks_bar_is_a_toolbar_of_named_buttons() {
         assert_eq!(names, ["https://ladybird.org/", "Work"], "{layout:?}");
     }
 }
+
+fn tree_for(browser: Browser) -> Value {
+    let mut rt = Runtime::new(browser, browser_view, (1300.0, 600.0), Env::new(false, 1.0));
+    rt.frame(0.0);
+    rt.frame(0.0);
+    rt.accessibility_json()
+}
+
+fn unnamed_controls(tree: &Value) -> Vec<String> {
+    nodes(tree)
+        .into_iter()
+        .filter(|node| has(node, "actions", "click") && !named(node))
+        .map(|node| format!("{} {}", node["role"], node["key"]))
+        .collect()
+}
+
+fn named_role(tree: &Value, key: &str, role: &str) {
+    let node = nodes(tree)
+        .into_iter()
+        .find(|node| node["key"] == key)
+        .unwrap_or_else(|| panic!("no {key}"));
+    assert_eq!(node["role"], role, "{node}");
+    assert!(named(node), "{node}");
+}
+
+fn check_overlay(set_up: impl FnOnce(&mut Browser), key: &str, role: &str) {
+    let mut state = browser(ChromeLayout::Classic);
+    set_up(&mut state);
+    let tree = tree_for(state);
+    let unnamed = unnamed_controls(&tree);
+    assert!(unnamed.is_empty(), "{key}: unnamed controls {unnamed:?}");
+    named_role(&tree, key, role);
+}
+
+#[test]
+fn prompts_media_and_report_overlays_name_their_controls() {
+    check_overlay(
+        |s| crate::pickers::color_picker_requested(s, ACTIVE_VIEW, 1, 0x3366cc),
+        "color-picker-ok",
+        "default-button",
+    );
+    check_overlay(
+        |s| {
+            crate::pickers::date_picker_requested(
+                s,
+                ACTIVE_VIEW,
+                2,
+                "date".to_owned(),
+                "2026-11-06".to_owned(),
+                String::new(),
+                String::new(),
+            )
+        },
+        "date-day-2026-11-20",
+        "button",
+    );
+    check_overlay(
+        |s| {
+            crate::pickers::web_authn_prompt(
+                s,
+                ACTIVE_VIEW,
+                crate::pickers::WebAuthn {
+                    state: crate::pickers::WebAuthnState::EnterPin,
+                    registering: false,
+                    relying_party: "example.com".to_owned(),
+                    user_name: String::new(),
+                    caller: String::new(),
+                    pin_was_wrong: false,
+                    pin_retries: Some(3),
+                    accounts: Vec::new(),
+                    chosen_account: 0,
+                    pin: rune::TextEdit::new("").secure(),
+                },
+            )
+        },
+        "web-authn",
+        "dialog",
+    );
+    check_overlay(
+        |s| {
+            crate::crash_reports::review_opened(
+                s,
+                ACTIVE_VIEW,
+                "This page crashed.".to_owned(),
+                "Reload page".to_owned(),
+                Some("https://example.com/".to_owned()),
+                Vec::new(),
+            )
+        },
+        "crash-review-description",
+        "multiline-text-input",
+    );
+    check_overlay(
+        |s| crate::screenshots::selection_requested(s, ACTIVE_VIEW, 9002),
+        "screenshot-instructions",
+        "dialog",
+    );
+    check_overlay(
+        |s| {
+            s.updates.status_changed(Some("9.9.9".to_owned()));
+        },
+        "update-button",
+        "button",
+    );
+    check_overlay(
+        |s| {
+            s.updates.status_changed(Some("9.9.9".to_owned()));
+            s.updates.popover_open = true;
+        },
+        "update-relaunch",
+        "button",
+    );
+    check_overlay(
+        |s| crate::crash_reports::offer(s, "report".to_owned()),
+        "crash-report-popover",
+        "dialog",
+    );
+    check_overlay(
+        |s| {
+            crate::picture_in_picture::shown(
+                s,
+                crate::picture_in_picture::Shown {
+                    id: 9001,
+                    owner: ACTIVE_VIEW,
+                    size: (320.0, 180.0),
+                    minimum: (160.0, 90.0),
+                    maximum: (640.0, 360.0),
+                },
+            )
+        },
+        "picture-in-picture-9001",
+        "dialog",
+    );
+}
