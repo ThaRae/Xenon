@@ -212,6 +212,7 @@ pub struct ViewPrompts {
     pub color_picker: Option<ColorPicker>,
     pub date_picker: Option<DatePicker>,
     pub web_authn: Option<WebAuthn>,
+    pub crash_review: Option<crate::crash_reports::CrashReview>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

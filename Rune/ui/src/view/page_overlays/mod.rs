@@ -6,6 +6,7 @@
 
 mod bubbles;
 pub(crate) mod controls;
+mod crash_review;
 mod dialog;
 mod find_bar;
 pub(crate) mod menu;
@@ -27,6 +28,9 @@ pub fn page_overlays(s: &Browser, view: ViewId, p: &Palette) -> Vec<El> {
         }
         if !prompts.permissions.is_empty() {
             overlays.push(bubbles::permission_prompts(view, &prompts.permissions, p));
+        }
+        if let Some(review) = &prompts.crash_review {
+            overlays.push(crash_review::crash_review(view, review, p));
         }
         if let Some(prompt) = &prompts.web_authn {
             overlays.push(pickers::web_authn(view, prompt, p));
