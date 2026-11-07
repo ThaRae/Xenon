@@ -6,7 +6,7 @@
 
 #include <AK/Vector.h>
 #include <LibCore/Environment.h>
-#include <LibThreading/Mutex.h>
+#include <AK/Mutex.h>
 #include <LibWebView/Application.h>
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/UpdaterBridge.h>
@@ -31,7 +31,7 @@ static SPUStandardUpdaterController* s_controller;
 static XenonRuneUpdaterDelegate* s_delegate;
 static SettingsFollower* s_settings_follower;
 static void (^s_install_now)(void);
-static Threading::Mutex s_status_mutex;
+static Mutex s_status_mutex;
 static Status s_status;
 static Vector<Function<bool()>> s_status_listeners;
 
@@ -68,7 +68,7 @@ template<typename Change>
 static void change_status(Change change)
 {
     {
-        Threading::MutexLocker locker(s_status_mutex);
+        MutexLocker locker(s_status_mutex);
         change(s_status);
     }
     Xenon::Engine::the().post([] {
@@ -158,7 +158,7 @@ Status status()
 
     Status status;
     {
-        Threading::MutexLocker locker(s_status_mutex);
+        MutexLocker locker(s_status_mutex);
         status = s_status;
     }
     status.availability = is_release_build() ? Availability::Available : Availability::DevelopmentBuild;
