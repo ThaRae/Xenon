@@ -80,6 +80,14 @@ void xenon_engine_set_window_surface(XenonWindowId window, void* display, void* 
     });
 }
 
+void xenon_engine_set_view_frame_rate(XenonViewId view_id, double frames_per_second)
+{
+    Engine::the().post([view_id, frames_per_second] {
+        if (auto* view = Engine::the().view(view_id))
+            view->set_frame_rate(frames_per_second);
+    });
+}
+
 void xenon_engine_set_system_dark(bool dark)
 {
     Engine::the().post([dark] {

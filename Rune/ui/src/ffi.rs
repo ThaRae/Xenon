@@ -321,6 +321,7 @@ unsafe extern "C" {
         display: *mut c_void,
         surface: *mut c_void,
     );
+    pub fn xenon_engine_set_view_frame_rate(view: XenonViewId, frames_per_second: f64);
     pub fn xenon_engine_set_system_dark(dark: bool);
     pub fn xenon_engine_set_chrome_layout(layout: u8);
     pub fn xenon_engine_set_cycle_tabs_in_recently_used_order(enabled: bool);

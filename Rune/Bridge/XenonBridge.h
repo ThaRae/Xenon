@@ -258,6 +258,7 @@ void xenon_engine_shutdown(void);
 
 void xenon_engine_set_window_viewport(XenonWindowId, uint32_t width, uint32_t height, double device_pixel_ratio);
 void xenon_engine_set_window_surface(XenonWindowId, void* display, void* surface);
+void xenon_engine_set_view_frame_rate(XenonViewId, double frames_per_second);
 void xenon_engine_set_system_dark(bool dark);
 void xenon_engine_set_chrome_layout(uint8_t layout);
 void xenon_engine_set_cycle_tabs_in_recently_used_order(bool);

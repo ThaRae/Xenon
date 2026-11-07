@@ -466,6 +466,11 @@ void View::set_visible(bool visible)
     set_system_visibility_state(visible ? Web::HTML::VisibilityState::Visible : Web::HTML::VisibilityState::Hidden);
 }
 
+void View::set_frame_rate(double frames_per_second)
+{
+    set_display_metadata({}, frames_per_second);
+}
+
 void View::set_uses_native_surface(bool uses)
 {
     if (m_uses_native_surface == uses)

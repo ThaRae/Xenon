@@ -149,6 +149,8 @@ pub struct Browser {
     native_shown_view: Option<ViewId>,
     #[cfg(target_os = "linux")]
     native_waiting_for_cpu: bool,
+    #[cfg(target_os = "linux")]
+    native_rate_view: Option<ViewId>,
 }
 
 impl Browser {
@@ -201,6 +203,8 @@ impl Browser {
             native_shown_view: None,
             #[cfg(target_os = "linux")]
             native_waiting_for_cpu: false,
+            #[cfg(target_os = "linux")]
+            native_rate_view: None,
         }
     }
 
@@ -372,7 +376,9 @@ impl Browser {
             let page_rect = self.page_rect();
             let window = self.shown_window();
             let active_view = self.tabs.active_view();
-            let blocked = self.split.shown(&self.tabs).is_some() || self.native_overlay_open();
+            let split_blocked = self.split.shown(&self.tabs).is_some();
+            let overlay_open = self.native_overlay_open();
+            let blocked = split_blocked || overlay_open;
             let Some(wayland) = self.wayland.as_mut() else {
                 return false;
             };
@@ -392,6 +398,17 @@ impl Browser {
                 if let Some(window) = window {
                     self.engine.set_window_surface(window, display, surface);
                 }
+            }
+            let throttled = overlay_open && !split_blocked;
+            let rate_view = if throttled { active_view } else { None };
+            if rate_view != self.native_rate_view {
+                if let Some(previous) = self.native_rate_view {
+                    self.engine.set_view_frame_rate(previous, 60.0);
+                }
+                if let Some(current) = rate_view {
+                    self.engine.set_view_frame_rate(current, 10.0);
+                }
+                self.native_rate_view = rate_view;
             }
             let active = active_view.filter(|view| self.native_views.contains(view));
             if active != self.native_shown_view {

@@ -65,6 +65,7 @@ public:
     void set_viewport(Web::DevicePixelSize, double device_pixel_ratio);
     void set_visible(bool);
     void set_uses_native_surface(bool);
+    void set_frame_rate(double);
     void apply_system_theme();
     void toggle_mute();
     void run_blocking_action(u32 action);

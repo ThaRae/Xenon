@@ -619,16 +619,22 @@ stop when macOS reports it, see [Windows](#windows)). Slots nobody has bound hav
   is left clear; the page surface is above the window's surface, because KWin does not composite a subsurface placed
   below its parent. While an overlay covers the page (a menu, dialog, permission prompt, picker, find bar, location
   suggestion list, hover card, link status, picture-in-picture or the task manager) the window falls back to the CPU
-  pixels path, which keeps those overlays above the page; it returns to the native surface when they close.
-  `Meta/rune.py` prepares a patched Rune checkout under `Build/rune` and `Patches/rune` holds the two small patches it
-  applies: `WindowHandle::with_raw_display_handle`, which winit's raw window handle does not expose, and an
-  `allow(dead_code)` for the tooling's performance meters in release builds.
+  pixels path, which keeps those overlays above the page; it returns to the native surface when they close. The page
+  behind such an overlay is capped to 10 frames per second (`xenon_engine_set_view_frame_rate`), and its rate goes back
+  to the display's when the overlay closes, so an animation there can't hold the whole fallback at 60.
+  `Meta/rune.py` prepares a patched Rune checkout under `Build/rune` and `Patches/rune` holds the three small patches it
+  applies: `WindowHandle::with_raw_display_handle`, which winit's raw window handle does not expose, an
+  `allow(dead_code)` for the tooling's performance meters in release builds, and one that hands the IME cursor area to
+  the window only when it moves (sending it every frame kept KWin repositioning its input-method popup at the display's
+  rate, which cost about 7% GPU with a text field focused).
 
 Measured in a KWin session with OpenGL compositing (`compositingType` `gl2`), 1280×800, a 60 fps CSS-animated page and
-`gpu_busy_percent`: Rune with the native page surface **3.0%**, Qt **3.0%**, before the native surface 10.0%. While an
-overlay is open the fallback returns to about 10%. X11 and macOS keep the CPU pixels path, so the conversion above still
-applies there; on Linux and Windows a window's pages also keep painting while the window is minimised or covered,
-because only the macOS side learns about that from AppKit.
+`gpu_busy_percent`: Rune with the native page surface **3.0%**, Qt **3.0%**, before the native surface 10.0%. With the
+find bar open and focused, Rune measures **0.0%** on a settled page and **1.6%** over the same animation, Qt **3.0%**.
+Moving the pointer over a settled page costs Rune **0.0%**, and a page that scrolls itself measures Rune **4.0%** against
+Qt's **4.1%**. X11 and macOS keep the CPU pixels path, so the conversion above still applies there; on Linux and Windows
+a window's pages also keep painting while the window is minimised or covered, because only the macOS side learns about
+that from AppKit.
 
 ## Page accessibility
 
