@@ -370,6 +370,9 @@ automaticUpdates.addEventListener("change", () => {
     ladybird.sendMessage("xenon/setAutomaticUpdates", automaticUpdates.checked);
 });
 
+const defaultBrowserStatus = document.querySelector("#default-browser-status");
+const makeDefaultBrowser = document.querySelector("#make-default-browser");
+
 function renderDefaultBrowser() {
     const defaultBrowser = XENON.defaultBrowser;
     if (!defaultBrowser) return;
