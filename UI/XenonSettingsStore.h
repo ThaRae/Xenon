@@ -21,6 +21,7 @@ namespace Ladybird::XenonSettings {
 namespace Keys {
 
 inline constexpr auto compact_toolbar = "layout/compactToolbar"sv;
+inline constexpr auto framed_pages = "layout/framedPages"sv;
 inline constexpr auto cycle_tabs_in_recently_used_order = "tabs/cycleInRecentlyUsedOrder"sv;
 inline constexpr auto tab_hibernation = "tabs/hibernation"sv;
 inline constexpr auto tab_hibernation_timeout = "tabs/hibernationTimeout"sv;

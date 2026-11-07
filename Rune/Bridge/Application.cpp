@@ -99,11 +99,6 @@ void Application::resolve_external_url_handler(URL::URL const& url, WebView::Ext
     resolve_platform_external_url_handler(url, move(callback));
 }
 
-void Application::display_crash_report_notification(ByteString const& report_name)
-{
-    Xenon::offer_crash_report(report_name);
-}
-
 NonnullRefPtr<Core::Promise<ByteString>> Application::ask_user_for_download_path(ByteString const& file) const
 {
     return ask_ui_for_save_location(file);

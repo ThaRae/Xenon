@@ -264,23 +264,28 @@ pub fn toolbar_button(s: &Browser, p: &Palette) -> Option<El> {
 
 pub fn pair_split_tabs(
     s: &Browser,
-    tabs: Vec<(ViewId, El)>,
+    entries: Vec<(Option<ViewId>, El)>,
     vertical: bool,
     radius: f32,
     p: &Palette,
 ) -> Vec<El> {
-    let mut paired = Vec::with_capacity(tabs.len());
-    let mut tabs = tabs.into_iter().peekable();
+    let mut paired = Vec::with_capacity(entries.len());
+    let mut tabs = entries.into_iter().peekable();
     while let Some((view, tab_el)) = tabs.next() {
-        let split = s
-            .split
-            .split_of(view)
-            .filter(|split| split.left == view)
-            .copied();
+        let split = view.and_then(|view| {
+            s.split
+                .split_of(view)
+                .filter(|split| split.left == view)
+                .copied()
+        });
         match split {
-            Some(split) if tabs.peek().is_some_and(|(next, _)| *next == split.right) => {
+            Some(split)
+                if tabs
+                    .peek()
+                    .is_some_and(|(next, _)| *next == Some(split.right)) =>
+            {
                 let (_, right) = tabs.next().expect("the peeked partner");
-                let shown = s.split.is_shown(&s.tabs, view);
+                let shown = s.split.is_shown(&s.tabs, split.left);
                 paired.push(split_tab_frame(
                     split, tab_el, right, shown, vertical, radius, p,
                 ));

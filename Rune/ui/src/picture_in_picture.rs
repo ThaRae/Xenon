@@ -133,7 +133,7 @@ fn window_mut(s: &mut Browser, id: ViewId) -> Option<&mut PictureInPicture> {
 }
 
 pub fn shown(s: &mut Browser, shown: Shown) {
-    let surface = s.surface_of(shown.id);
+    let surface = s.surface_for(shown.id);
     if let Some(window) = window_mut(s, shown.id) {
         let grew_from = window.size;
         window.size = shown.size;

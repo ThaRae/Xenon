@@ -60,49 +60,42 @@ fn send(
     }
 }
 
-pub fn hover_changed(s: &mut Browser, over: bool, tx: &mut Tx) {
-    let Some(view) = s.tabs.active_view() else {
-        return;
-    };
-    if over {
-        LEAVE_PENDING.with_borrow_mut(|pending| *pending = None);
-        let files = DRAGGED_FILES.with_borrow(Clone::clone);
-        send(
-            view,
-            ffi_drop::XENON_DRAG_ENTER,
-            tx.drop_point(),
-            s,
-            tx,
-            &files,
-        );
+pub fn hover_changed(s: &mut Browser, view: ViewId, over: bool, tx: &mut Tx) {
+    if !over {
+        LEAVE_PENDING.with_borrow_mut(|pending| *pending = Some(view));
+        tx.wake_after(std::time::Duration::ZERO);
         return;
     }
-    DRAGGED_FILES.with_borrow_mut(Vec::clear);
-    LEAVE_PENDING.with_borrow_mut(|pending| *pending = Some(view));
-    tx.wake_after(std::time::Duration::ZERO);
+    if let Some(left) = LEAVE_PENDING.with_borrow_mut(Option::take)
+        && left != view
+    {
+        send(left, ffi_drop::XENON_DRAG_LEAVE, None, s, tx, &[]);
+    }
+    let files = DRAGGED_FILES.with_borrow(Clone::clone);
+    send(
+        view,
+        ffi_drop::XENON_DRAG_ENTER,
+        tx.drop_point(),
+        s,
+        tx,
+        &files,
+    );
 }
 
-pub fn moved(s: &mut Browser, point: PointerEvent, tx: &mut Tx) {
-    if let Some(view) = s.tabs.active_view() {
-        send(view, ffi_drop::XENON_DRAG_MOVE, Some(point), s, tx, &[]);
-    }
+pub fn moved(s: &mut Browser, view: ViewId, point: PointerEvent, tx: &mut Tx) {
+    send(view, ffi_drop::XENON_DRAG_MOVE, Some(point), s, tx, &[]);
     tx.live_only();
 }
 
-pub fn dropped(s: &mut Browser, files: &[PathBuf], tx: &mut Tx) {
-    let pending = LEAVE_PENDING.with_borrow_mut(Option::take);
-    let Some(view) = s.tabs.active_view() else {
-        return;
-    };
-    if pending.is_some_and(|pending| pending != view) {
-        send(
-            pending.unwrap_or(view),
-            ffi_drop::XENON_DRAG_LEAVE,
-            None,
-            s,
-            tx,
-            &[],
-        );
+pub fn dropped(s: &mut Browser, view: ViewId, files: &[PathBuf], tx: &mut Tx) {
+    if let Some(left) = LEAVE_PENDING.with_borrow_mut(Option::take)
+        && left != view
+    {
+        send(left, ffi_drop::XENON_DRAG_LEAVE, None, s, tx, &[]);
+    }
+    DRAGGED_FILES.with_borrow_mut(Vec::clear);
+    if !s.tabs.is_active(view) {
+        s.activate_tab(view, tx);
     }
     s.focus_page();
     send(
@@ -117,6 +110,7 @@ pub fn dropped(s: &mut Browser, files: &[PathBuf], tx: &mut Tx) {
 
 pub fn poll(s: &mut Browser, tx: &mut Tx) -> bool {
     if let Some(view) = LEAVE_PENDING.with_borrow_mut(Option::take) {
+        DRAGGED_FILES.with_borrow_mut(Vec::clear);
         send(view, ffi_drop::XENON_DRAG_LEAVE, None, s, tx, &[]);
     }
     false

@@ -36,7 +36,6 @@ private:
     virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab) const override;
     virtual bool supports_private_browsing_windows() const override { return true; }
     virtual bool supports_picture_in_picture() const override;
-    virtual void display_crash_report_notification(ByteString const& report_name) override;
     virtual NonnullRefPtr<Core::Promise<ByteString>> ask_user_for_download_path(ByteString const& file) const override;
     virtual Optional<String> ui_font_family() const override;
     virtual Optional<String> system_font_family() const override;

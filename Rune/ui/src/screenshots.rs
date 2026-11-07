@@ -79,7 +79,7 @@ pub fn selection_requested(s: &mut Browser, view: ViewId, surface_id: ViewId) {
     s.screenshot = Some(ScreenshotSelection {
         view,
         surface_id,
-        frame: s.surface_of(surface_id),
+        frame: s.surface_for(surface_id),
         drag: None,
         reveals_page: false,
         settle_due: None,

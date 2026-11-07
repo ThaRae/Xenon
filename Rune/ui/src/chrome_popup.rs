@@ -6,7 +6,7 @@
 
 use rune::{PopupAnchor, Tx, popup_menu_supported};
 
-use crate::page_prompts::{MenuEntry, popup_menu_named};
+use crate::page_prompts::MenuEntry;
 use crate::state::Browser;
 
 pub const CHROME_MENU_ANCHOR_KEY: &str = "chrome-menu-anchor";
@@ -19,6 +19,7 @@ pub struct PopupItem {
     title: String,
     enabled: bool,
     checked: Option<bool>,
+    symbol: Option<String>,
 }
 
 impl PopupItem {
@@ -28,6 +29,7 @@ impl PopupItem {
             title: title.into(),
             enabled: true,
             checked: None,
+            symbol: None,
         }
     }
 
@@ -40,12 +42,33 @@ impl PopupItem {
         self.checked = Some(checked);
         self
     }
+
+    pub fn symbol(mut self, name: impl Into<String>) -> PopupItem {
+        self.symbol = Some(name.into());
+        self
+    }
+
+    #[cfg(test)]
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    #[cfg(test)]
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    #[cfg(test)]
+    pub fn is_checked(&self) -> bool {
+        self.checked.unwrap_or(false)
+    }
 }
 
 #[derive(Default)]
 pub struct PopupMenu {
     entries: Vec<MenuEntry>,
     names: Vec<String>,
+    symbols: Vec<Option<String>>,
 }
 
 impl PopupMenu {
@@ -59,12 +82,18 @@ impl PopupMenu {
             .into_iter()
             .map(|entry| renumbered(entry, &mut names))
             .collect();
-        PopupMenu { entries, names }
+        let symbols = vec![None; names.len()];
+        PopupMenu {
+            entries,
+            names,
+            symbols,
+        }
     }
 
     pub fn item(mut self, item: PopupItem) -> PopupMenu {
         let id = self.names.len() as u32;
         self.names.push(item.id);
+        self.symbols.push(item.symbol);
         self.entries.push(MenuEntry::Action {
             id,
             title: item.title,
@@ -84,6 +113,7 @@ impl PopupMenu {
     pub fn submenu(mut self, title: impl Into<String>, submenu: PopupMenu) -> PopupMenu {
         let offset = self.names.len() as u32;
         self.names.extend(submenu.names);
+        self.symbols.extend(submenu.symbols);
         self.entries.push(MenuEntry::Submenu {
             title: title.into(),
             entries: submenu
@@ -107,11 +137,74 @@ impl PopupMenu {
         self.names.get(item as usize).map(String::as_str)
     }
 
-    fn native(&self) -> rune::PopupMenu {
-        popup_menu_named(&self.entries, &|item| {
-            self.name(item).unwrap_or_default().to_owned()
+    #[cfg(test)]
+    pub fn find(&self, id: &str) -> Option<PopupItem> {
+        let item = self.names.iter().position(|name| name == id)? as u32;
+        found(&self.entries, item).map(|(title, enabled, checked)| PopupItem {
+            id: id.to_owned(),
+            title,
+            enabled,
+            checked,
+            symbol: self.symbols[item as usize].clone(),
         })
     }
+
+    fn native(&self) -> rune::PopupMenu {
+        self.native_entries(&self.entries)
+    }
+
+    fn native_entries(&self, entries: &[MenuEntry]) -> rune::PopupMenu {
+        let mut popup = rune::PopupMenu::new();
+        for entry in entries {
+            popup = match entry {
+                MenuEntry::Action {
+                    id,
+                    title,
+                    enabled,
+                    checked,
+                    indented,
+                    ..
+                } => {
+                    let title = if *indented {
+                        format!("    {title}")
+                    } else {
+                        title.clone()
+                    };
+                    let mut item = rune::PopupItem::new(self.name(*id).unwrap_or_default(), title)
+                        .enabled(*enabled)
+                        .checked(*checked);
+                    if let Some(Some(symbol)) = self.symbols.get(*id as usize) {
+                        item = item.symbol(symbol.clone());
+                    }
+                    popup.item(item)
+                }
+                MenuEntry::Separator => popup.separator(),
+                MenuEntry::Heading(title) => {
+                    popup.item(rune::PopupItem::new(String::new(), title.clone()).enabled(false))
+                }
+                MenuEntry::Submenu { title, entries } => {
+                    popup.submenu(title.clone(), self.native_entries(entries))
+                }
+            };
+        }
+        popup
+    }
+}
+
+#[cfg(test)]
+fn found(entries: &[MenuEntry], item: u32) -> Option<(String, bool, Option<bool>)> {
+    entries.iter().find_map(|entry| match entry {
+        MenuEntry::Action {
+            id,
+            title,
+            enabled,
+            checkable,
+            checked,
+            ..
+        } if *id == item => Some((title.clone(), *enabled, checkable.then_some(*checked))),
+        MenuEntry::Submenu { entries, .. } => found(entries, item),
+        _ => None,
+    })
 }
 
 fn renumbered(entry: MenuEntry, names: &mut Vec<String>) -> MenuEntry {

@@ -37,6 +37,7 @@ struct CrashReview {
     AK_ALLOC_WITH_KMALLOC;
 
     NonnullOwnPtr<WebView::CrashReportReview> review;
+    ByteString report_name;
     bool hidden { false };
     Optional<String> website;
     String last_description;
@@ -81,12 +82,24 @@ static void send_status(XenonViewId id, u32 stage, StringView title, StringView 
     notify_reports(&XenonReportCallbacks::crash_review_status, id, static_cast<XenonCrashReviewStatus const*>(&status));
 }
 
-static void report_outcome(XenonViewId id, CrashReview& review, StringView title, StringView message, int progress)
+static bool has_pending_report()
 {
-    send_status(id, XENON_CRASH_REVIEW_ANSWERED, title, message, progress, review.review->has_next_report(), review.hidden);
+    auto pending = WebView::CrashReportStore::the().pending_report_names();
+    return !pending.is_error() && !pending.value().is_empty();
 }
 
-static bool open_review(XenonViewId id, CrashReview& review, Optional<ByteString> const& name)
+static void mark_report_seen(ByteString const& name)
+{
+    if (auto result = WebView::CrashReportStore::the().mark_seen(name); result.is_error())
+        warnln("Xenon: Could not mark crash report as seen: {}", result.error());
+}
+
+static void report_outcome(XenonViewId id, CrashReview& review, StringView title, StringView message, int progress)
+{
+    send_status(id, XENON_CRASH_REVIEW_ANSWERED, title, message, progress, has_pending_report(), review.hidden);
+}
+
+static bool open_review(XenonViewId id, CrashReview& review, ByteString const& name)
 {
     auto report = review.review->open(name);
     if (report.is_error()) {
@@ -94,9 +107,17 @@ static bool open_review(XenonViewId id, CrashReview& review, Optional<ByteString
         return false;
     }
 
+    review.report_name = name;
+    review.website = WebView::CrashReportStore::the().website(name);
+
     Vector<XenonReportField> fields;
-    for (auto const& field : report.value().fields)
-        fields.append({ .label = xenon_str(field.label), .value = xenon_str(field.value), .is_code = field.is_code });
+    for (auto const& field : report.value().fields) {
+        XenonReportField entry;
+        entry.label = xenon_str(field.label);
+        entry.value = xenon_str(field.value);
+        entry.is_code = field.is_code;
+        fields.append(entry);
+    }
 
     auto website = review.website.value_or({});
     XenonCrashReview shown {
@@ -120,7 +141,14 @@ static void show_review(View& view, Optional<ByteString> const& hidden_report_na
     if (!report_name.has_value())
         return;
 
-    auto review = make<CrashReview>(make<WebView::CrashReportReview>(), is_hidden, is_hidden ? Optional<String> {} : view.crash_report_website(), String {}, Optional<String> {});
+    auto review = adopt_own(*new CrashReview {
+        .review = make<WebView::CrashReportReview>(),
+        .report_name = ByteString { *report_name },
+        .hidden = is_hidden,
+        .website = Optional<String> {},
+        .last_description = String {},
+        .last_url = Optional<String> {},
+    });
     auto& raw_review = *review;
     raw_review.review->on_progress = [id](WebView::ReportSubmission::Stage stage) {
         auto sending = stage == WebView::ReportSubmission::Stage::Sending;
@@ -131,6 +159,7 @@ static void show_review(View& view, Optional<ByteString> const& hidden_report_na
         send_status(id, XENON_CRASH_REVIEW_RETRYING, "Sending crash report"sv, message, -1, false, false);
     };
     raw_review.review->on_sent = [id, &raw_review] {
+        mark_report_seen(raw_review.report_name);
         report_outcome(id, raw_review, "Report sent"sv, "Thank you for helping Ladybird."sv, 100);
     };
     raw_review.review->on_failed = [id, &raw_review](WebView::ReportSubmission::Failure failure, String const& reason) {
@@ -141,7 +170,7 @@ static void show_review(View& view, Optional<ByteString> const& hidden_report_na
         report_outcome(id, raw_review, "Couldn’t send report"sv, reason, -1);
     };
 
-    if (!open_review(id, raw_review, report_name))
+    if (!open_review(id, raw_review, *report_name))
         return;
     reviews().set(id, move(review));
 }
@@ -220,13 +249,10 @@ void xenon_engine_review_crash_report(XenonStr report_name)
     });
 }
 
-void xenon_engine_decline_crash_report_offer(XenonStr report_name, bool replaced)
+void xenon_engine_decline_crash_report_offer(XenonStr report_name, bool)
 {
-    Engine::the().post([name = ByteString { string_view_from(report_name) }, replaced] {
-        auto& store = WebView::CrashReportStore::the();
-        auto result = replaced ? store.mark_seen(name) : store.mark_all_seen();
-        if (result.is_error())
-            warnln("Xenon: Could not mark crash reports as seen: {}", result.error());
+    Engine::the().post([name = ByteString { string_view_from(report_name) }] {
+        Xenon::mark_report_seen(name);
     });
 }
 
@@ -255,6 +281,8 @@ void xenon_engine_crash_review_send(XenonViewId id, XenonStr description, bool i
 void xenon_engine_crash_review_decline(XenonViewId id)
 {
     Xenon::with_review(id, [](View& view, CrashReview& review) {
+        (void)review.review->decline();
+        Xenon::mark_report_seen(review.report_name);
         Xenon::report_outcome(view.id(), review, "Report not sent"sv, "This report stays on your device and is not sent."sv, -1);
     });
 }
@@ -263,7 +291,7 @@ void xenon_engine_crash_review_cancel(XenonViewId id)
 {
     Xenon::with_review(id, [](View& view, CrashReview& review) {
         review.review->cancel_sending();
-        Xenon::open_review(view.id(), review, {});
+        Xenon::open_review(view.id(), review, review.report_name);
     });
 }
 
@@ -271,7 +299,8 @@ void xenon_engine_crash_review_next(XenonViewId id)
 {
     Xenon::with_review(id, [](View& view, CrashReview& review) {
         review.website.clear();
-        if (!Xenon::open_review(view.id(), review, {}))
+        auto pending = WebView::CrashReportStore::the().pending_report_names();
+        if (pending.is_error() || pending.value().is_empty() || !Xenon::open_review(view.id(), review, pending.value().first()))
             xenon_engine_crash_review_exit(view.id());
     });
 }
@@ -284,8 +313,7 @@ void xenon_engine_crash_review_exit(XenonViewId id)
         Xenon::reviews().remove(view_id);
         Xenon::notify_reports(&XenonReportCallbacks::crash_review_closed, view_id);
         if (hidden) {
-            if (auto result = WebView::CrashReportStore::the().mark_all_seen(); result.is_error())
-                warnln("Xenon: Could not mark crash reports as seen: {}", result.error());
+            Xenon::mark_report_seen(review.report_name);
             Engine::the().close_tab(view_id);
             return;
         }

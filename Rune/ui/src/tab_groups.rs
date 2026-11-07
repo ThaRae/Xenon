@@ -6,8 +6,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use rune::{Drag, Phase, PopupItem, PopupMenu, TextEdit, Tx};
+use rune::{Drag, Phase, TextEdit, Tx};
 
+use crate::chrome_popup::{PopupItem, PopupMenu};
 use crate::engine::{ViewId, WindowId};
 use crate::ffi::XenonStr;
 use crate::ffi_tab_groups as ffi;

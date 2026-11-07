@@ -296,5 +296,9 @@ void xenon_engine_move_tab_group_to_new_window(XenonTabGroupId group)
 
 void xenon_engine_drop_tab(XenonViewId view, uint32_t index, XenonTabGroupId group)
 {
-    post_to_model([view, index, group](BrowserModel& model) { model.drop_tab(view, index, group_from(group)); });
+    post_to_model([view, index, group](BrowserModel& model) {
+        model.drop_tab(view, index, group_from(group));
+        if (auto* split_views = Engine::the().split_views())
+            split_views->splits().keep_together(view);
+    });
 }

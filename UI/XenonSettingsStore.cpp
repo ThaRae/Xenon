@@ -30,6 +30,7 @@ static constexpr auto QSETTINGS_EMPTY_LIST = "@Invalid()"sv;
 
 static constexpr KnownKey KNOWN_KEYS[] = {
     { Keys::compact_toolbar, ValueType::Boolean },
+    { Keys::framed_pages, ValueType::Boolean },
     { Keys::cycle_tabs_in_recently_used_order, ValueType::Boolean },
     { Keys::tab_hibernation, ValueType::Boolean },
     { Keys::tab_hibernation_timeout, ValueType::Integer },

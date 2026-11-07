@@ -232,6 +232,7 @@ pub struct PagePrompts {
     now: f64,
     tooltip_due: Option<f64>,
     pointer: (f32, f32),
+    pointer_view: Option<ViewId>,
 }
 
 impl PagePrompts {
@@ -447,10 +448,6 @@ pub fn show_menu(
 }
 
 pub fn popup_menu_for(entries: &[MenuEntry]) -> PopupMenu {
-    popup_menu_named(entries, &|id| id.to_string())
-}
-
-pub fn popup_menu_named(entries: &[MenuEntry], name: &dyn Fn(u32) -> String) -> PopupMenu {
     let mut popup = PopupMenu::new();
     for entry in entries {
         popup = match entry {
@@ -468,7 +465,7 @@ pub fn popup_menu_named(entries: &[MenuEntry], name: &dyn Fn(u32) -> String) -> 
                     title.clone()
                 };
                 popup.item(
-                    PopupItem::new(name(*id), title)
+                    PopupItem::new(id.to_string(), title)
                         .enabled(*enabled)
                         .checked(*checked),
                 )
@@ -478,7 +475,7 @@ pub fn popup_menu_named(entries: &[MenuEntry], name: &dyn Fn(u32) -> String) -> 
                 popup.item(PopupItem::new(String::new(), title.clone()).enabled(false))
             }
             MenuEntry::Submenu { title, entries } => {
-                popup.submenu(title.clone(), popup_menu_named(entries, name))
+                popup.submenu(title.clone(), popup_menu_for(entries))
             }
         };
     }
@@ -780,11 +777,9 @@ pub fn tooltip_override(s: &mut Browser, view: ViewId, text: String, x: f32, y: 
     prompts.tooltip = Some(Tooltip { text, x, y });
 }
 
-pub fn page_pointer_moved(s: &mut Browser, x: f32, y: f32, tx: &mut Tx) -> bool {
+pub fn page_pointer_moved(s: &mut Browser, view: ViewId, x: f32, y: f32, tx: &mut Tx) -> bool {
     s.page_prompts.pointer = (x, y);
-    let Some(view) = active_view(s) else {
-        return false;
-    };
+    s.page_prompts.pointer_view = Some(view);
     let now = s.page_prompts.now;
     let prompts = s.page_prompts.of_mut(view);
     if prompts.tooltip_overridden {
@@ -806,7 +801,11 @@ fn show_due_tooltip(s: &mut Browser, now: f64, tx: &mut Tx) -> bool {
     }
     s.page_prompts.tooltip_due = None;
     let (x, y) = s.page_prompts.pointer;
-    let Some(view) = active_view(s) else {
+    let Some(view) = s
+        .page_prompts
+        .pointer_view
+        .filter(|view| view_exists(s, *view))
+    else {
         return false;
     };
     let prompts = s.page_prompts.of_mut(view);

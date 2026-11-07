@@ -188,6 +188,8 @@ int Engine::run_application()
     browser_process.on_open_urls = [this](auto const& urls) { open_urls_in_new_tabs(urls); };
 
     create_model();
+    if (auto pending = WebView::CrashReportStore::the().pending_report_names(); !pending.is_error() && !pending.value().is_empty())
+        offer_crash_report(pending.value().first());
     Ladybird::MemoryPressureRelease::start();
     m_tab_hibernation = make<TabHibernation>();
     m_tab_hibernation->start();

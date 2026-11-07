@@ -208,8 +208,11 @@ void install_accessibility(View& view)
     auto id = view.id();
     s_views.set(id, view.make_weak_ptr<View>());
 
-    view.on_accessibility_tree_received = [&view](Vector<WebView::AccessibilityNodeData> nodes) {
+    view.on_accessibility_tree_received = [&view](u64, Vector<WebView::AccessibilityNodeData> nodes) {
         report_tree(view, nodes);
+    };
+    view.on_accessibility_tree_changed = [&view](u64, u64, WebView::AccessibilityTreeDelta const&) {
+        request_tree_soon(view.id());
     };
 
     view.on_accessibility_focus_changed = [id](i64 node) {
