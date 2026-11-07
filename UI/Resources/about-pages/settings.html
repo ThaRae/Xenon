@@ -16,35 +16,9 @@ SPDX-License-Identifier: BSD-2-Clause
         <link rel="stylesheet" href="resource://ladybird/about-pages/settings.css" />
     </head>
     <body>
-        <header class="topbar">
-            <a class="wordmark" href="#look">
-                <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
-                    <path
-                        class="orbit"
-                        stroke-width="10"
-                        d="M43.01 61.99A33 13.5 45 0 1 42.30 27.68M56.99 38.01A33 13.5 45 0 1 57.70 72.32"
-                    />
-                    <path
-                        class="orbit orbit-rose"
-                        stroke-width="10"
-                        d="M61.99 56.99A33 13.5 -45 0 1 27.68 57.70M38.01 43.01A33 13.5 -45 0 1 72.32 42.30"
-                    />
-                    <circle class="nucleus" cx="50" cy="50" r="6.5" />
-                </svg>
-                Settings
-            </a>
-
-            <label class="find" for="find-setting">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="11" cy="11" r="6.5" />
-                    <line x1="16" y1="16" x2="21" y2="21" />
-                </svg>
-                <input id="find-setting" type="search" placeholder="Find a setting" autocomplete="off" />
-            </label>
-        </header>
-
         <div class="settings">
             <aside class="sidebar">
+                <p class="sidebar-title">Settings</p>
                 <nav aria-label="Settings sections">
                     <a href="#look"
                         ><svg viewBox="0 0 18 18" aria-hidden="true">
@@ -94,7 +68,7 @@ SPDX-License-Identifier: BSD-2-Clause
                             <path d="M14.7 2.6v3.1h-3.1" /></svg
                         >Updates</a
                     >
-                    <p class="nav-divider">Ladybird</p>
+                    <hr class="nav-divider" />
                     <a href="#startup"
                         ><svg viewBox="0 0 18 18" aria-hidden="true">
                             <path d="M3 8.3L9 3.3l6 5V15h-4v-4H7v4H3z" /></svg
@@ -133,205 +107,17 @@ SPDX-License-Identifier: BSD-2-Clause
                         >Advanced</a
                     >
                 </nav>
-                <p class="saved-note">Changes apply as you make them.</p>
             </aside>
 
             <main>
+                <label class="find" for="find-setting">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="6.5" />
+                        <line x1="16" y1="16" x2="21" y2="21" />
+                    </svg>
+                    <input id="find-setting" type="search" placeholder="Search settings" autocomplete="off" />
+                </label>
                 <p id="no-matches" class="no-matches" hidden>No settings match “<span></span>”.</p>
-
-                <section id="easy-setup" class="easy-setup" aria-labelledby="easy-setup-title">
-                    <div class="easy-setup-head">
-                        <h2 id="easy-setup-title">Easy setup</h2>
-                        <span>The settings people change most. Press one to change it.</span>
-                    </div>
-                    <div class="presets">
-                        <div class="preset-slot" data-preset="layout">
-                            <button type="button" class="preset" aria-haspopup="menu" aria-expanded="false">
-                                <svg
-                                    viewBox="0 0 18 18"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="1.5"
-                                    aria-hidden="true"
-                                >
-                                    <rect x="2.5" y="3" width="13" height="12" rx="2" />
-                                    <path d="M2.5 6.5h13" />
-                                </svg>
-                                <span class="preset-name">Layout</span>
-                                <span class="preset-value"
-                                    ><span data-value></span>
-                                    <svg
-                                        viewBox="0 0 10 10"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="1.6"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M2 3.8L5 6.8l3-3" />
-                                    </svg>
-                                </span>
-                            </button>
-                            <div class="preset-menu" role="menu" aria-label="Layout" hidden></div>
-                        </div>
-                        <div class="preset-slot" data-preset="blocking">
-                            <button type="button" class="preset" aria-haspopup="menu" aria-expanded="false">
-                                <span class="lamp"></span>
-                                <svg
-                                    viewBox="0 0 18 18"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="1.5"
-                                    stroke-linejoin="round"
-                                    aria-hidden="true"
-                                >
-                                    <path d="M9 2.5l5.5 2v4.2c0 3.5-2.4 5.7-5.5 6.8-3.1-1.1-5.5-3.3-5.5-6.8V4.5z" />
-                                </svg>
-                                <span class="preset-name">Ads and trackers</span>
-                                <span class="preset-value"
-                                    ><span data-value></span>
-                                    <svg
-                                        viewBox="0 0 10 10"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="1.6"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M2 3.8L5 6.8l3-3" />
-                                    </svg>
-                                </span>
-                            </button>
-                            <div class="preset-menu" role="menu" aria-label="Ads and trackers" hidden></div>
-                        </div>
-                        <div class="preset-slot" data-preset="search">
-                            <button type="button" class="preset" aria-haspopup="menu" aria-expanded="false">
-                                <svg
-                                    viewBox="0 0 18 18"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="1.5"
-                                    stroke-linecap="round"
-                                    aria-hidden="true"
-                                >
-                                    <circle cx="8" cy="8" r="4.8" />
-                                    <path d="M11.6 11.6l3.6 3.6" />
-                                </svg>
-                                <span class="preset-name">Search</span>
-                                <span class="preset-value"
-                                    ><span data-value></span>
-                                    <svg
-                                        viewBox="0 0 10 10"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="1.6"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M2 3.8L5 6.8l3-3" />
-                                    </svg>
-                                </span>
-                            </button>
-                            <div class="preset-menu" role="menu" aria-label="Search" hidden></div>
-                        </div>
-                        <div class="preset-slot" data-preset="hibernation">
-                            <button type="button" class="preset" aria-haspopup="menu" aria-expanded="false">
-                                <span class="lamp"></span>
-                                <svg
-                                    viewBox="0 0 18 18"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="1.5"
-                                    stroke-linejoin="round"
-                                    aria-hidden="true"
-                                >
-                                    <path d="M14.5 10.6A6 6 0 0 1 7.4 3.5a6 6 0 1 0 7.1 7.1z" />
-                                </svg>
-                                <span class="preset-name">Hibernation</span>
-                                <span class="preset-value"
-                                    ><span data-value></span>
-                                    <svg
-                                        viewBox="0 0 10 10"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="1.6"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M2 3.8L5 6.8l3-3" />
-                                    </svg>
-                                </span>
-                            </button>
-                            <div class="preset-menu" role="menu" aria-label="Hibernation" hidden></div>
-                        </div>
-                        <div class="preset-slot" data-preset="dark-pages">
-                            <button type="button" class="preset" aria-haspopup="menu" aria-expanded="false">
-                                <span class="lamp"></span>
-                                <svg
-                                    viewBox="0 0 18 18"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="1.5"
-                                    aria-hidden="true"
-                                >
-                                    <circle cx="9" cy="9" r="6" />
-                                    <path d="M9 3v12a6 6 0 0 0 0-12z" fill="currentColor" />
-                                </svg>
-                                <span class="preset-name">Dark pages</span>
-                                <span class="preset-value"
-                                    ><span data-value></span>
-                                    <svg
-                                        viewBox="0 0 10 10"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="1.6"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M2 3.8L5 6.8l3-3" />
-                                    </svg>
-                                </span>
-                            </button>
-                            <div class="preset-menu" role="menu" aria-label="Dark pages" hidden></div>
-                        </div>
-                        <div class="preset-slot" data-preset="bookmarks-bar">
-                            <button type="button" class="preset" aria-haspopup="menu" aria-expanded="false">
-                                <span class="lamp"></span>
-                                <svg
-                                    viewBox="0 0 18 18"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="1.5"
-                                    stroke-linejoin="round"
-                                    aria-hidden="true"
-                                >
-                                    <path d="M5 2.5h8v13l-4-3-4 3z" />
-                                </svg>
-                                <span class="preset-name">Bookmarks bar</span>
-                                <span class="preset-value"
-                                    ><span data-value></span>
-                                    <svg
-                                        viewBox="0 0 10 10"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="1.6"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M2 3.8L5 6.8l3-3" />
-                                    </svg>
-                                </span>
-                            </button>
-                            <div class="preset-menu" role="menu" aria-label="Bookmarks bar" hidden></div>
-                        </div>
-                    </div>
-                </section>
 
                 <section class="section" id="look" aria-labelledby="look-title">
                     <h1 id="look-title">Look and layout</h1>

@@ -23,10 +23,10 @@ Where Xenon keeps its data is in [Profile.md](Profile.md).
 
 ### Welcome and setup
 
-On first run (or any time at `about:welcome`), the first screen shows the defaults as preset keys (the layout already
-in use, DuckDuckGo, blocking on, and no password manager, or the one already installed). **Keep these** saves them as
-they are; **Choose for myself**, or pressing one of the presets, goes through the steps, counted off by a rail across
-the top:
+On first run (or any time at `about:welcome`), the first screen lists the defaults (the layout already in use,
+DuckDuckGo, blocking on, and no password manager, or the one already installed). **Keep these** saves them as they are;
+**Choose for myself**, or pressing one of them, goes through the steps, one centered screen each, counted off by a row
+of small bars across the top:
 
 - **Layout**: Classic, Compact or Vertical, as pictures of the window, and the sidebar's side for Vertical. The page
   reads and sets the layout through Xenon's settings messages, which `UI/WebUIInterfaces.cpp` gives `about:welcome` as
@@ -35,23 +35,25 @@ the top:
 - **Blocking**: block ads and trackers (on by default, with all the filter lists) or show everything, as pictures of a
   page with and without them.
 - **Passwords**: Bitwarden, Proton Pass, or 1Password, as Helium's setup offers, and iCloud Passwords on macOS, or none.
-- **Done**: what you picked, as presets, and three shortcuts worth knowing.
+- **Done**: what you picked.
 
-Nothing is saved until you press **Start browsing**. A new password manager installs first, its preset showing
+Nothing is saved until you press **Start browsing**. A new password manager installs first, its row showing
 "Installing…", and the rest is saved once it's in.
 
 ### New tab page
 
-The day's date as its title, then a speed dial of eight keys:
+An empty page with one centered row of up to eight shortcuts, each a favicon with the page's title below it, as
+Helium's is:
 
-- **Most visited**: your eight most visited sites, one per site with its favicon, ranked by Ladybird's decaying visit
-  score. A new profile shows eight empty keys until there are some.
-- **Bookmarks bar**: the links on the bookmarks bar (not its folders), in its order, when it has any.
+- **Most visited**: your eight most visited sites, one per site, ranked by Ladybird's decaying visit score.
+- **Bookmarks bar**: a profile with no history yet gets the links on the bookmarks bar (not its folders) instead, in
+  its order. With neither, the page is empty.
 
 Below them, **Recently closed** lists the last three tabs or windows you closed, with the page's title and favicon from
 the history, and opens the page again. <kbd>⌘</kbd><kbd>⇧</kbd><kbd>T</kbd> (<kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>T</kbd>
-elsewhere) still reopens a tab with its history. **Customize** goes to **Settings → Startup and pages**, which can turn
-Recently closed off. Private windows show neither, and say what they keep and who can still see what you do instead.
+elsewhere) still reopens a tab with its history. The sliders button in the bottom corner goes to **Settings → Startup
+and pages**, which can turn Recently closed off. Private windows show neither, and say what they keep and who can still
+see what you do instead.
 
 The page is static, with no channel back to the browser, so Xenon's UI hands it all of this once it has loaded
 (`UI/NewTabPage.cpp`).
@@ -73,9 +75,8 @@ bar, as in Ladybird (`NewTabPage::should_hide_url()`, `UI/LocationEdit.cpp`).
 `about:settings` (**Settings** in the menu) puts Xenon's own settings first, as Helium's does, and keeps Ladybird's
 below them. Every change applies at once, and the page follows changes made from the menus.
 
-It opens with **Easy setup**: the six settings people change most (layout, ads and trackers, search engine,
-hibernation, dark pages, the bookmarks bar) as preset keys showing their values, each with a menu of its choices. They
-drive the controls for those settings further down the page, so they follow every change wherever it's made.
+It is laid out as Helium's is: a sidebar of sections on the left, and one narrow column of settings in boxes of rows,
+with **Search settings** at the top.
 
 - Xenon's sections:
   - **Look and layout**: the three layouts, the sidebar's side, the bookmarks bar, zoom, whether sites are asked for
@@ -92,8 +93,8 @@ drive the controls for those settings further down the page, so they follow ever
   data, background connections, site permissions (autoplay, notifications, and the sites allowed or blocked from your
   location, microphone and notifications), DNS, where the profile keeps its files (each with **Show**), and Ladybird's
   configuration keys.
-- A sidebar of sections that follows the scroll, and **Find a setting** across the top, which hides everything that
-  doesn't match, Easy setup included.
+- A sidebar of sections that follows the scroll, and **Search settings**, which stays at the top and hides everything
+  that doesn't match.
 
 The page is Xenon's `UI/Resources/about-pages/settings.*`. It runs Ladybird's own settings scripts, by their element
 ids, for Ladybird's settings. `UI/SettingsPage.cpp` answers it about Xenon's (`UI/XenonSettings`), through engine patch
@@ -554,11 +555,12 @@ publishes the releases; see [Updates.md](Updates.md).
 
 - Xenon's own palette, built around **#ff0050**: `UI/BrandColors.h` for the chrome, and
   `UI/Resources/about-pages/webui.css` for the internal pages.
-- The internal pages are shaped like other browsers' (a speed dial, a setup flow of pictures, settings in boxes of
-  rows) and share their parts in `UI/Resources/about-pages/xenon.css`: a warm page with serif titles, choices as keys
-  that sink when chosen, and a small rose lamp for whatever is on. A choice gets one mark of the rose (its lamp, radio
-  or check) and nothing glows; spacing sits on a 4px grid. Ladybird draws weight 500 as bold, and 600 as regular inside
-  transformed boxes when text is antialiased, so the pages use 400 and 600 and leave font smoothing alone.
+- The internal pages are as sparse as Helium's (a row of shortcuts, a centered setup flow of pictures, settings in
+  boxes of rows) and share their parts in `UI/Resources/about-pages/xenon.css`: a warm page, small sans-serif titles,
+  flat controls with hairline borders, and a small rose lamp for whatever is on. A choice gets one mark of the rose (its
+  lamp, radio or check) and nothing glows; spacing sits on a 4px grid. Ladybird draws weight 500 as bold, and 600 as
+  regular inside transformed boxes when text is antialiased, so the pages use 400 and 600 and leave font smoothing
+  alone.
 - Xenon's own app icon: two orbits woven around a nucleus, in white and rose. Internal pages and the Task Manager show
   it in place of Ladybird's logo.
 

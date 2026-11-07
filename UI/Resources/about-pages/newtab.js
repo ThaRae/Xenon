@@ -6,13 +6,7 @@
 
 const DIAL_SIZE = 8;
 
-const dialGroups = {
-    sites: { label: "Most visited", note: "Busiest first, by how often you visit" },
-    bookmarksBar: { label: "Bookmarks bar", note: "In the bookmarks bar's order" },
-};
-
 let shown;
-let currentGroup = "sites";
 
 window.xenonNewTab = {
     show(data) {
@@ -25,20 +19,10 @@ window.xenonNewTab = {
         document.querySelector("#customize").hidden = isPrivate;
         if (isPrivate) return;
 
-        document.querySelector("#today").textContent = dateTitle(new Date());
-
-        const bookmarksBarKey = document.querySelector('[data-group="bookmarksBar"]');
-        bookmarksBarKey.hidden = !(shown.bookmarksBar?.length > 0);
-        if (bookmarksBarKey.hidden && currentGroup === "bookmarksBar") currentGroup = "sites";
-
         renderDial();
         renderRecentlyClosed(shown.recentlyClosed ?? []);
     },
 };
-
-function dateTitle(now) {
-    return now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-}
 
 function shortHost(host) {
     return host.replace(/^www\./, "");
@@ -66,7 +50,7 @@ function monogram(site, className) {
     return element;
 }
 
-function siteTile(site, index) {
+function siteTile(site) {
     const item = document.createElement("li");
     item.className = "tile";
 
@@ -74,53 +58,21 @@ function siteTile(site, index) {
     link.href = site.url;
     link.title = site.title ? `${site.title}\n${site.url}` : site.url;
 
-    const face = monogram(site, "tile-face");
-    const legend = document.createElement("span");
-    legend.className = "legend";
-    legend.textContent = index + 1;
-    face.prepend(legend);
-
     const name = document.createElement("span");
     name.className = "tile-name";
-    name.textContent = shortHost(site.host);
+    name.textContent = site.title || shortHost(site.host);
 
-    const detail = document.createElement("span");
-    detail.className = "tile-detail";
-    detail.textContent = site.title || site.host;
-
-    link.append(face, name, detail);
+    link.append(monogram(site, "tile-face"), name);
     item.append(link);
     return item;
 }
 
-function emptyTile(index) {
-    const item = document.createElement("li");
-    item.className = "tile";
-    const face = document.createElement("span");
-    face.className = "tile-face";
-    const legend = document.createElement("span");
-    legend.className = "legend";
-    legend.textContent = index + 1;
-    face.append(legend);
-    item.append(face);
-    return item;
-}
-
 function renderDial() {
-    for (const key of document.querySelectorAll("#dial-groups [data-group]")) {
-        key.setAttribute("aria-selected", String(key.dataset.group === currentGroup));
-    }
-
-    const group = dialGroups[currentGroup];
-    const sites = (shown[currentGroup] ?? []).slice(0, DIAL_SIZE);
+    const mostVisited = shown.sites ?? [];
+    const sites = (mostVisited.length ? mostVisited : (shown.bookmarksBar ?? [])).slice(0, DIAL_SIZE);
     const dial = document.querySelector("#dial");
-    dial.setAttribute("aria-label", group.label);
-    document.querySelector("#dial-note").textContent = sites.length ? group.note : "";
-
-    const empty = sites.length === 0 && currentGroup === "sites";
-    dial.classList.toggle("empty", empty);
-    dial.replaceChildren(...(empty ? [...Array(DIAL_SIZE).keys()].map(emptyTile) : sites.map(siteTile)));
-    document.querySelector("#no-sites").hidden = !empty;
+    dial.setAttribute("aria-label", mostVisited.length ? "Most visited" : "Bookmarks bar");
+    dial.replaceChildren(...sites.map(siteTile));
 }
 
 function closedWhen(closedAt) {
@@ -147,15 +99,11 @@ function renderRecentlyClosed(closed) {
             title.textContent = tab.title || tab.url;
             if (tab.tabCount > 1) title.textContent += ` and ${tab.tabCount - 1} more tabs`;
 
-            const host = document.createElement("span");
-            host.className = "closed-host";
-            host.textContent = shortHost(tab.host);
-
             const when = document.createElement("span");
             when.className = "closed-when";
             when.textContent = closedWhen(tab.closedAt);
 
-            link.append(monogram(tab, "monogram soft"), title, host, when);
+            link.append(monogram(tab, "closed-icon"), title, when);
             item.append(link);
             return item;
         })
@@ -164,18 +112,6 @@ function renderRecentlyClosed(closed) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    if (!navigator.platform.startsWith("Mac")) {
-        for (const shortcut of document.querySelectorAll("kbd[data-other]"))
-            shortcut.textContent = shortcut.dataset.other;
-    }
-
-    for (const key of document.querySelectorAll("#dial-groups [data-group]")) {
-        key.addEventListener("click", () => {
-            currentGroup = key.dataset.group;
-            renderDial();
-        });
-    }
-
     setTimeout(() => {
         if (!shown) window.xenonNewTab.show({});
     }, 1500);
