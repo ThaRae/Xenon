@@ -122,7 +122,7 @@ target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/UpdaterBridge
 if (APPLE)
     target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/UpdaterMac.mm")
     set_source_files_properties("${XENON_RUNE_DIR}/Bridge/UpdaterMac.mm" PROPERTIES COMPILE_FLAGS "-fobjc-arc -F${XENON_SPARKLE_DIR}")
-    target_link_options(xenon-rune-bridge PUBLIC "-F${XENON_SPARKLE_DIR}" "-Wl,-rpath,@executable_path/../Frameworks")
+    target_link_options(xenon-rune-bridge PUBLIC "-F${XENON_SPARKLE_DIR}" "-Wl,-rpath,@executable_path/../Frameworks" "-Wl,-rpath,${XENON_SPARKLE_DIR}")
     target_link_libraries(xenon-rune-bridge PUBLIC "-framework Sparkle")
 else()
     target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/Updater.cpp")
