@@ -41,6 +41,11 @@ private:
     virtual void show_download_in_folder(WebView::FileDownloader::Download const&) const override;
     virtual void display_download_confirmation_dialog(StringView, LexicalPath const&) const override { }
     virtual NonnullRefPtr<BookmarkPromise> display_add_bookmark_dialog(Optional<String const&> target_folder_id = {}) const override;
+    virtual NonnullRefPtr<BookmarkPromise> display_edit_bookmark_dialog(WebView::BookmarkItem const& current_bookmark, Optional<String const&> parent_folder_id) const override;
+    virtual NonnullRefPtr<BookmarkPromise> display_add_bookmark_folder_dialog(Optional<String const&> default_title = {}, Optional<String const&> target_folder_id = {}) const override;
+    virtual NonnullRefPtr<BookmarkPromise> display_edit_bookmark_folder_dialog(WebView::BookmarkItem const& current_folder, Optional<String const&> parent_folder_id) const override;
+    virtual void show_bookmark_context_menu(Gfx::IntPoint, Optional<WebView::BookmarkItem const&>, Optional<String const&> target_folder_id, Optional<String const&> parent_folder_id) override;
+    virtual Optional<BookmarkID> bookmark_item_id_for_context_menu() const override;
 
 #ifdef AK_OS_MACOS
     virtual Utf16String clipboard_text(ClipboardType) const override;

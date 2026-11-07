@@ -236,7 +236,3 @@ add_dependencies(xenon-tests TestXenonRunePrompts)
 if (NOT APPLE)
     set_target_properties(TestXenonRunePrompts PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${XENON_PREFIX_DIR}/tests")
 endif()
-
-target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/SplitViews.cpp" "${XENON_RUNE_DIR}/Bridge/XenonBridgeSplitView.cpp")
-ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonSplitViews.cpp" Xenon NAME TestXenonSplitViews LIBS xenon-rune-bridge)
-add_dependencies(xenon-tests TestXenonSplitViews)

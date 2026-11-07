@@ -12,6 +12,7 @@ use crate::state::Browser;
 pub const CHROME_MENU_ANCHOR_KEY: &str = "chrome-menu-anchor";
 
 type OnPick = Box<dyn FnOnce(&mut Browser, &str, &mut Tx)>;
+type OnDismiss = Box<dyn FnOnce(&mut Browser)>;
 
 pub struct PopupItem {
     id: String,
@@ -177,6 +178,7 @@ pub struct DrawnMenu {
     pub menu: PopupMenu,
     pub open_submenus: Vec<usize>,
     on_pick: OnPick,
+    on_dismiss: Option<OnDismiss>,
 }
 
 pub fn drawn() -> bool {
@@ -190,21 +192,35 @@ pub fn open(
     anchor: impl Into<PopupAnchor>,
     on_pick: impl FnOnce(&mut Browser, &str, &mut Tx) + 'static,
 ) {
+    open_tracked(s, tx, menu, anchor, on_pick, |_| {});
+}
+
+pub fn open_tracked(
+    s: &mut Browser,
+    tx: &mut Tx,
+    menu: PopupMenu,
+    anchor: impl Into<PopupAnchor>,
+    on_pick: impl FnOnce(&mut Browser, &str, &mut Tx) + 'static,
+    on_dismiss: impl FnOnce(&mut Browser) + 'static,
+) {
     if menu.is_empty() {
+        on_dismiss(s);
         return;
     }
     s.hover_card = None;
     if drawn() {
         present(s, menu, anchor.into(), on_pick);
+        if let Some(menu) = s.chrome_menu.as_mut() {
+            menu.on_dismiss = Some(Box::new(on_dismiss));
+        }
         return;
     }
     tx.popup_menu(
         menu.native(),
         anchor,
-        move |s: &mut Browser, picked: Option<&str>, tx: &mut Tx| {
-            if let Some(picked) = picked {
-                on_pick(s, picked, tx);
-            }
+        move |s: &mut Browser, picked: Option<&str>, tx: &mut Tx| match picked {
+            Some(picked) => on_pick(s, picked, tx),
+            None => on_dismiss(s),
         },
     );
 }
@@ -215,11 +231,13 @@ pub fn present(
     anchor: PopupAnchor,
     on_pick: impl FnOnce(&mut Browser, &str, &mut Tx) + 'static,
 ) {
+    dismiss(s);
     s.chrome_menu = Some(DrawnMenu {
         anchor,
         menu,
         open_submenus: Vec::new(),
         on_pick: Box::new(on_pick),
+        on_dismiss: None,
     });
 }
 
@@ -233,7 +251,9 @@ pub fn pick(s: &mut Browser, item: u32, tx: &mut Tx) {
 }
 
 pub fn dismiss(s: &mut Browser) {
-    s.chrome_menu = None;
+    if let Some(on_dismiss) = s.chrome_menu.take().and_then(|menu| menu.on_dismiss) {
+        on_dismiss(s);
+    }
 }
 
 pub fn open_submenu(s: &mut Browser, depth: usize, index: usize) {
