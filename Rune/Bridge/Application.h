@@ -38,6 +38,9 @@ private:
     virtual bool supports_picture_in_picture() const override;
     virtual void display_crash_report_notification(ByteString const& report_name) override;
     virtual NonnullRefPtr<Core::Promise<ByteString>> ask_user_for_download_path(ByteString const& file) const override;
+    virtual Optional<String> ui_font_family() const override;
+    virtual Optional<String> system_font_family() const override;
+    virtual void resolve_external_url_handler(URL::URL const&, WebView::ExternalURLHandlerCallback) const override;
     virtual OwnPtr<WebView::PictureInPictureWindow> create_picture_in_picture_window(WebView::WebContentPage&, WebView::CanonicalTraversable&, Gfx::IntSize video_size) override;
     virtual void open_url_in_new_window(URL::URL const&, WebView::IsPrivate) override;
     virtual void open_navigation_in_new_window(Web::HTML::PreparedNavigationDescriptor, WebView::IsPrivate) override;
