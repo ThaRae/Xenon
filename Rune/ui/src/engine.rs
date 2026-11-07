@@ -131,7 +131,7 @@ impl MouseEvent {
         }
     }
 
-    fn raw(&self) -> ffi::XenonMouseEvent {
+    pub(crate) fn raw(&self) -> ffi::XenonMouseEvent {
         ffi::XenonMouseEvent {
             r#type: self.kind.raw(),
             x: self.x,

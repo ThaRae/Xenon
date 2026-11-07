@@ -35,6 +35,8 @@ private:
     virtual Optional<WebView::ViewImplementation&> active_web_view() const override;
     virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab) const override;
     virtual bool supports_private_browsing_windows() const override { return true; }
+    virtual bool supports_picture_in_picture() const override;
+    virtual OwnPtr<WebView::PictureInPictureWindow> create_picture_in_picture_window(WebView::WebContentPage&, WebView::CanonicalTraversable&, Gfx::IntSize video_size) override;
     virtual void open_url_in_new_window(URL::URL const&, WebView::IsPrivate) override;
     virtual void open_navigation_in_new_window(Web::HTML::PreparedNavigationDescriptor, WebView::IsPrivate) override;
     virtual void open_download(WebView::FileDownloader::Download const&) const override;
