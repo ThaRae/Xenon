@@ -225,6 +225,7 @@ impl Engine {
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub fn set_view_frame_rate(self, view: ViewId, frames_per_second: f64) {
         unsafe { ffi::xenon_engine_set_view_frame_rate(view, frames_per_second) }
     }

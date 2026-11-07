@@ -26,7 +26,6 @@ namespace Ladybird::Extensions::Browser {
 using Xenon::BrowserModel;
 using Xenon::Engine;
 
-static constexpr i64 WINDOW_ID_NONE = -1;
 static constexpr i64 WINDOW_ID_CURRENT = -2;
 static constexpr u32 TOOLBAR_ICON_PIXELS = 32;
 static constexpr u32 DIALOG_ICON_PIXELS = 80;

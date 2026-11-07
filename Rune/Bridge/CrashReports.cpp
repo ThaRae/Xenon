@@ -50,7 +50,6 @@ static HashMap<XenonViewId, NonnullOwnPtr<CrashReview>>& reviews()
     return reviews;
 }
 
-static Optional<XenonViewId> s_pending_hidden_review_view;
 static Optional<ByteString> s_pending_hidden_review_name;
 
 static int progress_percent(WebView::ReportSubmission::Stage stage)

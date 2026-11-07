@@ -250,9 +250,6 @@ impl Browser {
         }
     }
 
-    #[cfg(not(target_os = "linux"))]
-    pub fn set_window_surface(&mut self, _: usize, _: usize) {}
-
     #[cfg(target_os = "linux")]
     pub(crate) fn enable_native_surface(&self, window: WindowId) {
         self.engine
