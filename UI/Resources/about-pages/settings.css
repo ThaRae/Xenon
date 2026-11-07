@@ -370,6 +370,13 @@ main {
     display: none;
 }
 
+.force-dark-sites {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding-block: 4px;
+}
+
 .row > label,
 .row > .label {
     flex: 1;
@@ -1181,14 +1188,16 @@ dialog .dialog-list {
     border-radius: 10px;
 }
 
-dialog .dialog-list-item {
+dialog .dialog-list-item,
+.force-dark-sites .dialog-list-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
 }
 
-dialog .dialog-list-item + .dialog-list-item {
+dialog .dialog-list-item + .dialog-list-item,
+.force-dark-sites .dialog-list-item + .dialog-list-item {
     border-top: 1px solid var(--xenon-hairline);
 }
 
@@ -1201,7 +1210,8 @@ dialog .dialog-list-item-placeholder {
     color: var(--xenon-muted);
 }
 
-dialog .dialog-list-item-label {
+dialog .dialog-list-item-label,
+.force-dark-sites .dialog-list-item-label {
     flex-grow: 1;
 }
 

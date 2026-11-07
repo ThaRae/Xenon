@@ -427,6 +427,12 @@ SPDX-License-Identifier: BSD-2-Clause
                                 </label>
                                 <input id="enable-force-dark" type="checkbox" switch />
                             </div>
+                            <div
+                                id="force-dark-sites"
+                                class="row force-dark-sites"
+                                aria-label="Sites with their own dark pages choice"
+                                hidden
+                            ></div>
                             <div class="row" data-keywords="dark mode light theme color scheme">
                                 <div class="label">
                                     <span id="website-color-scheme-title">Light or dark sites</span>
@@ -1058,6 +1064,22 @@ SPDX-License-Identifier: BSD-2-Clause
                                 </label>
                                 <button id="microphone-permissions-settings" class="secondary-button">Edit…</button>
                             </div>
+                            <div class="row">
+                                <label for="enable-notifications">
+                                    Notifications
+                                    <p class="description">Let sites ask to send you notifications.</p>
+                                </label>
+                                <input id="enable-notifications" type="checkbox" switch />
+                            </div>
+                            <div class="row">
+                                <label for="notifications-permissions-settings">
+                                    Notifications by site
+                                    <p class="description">
+                                        The sites you allowed or blocked from sending you notifications.
+                                    </p>
+                                </label>
+                                <button id="notifications-permissions-settings" class="secondary-button">Edit…</button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -1266,6 +1288,16 @@ SPDX-License-Identifier: BSD-2-Clause
             </div>
         </dialog>
 
+        <dialog id="site-permissions-notifications" class="site-permissions" closedby="any">
+            <div class="dialog-header">
+                <h3 class="dialog-title">Notifications</h3>
+                <button class="close-button dialog-button" aria-label="Close">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <div class="site-permissions-list dialog-list"></div>
+            </div>
+        </dialog>
+
         <dialog id="browsing-data-settings-dialog" closedby="any">
             <div class="dialog-header">
                 <h3 class="dialog-title">Clear browsing data</h3>
@@ -1338,6 +1370,7 @@ SPDX-License-Identifier: BSD-2-Clause
         <script src="resource://ladybird/about-pages/settings/geolocation.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/languages.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/network.js" type="module"></script>
+        <script src="resource://ladybird/about-pages/settings/notifications.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/permissions.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/site-permissions.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/privacy.js" type="module"></script>
