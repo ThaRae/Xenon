@@ -89,10 +89,10 @@ index 94d8734923cece5a43cd5c3ba4a6710bc572fd56..86670d95d33ac114566daa0a7d58328f
          Ok(image_data)
      }
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index e84b615d5096ae0a0b7e376c2853846af6fbc244..4b1d625b88d6918982cd99a75e3ffdab2029423d 100644
+index 8af342bca3740b34e0e3979b24d4d454b76aceb5..b2b40d7d306fad1a1e575fcd23a9bc476169bd53 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-@@ -31,6 +31,7 @@
+@@ -29,6 +29,7 @@
  #include <LibWeb/Platform/EventLoopPlugin.h>
  #include <LibWeb/WebIDL/AbstractOperations.h>
  #include <LibWeb/WebIDL/CallbackType.h>
@@ -100,7 +100,7 @@ index e84b615d5096ae0a0b7e376c2853846af6fbc244..4b1d625b88d6918982cd99a75e3ffdab
  #include <LibWeb/WebIDL/DOMException.h>
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
-@@ -127,6 +128,7 @@ HTML::EnvironmentSettingsObject* web_bindings_relevant_settings_object(JSObject*
+@@ -106,6 +107,7 @@ HTML::EnvironmentSettingsObject* web_bindings_relevant_settings_object(JSObject*
  JSObject* web_bindings_environment_settings_object_global_object(HTML::EnvironmentSettingsObject*);
  void web_bindings_environment_settings_object_id(HTML::EnvironmentSettingsObject*, void* ctx, void (*on_id)(void*, ReadonlyBytes));
  bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope*);
@@ -108,7 +108,7 @@ index e84b615d5096ae0a0b7e376c2853846af6fbc244..4b1d625b88d6918982cd99a75e3ffdab
  void web_bindings_with_temporary_execution_context(void* realm, bool callbacks_enabled, void* context, void (*steps)(void*));
  bool web_bindings_object_implements_interface(JSObject* object, u16 interface_name);
  JSObject* web_bindings_create_dom_exception(void* realm, ReadonlyBytes name, FlatPtr message);
-@@ -276,6 +278,14 @@ bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope* worker
+@@ -236,6 +238,14 @@ bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope* worker
      return worker_global_scope->is_closing();
  }
  
@@ -124,10 +124,10 @@ index e84b615d5096ae0a0b7e376c2853846af6fbc244..4b1d625b88d6918982cd99a75e3ffdab
  {
      HTML::TemporaryExecutionContext execution_context { *static_cast<JS::Realm*>(realm), callbacks_enabled ? HTML::TemporaryExecutionContext::CallbacksEnabled::Yes : HTML::TemporaryExecutionContext::CallbacksEnabled::No };
 diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
-index 8d05454b88f66e74c121340236e813322e62c03d..ead797fec73c71e7e471e073ab8c92248ef5c342 100644
+index 1f298b60b7452b6ca034404f52f34718182dbeca..91a6230be8df8a616ece498de4f156c077d30168 100644
 --- a/Libraries/LibWeb/CMakeLists.txt
 +++ b/Libraries/LibWeb/CMakeLists.txt
-@@ -342,6 +342,7 @@ set(SOURCES
+@@ -343,6 +343,7 @@ set(SOURCES
      FileAPI/BlobURLStore.cpp
      FileAPI/File.cpp
      FileAPI/FileList.cpp
@@ -642,7 +642,7 @@ index c00e7f9f031b9e122368da9d3a3144dd1de34258..eebd63c421b66cd6608393078211b58f
      String user_agent_for_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_url(url, user_agent); }
      String user_agent_for_websocket_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_websocket_url(url, user_agent); }
 diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
-index 5645f67adeb231c5be69825b5692e60fdbb5a768..67a2082c74b174a7d4ba4b29db0a5398e6cf9eed 100644
+index e95a349b354e2492efc4fb4f947f58128a2be3ab..a01c94d9d9afb1a35a45f9fb4c9a407826149856 100644
 --- a/Services/WebContent/main.cpp
 +++ b/Services/WebContent/main.cpp
 @@ -37,6 +37,7 @@
@@ -653,7 +653,7 @@ index 5645f67adeb231c5be69825b5692e60fdbb5a768..67a2082c74b174a7d4ba4b29db0a5398
  #include <LibWeb/Loader/ResourceLoader.h>
  #include <LibWeb/Painting/BoxViews.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
-@@ -281,6 +282,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -280,6 +281,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
      OPENSSL_TRY(OSSL_set_max_threads(nullptr, Core::System::hardware_concurrency()));
  
      Web::HTML::Window::set_enable_test_mode(enable_test_mode);
@@ -663,7 +663,7 @@ index 5645f67adeb231c5be69825b5692e60fdbb5a768..67a2082c74b174a7d4ba4b29db0a5398
      Web::HTML::WindowOrWorkerGlobalScopeMixin::set_experimental_interfaces_exposed(expose_experimental_interfaces);
  
 diff --git a/Services/WebWorker/main.cpp b/Services/WebWorker/main.cpp
-index 9f322d2c40d9df6d842a217357a398968d568a7d..0a67011a7a3af1b1a0ac72d205265163066eb67c 100644
+index 13a0d1ba3730426a78f4f907077d1acde6d9d5e2..72d00c00f4ca36075b7b81e554b15f09909b7664 100644
 --- a/Services/WebWorker/main.cpp
 +++ b/Services/WebWorker/main.cpp
 @@ -28,6 +28,7 @@
@@ -674,7 +674,7 @@ index 9f322d2c40d9df6d842a217357a398968d568a7d..0a67011a7a3af1b1a0ac72d205265163
  #include <LibWeb/Loader/ResourceLoader.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
  #include <LibWeb/Platform/RemoteImageCodecPlugin.h>
-@@ -136,6 +137,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -135,6 +136,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
      Web::Platform::EventLoopPlugin::install(*new Web::Platform::EventLoopPlugin);
  
      Web::Bindings::initialize_main_thread_vm(worker_type);

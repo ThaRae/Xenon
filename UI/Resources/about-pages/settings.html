@@ -976,6 +976,25 @@ SPDX-License-Identifier: BSD-2-Clause
                                 </label>
                                 <input id="fingerprinting-protection-toggle" type="checkbox" switch />
                             </div>
+                            <div class="row" data-keywords="crash reports feedback">
+                                <label for="crash-report-sending">
+                                    Crash reports
+                                    <p class="description">
+                                        Keep reports on this computer until you review them, or keep none.
+                                    </p>
+                                </label>
+                                <select id="crash-report-sending">
+                                    <option value="ask">Ask me</option>
+                                    <option value="never">Never send</option>
+                                </select>
+                            </div>
+                            <div class="row" id="crash-reports-waiting-row" data-keywords="crash reports" hidden>
+                                <div class="label">
+                                    Crash reports waiting
+                                    <p id="crash-reports-waiting" class="description"></p>
+                                </div>
+                                <button id="review-crash-reports" class="secondary-button">Review</button>
+                            </div>
                         </div>
                     </div>
 

@@ -29,7 +29,6 @@
 #include <LibWebCommon/UIEvents/MouseButton.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/CrashReport.h>
-#include <LibWebView/CrashReportStore.h>
 #include <LibWebView/PlatformColors.h>
 #include <LibWebView/Utilities.h>
 #include <LibWebView/WebCompatReport.h>
@@ -225,60 +224,25 @@ WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTrave
     QAccessible::installActivationObserver(this);
 #endif
 
-    on_accessibility_tree_received = [this](auto nodes) {
-        m_accessibility_manager->update_tree(AK::move(nodes));
+    on_accessibility_tree_received = [this](u64 sequence, auto nodes) {
+        m_accessibility_whole_tree_pending = false;
+        m_accessibility_manager->update_tree(AK::move(nodes), sequence);
+        did_update_accessibility_tree({});
+    };
 
-#if defined(Q_OS_MACOS)
-        // Only the first tree for a page announces the load. WebContent rebuilds the tree on DOM mutations too, and
-        // announcing each of those would move VoiceOver's cursor back to the top of the page while the user is reading
-        // it. Same gate as the AT-SPI focus post in the branch below.
-        // NB: A page load never moves the keyboard focus, with or without an assistive technology. For example, a new
-        //     tab's location editor keeps the focus while the new tab page loads.
-        auto const announce_load = !m_posted_initial_accessibility_focus && m_accessibility_manager && !m_accessibility_manager->is_empty();
-        if (announce_load)
-            m_posted_initial_accessibility_focus = true;
-        // An assistive technology that turned up mid-page got no focused element from its first queries: The first tree
-        // has AppKit look the focus up again — if the page has the keyboard focus (update_accessibility_tree() checks).
-        auto const report_focus = m_report_accessibility_focus_with_next_tree && m_accessibility_manager && !m_accessibility_manager->is_empty();
-        if (report_focus)
-            m_report_accessibility_focus_with_next_tree = false;
-        QTimer::singleShot(100, this, [this, announce_load, report_focus] {
-            update_accessibility_tree(this, announce_load, report_focus);
-        });
-#elif !defined(Q_OS_WIN)
-        // Prune interfaces for nodes no longer in the tree.
-        QList<i64> stale_ids;
-        for (auto it = m_accessibility_elements.begin(); it != m_accessibility_elements.end(); ++it) {
-            if (!it.value()->isValid())
-                stale_ids.append(it.key());
+    on_accessibility_tree_changed = [this](u64 base_sequence, u64 sequence, auto delta) {
+        // Once the whole tree has been asked for, every change before it arrives is to a tree this view doesn't hold.
+        if (m_accessibility_whole_tree_pending)
+            return;
+        auto removed_ids = m_accessibility_manager->apply_delta(delta, base_sequence, sequence);
+        if (!removed_ids.has_value()) {
+            // A change to a tree this view doesn't hold (one it dropped while it didn't display the tab, e.g.), or one
+            // that doesn't fit the tree it holds: Start over from the whole tree.
+            m_accessibility_whole_tree_pending = true;
+            request_accessibility_tree();
+            return;
         }
-        for (auto id : stale_ids) {
-            auto* iface = m_accessibility_elements.take(id);
-            QAccessible::deleteAccessibleInterface(QAccessible::uniqueId(iface));
-        }
-
-        // An assistive technology that turned up mid-page found no tree to take the focus from: Tell it where the focus
-        // is now that there's one — if the page has the keyboard focus at all.
-        if (m_report_accessibility_focus_with_next_tree && m_accessibility_manager && !m_accessibility_manager->is_empty()) {
-            m_report_accessibility_focus_with_next_tree = false;
-            if (hasFocus())
-                announce_accessibility_focus();
-        }
-
-        // Post a Focus AT-SPI2 event on the document root the first time a tree arrives. This is what lets Orca's
-        // browse-mode commands (H/K/L structural nav) work on page load — without the user having to Tab/click into the
-        // page first. The event is posted unconditionally — even when the address bar has Qt focus — because our Orca
-        // script re-suspends browse-mode commands when it later sees a focus event for an editable chrome widget. So if
-        // the user explicitly focuses the address bar (Ctrl+L, mouse click), typing there still works. Firing this on
-        // every subsequent tree update would be wrong: it would re-focus the document root while the user is
-        // mid-navigation — causing Orca to re-present the current structural-nav target.
-        if (!m_posted_initial_accessibility_focus && m_accessibility_manager && !m_accessibility_manager->is_empty()) {
-            m_posted_initial_accessibility_focus = true;
-            QTimer::singleShot(1000, this, [this] {
-                notify_accessibility_focus_on_document_root();
-            });
-        }
-#endif
+        did_update_accessibility_tree(removed_ids.release_value());
     };
 
     on_accessibility_focus_changed = [this](i64 node_id) {
@@ -1522,14 +1486,6 @@ void WebContentView::set_crash_overlay_visible(bool visible)
     schedule_repaint();
 }
 
-void WebContentView::review_hidden_crash_report(ByteString const& report_name)
-{
-    set_crash_overlay_visible(true);
-    show_crash_report_review(report_name);
-    if (!m_crash_report_review)
-        set_crash_overlay_visible(false);
-}
-
 // A tab opened only for a review lets go of what it showed over its page once the user takes the tab elsewhere.
 void WebContentView::leave_report_review()
 {
@@ -1720,42 +1676,30 @@ bool WebContentView::is_page_covered_by_overlay() const
     return false;
 }
 
-// A report of a crash with no crash screen of its own is reviewed in a blank tab opened for it.
-void WebContentView::show_crash_report_review(Optional<ByteString> const& hidden_crash_report_name)
+void WebContentView::show_crash_report_review()
 {
     if (!m_crash_report_container || m_crash_report_review)
         return;
 
-    auto is_hidden_crash = hidden_crash_report_name.has_value();
-    auto report_name = is_hidden_crash ? hidden_crash_report_name : crash_report_name();
+    auto report_name = crash_report_name();
     if (!report_name.has_value())
         return;
 
-    m_crash_report_review = new CrashReportReviewWidget(is_hidden_crash ? tr("Close tab") : tr("Reload page"), m_crash_report_container);
-    if (auto result = m_crash_report_review->open_report(report_name, is_hidden_crash ? Optional<String> {} : crash_report_website()); result.is_error()) {
+    m_crash_report_review = new CrashReportReviewWidget(tr("Reload page"), m_crash_report_container);
+    if (auto result = m_crash_report_review->open_report(*report_name, crash_report_website()); result.is_error()) {
         warnln("Could not open crash report {}: {}", *report_name, result.error());
         delete m_crash_report_review;
         m_crash_report_review = nullptr;
         return;
     }
-    m_crash_report_review->on_exit = [this, is_hidden_crash] {
-        // The tab was opened only for the review, and a report on its way keeps going without it. Closing it also
-        // declines the reports still waiting, so none of them is offered again.
-        if (is_hidden_crash) {
-            if (auto result = WebView::CrashReportStore::the().mark_all_seen(); result.is_error())
-                warnln("Could not mark crash reports as seen: {}", result.error());
-            if (on_close)
-                on_close();
-            return;
-        }
+    m_crash_report_review->on_exit = [this] {
         reload();
     };
     m_crash_report_review->on_report_text_visibility_change = [this](bool visible) {
         m_crash_overlay->set_fills_tab(visible);
     };
-    auto answered_message = is_hidden_crash ? tr("Part of Ladybird stopped unexpectedly.") : crash_screen_message();
-    m_crash_report_review->on_answered = [this, answered_message] {
-        m_crash_overlay_message->setText(answered_message);
+    m_crash_report_review->on_answered = [this] {
+        m_crash_overlay_message->setText(crash_screen_message());
     };
 
     // The review offers reloading among its own actions, and the website among its fields. It takes text, so Return
@@ -1764,9 +1708,7 @@ void WebContentView::show_crash_report_review(Optional<ByteString> const& hidden
     auto reload_button_had_focus = m_crash_overlay_reload_button->hasFocus();
     m_crash_overlay_reload_button->hide();
     m_crash_overlay_url->hide();
-    m_crash_overlay_message->setText(is_hidden_crash
-            ? tr("Part of Ladybird stopped unexpectedly. You can send us a crash report to help fix it.")
-            : tr("This page crashed. You can send us a crash report to help fix it."));
+    m_crash_overlay_message->setText(tr("This page crashed. You can send us a crash report to help fix it."));
     m_crash_report_container->layout()->addWidget(m_crash_report_review);
     m_crash_report_container->show();
     if (reload_button_had_focus)
@@ -2042,7 +1984,7 @@ void WebContentView::notify_accessibility_focus_on_document_root()
             // Mark the root as focused in the shared tree data *before* posting the Qt Focus event. Otherwise, state()
             // reports focused=false and Qt's AT-SPI2 bridge emits the focus event with detail1=0 (focus lost) rather
             // than detail1=1 (focus gained) — defeating the announcement.
-            m_accessibility_manager->set_focused_node(root->id);
+            m_accessibility_manager->show_focus_on_root();
             auto* root_iface = accessibility_interface_for_node(root->id);
             if (root_iface) {
                 QAccessibleEvent focus_event(root_iface, QAccessible::Focus);
@@ -2071,6 +2013,69 @@ void WebContentView::announce_accessibility_focus()
     notify_accessibility_focus_on_document_root();
 }
 #endif
+
+void WebContentView::did_update_accessibility_tree([[maybe_unused]] Optional<Vector<i64>> removed_ids)
+{
+#if defined(Q_OS_MACOS)
+    // Only the first tree for a page announces the load. WebContent rebuilds the tree on DOM mutations too, and
+    // announcing each of those would move VoiceOver's cursor back to the top of the page while the user is reading
+    // it. Same gate as the AT-SPI focus post in the branch below.
+    // NB: A page load never moves the keyboard focus, with or without an assistive technology. For example, a new
+    //     tab's location editor keeps the focus while the new tab page loads.
+    auto const announce_load = !m_posted_initial_accessibility_focus && m_accessibility_manager && !m_accessibility_manager->is_empty();
+    if (announce_load)
+        m_posted_initial_accessibility_focus = true;
+    // An assistive technology that turned up mid-page got no focused element from its first queries: The first tree
+    // has AppKit look the focus up again — if the page has the keyboard focus (update_accessibility_tree() checks).
+    auto const report_focus = m_report_accessibility_focus_with_next_tree && m_accessibility_manager && !m_accessibility_manager->is_empty();
+    if (report_focus)
+        m_report_accessibility_focus_with_next_tree = false;
+    QTimer::singleShot(100, this, [this, announce_load, report_focus, removed_ids = AK::move(removed_ids)] {
+        update_accessibility_tree(this, announce_load, report_focus, removed_ids);
+    });
+#elif !defined(Q_OS_WIN)
+    // Prune interfaces for nodes no longer in the tree: after a change, the ones it removed; after a whole new tree,
+    // every one whose node is gone.
+    QList<i64> stale_ids;
+    if (removed_ids.has_value()) {
+        for (auto id : *removed_ids) {
+            if (m_accessibility_elements.contains(id))
+                stale_ids.append(id);
+        }
+    } else {
+        for (auto it = m_accessibility_elements.begin(); it != m_accessibility_elements.end(); ++it) {
+            if (!it.value()->isValid())
+                stale_ids.append(it.key());
+        }
+    }
+    for (auto id : stale_ids) {
+        auto* iface = m_accessibility_elements.take(id);
+        QAccessible::deleteAccessibleInterface(QAccessible::uniqueId(iface));
+    }
+
+    // An assistive technology that turned up mid-page found no tree to take the focus from: Tell it where the focus
+    // is now that there's one — if the page has the keyboard focus at all.
+    if (m_report_accessibility_focus_with_next_tree && m_accessibility_manager && !m_accessibility_manager->is_empty()) {
+        m_report_accessibility_focus_with_next_tree = false;
+        if (hasFocus())
+            announce_accessibility_focus();
+    }
+
+    // Post a Focus AT-SPI2 event on the document root the first time a tree arrives. This is what lets Orca's
+    // browse-mode commands (H/K/L structural nav) work on page load — without the user having to Tab/click into the
+    // page first. The event is posted unconditionally — even when the address bar has Qt focus — because our Orca
+    // script re-suspends browse-mode commands when it later sees a focus event for an editable chrome widget. So if
+    // the user explicitly focuses the address bar (Ctrl+L, mouse click), typing there still works. Firing this on
+    // every subsequent tree update would be wrong: it would re-focus the document root while the user is
+    // mid-navigation — causing Orca to re-present the current structural-nav target.
+    if (!m_posted_initial_accessibility_focus && m_accessibility_manager && !m_accessibility_manager->is_empty()) {
+        m_posted_initial_accessibility_focus = true;
+        QTimer::singleShot(1000, this, [this] {
+            notify_accessibility_focus_on_document_root();
+        });
+    }
+#endif
+}
 
 #if !defined(Q_OS_WIN)
 void WebContentView::fetch_accessibility_tree()

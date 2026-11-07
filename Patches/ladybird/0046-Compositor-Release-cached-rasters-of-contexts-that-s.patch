@@ -39,10 +39,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  9 files changed, 247 insertions(+), 1 deletion(-)
 
 diff --git a/Services/Compositor/CMakeLists.txt b/Services/Compositor/CMakeLists.txt
-index 486095b478a19fc7ba4bdd1cf72180344f60f098..9edf21d4d0afe93277bc08a1e259dd6597ecfa5c 100644
+index 0bc48ab12c8a8108b95cf9a7cabab1ea94aac574..ee9a5584f1635880ba13b0875d6d38714fd3133f 100644
 --- a/Services/Compositor/CMakeLists.txt
 +++ b/Services/Compositor/CMakeLists.txt
-@@ -83,7 +83,7 @@ target_include_directories(compositorservice PRIVATE ${LADYBIRD_SOURCE_DIR}/Serv
+@@ -82,7 +82,7 @@ target_include_directories(compositorservice PRIVATE ${LADYBIRD_SOURCE_DIR}/Serv
  target_link_libraries(Compositor PRIVATE compositorservice LibCore LibMain LibSandbox)
  # ANGLE must precede Skia so macOS GLES symbols bind to ANGLE rather than the
  # OpenGL framework pulled in by Skia.
@@ -333,10 +333,10 @@ index a196ea6f45403a8cad2f8bce46ee59eb8c65fbba..26cdaa1d508d645ad303e6cf9acd5fa5
      void apply_display_list_resource_transaction(Compositing::DisplayListResourceTransaction&&);
      void install_display_list_update(
 diff --git a/Services/Compositor/DisplayListPlayerSkia.cpp b/Services/Compositor/DisplayListPlayerSkia.cpp
-index 110d317527a9b4efac0151401a257d78c5280318..00413c20aa22fece538a82d5dffd3d0f90946bc1 100644
+index 3e7c6e7633a5b8dc92fd8cf1b988a38e37db1289..590ae630e80bd0049ef12ab32ff5ca3f3143ad25 100644
 --- a/Services/Compositor/DisplayListPlayerSkia.cpp
 +++ b/Services/Compositor/DisplayListPlayerSkia.cpp
-@@ -76,6 +76,7 @@ void DisplayListPlayerSkia::execute(
+@@ -77,6 +77,7 @@ void DisplayListPlayerSkia::execute(
      TemporaryChange composited_context_resolver_change { m_composited_context_resolver, composited_context_resolver };
      TemporaryChange scrollbar_controller_change { m_scrollbar_controller, scrollbar_controller };
      raster_cache.drop_clip_paths_not_used_since_last_frame();

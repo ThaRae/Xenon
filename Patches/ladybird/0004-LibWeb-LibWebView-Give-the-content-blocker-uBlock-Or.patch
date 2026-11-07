@@ -52,7 +52,7 @@ The following commits put these to use.
  create mode 100644 Libraries/LibWeb/ContentBlocker/Rust/src/procedural.js
 
 diff --git a/Cargo.lock b/Cargo.lock
-index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff0cbe0927 100644
+index c5fb5d97a9b26da0c7a63150d4b0e9c51172583f..79c7558a02587a3fe438f030ee1728e9dcadc9d2 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -12,6 +12,7 @@ dependencies = [
@@ -169,7 +169,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "rtcp",
   "rtp",
   "thiserror 1.0.69",
-@@ -2150,6 +2211,12 @@ dependencies = [
+@@ -2160,6 +2221,12 @@ dependencies = [
   "jni-sys 0.3.1",
  ]
  
@@ -182,7 +182,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
  [[package]]
  name = "nix"
  version = "0.26.4"
-@@ -2372,6 +2439,58 @@ version = "2.3.2"
+@@ -2382,6 +2449,58 @@ version = "2.3.2"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
  
@@ -241,7 +241,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
  [[package]]
  name = "pin-project-lite"
  version = "0.2.17"
-@@ -2572,6 +2691,15 @@ dependencies = [
+@@ -2582,6 +2701,15 @@ dependencies = [
   "ptr_meta",
  ]
  
@@ -257,7 +257,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
  [[package]]
  name = "rand"
  version = "0.9.5"
-@@ -2765,7 +2893,7 @@ dependencies = [
+@@ -2775,7 +2903,7 @@ dependencies = [
   "bytes",
   "memchr",
   "portable-atomic",
@@ -266,7 +266,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "serde",
   "thiserror 1.0.69",
   "webrtc-util",
-@@ -2884,7 +3012,7 @@ version = "0.17.2"
+@@ -2894,7 +3022,7 @@ version = "0.17.2"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "66b6eecfa5151edef84d544ff3885dff98e5b5fe97586757a4b5118bde51c958"
  dependencies = [
@@ -275,7 +275,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "substring",
   "thiserror 1.0.69",
   "url",
-@@ -2910,6 +3038,25 @@ dependencies = [
+@@ -2920,6 +3048,25 @@ dependencies = [
   "zeroize",
  ]
  
@@ -301,7 +301,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
  [[package]]
  name = "semver"
  version = "1.0.28"
-@@ -2969,6 +3116,15 @@ dependencies = [
+@@ -2979,6 +3126,15 @@ dependencies = [
   "serde_core",
  ]
  
@@ -317,7 +317,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
  [[package]]
  name = "sha1"
  version = "0.10.7"
-@@ -3029,6 +3185,12 @@ version = "0.1.5"
+@@ -3039,6 +3195,12 @@ version = "0.1.5"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
  
@@ -330,7 +330,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
  [[package]]
  name = "slab"
  version = "0.4.12"
-@@ -3102,7 +3264,7 @@ dependencies = [
+@@ -3112,7 +3274,7 @@ dependencies = [
   "crc",
   "lazy_static",
   "md-5",
@@ -339,7 +339,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "ring",
   "subtle",
   "thiserror 1.0.69",
-@@ -3372,7 +3534,7 @@ dependencies = [
+@@ -3382,7 +3544,7 @@ dependencies = [
   "log",
   "md-5",
   "portable-atomic",
@@ -348,7 +348,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "ring",
   "stun",
   "thiserror 1.0.69",
-@@ -3620,7 +3782,7 @@ dependencies = [
+@@ -3630,7 +3792,7 @@ dependencies = [
   "lazy_static",
   "log",
   "portable-atomic",
@@ -357,7 +357,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "rcgen",
   "regex",
   "ring",
-@@ -3673,7 +3835,7 @@ dependencies = [
+@@ -3683,7 +3845,7 @@ dependencies = [
   "crc",
   "log",
   "portable-atomic",
@@ -366,7 +366,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "serde",
   "serde_json",
   "stun",
-@@ -3708,7 +3870,7 @@ checksum = "26a6c7335bdd03dc023cb9a3bd7966866d969c92c86987b73aa16dfa39c7ca29"
+@@ -3718,7 +3880,7 @@ checksum = "26a6c7335bdd03dc023cb9a3bd7966866d969c92c86987b73aa16dfa39c7ca29"
  dependencies = [
   "byteorder",
   "bytes",
@@ -375,7 +375,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "rtp",
   "thiserror 1.0.69",
  ]
-@@ -3725,7 +3887,7 @@ dependencies = [
+@@ -3735,7 +3897,7 @@ dependencies = [
   "crc",
   "log",
   "portable-atomic",
@@ -384,7 +384,7 @@ index ebe53d599a5f1618a4435fa54c322082ee03bc6c..611968f4763812b78965cfc5980dc6ff
   "thiserror 1.0.69",
   "tokio",
   "webrtc-util",
-@@ -3768,7 +3930,7 @@ dependencies = [
+@@ -3778,7 +3940,7 @@ dependencies = [
   "log",
   "nix",
   "portable-atomic",
@@ -1039,7 +1039,7 @@ index 0000000000000000000000000000000000000000..c5c7af90b0effdd29d2ca7a3b146a8f7
 +    schedule();
 +})
 diff --git a/Libraries/LibWeb/HTML/Window.h b/Libraries/LibWeb/HTML/Window.h
-index 6ce69f476d3d5350916145ceda7e9f028ff0afac..896f644f20ed6095e85017eda4d74dda9c7eaa40 100644
+index 8fb64425b5b553022dc98ad7fffc9c5405b48427..2ff566d2bcbebf7a131bd236151d8f108f303374 100644
 --- a/Libraries/LibWeb/HTML/Window.h
 +++ b/Libraries/LibWeb/HTML/Window.h
 @@ -175,6 +175,11 @@ public:
@@ -1054,7 +1054,7 @@ index 6ce69f476d3d5350916145ceda7e9f028ff0afac..896f644f20ed6095e85017eda4d74dda
      ReadonlySpan<GC::Ref<Plugin>> pdf_viewer_plugin_objects();
      ReadonlySpan<GC::Ref<MimeType>> pdf_viewer_mime_type_objects();
  
-@@ -418,6 +423,8 @@ private:
+@@ -409,6 +414,8 @@ private:
      // https://w3c.github.io/largest-contentful-paint/#has-dispatched-scroll-event
      // Each Window has has dispatched scroll event, a boolean which is initially set to false.
      bool m_has_dispatched_scroll_event { false };
@@ -1250,10 +1250,10 @@ index be3aa176401dc3cf61c7200da417fc6e0b89b5cc..4ea71815c02582f91e20cb52b19bcb2b
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&) const;
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&, ReadonlySpan<Utf16FlyString> classes, ReadonlySpan<Utf16FlyString> ids) const;
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 568034a161fb19b348f9cb5cce91fe08c1ea730f..37dd5396b885ca713ff7ed1e882f9493ffb178cd 100644
+index 2ce37108e459177a1bfab01536cfe0f2228e8543..e953503bc5e1bf5d0468622c1a9ca62c45a26c3d 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -382,6 +382,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -388,6 +388,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
      bool disable_sandbox = false;
      bool force_video_decoder_server = false;
      Vector<ByteString> content_blocker_list_paths;
@@ -1262,7 +1262,7 @@ index 568034a161fb19b348f9cb5cce91fe08c1ea730f..37dd5396b885ca713ff7ed1e882f9493
      Optional<StringView> resource_substitution_map_path;
      bool enable_autoplay = false;
      bool expose_experimental_interfaces = false;
-@@ -503,6 +505,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -509,6 +511,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
              return true;
          },
      });
@@ -1283,7 +1283,7 @@ index 568034a161fb19b348f9cb5cce91fe08c1ea730f..37dd5396b885ca713ff7ed1e882f9493
      args_parser.add_option(enable_autoplay, "Enable multimedia autoplay", "enable-autoplay");
      args_parser.add_option(expose_experimental_interfaces, "Expose experimental IDL interfaces", "expose-experimental-interfaces");
      args_parser.add_option(expose_internals_object, "Expose internals object", "expose-internals-object");
-@@ -574,6 +590,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -580,6 +596,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          return Error::from_string_literal("--profile-output requires --profile-tool cpu");
  
      m_explicit_content_blocker_list_paths = move(content_blocker_list_paths);
@@ -1293,7 +1293,7 @@ index 568034a161fb19b348f9cb5cce91fe08c1ea730f..37dd5396b885ca713ff7ed1e882f9493
  
      // Disable site isolation when debugging WebContent. Otherwise, the process swap may interfere with the gdb session.
      if (debug_process_types.contains_slow(ProcessType::WebContent))
-@@ -843,12 +862,67 @@ void Application::rebuild_content_blocker_list_paths()
+@@ -868,12 +887,67 @@ void Application::rebuild_content_blocker_list_paths()
      }
  }
  
@@ -1362,7 +1362,7 @@ index 568034a161fb19b348f9cb5cce91fe08c1ea730f..37dd5396b885ca713ff7ed1e882f9493
          m_content_blocker_list_buffer = TRY(Core::AnonymousBuffer::create_with_size(0));
          return true;
      }
-@@ -882,7 +956,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
+@@ -907,7 +981,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
      VERIFY(offset == bytes.size());
  
      if (m_content_blocker_list_buffer.has_value() && m_content_blocker_list_buffer->bytes() == blocker_list_buffer.bytes())
@@ -1371,7 +1371,7 @@ index 568034a161fb19b348f9cb5cce91fe08c1ea730f..37dd5396b885ca713ff7ed1e882f9493
  
      m_content_blocker_list_buffer = move(blocker_list_buffer);
      return true;
-@@ -1210,8 +1284,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1233,8 +1307,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
      if (auto* webdriver_bidi = WebDriverBiDi::the(); webdriver_bidi && webdriver_bidi->session_state().is_active)
          webdriver_bidi->push_session_state_for_client(*client);
  
@@ -1381,7 +1381,7 @@ index 568034a161fb19b348f9cb5cce91fe08c1ea730f..37dd5396b885ca713ff7ed1e882f9493
  
      m_web_content_clients.set(client);
      return client;
-@@ -3250,7 +3323,7 @@ void Application::apply_content_blocker_settings()
+@@ -3251,7 +3324,7 @@ void Application::apply_content_blocker_settings()
              return IterationDecision::Continue;
          });
          if (rules_changed)
@@ -1391,10 +1391,10 @@ index 568034a161fb19b348f9cb5cce91fe08c1ea730f..37dd5396b885ca713ff7ed1e882f9493
      });
      ViewImplementation::for_each_view([](ViewImplementation& view) {
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 19841bdf9721f0abb23f390c1ae6054e0532bf9b..d7c6a43cb3a8ec242e3872c6322f698fedf325f7 100644
+index c22745f634fd3aec5cfab04bcdae65b429248f3d..3ae6fdc8eebc20acfc4ca59c26bcd76771b3ede0 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -502,6 +502,8 @@ private:
+@@ -500,6 +500,8 @@ private:
      ErrorOr<void> launch_devtools_server();
      // Returns whether the combined rules changed.
      ErrorOr<bool> load_content_blocker_lists();
@@ -1403,7 +1403,7 @@ index 19841bdf9721f0abb23f390c1ae6054e0532bf9b..d7c6a43cb3a8ec242e3872c6322f698f
      void apply_content_blocker_settings();
      void rebuild_content_blocker_list_paths();
      ByteString content_blocker_list_path(StringView identifier) const;
-@@ -654,6 +656,8 @@ private:
+@@ -652,6 +654,8 @@ private:
      JsonValue m_site_compatibility_data;
      Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> m_origin_access_allow_list;
      Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
@@ -1412,7 +1412,7 @@ index 19841bdf9721f0abb23f390c1ae6054e0532bf9b..d7c6a43cb3a8ec242e3872c6322f698f
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
          String identifier;
-@@ -664,6 +668,8 @@ private:
+@@ -662,6 +666,8 @@ private:
          u8 redirect_count { 0 };
      };
      Vector<ByteString> m_explicit_content_blocker_list_paths;
@@ -1422,10 +1422,10 @@ index 19841bdf9721f0abb23f390c1ae6054e0532bf9b..d7c6a43cb3a8ec242e3872c6322f698f
      Vector<PendingContentBlockerListUpdate> m_pending_content_blocker_list_updates;
      Optional<PendingContentBlockerListUpdate> m_active_content_blocker_list_update;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index ad78760902c7db0c1d912fec54c90779a1690bd2..925e5fda9b70caaefd201681ac15c2db029173f3 100644
+index f290e0b6e3ca57e9308ef8e55222f231a181b3f2..6d21ef39d01b3cf37db6687c439f76a1f96a6f3f 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3290,11 +3290,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
+@@ -3291,11 +3291,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
          page->page().set_content_blocking_policy(enabled, disabled_sites);
  }
  
@@ -1440,7 +1440,7 @@ index ad78760902c7db0c1d912fec54c90779a1690bd2..925e5fda9b70caaefd201681ac15c2db
          dbgln("Failed to set content blockers: {}", result.error());
          return;
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index dc0a12da544b3ee3bc1677ba0e704aa20f32db39..be8e2f82ca805c9f3882a9fbfea2dcfb5a6ce477 100644
+index 19ce44a747ed56e8ce69f3f57eeac8245be44b28..1f9364964625673639eb64dbf4ed138cfa4ce574 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -251,7 +251,7 @@ private:
@@ -1453,10 +1453,10 @@ index dc0a12da544b3ee3bc1677ba0e704aa20f32db39..be8e2f82ca805c9f3882a9fbfea2dcfb
      virtual void set_force_dark_settings(Web::PageId page_id, bool enabled, HashMap<String, bool> per_host) override;
      virtual void set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, Vector<Utf16String> allowlist) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index c2eef8ace18678e9083faac37e56cc36e70390a1..9a294b790ec41325260e91ff6e6cb8820c582fdb 100644
+index 63326de421c3a00ddb83d61515ccaa963d1ac3f6..1686b2690fd4fea0dd90babdff950201d7255582 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -258,7 +258,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -259,7 +259,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      find_in_page_end(Web::PageId page_id) =|
  
      set_content_blocking_policy(Web::PageId page_id, bool enabled, Vector<String> disabled_sites) =|

@@ -41,10 +41,10 @@ index e57a7113283fed6a2ddcc292671031f7f854772e..47d69519229e8741c89b7d969e53d2a6
  static NeverDestroyed<Client::TransportFactory> s_transport_factory;
  static NeverDestroyed<RefPtr<Client>> s_client;
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index 08913d235a5876232df894463637d3d8e98e6e54..1f76d6185be52798081f5af60722ef0a877708ee 100644
+index 27995902311144095ef1dfce7dab2db4aa8e7b0f..c7dbf244bd9b51e939acfec9f7e118b3de3d0c5e 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
-@@ -197,8 +197,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
+@@ -188,8 +188,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
          auto self = weak_self.strong_ref();
          if (!self)
              return Error::from_string_literal("The worker process is gone");

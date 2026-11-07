@@ -146,7 +146,7 @@ index 1aa3992764aa21376f3dffef1dae950655a97d67..49e59167697d31ec299d787980f02fb8
  
  private:
 diff --git a/Libraries/LibWeb/CookieStore/CookieStore.cpp b/Libraries/LibWeb/CookieStore/CookieStore.cpp
-index 69b7bd6d91be9e95a2577216ec7f0f145e3c58a0..b612518eb09a11f1fdd146bc773a01f52784c339 100644
+index dc06c497a0a028103b33ed7074c62790590d3041..465c4daefe6d7a6920f0025440a3c283842297a9 100644
 --- a/Libraries/LibWeb/CookieStore/CookieStore.cpp
 +++ b/Libraries/LibWeb/CookieStore/CookieStore.cpp
 @@ -448,7 +448,7 @@ bool CookieStore::set_a_cookie(HTML::EnvironmentId const& environment_id, URL::U
@@ -159,10 +159,10 @@ index 69b7bd6d91be9e95a2577216ec7f0f145e3c58a0..b612518eb09a11f1fdd146bc773a01f5
  
          // 4. Let parsedDomain be the result of host parsing domain.
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index 2bef8a237945b8ee39833cc92d1da091ed18c127..527daa964396ff3af78232d8097d78178305cdae 100644
+index edfe781c0a6442b467465daf786bf75a509cf3e8..7238828bc7728fcc9c319c29f1224c9f0a7d75fd 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -6386,52 +6386,7 @@ bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_stri
+@@ -6468,52 +6468,7 @@ bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_stri
      if (!host_suffix.has_value())
          return false;
  
@@ -190,7 +190,7 @@ index 2bef8a237945b8ee39833cc92d1da091ed18c127..527daa964396ff3af78232d8097d7817
 -        auto const& original_host_string = original_host.get<String>();
 -
 -        // 2. If hostSuffix, prefixed by U+002E (.), does not match the end of originalHost, then return false.
--        if (!ends_with_dot_prefixed_suffix(Utf16View { original_host_string.bytes_as_string_view() }, Utf16View { host_suffix_string.bytes_as_string_view() }))
+-        if (!ends_with_dot_prefixed_suffix(Utf16View::from_ascii(original_host_string.bytes_as_string_view()), Utf16View::from_ascii(host_suffix_string.bytes_as_string_view())))
 -            return false;
 -
 -        // 3. If any of the following are true:
@@ -203,11 +203,11 @@ index 2bef8a237945b8ee39833cc92d1da091ed18c127..527daa964396ff3af78232d8097d7817
 -        auto original_host_public_suffix = original_host.public_suffix();
 -        VERIFY(original_host_public_suffix.has_value());
 -
--        if (ends_with_dot_prefixed_suffix(Utf16View { original_host_public_suffix->bytes_as_string_view() }, Utf16View { host_suffix_string.bytes_as_string_view() }))
+-        if (ends_with_dot_prefixed_suffix(Utf16View::from_ascii(original_host_public_suffix->bytes_as_string_view()), Utf16View::from_ascii(host_suffix_string.bytes_as_string_view())))
 -            return false;
 -
 -        // 4. Assert: originalHost's public suffix, prefixed by U+002E (.), matches the end of hostSuffix.
--        VERIFY(ends_with_dot_prefixed_suffix(Utf16View { host_suffix_string.bytes_as_string_view() }, Utf16View { original_host_public_suffix->bytes_as_string_view() }));
+-        VERIFY(ends_with_dot_prefixed_suffix(Utf16View::from_ascii(host_suffix_string.bytes_as_string_view()), Utf16View::from_ascii(original_host_public_suffix->bytes_as_string_view())));
 -    }
 -
 -    // 5. Return true.
@@ -217,10 +217,10 @@ index 2bef8a237945b8ee39833cc92d1da091ed18c127..527daa964396ff3af78232d8097d7817
  
  // https://html.spec.whatwg.org/multipage/browsers.html#dom-document-domain
 diff --git a/Libraries/LibWeb/DOM/Document.h b/Libraries/LibWeb/DOM/Document.h
-index 6c879b9751e11cc5e46b7670e2ce2d9754a07287..ca5bb7e5705cd85924e9a6ea4ba5137e1bb18bde 100644
+index e331d987e8dfcd3332d8f908eefe9706b2b7fee5..45cc6240e58ea13e8e6d1aad0c5c7482f32b1712 100644
 --- a/Libraries/LibWeb/DOM/Document.h
 +++ b/Libraries/LibWeb/DOM/Document.h
-@@ -2588,6 +2588,5 @@ template<>
+@@ -2677,6 +2677,5 @@ template<>
  inline bool Node::fast_is<Document>() const { return is_document(); }
  
  bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_string, URL::Host const& original_host);
@@ -228,10 +228,10 @@ index 6c879b9751e11cc5e46b7670e2ce2d9754a07287..ca5bb7e5705cd85924e9a6ea4ba5137e
  
  }
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index 2acae3fa66d9803bfd877125aa5ceabe8347d5b2..6628bf1d50f043f0891da051e72a6b294adef7d5 100644
+index a0169837a9e6a9169f1812059fc5d298c7f726f8..45dc887578ed63af5a013c8a723cdefedcdf0c92 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -81,6 +81,10 @@ set(SOURCES
+@@ -87,6 +87,10 @@ set(SOURCES
      Utilities.cpp
      VideoDecoderServerControlClient.cpp
      ViewImplementation.cpp
@@ -243,10 +243,10 @@ index 2acae3fa66d9803bfd877125aa5ceabe8347d5b2..6628bf1d50f043f0891da051e72a6b29
      WebContentClient.cpp
      WebContentPage.cpp
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index a11066978755ec355509f6486e35e2617d1c0379..a15c61ee4773e4e912a102541b510b1b948e615a 100644
+index c6a381a805cc22dd90e41d4b434e2b67c5a7dbb6..a6b273fad8d5c554ee280c8cc30be86c28dc14e5 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -44,6 +44,7 @@
+@@ -46,6 +46,7 @@
  #include <LibWebView/URL.h>
  #include <LibWebView/UserAgent.h>
  #include <LibWebView/ViewImplementation.h>
@@ -254,7 +254,7 @@ index a11066978755ec355509f6486e35e2617d1c0379..a15c61ee4773e4e912a102541b510b1b
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
  #include <math.h>
-@@ -516,6 +517,26 @@ void ViewImplementation::set_has_system_focus(bool has_system_focus)
+@@ -520,6 +521,26 @@ void ViewImplementation::set_has_system_focus(bool has_system_focus)
      traversable().set_has_system_focus(has_system_focus, {});
  }
  
@@ -282,7 +282,7 @@ index a11066978755ec355509f6486e35e2617d1c0379..a15c61ee4773e4e912a102541b510b1b
  {
      load(traversable().prepare_navigation(url, {}, history_handling));
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index ba222df9cce8af0f32888f4e80edb5b7e01cb5bd..980f82cf38ada0ebf6055d685ae10fb5f884372d 100644
+index 10e7ae46d31bf2814878c66521ac9bb5f51cf8af..a1ad6812ad75f22837f4402087093263b8b42c6d 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
 @@ -84,6 +84,7 @@
@@ -2344,7 +2344,7 @@ index 0000000000000000000000000000000000000000..bfd39cfcfc12ae4ff3e82254ad9b5151
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 9fafbf57d2fdeb79b4b6b56efe2ed997d676ddcc..5b8b052715c313f06db00c1103e6cd940809a148 100644
+index b2132b63c3c287e76fa2a2aa76733a46e0248489..f2fac71c2b94175ec2ef3cccfef0592241e5d90a 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -11,6 +11,7 @@
@@ -2355,7 +2355,7 @@ index 9fafbf57d2fdeb79b4b6b56efe2ed997d676ddcc..5b8b052715c313f06db00c1103e6cd94
  #include <LibWebCommon/Geolocation/GeolocationPositionErrorCode.h>
  #include <LibWebCommon/HTML/BrowsingContext.h>
  #include <LibWebCommon/Page/InputEvent.h>
-@@ -2087,6 +2088,104 @@ void WebContentPage::did_request_dismiss_notification_for_testing(u64 notificati
+@@ -2096,6 +2097,104 @@ void WebContentPage::did_request_dismiss_notification_for_testing(u64 notificati
          recording_backend->dismiss(*id);
  }
  
@@ -2461,7 +2461,7 @@ index 9fafbf57d2fdeb79b4b6b56efe2ed997d676ddcc..5b8b052715c313f06db00c1103e6cd94
  {
      if (view().on_cancel_geolocation_position_request)
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 138645130e3f189170c6f2fb79d7070c4224a495..27f8bc36a465bbad4def513f7a7e5151a51aff07 100644
+index 6b10c3bd915c1dc8a34cdbbd0f33adbe87e9b382..f552b1eefb83e3a77188711bd3175bce4c7a535e 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
 @@ -27,6 +27,7 @@
@@ -2482,7 +2482,7 @@ index 138645130e3f189170c6f2fb79d7070c4224a495..27f8bc36a465bbad4def513f7a7e5151
      void relay_finished_input_event(WebContentPage const& reporting_page, u64 event_id, Web::EventResult);
      Optional<CanonicalNavigable&> population_worker_navigable(Web::HTML::CrossProcessId navigable_id) const;
      bool holds_container_of(CanonicalNavigable const& child_frame, StringView message_name);
-@@ -300,6 +304,9 @@ private:
+@@ -301,6 +305,9 @@ private:
      virtual void did_request_click_notification_for_testing(u64 notification_id) override;
      virtual void did_request_click_notification_by_id_for_testing(u64 browser_notification_id) override;
      virtual void did_request_dismiss_notification_for_testing(u64 notification_id) override;
@@ -2493,10 +2493,10 @@ index 138645130e3f189170c6f2fb79d7070c4224a495..27f8bc36a465bbad4def513f7a7e5151
      virtual void did_finish_handling_input_event(u64 event_id, Web::EventResult event_result) override;
      virtual void did_update_input_method_state(Optional<Web::DevicePixelRect> caret_rect, bool is_enabled, i32 cursor_position, i32 anchor_position, Utf16String text_before_cursor, Utf16String text_after_cursor) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 615d16b41dbaff0ab350bf7e51e2578c37d34c44..fddd925c69ba5c4f6fd9ee146eb897762b071188 100644
+index 43ac81cfa65110a05025058efa2ee465397eb56d..62cc206410618b4b9fdf59383e1caab227967f6e 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3423,6 +3423,12 @@ void ConnectionFromClient::notification_closed(Web::PageId page_id, u64 notifica
+@@ -3424,6 +3424,12 @@ void ConnectionFromClient::notification_closed(Web::PageId page_id, u64 notifica
          page->page().notification_closed(notification_id, by_user);
  }
  
@@ -2510,7 +2510,7 @@ index 615d16b41dbaff0ab350bf7e51e2578c37d34c44..fddd925c69ba5c4f6fd9ee146eb89776
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index a47d7d6e5daff9327f6ac86325c4da85918f83f3..3457a1793428fdfb5cf1e0aaa5d156a0cad1acdf 100644
+index 4b6b180b5be23243dab30223eec13311e14333f4..2fabd5022837a1002c57236391dd7839ede9ce50 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -271,6 +271,7 @@ private:
@@ -2522,10 +2522,10 @@ index a47d7d6e5daff9327f6ac86325c4da85918f83f3..3457a1793428fdfb5cf1e0aaa5d156a0
      virtual void set_focused_navigable(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id) override;
      virtual void consume_user_activation(Web::PageId page_id, Web::HTML::UserActivationConsumption) override;
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 5ecfae0ca00329bca9e6f209258d0a84ab806831..612aaa76dcadeb577c709c5b569b310546fb47e7 100644
+index 8dd0b38161ce148c6bc4f3dc9681edca6b01f4c1..c8c9f81be44db5ac60636a3c36f8de88c4c735da 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -1379,6 +1379,28 @@ void PageClient::page_did_request_dismiss_notification_for_testing(u64 notificat
+@@ -1391,6 +1391,28 @@ void PageClient::page_did_request_dismiss_notification_for_testing(u64 notificat
      client().async_did_request_dismiss_notification_for_testing(m_id, notification_id);
  }
  
@@ -2555,10 +2555,10 @@ index 5ecfae0ca00329bca9e6f209258d0a84ab806831..612aaa76dcadeb577c709c5b569b3105
  {
      auto response = client().send_sync_but_allow_failure<Messages::WebContentClient::DidRequestPermissionSnapshot>(m_id, top_level_origin);
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index dd77cbeaf8c1a23399f7cbd8cd165f73d0fcfb06..a31e79b332fb1676565cf55c91386556d4f9f436 100644
+index d222692ffe524b99768e150f47bab0f0b008a7d8..b316ec566c64af3227cb2ada9aa52add52178c07 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
-@@ -113,6 +113,7 @@ public:
+@@ -114,6 +114,7 @@ public:
      void set_geolocation_emulated_position(WebView::GeolocationPositionData const&, Optional<u16> error_code);
      void geolocation_position_response(u64 request_id, WebView::GeolocationPositionData const&, Optional<u16> error_code);
      void permission_request_completed(u64 request_id, Web::Permissions::EffectiveState);
@@ -2566,7 +2566,7 @@ index dd77cbeaf8c1a23399f7cbd8cd165f73d0fcfb06..a31e79b332fb1676565cf55c91386556
      Optional<URL::URL> generate_text_fragment_url(u64 generation_id);
  
      void alert_closed();
-@@ -385,6 +386,9 @@ private:
+@@ -386,6 +387,9 @@ private:
      virtual void page_did_request_click_notification_for_testing(u64 notification_id) override;
      virtual void page_did_request_click_notification_by_id_for_testing(u64 browser_notification_id) override;
      virtual void page_did_request_dismiss_notification_for_testing(u64 notification_id) override;
@@ -2577,10 +2577,10 @@ index dd77cbeaf8c1a23399f7cbd8cd165f73d0fcfb06..a31e79b332fb1676565cf55c91386556
      virtual void page_did_set_test_timeout(double milliseconds) override;
      virtual void page_did_receive_reference_test_metadata(JsonValue) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index 0a0424078b727a3e3a3bef33c7fef8444467e98c..a61f34addfb5e6df84efd6e5a70f4bcc5a17d965 100644
+index 61af472e9749fd0887ab8bab2b097311f2b3541f..b9da7c7f101885219810db0fe4355b57f10ad167 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
-@@ -67,6 +67,7 @@
+@@ -68,6 +68,7 @@
  #include <LibWebCommon/StorageAPI/StorageAreaId.h>
  #include <LibWebCommon/StorageAPI/StorageEndpoint.h>
  #include <LibWebCommon/WebDriver/Response.h>
@@ -2588,7 +2588,7 @@ index 0a0424078b727a3e3a3bef33c7fef8444467e98c..a61f34addfb5e6df84efd6e5a70f4bcc
  #include <LibWebCommon/WebView/AccessibilityNodeData.h>
  #include <LibWebCommon/WebView/Attribute.h>
  #include <LibWebCommon/WebView/ConsoleOutput.h>
-@@ -255,6 +256,9 @@ endpoint WebContentClient routed by Web::PageId page_id
+@@ -259,6 +260,9 @@ endpoint WebContentClient routed by Web::PageId page_id
      did_request_click_notification_for_testing(Web::PageId page_id, u64 notification_id) =|
      did_request_click_notification_by_id_for_testing(Web::PageId page_id, u64 browser_notification_id) =|
      did_request_dismiss_notification_for_testing(Web::PageId page_id, u64 notification_id) =|
@@ -2599,10 +2599,10 @@ index 0a0424078b727a3e3a3bef33c7fef8444467e98c..a61f34addfb5e6df84efd6e5a70f4bcc
      did_request_select_dropdown(Web::PageId page_id, Web::HTML::CrossProcessId local_root_id, Gfx::IntPoint content_position, i32 minimum_width, Vector<Web::HTML::SelectItem> items) =|
      did_finish_handling_input_event(Web::PageId page_id, u64 event_id, Web::EventResult event_result) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 1833d012333da10d66e3cee90450c29e94eec5fd..f034c8a152a4b6bace629028f25c3eca721e0339 100644
+index f0188450eff7ec3185a6a60965fedc8a5121069e..d8006d70d4ddc6ce6b6d6985a8dc767e647cbb7a 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -59,6 +59,7 @@
+@@ -60,6 +60,7 @@
  #include <LibWebCommon/WebDriver/Capabilities.h>
  #include <LibWebCommon/WebDriver/Response.h>
  #include <LibWebCommon/WebDriver/UserPrompt.h>
@@ -2610,7 +2610,7 @@ index 1833d012333da10d66e3cee90450c29e94eec5fd..f034c8a152a4b6bace629028f25c3eca
  #include <LibWebCommon/WebView/Attribute.h>
  #include <LibWebCommon/WebView/BrowsingBehavior.h>
  #include <LibWebCommon/WebView/DOMNodeProperties.h>
-@@ -278,6 +279,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -279,6 +280,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      notification_show_failed(Web::PageId page_id, u64 notification_id) =|
      notification_clicked(Web::PageId page_id, u64 notification_id) =|
      notification_closed(Web::PageId page_id, u64 notification_id, bool by_user) =|
@@ -2619,10 +2619,10 @@ index 1833d012333da10d66e3cee90450c29e94eec5fd..f034c8a152a4b6bace629028f25c3eca
      set_focused_navigable(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id) =|
      consume_user_activation(Web::PageId page_id, Web::HTML::UserActivationConsumption consumption) =|
 diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
-index 306e32901d8ff2eac5be2740a3881d5e36781bc7..819d4eb3cf1a4dabccff676e8f2d641efa0c6545 100644
+index e8e9bb011c4402e5d19fdcab78a5dc809f2079c2..889f6f1cdc781e83b5c81131d01e14b8c5123434 100644
 --- a/Tests/LibWebView/CMakeLists.txt
 +++ b/Tests/LibWebView/CMakeLists.txt
-@@ -83,6 +83,7 @@ set(TEST_SOURCES
+@@ -82,6 +82,7 @@ set(TEST_SOURCES
      TestStorageJar.cpp
      TestTabIndicators.cpp
      TestTabPerformanceStats.cpp
@@ -2630,7 +2630,7 @@ index 306e32901d8ff2eac5be2740a3881d5e36781bc7..819d4eb3cf1a4dabccff676e8f2d641e
      TestWebDriverBiDiNetwork.cpp
      TestWebViewURL.cpp
  )
-@@ -158,7 +159,7 @@ if (NOT WIN32)
+@@ -153,7 +154,7 @@ if (NOT WIN32)
  endif()
  
  target_sources(TestLibWebView PRIVATE ${TEST_SOURCES})

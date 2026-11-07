@@ -23,10 +23,10 @@ The blocker now also gets the request method, so $method filters match.
  2 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 0b9163d55deab38de6a9f14f6fe478fea8841c72..608ec4ba6829e987e4e98fd8cbad2a48848a197b 100644
+index 4b625df515ab36973aab3a3962644c982eb06ecf..a27b8b01cb910460e66342a5191e78725cfb2a8f 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -66,6 +66,7 @@
+@@ -67,6 +67,7 @@
  #include <LibWeb/HTML/WorkerGlobalScope.h>
  #include <LibWeb/HighResolutionTime/TimeOrigin.h>
  #include <LibWeb/Infra/SerializedURL.h>
@@ -34,7 +34,7 @@ index 0b9163d55deab38de6a9f14f6fe478fea8841c72..608ec4ba6829e987e4e98fd8cbad2a48
  #include <LibWeb/Loader/LoadRequest.h>
  #include <LibWeb/Loader/LoaderConfig.h>
  #include <LibWeb/Loader/ResourceLoader.h>
-@@ -560,6 +561,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
+@@ -562,6 +563,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
          request.set_client_snapshot(client->visit([](auto const& client) { return snapshot_client_context(*client); }));
  }
  
@@ -64,7 +64,7 @@ index 0b9163d55deab38de6a9f14f6fe478fea8841c72..608ec4ba6829e987e4e98fd8cbad2a48
  // https://fetch.spec.whatwg.org/#concept-main-fetch
  GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParams const& fetch_params, Recursive recursive)
  {
-@@ -634,6 +658,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -636,6 +660,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
          request->current_url().set_scheme("https"sv);
      }
  
@@ -74,7 +74,7 @@ index 0b9163d55deab38de6a9f14f6fe478fea8841c72..608ec4ba6829e987e4e98fd8cbad2a48
          dbgln_if(WEB_FETCH_DEBUG, "Fetch: Running 'main fetch' get_response() function");
          auto const* origin = request->origin().get_pointer<URL::Origin>();
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index 7a320b45d2180364d841ec255de9127f03bd6160..6f5261583ab11e2b666311121f3b071c0d1c4188 100644
+index 4ec36e7d279328fd19c237f7f67c3590e75cfec9..e7a97a1df9bb4b7202ca05eb502dd200d85edc5b 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
 @@ -30,6 +30,7 @@
@@ -141,7 +141,7 @@ index 7a320b45d2180364d841ec255de9127f03bd6160..6f5261583ab11e2b666311121f3b071c
 +        headers->append(HTTP::Header::isomorphic_encode("Access-Control-Allow-Credentials"sv, "true"sv));
 +    }
 +
-+    on_headers_received.function()(nullptr, headers, 200, {}, {}, {}, Requests::CacheState::NotCached);
++    on_headers_received.function()(nullptr, headers, 200, {}, Requests::CacheState::NotCached);
 +    // NB: Fetch only delivers the response once it has seen a body, so send one even if it is empty.
 +    on_data_received.function()(Requests::ResponseData::from_bytes(data_url.value().body.bytes()));
 +    on_complete.function()(true, {}, {});

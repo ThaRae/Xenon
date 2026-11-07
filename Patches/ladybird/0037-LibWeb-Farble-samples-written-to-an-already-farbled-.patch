@@ -31,10 +31,10 @@ navigator.webdriver.
  create mode 100644 Tests/LibWeb/Text/input/Fingerprinting/protection.html
 
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index 4b1d625b88d6918982cd99a75e3ffdab2029423d..533d137ea5b5512ce4d07de7ff1994d729c3d5d4 100644
+index b2b40d7d306fad1a1e575fcd23a9bc476169bd53..c792e1b5935bfd14b6f15d0c9c4872876dc702be 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-@@ -17,6 +17,7 @@
+@@ -15,6 +15,7 @@
  #include <LibWeb/Bindings/Wrappable.h>
  #include <LibWeb/Bindings/WrapperWorld.h>
  #include <LibWeb/DOM/Document.h>
@@ -42,7 +42,7 @@ index 4b1d625b88d6918982cd99a75e3ffdab2029423d..533d137ea5b5512ce4d07de7ff1994d7
  #include <LibWeb/HTML/CustomElements/CustomElementReactions.h>
  #include <LibWeb/HTML/EventLoop/EventLoop.h>
  #include <LibWeb/HTML/Scripting/Agent.h>
-@@ -31,7 +32,6 @@
+@@ -29,7 +30,6 @@
  #include <LibWeb/Platform/EventLoopPlugin.h>
  #include <LibWeb/WebIDL/AbstractOperations.h>
  #include <LibWeb/WebIDL/CallbackType.h>
@@ -51,10 +51,10 @@ index 4b1d625b88d6918982cd99a75e3ffdab2029423d..533d137ea5b5512ce4d07de7ff1994d7
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index acd91f565158826aa46af2279e09345357e8779a..16b3631f2c8ce7be5a613c725f26b7f199da299f 100644
+index dc3dd140e263c2e0d0c48f57d47cbfb6727afbd4..fb10d337cdff4d4028c02af5c8a4bceccb24e6df 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1496,6 +1496,12 @@ void Internals::set_user_agent(Utf16String const& user_agent)
+@@ -1534,6 +1534,12 @@ void Internals::set_user_agent(Utf16String const& user_agent)
      Web::update_loader_config([&](auto& config) { config.user_agent = user_agent.to_utf8(); });
  }
  
@@ -68,10 +68,10 @@ index acd91f565158826aa46af2279e09345357e8779a..16b3631f2c8ce7be5a613c725f26b7f1
  {
      page().set_content_blocking_policy(enabled, {});
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index 97bf918ce0adc47b54ee4ac3a6c47be59ceb77c2..0e2b229d8c890a36d5a5d6b8406d128ab8c434b7 100644
+index 2d547d9cf040a3fd4f332d5f60c0bdf9f5eb6830..72604126a2f2b1c23d2426d4501aef5c4da995d6 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -180,6 +180,7 @@ public:
+@@ -186,6 +186,7 @@ public:
      WebIDL::ExceptionOr<void> set_content_blockers(Utf16String const& patterns);
      WebIDL::ExceptionOr<void> set_site_compatibility_data(Utf16String const& source);
      void set_user_agent(Utf16String const& user_agent);
@@ -80,10 +80,10 @@ index 97bf918ce0adc47b54ee4ac3a6c47be59ceb77c2..0e2b229d8c890a36d5a5d6b8406d128a
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
      WebIDL::UnsignedLongLong partial_layout_count();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 118cfc315fec4b9180a992504e11646d3806d529..b54bcdd2744bde351a2cfb2bacc0da31991c38d4 100644
+index bddc46f49698068985f6860a098e05a5d7ba40ff..65c3cd863e4454eec6f912493310f6a13388ef93 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -178,6 +178,7 @@ interface Internals {
+@@ -188,6 +188,7 @@ interface Internals {
      undefined setContentBlockers(DOMString patterns);
      undefined setSiteCompatibilityData(DOMString source);
      undefined setUserAgent(DOMString userAgent);

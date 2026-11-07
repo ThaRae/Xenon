@@ -9,7 +9,6 @@
 #include <LibURL/InternalURLs.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/BrowserProcess.h>
-#include <LibWebView/CrashReportStore.h>
 #include <LibWebView/URL.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Application.h>
@@ -63,9 +62,6 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
     AK::set_rich_debug_enabled(true);
 
     WebView::set_application_name("Xenon"sv);
-
-    if (auto result = WebView::CrashReportStore::the().initialize_browser_crash_handler(); result.is_error())
-        warnln("Could not prepare Browser crash reporting: {}", result.error());
 
     // The web content view is presented in a native child window. Without this attribute, a widget
     // gaining a native window would force every other widget in the browser window to become native
@@ -168,8 +164,6 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
             auto& window = app->new_window(browser_options.urls, configuration);
             window.setWindowTitle("Xenon");
         }
-
-        app->offer_newest_pending_crash_report();
     }
 
     Ladybird::Extensions::Registry::the().start_background_pages();

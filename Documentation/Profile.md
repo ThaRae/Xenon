@@ -10,10 +10,14 @@ of its own:
 | History, cookies, sessions, extensions | `~/Library/Application Support/Xenon/Profiles/default` | `~/.local/share/Xenon/Profiles/default` |
 | HTTP cache | `~/Library/Caches/Xenon/Profiles/default` | `~/.cache/Xenon/Profiles/default` |
 | The running browser's lock and socket | `~/Library/Application Support/Xenon/Profiles/default` | `$XDG_RUNTIME_DIR/Xenon/Profiles/default` |
-| Crash reports | `~/Library/Application Support/Xenon/CrashReports` | `~/.local/share/Xenon/CrashReports` |
+| Crash reports | `~/Library/Application Support/Xenon/Profiles/default/CrashReports` | `~/.local/share/Xenon/Profiles/default/CrashReports` |
 | Xenon's own settings (layout and the like) | `~/Library/Preferences/com.xenon.Xenon.plist` | `~/.config/Xenon/Xenon.conf` |
 
 **Settings → Profile and files** lists the running profile's directories, with a button that shows each one.
+
+Crash reports used to be kept in `Xenon/CrashReports`, outside any profile. The first profile that isn't temporary to
+start takes those over. **Settings → Privacy** chooses whether to keep reports for review or keep none, and once some are
+waiting, opens `about:crashes` to send or delete them.
 
 On macOS, the updater keeps its state in `~/Library/Preferences/org.xenon.Xenon.plist`, and the update it downloaded in
 `~/Library/Caches/org.xenon.Xenon` ([Updates.md](Updates.md)).
@@ -27,7 +31,7 @@ profile:
 - `--profile-path <dir>` keeps a whole profile in `config/`, `data/`, `cache/` and `runtime/` under one directory,
   which the tests use.
 
-Crash reports and Xenon's own settings stay where they are with either. Ladybird's engine still names its database in
+Xenon's own settings stay where they are with either. Ladybird's engine still names its database in
 the profile `Ladybird.db`.
 
 ## Profiles from earlier builds

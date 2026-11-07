@@ -21,10 +21,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index eb0c0dacaf99b3e7778406961fbd510138f2dc07..7cc78d0111b456436c9732b1d6f7617da275af39 100644
+index 36ff2010c73d296e2948226ca178524210d43673..fea7577171706b00627c3ef9fc5fc52dff290819 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -856,6 +856,14 @@ Optional<UnixDateTime> Application::content_blocker_list_last_updated_at(StringV
+@@ -881,6 +881,14 @@ Optional<UnixDateTime> Application::content_blocker_list_last_updated_at(StringV
      return {};
  }
  
@@ -40,10 +40,10 @@ index eb0c0dacaf99b3e7778406961fbd510138f2dc07..7cc78d0111b456436c9732b1d6f7617d
  {
      m_browser_options.content_blocker_list_paths = m_explicit_content_blocker_list_paths;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 108c92143d2400089153cff73e4a7dc916ce4f6b..a567ddef8993b276ee54dcbcd3bccf5f58d820fd 100644
+index 25e51a00d11169b35d9312a64f639d74935d7972..618f0c0372b9cbb8151686823e949e9808db5fa1 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -220,6 +220,10 @@ public:
+@@ -224,6 +224,10 @@ public:
      void remove_content_blocker_list(Badge<SettingsUI>, StringView identifier);
      Optional<UnixDateTime> content_blocker_list_last_updated_at(StringView identifier) const;
  
