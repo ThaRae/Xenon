@@ -281,6 +281,9 @@ private:
     {
         JsonObject settings;
         settings.set("layout"sv, layout_name(XenonSettings::chrome_layout()));
+#ifdef AK_OS_MACOS
+        settings.set("framedPages"sv, XenonSettings::framed_pages());
+#endif
         settings.set("cycleTabsInRecentlyUsedOrder"sv, XenonSettings::cycle_tabs_in_recently_used_order());
         settings.set("splitViewDragAndDrop"sv, XenonSettings::split_view_drag_and_drop());
         settings.set("newTabPageShowsRecentlyClosed"sv, XenonSettings::new_tab_page_shows_recently_closed());
@@ -377,6 +380,11 @@ void register_interfaces(WebView::WebUI& web_ui)
             XenonSettings::set_tab_hibernation_enabled(*enabled);
         if (auto on_memory_pressure = object.get_bool("onMemoryPressure"sv); on_memory_pressure.has_value())
             XenonSettings::set_hibernate_on_memory_pressure(*on_memory_pressure);
+    });
+
+    web_ui.register_interface("xenon/setFramedPages"sv, [](auto const& data) {
+        if (data.is_bool())
+            XenonSettings::set_framed_pages(data.as_bool());
     });
 
     web_ui.register_interface("xenon/setSplitViewDragAndDrop"sv, [](auto const& data) {

@@ -27,6 +27,9 @@ void set_chrome_layout(ChromeLayout);
 
 bool compact_toolbar();
 
+bool framed_pages();
+void set_framed_pages(bool);
+
 bool cycle_tabs_in_recently_used_order();
 void set_cycle_tabs_in_recently_used_order(bool);
 
