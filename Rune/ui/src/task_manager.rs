@@ -7,16 +7,19 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ffi::c_void;
+use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 use std::sync::{Arc, OnceLock};
 
-use rune::{AppHandle, ImageCache, Pixels, PointerPress, PopupItem, PopupMenu, TextEdit, Tx};
+use rune::{ImageCache, Pixels, PointerPress, TextEdit, Tx};
 
+use crate::chrome_popup::{self, PopupItem, PopupMenu};
 use crate::ffi::XenonStr;
 use crate::ffi_task_manager::{
     self, XENON_PROCESS_ICON_BROWSER, XENON_PROCESS_ICON_PAGE, XENON_PROCESS_ICON_SPARE,
     XenonProcess, XenonTaskManagerCallbacks,
 };
 use crate::state::Browser;
+use crate::window_slots::Slots;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Column {
@@ -241,6 +244,8 @@ pub fn format_data_size(bytes: u64) -> String {
     format!("{value:.2} {}", UNITS[unit])
 }
 
+static OPEN_WINDOWS: AtomicUsize = AtomicUsize::new(0);
+
 pub fn open(s: &mut Browser) {
     s.hover_card = None;
     if s.task_manager.open {
@@ -249,6 +254,7 @@ pub fn open(s: &mut Browser) {
     s.task_manager.open = true;
     s.task_manager.error = None;
     s.task_manager.favicons.clear();
+    OPEN_WINDOWS.fetch_add(1, AtomicOrdering::Relaxed);
     unsafe { ffi_task_manager::xenon_engine_task_manager_set_visible(true) };
 }
 
@@ -258,7 +264,9 @@ pub fn close(s: &mut Browser) {
     }
     s.task_manager.open = false;
     s.task_manager.search.focused = false;
-    unsafe { ffi_task_manager::xenon_engine_task_manager_set_visible(false) };
+    if OPEN_WINDOWS.fetch_sub(1, AtomicOrdering::Relaxed) == 1 {
+        unsafe { ffi_task_manager::xenon_engine_task_manager_set_visible(false) };
+    }
 }
 
 pub fn select(s: &mut Browser, child_id: u64) {
@@ -285,24 +293,18 @@ pub fn show_row_menu(s: &mut Browser, child_id: u64, at: PointerPress, tx: &mut 
         menu = menu.item(PopupItem::new("end-process", "End Process"));
     }
     menu = menu.item(PopupItem::new("copy-pid", "Copy PID"));
-    tx.popup_menu(
-        menu,
-        at,
-        move |s: &mut Browser, picked: Option<&str>, _: &mut Tx| match picked {
-            Some("end-process") => end_selected_process(s),
-            Some("copy-pid") => unsafe {
-                ffi_task_manager::xenon_engine_task_manager_copy_pid(child_id)
-            },
-            _ => {}
-        },
-    );
+    chrome_popup::open(s, tx, menu, at, move |s, picked, _| match picked {
+        "end-process" => end_selected_process(s),
+        "copy-pid" => unsafe { ffi_task_manager::xenon_engine_task_manager_copy_pid(child_id) },
+        _ => {}
+    });
 }
 
 pub struct TaskManagerContext {
-    handle: AppHandle<Browser>,
+    handle: Arc<Slots>,
 }
 
-pub fn install(handle: AppHandle<Browser>) -> Arc<TaskManagerContext> {
+pub fn install(handle: Arc<Slots>) -> Arc<TaskManagerContext> {
     let context = Arc::new(TaskManagerContext { handle });
     let callbacks = XenonTaskManagerCallbacks {
         context: Arc::as_ptr(&context).cast_mut().cast(),
@@ -314,7 +316,7 @@ pub fn install(handle: AppHandle<Browser>) -> Arc<TaskManagerContext> {
     context
 }
 
-unsafe fn handle<'a>(context: *mut c_void) -> &'a AppHandle<Browser> {
+unsafe fn handle<'a>(context: *mut c_void) -> &'a Slots {
     unsafe { &(*context.cast::<TaskManagerContext>()).handle }
 }
 
@@ -337,7 +339,7 @@ unsafe fn string(text: XenonStr) -> String {
 }
 
 unsafe extern "C" fn open_requested(context: *mut c_void) {
-    unsafe { handle(context) }.update(|s, _| open(s));
+    unsafe { handle(context) }.update_target(|s, _| open(s));
 }
 
 unsafe extern "C" fn processes_changed(
@@ -351,7 +353,7 @@ unsafe extern "C" fn processes_changed(
         unsafe { std::slice::from_raw_parts(raw, count) }
     };
     let mut favicons = Vec::new();
-    let processes = raw
+    let processes: Vec<Process> = raw
         .iter()
         .map(|raw| {
             let favicon_hash = unsafe { string(raw.favicon_hash) };
@@ -377,14 +379,19 @@ unsafe extern "C" fn processes_changed(
         .collect();
     unsafe { handle(context) }.update(move |s, _| {
         if s.task_manager.open {
-            s.task_manager.processes_changed(processes, favicons);
+            s.task_manager
+                .processes_changed(processes.clone(), favicons.clone());
         }
     });
 }
 
 unsafe extern "C" fn end_process_failed(context: *mut c_void, message: XenonStr) {
     let message = unsafe { string(message) };
-    unsafe { handle(context) }.update(move |s, _| s.task_manager.error = Some(message));
+    unsafe { handle(context) }.update(move |s, _| {
+        if s.task_manager.open {
+            s.task_manager.error = Some(message.clone());
+        }
+    });
 }
 
 #[cfg(test)]

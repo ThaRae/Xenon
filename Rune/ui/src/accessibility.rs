@@ -6,9 +6,10 @@
 
 use std::collections::HashMap;
 use std::ffi::c_void;
+use std::sync::Arc;
 use std::time::Duration;
 
-use rune::{AppHandle, TextEdit, Tx};
+use rune::{TextEdit, Tx};
 
 use crate::engine::ViewId;
 use crate::ffi::XenonStr;
@@ -19,6 +20,7 @@ use crate::ffi_accessibility::{
     XenonAccessibilityTree,
 };
 use crate::state::Browser;
+use crate::window_slots::{Slots, ViewRoute};
 
 const FORCE_VARIABLE: &str = "XENON_ACCESSIBILITY";
 const ASSISTIVE_TECHNOLOGY_CHECK_INTERVAL: Duration = Duration::from_secs(2);
@@ -421,10 +423,10 @@ impl PageAccessibility {
 }
 
 pub struct AccessibilityContext {
-    handle: AppHandle<Browser>,
+    handle: Arc<Slots>,
 }
 
-pub fn install(handle: AppHandle<Browser>) -> Box<AccessibilityContext> {
+pub fn install(handle: Arc<Slots>) -> Box<AccessibilityContext> {
     let context = Box::new(AccessibilityContext { handle });
     let callbacks = XenonAccessibilityCallbacks {
         context: std::ptr::from_ref::<AccessibilityContext>(&context)
@@ -437,8 +439,8 @@ pub fn install(handle: AppHandle<Browser>) -> Box<AccessibilityContext> {
     context
 }
 
-unsafe fn handle<'a>(context: *mut c_void) -> &'a AppHandle<Browser> {
-    unsafe { &(*context.cast::<AccessibilityContext>()).handle }
+unsafe fn handle<'a>(context: *mut c_void) -> ViewRoute<'a> {
+    ViewRoute(unsafe { &(*context.cast::<AccessibilityContext>()).handle })
 }
 
 fn text(string: XenonStr) -> String {
@@ -511,11 +513,13 @@ unsafe extern "C" fn tree_changed(
         return;
     };
     let received = tree_from(tree);
-    unsafe { handle(context) }.update(move |browser, _| tree_received(browser, view, received));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        tree_received(browser, view, received)
+    });
 }
 
 unsafe extern "C" fn focus_changed_callback(context: *mut c_void, view: ViewId, node: i64) {
-    unsafe { handle(context) }.update(move |browser, _| focus_changed(browser, view, node));
+    unsafe { handle(context) }.update(view, move |browser, _| focus_changed(browser, view, node));
 }
 
 #[cfg(test)]

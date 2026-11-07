@@ -8,14 +8,16 @@ use std::collections::HashMap;
 use std::ffi::c_void;
 use std::sync::Arc;
 
-use rune::{AppHandle, Pixels, PopupItem, PopupMenu};
+use rune::Pixels;
 
+use crate::chrome_popup::{PopupItem, PopupMenu};
 use crate::engine::ViewId;
 use crate::ffi_hibernation::{
     self, XENON_TAB_HIBERNATED, XENON_TAB_NOT_LOADED, XenonHibernationCallbacks,
     XenonHibernationSettings, XenonTabIcon,
 };
 use crate::state::Browser;
+use crate::window_slots::Slots;
 
 pub const HIBERNATE_TAB_ITEM: &str = "hibernate";
 const OFF_ITEM: &str = "hibernation-off";
@@ -136,7 +138,7 @@ pub fn may_hibernate(s: &Browser, view: ViewId) -> bool {
     let Some(tab) = s.tabs.get(view) else {
         return false;
     };
-    if s.tabs.is_active(view) || tab.pinned || tab.loading || tab.playing_audio {
+    if s.split.is_shown(&s.tabs, view) || tab.pinned || tab.loading || tab.playing_audio {
         return false;
     }
     if !s.hibernation.is_loaded(view) {
@@ -193,6 +195,7 @@ fn load_state_changed(
         Some(LoadState::Hibernated) => {
             let mut colour_favicon = None;
             if let Some(tab) = tab {
+                tab.sent_viewport.set(None);
                 tab.loading = false;
                 tab.unresponsive = false;
                 tab.hovered_link.clear();
@@ -213,10 +216,10 @@ fn load_state_changed(
 }
 
 pub struct HibernationContext {
-    handle: AppHandle<Browser>,
+    handle: Arc<Slots>,
 }
 
-pub fn install(handle: AppHandle<Browser>) -> Arc<HibernationContext> {
+pub fn install(handle: Arc<Slots>) -> Arc<HibernationContext> {
     let context = Arc::new(HibernationContext { handle });
     let callbacks = XenonHibernationCallbacks {
         context: Arc::as_ptr(&context).cast_mut().cast(),
@@ -227,7 +230,7 @@ pub fn install(handle: AppHandle<Browser>) -> Arc<HibernationContext> {
     context
 }
 
-unsafe fn handle<'a>(context: *mut c_void) -> &'a AppHandle<Browser> {
+unsafe fn handle<'a>(context: *mut c_void) -> &'a Slots {
     unsafe { &(*context.cast::<HibernationContext>()).handle }
 }
 
@@ -258,7 +261,7 @@ unsafe extern "C" fn tab_load_state_changed(
         _ => None,
     };
     let icon = unsafe { icon_pixels(icon) };
-    unsafe { handle(context) }.update(move |s, _| load_state_changed(s, view, state, icon));
+    unsafe { handle(context) }.update(move |s, _| load_state_changed(s, view, state, icon.clone()));
 }
 
 unsafe extern "C" fn settings_changed(context: *mut c_void, raw: *const XenonHibernationSettings) {
@@ -279,7 +282,7 @@ unsafe extern "C" fn settings_changed(context: *mut c_void, raw: *const XenonHib
         timeout_choices_in_minutes: choices,
         on_memory_pressure: raw.hibernate_on_memory_pressure,
     };
-    unsafe { handle(context) }.update(move |s, _| s.hibernation.settings = settings);
+    unsafe { handle(context) }.update(move |s, _| s.hibernation.settings = settings.clone());
 }
 
 #[cfg(test)]
@@ -356,6 +359,15 @@ mod tests {
         }
         assert!(may_hibernate(&s, 2));
         assert!(!may_hibernate(&s, 42));
+    }
+
+    #[test]
+    fn a_tab_shown_in_a_split_view_cannot_hibernate() {
+        let mut s = browser();
+        s.split.replace(&[(1, 2)]);
+        assert!(!may_hibernate(&s, 2));
+        s.split.replace(&[]);
+        assert!(may_hibernate(&s, 2));
     }
 
     #[test]

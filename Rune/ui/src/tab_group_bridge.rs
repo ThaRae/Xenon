@@ -5,19 +5,18 @@
  */
 
 use std::ffi::c_void;
-
-use rune::AppHandle;
+use std::sync::Arc;
 
 use crate::engine::WindowId;
 use crate::ffi_tab_groups::{self, XenonTabGroup, XenonTabGroupCallbacks, XenonTabGroupId};
-use crate::state::Browser;
 use crate::tab_groups::{self, Group, GroupColor};
+use crate::window_slots::Slots;
 
 pub struct TabGroupContext {
-    handle: AppHandle<Browser>,
+    handle: Arc<Slots>,
 }
 
-pub fn install(handle: AppHandle<Browser>) -> Box<TabGroupContext> {
+pub fn install(handle: Arc<Slots>) -> Box<TabGroupContext> {
     let context = Box::new(TabGroupContext { handle });
     let callbacks = XenonTabGroupCallbacks {
         context: std::ptr::from_ref::<TabGroupContext>(&context)
@@ -30,7 +29,7 @@ pub fn install(handle: AppHandle<Browser>) -> Box<TabGroupContext> {
     context
 }
 
-unsafe fn handle<'a>(context: *mut c_void) -> &'a AppHandle<Browser> {
+unsafe fn handle<'a>(context: *mut c_void) -> &'a Slots {
     unsafe { &(*context.cast::<TabGroupContext>()).handle }
 }
 
@@ -64,7 +63,7 @@ unsafe extern "C" fn groups_changed(
             .collect()
     };
     unsafe { handle(context) }
-        .update(move |browser, _| browser.tab_groups.groups_changed(window, groups));
+        .update(move |browser, _| browser.tab_groups.groups_changed(window, groups.clone()));
 }
 
 unsafe extern "C" fn edit_requested(
@@ -72,6 +71,7 @@ unsafe extern "C" fn edit_requested(
     window: WindowId,
     group: XenonTabGroupId,
 ) {
-    unsafe { handle(context) }
-        .update(move |browser, _| tab_groups::edit_requested(browser, window, group));
+    unsafe { handle(context) }.update_window(window, move |browser, _| {
+        tab_groups::edit_requested(browser, window, group)
+    });
 }
