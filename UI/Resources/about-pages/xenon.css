@@ -19,15 +19,11 @@
     --xenon-rose-ink: var(--xenon-rose-pressed);
 
     --xenon-key-face: #fffdfb;
-    --xenon-key-edge: rgba(26, 21, 23, 0.14);
-    --xenon-key-lip: #ddd4d0;
-    --xenon-key-down: #f0ebe8;
     --xenon-lamp-off: #cfc7c4;
 
     --xenon-orbit: var(--xenon-ink);
 
     --xenon-sans: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-    --xenon-serif: "Iowan Old Style", Charter, Georgia, ui-serif, serif;
     --xenon-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -47,9 +43,6 @@
         --xenon-rose-ink: var(--xenon-rose-light);
 
         --xenon-key-face: #1e181a;
-        --xenon-key-edge: rgba(244, 239, 241, 0.12);
-        --xenon-key-lip: #050304;
-        --xenon-key-down: #141012;
         --xenon-lamp-off: #4a4245;
 
         --xenon-orbit: #ffffff;
@@ -112,10 +105,9 @@ body {
 
 .page-title {
     margin: 0;
-    font-family: var(--xenon-serif);
-    font-size: 40px;
-    font-weight: 400;
-    line-height: 1.1;
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.2;
     letter-spacing: -0.01em;
 }
 
@@ -125,7 +117,7 @@ body {
 
 .page-lede {
     margin: 8px 0 0;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--xenon-muted);
 }
 
@@ -135,13 +127,11 @@ kbd {
     padding: 0 4px;
     font-family: var(--xenon-sans);
     font-size: 12px;
-    font-weight: 600;
-    line-height: 17px;
+    line-height: 18px;
     text-align: center;
     color: var(--xenon-ink-soft);
-    background-color: var(--xenon-key-face);
-    border: 1px solid var(--xenon-key-edge);
-    border-bottom-width: 2px;
+    background-color: var(--xenon-sand);
+    border: 1px solid var(--xenon-hairline);
     border-radius: 4px;
     vertical-align: 1px;
 }
@@ -159,15 +149,14 @@ button.secondary-button {
     justify-content: center;
     gap: 8px;
     height: 32px;
-    padding: 0 16px;
-    font: 600 14px/1 var(--xenon-sans);
+    padding: 0 14px;
+    font: 400 13px/1 var(--xenon-sans);
     color: var(--xenon-ink);
     white-space: nowrap;
     text-decoration: none;
-    background-color: var(--xenon-key-face);
-    border: 1px solid var(--xenon-key-edge);
+    background-color: var(--xenon-card);
+    border: 1px solid var(--xenon-hairline);
     border-radius: 8px;
-    box-shadow: 0 2px 0 var(--xenon-key-lip);
     cursor: pointer;
 }
 
@@ -179,14 +168,13 @@ button.secondary-button {
 
 .key:hover:not(:disabled),
 button.secondary-button:hover:not(:disabled) {
-    background-color: var(--xenon-sand);
+    background-color: var(--xenon-row-hover);
 }
 
 .key[aria-pressed="true"],
 .key:has(input:checked) {
-    background-color: var(--xenon-key-down);
-    box-shadow: inset 0 1px 2px rgba(26, 21, 23, 0.14);
-    transform: translateY(2px);
+    background-color: var(--xenon-row-selected);
+    border-color: color-mix(in srgb, var(--xenon-ink) 35%, transparent);
 }
 
 .key input {
@@ -213,18 +201,15 @@ button.secondary-button:disabled {
 
 .key.big,
 button.primary-button.big {
-    height: 40px;
-    padding: 0 20px;
-    font-size: 15px;
-    border-radius: 10px;
-    box-shadow: 0 3px 0 var(--xenon-key-lip);
+    height: 36px;
+    padding: 0 18px;
+    font-size: 14px;
 }
 
 button.primary-button {
     color: #fff;
     background-color: var(--xenon-rose-hover);
-    border-color: var(--xenon-rose-pressed);
-    box-shadow: 0 3px 0 var(--xenon-rose-pressed);
+    border-color: var(--xenon-rose-hover);
 }
 
 button.primary-button:hover:not(:disabled) {
@@ -235,7 +220,6 @@ button.primary-button:disabled {
     cursor: default;
     background-color: var(--xenon-rose-light);
     border-color: var(--xenon-rose-light);
-    box-shadow: none;
 }
 
 .text-key {
@@ -307,7 +291,7 @@ button.primary-button:disabled {
     margin: 24px 0 8px 2px;
     font-size: 13px;
     font-weight: 600;
-    color: var(--xenon-ink-soft);
+    color: var(--xenon-muted);
 }
 
 .presets {
@@ -322,17 +306,14 @@ button.primary-button:disabled {
     flex-direction: column;
     align-items: stretch;
     gap: 2px;
-    min-height: 104px;
-    padding: 16px 16px 12px;
+    min-height: 88px;
+    padding: 14px 16px 12px;
     font: inherit;
     color: var(--xenon-ink);
     text-align: left;
-    background-color: var(--xenon-key-face);
-    border: 1px solid var(--xenon-key-edge);
+    background-color: var(--xenon-card);
+    border: 1px solid var(--xenon-hairline);
     border-radius: 12px;
-    box-shadow:
-        0 4px 0 var(--xenon-key-lip),
-        0 6px 14px rgba(26, 21, 23, 0.05);
 }
 
 button.preset {
@@ -340,12 +321,7 @@ button.preset {
 }
 
 button.preset:hover {
-    background-color: var(--xenon-sand);
-}
-
-button.preset[aria-expanded="true"] {
-    transform: translateY(3px);
-    box-shadow: 0 1px 0 var(--xenon-key-lip);
+    background-color: var(--xenon-row-hover);
 }
 
 .preset:focus-visible {
@@ -357,7 +333,7 @@ button.preset[aria-expanded="true"] {
     width: 16px;
     height: 16px;
     margin-bottom: auto;
-    color: var(--xenon-ink-soft);
+    color: var(--xenon-muted);
 }
 
 .preset .lamp {
@@ -376,7 +352,7 @@ button.preset[aria-expanded="true"] {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
 }
 
@@ -391,23 +367,20 @@ button.preset[aria-expanded="true"] {
     position: relative;
     display: flex;
     flex-direction: column;
-    padding: 12px 12px 16px;
-    background-color: var(--xenon-key-face);
-    border: 1px solid var(--xenon-key-edge);
+    padding: 8px 8px 12px;
+    background-color: var(--xenon-card);
+    border: 1px solid var(--xenon-hairline);
     border-radius: 12px;
-    box-shadow:
-        0 5px 0 var(--xenon-key-lip),
-        0 8px 16px rgba(26, 21, 23, 0.06);
     cursor: pointer;
 }
 
+.choice:hover {
+    background-color: var(--xenon-row-hover);
+}
+
 .choice:has(.choice-input:checked) {
-    background-color: var(--xenon-key-down);
-    border-color: var(--xenon-ink-soft);
-    transform: translateY(3px);
-    box-shadow:
-        0 2px 0 var(--xenon-key-lip),
-        inset 0 1px 2px rgba(26, 21, 23, 0.14);
+    border-color: color-mix(in srgb, var(--xenon-ink) 45%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--xenon-ink) 45%, transparent);
 }
 
 .choice:has(.choice-input:focus-visible) {
@@ -429,10 +402,10 @@ button.preset[aria-expanded="true"] {
 
 .choice-picture {
     display: block;
-    padding: 16px 16px 0;
+    padding: 12px 12px 0;
     overflow: hidden;
-    background-color: var(--xenon-stone);
-    border-radius: 7px;
+    background-color: var(--xenon-sand);
+    border-radius: 8px;
 }
 
 .choice-picture svg {
@@ -445,14 +418,14 @@ button.preset[aria-expanded="true"] {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 16px 4px 0;
-    font-size: 16px;
+    margin: 12px 4px 0;
+    font-size: 14px;
     font-weight: 600;
 }
 
 .choice-note {
-    margin: 4px 4px 0;
-    font-size: 14px;
+    margin: 2px 4px 0;
+    font-size: 13px;
     color: var(--xenon-muted);
 }
 
@@ -590,13 +563,5 @@ button.preset[aria-expanded="true"] {
 
     .pick:nth-child(odd) {
         border-right: none;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .key,
-    .preset,
-    .choice {
-        transition: none;
     }
 }

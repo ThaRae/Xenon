@@ -17,26 +17,6 @@ SPDX-License-Identifier: BSD-2-Clause
         <script type="module" src="resource://ladybird/about-pages/welcome.js"></script>
     </head>
     <body data-step="hello">
-        <header class="topbar">
-            <span class="wordmark">
-                <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
-                    <path
-                        class="orbit"
-                        stroke-width="10"
-                        d="M43.01 61.99A33 13.5 45 0 1 42.30 27.68M56.99 38.01A33 13.5 45 0 1 57.70 72.32"
-                    />
-                    <path
-                        class="orbit orbit-rose"
-                        stroke-width="10"
-                        d="M61.99 56.99A33 13.5 -45 0 1 27.68 57.70M38.01 43.01A33 13.5 -45 0 1 72.32 42.30"
-                    />
-                    <circle class="nucleus" cx="50" cy="50" r="6.5" />
-                </svg>
-                Setting up Xenon
-            </span>
-            <span class="come-back">You can come back to this any time at <code>about:welcome</code></span>
-        </header>
-
         <ol id="rail" class="rail" aria-label="Setup steps">
             <li data-for="layout"><span class="bar"></span><span class="rail-step">1 Layout</span></li>
             <li data-for="search"><span class="bar"></span><span class="rail-step">2 Search</span></li>
@@ -63,7 +43,6 @@ SPDX-License-Identifier: BSD-2-Clause
                 <h1 id="hello-title" class="page-title" tabindex="-1">Welcome to Xenon</h1>
                 <p class="page-lede">Most people keep these settings. Keep them, or go through them one by one.</p>
 
-                <h2 class="box-title">To start with</h2>
                 <div class="presets defaults">
                     <div>
                         <button type="button" class="preset" data-go="layout" disabled>
@@ -80,7 +59,6 @@ SPDX-License-Identifier: BSD-2-Clause
                             <span class="preset-name">Layout</span>
                             <span class="preset-value" data-summary="layout">Classic</span>
                         </button>
-                        <span class="preset-hint" data-summary="layout-note">Tabs above the toolbar</span>
                     </div>
                     <div>
                         <button type="button" class="preset" data-go="search" disabled>
@@ -98,9 +76,6 @@ SPDX-License-Identifier: BSD-2-Clause
                             <span class="preset-name">Search</span>
                             <span class="preset-value" data-summary="engine">DuckDuckGo</span>
                         </button>
-                        <span class="preset-hint" data-summary="engine-note"
-                            >It doesn't keep a profile of what you search</span
-                        >
                     </div>
                     <div>
                         <button type="button" class="preset" data-go="blocking" disabled>
@@ -118,7 +93,6 @@ SPDX-License-Identifier: BSD-2-Clause
                             <span class="preset-name">Ads and trackers</span>
                             <span class="preset-value" data-summary="blocking">Blocked</span>
                         </button>
-                        <span class="preset-hint">With uBlock Origin's lists, on this computer</span>
                     </div>
                     <div>
                         <button type="button" class="preset" data-go="passwords" disabled>
@@ -136,7 +110,6 @@ SPDX-License-Identifier: BSD-2-Clause
                             <span class="preset-name">Password manager</span>
                             <span class="preset-value" data-summary="password-manager">None for now</span>
                         </button>
-                        <span class="preset-hint" data-summary="password-manager-note">Pick one whenever you like</span>
                     </div>
                 </div>
 
@@ -158,9 +131,7 @@ SPDX-License-Identifier: BSD-2-Clause
                     </button>
                 </div>
                 <p class="save-status" role="status" data-status></p>
-                <p class="aside">
-                    Settings has all of these later. You can come back to this any time at <code>about:welcome</code>.
-                </p>
+                <p class="aside">You can come back to this any time at <code>about:welcome</code>.</p>
             </section>
 
             <section class="step" data-step="layout" aria-labelledby="layout-title" hidden>
@@ -209,7 +180,6 @@ SPDX-License-Identifier: BSD-2-Clause
                         </span>
                         <span class="choice-name">Classic <span class="lamp"></span></span>
                         <span class="choice-note">Tabs above the toolbar</span>
-                        <span class="choice-extra">The way most browsers look. It's the default.</span>
                     </label>
 
                     <label class="choice">
@@ -247,7 +217,6 @@ SPDX-License-Identifier: BSD-2-Clause
                         </span>
                         <span class="choice-name">Compact <span class="lamp"></span></span>
                         <span class="choice-note">Tabs and toolbar in one row</span>
-                        <span class="choice-extra">One row less, so the page gets more room.</span>
                     </label>
 
                     <div class="choice">
@@ -324,7 +293,6 @@ SPDX-License-Identifier: BSD-2-Clause
                         </svg>
                         Back
                     </button>
-                    <span class="foot-note">Nothing is saved until you finish.</span>
                     <button type="button" class="primary-button big" data-go="search">Continue</button>
                 </div>
             </section>
@@ -377,7 +345,6 @@ SPDX-License-Identifier: BSD-2-Clause
                         </svg>
                         Back
                     </button>
-                    <span class="foot-note">Nothing is saved until you finish.</span>
                     <button type="button" class="primary-button big" data-go="blocking">Continue</button>
                 </div>
             </section>
@@ -423,7 +390,6 @@ SPDX-License-Identifier: BSD-2-Clause
                             ><span class="lamp"></span
                         ></span>
                         <span class="choice-note">Pages load without them. The shield counts what it caught.</span>
-                        <span class="covers">Ads · Trackers · Malware and scam sites · Cookie banners</span>
                     </label>
 
                     <label class="choice">
@@ -478,7 +444,6 @@ SPDX-License-Identifier: BSD-2-Clause
                         </span>
                         <span class="choice-name"><span>Show everything</span><span class="lamp"></span></span>
                         <span class="choice-note">Pages load the way they're sent, ads and all</span>
-                        <span class="covers">You can turn blocking on later in Settings.</span>
                     </label>
                 </div>
 
@@ -492,21 +457,6 @@ SPDX-License-Identifier: BSD-2-Clause
                             >
                         </span>
                     </label>
-                    <p class="local">
-                        <svg
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.5"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
-                        >
-                            <rect x="2" y="3" width="12" height="8.5" rx="1.5" />
-                            <path d="M5.5 14h5M8 11.5V14" />
-                        </svg>
-                        The lists run on this computer. Nothing you visit is sent anywhere.
-                    </p>
                 </div>
 
                 <div class="foot">
@@ -524,7 +474,6 @@ SPDX-License-Identifier: BSD-2-Clause
                         </svg>
                         Back
                     </button>
-                    <span class="foot-note">Nothing is saved until you finish.</span>
                     <button type="button" class="primary-button big" data-go="passwords">Continue</button>
                 </div>
             </section>
@@ -558,7 +507,6 @@ SPDX-License-Identifier: BSD-2-Clause
                         </svg>
                         Back
                     </button>
-                    <span class="foot-note">Nothing is saved until you finish.</span>
                     <button type="button" class="primary-button big" data-go="done">Continue</button>
                 </div>
             </section>
@@ -631,30 +579,6 @@ SPDX-License-Identifier: BSD-2-Clause
                     </div>
                 </div>
 
-                <h2 class="box-title">Three keys worth knowing</h2>
-                <div class="box tips">
-                    <div class="tip-cell">
-                        <div class="caps"><kbd>Ctrl</kbd> <kbd>Tab</kbd></div>
-                        <div class="tip-title">Back through recent tabs</div>
-                        <div class="tip-note">In the order you last used them. Add Shift to go the other way.</div>
-                    </div>
-                    <div class="tip-cell">
-                        <div class="caps">
-                            <kbd data-mac="⌘" data-other="Ctrl">⌘</kbd> <kbd data-mac="⌥" data-other="Alt">⌥</kbd>
-                            <kbd>N</kbd>
-                        </div>
-                        <div class="tip-title">Split view</div>
-                        <div class="tip-note">Opens a new tab beside this one, in the same window.</div>
-                    </div>
-                    <div class="tip-cell">
-                        <div class="caps"><kbd>!w ladybird</kbd></div>
-                        <div class="tip-title">!bangs</div>
-                        <div class="tip-note">
-                            Searches Wikipedia instead. There are over 10,000, like <kbd>!gh</kbd> for GitHub.
-                        </div>
-                    </div>
-                </div>
-
                 <p class="save-status" role="status" data-status></p>
                 <div class="foot">
                     <button type="button" class="key big" data-go="passwords">
@@ -671,7 +595,6 @@ SPDX-License-Identifier: BSD-2-Clause
                         </svg>
                         Back
                     </button>
-                    <span class="foot-note">Pressing Start browsing saves these.</span>
                     <button type="submit" id="start-browsing" class="primary-button big">Start browsing</button>
                 </div>
             </section>

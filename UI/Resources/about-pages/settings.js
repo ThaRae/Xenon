@@ -98,7 +98,6 @@ function applyFind() {
 
     noMatches.hidden = anyMatch;
     noMatches.querySelector("span").textContent = findSetting.value.trim();
-    document.querySelector("#easy-setup").hidden = query.length !== 0;
     updateCurrentSection();
 }
 
@@ -603,163 +602,6 @@ function choosePasswordManager(id) {
     ladybird.sendMessage("setPasswordManager", id || null);
 }
 
-const easySetup = document.querySelector("#easy-setup");
-const enableContentBlocking = document.querySelector("#enable-content-blocking");
-const enableForceDark = document.querySelector("#enable-force-dark");
-const showBookmarksBar = document.querySelector("#show-bookmarks-bar");
-
-function setChecked(checkbox, checked) {
-    if (checkbox.checked !== checked) checkbox.click();
-}
-
-function setSelected(select, value) {
-    if (select.value === value) return;
-    select.value = value;
-    select.dispatchEvent(new Event("change"));
-}
-
-function chooseRadio(radio) {
-    if (radio && !radio.checked) radio.click();
-}
-
-function optionsOf(select) {
-    return [...select.options].map(option => ({ value: option.value, label: option.textContent }));
-}
-
-const PRESETS = {
-    layout: {
-        value: () => document.querySelector('input[name="layout"]:checked')?.value ?? "",
-        options: () => [
-            { value: "classic", label: "Classic" },
-            { value: "compact", label: "Compact" },
-            { value: "vertical", label: "Vertical" },
-        ],
-        choose: value => chooseRadio(document.querySelector(`input[name="layout"][value="${value}"]`)),
-    },
-    blocking: {
-        value: () => (enableContentBlocking.checked ? "on" : "off"),
-        options: () => [
-            { value: "on", label: "Blocked" },
-            { value: "off", label: "Shown" },
-        ],
-        choose: value => setChecked(enableContentBlocking, value === "on"),
-        isOn: value => value === "on",
-    },
-    search: {
-        value: () => document.querySelector('#search-engine input[name="search-engine"]:checked')?.value ?? "",
-        options: () =>
-            [...document.querySelectorAll('#search-engine input[name="search-engine"]')].map(radio => ({
-                value: radio.value,
-                label: radio.value || "None",
-            })),
-        choose: value =>
-            chooseRadio(
-                [...document.querySelectorAll('#search-engine input[name="search-engine"]')].find(
-                    radio => radio.value === value
-                )
-            ),
-    },
-    hibernation: {
-        value: () => (hibernationEnabled.checked ? hibernationTimeout.value : "off"),
-        options: () => [{ value: "off", label: "Off" }, ...optionsOf(hibernationTimeout)],
-        choose: value => {
-            setChecked(hibernationEnabled, value !== "off");
-            if (value !== "off") setSelected(hibernationTimeout, value);
-        },
-        isOn: value => value !== "off",
-    },
-    "dark-pages": {
-        value: () => (enableForceDark.checked ? "on" : "off"),
-        options: () => [
-            { value: "on", label: "On" },
-            { value: "off", label: "Off" },
-        ],
-        choose: value => setChecked(enableForceDark, value === "on"),
-        isOn: value => value === "on",
-    },
-    "bookmarks-bar": {
-        value: () => showBookmarksBar.value,
-        options: () =>
-            optionsOf(showBookmarksBar).map(option =>
-                option.value === "onHover" ? { ...option, label: "On hover" } : option
-            ),
-        choose: value => setSelected(showBookmarksBar, value),
-        isOn: value => value !== "never",
-    },
-};
-
-function presetLabel(preset) {
-    const value = preset.value();
-    return preset.options().find(option => option.value === value)?.label ?? "";
-}
-
-function renderEasySetup() {
-    for (const slot of easySetup.querySelectorAll("[data-preset]")) {
-        const preset = PRESETS[slot.dataset.preset];
-        slot.querySelector("[data-value]").textContent = presetLabel(preset) || "…";
-        slot.querySelector(".lamp")?.classList.toggle("on", Boolean(preset.isOn?.(preset.value())));
-    }
-}
-
-function closePresetMenus(except) {
-    for (const slot of easySetup.querySelectorAll("[data-preset]")) {
-        if (slot === except) continue;
-        slot.querySelector(".preset-menu").hidden = true;
-        slot.querySelector(".preset").setAttribute("aria-expanded", "false");
-    }
-}
-
-function openPresetMenu(slot) {
-    const preset = PRESETS[slot.dataset.preset];
-    const menu = slot.querySelector(".preset-menu");
-    const current = preset.value();
-
-    menu.replaceChildren(
-        ...preset.options().map(option => {
-            const item = document.createElement("button");
-            item.type = "button";
-            item.setAttribute("role", "menuitemradio");
-            item.setAttribute("aria-checked", String(option.value === current));
-            item.textContent = option.label;
-            item.addEventListener("click", () => {
-                closePresetMenus();
-                preset.choose(option.value);
-                renderEasySetup();
-                slot.querySelector(".preset").focus();
-            });
-            return item;
-        })
-    );
-
-    closePresetMenus(slot);
-    menu.hidden = false;
-    slot.querySelector(".preset").setAttribute("aria-expanded", "true");
-    (menu.querySelector('[aria-checked="true"]') ?? menu.firstElementChild)?.focus();
-}
-
-for (const slot of easySetup.querySelectorAll("[data-preset]")) {
-    slot.querySelector(".preset").addEventListener("click", () => {
-        if (slot.querySelector(".preset-menu").hidden) openPresetMenu(slot);
-        else closePresetMenus();
-    });
-}
-
-document.addEventListener("click", event => {
-    if (!event.target.closest("#easy-setup [data-preset]")) closePresetMenus();
-});
-easySetup.addEventListener("keydown", event => {
-    if (event.key !== "Escape") return;
-    const slot = event.target.closest("[data-preset]");
-    closePresetMenus();
-    slot?.querySelector(".preset").focus();
-});
-
-document.addEventListener("change", () => setTimeout(renderEasySetup));
-new MutationObserver(renderEasySetup).observe(document.querySelector("#search-engine"), {
-    childList: true,
-    subtree: true,
-});
-
 function render() {
     renderLayout();
     renderTabs();
@@ -772,7 +614,6 @@ function render() {
     renderDefaultBrowser();
     renderProfile();
     renderNewTabPage();
-    renderEasySetup();
     if (findSetting.value) applyFind();
 }
 
@@ -811,8 +652,6 @@ document.addEventListener("WebUIMessage", event => {
         }
         if (XENON) renderFilterLists();
     }
-
-    setTimeout(renderEasySetup);
 });
 
 for (const dialog of document.querySelectorAll("dialog")) {
