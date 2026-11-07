@@ -427,6 +427,18 @@ impl Browser {
         }
     }
 
+    fn window_point_in_page(&self, view: ViewId, (x, y): (f32, f32)) -> (f32, f32) {
+        let (left, top) = self.split.page_origin;
+        let (pane_left, pane_top) = crate::split_view::shown_layout(self)
+            .filter(|(split, _)| split.contains(view))
+            .map(|(split, layout)| {
+                let pane = layout.pane(split.side(view));
+                (pane.x, pane.y)
+            })
+            .unwrap_or_default();
+        (left + pane_left + x, top + pane_top + y)
+    }
+
     pub fn bookmark_context_menu_requested(
         &mut self,
         view: ViewId,
@@ -441,8 +453,7 @@ impl Browser {
             return;
         }
         let anchor = if at_page_position {
-            let (left, top) = self.page.origin();
-            (left + x, top + y)
+            self.window_point_in_page(view, (x, y))
         } else {
             (x, y)
         };
