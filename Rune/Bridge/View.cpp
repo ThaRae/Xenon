@@ -16,6 +16,7 @@
 #include <LibWebView/Utilities.h>
 #include <Rune/Bridge/Accessibility.h>
 #include <Rune/Bridge/Application.h>
+#include <Rune/Bridge/ElementPicker.h>
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/ExtensionsHost.h>
 #include <Rune/Bridge/Input.h>
@@ -184,9 +185,8 @@ void View::install_callbacks()
         report_content_blocking(snapshot);
     };
 
-    // FIXME: Let the user edit the filter before it's added, as the Qt frontend's ElementPicker does.
-    on_element_picker_filter = [](String const& filter) {
-        WebView::Application::settings().add_custom_content_blocker_filter(filter);
+    on_element_picker_filter = [this](String const& filter) {
+        ElementPicker::confirm_filter(m_id, filter);
     };
 
     on_tab_indicator_change = [this](WebView::TabIndicator, bool) {
@@ -449,8 +449,36 @@ int View::click_count_for_press(XenonMouseEvent const& event)
     return click_count;
 }
 
+static void route_to_node_picker(View& view, XenonMouseEvent const& event)
+{
+    Web::DevicePixelPoint position { static_cast<int>(AK::round(event.x)), static_cast<int>(AK::round(event.y)) };
+    switch (event.type) {
+    case XENON_MOUSE_EVENT_MOVE:
+        view.node_picker_hover(position);
+        break;
+    case XENON_MOUSE_EVENT_DOWN:
+        if (event.button != XENON_MOUSE_BUTTON_PRIMARY)
+            break;
+        if ((event.modifiers & XENON_MODIFIER_CTRL) != 0)
+            view.node_picker_preview(position);
+        else
+            view.node_picker_pick(position);
+        break;
+    case XENON_MOUSE_EVENT_LEAVE:
+        view.clear_node_picker();
+        break;
+    default:
+        break;
+    }
+}
+
 void View::handle_mouse_event(XenonMouseEvent const& event)
 {
+    if (is_node_picker_active()) {
+        route_to_node_picker(*this, event);
+        return;
+    }
+
     Web::MouseEvent::Type type;
     switch (event.type) {
     case XENON_MOUSE_EVENT_DOWN:
@@ -512,6 +540,11 @@ void View::handle_mouse_event(XenonMouseEvent const& event)
 
 void View::handle_key_event(Web::KeyEvent event)
 {
+    if (is_node_picker_active()) {
+        if (event.type == Web::KeyEvent::Type::KeyDown && event.key == Web::UIEvents::KeyCode::Key_Escape)
+            node_picker_cancel();
+        return;
+    }
     enqueue_input_event(move(event));
 }
 
