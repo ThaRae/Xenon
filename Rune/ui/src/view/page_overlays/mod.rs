@@ -10,6 +10,7 @@ mod dialog;
 mod find_bar;
 pub(crate) mod menu;
 mod pickers;
+mod screenshot;
 
 use rune::El;
 
@@ -41,6 +42,13 @@ pub fn page_overlays(s: &Browser, view: ViewId, p: &Palette) -> Vec<El> {
         && dialog_view == view
     {
         overlays.push(dialog::dialog_sheet(view, dialog, p));
+    }
+    if let Some(selection) = s
+        .screenshot
+        .as_ref()
+        .filter(|selection| selection.view == view)
+    {
+        overlays.push(screenshot::selection_overlay(selection, p));
     }
     if let Some(shown) = s
         .page_prompts

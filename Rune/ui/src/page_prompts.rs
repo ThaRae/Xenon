@@ -238,6 +238,10 @@ impl PagePrompts {
         self.views.get(&view)
     }
 
+    pub(crate) fn now(&self) -> f64 {
+        self.now
+    }
+
     pub(crate) fn views_mut(&mut self) -> &mut HashMap<ViewId, ViewPrompts> {
         &mut self.views
     }
@@ -904,7 +908,7 @@ pub fn key(s: &mut Browser, event: &KeyEvent, tx: &mut Tx, context: KeyContext) 
     if context == KeyContext::Location {
         return false;
     }
-    if crate::pickers::key(s, event, tx) {
+    if crate::screenshots::key(s, event) || crate::pickers::key(s, event, tx) {
         return true;
     }
     if let Some(view) = active_view(s)
