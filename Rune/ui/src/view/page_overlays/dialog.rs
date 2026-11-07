@@ -76,6 +76,7 @@ pub fn dialog_sheet(view: ViewId, dialog: &Dialog, p: &Palette) -> El {
 
     col()
         .key("page-dialog-scrim")
+        .role("none")
         .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .center()
         .padding(24.0)
