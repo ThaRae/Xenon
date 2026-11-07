@@ -289,10 +289,6 @@ impl Engine {
         unsafe { ffi::xenon_engine_activate_window(window) }
     }
 
-    pub fn close_window(self, window: WindowId) {
-        unsafe { ffi::xenon_engine_close_window(window) }
-    }
-
     pub fn new_tab(
         self,
         window: Option<WindowId>,

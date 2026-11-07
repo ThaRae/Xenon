@@ -659,3 +659,32 @@ TEST_CASE(every_new_or_restored_window_reports_that_it_opened_for_group_cleanup)
     fixture.model.restore_window(restored);
     EXPECT_EQ(windows_opened, 2u);
 }
+
+TEST_CASE(a_window_comes_back_with_the_geometry_it_was_saved_with)
+{
+    Fixture fixture;
+    WebView::SessionWindowGeometry geometry { .x = 40, .y = 60, .width = 900, .height = 700, .maximized = true };
+    WebView::RestoredSessionWindow restored {
+        .window_id = 7,
+        .tabs = { { .tab_id = 1, .url = URL::Parser::basic_parse("https://restored.example/"sv).value(), .pinned = false } },
+        .active_tab_index = 0,
+        .geometry = geometry,
+    };
+    auto window = fixture.model.restore_window(restored);
+    EXPECT(fixture.model.window(window)->geometry == geometry);
+
+    auto keep = fixture.model.open_window(WebView::IsPrivate::No);
+    fixture.open(keep);
+    EXPECT(!fixture.model.window(keep)->geometry.has_value());
+
+    auto closing = fixture.model.open_window(WebView::IsPrivate::No);
+    fixture.open(closing, "https://closing.example/"sv);
+    WebView::SessionWindowGeometry closing_geometry { .x = 10, .y = 20, .width = 800, .height = 600, .maximized = false };
+    fixture.store->window_geometry_changed(*fixture.model.window(closing)->session_window_id, closing_geometry);
+    fixture.model.close_window(closing);
+
+    EXPECT(fixture.model.reopen_closed_tab(keep));
+    auto reopened = fixture.model.active_window().value();
+    EXPECT_NE(reopened, keep);
+    EXPECT(fixture.model.window(reopened)->geometry == closing_geometry);
+}

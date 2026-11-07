@@ -18,10 +18,14 @@
 #include <LibWebView/PlatformColors.h>
 #include <Rune/Bridge/Application.h>
 #include <Rune/Bridge/Engine.h>
+#include <Rune/Bridge/ExtensionsHost.h>
 #include <Rune/Bridge/TabGroupHooks.h>
 #include <Rune/Bridge/TabHibernation.h>
 #include <Rune/Bridge/TabMemory.h>
+#include <Rune/Bridge/PlatformServices.h>
 #include <Rune/Bridge/View.h>
+#include <Rune/Bridge/WindowLifecycle.h>
+#include <UI/Updater.h>
 #include <UI/FilterLists.h>
 #include <UI/MemoryPressureRelease.h>
 #include <pthread.h>
@@ -171,6 +175,8 @@ int Engine::run_application()
         return 1;
     }
     auto application = application_or_error.release_value();
+    if (auto spell_checker = create_platform_spell_checker())
+        application->set_spell_checker(move(spell_checker));
     if (application->should_exit_after_profile_coordination())
         return 0;
 
@@ -198,10 +204,12 @@ int Engine::run_application()
 
     stop_accepting_commands();
     m_tab_hibernation = nullptr;
+    ExtensionsHost::stop();
     m_settings_observer = nullptr;
     m_downloads_observer = nullptr;
     m_focused_view.clear();
     m_views.clear();
+    m_split_view_host = nullptr;
     m_model = nullptr;
     m_private_session = nullptr;
     m_session_save_timer = nullptr;
@@ -215,7 +223,7 @@ int Engine::run_application()
 
 WebView::SessionLaunchPolicy Engine::launch_restore_policy()
 {
-    if (WebView::Application::settings().restore_previous_session())
+    if (WebView::Application::settings().restore_previous_session() || Ladybird::Updater::relaunched_to_update())
         return WebView::SessionLaunchPolicy::Everything;
     return WebView::SessionLaunchPolicy::PinnedOnly;
 }
@@ -228,6 +236,7 @@ void Engine::create_model()
     };
     m_model = make<BrowserModel>(*this, move(allocators), [this](WebView::IsPrivate is_private) { return session_store_for(is_private); });
     install_tab_group_hooks(*m_model);
+    m_split_view_host = make<SplitViewHost>(*m_model);
     m_session_save_timer = Core::Timer::create_single_shot(session_save_delay, [] {
         if (auto* store = WebView::Application::session_store(WebView::IsPrivate::No))
             store->flush_dirty_state();
@@ -345,9 +354,30 @@ void Engine::set_window_viewport(XenonWindowId window, Web::DevicePixelSize size
         m_window_viewports.set(window, viewport);
 }
 
+void Engine::set_window_surface(XenonWindowId window, void* display, void* surface)
+{
+    if (window == XENON_WINDOW_NONE)
+        return;
+    auto native = display && surface;
+    if (native)
+        m_native_surface_windows.set(window);
+    else
+        m_native_surface_windows.remove(window);
+    if (!m_model)
+        return;
+    if (auto const* model_window = m_model->window(window)) {
+        for (auto view_id : model_window->tabs) {
+            if (auto* tab_view = view(view_id))
+                tab_view->set_uses_native_surface(native);
+        }
+    }
+}
+
 void Engine::record_view_viewport(XenonViewId view, Web::DevicePixelSize size, double device_pixel_ratio)
 {
     if (!m_model)
+        return;
+    if (m_split_view_host && m_split_view_host->contains(view))
         return;
     if (auto const* window = m_model->window_of(view))
         set_window_viewport(window->id, size, device_pixel_ratio);
@@ -401,6 +431,19 @@ View& Engine::open_view_for_new_tab_or_window(XenonViewId opener_id, WebView::Is
     return *opened;
 }
 
+View& Engine::add_detached_view(NonnullOwnPtr<View> view)
+{
+    auto id = view->id();
+    auto& added = *view;
+    m_views.set(id, move(view));
+    return added;
+}
+
+void Engine::close_detached_view(XenonViewId id)
+{
+    close_view(id);
+}
+
 void Engine::close_tab(XenonViewId id)
 {
     Core::deferred_invoke([this, id] {
@@ -419,7 +462,9 @@ View& Engine::create_view_for_tab(BrowserModel::Tab const& tab, Web::HTML::Visib
 
     auto created = View::create(tab.view, viewport.size, viewport.device_pixel_ratio, is_private, visibility_state, traversable);
     auto& view = *created;
+    view.set_uses_native_surface(m_native_surface_windows.contains(tab.window));
     m_views.set(tab.view, move(created));
+    WindowLifecycle::the().install_page_window_requests(view);
     if (tab.session_tab_id.has_value())
         view.set_session_tab_id(*tab.session_tab_id);
     auto was_unloaded = tab.deferred;
@@ -497,7 +542,9 @@ void Engine::notify_tab_inserted(BrowserModel::Window const& window, BrowserMode
 
 void Engine::window_opened(BrowserModel::Window const& window)
 {
+    WindowLifecycle::the().window_opened(window);
     notify(&XenonUiCallbacks::window_opened, window.id, window.is_private == WebView::IsPrivate::Yes);
+    ExtensionsHost::window_opened(window);
 }
 
 void Engine::window_closed(BrowserModel::Window const& window)
@@ -508,7 +555,10 @@ void Engine::window_closed(BrowserModel::Window const& window)
             m_tab_hibernation->tab_removed(view);
     }
     m_window_viewports.remove(window.id);
+    WindowLifecycle::the().window_closed(window);
+    m_shown_tabs.remove(window.id);
     notify(&XenonUiCallbacks::window_closed, window.id);
+    ExtensionsHost::window_closed(window);
 
     if (window.is_private == WebView::IsPrivate::Yes) {
         auto other_private_window_open = false;
@@ -525,6 +575,7 @@ void Engine::window_closed(BrowserModel::Window const& window)
 void Engine::window_activated(BrowserModel::Window const& window)
 {
     notify(&XenonUiCallbacks::window_activated, window.id);
+    ExtensionsHost::window_activated(window);
 }
 
 void Engine::tab_inserted(BrowserModel::Window const& window, BrowserModel::Tab const& tab, size_t index)
@@ -534,6 +585,9 @@ void Engine::tab_inserted(BrowserModel::Window const& window, BrowserModel::Tab 
         create_view_for_tab(tab, Web::HTML::VisibilityState::Hidden);
     else if (m_tab_hibernation)
         m_tab_hibernation->tab_inserted_unloaded(tab.view);
+    ExtensionsHost::tab_inserted(window, tab, index);
+    if (m_split_view_host)
+        m_split_view_host->schedule_validation();
 }
 
 void Engine::tab_removed(BrowserModel::Window const& window, BrowserModel::Tab const& tab)
@@ -542,30 +596,74 @@ void Engine::tab_removed(BrowserModel::Window const& window, BrowserModel::Tab c
     if (m_tab_hibernation)
         m_tab_hibernation->tab_removed(tab.view);
     notify(&XenonUiCallbacks::tab_removed, window.id, tab.view);
+    ExtensionsHost::tab_removed(window, tab);
+    if (m_split_view_host)
+        m_split_view_host->schedule_validation();
 }
 
 void Engine::tab_moved(BrowserModel::Tab const& tab, XenonWindowId from, size_t index)
 {
     notify(&XenonUiCallbacks::tab_moved, tab.view, from, tab.window, static_cast<u32>(index));
+    ExtensionsHost::tab_moved(tab, from, index);
+    if (m_split_view_host)
+        m_split_view_host->schedule_validation();
 }
 
 void Engine::tab_activated(BrowserModel::Window const& window, BrowserModel::Tab const& tab, Optional<XenonViewId> previous)
 {
-    if (previous.has_value()) {
-        if (auto* previous_view = view(*previous))
-            previous_view->set_visible(false);
-    }
     ensure_view_for_tab(tab);
-    if (auto* activated = view(tab.view))
-        activated->set_visible(true);
+    sync_shown_tabs(window.id);
     if (m_tab_hibernation)
         m_tab_hibernation->tab_activated(previous, tab.view);
     notify(&XenonUiCallbacks::tab_activated, window.id, tab.view);
+    ExtensionsHost::tab_activated(window, tab);
+}
+
+void Engine::sync_shown_tabs(XenonWindowId window_id)
+{
+    auto const* window = m_model ? m_model->window(window_id) : nullptr;
+    if (!window)
+        return;
+
+    Vector<XenonViewId> shown;
+    if (window->active_tab.has_value()) {
+        shown.append(*window->active_tab);
+        if (auto partner = m_split_view_host ? m_split_view_host->partner(*window->active_tab) : Optional<XenonViewId> {}; partner.has_value() && m_model->window_of(*partner) == window)
+            shown.append(*partner);
+    }
+
+    auto is_shown_in_another_window = [&](XenonViewId id) {
+        auto const* owner = m_model->window_of(id);
+        if (!owner || owner == window)
+            return false;
+        auto owner_shown = m_shown_tabs.get(owner->id);
+        return owner_shown.has_value() && owner_shown->contains_slow(id);
+    };
+
+    if (auto previous = m_shown_tabs.get(window_id); previous.has_value()) {
+        for (auto id : *previous) {
+            if (shown.contains_slow(id) || is_shown_in_another_window(id))
+                continue;
+            if (auto* hidden = view(id))
+                hidden->set_visible(false);
+        }
+    }
+    auto exposed = WindowLifecycle::the().is_exposed(window_id);
+    for (auto id : shown) {
+        if (auto const* tab = m_model->tab(id))
+            ensure_view_for_tab(*tab);
+        if (auto* shown_view = view(id))
+            shown_view->set_visible(exposed);
+    }
+    m_shown_tabs.set(window_id, move(shown));
 }
 
 void Engine::tab_pinned_changed(BrowserModel::Tab const& tab)
 {
     notify(&XenonUiCallbacks::tab_pinned_changed, tab.view, tab.pinned);
+    ExtensionsHost::tab_pinned_changed(tab);
+    if (m_split_view_host)
+        m_split_view_host->schedule_validation();
 }
 
 void Engine::closed_tabs_changed(bool can_reopen)

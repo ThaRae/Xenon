@@ -30,10 +30,7 @@ pub fn show_window_menu(s: &mut Browser, at: PointerPress, tx: &mut Tx) {
                 .enabled(s.windows.can_reopen_closed_tab),
         )
         .separator()
-        .item(
-            PopupItem::new("always-on-top", "Always on Top")
-                .checked(crate::platform::is_always_on_top()),
-        )
+        .item(PopupItem::new("always-on-top", "Always on Top").checked(s.is_always_on_top()))
         .separator()
         .submenu("Layout", layouts)
         .item(
@@ -52,7 +49,7 @@ fn run_window_menu_item(s: &mut Browser, picked: &str, tx: &mut Tx) {
         "new-tab" => s.new_tab(tx),
         "reopen-closed-tab" => s.reopen_closed_tab(),
         "cycle-recently-used" => s.toggle_cycle_tabs_in_recently_used_order(),
-        "always-on-top" => crate::platform::set_always_on_top(!crate::platform::is_always_on_top()),
+        "always-on-top" => s.toggle_always_on_top(),
         _ => {
             if let Some((layout, _, _)) = LAYOUTS.iter().find(|(_, id, _)| *id == picked) {
                 s.set_chrome_layout(*layout);

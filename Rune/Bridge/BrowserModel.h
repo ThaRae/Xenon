@@ -60,6 +60,7 @@ public:
         Vector<ViewId> tabs;
         Optional<ViewId> active_tab;
         Optional<WebView::SessionWindowId> session_window_id;
+        Optional<WebView::SessionWindowGeometry> geometry;
         RecentOrder recent_order;
         Vector<TabGroup> groups;
 
@@ -197,6 +198,7 @@ private:
     Vector<NonnullOwnPtr<Window>> m_windows;
     HashMap<ViewId, NonnullOwnPtr<Tab>> m_tabs;
     Vector<WindowId> m_activation_order;
+    Optional<WebView::SessionWindowGeometry> m_geometry_for_next_window;
 
     TabGroupHooks m_tab_group_hooks;
     HashMap<WindowId, Vector<TabGroup>> m_reported_tab_groups;

@@ -10,7 +10,12 @@ use crate::chrome_menu;
 use crate::engine::ChromeLayout;
 use crate::page_prompts::chrome_hidden;
 use crate::state::Browser;
+use crate::view::bookmarks::{
+    bookmark_dialog, bookmarks_bar, bookmarks_hover_bar, bookmarks_hover_region,
+};
+use crate::view::crash_offer::crash_report_popover;
 use crate::view::downloads::downloads_popover;
+use crate::view::element_picker::element_filter_dialog;
 use crate::view::location::location_overlays;
 use crate::view::page::page_area;
 use crate::view::page_overlays::menu::chrome_menu_layers;
@@ -22,6 +27,8 @@ use crate::view::tabs::{
 };
 use crate::view::task_manager::task_manager_overlay;
 use crate::view::toolbar::{toolbar, toolbar_band, toolbar_controls};
+use crate::view::update_button::update_popover;
+use crate::view::window_overlays::{devtools_banner, stop_downloads_dialog};
 
 const COMPACT_TOOLBAR_MIN_WIDTH: f32 = 380.0;
 const COMPACT_TOOLBAR_MAX_WIDTH: f32 = 620.0;
@@ -31,7 +38,7 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
     let scale = cx.env().scale;
     s.observe_scale(scale);
     s.observe_system_dark(cx.system_dark());
-    let palette = Palette::new(cx.system_dark(), scale);
+    let palette = Palette::new(cx.system_dark(), scale).for_window(s.window_focused);
     let titlebar_inset = cx.titlebar_inset();
     let layout = s.chrome.layout;
     let window = col()
@@ -39,21 +46,35 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
         .role("window")
         .w_full()
         .h_full()
-        .fill(palette.chrome)
-        .on_window_focus(|s: &mut Browser, focused, _| s.window_focus_changed(focused));
+        .on_window_focus(|s: &mut Browser, focused, _| s.window_focus_changed(focused))
+        .on_screen_layout(|s: &mut Browser, rect| s.window_rect_changed(rect));
+    let window = if s.native_page_active() {
+        window
+    } else {
+        window.fill(palette.chrome)
+    };
     let window = if chrome_hidden(s) {
         window.child(page_area(s, &palette))
     } else {
         match layout {
             ChromeLayout::Classic => window
                 .child(tab_strip(s, &palette, titlebar_inset))
-                .child(toolbar(s, &palette, cx))
-                .child(page_area(s, &palette)),
+                .child(bookmarks_hover_region(s, toolbar(s, &palette, cx)))
+                .children(bookmarks_bar(s, &palette, cx))
+                .child(page_area(s, &palette).children(bookmarks_hover_bar(s, &palette, cx))),
             ChromeLayout::Compact => window
-                .child(compact_bar(s, &palette, titlebar_inset, cx))
-                .child(page_area(s, &palette)),
+                .child(bookmarks_hover_region(
+                    s,
+                    compact_bar(s, &palette, titlebar_inset, cx),
+                ))
+                .children(bookmarks_bar(s, &palette, cx))
+                .child(page_area(s, &palette).children(bookmarks_hover_bar(s, &palette, cx))),
             ChromeLayout::Vertical => window
-                .child(vertical_toolbar(s, &palette, titlebar_inset, cx))
+                .child(bookmarks_hover_region(
+                    s,
+                    vertical_toolbar(s, &palette, titlebar_inset, cx),
+                ))
+                .children(bookmarks_bar(s, &palette, cx))
                 .child(
                     row()
                         .key("sidebar-and-page")
@@ -74,23 +95,34 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
                                 .h_full()
                                 .grow(1.0)
                                 .min_w(0.0)
-                                .child(page_area(s, &palette)),
+                                .child(
+                                    page_area(s, &palette)
+                                        .children(bookmarks_hover_bar(s, &palette, cx)),
+                                ),
                         ),
                 ),
         }
     };
-    let window = window.children(location_overlays(s, &palette, cx));
+    let window = window
+        .children(devtools_banner(s, &palette))
+        .children(location_overlays(s, &palette, cx))
+        .children(bookmark_dialog(s, &palette))
+        .children(element_filter_dialog(s, &palette));
     if chrome_hidden(s) {
-        return window.children(chrome_menu(s, &palette));
+        return window
+            .children(stop_downloads_dialog(s, &palette))
+            .children(chrome_menu(s, &palette));
     }
     window
         .children(hover_card(s, &palette, layout == ChromeLayout::Vertical))
         .children(downloads_popover(s, &palette))
         .children(shield_popover(s, &palette))
-<<<<<<< HEAD
         .children(group_editor(s, &palette, layout == ChromeLayout::Vertical))
         .children(task_manager_overlay(s, &palette))
-=======
+        .children(update_popover(s, &palette))
+        .children(crash_report_popover(s, &palette))
+        .children(stop_downloads_dialog(s, &palette))
+        .children(crate::view::extensions::extension_overlays(s, &palette))
         .children(chrome_menu(s, &palette))
 }
 
@@ -99,7 +131,6 @@ fn chrome_menu(s: &Browser, p: &Palette) -> Vec<El> {
         .as_ref()
         .map(|menu| chrome_menu_layers(menu, p))
         .unwrap_or_default()
->>>>>>> a450868 (Rune: Draw chrome menus in the window where there are no native ones)
 }
 
 fn compact_bar(s: &Browser, p: &Palette, titlebar_inset: f32, cx: &mut Cx<Browser>) -> El {

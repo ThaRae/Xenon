@@ -15,6 +15,7 @@
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/TaskManager.h>
 #include <Rune/Bridge/View.h>
+#include <Rune/Bridge/WindowLifecycle.h>
 #include <UI/BlockingDashboard.h>
 #include <UI/CertificateErrors.h>
 #include <UI/Extensions/Registry.h>
@@ -96,6 +97,18 @@ void Application::create_platform_actions()
 {
     TaskManager::add_open_action();
     start_xenon_services();
+}
+
+void Application::on_devtools_enabled() const
+{
+    WebView::Application::on_devtools_enabled();
+    WindowLifecycle::the().devtools_changed(true);
+}
+
+void Application::on_devtools_disabled() const
+{
+    WebView::Application::on_devtools_disabled();
+    WindowLifecycle::the().devtools_changed(false);
 }
 
 void Application::start_xenon_services()

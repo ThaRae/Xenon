@@ -22,6 +22,7 @@ use crate::engine::{
 use crate::keys::{Platform, Shortcut, page_key_event, shortcut_for};
 use crate::location::LocationBar;
 use crate::page_prompts::{self, KeyContext, PagePrompts};
+use crate::split_view::SplitViews;
 use crate::tab_list::{Activation, Tab, TabInsertion, TabList, WindowInfo, Windows};
 
 pub const NEW_TAB_URL: &str = "about:newtab";
@@ -109,7 +110,7 @@ pub struct Browser {
     pub location: LocationBar,
     pub engine_ready: bool,
     page_focused: bool,
-    window_focused: bool,
+    pub(crate) window_focused: bool,
     pressed_buttons: u32,
     forwarded_keys: HashSet<String>,
     pub page: PageGeometry,
@@ -127,6 +128,27 @@ pub struct Browser {
     pub hibernation: crate::hibernation::TabHibernation,
     pub task_manager: crate::task_manager::TaskManager,
     pub chrome_menu: Option<DrawnMenu>,
+    pub window: crate::window_state::WindowState,
+    pub extensions: crate::extensions::Extensions,
+    pub split: SplitViews,
+    pub bookmarks: crate::bookmarks::Bookmarks,
+    pub element_filter: Option<crate::element_picker::ElementFilter>,
+    pub picture_in_picture: Vec<crate::picture_in_picture::PictureInPicture>,
+    pub updates: crate::updates::Updates,
+    pub screenshot: Option<crate::screenshots::ScreenshotSelection>,
+    pub crash_report_offer: Option<String>,
+    #[cfg(target_os = "linux")]
+    wayland: Option<crate::wayland_page::WindowPage>,
+    #[cfg(target_os = "linux")]
+    native_views: HashSet<ViewId>,
+    #[cfg(target_os = "linux")]
+    native_handles: (usize, usize),
+    #[cfg(target_os = "linux")]
+    native_blocked_by_split: bool,
+    #[cfg(target_os = "linux")]
+    native_shown_view: Option<ViewId>,
+    #[cfg(target_os = "linux")]
+    native_waiting_for_cpu: bool,
 }
 
 impl Browser {
@@ -158,6 +180,27 @@ impl Browser {
             hibernation: Default::default(),
             task_manager: Default::default(),
             chrome_menu: None,
+            window: crate::window_state::WindowState::default(),
+            extensions: crate::extensions::Extensions::default(),
+            split: SplitViews::default(),
+            bookmarks: crate::bookmarks::Bookmarks::default(),
+            element_filter: None,
+            picture_in_picture: Vec::new(),
+            updates: crate::updates::Updates::default(),
+            screenshot: None,
+            crash_report_offer: None,
+            #[cfg(target_os = "linux")]
+            wayland: None,
+            #[cfg(target_os = "linux")]
+            native_views: HashSet::new(),
+            #[cfg(target_os = "linux")]
+            native_handles: (0, 0),
+            #[cfg(target_os = "linux")]
+            native_blocked_by_split: false,
+            #[cfg(target_os = "linux")]
+            native_shown_view: None,
+            #[cfg(target_os = "linux")]
+            native_waiting_for_cpu: false,
         }
     }
 
@@ -169,10 +212,205 @@ impl Browser {
         self.windows.shown_id()
     }
 
+    pub fn shows_view(&self, view: ViewId) -> bool {
+        self.extensions
+            .popup
+            .as_ref()
+            .is_some_and(|popup| popup.view == view)
+            || self
+                .windows
+                .window_of(view, &self.tabs)
+                .is_some_and(|window| Some(window) == self.shown_window())
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn set_window_surface(&mut self, display: usize, surface: usize) {
+        self.native_handles = (display, surface);
+        self.native_views.clear();
+        self.wayland = if display != 0 && surface != 0 {
+            unsafe {
+                crate::wayland_page::WindowPage::new(
+                    display as *mut std::ffi::c_void,
+                    surface as *mut std::ffi::c_void,
+                )
+            }
+        } else {
+            None
+        };
+        if self.wayland.is_none() {
+            self.native_handles = (0, 0);
+        }
+        if let Some(window) = self.shown_window() {
+            self.engine
+                .set_window_surface(window, self.native_handles.0, self.native_handles.1);
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn set_window_surface(&mut self, _: usize, _: usize) {}
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn enable_native_surface(&self, window: WindowId) {
+        self.engine
+            .set_window_surface(window, self.native_handles.0, self.native_handles.1);
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn dmabuf_frame(&mut self, view: ViewId, frame: crate::wayland_page::DmaBufFrame) -> bool {
+        if self.split_blocks_native() || !self.tabs.is_active(view) || !self.shows_view(view) {
+            return false;
+        }
+        let rect = self.page_rect();
+        let Some(wayland) = self.wayland.as_mut() else {
+            return false;
+        };
+        wayland.set_rect(rect);
+        wayland.present(view, frame);
+        self.native_waiting_for_cpu = false;
+        self.native_views.insert(view)
+    }
+
+    pub fn cpu_frame(&mut self, view: ViewId) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            let was_native = self.native_views.remove(&view);
+            let was_waiting = self.native_waiting_for_cpu;
+            if (was_native || was_waiting)
+                && let Some(wayland) = self.wayland.as_mut()
+            {
+                wayland.hide();
+                self.native_shown_view = None;
+                self.native_waiting_for_cpu = false;
+            }
+            return was_native || was_waiting;
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = view;
+            false
+        }
+    }
+
+    pub fn native_page_active(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            let Some(view) = self.tabs.active_view() else {
+                return false;
+            };
+            return !self.split_blocks_native() && self.native_views.contains(&view);
+        }
+        #[cfg(not(target_os = "linux"))]
+        false
+    }
+
+    #[cfg(target_os = "linux")]
+    fn split_blocks_native(&self) -> bool {
+        self.split.shown(&self.tabs).is_some()
+    }
+
+    #[cfg(target_os = "linux")]
+    fn native_overlay_open(&self) -> bool {
+        let active = self.tabs.active_view();
+        let prompts = active.and_then(|view| self.page_prompts.of(view));
+        let page_prompts = prompts.is_some_and(|prompts| {
+            prompts.dialog.is_some()
+                || prompts.find.is_some()
+                || !prompts.permissions.is_empty()
+                || prompts.tooltip.is_some()
+                || prompts.color_picker.is_some()
+                || prompts.date_picker.is_some()
+                || prompts.web_authn.is_some()
+                || prompts.crash_review.is_some()
+        });
+        let tab_overlay = self
+            .tabs
+            .active()
+            .is_some_and(|tab| !tab.hovered_link.is_empty() || tab.crashed || tab.unresponsive);
+        page_prompts
+            || tab_overlay
+            || self.page_prompts.menu.is_some()
+            || self.screenshot.is_some()
+            || !self.picture_in_picture.is_empty()
+            || self.element_filter.is_some()
+            || self.chrome_menu.is_some()
+            || self.extensions.popup.is_some()
+            || self.extensions.dialog_open
+            || !self.extensions.prompts.is_empty()
+            || self.extensions.confirmation.is_some()
+            || self.extensions.error.is_some()
+            || self.hover_card.is_some()
+            || self.downloads_popover_open
+            || self.shield_popover_open
+            || self.updates.popover_open
+            || self.task_manager.open
+            || self.crash_report_offer.is_some()
+            || self.tab_groups.editor.is_some()
+            || self.window.stop_downloads_prompt.is_some()
+            || self.bookmarks.dialog.is_some()
+            || self.split.tab_drag.is_some()
+            || self.location.edit.focused
+            || self.location.popup_visible
+            || self.location.site_info.is_some()
+            || self.location.menu_request.is_some()
+    }
+
+    #[cfg(target_os = "linux")]
+    fn page_rect(&self) -> (i32, i32, i32, i32) {
+        let (x, y) = self.split.page_origin;
+        let (width, height) = self.page.size.get();
+        (
+            x.round() as i32,
+            y.round() as i32,
+            width.round() as i32,
+            height.round() as i32,
+        )
+    }
+
+    pub fn poll_native(&mut self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            let page_rect = self.page_rect();
+            let window = self.shown_window();
+            let active_view = self.tabs.active_view();
+            let blocked = self.split.shown(&self.tabs).is_some() || self.native_overlay_open();
+            let Some(wayland) = self.wayland.as_mut() else {
+                return false;
+            };
+            wayland.poll();
+            if blocked != self.native_blocked_by_split {
+                self.native_blocked_by_split = blocked;
+                self.native_views.clear();
+                self.native_shown_view = None;
+                let (display, surface) = if blocked {
+                    self.native_waiting_for_cpu = true;
+                    (0, 0)
+                } else {
+                    self.native_waiting_for_cpu = false;
+                    wayland.hide();
+                    self.native_handles
+                };
+                if let Some(window) = window {
+                    self.engine.set_window_surface(window, display, surface);
+                }
+            }
+            let active = active_view.filter(|view| self.native_views.contains(view));
+            if active != self.native_shown_view {
+                self.native_shown_view = active;
+                match active {
+                    Some(view) => {
+                        wayland.set_rect(page_rect);
+                        wayland.show(view);
+                    }
+                    None => wayland.hide(),
+                }
+            }
+        }
+        false
+    }
+
     pub fn new_tab(&mut self, _: &mut Tx) {
         self.engine
             .new_tab(self.shown_window(), "", TabIndex::End, true);
-        self.focus_location();
     }
 
     pub fn new_window(&mut self, private: bool) {
@@ -185,6 +423,18 @@ impl Browser {
 
     fn surface(&self, view: ViewId) -> Pixels {
         self.surfaces.surface(view).unwrap_or_default()
+    }
+
+    pub(crate) fn surface_for(&self, view: ViewId) -> Pixels {
+        self.surface(view)
+    }
+
+    pub(crate) fn close_surface(&self, view: ViewId) {
+        self.surfaces.close(view);
+    }
+
+    pub(crate) fn page_prompts_now(&self) -> f64 {
+        self.page_prompts.now()
     }
 
     pub fn activate_tab(&mut self, view: ViewId, _: &mut Tx) {
@@ -281,7 +531,7 @@ impl Browser {
     pub fn run_ui_command(&mut self, command: u32, tx: &mut Tx) {
         match command {
             crate::ffi::XENON_UI_COMMAND_FIND => page_prompts::open_find(self, tx),
-            crate::ffi::XENON_UI_COMMAND_QUIT => tx.quit(),
+            crate::ffi::XENON_UI_COMMAND_QUIT => self.request_quit(tx),
             crate::ffi::XENON_UI_COMMAND_OPEN_FILE => self.open_file(tx),
             crate::ffi::XENON_UI_COMMAND_TOGGLE_FULLSCREEN => self.toggle_fullscreen(tx),
             _ => {}
@@ -330,7 +580,7 @@ impl Browser {
             download.is_active() && !self.downloads.iter().any(|known| known.id == download.id)
         });
         self.downloads = downloads;
-        if started {
+        if started && (self.window.link.is_none() || self.windows.shown_is_active()) {
             self.downloads_popover_open = true;
         }
         if self.downloads.is_empty() {
@@ -515,9 +765,7 @@ impl Browser {
     }
 
     fn close_shown_window(&mut self) {
-        if let Some(window) = self.shown_window() {
-            self.engine.close_window(window);
-        }
+        self.request_close_shown_window();
     }
 
     fn show_next_window(&mut self) {
@@ -566,11 +814,16 @@ impl Browser {
             id: window,
             private,
         });
-        self.engine
-            .set_window_viewport(Some(window), self.page.viewport());
+        if self.is_bound_to(window) {
+            self.engine
+                .set_window_viewport(Some(window), self.page.viewport());
+        }
     }
 
     pub fn window_closed(&mut self, window: WindowId, tx: &mut Tx) {
+        if self.is_bound_to(window) {
+            crate::task_manager::close(self);
+        }
         let previous = self.tabs.active_view();
         let Some(closed) = self.windows.closed(window, &mut self.tabs) else {
             return;
@@ -594,7 +847,7 @@ impl Browser {
         }
     }
 
-    fn shown_tabs_changed(&mut self, previous: Option<ViewId>, tx: &mut Tx) {
+    pub(crate) fn shown_tabs_changed(&mut self, previous: Option<ViewId>, tx: &mut Tx) {
         let current = self.tabs.active_view();
         if previous == current {
             return;
@@ -703,9 +956,9 @@ impl Browser {
             self.release_forwarded_keys_of(previous);
             self.engine.set_focused(previous, false);
         }
-        self.sync_viewport_of(current);
+        self.sync_active_viewport();
         self.engine.set_focused(current, self.page_has_keyboard());
-        self.reset_location();
+        self.switch_location(tx);
         self.refresh_title(tx);
     }
 
@@ -739,12 +992,14 @@ impl Browser {
         let Some(tab) = self.tabs.get_mut(view) else {
             return;
         };
-        tab.url = url;
+        tab.url = url.clone();
         if self.tabs.is_active(view) {
             if !self.location.edit.focused {
                 self.reset_location();
             }
             self.refresh_title(tx);
+        } else {
+            self.location.parked_url_changed(view, &url);
         }
     }
 
@@ -768,6 +1023,9 @@ impl Browser {
     }
 
     pub fn cursor_changed(&mut self, view: ViewId, cursor: u32) {
+        if self.extension_popup_cursor_changed(view, cursor) {
+            return;
+        }
         if let Some(tab) = self.tabs.get_mut(view) {
             tab.cursor = cursor;
         }
@@ -800,10 +1058,14 @@ impl Browser {
     }
 
     pub fn reload(&mut self) {
+        if let Some(view) = self.tabs.active_view() {
+            self.reload_view(view);
+        }
+    }
+
+    pub fn reload_view(&mut self, view: ViewId) {
         let engine = self.engine;
-        if let Some(view) = self.tabs.active_view()
-            && let Some(tab) = self.tabs.get_mut(view)
-        {
+        if let Some(tab) = self.tabs.get_mut(view) {
             tab.crashed = false;
             engine.reload(view);
         }
@@ -840,6 +1102,7 @@ impl Browser {
 
     pub fn window_focus_changed(&mut self, focused: bool) {
         self.window_focused = focused;
+        self.slot_focus_changed(focused);
         if !focused {
             chrome_popup::dismiss(self);
             self.release_forwarded_keys();
@@ -851,8 +1114,12 @@ impl Browser {
     }
 
     pub fn run_shortcut(&mut self, shortcut: Shortcut, tx: &mut Tx) {
+        if self.forwards_to_target(shortcut) {
+            return;
+        }
         match shortcut {
             Shortcut::NewTab => self.new_tab(tx),
+            Shortcut::NewSplitView => crate::split_view::new_split_view(self),
             Shortcut::CloseTab => self.close_active_tab(tx),
             Shortcut::FocusLocation => self.focus_location(),
             Shortcut::Reload => self.reload(),
@@ -892,7 +1159,7 @@ impl Browser {
             Shortcut::FindNext => self.find_step(true, tx),
             Shortcut::FindPrevious => self.find_step(false, tx),
             Shortcut::ToggleFullscreen => self.toggle_fullscreen(tx),
-            Shortcut::Quit => tx.quit(),
+            Shortcut::Quit => self.request_quit(tx),
             Shortcut::OpenTaskManager => crate::task_manager::open(self),
         }
     }
@@ -911,8 +1178,14 @@ impl Browser {
         if page_prompts::key(self, event, tx, KeyContext::Window) {
             return true;
         }
+        if self.run_extension_command_shortcut(event) {
+            return true;
+        }
         if let Some(shortcut) = shortcut_for(&event.key, event.mods, Platform::CURRENT) {
             self.run_shortcut(shortcut, tx);
+            return true;
+        }
+        if tx.focused().is_none() && self.extension_popup_window_key(event, tx) {
             return true;
         }
         if self.page_focused && tx.focused().is_none() {
@@ -929,6 +1202,9 @@ impl Browser {
         if page_prompts::key(self, event, tx, KeyContext::Page) {
             return true;
         }
+        if self.run_extension_command_shortcut(event) {
+            return true;
+        }
         if let Some(shortcut) = shortcut_for(&event.key, event.mods, Platform::CURRENT) {
             self.run_shortcut(shortcut, tx);
             return true;
@@ -940,6 +1216,9 @@ impl Browser {
     pub fn location_key(&mut self, event: &KeyEvent, tx: &mut Tx) -> bool {
         self.observe_cycle_modifier(&event.key);
         if page_prompts::key(self, event, tx, KeyContext::Location) {
+            return true;
+        }
+        if self.run_extension_command_shortcut(event) {
             return true;
         }
         if let Some(shortcut) = shortcut_for(&event.key, event.mods, Platform::CURRENT) {
@@ -1030,6 +1309,7 @@ impl Browser {
     }
 
     pub fn observe_scale(&self, scale: f32) {
+        self.observe_slot_scale(scale);
         if self.page.scale.get() != scale {
             self.page.scale.set(scale);
             self.send_window_viewport();
@@ -1041,24 +1321,45 @@ impl Browser {
         self.page.size.get().0
     }
 
-    pub fn page_laid_out(&mut self, [_, _, width, height]: [f32; 4]) {
+    pub fn page_size(&self) -> (f32, f32) {
+        self.page.size.get()
+    }
+
+    pub fn page_laid_out(&mut self, [x, y, width, height]: [f32; 4]) {
+        self.split.page_origin = (x, y);
+        crate::platform_services::set_page_origin(x, y);
         if self.page.size.get() != (width, height) {
             self.page.size.set((width, height));
             self.send_window_viewport();
         }
+        #[cfg(target_os = "linux")]
+        if let Some(wayland) = self.wayland.as_mut() {
+            wayland.set_rect((
+                x.round() as i32,
+                y.round() as i32,
+                width.round() as i32,
+                height.round() as i32,
+            ));
+        }
         self.sync_active_viewport();
     }
 
-    fn send_window_viewport(&self) {
+    pub(crate) fn send_window_viewport(&self) {
         if let Some(window) = self.shown_window() {
             self.engine
                 .set_window_viewport(Some(window), self.page.viewport());
         }
     }
 
-    fn sync_active_viewport(&self) {
-        if let Some(view) = self.tabs.active_view() {
-            self.sync_viewport_of(view);
+    pub(crate) fn sync_active_viewport(&self) {
+        let Some(active) = self.tabs.active_view() else {
+            return;
+        };
+        self.sync_viewport_of(active);
+        if let Some(split) = self.split.shown(&self.tabs)
+            && !page_prompts::chrome_hidden(self)
+        {
+            self.sync_viewport_of(split.partner(active));
         }
     }
 
@@ -1066,7 +1367,8 @@ impl Browser {
         let Some(tab) = self.tabs.get(view) else {
             return;
         };
-        let viewport = self.page.viewport();
+        let viewport =
+            crate::split_view::pane_viewport(self, view).unwrap_or_else(|| self.page.viewport());
         if tab.sent_viewport.get() != Some(viewport) {
             tab.sent_viewport.set(Some(viewport));
             self.engine.set_viewport(view, viewport);
@@ -1075,15 +1377,13 @@ impl Browser {
 
     fn send_mouse(
         &self,
+        view: ViewId,
         kind: MouseEventKind,
         x: f32,
         y: f32,
         button: Option<MouseButton>,
         modifiers: rune::Mods,
     ) {
-        let Some(view) = self.tabs.active_view() else {
-            return;
-        };
         let (x, y) = self.page.to_device(x, y);
         let event = MouseEvent {
             button,
@@ -1094,11 +1394,12 @@ impl Browser {
         self.engine.mouse_event(view, &event);
     }
 
-    pub fn page_drag(&mut self, drag: &Drag, tx: &Tx) {
+    pub fn page_drag(&mut self, view: ViewId, drag: &Drag, tx: &mut Tx) {
         let button = mouse_button(tx.button());
         let kind = match drag.phase {
             Phase::Down => {
                 self.end_recent_tab_cycle();
+                self.activate_shown_page(view, tx);
                 self.focus_page();
                 self.pressed_buttons |= button.bit();
                 if drag.clicks == 2 {
@@ -1114,31 +1415,45 @@ impl Browser {
             }
         };
         let button = (kind != MouseEventKind::Move).then_some(button);
-        self.send_mouse(kind, drag.x, drag.y, button, tx.mods());
+        self.send_mouse(view, kind, drag.x, drag.y, button, tx.mods());
     }
 
-    pub fn page_pointer_moved(&mut self, pointer: PointerEvent, tx: &Tx) {
-        if self.pressed_buttons == 0 {
-            self.send_mouse(MouseEventKind::Move, pointer.x, pointer.y, None, tx.mods());
+    fn activate_shown_page(&mut self, view: ViewId, tx: &mut Tx) {
+        if !self.tabs.is_active(view) && self.split.is_shown(&self.tabs, view) {
+            self.activate_tab(view, tx);
         }
     }
 
-    pub fn page_hover_changed(&mut self, hovered: bool, tx: &Tx) {
+    pub fn page_pointer_moved(&mut self, view: ViewId, pointer: PointerEvent, tx: &mut Tx) -> bool {
+        if self.pressed_buttons == 0 {
+            self.send_mouse(
+                view,
+                MouseEventKind::Move,
+                pointer.x,
+                pointer.y,
+                None,
+                tx.mods(),
+            );
+        }
+        page_prompts::page_pointer_moved(self, view, pointer.x, pointer.y, tx)
+    }
+
+    pub fn page_hover_changed(&mut self, view: ViewId, hovered: bool, tx: &Tx) {
         if !hovered && self.pressed_buttons == 0 {
-            self.send_mouse(MouseEventKind::Leave, 0.0, 0.0, None, tx.mods());
-            if let Some(view) = self.tabs.active_view()
-                && let Some(tab) = self.tabs.get_mut(view)
-            {
+            self.send_mouse(view, MouseEventKind::Leave, 0.0, 0.0, None, tx.mods());
+            if let Some(tab) = self.tabs.get_mut(view) {
                 tab.hovered_link.clear();
             }
         }
     }
 
-    pub fn page_secondary_click(&mut self, pointer: PointerEvent, tx: &Tx) {
+    pub fn page_secondary_click(&mut self, view: ViewId, pointer: PointerEvent, tx: &mut Tx) {
+        self.activate_shown_page(view, tx);
         self.focus_page();
         let button = MouseButton::Secondary;
         self.pressed_buttons |= button.bit();
         self.send_mouse(
+            view,
             MouseEventKind::Down,
             pointer.x,
             pointer.y,
@@ -1147,6 +1462,7 @@ impl Browser {
         );
         self.pressed_buttons &= !button.bit();
         self.send_mouse(
+            view,
             MouseEventKind::Up,
             pointer.x,
             pointer.y,
@@ -1155,10 +1471,7 @@ impl Browser {
         );
     }
 
-    pub fn page_wheel(&mut self, wheel: WheelEvent) {
-        let Some(view) = self.tabs.active_view() else {
-            return;
-        };
+    pub fn page_wheel(&mut self, view: ViewId, wheel: WheelEvent) {
         let (x, y) = self.page.to_device(wheel.x, wheel.y);
         let scale = self.page.scale();
         let event = MouseEvent {
@@ -1178,5 +1491,34 @@ fn mouse_button(button: PointerButton) -> MouseButton {
         PointerButton::Back => MouseButton::Backward,
         PointerButton::Forward => MouseButton::Forward,
         _ => MouseButton::Primary,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_the_shown_windows_views_repaint_it() {
+        let mut browser = Browser::new(Arc::default());
+        browser.windows.opened(WindowInfo {
+            id: 1,
+            private: false,
+        });
+        browser.windows.opened(WindowInfo {
+            id: 2,
+            private: false,
+        });
+        browser
+            .tabs
+            .insert(Tab::new(7, "about:blank", Pixels::new()), 0);
+        browser
+            .windows
+            .tabs_mut(2, &mut browser.tabs)
+            .unwrap()
+            .insert(Tab::new(8, "about:blank", Pixels::new()), 0);
+        assert!(browser.shows_view(7));
+        assert!(!browser.shows_view(8));
+        assert!(!browser.shows_view(9));
     }
 }

@@ -8,7 +8,7 @@ use std::ffi::c_void;
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 
-use rune::{AppHandle, ImageCache, Pixels};
+use rune::{ImageCache, Pixels};
 
 use crate::engine::{Modifiers, ViewId};
 use crate::ffi::{XenonStr, XenonViewId};
@@ -16,7 +16,7 @@ use crate::location::{
     Certificate, InputKind, LocationInput, SiteSecurity, SiteSecurityState, Suggestion,
     SuggestionKind, UrlInfo, UrlParts,
 };
-use crate::state::Browser;
+use crate::window_slots::{Slots, ViewRoute};
 
 pub const XENON_SITE_SECURITY_NONE: u32 = 0;
 pub const XENON_SITE_SECURITY_SECURE: u32 = 1;
@@ -262,11 +262,11 @@ impl LocationEngine {
 }
 
 pub struct LocationContext {
-    handle: AppHandle<Browser>,
+    handle: Arc<Slots>,
 }
 
 impl LocationContext {
-    pub fn new(handle: AppHandle<Browser>) -> Arc<LocationContext> {
+    pub fn new(handle: Arc<Slots>) -> Arc<LocationContext> {
         Arc::new(LocationContext { handle })
     }
 
@@ -285,8 +285,8 @@ impl LocationContext {
     }
 }
 
-unsafe fn handle<'a>(context: *mut c_void) -> &'a AppHandle<Browser> {
-    unsafe { &(*context.cast::<LocationContext>()).handle }
+unsafe fn handle<'a>(context: *mut c_void) -> ViewRoute<'a> {
+    ViewRoute(unsafe { &(*context.cast::<LocationContext>()).handle })
 }
 
 unsafe fn string(text: XenonStr) -> String {
@@ -396,7 +396,9 @@ unsafe extern "C" fn url_described(
         security: site_security_state(url.security),
         search_engine: unsafe { string(url.search_engine) },
     };
-    unsafe { handle(context) }.update(move |browser, _| browser.location_url_described(view, info));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        browser.location_url_described(view, info)
+    });
 }
 
 unsafe extern "C" fn display_changed(
@@ -408,7 +410,7 @@ unsafe extern "C" fn display_changed(
 ) {
     let text = unsafe { string(text) };
     let selection_start = index_from(selection_start);
-    unsafe { handle(context) }.update(move |browser, _| {
+    unsafe { handle(context) }.update(view, move |browser, _| {
         browser.location_display_changed(view, generation, text, selection_start)
     });
 }
@@ -428,8 +430,9 @@ unsafe extern "C" fn input_changed(
         bang: (!bang_name.is_empty() && input.bang_length > 0)
             .then_some((bang_name, input.bang_length)),
     };
-    unsafe { handle(context) }
-        .update(move |browser, _| browser.location_input_changed(view, generation, input));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        browser.location_input_changed(view, generation, input)
+    });
 }
 
 unsafe extern "C" fn suggestions_changed(
@@ -450,7 +453,7 @@ unsafe extern "C" fn suggestions_changed(
             .collect()
     };
     let selected = index_from(selected);
-    unsafe { handle(context) }.update(move |browser, _| {
+    unsafe { handle(context) }.update(view, move |browser, _| {
         browser.location_suggestions_changed(view, generation, suggestions, visible, selected)
     });
 }
@@ -462,12 +465,15 @@ unsafe extern "C" fn selection_changed(
     selected: i64,
 ) {
     let selected = index_from(selected);
-    unsafe { handle(context) }
-        .update(move |browser, _| browser.location_selection_changed(view, generation, selected));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        browser.location_selection_changed(view, generation, selected)
+    });
 }
 
 unsafe extern "C" fn committed(context: *mut c_void, view: XenonViewId, _: XenonStr) {
-    unsafe { handle(context) }.update(move |browser, tx| browser.location_committed(view, tx));
+    unsafe { handle(context) }.update(view, move |browser, tx| {
+        browser.location_committed(view, tx)
+    });
 }
 
 unsafe extern "C" fn site_security(
@@ -504,6 +510,7 @@ unsafe extern "C" fn site_security(
         }),
         chain,
     };
-    unsafe { handle(context) }
-        .update(move |browser, _| browser.location_site_security(view, security));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        browser.location_site_security(view, security)
+    });
 }

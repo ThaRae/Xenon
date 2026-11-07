@@ -29,6 +29,8 @@ private:
     virtual void create_platform_actions() override;
 
     virtual WebView::SessionLaunchPolicy launch_restore_policy() const override;
+    virtual void on_devtools_enabled() const override;
+    virtual void on_devtools_disabled() const override;
 
     virtual Optional<WebView::ViewImplementation&> active_web_view() const override;
     virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab) const override;

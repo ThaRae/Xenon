@@ -19,5 +19,6 @@ mod tabs;
 mod task_manager;
 mod toolbar;
 mod window;
+mod window_overlays;
 
 pub use window::browser_view;

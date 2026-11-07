@@ -5,7 +5,7 @@
  */
 
 mod bubbles;
-mod controls;
+pub(crate) mod controls;
 mod dialog;
 mod find_bar;
 pub(crate) mod menu;

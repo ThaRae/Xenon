@@ -86,6 +86,7 @@ WindowId BrowserModel::open_window(WebView::IsPrivate is_private, Optional<Windo
     auto window = make<Window>();
     window->id = id.has_value() ? *id : m_allocators.window_id();
     window->is_private = is_private;
+    window->geometry = exchange(m_geometry_for_next_window, {});
     if (auto* store = store_for(*window)) {
         if (auto session_window_id = store->window_opened(); session_window_id.is_error())
             dbgln("Xenon: Unable to register the new window with the session store: {}", session_window_id.error());
@@ -106,6 +107,7 @@ WindowId BrowserModel::restore_window(WebView::RestoredSessionWindow const& rest
     auto window = make<Window>();
     window->id = m_allocators.window_id();
     window->session_window_id = restored.window_id;
+    window->geometry = restored.geometry;
 
     auto& opened = *window;
     m_windows.append(move(window));
@@ -508,8 +510,10 @@ bool BrowserModel::reopen_closed_tab(Optional<WindowId> target_id)
             }
         }
     }
-    if (unit.was_window || !window)
+    if (unit.was_window || !window) {
+        m_geometry_for_next_window = unit.geometry;
         window = find_window(open_window(is_private));
+    }
     VERIFY(window);
 
     Optional<size_t> next_insertion_index;

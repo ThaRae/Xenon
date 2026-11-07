@@ -222,9 +222,36 @@ pub struct Windows {
     hidden: Vec<HiddenWindow>,
     activation_order: Vec<WindowId>,
     pub can_reopen_closed_tab: bool,
+    slotted: bool,
+    bound: Option<WindowId>,
 }
 
 impl Windows {
+    pub fn slotted() -> Windows {
+        Windows {
+            slotted: true,
+            ..Windows::default()
+        }
+    }
+
+    pub fn bind(&mut self, window: WindowId, shown_tabs: &mut TabList) -> bool {
+        self.slotted = true;
+        self.bound = Some(window);
+        self.show(window, shown_tabs)
+    }
+
+    pub fn shown_is_active(&self) -> bool {
+        self.shown_id().is_some() && self.activation_order.last().copied() == self.shown_id()
+    }
+
+    #[cfg(test)]
+    pub fn ids(&self) -> impl Iterator<Item = WindowId> + '_ {
+        self.shown
+            .iter()
+            .map(|info| info.id)
+            .chain(self.hidden.iter().map(|hidden| hidden.info.id))
+    }
+
     pub fn shown_is_private(&self) -> bool {
         self.shown.as_ref().is_some_and(|window| window.private)
     }
@@ -252,7 +279,12 @@ impl Windows {
         if self.contains(info.id) {
             return;
         }
-        if self.shown.is_none() {
+        let adopt = if self.slotted {
+            self.bound == Some(info.id)
+        } else {
+            self.shown.is_none()
+        };
+        if adopt && self.shown.is_none() {
             self.shown = Some(info);
         } else {
             self.hidden.push(HiddenWindow {
@@ -289,6 +321,9 @@ impl Windows {
     pub fn activated(&mut self, window: WindowId, shown_tabs: &mut TabList) -> bool {
         self.activation_order.retain(|id| *id != window);
         self.activation_order.push(window);
+        if self.slotted {
+            return false;
+        }
         self.show(window, shown_tabs)
     }
 
@@ -318,6 +353,10 @@ impl Windows {
         }
         let closed = shown_tabs.drain();
         self.shown = None;
+        if self.slotted {
+            self.bound = None;
+            return Some(closed);
+        }
         let next = self
             .activation_order
             .iter()
@@ -489,5 +528,32 @@ mod tests {
         assert!(windows.is_empty());
         assert_eq!(shown.iter().count(), 0);
         assert!(windows.closed(2, &mut shown).is_none());
+    }
+
+    #[test]
+    fn a_bound_window_list_keeps_showing_its_own_window() {
+        let mut windows = Windows::slotted();
+        let mut shown = TabList::default();
+        windows.opened(info(1));
+        windows.tabs_mut(1, &mut shown).unwrap().insert(tab(10), 0);
+        assert_eq!(windows.shown_id(), None);
+        windows.bind(2, &mut shown);
+        windows.opened(info(2));
+        windows.tabs_mut(2, &mut shown).unwrap().insert(tab(20), 0);
+        assert_eq!(windows.shown_id(), Some(2));
+        assert_eq!(order(&shown), [20]);
+
+        assert!(!windows.activated(1, &mut shown));
+        assert_eq!(windows.shown_id(), Some(2));
+        assert!(!windows.shown_is_active());
+        windows.activated(2, &mut shown);
+        assert!(windows.shown_is_active());
+
+        windows.closed(2, &mut shown);
+        assert_eq!(windows.shown_id(), None);
+        assert!(!windows.is_empty());
+        assert!(windows.bind(1, &mut shown));
+        assert_eq!(order(&shown), [10]);
+        assert_eq!(windows.ids().collect::<Vec<_>>(), [1]);
     }
 }

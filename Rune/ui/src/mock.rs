@@ -542,6 +542,7 @@ impl MockEngine {
         let callbacks = self.callbacks;
         match event {
             ModelEvent::WindowOpened(window, private) => {
+                crate::mock_windows::place_window(window);
                 if let Some(opened) = callbacks.window_opened {
                     unsafe { opened(context, window, private) };
                 }

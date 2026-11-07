@@ -6,7 +6,7 @@
 
 use std::ffi::c_void;
 
-use rune::AppHandle;
+use std::sync::Arc;
 
 use crate::engine::ViewId;
 use crate::ffi::XenonStr;
@@ -14,7 +14,7 @@ use crate::ffi_page::{self, XenonDialog, XenonFilePicker, XenonMenu, XenonPageCa
 use crate::page_prompts::{
     self, DialogKind, MenuPurpose, PermissionAnswer, PromptId, RawMenuItem, RawMenuItemKind,
 };
-use crate::state::Browser;
+use crate::window_slots::{Slots, ViewRoute};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PageEngine;
@@ -82,10 +82,10 @@ impl PageEngine {
 }
 
 pub struct PageContext {
-    handle: AppHandle<Browser>,
+    handle: Arc<Slots>,
 }
 
-pub fn install(handle: AppHandle<Browser>) -> Box<PageContext> {
+pub fn install(handle: Arc<Slots>) -> Box<PageContext> {
     let context = Box::new(PageContext { handle });
     let callbacks = XenonPageCallbacks {
         context: std::ptr::from_ref::<PageContext>(&context)
@@ -107,8 +107,8 @@ pub fn install(handle: AppHandle<Browser>) -> Box<PageContext> {
     context
 }
 
-unsafe fn handle<'a>(context: *mut c_void) -> &'a AppHandle<Browser> {
-    unsafe { &(*context.cast::<PageContext>()).handle }
+unsafe fn handle<'a>(context: *mut c_void) -> ViewRoute<'a> {
+    ViewRoute(unsafe { &(*context.cast::<PageContext>()).handle })
 }
 
 fn text(string: XenonStr) -> String {
@@ -136,7 +136,7 @@ unsafe extern "C" fn dialog_opened(context: *mut c_void, view: ViewId, dialog: *
     let default_text = text(dialog.default_text);
     let accept_label = text(dialog.accept_label);
     let cancel_label = Some(text(dialog.cancel_label)).filter(|label| !label.is_empty());
-    unsafe { handle(context) }.update(move |browser, _| {
+    unsafe { handle(context) }.update(view, move |browser, _| {
         page_prompts::dialog_opened(
             browser,
             view,
@@ -158,14 +158,15 @@ unsafe extern "C" fn dialog_text_changed(
     new_text: XenonStr,
 ) {
     let new_text = text(new_text);
-    unsafe { handle(context) }.update(move |browser, _| {
+    unsafe { handle(context) }.update(view, move |browser, _| {
         page_prompts::dialog_text_changed(browser, view, dialog, new_text)
     });
 }
 
 unsafe extern "C" fn dialog_closed(context: *mut c_void, view: ViewId, dialog: PromptId) {
-    unsafe { handle(context) }
-        .update(move |browser, _| page_prompts::dialog_closed(browser, view, dialog));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        page_prompts::dialog_closed(browser, view, dialog)
+    });
 }
 
 pub fn raw_menu_items(menu: &XenonMenu) -> Vec<RawMenuItem> {
@@ -200,7 +201,7 @@ fn show_menu(context: *mut c_void, view: ViewId, menu: *const XenonMenu, purpose
     let id = menu.id;
     let geometry = (menu.x, menu.y, menu.minimum_width);
     let entries = page_prompts::menu_entries(&raw_menu_items(menu));
-    unsafe { handle(context) }.update(move |browser, tx| {
+    unsafe { handle(context) }.update(view, move |browser, tx| {
         page_prompts::show_menu(browser, view, id, purpose, geometry, entries, tx)
     });
 }
@@ -246,7 +247,7 @@ unsafe extern "C" fn file_picker_requested(
             .collect()
     };
     let (id, allow_multiple) = (picker.id, picker.allow_multiple);
-    unsafe { handle(context) }.update(move |browser, tx| {
+    unsafe { handle(context) }.update(view, move |browser, tx| {
         page_prompts::file_picker_requested(browser, view, id, allow_multiple, filters, tx)
     });
 }
@@ -259,8 +260,9 @@ unsafe extern "C" fn find_result(
     total_matches: usize,
 ) {
     let total = has_total.then_some(total_matches);
-    unsafe { handle(context) }
-        .update(move |browser, _| page_prompts::find_result(browser, view, current_match, total));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        page_prompts::find_result(browser, view, current_match, total)
+    });
 }
 
 unsafe extern "C" fn tooltip_changed(
@@ -271,13 +273,15 @@ unsafe extern "C" fn tooltip_changed(
     y: f32,
 ) {
     let tooltip = text(tooltip);
-    unsafe { handle(context) }
-        .update(move |browser, _| page_prompts::tooltip_changed(browser, view, tooltip, x, y));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        page_prompts::tooltip_changed(browser, view, tooltip, x, y)
+    });
 }
 
 unsafe extern "C" fn fullscreen_requested(context: *mut c_void, view: ViewId, fullscreen: bool) {
-    unsafe { handle(context) }
-        .update(move |browser, _| page_prompts::fullscreen_requested(browser, view, fullscreen));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        page_prompts::fullscreen_requested(browser, view, fullscreen)
+    });
 }
 
 unsafe extern "C" fn permission_requested(
@@ -292,12 +296,13 @@ unsafe extern "C" fn permission_requested(
     let notice = request.kind == ffi_page::XENON_PERMISSION_PROMPT_SYSTEM_DENIED_NOTICE;
     let permission = text(request.permission);
     let requester = text(request.requester);
-    unsafe { handle(context) }.update(move |browser, _| {
+    unsafe { handle(context) }.update(view, move |browser, _| {
         page_prompts::permission_requested(browser, view, id, notice, permission, requester)
     });
 }
 
 unsafe extern "C" fn permission_cancelled(context: *mut c_void, view: ViewId, request: PromptId) {
-    unsafe { handle(context) }
-        .update(move |browser, _| page_prompts::permission_cancelled(browser, view, request));
+    unsafe { handle(context) }.update(view, move |browser, _| {
+        page_prompts::permission_cancelled(browser, view, request)
+    });
 }
