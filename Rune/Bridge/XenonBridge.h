@@ -148,6 +148,17 @@ typedef struct XenonFrame {
     double device_pixel_ratio;
 } XenonFrame;
 
+typedef struct XenonDmaBufFrame {
+    uint32_t width;
+    uint32_t height;
+    uint32_t drm_format;
+    uint64_t modifier;
+    uint32_t plane_count;
+    int32_t fds[4];
+    uint32_t offsets[4];
+    uint32_t pitches[4];
+} XenonDmaBufFrame;
+
 typedef struct XenonTabInfo {
     XenonWindowId window;
     XenonViewId view;
@@ -209,6 +220,7 @@ typedef struct XenonUiCallbacks {
     void (*engine_ready)(void* context);
     void (*engine_exited)(void* context, int exit_code);
     void (*view_frame)(void* context, XenonViewId, XenonFrame const*);
+    void (*view_dmabuf_frame)(void* context, XenonViewId, XenonDmaBufFrame const*);
     void (*view_title_changed)(void* context, XenonViewId, XenonStr title);
     void (*view_url_changed)(void* context, XenonViewId, XenonStr url);
     void (*view_loading_changed)(void* context, XenonViewId, bool is_loading);
@@ -245,6 +257,7 @@ bool xenon_engine_start(XenonUiCallbacks const*, int argc, char const* const* ar
 void xenon_engine_shutdown(void);
 
 void xenon_engine_set_window_viewport(XenonWindowId, uint32_t width, uint32_t height, double device_pixel_ratio);
+void xenon_engine_set_window_surface(XenonWindowId, void* display, void* surface);
 void xenon_engine_set_system_dark(bool dark);
 void xenon_engine_set_chrome_layout(uint8_t layout);
 void xenon_engine_set_cycle_tabs_in_recently_used_order(bool);

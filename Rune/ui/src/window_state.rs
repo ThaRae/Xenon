@@ -102,6 +102,8 @@ impl Browser {
             unsafe { ffi_windows::xenon_platform_bind_window(slot, window) };
         }
         self.send_window_viewport();
+        #[cfg(target_os = "linux")]
+        self.enable_native_surface(window);
         self.shown_tabs_changed(previous, tx);
     }
 

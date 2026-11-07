@@ -225,6 +225,17 @@ impl Engine {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    pub fn set_window_surface(self, window: WindowId, display: usize, surface: usize) {
+        unsafe {
+            ffi::xenon_engine_set_window_surface(
+                window,
+                display as *mut std::ffi::c_void,
+                surface as *mut std::ffi::c_void,
+            )
+        }
+    }
+
     pub fn set_chrome_layout(self, layout: ChromeLayout) {
         unsafe { ffi::xenon_engine_set_chrome_layout(layout.raw()) }
     }

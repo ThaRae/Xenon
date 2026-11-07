@@ -2516,7 +2516,6 @@ checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/anomalyco/rune?rev=781e2b6d87cd5f32d6f4365956fad4baaf24ee50#781e2b6d87cd5f32d6f4365956fad4baaf24ee50"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2592,12 +2591,10 @@ dependencies = [
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/anomalyco/rune?rev=781e2b6d87cd5f32d6f4365956fad4baaf24ee50#781e2b6d87cd5f32d6f4365956fad4baaf24ee50"
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/anomalyco/rune?rev=781e2b6d87cd5f32d6f4365956fad4baaf24ee50#781e2b6d87cd5f32d6f4365956fad4baaf24ee50"
 dependencies = [
  "wgpu",
 ]
@@ -2605,7 +2602,6 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/anomalyco/rune?rev=781e2b6d87cd5f32d6f4365956fad4baaf24ee50#781e2b6d87cd5f32d6f4365956fad4baaf24ee50"
 dependencies = [
  "taffy",
 ]
@@ -4076,8 +4072,12 @@ checksum = "163b33ed8786455e2fa5d72f554057ce3f3182425434f756cd39c99839d88e23"
 name = "xenon_ui"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "rune",
  "serde_json",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
  "zbus 5.19.0",
 ]
 

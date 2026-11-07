@@ -126,6 +126,19 @@ pub struct XenonFrame {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
+pub struct XenonDmaBufFrame {
+    pub width: u32,
+    pub height: u32,
+    pub drm_format: u32,
+    pub modifier: u64,
+    pub plane_count: u32,
+    pub fds: [c_int; 4],
+    pub offsets: [u32; 4],
+    pub pitches: [u32; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct XenonTabInfo {
     pub window: XenonWindowId,
     pub view: XenonViewId,
@@ -147,6 +160,13 @@ pub struct XenonUiCallbacks {
     pub engine_exited: Option<unsafe extern "C" fn(context: *mut c_void, exit_code: c_int)>,
     pub view_frame: Option<
         unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, frame: *const XenonFrame),
+    >,
+    pub view_dmabuf_frame: Option<
+        unsafe extern "C" fn(
+            context: *mut c_void,
+            view: XenonViewId,
+            frame: *const XenonDmaBufFrame,
+        ),
     >,
     pub view_title_changed:
         Option<unsafe extern "C" fn(context: *mut c_void, view: XenonViewId, title: XenonStr)>,
@@ -295,6 +315,11 @@ unsafe extern "C" {
         width: u32,
         height: u32,
         device_pixel_ratio: f64,
+    );
+    pub fn xenon_engine_set_window_surface(
+        window: XenonWindowId,
+        display: *mut c_void,
+        surface: *mut c_void,
     );
     pub fn xenon_engine_set_system_dark(dark: bool);
     pub fn xenon_engine_set_chrome_layout(layout: u8);

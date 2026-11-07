@@ -255,6 +255,19 @@ impl Slots {
         }
     }
 
+    pub fn update_view_if(
+        &self,
+        view: ViewId,
+        f: impl FnOnce(&mut Browser, &mut Tx) -> bool + Send + 'static,
+    ) {
+        let slot = self.table().slot_of_view(view);
+        if let Some(slot) = slot
+            && let Some(handle) = self.handles.get(slot)
+        {
+            handle.update_if(f);
+        }
+    }
+
     pub fn update_window(
         &self,
         window: WindowId,
@@ -377,6 +390,17 @@ impl Slots {
             unsafe { crate::ffi_windows::xenon_platform_attach_window(slot as u32, number) };
             if let Some(window) = self.window_in(slot) {
                 unsafe { crate::ffi_windows::xenon_platform_bind_window(slot as u32, window) };
+            }
+        }
+        #[cfg(target_os = "linux")]
+        if let Some((display, surface)) = wayland_handles(handle) {
+            self.update_slot(slot, move |browser, _| {
+                browser.set_window_surface(display, surface)
+            });
+            if let Some(window) = self.window_in(slot) {
+                self.update_slot(slot, move |browser, _| {
+                    browser.enable_native_surface(window)
+                });
             }
         }
     }
@@ -510,4 +534,22 @@ mod tests {
         table.focus_changed(2, true);
         assert_eq!(table.target(), 1);
     }
+}
+
+#[cfg(target_os = "linux")]
+fn wayland_handles(handle: &WindowHandle) -> Option<(usize, usize)> {
+    use rune::raw_window_handle::{RawDisplayHandle, RawWindowHandle};
+    let surface = handle
+        .with_raw_handle(|window| match window.as_raw() {
+            RawWindowHandle::Wayland(window) => Some(window.surface.as_ptr() as usize),
+            _ => None,
+        })
+        .ok()??;
+    let display = handle
+        .with_raw_display_handle(|display| match display {
+            RawDisplayHandle::Wayland(display) => Some(display.display.as_ptr() as usize),
+            _ => None,
+        })
+        .ok()??;
+    Some((display, surface))
 }

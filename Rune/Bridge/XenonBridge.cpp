@@ -73,6 +73,13 @@ void xenon_engine_set_window_viewport(XenonWindowId window, uint32_t width, uint
     });
 }
 
+void xenon_engine_set_window_surface(XenonWindowId window, void* display, void* surface)
+{
+    Engine::the().post([window, display, surface] {
+        Engine::the().set_window_surface(window, display, surface);
+    });
+}
+
 void xenon_engine_set_system_dark(bool dark)
 {
     Engine::the().post([dark] {

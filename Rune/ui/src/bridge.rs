@@ -6,12 +6,16 @@
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::{c_int, c_void};
+#[cfg(target_os = "linux")]
+use std::os::fd::FromRawFd;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use rune::Pixels;
 
 use crate::engine::{ViewId, WindowId};
+#[cfg(target_os = "linux")]
+use crate::ffi::XenonDmaBufFrame;
 use crate::ffi::{XenonFrame, XenonStr, XenonTabInfo, XenonUiCallbacks};
 use crate::frame::straight_rgba_from_premultiplied_bgra;
 use crate::tab_list::TabInsertion;
@@ -81,6 +85,16 @@ impl UiContext {
             engine_ready: Some(engine_ready),
             engine_exited: Some(engine_exited),
             view_frame: Some(view_frame),
+            view_dmabuf_frame: {
+                #[cfg(target_os = "linux")]
+                {
+                    Some(view_dmabuf_frame)
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    None
+                }
+            },
             view_title_changed: Some(view_title_changed),
             view_url_changed: Some(view_url_changed),
             view_loading_changed: Some(view_loading_changed),
@@ -148,6 +162,44 @@ unsafe extern "C" fn view_frame(context: *mut c_void, view: ViewId, frame: *cons
         frame.height,
         straight_rgba_from_premultiplied_bgra(frame.width, frame.height, frame.stride, bgra),
     );
+    ui.handle
+        .update_view_if(view, move |browser, _| browser.cpu_frame(view));
+}
+
+#[cfg(target_os = "linux")]
+unsafe extern "C" fn view_dmabuf_frame(
+    context: *mut c_void,
+    view: ViewId,
+    frame: *const XenonDmaBufFrame,
+) {
+    let Some(frame) = (unsafe { frame.as_ref() }) else {
+        return;
+    };
+    let mut planes = Vec::new();
+    for index in 0..(frame.plane_count as usize).min(4) {
+        let fd = unsafe { libc::dup(frame.fds[index]) };
+        if fd < 0 {
+            return;
+        }
+        planes.push(crate::wayland_page::DmaBufPlane {
+            fd: unsafe { std::os::fd::OwnedFd::from_raw_fd(fd) },
+            offset: frame.offsets[index],
+            pitch: frame.pitches[index],
+        });
+    }
+    if planes.is_empty() {
+        return;
+    }
+    let frame = crate::wayland_page::DmaBufFrame {
+        width: frame.width,
+        height: frame.height,
+        format: frame.drm_format,
+        modifier: frame.modifier,
+        planes,
+    };
+    unsafe { ui(context) }
+        .handle
+        .update_view_if(view, move |browser, _| browser.dmabuf_frame(view, frame));
 }
 
 unsafe extern "C" fn view_title_changed(context: *mut c_void, view: ViewId, title: XenonStr) {
