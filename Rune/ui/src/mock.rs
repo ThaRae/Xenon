@@ -17,18 +17,38 @@ use std::thread::JoinHandle;
 #[path = "mock_page.rs"]
 mod page;
 
-<<<<<<< HEAD
 #[path = "mock_accessibility.rs"]
 pub(crate) mod accessibility;
-#[path = "mock_tab_groups.rs"]
-mod tab_groups;
-=======
 #[path = "mock_hibernation.rs"]
 mod hibernation;
->>>>>>> ba55001 (Rune: Hibernate background tabs as the Qt frontend does)
+#[path = "mock_tab_groups.rs"]
+mod tab_groups;
 
+#[path = "mock_extensions.rs"]
+mod extensions;
 #[path = "mock_task_manager.rs"]
 mod task_manager;
+
+#[path = "mock_prompts.rs"]
+mod prompts;
+
+#[path = "mock_drop.rs"]
+mod drop;
+
+#[path = "mock_media.rs"]
+mod media;
+
+#[path = "mock_screenshots.rs"]
+mod screenshots;
+
+#[path = "mock_reports.rs"]
+mod reports;
+
+#[path = "mock_updater.rs"]
+mod updater;
+
+#[path = "mock_platform.rs"]
+mod platform;
 
 use crate::ffi::{
     XENON_CURSOR_DEFAULT, XENON_CURSOR_POINTER, XENON_MOUSE_BUTTON_MIDDLE,
@@ -129,6 +149,10 @@ pub unsafe extern "C" fn xenon_engine_start(
     *running() = Some(Running { commands, thread });
     send(Command::Ready);
     true
+}
+
+pub fn xenon_engine_allocate_mock_view() -> XenonViewId {
+    NEXT_VIEW.fetch_add(1, Ordering::Relaxed)
 }
 
 #[unsafe(no_mangle)]
@@ -690,6 +714,10 @@ impl MockEngine {
                 ],
             );
         }
+        prompts::navigated(view, &url);
+        media::navigated(view, &url);
+        screenshots::navigated(view, &url);
+        reports::navigated(view, &url);
         if !url.contains(STILL_LOADING_MARKER) {
             self.loading(view, false);
         }
@@ -1054,3 +1082,86 @@ pub extern "C" fn xenon_platform_is_always_on_top() -> bool {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn xenon_platform_set_always_on_top(_always_on_top: bool) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_bookmarks_callbacks(
+    _callbacks: *const crate::ffi_bookmarks::XenonBookmarksCallbacks,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_bookmarks_start() {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_open_bookmark(_view: XenonViewId, _id: XenonStr, _disposition: u32) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_open_bookmark_folder(_id: XenonStr) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_show_bookmark_context_menu(
+    _view: XenonViewId,
+    _id: XenonStr,
+    _target_folder_id: XenonStr,
+    _parent_folder_id: XenonStr,
+    _x: f32,
+    _y: f32,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_activate_bookmark_menu_item(_menu: u64, _item: u32) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_close_bookmark_dialog(
+    _dialog: u64,
+    _accepted: bool,
+    _url: XenonStr,
+    _title: XenonStr,
+    _folder_id: XenonStr,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_element_picker_callbacks(
+    _callbacks: *const crate::element_picker::XenonElementPickerCallbacks,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_confirm_element_filter(
+    _request: u64,
+    _accepted: bool,
+    _filter: XenonStr,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_location_menu_callbacks(
+    _callbacks: *const crate::location_menu::XenonLocationMenuCallbacks,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_location_describe_paste_and_go(
+    _request: u64,
+    _clipboard_text: XenonStr,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_location_paste_and_go(
+    _view: XenonViewId,
+    _generation: u64,
+    _text: XenonStr,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_location_set_suspended(
+    _view: XenonViewId,
+    _generation: u64,
+    _suspended: bool,
+) {
+}

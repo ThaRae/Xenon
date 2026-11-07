@@ -258,7 +258,7 @@ fn crashed_notice(p: &Palette) -> El {
         .child(reload)
 }
 
-fn cursor_for(cursor: u32) -> Cursor {
+pub(crate) fn cursor_for(cursor: u32) -> Cursor {
     match cursor {
         ffi::XENON_CURSOR_POINTER => Cursor::Pointer,
         ffi::XENON_CURSOR_TEXT | ffi::XENON_CURSOR_VERTICAL_TEXT => Cursor::Text,

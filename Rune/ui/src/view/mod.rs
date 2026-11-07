@@ -7,6 +7,7 @@
 #[cfg(all(test, feature = "mock-engine"))]
 mod chrome_accessibility_tests;
 mod downloads;
+mod extensions;
 mod icons;
 mod location;
 mod page;

@@ -65,6 +65,7 @@ pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
         )
         .child(reload)
         .child(location_field(s, p, dark, cx))
+        .children(crate::view::extensions::action_buttons(s, p))
         .children(s.windows.shown_is_private().then(|| private_badge(p)))
         .children(downloads_button(s, p))
         .children(shield_button(s, p))
