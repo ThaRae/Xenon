@@ -1,0 +1,18 @@
+--- a/crates/rune/src/window/handle.rs
++++ b/crates/rune/src/window/handle.rs
+@@ -118,6 +118,15 @@
+         let handle = window.window_handle().map_err(|e| e.to_string())?;
+         Ok(f(handle))
+     }
++
++    /// Borrow the display's raw handle while alive, for a framework that draws into a native
++    /// surface of the window.
++    pub fn with_raw_display_handle<R>(&self, f: impl FnOnce(winit::raw_window_handle::RawDisplayHandle) -> R) -> Result<R, String> {
++        use winit::raw_window_handle::HasDisplayHandle;
++        let window = self.window()?;
++        let handle = window.display_handle().map_err(|e| e.to_string())?;
++        Ok(f(handle.as_raw()))
++    }
+ }
+ 
+ #[cfg(target_os = "macos")]
