@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use rune::{
     FileDialogOptions, FileDialogResult, Key, KeyEvent, PopupItem, PopupMenu, TextEdit, Tx,
@@ -15,11 +16,14 @@ use rune::{
 use crate::engine::ViewId;
 use crate::keys::{Platform, shortcut_for};
 use crate::page_bridge::PageEngine;
+use crate::pickers::{ColorPicker, DatePicker, WebAuthn};
+use crate::prompts_bridge::PromptEngine;
 use crate::state::Browser;
 
 pub type PromptId = u64;
 
 pub const MENU_ANCHOR_KEY: &str = "page-menu-anchor";
+pub const TOOLTIP_DELAY: f64 = 0.6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DialogKind {
@@ -154,8 +158,10 @@ impl FindResult {
     pub fn label(self) -> Option<String> {
         match self {
             FindResult::Searching => None,
-            FindResult::NotFound => Some("No matches".to_owned()),
-            FindResult::Match { current, total } => Some(format!("{} of {}", current + 1, total)),
+            FindResult::NotFound => Some("Phrase not found".to_owned()),
+            FindResult::Match { current, total } => {
+                Some(format!("{} of {} matches", current + 1, total))
+            }
         }
     }
 }
@@ -165,6 +171,9 @@ pub struct FindBar {
     sent_query: Option<String>,
     pub result: Option<FindResult>,
     pub case_sensitive: bool,
+    pub highlight_all: bool,
+    selection_request: u64,
+    text_at_selection_request: String,
 }
 
 pub struct PermissionPrompt {
@@ -198,6 +207,11 @@ pub struct ViewPrompts {
     pub find: Option<FindBar>,
     pub permissions: Vec<PermissionPrompt>,
     pub tooltip: Option<Tooltip>,
+    pub tooltip_area: Option<String>,
+    pub tooltip_overridden: bool,
+    pub color_picker: Option<ColorPicker>,
+    pub date_picker: Option<DatePicker>,
+    pub web_authn: Option<WebAuthn>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,6 +227,10 @@ pub struct PagePrompts {
     pub menu: Option<ShownMenu>,
     fullscreen: Option<ViewId>,
     window_fullscreen_for_page: bool,
+    next_selection_request: u64,
+    now: f64,
+    tooltip_due: Option<f64>,
+    pointer: (f32, f32),
 }
 
 impl PagePrompts {
@@ -220,7 +238,11 @@ impl PagePrompts {
         self.views.get(&view)
     }
 
-    fn of_mut(&mut self, view: ViewId) -> &mut ViewPrompts {
+    pub(crate) fn views_mut(&mut self) -> &mut HashMap<ViewId, ViewPrompts> {
+        &mut self.views
+    }
+
+    pub(crate) fn of_mut(&mut self, view: ViewId) -> &mut ViewPrompts {
         self.views.entry(view).or_default()
     }
 
@@ -256,6 +278,9 @@ impl FindBar {
             sent_query: None,
             result: None,
             case_sensitive: false,
+            highlight_all: false,
+            selection_request: 0,
+            text_at_selection_request: String::new(),
         }
     }
 }
@@ -264,11 +289,11 @@ pub fn active_view(s: &Browser) -> Option<ViewId> {
     s.tabs.active_view()
 }
 
-fn view_exists(s: &Browser, view: ViewId) -> bool {
+pub(crate) fn view_exists(s: &Browser, view: ViewId) -> bool {
     s.tabs.get(view).is_some()
 }
 
-fn points(s: &Browser, device: f32) -> f32 {
+pub(crate) fn points(s: &Browser, device: f32) -> f32 {
     device / s.page.scale().max(0.01)
 }
 
@@ -548,6 +573,8 @@ pub fn open_find(s: &mut Browser, tx: &mut Tx) {
         return;
     };
     let _ = tx;
+    s.page_prompts.next_selection_request += 1;
+    let request = s.page_prompts.next_selection_request;
     let find = s
         .page_prompts
         .of_mut(view)
@@ -556,6 +583,39 @@ pub fn open_find(s: &mut Browser, tx: &mut Tx) {
     let end = find.query.text.len();
     find.query.set_selection(0, end);
     find.query.focused = true;
+    find.selection_request = request;
+    find.text_at_selection_request = find.query.text.clone();
+    PromptEngine.request_find_selection(view, request);
+}
+
+pub fn find_selection(s: &mut Browser, view: ViewId, request: u64, selection: String) {
+    let Some(find) = s
+        .page_prompts
+        .views
+        .get_mut(&view)
+        .and_then(|prompts| prompts.find.as_mut())
+    else {
+        return;
+    };
+    if find.selection_request != request || find.query.text != find.text_at_selection_request {
+        return;
+    }
+    let selection = find_text_from_selection(&selection);
+    if !selection.is_empty() {
+        find.query.replace_text(selection);
+        find.sent_query = None;
+    }
+    let end = find.query.text.len();
+    find.query.set_selection(0, end);
+}
+
+pub fn find_text_from_selection(selection: &str) -> String {
+    selection
+        .split(['\n', '\r'])
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub fn close_find(s: &mut Browser, view: ViewId, tx: &mut Tx) {
@@ -585,6 +645,48 @@ pub fn toggle_find_case_sensitive(s: &mut Browser, view: ViewId) {
     }
 }
 
+pub fn toggle_find_highlight_all(s: &mut Browser, view: ViewId) {
+    if let Some(find) = s
+        .page_prompts
+        .views
+        .get_mut(&view)
+        .and_then(|prompts| prompts.find.as_mut())
+    {
+        find.highlight_all = !find.highlight_all;
+        find.sent_query = None;
+    }
+}
+
+fn find_option_mnemonic(event: &KeyEvent) -> Option<char> {
+    if Platform::CURRENT == Platform::Mac
+        || !event.mods.alt
+        || event.mods.cmd
+        || event.mods.ctrl
+        || event.mods.shift
+    {
+        return None;
+    }
+    match &event.key {
+        Key::Text(text) => {
+            let mut chars = text.chars();
+            chars
+                .next()
+                .filter(|_| chars.next().is_none())
+                .map(|c| c.to_ascii_lowercase())
+        }
+        _ => None,
+    }
+}
+
+fn find_option_key(s: &mut Browser, view: ViewId, event: &KeyEvent) -> bool {
+    match find_option_mnemonic(event) {
+        Some('a') => toggle_find_highlight_all(s, view),
+        Some('c') => toggle_find_case_sensitive(s, view),
+        _ => return false,
+    }
+    true
+}
+
 pub fn find_step(s: &mut Browser, view: ViewId, forward: bool) {
     let Some(find) = s
         .page_prompts
@@ -600,7 +702,12 @@ pub fn find_step(s: &mut Browser, view: ViewId, forward: bool) {
     if find.sent_query.as_deref() != Some(find.query.text.as_str()) {
         find.sent_query = Some(find.query.text.clone());
         find.result = Some(FindResult::Searching);
-        PageEngine.find_in_page(view, &find.query.text, find.case_sensitive);
+        PageEngine.find_in_page(
+            view,
+            &find.query.text,
+            find.case_sensitive,
+            find.highlight_all,
+        );
         return;
     }
     if forward {
@@ -635,20 +742,77 @@ pub fn find_key(s: &mut Browser, view: ViewId, event: &KeyEvent, tx: &mut Tx) ->
             find_step(s, view, !event.mods.shift);
             true
         }
-        _ => false,
+        _ => find_option_key(s, view, event),
     }
 }
 
-pub fn tooltip_changed(s: &mut Browser, view: ViewId, text: String, x: f32, y: f32) {
+pub fn tooltip_changed(s: &mut Browser, view: ViewId, text: String, _x: f32, _y: f32) {
     if !view_exists(s, view) {
         return;
     }
-    let tooltip = (!text.trim().is_empty()).then(|| Tooltip {
-        text,
-        x: points(s, x),
-        y: points(s, y),
-    });
-    s.page_prompts.of_mut(view).tooltip = tooltip;
+    let prompts = s.page_prompts.of_mut(view);
+    if text.trim().is_empty() {
+        prompts.tooltip_area = None;
+        if !prompts.tooltip_overridden {
+            prompts.tooltip = None;
+        }
+        return;
+    }
+    prompts.tooltip_area = Some(text);
+}
+
+pub fn tooltip_override(s: &mut Browser, view: ViewId, text: String, x: f32, y: f32) {
+    if !view_exists(s, view) {
+        return;
+    }
+    let (x, y) = (points(s, x), points(s, y));
+    let prompts = s.page_prompts.of_mut(view);
+    if text.trim().is_empty() {
+        prompts.tooltip_overridden = false;
+        return;
+    }
+    prompts.tooltip_overridden = true;
+    prompts.tooltip = Some(Tooltip { text, x, y });
+}
+
+pub fn page_pointer_moved(s: &mut Browser, x: f32, y: f32, tx: &mut Tx) -> bool {
+    s.page_prompts.pointer = (x, y);
+    let Some(view) = active_view(s) else {
+        return false;
+    };
+    let now = s.page_prompts.now;
+    let prompts = s.page_prompts.of_mut(view);
+    if prompts.tooltip_overridden {
+        return false;
+    }
+    let hid = prompts.tooltip.take().is_some();
+    s.page_prompts.tooltip_due = Some(now + TOOLTIP_DELAY);
+    tx.wake_after(Duration::from_secs_f64(TOOLTIP_DELAY));
+    hid
+}
+
+fn show_due_tooltip(s: &mut Browser, now: f64, tx: &mut Tx) -> bool {
+    let Some(due) = s.page_prompts.tooltip_due else {
+        return false;
+    };
+    if now < due {
+        tx.wake_after(Duration::from_secs_f64(due - now));
+        return false;
+    }
+    s.page_prompts.tooltip_due = None;
+    let (x, y) = s.page_prompts.pointer;
+    let Some(view) = active_view(s) else {
+        return false;
+    };
+    let prompts = s.page_prompts.of_mut(view);
+    if prompts.tooltip_overridden || prompts.dialog.is_some() {
+        return false;
+    }
+    let Some(text) = prompts.tooltip_area.clone() else {
+        return false;
+    };
+    prompts.tooltip = Some(Tooltip { text, x, y });
+    true
 }
 
 pub fn fullscreen_requested(s: &mut Browser, view: ViewId, fullscreen: bool) {
@@ -740,6 +904,17 @@ pub fn key(s: &mut Browser, event: &KeyEvent, tx: &mut Tx, context: KeyContext) 
     if context == KeyContext::Location {
         return false;
     }
+    if crate::pickers::key(s, event, tx) {
+        return true;
+    }
+    if let Some(view) = active_view(s)
+        && s.page_prompts
+            .of(view)
+            .is_some_and(|prompts| prompts.find.is_some())
+        && find_option_key(s, view, event)
+    {
+        return true;
+    }
     if let Some((view, _)) = active_dialog(s) {
         if shortcut_for(&event.key, event.mods, Platform::CURRENT).is_some() {
             return false;
@@ -758,8 +933,9 @@ pub fn key(s: &mut Browser, event: &KeyEvent, tx: &mut Tx, context: KeyContext) 
     false
 }
 
-pub fn poll(s: &mut Browser, _: &mut Tx) -> bool {
-    let mut changed = false;
+pub fn poll(s: &mut Browser, now: f64, tx: &mut Tx) -> bool {
+    s.page_prompts.now = now;
+    let mut changed = show_due_tooltip(s, now, tx);
     if s.page_prompts
         .views
         .keys()
@@ -797,7 +973,12 @@ pub fn poll(s: &mut Browser, _: &mut Tx) -> bool {
     {
         find.sent_query = Some(find.query.text.clone());
         find.result = (!find.query.text.is_empty()).then_some(FindResult::Searching);
-        PageEngine.find_in_page(view, &find.query.text, find.case_sensitive);
+        PageEngine.find_in_page(
+            view,
+            &find.query.text,
+            find.case_sensitive,
+            find.highlight_all,
+        );
         changed = true;
     }
     changed
@@ -860,7 +1041,10 @@ mod tests {
     #[test]
     fn find_results_read_as_the_find_bar_shows_them() {
         assert_eq!(FindResult::Searching.label(), None);
-        assert_eq!(FindResult::NotFound.label().as_deref(), Some("No matches"));
+        assert_eq!(
+            FindResult::NotFound.label().as_deref(),
+            Some("Phrase not found")
+        );
         assert_eq!(
             FindResult::Match {
                 current: 0,
@@ -868,8 +1052,18 @@ mod tests {
             }
             .label()
             .as_deref(),
-            Some("1 of 3")
+            Some("1 of 3 matches")
         );
+    }
+
+    #[test]
+    fn a_selection_fills_the_find_bar_on_one_line() {
+        assert_eq!(find_text_from_selection("  quick brown  "), "quick brown");
+        assert_eq!(
+            find_text_from_selection("first\r\n\nsecond"),
+            "first second"
+        );
+        assert_eq!(find_text_from_selection("\n"), "");
     }
 
     #[test]

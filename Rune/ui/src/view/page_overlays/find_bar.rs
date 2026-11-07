@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-use rune::{El, edit_access, row, text, text_input};
+use rune::{El, Icon, edit_access, icon, row, text, text_input};
 
 use crate::engine::ViewId;
 use crate::page_prompts::{self, FindBar, FindResult};
@@ -16,6 +16,12 @@ use crate::view::page_overlays::controls::{
 use crate::view::palette::Palette;
 
 const FIELD_WIDTH: f32 = 220.0;
+
+static HIGHLIGHT: Icon = Icon {
+    name: "xenon-highlight-all",
+    view: 24.0,
+    body: r#"<path d="M9 11l-4 4v4h4l4-4M9 11l6-6 4 4-6 6M9 11l4 4M4 21h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>"#,
+};
 
 pub fn find_bar(view: ViewId, find: &FindBar, p: &Palette) -> El {
     let input = text_input(&find.query, BODY_FONT)
@@ -82,11 +88,39 @@ pub fn find_bar(view: ViewId, find: &FindBar, p: &Palette) -> El {
                 })
                 .a11y_hidden(),
         );
-    let bar = bar.child(if find.case_sensitive {
-        match_case.fill(p.hover)
-    } else {
-        match_case
-    });
+    let highlight_all = row()
+        .key("find-highlight-all")
+        .role("button")
+        .label("Highlight all")
+        .checked(find.highlight_all)
+        .h(28.0)
+        .px(6.0)
+        .radius(6.0)
+        .center()
+        .focusable(false)
+        .hover(p.hover)
+        .press(p.press)
+        .on_press(move |s: &mut Browser| page_prompts::toggle_find_highlight_all(s, view))
+        .child(
+            icon(&HIGHLIGHT, 16.0)
+                .color(if find.highlight_all {
+                    p.accent
+                } else {
+                    p.text_muted
+                })
+                .a11y_hidden(),
+        );
+    let bar = bar
+        .child(if find.highlight_all {
+            highlight_all.fill(p.hover)
+        } else {
+            highlight_all
+        })
+        .child(if find.case_sensitive {
+            match_case.fill(p.hover)
+        } else {
+            match_case
+        });
     panel_shadow(
         bar.child(icon_button(
             "find-previous",

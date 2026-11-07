@@ -331,8 +331,12 @@ pub unsafe extern "C" fn xenon_engine_find_in_page(
     view: XenonViewId,
     query: XenonStr,
     _case_sensitive: bool,
+    highlight_all: bool,
 ) {
     let query = unsafe { query.to_string_lossy() }.to_lowercase();
+    if highlight_all {
+        record(format!("find highlight all {query}"));
+    }
     let total = if query.is_empty() {
         0
     } else {

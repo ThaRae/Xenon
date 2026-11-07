@@ -82,10 +82,10 @@ void xenon_engine_close_file_picker(XenonViewId id, XenonPromptId picker, XenonS
     });
 }
 
-void xenon_engine_find_in_page(XenonViewId id, XenonStr query, bool case_sensitive)
+void xenon_engine_find_in_page(XenonViewId id, XenonStr query, bool case_sensitive, bool highlight_all)
 {
-    post_to_view(id, [query = ByteString { string_view_from(query) }, case_sensitive](View& view) {
-        view.find(query, case_sensitive);
+    post_to_view(id, [query = ByteString { string_view_from(query) }, case_sensitive, highlight_all](View& view) {
+        view.find(query, case_sensitive, highlight_all);
     });
 }
 

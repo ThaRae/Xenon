@@ -111,7 +111,7 @@ void xenon_engine_close_dialog(XenonViewId, XenonPromptId, bool accepted, XenonS
 void xenon_engine_activate_menu_item(XenonViewId, XenonPromptId menu, uint32_t item);
 void xenon_engine_close_select_dropdown(XenonViewId, XenonPromptId, bool has_selection, uint32_t item);
 void xenon_engine_close_file_picker(XenonViewId, XenonPromptId, XenonStr const* paths, size_t path_count);
-void xenon_engine_find_in_page(XenonViewId, XenonStr query, bool case_sensitive);
+void xenon_engine_find_in_page(XenonViewId, XenonStr query, bool case_sensitive, bool highlight_all);
 void xenon_engine_find_next(XenonViewId);
 void xenon_engine_find_previous(XenonViewId);
 void xenon_engine_end_find(XenonViewId);

@@ -14,9 +14,11 @@
 #include <LibWebCommon/HTML/VisibilityState.h>
 #include <LibWebCommon/PixelUnits.h>
 #include <LibWebView/Menu.h>
+#include <LibWakeLock/DisplaySleepInhibitor.h>
 #include <LibWebView/ViewImplementation.h>
 #include <Rune/Bridge/XenonBridge.h>
 #include <Rune/Bridge/XenonBridgePage.h>
+#include <Rune/Bridge/XenonBridgePrompts.h>
 
 namespace Xenon {
 
@@ -30,6 +32,19 @@ template<typename Callback, typename... Arguments>
 void notify_page(Callback XenonPageCallbacks::* callback, Arguments... arguments)
 {
     auto const& callbacks = page_callbacks();
+    if (auto function = callbacks.*callback)
+        function(callbacks.context, arguments...);
+}
+
+void offer_crash_report(ByteString const& report_name);
+
+void set_prompt_callbacks(XenonPromptCallbacks const&);
+XenonPromptCallbacks const& prompt_callbacks();
+
+template<typename Callback, typename... Arguments>
+void notify_prompts(Callback XenonPromptCallbacks::* callback, Arguments... arguments)
+{
+    auto const& callbacks = prompt_callbacks();
     if (auto function = callbacks.*callback)
         function(callbacks.context, arguments...);
 }
@@ -49,6 +64,7 @@ public:
     void go_forward();
     void set_viewport(Web::DevicePixelSize, double device_pixel_ratio);
     void set_visible(bool);
+    void set_uses_native_surface(bool);
     void apply_system_theme();
     void toggle_mute();
     void run_blocking_action(u32 action);
@@ -63,7 +79,7 @@ public:
     void activate_context_menu_item(XenonPromptId, u32 item);
     void close_select_dropdown(XenonPromptId, Optional<u32> item);
     void close_file_picker(XenonPromptId, Vector<ByteString> const& paths);
-    void find(StringView query, bool case_sensitive);
+    void find(StringView query, bool case_sensitive, bool highlight_all);
     void set_fullscreen(bool);
     void answer_permission(XenonPromptId, u32 outcome);
     void request_close_with_prompt();
@@ -75,6 +91,16 @@ public:
     };
     Optional<Favicon> const& favicon() const { return m_favicon; }
     bool can_hibernate() const;
+    void adopt_owner(WebView::ViewImplementation const& owner) { set_owner_view(owner); }
+    void cancel_mouse_press();
+
+    void review_hidden_crash_report(ByteString const& report_name);
+    void handle_drag_event(u32 type, Gfx::FloatPoint, u32 modifiers, Vector<ByteString> paths);
+    void request_find_selection(u64 request);
+    void refresh_screenshot_frame();
+    void finish_screenshot(u32 answer, Gfx::IntRect selection);
+    void update_color_picker(XenonPromptId, Optional<Color>, bool closed);
+    void close_date_picker(XenonPromptId, Optional<StringView> value);
 
     virtual Web::DevicePixelSize viewport_size() const override { return m_viewport_size; }
     virtual Gfx::IntPoint to_content_position(Gfx::IntPoint widget_position) const override { return widget_position; }
@@ -100,6 +126,17 @@ private:
 
     void install_callbacks();
     void install_page_callbacks();
+    void install_prompt_callbacks();
+    void install_media_callbacks();
+    void install_screenshot_callbacks();
+    void install_drop_callbacks();
+    void install_platform_callbacks();
+    void install_report_callbacks();
+    void open_dropped_files(Vector<ByteString> const& paths);
+    void start_screenshot();
+    RefPtr<Gfx::Bitmap> copy_current_frame();
+    void send_screenshot_frame();
+    void reset_prompts();
     XenonPromptId next_prompt_id() { return m_next_prompt_id++; }
     void open_page_dialog(PageDialog, StringView title, StringView message, StringView default_text = {}, Function<void(bool)> completion = {});
     void complete_page_dialog(bool accepted, Optional<Utf16String> const& text);
@@ -120,6 +157,7 @@ private:
 
     XenonViewId m_id { 0 };
     Web::DevicePixelSize m_viewport_size;
+    bool m_uses_native_surface { false };
 
     Optional<bool> m_reported_can_go_back;
     Optional<bool> m_reported_can_go_forward;
@@ -150,6 +188,15 @@ private:
     Vector<PendingPermission> m_pending_permissions;
     bool m_fullscreen_requested { false };
     Optional<Favicon> m_favicon;
+
+    XenonPromptId m_color_picker_id { 0 };
+    XenonPromptId m_date_picker_id { 0 };
+    bool m_web_authn_prompt_shown { false };
+
+    Optional<WakeLock::DisplaySleepInhibitor> m_screen_wake_lock;
+
+    RefPtr<Gfx::Bitmap> m_screenshot_frame;
+    XenonViewId m_screenshot_surface { 0 };
 };
 
 }

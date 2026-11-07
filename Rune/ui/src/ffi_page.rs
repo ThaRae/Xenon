@@ -175,7 +175,12 @@ unsafe extern "C" {
         paths: *const XenonStr,
         path_count: usize,
     );
-    pub fn xenon_engine_find_in_page(view: XenonViewId, query: XenonStr, case_sensitive: bool);
+    pub fn xenon_engine_find_in_page(
+        view: XenonViewId,
+        query: XenonStr,
+        case_sensitive: bool,
+        highlight_all: bool,
+    );
     pub fn xenon_engine_find_next(view: XenonViewId);
     pub fn xenon_engine_find_previous(view: XenonViewId);
     pub fn xenon_engine_end_find(view: XenonViewId);

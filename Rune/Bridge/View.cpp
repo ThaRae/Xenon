@@ -222,6 +222,12 @@ void View::install_callbacks()
 
     install_page_callbacks();
     install_accessibility(*this);
+    install_prompt_callbacks();
+    install_media_callbacks();
+    install_screenshot_callbacks();
+    install_drop_callbacks();
+    install_platform_callbacks();
+    install_report_callbacks();
 }
 
 void View::present_current_frame()
@@ -242,6 +248,42 @@ void View::present_current_frame()
 
     if (!shared_image_buffer)
         return;
+
+#ifdef USE_VULKAN_DMABUF_IMAGES
+    if (m_uses_native_surface) {
+        if (auto const* dmabuf = shared_image_buffer->linux_dmabuf_handle()) {
+            auto width = min(size.width().value(), dmabuf->size.width());
+            auto height = min(size.height().value(), dmabuf->size.height());
+            if (width > 0 && height > 0 && !dmabuf->planes.is_empty()) {
+                XenonDmaBufFrame frame {
+                    .width = static_cast<u32>(width),
+                    .height = static_cast<u32>(height),
+                    .drm_format = dmabuf->drm_format,
+                    .modifier = dmabuf->modifier,
+                    .plane_count = static_cast<u32>(min(dmabuf->planes.size(), static_cast<size_t>(4))),
+                    .fds = {},
+                    .offsets = {},
+                    .pitches = {},
+                };
+                for (size_t i = 0; i < frame.plane_count; ++i) {
+                    auto const& plane = dmabuf->planes[i];
+                    if (plane.object_index >= dmabuf->objects.size()) {
+                        frame.plane_count = static_cast<u32>(i);
+                        break;
+                    }
+                    frame.fds[i] = dmabuf->objects[plane.object_index].fd();
+                    frame.offsets[i] = plane.offset;
+                    frame.pitches[i] = plane.pitch;
+                }
+                if (frame.plane_count > 0) {
+                    Engine::the().notify(&XenonUiCallbacks::view_dmabuf_frame, m_id, static_cast<XenonDmaBufFrame const*>(&frame));
+                    return;
+                }
+            }
+        }
+        set_uses_native_surface(false);
+    }
+#endif
 
     auto bitmap = shared_image_buffer->bitmap_if_present();
     if (!bitmap) {
@@ -422,6 +464,16 @@ void View::set_viewport(Web::DevicePixelSize viewport_size, double device_pixel_
 void View::set_visible(bool visible)
 {
     set_system_visibility_state(visible ? Web::HTML::VisibilityState::Visible : Web::HTML::VisibilityState::Hidden);
+}
+
+void View::set_uses_native_surface(bool uses)
+{
+    if (m_uses_native_surface == uses)
+        return;
+    m_uses_native_surface = uses;
+#ifdef USE_VULKAN_DMABUF_IMAGES
+    set_presents_from_cpu_memory(!uses);
+#endif
 }
 
 void View::set_focused(bool focused)
@@ -858,20 +910,6 @@ void View::install_page_callbacks()
         notify_page(&XenonPageCallbacks::file_picker_requested, m_id, static_cast<XenonFilePicker const*>(&picker));
     };
 
-    on_request_color_picker = [this](Color) {
-        Core::deferred_invoke([weak_this = make_weak_ptr<View>()] {
-            if (weak_this)
-                weak_this->color_picker_update({}, Web::HTML::ColorPickerUpdateState::Closed);
-        });
-    };
-
-    on_request_date_picker = [this](Utf16String const&, Utf16String const&, Utf16String const&, Utf16String const&) {
-        Core::deferred_invoke([weak_this = make_weak_ptr<View>()] {
-            if (weak_this)
-                weak_this->date_picker_closed({});
-        });
-    };
-
     on_find_in_page = [this](size_t current_match_index, Optional<size_t> const& total_match_count) {
         notify_page(&XenonPageCallbacks::find_result, m_id, current_match_index, total_match_count.has_value(), total_match_count.value_or(0));
     };
@@ -881,14 +919,6 @@ void View::install_page_callbacks()
     };
 
     on_leave_tooltip_area = [this] {
-        show_tooltip({}, {});
-    };
-
-    on_request_tooltip_override = [this](Gfx::IntPoint position, ByteString const& tooltip) {
-        show_tooltip(tooltip, position.to_type<float>());
-    };
-
-    on_stop_tooltip_override = [this] {
         show_tooltip({}, {});
     };
 
@@ -1057,6 +1087,7 @@ void View::reset_page_prompts()
     }
 
     show_tooltip({}, {});
+    reset_prompts();
     if (exchange(m_fullscreen_requested, false))
         notify_page(&XenonPageCallbacks::fullscreen_requested, m_id, false);
 }
@@ -1129,12 +1160,12 @@ void View::close_file_picker(XenonPromptId id, Vector<ByteString> const& paths)
     file_picker_closed(move(selected_files));
 }
 
-void View::find(StringView query, bool case_sensitive)
+void View::find(StringView query, bool case_sensitive, bool highlight_all)
 {
     auto utf8_query = String::from_utf8(query);
     if (utf8_query.is_error())
         return;
-    find_in_page(Utf16String::from_utf8(utf8_query.value()), case_sensitive ? CaseSensitivity::CaseSensitive : CaseSensitivity::CaseInsensitive);
+    find_in_page(Utf16String::from_utf8(utf8_query.value()), case_sensitive ? CaseSensitivity::CaseSensitive : CaseSensitivity::CaseInsensitive, highlight_all);
 }
 
 void View::set_fullscreen(bool fullscreen)

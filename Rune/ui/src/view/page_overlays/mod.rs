@@ -9,6 +9,7 @@ pub(crate) mod controls;
 mod dialog;
 mod find_bar;
 pub(crate) mod menu;
+mod pickers;
 
 use rune::El;
 
@@ -25,6 +26,15 @@ pub fn page_overlays(s: &Browser, view: ViewId, p: &Palette) -> Vec<El> {
         }
         if !prompts.permissions.is_empty() {
             overlays.push(bubbles::permission_prompts(view, &prompts.permissions, p));
+        }
+        if let Some(prompt) = &prompts.web_authn {
+            overlays.push(pickers::web_authn(view, prompt, p));
+        }
+        if let Some(picker) = &prompts.color_picker {
+            overlays.push(pickers::color_picker(view, picker, p));
+        }
+        if let Some(picker) = &prompts.date_picker {
+            overlays.push(pickers::date_picker(view, picker, p));
         }
     }
     if let Some((dialog_view, dialog)) = page_prompts::active_dialog(s)

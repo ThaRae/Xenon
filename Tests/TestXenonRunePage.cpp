@@ -246,7 +246,7 @@ TEST_CASE(page_prompts_round_trip_through_the_page_abi)
     load(events, "data:text/html,<title>find</title><p>needle hay needle hay needle</p>"sv);
     EXPECT(has_title(events, "find"sv));
     EXPECT(wait_until(events, [](auto& events) { return !events.loading; }));
-    xenon_engine_find_in_page(events.view, xenon_str("needle"sv), false);
+    xenon_engine_find_in_page(events.view, xenon_str("needle"sv), false, false);
     EXPECT(wait_until(events, [](auto& events) { return events.find_total.has_value(); }));
     {
         MutexLocker locker(events.mutex);
