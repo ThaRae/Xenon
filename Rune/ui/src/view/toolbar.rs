@@ -14,6 +14,7 @@ use crate::view::icons;
 use crate::view::location::location_field;
 use crate::view::palette::Palette;
 use crate::view::shield::shield_button;
+use crate::view::update_button::update_button;
 
 const BUTTON_SIZE: f32 = 32.0;
 
@@ -70,6 +71,7 @@ pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
         .children(s.windows.shown_is_private().then(|| private_badge(p)))
         .children(downloads_button(s, p))
         .children(shield_button(s, p))
+        .children(update_button(s))
         .child(nav_button(
             "menu-button",
             "Menu",

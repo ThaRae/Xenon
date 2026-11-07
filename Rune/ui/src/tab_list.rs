@@ -372,6 +372,17 @@ impl Windows {
     }
 }
 
+impl Windows {
+    pub fn private_window_count(&self) -> usize {
+        self.shown.iter().filter(|window| window.private).count()
+            + self
+                .hidden
+                .iter()
+                .filter(|window| window.info.private)
+                .count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

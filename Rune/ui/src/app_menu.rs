@@ -36,6 +36,9 @@ pub fn menu_bar() -> Vec<MenuItem<Browser>> {
         item("", "Settings…", Some("cmd+,"), |s, tx| {
             s.run_shortcut(BrowserShortcut::OpenSettings, tx)
         }),
+        item("", "Check for Updates…", None, |s, _| {
+            crate::updates::check_or_offer(s)
+        }),
         item("File", "New Tab", Some("cmd+t"), |s, tx| {
             s.run_shortcut(BrowserShortcut::NewTab, tx)
         }),
