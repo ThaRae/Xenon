@@ -9,6 +9,7 @@ use std::sync::Arc;
 use rune::{Env, Pixels, Runtime};
 use serde_json::Value;
 
+use crate::bookmarks::{BarVisibility, BookmarkNode};
 use crate::engine::ChromeLayout;
 use crate::state::Browser;
 use crate::tab_list::Tab;
@@ -30,6 +31,20 @@ fn browser(layout: ChromeLayout) -> Browser {
     browser.tabs.insert(active, 0);
     browser.tabs.insert(background, 1);
     browser.tabs.activate(ACTIVE_VIEW);
+    browser.bookmarks.visibility = BarVisibility::Always;
+    browser.bookmarks.items = vec![
+        BookmarkNode::Bookmark {
+            id: "b1".to_owned(),
+            title: String::new(),
+            url: "https://ladybird.org/".to_owned(),
+            favicon: None,
+        },
+        BookmarkNode::Folder {
+            id: "f1".to_owned(),
+            title: "Work".to_owned(),
+            children: Vec::new(),
+        },
+    ];
     browser
 }
 
@@ -139,4 +154,28 @@ fn popover_buttons_say_whether_their_popover_is_open() {
         .find(|node| node["role"] == "toolbar")
         .expect("a toolbar");
     assert!(named(toolbar), "{toolbar}");
+}
+
+#[test]
+fn the_bookmarks_bar_is_a_toolbar_of_named_buttons() {
+    for layout in LAYOUTS {
+        let tree = tree(layout);
+        let all = nodes(&tree);
+        let bar = all
+            .iter()
+            .find(|node| node["key"] == "bookmarks-bar")
+            .unwrap_or_else(|| panic!("{layout:?}: no bookmarks bar"));
+        assert_eq!(bar["role"], "toolbar", "{layout:?}: {bar}");
+        assert_eq!(bar["name"], "Bookmarks", "{layout:?}: {bar}");
+        let names: Vec<&str> = all
+            .iter()
+            .filter(|node| {
+                node["key"]
+                    .as_str()
+                    .is_some_and(|key| key.starts_with("bookmark-"))
+            })
+            .filter_map(|node| node["name"].as_str())
+            .collect();
+        assert_eq!(names, ["https://ladybird.org/", "Work"], "{layout:?}");
+    }
 }
