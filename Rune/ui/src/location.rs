@@ -10,7 +10,11 @@ use std::ops::Range;
 use rune::{Key, KeyEvent, Mods, Pixels, TextEdit, Tx};
 
 use crate::engine::{Engine, Modifiers, TabIndex, ViewId};
+use crate::ffi::XenonStr;
 use crate::ffi_location::{LocationCommand, LocationEngine};
+use crate::location_menu::{
+    MenuRequest, xenon_engine_location_paste_and_go, xenon_engine_location_set_suspended,
+};
 use crate::state::{Browser, NEW_TAB_URL};
 
 pub const MAX_DISPLAY_BYTES: usize = 2048;
@@ -137,6 +141,18 @@ struct Session {
     sent_at_end: bool,
 }
 
+struct ParkedSession {
+    session: Session,
+    text: String,
+    anchor: usize,
+    focus: usize,
+    suggestions: Vec<Suggestion>,
+    popup_visible: bool,
+    selected: Option<usize>,
+    completion_from: Option<usize>,
+    input: LocationInput,
+}
+
 #[derive(Default)]
 pub struct LocationBar {
     pub edit: TextEdit,
@@ -155,6 +171,10 @@ pub struct LocationBar {
     pub input: LocationInput,
     pub site_info: Option<SiteInfo>,
     pub copied_links: u64,
+    parked: HashMap<ViewId, ParkedSession>,
+    pub menu_request: Option<MenuRequest>,
+    menu_requests: u64,
+    menu_open: bool,
 }
 
 pub fn elide(text: &str, max_bytes: usize) -> String {
@@ -433,6 +453,9 @@ impl LocationBar {
     pub fn poll(&mut self) -> (bool, bool) {
         let mut changed = false;
         let mut gained = false;
+        if self.menu_open && self.had_focus && !self.edit.focused {
+            return (false, false);
+        }
         if self.edit.focused != self.had_focus {
             self.had_focus = self.edit.focused;
             changed = true;
@@ -623,6 +646,123 @@ impl LocationBar {
         true
     }
 
+    fn set_suspended(&self, view: ViewId, generation: u64, suspended: bool) {
+        unsafe { xenon_engine_location_set_suspended(view, generation, suspended) }
+    }
+
+    fn park(&mut self) -> bool {
+        let Some(session) = self.session.take() else {
+            return false;
+        };
+        let view = session.view;
+        self.set_suspended(view, self.generation, true);
+        let parked = ParkedSession {
+            session,
+            text: self.edit.text.clone(),
+            anchor: self.edit.anchor,
+            focus: self.edit.focus,
+            suggestions: std::mem::take(&mut self.suggestions),
+            popup_visible: self.popup_visible,
+            selected: self.selected,
+            completion_from: self.completion_from,
+            input: std::mem::take(&mut self.input),
+        };
+        self.clear_popup();
+        self.site_info = None;
+        self.menu_request = None;
+        self.parked.insert(view, parked);
+        true
+    }
+
+    pub fn has_parked_session(&self, view: ViewId) -> bool {
+        self.parked.contains_key(&view)
+    }
+
+    pub fn forget_parked_sessions(&mut self, keep: impl Fn(ViewId) -> bool) {
+        self.parked.retain(|view, _| keep(*view));
+    }
+
+    fn restore(&mut self, view: ViewId, url: &str) -> bool {
+        let Some(parked) = self.parked.remove(&view) else {
+            return false;
+        };
+        self.end_session();
+        self.shown = Some((view, url.to_owned()));
+        self.ensure_described(view, url);
+        self.edit.replace_text(parked.text);
+        self.edit.set_selection(parked.anchor, parked.focus);
+        self.edit.focused = true;
+        self.had_focus = true;
+        self.suggestions = parked.suggestions;
+        self.popup_visible = parked.popup_visible;
+        self.selected = parked.selected;
+        self.completion_from = parked.completion_from;
+        self.input = parked.input;
+        self.session = Some(parked.session);
+        let generation = self.next_generation();
+        self.set_suspended(view, generation, false);
+        true
+    }
+
+    pub fn parked_url_changed(&mut self, view: ViewId, url: &str) {
+        if !self.parked.contains_key(&view) {
+            return;
+        }
+        let text = editing_text_for(url, self.info_for(view, url));
+        let generation = self.next_generation();
+        self.engine.begin_editing(view, generation, &text);
+        self.set_suspended(view, generation, true);
+        if let Some(parked) = self.parked.get_mut(&view) {
+            parked.session.sent_text = text.clone();
+            parked.session.sent_at_end = true;
+            parked.text = text;
+            parked.anchor = 0;
+            parked.focus = 0;
+            parked.suggestions.clear();
+            parked.popup_visible = false;
+            parked.selected = None;
+            parked.completion_from = None;
+            parked.input = LocationInput::default();
+        }
+    }
+
+    pub fn menu_opened(&mut self) {
+        self.menu_open = true;
+        if let Some(view) = self.session.as_ref().map(|session| session.view) {
+            self.set_suspended(view, self.generation, true);
+        }
+    }
+
+    pub fn menu_closed(&mut self) {
+        if !std::mem::take(&mut self.menu_open) || !self.had_focus {
+            return;
+        }
+        self.edit.focused = true;
+        if let Some(view) = self.session.as_ref().map(|session| session.view) {
+            self.set_suspended(view, self.generation, false);
+        }
+    }
+
+    pub fn next_menu_request(&mut self) -> u64 {
+        self.menu_requests += 1;
+        self.menu_requests
+    }
+
+    pub fn paste_and_go(&mut self, text: &str) {
+        self.edit.replace_text(text.to_owned());
+        let end = self.edit.text.len();
+        self.edit.set_caret(end);
+        let Some(session) = self.session.as_mut() else {
+            return;
+        };
+        session.sent_text = text.to_owned();
+        session.sent_at_end = true;
+        let view = session.view;
+        let generation = self.next_generation();
+        self.completion_from = None;
+        unsafe { xenon_engine_location_paste_and_go(view, generation, XenonStr::borrowed(text)) }
+    }
+
     pub fn toggle_site_info(&mut self) {
         if self.site_info.take().is_some() {
             return;
@@ -671,6 +811,52 @@ impl Browser {
             .map(|tab| tab.url.clone())
             .unwrap_or_default();
         self.location.show(view, &url);
+    }
+
+    pub fn switch_location(&mut self, tx: &mut Tx) {
+        let view = self.tabs.active_view();
+        let leaving = self
+            .location
+            .shown_view()
+            .is_some_and(|shown| Some(shown) != view);
+        let was_editing = self.location.edit.focused && self.location.had_focus;
+        if leaving && was_editing {
+            self.location.park();
+        }
+        let tabs = &self.tabs;
+        let windows = &self.windows;
+        self.location
+            .forget_parked_sessions(|parked| windows.window_of(parked, tabs).is_some());
+        if let Some(view) = view
+            && self.location.has_parked_session(view)
+        {
+            let url = self
+                .tabs
+                .active()
+                .map(|tab| tab.url.clone())
+                .unwrap_or_default();
+            if self.location.restore(view, &url) {
+                self.blur_page();
+                return;
+            }
+        }
+        if !(leaving && was_editing) {
+            self.reset_location();
+            return;
+        }
+        self.location.edit.focused = false;
+        self.location.had_focus = false;
+        self.reset_location();
+        if self
+            .location
+            .editing_text()
+            .is_some_and(|text| text.is_empty())
+        {
+            self.focus_location();
+        } else {
+            tx.blur();
+            self.focus_page();
+        }
     }
 
     pub fn track_location_focus(&mut self) -> bool {
@@ -969,5 +1155,78 @@ mod tests {
         assert_eq!(bar.edit.text, "ladybird.org");
         assert_eq!(bar.edit.range(), (3, 12));
         assert!(bar.has_inline_completion());
+    }
+
+    #[test]
+    fn a_parked_session_comes_back_with_its_text_selection_and_suggestions() {
+        let mut bar = LocationBar::default();
+        bar.edit.focused = true;
+        bar.had_focus = true;
+        bar.shown = Some((3, "https://example.com/".into()));
+        bar.session = Some(Session {
+            view: 3,
+            sent_text: "ladyb".into(),
+            sent_at_end: true,
+        });
+        bar.edit.replace_text("ladybird.org");
+        bar.edit.set_selection(5, 12);
+        bar.completion_from = Some(5);
+        bar.popup_visible = true;
+
+        assert!(bar.park());
+        assert!(!bar.is_editing());
+        assert!(!bar.popup_visible);
+        assert!(bar.has_parked_session(3));
+
+        bar.show(Some(4), "https://other.example/");
+        assert_ne!(bar.edit.text, "ladybird.org");
+
+        assert!(bar.restore(3, "https://example.com/"));
+        assert_eq!(bar.edit.text, "ladybird.org");
+        assert_eq!(bar.edit.range(), (5, 12));
+        assert!(bar.edit.focused);
+        assert!(bar.popup_visible);
+        assert!(bar.has_inline_completion());
+        assert_eq!(bar.shown_view(), Some(3));
+        assert!(!bar.has_parked_session(3));
+    }
+
+    #[test]
+    fn a_menu_borrows_the_focus_without_ending_the_editing_session() {
+        let mut bar = LocationBar::default();
+        bar.shown = Some((3, "https://example.com/".into()));
+        bar.edit.focused = true;
+        bar.poll();
+        bar.edit.replace_text("typed text");
+        bar.edit.set_selection(0, 5);
+        bar.poll();
+        bar.menu_opened();
+        bar.edit.focused = false;
+        bar.poll();
+        assert!(bar.is_editing());
+        assert_eq!(bar.edit.text, "typed text");
+        bar.menu_closed();
+        assert!(bar.edit.focused);
+        bar.poll();
+        assert!(bar.is_editing());
+        assert_eq!(bar.edit.text, "typed text");
+        assert_eq!(bar.edit.range(), (0, 5));
+    }
+
+    #[test]
+    fn a_navigation_in_a_parked_tab_restarts_its_session_on_the_new_address() {
+        let mut bar = LocationBar::default();
+        bar.edit.focused = true;
+        bar.session = Some(Session {
+            view: 3,
+            sent_text: "typed".into(),
+            sent_at_end: true,
+        });
+        bar.edit.replace_text("typed");
+        assert!(bar.park());
+        bar.parked_url_changed(3, "https://example.com/next");
+        assert!(bar.restore(3, "https://example.com/next"));
+        assert_eq!(bar.edit.text, "https://example.com/next");
+        assert_eq!(bar.edit.range(), (0, 0));
     }
 }

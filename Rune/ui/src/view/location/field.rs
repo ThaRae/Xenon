@@ -185,7 +185,8 @@ pub fn location_field(s: &Browser, p: &Palette, dark: bool, cx: &mut Cx<Browser>
         })
         .pr(FIELD_PADDING)
         .center_y()
-        .radius(FIELD_HEIGHT / 2.0);
+        .radius(FIELD_HEIGHT / 2.0)
+        .on_secondary_press(|s: &mut Browser, at, tx| s.show_location_menu(at, tx));
     if let Some(leading) = leading {
         field = field.child(indicator(leading, bar.site_info.is_some(), p, &colors));
     }

@@ -22,6 +22,7 @@
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/View.h>
 #include <Rune/Bridge/XenonBridgeLocation.h>
+#include <Rune/Bridge/XenonBridgeLocationMenu.h>
 #include <UI/Bangs.h>
 #include <UI/SiteSecurity.h>
 #include <UI/XenonSettings.h>
@@ -567,5 +568,21 @@ void xenon_engine_location_request_site_security(XenonViewId id)
     Xenon::Engine::the().post([id] {
         if (auto* view = Xenon::Engine::the().view(id))
             request_site_security(*view);
+    });
+}
+
+void xenon_engine_location_paste_and_go(XenonViewId id, uint64_t generation, XenonStr text)
+{
+    post_to_session(id, generation, [text = string_from(text)](Session& session) {
+        session.bang_dismissed = false;
+        session.display_text = text;
+        session.omnibox.navigate_directly_to_query(text);
+    });
+}
+
+void xenon_engine_location_set_suspended(XenonViewId id, uint64_t generation, bool suspended)
+{
+    post_to_session(id, generation, [suspended](Session& session) {
+        session.omnibox.set_suspended(suspended);
     });
 }
