@@ -441,6 +441,8 @@ self-signed certificate.
 - **What proceeding accepts**: that certificate, and only it, for the site's host and port: the page and everything it
   loads from there, `fetch()`, `XMLHttpRequest` and WebSockets included. Another port, or another certificate on the
   same one, gets the warning again. Xenon forgets it when it quits, or a private window's when the private windows close.
+  The warning page names the fingerprint it showed when you proceed, and if the site has presented another certificate
+  since, Xenon shows the warning again, with that one, instead of accepting it.
 - **Web UIs built on Ext JS**, like Proxmox VE's, find the methods they override by reading a function's `caller`
   through `apply()`. Ladybird looks past `call`, `apply` and `Reflect.apply` for a function's caller, as other browsers
   do (this was once a Xenon engine patch); without it, they showed an empty page past the warning.
