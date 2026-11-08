@@ -468,8 +468,8 @@ an HTTPS page's whose certificate the user accepted past the [certificate warnin
 either opens a popover below it, as Chrome's and Helium's site information does:
 
 - **Connection is secure**, for an HTTPS page whose certificate was verified; **Certificate not verified**, in the
-  accent color, for one reached over a certificate the user accepted; or **Connection isn't secure**, for HTTP, with
-  nothing more.
+  accent color, for one reached over a certificate the user accepted, or on a host and port the user accepted one for
+  (as the padlock says); or **Connection isn't secure**, for HTTP, with nothing more.
 - **Connection**: the TLS version (`TLS 1.3`) and cipher (`TLS_AES_256_GCM_SHA384`).
 - **Certificate**: who it's issued to and by (common name and organization), when it's valid, and its SHA-256
   fingerprint, in eight-byte lines that can be selected and copied.
