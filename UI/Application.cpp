@@ -1445,7 +1445,9 @@ void Application::display_error_dialog(StringView error_message) const
         return;
     }
 
-    QMessageBox::warning(active_tab(), "Xenon", qstring_from_ak_string(error_message));
+    QMessageBox dialog(QMessageBox::Warning, "Xenon", qstring_from_ak_string(error_message), QMessageBox::Ok, active_tab());
+    dialog.setTextFormat(Qt::PlainText);
+    dialog.exec();
 }
 
 void Application::open_download(WebView::FileDownloader::Download const& download) const

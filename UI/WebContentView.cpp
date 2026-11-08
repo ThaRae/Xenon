@@ -81,6 +81,7 @@
 #include <QScrollBar>
 #include <QShortcut>
 #include <QStyleHints>
+#include <QTextDocument>
 #include <QTextEdit>
 #include <QTimer>
 #include <QToolTip>
@@ -180,7 +181,7 @@ WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTrave
         if (m_tooltip_text.has_value())
             QToolTip::showText(
                 QCursor::pos(),
-                qstring_from_ak_string(m_tooltip_text.value()),
+                Qt::convertFromPlainText(qstring_from_ak_string(m_tooltip_text.value())),
                 this);
     });
 
@@ -330,7 +331,7 @@ WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTrave
             : tooltip;
         QToolTip::showText(
             mapToGlobal(QPoint(position.x(), position.y())),
-            qstring_from_ak_string(tooltip_without_carriage_return),
+            Qt::convertFromPlainText(qstring_from_ak_string(tooltip_without_carriage_return)),
             this);
     };
 
