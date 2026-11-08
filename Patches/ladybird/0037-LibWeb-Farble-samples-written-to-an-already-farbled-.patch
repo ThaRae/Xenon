@@ -20,13 +20,13 @@ hardwareConcurrency, deviceMemory, the Chrome User-Agent, and
 navigator.webdriver.
 ---
  .../LibWeb/Bindings/RustBindingsServices.cpp  |   2 +-
- Libraries/LibWeb/Internals/Internals.cpp      |   6 +
+ Libraries/LibWeb/Internals/Internals.cpp      |   5 +
  Libraries/LibWeb/Internals/Internals.h        |   1 +
  Libraries/LibWeb/Internals/Internals.idl      |   1 +
  Libraries/LibWeb/WebAudio/AudioBuffer.cpp     |   7 ++
  .../expected/Fingerprinting/protection.txt    |  15 +++
  .../Text/input/Fingerprinting/protection.html | 106 ++++++++++++++++++
- 7 files changed, 137 insertions(+), 1 deletion(-)
+ 7 files changed, 136 insertions(+), 1 deletion(-)
  create mode 100644 Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
  create mode 100644 Tests/LibWeb/Text/input/Fingerprinting/protection.html
 
@@ -51,11 +51,11 @@ index b2b40d7d306fad1a1e575fcd23a9bc476169bd53..c792e1b5935bfd14b6f15d0c9c487287
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index dc3dd140e263c2e0d0c48f57d47cbfb6727afbd4..fb10d337cdff4d4028c02af5c8a4bceccb24e6df 100644
+index 0491a3d18c398729b19411bdbb5ee14507188da7..1792b56c94c051e70bdfe9e803c3ab18f8943aeb 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1534,6 +1534,12 @@ void Internals::set_user_agent(Utf16String const& user_agent)
-     Web::update_loader_config([&](auto& config) { config.user_agent = user_agent.to_utf8(); });
+@@ -1528,6 +1528,11 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
+     return {};
  }
  
 +// Test mode forces fingerprinting protection off so output stays deterministic. Tests of farbling turn it back on.
@@ -63,30 +63,29 @@ index dc3dd140e263c2e0d0c48f57d47cbfb6727afbd4..fb10d337cdff4d4028c02af5c8a4bcec
 +{
 +    Web::update_loader_config([&](auto& config) { config.enable_fingerprinting_protection = enabled; });
 +}
-+
  void Internals::set_content_blocking_enabled(bool enabled)
  {
      page().set_content_blocking_policy(enabled, {});
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index 2d547d9cf040a3fd4f332d5f60c0bdf9f5eb6830..72604126a2f2b1c23d2426d4501aef5c4da995d6 100644
+index 0010c8a4445aa132f870f1d2c41c52a0ce1bb6d4..254c458493c69b90583eb8d2b790c10786816fe4 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -186,6 +186,7 @@ public:
+@@ -185,6 +185,7 @@ public:
+     WebIDL::ExceptionOr<void> send_bad_ipc_message_for_testing(Utf16String const& kind);
      WebIDL::ExceptionOr<void> set_content_blockers(Utf16String const& patterns);
      WebIDL::ExceptionOr<void> set_site_compatibility_data(Utf16String const& source);
-     void set_user_agent(Utf16String const& user_agent);
 +    void set_fingerprinting_protection(bool enabled);
      void set_content_blocking_enabled(bool enabled);
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
      WebIDL::UnsignedLongLong partial_layout_count();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index bddc46f49698068985f6860a098e05a5d7ba40ff..65c3cd863e4454eec6f912493310f6a13388ef93 100644
+index af33aeda0fd2fb1473423f9dbefa54b212fc0f23..8907e0da2fe2047005ec137c7ef57c6a3b37d969 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -188,6 +188,7 @@ interface Internals {
+@@ -187,6 +187,7 @@ interface Internals {
+     undefined sendBadIpcMessageForTesting(DOMString kind);
      undefined setContentBlockers(DOMString patterns);
      undefined setSiteCompatibilityData(DOMString source);
-     undefined setUserAgent(DOMString userAgent);
 +    undefined setFingerprintingProtection(boolean enabled);
      undefined setContentBlockingEnabled(boolean enabled);
      DOMString? cosmeticFilterForElement(Element element);
@@ -111,13 +110,13 @@ index c4af9f1bedf1587d5e6c957ab2242c455d7acab8..5fe0717028cb2cc4066746bd8760a2fa
  
 diff --git a/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt b/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
 new file mode 100644
-index 0000000000000000000000000000000000000000..3cff823f90350a96fc916fc11db2a1dc182128c8
+index 0000000000000000000000000000000000000000..563acfec73fecf07ec27e2eee992d8c2dfb98472
 --- /dev/null
 +++ b/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
 @@ -0,0 +1,15 @@
 +webdriver is false: PASS
 +user agent is chrome-shaped: PASS
-+user agent has no Ladybird token: PASS
++user agent names Ladybird: PASS
 +vendor is Google Inc.: PASS
 +canvas readback is exact with protection off: PASS
 +canvas getImageData is stable: PASS
@@ -132,7 +131,7 @@ index 0000000000000000000000000000000000000000..3cff823f90350a96fc916fc11db2a1dc
 +deviceMemory is 1, 2, or 4: PASS
 diff --git a/Tests/LibWeb/Text/input/Fingerprinting/protection.html b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
 new file mode 100644
-index 0000000000000000000000000000000000000000..cba8b5bb83506aaca65aa02bf0409ec02094b69b
+index 0000000000000000000000000000000000000000..ec0fb4f9c22c1e1afed885baeb7a7992cbe02432
 --- /dev/null
 +++ b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
 @@ -0,0 +1,106 @@
@@ -159,9 +158,9 @@ index 0000000000000000000000000000000000000000..cba8b5bb83506aaca65aa02bf0409ec0
 +        try {
 +            println(`webdriver is false: ${navigator.webdriver === false ? "PASS" : `FAIL (${navigator.webdriver})`}`);
 +
-+            const chromeShaped = /^Mozilla\/5\.0 \([^)]*\) AppleWebKit\/537\.36 \(KHTML, like Gecko\) Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/.test(navigator.userAgent);
++            const chromeShaped = /^Mozilla\/5\.0 \([^)]*\) Ladybird\/\S+ Chrome\/\d+\.0\.0\.0 AppleWebKit\/537\.36 Safari\/537\.36$/.test(navigator.userAgent);
 +            println(`user agent is chrome-shaped: ${chromeShaped ? "PASS" : `FAIL (${navigator.userAgent})`}`);
-+            println(`user agent has no Ladybird token: ${navigator.userAgent.includes("Ladybird") ? `FAIL (${navigator.userAgent})` : "PASS"}`);
++            println(`user agent names Ladybird: ${navigator.userAgent.includes("Ladybird/") ? "PASS" : `FAIL (${navigator.userAgent})`}`);
 +            println(`vendor is Google Inc.: ${navigator.vendor === "Google Inc." ? "PASS" : `FAIL (${navigator.vendor})`}`);
 +
 +            const canvas = document.createElement("canvas");
