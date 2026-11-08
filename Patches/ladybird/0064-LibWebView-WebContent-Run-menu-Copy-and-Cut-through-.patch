@@ -1,0 +1,168 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 21:51:53 -0500
+Subject: [PATCH] LibWebView+WebContent: Run menu Copy and Cut through the page
+
+The context menu's Cut and Copy read the selection out of the page from
+the UI process, so they never fired the DOM cut and copy events. Pages
+that implement editing themselves, such as contenteditable editors,
+therefore did nothing, while the keyboard shortcuts worked because
+WebContent runs the clipboard actions for those.
+
+Run the copy and cut actions in WebContent for both the context menu and
+the application menu, as the keyboard shortcuts do, and give the page
+user activation first so that it may write the clipboard.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/Application.cpp         | 10 ++------
+ Libraries/LibWebView/ViewImplementation.cpp  | 24 +++++++++++++-------
+ Libraries/LibWebView/ViewImplementation.h    |  2 ++
+ Services/WebContent/ConnectionFromClient.cpp | 18 +++++++++++++++
+ Services/WebContent/ConnectionFromClient.h   |  2 ++
+ Services/WebContent/WebContentServer.ipc     |  2 ++
+ 6 files changed, 42 insertions(+), 16 deletions(-)
+
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 4032e95fc8960dd53f4aebb93ebf965636b788ba..c59272b2bb362b46248eb70611d2e16298d9e68e 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -2915,17 +2915,11 @@ void Application::initialize_actions()
+     update_editing_history_actions();
+     m_copy_selection_action = Action::create("Copy"sv, ActionID::CopySelection, [this]() {
+         if (auto view = active_web_view(); view.has_value())
+-            view->selected_text()->when_resolved([this](auto& text) {
+-                if (!text.is_empty())
+-                    insert_clipboard_entry({ "text/plain"_string, text });
+-            });
++            view->copy_selection();
+     });
+     m_cut_selection_action = Action::create("Cut"sv, ActionID::CutSelection, [this]() {
+         if (auto view = active_web_view(); view.has_value())
+-            view->cut_selected_text()->when_resolved([this](auto& text) {
+-                if (!text.is_empty())
+-                    insert_clipboard_entry({ "text/plain"_string, text });
+-            });
++            view->cut_selection();
+     });
+     m_paste_action = Action::create("Paste"sv, ActionID::Paste, [this]() {
+         if (auto view = active_web_view(); view.has_value())
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index f0c93bda31ce15b76bc2c8c5eb33db9d348d859c..4c029a8a494903e3372b3c10193338223dbc69ca 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -3178,6 +3178,20 @@ void ViewImplementation::paste_from_clipboard()
+     host.async_paste_from_clipboard();
+ }
+ 
++void ViewImplementation::copy_selection()
++{
++    auto& host = focused_navigable_host();
++    host.give_user_activation();
++    host.async_copy_selection();
++}
++
++void ViewImplementation::cut_selection()
++{
++    auto& host = focused_navigable_host();
++    host.give_user_activation();
++    host.async_cut_selection();
++}
++
+ void ViewImplementation::set_marked_text_from_input_method(Utf16String const& text)
+ {
+     auto& host = focused_navigable_host();
+@@ -5517,23 +5531,17 @@ void ViewImplementation::add_open_url_actions(Menu& menu, URL::URL const& url, O
+     }
+ }
+ 
+-static void insert_text_clipboard_entry(ByteString const& text)
+-{
+-    if (!text.is_empty())
+-        Application::the().insert_clipboard_entry({ "text/plain"_string, text });
+-}
+-
+ // Text can be edited only in a field, and copied only where there is some.
+ void ViewImplementation::add_text_edit_actions(Menu& menu, bool is_editable, bool has_selected_text)
+ {
+     if (is_editable) {
+         menu.add_action(Action::create("Cut"sv, ActionID::CutSelection, [this]() {
+-            cut_selected_text()->when_resolved(insert_text_clipboard_entry);
++            cut_selection();
+         }));
+     }
+     if (is_editable || has_selected_text) {
+         menu.add_action(Action::create("Copy"sv, ActionID::CopySelection, [this]() {
+-            selected_text()->when_resolved(insert_text_clipboard_entry);
++            copy_selection();
+         }));
+     }
+     if (is_editable) {
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index e1cbd947a8577c9d5b72b84af8a3036e480974b6..67abed29fdb54bd1559cea12ab679f4d1dfebffd 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -401,6 +401,8 @@ public:
+     void did_receive_selected_text_for_lookup(Badge<WebContentPage>, u64 request_id, Optional<DictionaryLookup> lookup);
+     void did_select_word_for_dictionary_lookup(Badge<WebContentPage>, u64 request_id, bool selected);
+     void did_cut_selected_text(Badge<WebContentPage>, u64 request_id, ByteString selection);
++    void copy_selection();
++    void cut_selection();
+     void select_all();
+     void undo();
+     void redo();
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 136a047234e5f129bf4aff131a9dd481e10e0de5..e2ced7e5e243465adb3927d31bf2592d93d7fbc5 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3185,6 +3185,24 @@ void ConnectionFromClient::select_all(Web::PageId page_id)
+     }
+ }
+ 
++void ConnectionFromClient::copy_selection(Web::PageId page_id)
++{
++    if (auto page = this->page(page_id); page.has_value()) {
++        if (auto navigable = page->page().hosted_focused_navigable())
++            (void)navigable->event_handler().perform_copy_action(Web::EventHandler::ClipboardActionTrigger::User);
++    }
++}
++
++void ConnectionFromClient::cut_selection(Web::PageId page_id)
++{
++    if (auto page = this->page(page_id); page.has_value()) {
++        if (auto navigable = page->page().hosted_focused_navigable()) {
++            (void)navigable->event_handler().perform_cut_action(Web::EventHandler::ClipboardActionTrigger::User);
++            update_input_method_state(page_id);
++        }
++    }
++}
++
+ void ConnectionFromClient::undo(Web::PageId page_id)
+ {
+     if (auto page = this->page(page_id); page.has_value()) {
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index a441975cdbaafec8aefd3231122e2ad8f2ea9672..502a017db364da974b86215b9a39229da880aa2f 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -351,6 +351,8 @@ private:
+     virtual void get_selected_text_for_lookup(Web::PageId page_id, u64 request_id) override;
+     virtual void select_word_for_dictionary_lookup(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) override;
+     virtual void cut_selected_text(Web::PageId page_id, u64 request_id) override;
++    virtual void copy_selection(Web::PageId page_id) override;
++    virtual void cut_selection(Web::PageId page_id) override;
+     virtual void select_all(Web::PageId page_id) override;
+     virtual void undo(Web::PageId page_id) override;
+     virtual void redo(Web::PageId page_id) override;
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 04e0e600940a86ea3813c3849748b1dff78f7b92..4d835d68742471dd89ebcf3dd64fd46593e788a6 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -251,6 +251,8 @@ endpoint WebContentServer routed by Web::PageId page_id
+     get_selected_text_for_lookup(Web::PageId page_id, u64 request_id) =|
+     select_word_for_dictionary_lookup(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) =|
+     cut_selected_text(Web::PageId page_id, u64 request_id) =|
++    copy_selection(Web::PageId page_id) =|
++    cut_selection(Web::PageId page_id) =|
+     select_all(Web::PageId page_id) =|
+     undo(Web::PageId page_id) =|
+     redo(Web::PageId page_id) =|
