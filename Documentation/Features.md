@@ -418,7 +418,8 @@ Xenon installs the one picked from the Chrome Web Store, after checking its sign
 
 On macOS, sites and password managers can register a USB security key and sign in with it
 (`navigator.credentials.create()` and `get()`), PINs included, and in cross-origin frames that are allowed to. A prompt
-over the page says what the key needs. It comes from engine patches `0010`–`0015`; see [WebAuthn.md](WebAuthn.md).
+over the page says what the key needs. It comes from engine patches `0010`–`0015`; see [WebAuthn.md](WebAuthn.md). Engine patch `0065` checks a request's
+U2F AppID against the page's origin in the UI process too, not only in the page's own process.
 
 ## Security
 
