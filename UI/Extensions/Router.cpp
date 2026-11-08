@@ -467,6 +467,8 @@ ErrorOr<JsonValue, String> Router::handle_storage_call(Context& context, String 
         return "The 'storage' permission is required."_string;
 
     if (name == "storage.setAccessLevel"sv) {
+        if (context.kind == ContextKind::ContentScript)
+            return "storage.setAccessLevel() isn't available to content scripts."_string;
         auto options = !args.is_empty() && args.at(0).is_object() ? args.at(0).as_object() : JsonObject {};
         auto level = options.get_string("accessLevel"sv);
         if (level == "TRUSTED_AND_UNTRUSTED_CONTEXTS"sv)
@@ -991,6 +993,8 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
 {
     prune_closed_contexts();
 
+    auto is_session_storage_change = name == "storage.onChanged"sv && args.size() > 1 && args.at(1).is_string()
+        && args.at(1).as_string() == storage_area_name(StorageArea::Kind::Session);
     auto serialized = event_message(name, move(args));
 
     if (!kind.has_value() || *kind == ContextKind::Background) {
@@ -1005,6 +1009,7 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
         }
     }
     auto background_is_starting = m_starting_backgrounds.contains(extension.id());
+    auto content_scripts_see_session_storage = m_session_storage_open_to_content_scripts.contains(extension.id());
 
     for (auto const& context : m_contexts) {
         if (context.extension->id() != extension.id())
@@ -1014,6 +1019,8 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
         if (context.kind == ContextKind::ExternalPage || (context.kind == ContextKind::Background && background_is_starting))
             continue;
         if (context.kind == ContextKind::ContentScript && !name.starts_with("storage."sv) && !name.starts_with("permissions."sv))
+            continue;
+        if (context.kind == ContextKind::ContentScript && is_session_storage_change && !content_scripts_see_session_storage)
             continue;
         post(context.endpoint, serialized);
     }
