@@ -169,7 +169,11 @@ int Engine::run_application()
         .strings = m_argument_views.span(),
     };
 
+#if defined(XENON_HELPER_PROCESS_DIRECTORY)
+    auto application_or_error = Application::create(Ladybird::FilterLists::with_bundled_filter_lists(arguments), ByteString { XENON_HELPER_PROCESS_DIRECTORY });
+#else
     auto application_or_error = Application::create(Ladybird::FilterLists::with_bundled_filter_lists(arguments));
+#endif
     if (application_or_error.is_error()) {
         warnln("Xenon: Unable to start the engine: {}", application_or_error.error());
         return 1;

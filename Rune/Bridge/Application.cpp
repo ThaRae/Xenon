@@ -60,7 +60,8 @@ static void reveal_file(ByteString const& file)
 #endif
 }
 
-Application::Application()
+Application::Application(Optional<ByteString> ladybird_binary_path)
+    : WebView::Application(move(ladybird_binary_path))
 {
     Ladybird::Extensions::Registry::the().register_url_scheme();
     Ladybird::BlockingDashboard::register_url_scheme();

@@ -22,7 +22,7 @@ public:
     void did_create_view(View&);
 
 private:
-    Application();
+    explicit Application(Optional<ByteString> ladybird_binary_path = {});
 
     virtual void create_platform_arguments(Core::ArgsParser&) override;
     virtual void create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&) override;
