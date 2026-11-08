@@ -120,6 +120,15 @@ TEST_CASE(manifest_errors)
     EXPECT(parse(R"({ "manifest_version": 3, "name": "T", "version": "1", "web_accessible_resources": ["a.png"] })"sv).error().contains("must be objects"sv));
 }
 
+TEST_CASE(manifest_incognito_key)
+{
+    EXPECT(MUST(parse(R"({ "manifest_version": 3, "name": "T", "version": "1" })"sv)).allows_private_windows);
+    EXPECT(MUST(parse(R"({ "manifest_version": 3, "name": "T", "version": "1", "incognito": "spanning" })"sv)).allows_private_windows);
+    EXPECT(MUST(parse(R"({ "manifest_version": 3, "name": "T", "version": "1", "incognito": "split" })"sv)).allows_private_windows);
+    EXPECT(!MUST(parse(R"({ "manifest_version": 3, "name": "T", "version": "1", "incognito": "not_allowed" })"sv)).allows_private_windows);
+    EXPECT(parse(R"({ "manifest_version": 3, "name": "T", "version": "1", "incognito": "always" })"sv).error().contains("'incognito'"sv));
+}
+
 TEST_CASE(extension_pages_csp_cannot_allow_remote_code)
 {
     auto manifest = [](StringView policy) {

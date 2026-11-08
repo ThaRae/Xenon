@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 19:13:07 -0500
+Subject: [PATCH] LibWebView: Give an endpoint its view while the page hosts
+ its document
+
+ScriptBridgeEndpoint::view_id() answered only for an endpoint whose
+bridge was open, so the world-less endpoint of a web page, which never
+has one, had no view. That is the endpoint a UserScriptHandler gets to
+decide which scripts a document runs, and it has to know the view to
+tell a private window's documents from the others.
+
+Answer for any document the page still hosts.
+---
+ Libraries/LibWebView/URLSchemeHandler.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/Libraries/LibWebView/URLSchemeHandler.cpp b/Libraries/LibWebView/URLSchemeHandler.cpp
+index e79a314514f1bec201ff33d6c86bc9c647ae1085..14dd2d0a9e024a17f2e4bafefe563d3dcda59bfc 100644
+--- a/Libraries/LibWebView/URLSchemeHandler.cpp
++++ b/Libraries/LibWebView/URLSchemeHandler.cpp
+@@ -79,9 +79,10 @@ bool ScriptBridgeEndpoint::is_open() const
+ 
+ Optional<u64> ScriptBridgeEndpoint::view_id() const
+ {
+-    if (!is_open())
++    auto page = m_page.strong_ref();
++    if (!page || !page->hosted_document_endpoint(m_document_id).has_value())
+         return {};
+-    if (auto view = m_page->traversable().view(); view.has_value())
++    if (auto view = page->traversable().view(); view.has_value())
+         return view->view_id();
+     return {};
+ }

@@ -56,8 +56,10 @@ elsewhere) still reopens a tab with its history. The sliders button in the botto
 and pages**, which can turn Recently closed off. Private windows show neither, and say what they keep and who can still
 see what you do instead.
 
-The page is static, with no channel back to the browser, so Xenon's UI hands it all of this once it has loaded
-(`UI/NewTabPage.cpp`).
+The page has no channel back to the browser, so Xenon's UI hands it all of this once it has loaded
+(`UI/NewTabPage.cpp`). A site can open `about:newtab` too, so engine patch `0069` (`LibWebView: Give about:newtab a
+process of its own`) keeps it in a process of its own, like `about:history`'s, and Xenon fills it only there: never in
+a process that also runs a site's pages.
 
 Ladybird opens new tabs blank, so Xenon makes `about:newtab` the new tab page of a profile until its first run is
 complete (`UI/main.cpp`). **Settings → Startup and pages** can change it, and its reset button goes back to
@@ -330,7 +332,8 @@ Scriptlets (YouTube ads, anti-adblock walls), `$redirect` surrogates, `$removepa
 hiding (`:has-text()`), CNAME uncloaking, and an element picker (**Block Element...** in a page's context menu). They
 follow the same on/off switch and per-site toggle as the rest of blocking.
 
-They come from engine patches `0004`–`0009`, from xenon-ublock. What's still missing is in xenon-ublock's
+They come from engine patches `0004`–`0009`, from xenon-ublock. Engine patch `0066` keeps every scriptlet named
+`trusted-*` to the trusted lists, whatever the resources file marks. What's still missing is in xenon-ublock's
 `docs/gap-analysis.md`.
 
 ### uBlock Origin's popup and dashboard
@@ -406,6 +409,9 @@ still in progress; [Extensions.md](Extensions.md) has the details.
   `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for.
 - Their content scripts run in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and
   stylesheets on request.
+- They stay out of private windows, as in Chrome, until **Allow in private windows** is ticked for each one in the
+  Extensions dialog: no content scripts there, and no private tabs, windows, or their events in their APIs
+  (`Registry::may_see()`; see [Extensions.md](Extensions.md#security)).
 
 ### Bitwarden, Proton Pass, 1Password, and iCloud Passwords
 
@@ -431,7 +437,8 @@ Xenon installs the one picked from the Chrome Web Store, after checking its sign
 
 On macOS, sites and password managers can register a USB security key and sign in with it
 (`navigator.credentials.create()` and `get()`), PINs included, and in cross-origin frames that are allowed to. A prompt
-over the page says what the key needs. It comes from engine patches `0010`–`0015`; see [WebAuthn.md](WebAuthn.md).
+over the page says what the key needs. It comes from engine patches `0010`–`0015`; see [WebAuthn.md](WebAuthn.md). Engine patch `0065` checks a request's
+U2F AppID against the page's origin in the UI process too, not only in the page's own process.
 
 ## Security
 
@@ -452,6 +459,8 @@ self-signed certificate.
 - **What proceeding accepts**: that certificate, and only it, for the site's host and port: the page and everything it
   loads from there, `fetch()`, `XMLHttpRequest` and WebSockets included. Another port, or another certificate on the
   same one, gets the warning again. Xenon forgets it when it quits, or a private window's when the private windows close.
+  The warning page names the fingerprint it showed when you proceed, and if the site has presented another certificate
+  since, Xenon shows the warning again, with that one, instead of accepting it.
 - **Web UIs built on Ext JS**, like Proxmox VE's, find the methods they override by reading a function's `caller`
   through `apply()`. Ladybird looks past `call`, `apply` and `Reflect.apply` for a function's caller, as other browsers
   do (this was once a Xenon engine patch); without it, they showed an empty page past the warning.
@@ -477,8 +486,8 @@ an HTTPS page's whose certificate the user accepted past the [certificate warnin
 either opens a popover below it, as Chrome's and Helium's site information does:
 
 - **Connection is secure**, for an HTTPS page whose certificate was verified; **Certificate not verified**, in the
-  accent color, for one reached over a certificate the user accepted; or **Connection isn't secure**, for HTTP, with
-  nothing more.
+  accent color, for one reached over a certificate the user accepted, or on a host and port the user accepted one for
+  (as the padlock says); or **Connection isn't secure**, for HTTP, with nothing more.
 - **Connection**: the TLS version (`TLS 1.3`) and cipher (`TLS_AES_256_GCM_SHA384`).
 - **Certificate**: who it's issued to and by (common name and organization), when it's valid, and its SHA-256
   fingerprint, in eight-byte lines that can be selected and copied.

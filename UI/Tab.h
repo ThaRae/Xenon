@@ -68,6 +68,7 @@ public:
     {
         setAttribute(Qt::WA_ShowWithoutActivating);
         setMouseTracking(true);
+        setTextFormat(Qt::PlainText);
     }
 
     virtual void enterEvent(QEnterEvent* event) override

@@ -13,10 +13,14 @@
 #include <LibWebView/Application.h>
 #include <LibWebView/BookmarkStore.h>
 #include <LibWebView/BrowsingSession.h>
+#include <LibWebView/CanonicalDocument.h>
+#include <LibWebView/CanonicalTraversable.h>
 #include <LibWebView/FaviconStore.h>
 #include <LibWebView/HistoryStore.h>
 #include <LibWebView/SessionStore.h>
 #include <LibWebView/ViewImplementation.h>
+#include <LibWebView/WebContentClient.h>
+#include <LibWebView/WebContentPage.h>
 #include <UI/NewTabPage.h>
 
 namespace Ladybird::NewTabPage {
@@ -162,8 +166,23 @@ static JsonArray bookmarks_bar(WebView::BrowsingSession& session)
     return bookmarks;
 }
 
+static bool is_in_a_process_of_its_own(WebView::ViewImplementation& view)
+{
+    if (!view.has_traversable())
+        return false;
+    auto const& document = view.traversable().active_document();
+    auto const& host = document.host();
+    if (!is_new_tab_page(document.creation_url()) || !host)
+        return false;
+    auto const& hosted_web_ui = host->client().hosted_web_ui();
+    return hosted_web_ui.has_value() && *hosted_web_ui == "newtab"sv;
+}
+
 void populate(WebView::ViewImplementation& view, WebView::BrowsingSession& session, ShowRecentlyClosed show_recently_closed)
 {
+    if (!is_in_a_process_of_its_own(view))
+        return;
+
     auto is_private = session.is_private() == WebView::IsPrivate::Yes;
 
     JsonObject data;

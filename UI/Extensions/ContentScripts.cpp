@@ -98,8 +98,11 @@ Vector<Web::HTML::UserScript> ContentScripts::scripts_for_document(WebView::Scri
     Vector<Web::HTML::UserScript> scripts;
     auto const& url = document.url();
     auto is_top_level_frame = !document.navigable().parent_id.has_value();
+    auto view_id = document.view_id();
 
     for (auto const& extension : Registry::the().extensions()) {
+        if (!Registry::the().may_see_view(extension, view_id))
+            continue;
         Vector<ContentScript const&> matching;
         for (auto const& content_script : extension->manifest().content_scripts) {
             if (content_script.matches_document(url, is_top_level_frame))
@@ -174,8 +177,11 @@ Vector<Web::HTML::UserScript> ContentScripts::externally_connectable_scripts(Web
     if (!url.scheme().is_one_of("http"sv, "https"sv))
         return {};
 
+    auto view_id = document.view_id();
     Vector<NonnullRefPtr<Extension>> extensions;
     for (auto const& extension : Registry::the().extensions()) {
+        if (!Registry::the().may_see_view(extension, view_id))
+            continue;
         auto const& externally_connectable = extension->manifest().externally_connectable;
         if (externally_connectable.has_value() && externally_connectable->matches_document(url))
             extensions.append(extension);

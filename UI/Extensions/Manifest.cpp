@@ -354,6 +354,12 @@ ErrorOr<Manifest, String> Manifest::parse(JsonObject json)
         manifest.options_page = normalized_path(*page);
     }
 
+    if (auto incognito = TRY(optional_string(json, "incognito"sv, ""sv)); incognito.has_value()) {
+        if (!incognito->is_one_of("spanning"sv, "split"sv, "not_allowed"sv))
+            return error("Invalid value for 'incognito'.");
+        manifest.allows_private_windows = *incognito != "not_allowed"sv;
+    }
+
     if (auto commands = json.get("commands"sv); commands.has_value()) {
         if (!commands->is_object())
             return error("Invalid value for 'commands'.");

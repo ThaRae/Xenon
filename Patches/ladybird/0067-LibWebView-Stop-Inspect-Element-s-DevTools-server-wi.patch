@@ -1,0 +1,70 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 19:10:25 -0500
+Subject: [PATCH] LibWebView: Stop Inspect Element's DevTools server with its
+ client
+
+Inspect Element starts the DevTools server when it isn't running, and
+launches Firefox to connect to it. The server takes the first client
+that connects to its port on the loopback interface, without telling
+the Firefox it launched from any other local process, and it kept
+listening after that Firefox closed, until the user turned DevTools
+off. Any process on the machine could connect then, and run script in
+every tab.
+
+Stop the server once the client goes when Inspect Element started it,
+so it listens only while the user is inspecting. Turning DevTools on
+by hand keeps it listening as before.
+---
+ Libraries/LibWebView/Application.cpp | 11 +++++++++++
+ Libraries/LibWebView/Application.h   |  1 +
+ 2 files changed, 12 insertions(+)
+
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 4032e95fc8960dd53f4aebb93ebf965636b788ba..921f45e10738391fb7566652f5a1d3aa0fe27b67 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -2397,6 +2397,7 @@ ErrorOr<void> Application::inspect_element(ViewImplementation& view)
+     if (!m_devtools) {
+         TRY(launch_devtools_server());
+         started_devtools = true;
++        m_devtools_started_by_inspect_element = true;
+     }
+ 
+     if (auto result = launch_devtools_client(view.view_id()); result.is_error()) {
+@@ -3743,6 +3744,7 @@ ErrorOr<void> Application::toggle_devtools_enabled()
+     if (m_devtools) {
+         m_devtools_client.clear();
+         m_devtools_launched_for_view_id.clear();
++        m_devtools_started_by_inspect_element = false;
+         m_devtools.clear();
+         ViewImplementation::for_each_view([](ViewImplementation& view) {
+             view.clear_pending_inspect_element();
+@@ -4770,6 +4772,15 @@ void Application::did_close_devtools_connection()
+ {
+     m_devtools_client.clear();
+     m_devtools_launched_for_view_id.clear();
++
++    if (!m_devtools_started_by_inspect_element)
++        return;
++    Core::deferred_invoke([this] {
++        if (!m_devtools || !m_devtools_started_by_inspect_element || m_devtools->has_active_connection())
++            return;
++        if (auto result = toggle_devtools_enabled(); result.is_error())
++            warnln("Unable to stop the DevTools server: {}", result.error());
++    });
+ }
+ 
+ }
+diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
+index 9da9e41af34a848d6e65782852d17879efa2ba24..10e82ac1e20ff37d0975eb68596fe705f2f2e154 100644
+--- a/Libraries/LibWebView/Application.h
++++ b/Libraries/LibWebView/Application.h
+@@ -830,6 +830,7 @@ private:
+     OwnPtr<DevTools::FirefoxClient> m_devtools_client;
+     // The tab the client was launched for, which may not have an attached client yet.
+     Optional<u64> m_devtools_launched_for_view_id;
++    bool m_devtools_started_by_inspect_element { false };
+ 
+     mutable HashMap<u64, u64> m_navigation_listener_ids;
+ };
