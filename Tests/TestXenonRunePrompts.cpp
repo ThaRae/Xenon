@@ -8,6 +8,7 @@
 #include <AK/ConditionVariable.h>
 #include <AK/Mutex.h>
 #include <AK/Optional.h>
+#include <AK/Platform.h>
 #include <AK/Time.h>
 #include <AK/Vector.h>
 #include <LibCore/File.h>
@@ -225,9 +226,11 @@ TEST_CASE(prompts_drops_and_handlers_round_trip_through_their_abis)
     MUST(Core::System::mkdir(ByteString::formatted("{}/data", directory), 0700));
     MUST(Core::System::mkdir(ByteString::formatted("{}/data/applications", directory), 0700));
     auto launched = ByteString::formatted("{}/launched", directory);
+#if defined(AK_OS_LINUX)
     write_file(directory, "data/applications/xenon-test-handler.desktop"sv,
         ByteString::formatted("[Desktop Entry]\nType=Application\nName=Xenon Test Handler\nExec=/bin/sh -c 'echo \"$1\" > {}' sh %u\nMimeType=x-scheme-handler/xenontest;\nNoDisplay=true\n", launched));
     write_file(directory, "config/mimeapps.list"sv, "[Default Applications]\nx-scheme-handler/xenontest=xenon-test-handler.desktop\n"sv);
+#endif
     VERIFY(setenv("XDG_CONFIG_HOME", ByteString::formatted("{}/config", directory).characters(), 1) == 0);
     VERIFY(setenv("XDG_DATA_HOME", ByteString::formatted("{}/data", directory).characters(), 1) == 0);
     VERIFY(setenv("XENON_TEST_UPDATE_READY", "9.9.9", 1) == 0);
@@ -319,6 +322,7 @@ TEST_CASE(prompts_drops_and_handlers_round_trip_through_their_abis)
     drop_files(events.view, dropped_files);
     EXPECT(has_title(events, "dropped-first.html+second.txt"sv));
 
+#if defined(AK_OS_LINUX)
     load(events, "data:text/html,<title>external</title><body style='margin:0'><a href='xenontest:hello' style='display:block;width:300px;height:100px'>open</a>"sv, "external"sv);
     click(events.view, 50, 50);
     if (!wait_until(events, [](auto& events) { return events.dialog.has_value(); })) {
@@ -332,6 +336,7 @@ TEST_CASE(prompts_drops_and_handlers_round_trip_through_their_abis)
         EXPECT_EQ(events.dialog->title, "Open Xenon Test Handler?"sv);
     }
     xenon_engine_close_dialog(events.view, events.dialog->id, false, {});
+#endif
 
     xenon_engine_shutdown();
 
