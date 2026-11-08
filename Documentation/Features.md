@@ -329,7 +329,8 @@ Scriptlets (YouTube ads, anti-adblock walls), `$redirect` surrogates, `$removepa
 hiding (`:has-text()`), CNAME uncloaking, and an element picker (**Block Element...** in a page's context menu). They
 follow the same on/off switch and per-site toggle as the rest of blocking.
 
-They come from engine patches `0004`–`0009`, from xenon-ublock. What's still missing is in xenon-ublock's
+They come from engine patches `0004`–`0009`, from xenon-ublock. Engine patch `0066` keeps every scriptlet named
+`trusted-*` to the trusted lists, whatever the resources file marks. What's still missing is in xenon-ublock's
 `docs/gap-analysis.md`.
 
 ### uBlock Origin's popup and dashboard
