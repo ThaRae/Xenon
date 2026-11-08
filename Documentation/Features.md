@@ -394,6 +394,9 @@ still in progress; [Extensions.md](Extensions.md) has the details.
   `action`, `commands`, and `offscreen`, and fetch from the hosts they have permission for.
 - Their content scripts run in isolated worlds of their own in web pages, and `chrome.scripting` injects scripts and
   stylesheets on request.
+- They stay out of private windows, as in Chrome, until **Allow in private windows** is ticked for each one in the
+  Extensions dialog: no content scripts there, and no private tabs, windows, or their events in their APIs
+  (`Registry::may_see()`; see [Extensions.md](Extensions.md#security)).
 
 ### Bitwarden, Proton Pass, 1Password, and iCloud Passwords
 

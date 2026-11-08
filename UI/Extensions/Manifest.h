@@ -104,6 +104,7 @@ struct Manifest {
     Optional<ExternallyConnectable> externally_connectable;
     Optional<String> options_page;
     Vector<Command> commands;
+    bool allows_private_windows { true };
 
     Vector<String> permissions;
     Vector<String> optional_permissions;

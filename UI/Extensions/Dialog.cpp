@@ -12,6 +12,7 @@
 #include <UI/StringUtils.h>
 
 #include <QAction>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFrame>
@@ -69,6 +70,16 @@ QDialog#XenonExtensionsDialog QComboBox {{
 
 QLabel#XenonExtensionWarning {{
     color: {7};
+}}
+
+QDialog#XenonExtensionsDialog QCheckBox {{
+    color: {0};
+    background: transparent;
+    spacing: 6px;
+}}
+
+QDialog#XenonExtensionsDialog QCheckBox:disabled {{
+    color: {1};
 }}
 
 QScrollArea, QWidget#XenonExtensionsList {{
@@ -287,6 +298,17 @@ void ExtensionsDialog::rebuild()
         details->setTextInteractionFlags(Qt::TextSelectableByMouse);
         details->setWordWrap(true);
         text->addWidget(details);
+
+        auto* private_windows = new QCheckBox("Allow in private windows", row);
+        private_windows->setChecked(Registry::the().is_allowed_in_private_windows(*extension));
+        private_windows->setEnabled(manifest.allows_private_windows);
+        private_windows->setToolTip(manifest.allows_private_windows
+                ? "Let the extension run in private windows and see their tabs"
+                : "The extension says it can't run in private windows");
+        QObject::connect(private_windows, &QCheckBox::toggled, this, [id = extension->id()](bool allowed) {
+            Registry::the().set_allowed_in_private_windows(id, allowed);
+        });
+        text->addWidget(private_windows);
 
         for (auto const& warning : manifest.warnings) {
             auto* label = new QLabel(qstring_from_ak_string(warning), row);

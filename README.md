@@ -36,6 +36,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 - Pick Bitwarden, Proton Pass, 1Password, or (on macOS) iCloud Passwords when you first start Xenon, and it installs and updates it for you
 - Sign in with a USB security key (WebAuthn, on macOS)
 - Extensions stop running in the background when idle, as in Chrome, and start again when needed
+- Extensions stay out of private windows unless you allow each one
 
 **Security**
 

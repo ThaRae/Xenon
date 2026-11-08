@@ -293,7 +293,7 @@ void Router::forget_extension(Extension const& extension)
 void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String const& text)
 {
     auto context = context_for(endpoint);
-    if (!context.has_value())
+    if (!context.has_value() || !Registry::the().may_see_view(*context->extension, endpoint.view_id()))
         return;
 
     if (context->kind == ContextKind::Background)
@@ -434,7 +434,7 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
         result = handle_permissions_call(context, name, args);
     else if (name.starts_with_bytes("privacy."sv))
         result = handle_privacy_call(context, name, args);
-    else if (name.starts_with_bytes("runtime."sv) || name.starts_with_bytes("management."sv) || name.starts_with_bytes("idle."sv) || name.starts_with_bytes("offscreen."sv) || name.starts_with_bytes("commands."sv))
+    else if (name.starts_with_bytes("runtime."sv) || name.starts_with_bytes("management."sv) || name.starts_with_bytes("idle."sv) || name.starts_with_bytes("offscreen."sv) || name.starts_with_bytes("commands."sv) || name.starts_with_bytes("extension."sv))
         result = handle_runtime_call(context, name, args);
     else if (name.starts_with_bytes("webNavigation."sv))
         result = handle_web_navigation_call(context, name, args);
@@ -899,6 +899,9 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
     if (name == "runtime.setUninstallURL"sv)
         return JsonValue {};
 
+    if (name == "extension.isAllowedIncognitoAccess"sv)
+        return JsonValue { Registry::the().is_allowed_in_private_windows(*extension) };
+
     if (name == "management.getSelf"sv) {
         auto const& manifest = extension->manifest();
         JsonObject info;
@@ -1016,12 +1019,6 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
     }
 }
 
-void Router::dispatch_event_to_all(StringView name, JsonArray args)
-{
-    for (auto const& extension : Registry::the().extensions())
-        dispatch_event(extension, name, args);
-}
-
 Vector<WebView::ScriptBridgeEndpoint> Router::extension_receivers(Context const& sender) const
 {
     Vector<WebView::ScriptBridgeEndpoint> receivers;
@@ -1044,7 +1041,7 @@ Vector<WebView::ScriptBridgeEndpoint> Router::content_script_receivers(Extension
         if (context.extension->id() != extension.id() || context.kind != ContextKind::ContentScript)
             continue;
         auto view_id = context.endpoint.view_id();
-        if (!view_id.has_value())
+        if (!view_id.has_value() || !Registry::the().may_see_view(extension, *view_id))
             continue;
         if (auto ids = Browser::tab_and_window_ids(*view_id); !ids.has_value() || ids->tab_id != tab_id)
             continue;

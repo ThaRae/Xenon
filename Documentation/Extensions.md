@@ -443,6 +443,7 @@ for Bitwarden in Chrome.
 | Background worker, offscreen documents | 0001 (workers' loads), 0032 (no content blocker), 0033 (no lingering RequestServer) | `UI/Extensions/Registry` (their hidden views and generated files), `Router` (stopping the background when idle, and starting it for events), `UI/Resources/extensions/background-page.js` and `worker-bridge.js` |
 | `tabs`, `windows`, `action`, `commands` | | `UI/Extensions/Browser` (Chrome's numeric IDs for Xenon's tabs and windows, their events, action state per tab, shortcuts) |
 | `alarms` | | `UI/Extensions/Alarms` |
+| Private windows | | `UI/Extensions/Registry` (the per-extension allowance and `may_see()`), `Dialog` (its toggle), and the checks in `ContentScripts`, `Browser`, `Router`, `Scripting.cpp`, and `Toolbar` (see [Security](#security)) |
 | Managing extensions | | `UI/Extensions/Dialog` (Qt), and `--load-extension`. An `about:extensions` page would need LibWebView's hardcoded WebUI list to grow, so it waits. |
 | Installing from the Chrome Web Store | | `UI/Extensions/WebStore` (update checks and downloads), `CRX` (verifying CRX3 files and unpacking their zip), `Registry` (installed extensions, under `<profile data>/Extensions/Installed/`) |
 | Choosing a password manager | 0025 | `UI/PasswordManagers` (installs, switches, removes, and updates them daily; the `loadPasswordManagers` and `setPasswordManager` WebUI messages), `UI/WebUIInterfaces`, the welcome page's last step, the Extensions dialog's picker, and `--password-manager`. iCloud Passwords is offered on macOS only. |
@@ -492,6 +493,20 @@ for Bitwarden in Chrome.
   `SIGCHLD`. An open native port keeps the background service worker from stopping when idle. As in Chrome, the host
   gets only stdin, stdout, and stderr of the browser's files; a host that's still running when its port closes is sent
   `SIGTERM`; and writing to one that has exited fails instead of raising `SIGPIPE`, which would end the browser.
+- **Private windows** are off limits to every extension until the user ticks **Allow in private windows** on its row in
+  the Extensions dialog, as Chrome's "Allow in Incognito" is. The choice is kept per extension ID in `extensions.json`
+  (`allowedInPrivateWindows`), so it survives reloads and updates, and goes when the extension is removed. A manifest
+  with `"incognito": "not_allowed"` can't be allowed; `"split"` runs as `"spanning"`, since the background is never
+  private. Until it's allowed, an extension gets nothing from a private window: no content scripts, registered
+  scripts, or `externally_connectable` relay in its documents; no tabs or windows from `tabs.*` and `windows.*`
+  (asking for one by ID fails as if it didn't exist, and `windows.create({ incognito: true })` fails); none of their
+  `tabs`, `windows`, or `webNavigation` events (focus moving to one reports `WINDOW_ID_NONE`); no `scripting`
+  injection or `tabs.sendMessage` / `tabs.connect` to their documents; no toolbar button or command shortcuts in
+  them. Messages from its scripts already in a private document when it's disallowed are dropped. Once allowed,
+  `chrome.extension.isAllowedIncognitoAccess()` resolves to true and the extension spans both kinds of window;
+  `inIncognitoContext` stays false, since its own pages never run in a private session (`runtime.openOptionsPage()`
+  opens in a normal window). The one check is `Registry::may_see()` (and `may_see_view()` for a document's view), used
+  by `ContentScripts`, `Browser` (`may_see_window()`), `Router`, `Scripting.cpp`, and `Toolbar`.
 - **No `file://` access** for content scripts unless the user turns it on per extension, as in Chrome.
 
 ## Testing
