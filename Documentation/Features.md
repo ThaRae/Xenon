@@ -55,8 +55,10 @@ elsewhere) still reopens a tab with its history. The sliders button in the botto
 and pages**, which can turn Recently closed off. Private windows show neither, and say what they keep and who can still
 see what you do instead.
 
-The page is static, with no channel back to the browser, so Xenon's UI hands it all of this once it has loaded
-(`UI/NewTabPage.cpp`).
+The page has no channel back to the browser, so Xenon's UI hands it all of this once it has loaded
+(`UI/NewTabPage.cpp`). A site can open `about:newtab` too, so engine patch `0069` (`LibWebView: Give about:newtab a
+process of its own`) keeps it in a process of its own, like `about:history`'s, and Xenon fills it only there: never in
+a process that also runs a site's pages.
 
 Ladybird opens new tabs blank, so Xenon makes `about:newtab` the new tab page of a profile until its first run is
 complete (`UI/main.cpp`). **Settings → Startup and pages** can change it, and its reset button goes back to
