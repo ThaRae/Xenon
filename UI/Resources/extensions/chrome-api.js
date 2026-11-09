@@ -584,7 +584,7 @@ const commands = {
 
 const extension = {
     inIncognitoContext: false,
-    isAllowedIncognitoAccess: api(() => false),
+    isAllowedIncognitoAccess: method("extension.isAllowedIncognitoAccess"),
     isAllowedFileSchemeAccess: api(() => false),
 };
 

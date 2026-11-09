@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 18:42:18 -0500
+Subject: [PATCH] LibWeb: Keep trusted- scriptlets to trusted filter lists
+
+The content blocker lets only trusted lists use the scriptlets uBlock
+Origin keeps to them, through the permission bit the resources give
+those scriptlets. A resource that leaves the bit out is open to every
+list, and to the user's own filters, all the same: the resources
+built from uBlock Origin 1.75.0 leave it out of trusted-prevent-xhr,
+which answers a page's requests with whatever text a filter names.
+
+uBlock Origin names every scriptlet it keeps to trusted lists
+trusted-, so require the trusted bit of any resource named or aliased
+so, on top of what the resources mark.
+---
+ Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs b/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
+index eacda5b0d36fc663f89c49af6abf7096dad23f1d..76c597b96fced9ea13b7430b392ccaadd6ac0546 100644
+--- a/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
++++ b/Libraries/LibWeb/ContentBlocker/Rust/src/lib.rs
+@@ -55,6 +55,16 @@ pub struct ContentBlockerEngine {
+ /// resources built from uBlock Origin's source mark them.
+ const TRUSTED_LIST_PERMISSION: u8 = 0x01;
+ 
++fn require_trust_for_trusted_scriptlet(resource: &mut adblock::resources::Resource) {
++    let is_trusted_scriptlet = std::iter::once(&resource.name)
++        .chain(resource.aliases.iter())
++        .any(|name| name.starts_with("trusted-"));
++    if is_trusted_scriptlet {
++        resource.permission =
++            adblock::resources::PermissionMask::from_bits(resource.permission.to_bits() | TRUSTED_LIST_PERMISSION);
++    }
++}
++
+ /// Applies procedural and action cosmetic filters in the page (see `page_script_for_url`).
+ const PROCEDURAL_FILTERING_SCRIPT: &str = include_str!("procedural.js");
+ 
+@@ -631,7 +641,8 @@ pub extern "C" fn rust_content_blocker_create(
+         document_url_badfilters.extend(trusted.document_url_badfilters);
+ 
+         let mut engine = main_engine_from_lists(untrusted.rules, trusted.rules);
+-        if let Ok(resources) = serde_json::from_slice::<Vec<adblock::resources::Resource>>(resources.as_slice()) {
++        if let Ok(mut resources) = serde_json::from_slice::<Vec<adblock::resources::Resource>>(resources.as_slice()) {
++            resources.iter_mut().for_each(require_trust_for_trusted_scriptlet);
+             engine.use_resources(resources);
+         }
+ 

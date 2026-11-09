@@ -64,7 +64,7 @@ JsonObject describe(URL::URL const& url, Optional<Requests::SecureConnection> co
         return description;
     }
 
-    auto uses_certificate_exception = connection.has_value() ? connection->uses_certificate_exception : has_certificate_exception;
+    auto uses_certificate_exception = has_certificate_exception || (connection.has_value() && connection->uses_certificate_exception);
     description.set("state"sv, uses_certificate_exception ? "acceptedCertificate"_string : "secure"_string);
     if (!connection.has_value())
         return description;

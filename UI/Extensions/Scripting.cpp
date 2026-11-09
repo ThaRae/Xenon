@@ -23,9 +23,9 @@ namespace Ladybird::Extensions {
 
 static constexpr auto NO_HOST_ACCESS = "Cannot access contents of the page. Extension manifest must request permission to access the respective host."sv;
 
-Optional<Vector<Router::Frame>> Router::frames_of_tab(i64 tab_id)
+Optional<Vector<Router::Frame>> Router::frames_of_tab(Extension const& extension, i64 tab_id)
 {
-    auto documents = Browser::frame_documents(tab_id);
+    auto documents = Browser::frame_documents(extension, tab_id);
     if (!documents.has_value())
         return {};
 
@@ -71,7 +71,7 @@ ErrorOr<Vector<Router::Frame>, String> Router::injection_frames(Extension const&
     auto tab_id = target->get_integer<i64>("tabId"sv);
     if (!tab_id.has_value())
         return "The injection's target needs a tabId."_string;
-    auto frames = frames_of_tab(*tab_id);
+    auto frames = frames_of_tab(extension, *tab_id);
     if (!frames.has_value() || frames->is_empty())
         return MUST(String::formatted("No tab with id: {}.", *tab_id));
 
@@ -462,7 +462,7 @@ ErrorOr<JsonValue, String> Router::handle_web_navigation_call(Context& context, 
     if (!tab_id.has_value())
         return "tabId is required."_string;
 
-    auto frames = frames_of_tab(*tab_id);
+    auto frames = frames_of_tab(*context.extension, *tab_id);
     if (!frames.has_value())
         return JsonValue {};
 
@@ -576,7 +576,7 @@ void Router::did_navigate(WebView::CanonicalNavigable const& navigable, StringVi
         details.set("error"sv, webdriver_bidi_event == "browsingContext.navigationAborted"sv ? "net::ERR_ABORTED"sv : "net::ERR_FAILED"sv);
 
     for (auto const& extension : Registry::the().extensions()) {
-        if (!extension->has_permission("webNavigation"sv))
+        if (!extension->has_permission("webNavigation"sv) || !Registry::the().may_see_view(extension, view->view_id()))
             continue;
         JsonArray args;
         args.must_append(details);

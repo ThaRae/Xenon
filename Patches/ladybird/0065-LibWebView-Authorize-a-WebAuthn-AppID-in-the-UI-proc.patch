@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 18:41:35 -0500
+Subject: [PATCH] LibWebView: Authorize a WebAuthn AppID in the UI process
+
+The appid extension asks an authenticator for an assertion under a
+U2F AppID once one under the RP ID isn't found. LibWeb authorizes the
+AppID against the caller's origin, but only in the WebContent process,
+and the UI process took the request's app_id as it came: it checked
+the RP ID against the origin it holds for the document, then retried
+under whatever AppID the page named. A compromised WebContent could so
+have the user's security key sign for another site's AppID, behind a
+prompt that names the page's own RP ID.
+
+Run the same check in the UI process, against the document's origin
+there, and treat an AppID the caller isn't authorized for as
+misbehavior.
+---
+ Libraries/LibWebView/WebContentPage.cpp | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index 6ffef4c0bac1e7e2ba5d19c0451279b1d7f20f3c..8c0863497ef2a6e87e7af0351c3490fbc2a1fa42 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -2264,6 +2264,18 @@ void WebContentPage::did_request_dismiss_notification_for_testing(u64 notificati
+ // https://w3c.github.io/webauthn/#sctn-api
+ // The renderer has checked the request already, but this process decides: it knows which document asks, and
+ // where, from its own records, which a renderer can't forge.
++// https://fidoalliance.org/specs/fido-v2.0-id-20180227/fido-appid-and-facets-v2.0-id-20180227.html#determining-if-a-caller-s-facetid-is-authorized-for-an-appid
++static bool is_a_caller_s_facet_id_authorized_for_an_app_id(URL::Origin const& caller_origin, String const& app_id)
++{
++    auto app_id_url = URL::Parser::basic_parse(app_id);
++    if (!app_id_url.has_value() || app_id_url->scheme() != "https"sv || !app_id_url->host().has_value())
++        return false;
++    if (caller_origin.is_opaque() || caller_origin.scheme().value_or({}) != "https"sv)
++        return false;
++
++    return caller_origin.host() == *app_id_url->host();
++}
++
+ ErrorOr<WebAuthnCoordinator::CeremonyContext, Web::WebAuthn::Error> WebContentPage::web_authn_ceremony_context(StringView message_name, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::PermissionsPolicy::PolicyControlledFeature feature, String const& rp_id)
+ {
+     auto not_allowed = [](StringView message) {
+@@ -2351,6 +2363,11 @@ void WebContentPage::did_request_web_authn_get(u64 request_id, Web::HTML::CrossP
+         async_web_authn_request_completed(request_id, context.release_error());
+         return;
+     }
++    if (request.app_id.has_value() && !is_a_caller_s_facet_id_authorized_for_an_app_id(context.value().origin, *request.app_id)) {
++        client().did_misbehave("did_request_web_authn_get"sv, "AppID the caller isn't authorized for"sv);
++        async_web_authn_request_completed(request_id, Web::WebAuthn::Error { Web::WebAuthn::ErrorName::SecurityError, "The caller isn't authorized for this AppID"_string });
++        return;
++    }
+     WebAuthnCoordinator::the().begin_get(*this, request_id, context.release_value(), move(request));
+ }
+ 

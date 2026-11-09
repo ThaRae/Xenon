@@ -293,7 +293,7 @@ void Router::forget_extension(Extension const& extension)
 void Router::on_message(WebView::ScriptBridgeEndpoint const& endpoint, String const& text)
 {
     auto context = context_for(endpoint);
-    if (!context.has_value())
+    if (!context.has_value() || !Registry::the().may_see_view(*context->extension, endpoint.view_id()))
         return;
 
     if (context->kind == ContextKind::Background)
@@ -434,7 +434,7 @@ void Router::handle_call(Context& context, u64 id, String const& name, JsonArray
         result = handle_permissions_call(context, name, args);
     else if (name.starts_with_bytes("privacy."sv))
         result = handle_privacy_call(context, name, args);
-    else if (name.starts_with_bytes("runtime."sv) || name.starts_with_bytes("management."sv) || name.starts_with_bytes("idle."sv) || name.starts_with_bytes("offscreen."sv) || name.starts_with_bytes("commands."sv))
+    else if (name.starts_with_bytes("runtime."sv) || name.starts_with_bytes("management."sv) || name.starts_with_bytes("idle."sv) || name.starts_with_bytes("offscreen."sv) || name.starts_with_bytes("commands."sv) || name.starts_with_bytes("extension."sv))
         result = handle_runtime_call(context, name, args);
     else if (name.starts_with_bytes("webNavigation."sv))
         result = handle_web_navigation_call(context, name, args);
@@ -467,6 +467,8 @@ ErrorOr<JsonValue, String> Router::handle_storage_call(Context& context, String 
         return "The 'storage' permission is required."_string;
 
     if (name == "storage.setAccessLevel"sv) {
+        if (context.kind == ContextKind::ContentScript)
+            return "storage.setAccessLevel() isn't available to content scripts."_string;
         auto options = !args.is_empty() && args.at(0).is_object() ? args.at(0).as_object() : JsonObject {};
         auto level = options.get_string("accessLevel"sv);
         if (level == "TRUSTED_AND_UNTRUSTED_CONTEXTS"sv)
@@ -899,6 +901,9 @@ ErrorOr<JsonValue, String> Router::handle_runtime_call(Context& context, String 
     if (name == "runtime.setUninstallURL"sv)
         return JsonValue {};
 
+    if (name == "extension.isAllowedIncognitoAccess"sv)
+        return JsonValue { Registry::the().is_allowed_in_private_windows(*extension) };
+
     if (name == "management.getSelf"sv) {
         auto const& manifest = extension->manifest();
         JsonObject info;
@@ -988,6 +993,8 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
 {
     prune_closed_contexts();
 
+    auto is_session_storage_change = name == "storage.onChanged"sv && args.size() > 1 && args.at(1).is_string()
+        && args.at(1).as_string() == storage_area_name(StorageArea::Kind::Session);
     auto serialized = event_message(name, move(args));
 
     if (!kind.has_value() || *kind == ContextKind::Background) {
@@ -1002,6 +1009,7 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
         }
     }
     auto background_is_starting = m_starting_backgrounds.contains(extension.id());
+    auto content_scripts_see_session_storage = m_session_storage_open_to_content_scripts.contains(extension.id());
 
     for (auto const& context : m_contexts) {
         if (context.extension->id() != extension.id())
@@ -1012,14 +1020,10 @@ void Router::dispatch_event(Extension const& extension, StringView name, JsonArr
             continue;
         if (context.kind == ContextKind::ContentScript && !name.starts_with("storage."sv) && !name.starts_with("permissions."sv))
             continue;
+        if (context.kind == ContextKind::ContentScript && is_session_storage_change && !content_scripts_see_session_storage)
+            continue;
         post(context.endpoint, serialized);
     }
-}
-
-void Router::dispatch_event_to_all(StringView name, JsonArray args)
-{
-    for (auto const& extension : Registry::the().extensions())
-        dispatch_event(extension, name, args);
 }
 
 Vector<WebView::ScriptBridgeEndpoint> Router::extension_receivers(Context const& sender) const
@@ -1044,7 +1048,7 @@ Vector<WebView::ScriptBridgeEndpoint> Router::content_script_receivers(Extension
         if (context.extension->id() != extension.id() || context.kind != ContextKind::ContentScript)
             continue;
         auto view_id = context.endpoint.view_id();
-        if (!view_id.has_value())
+        if (!view_id.has_value() || !Registry::the().may_see_view(extension, *view_id))
             continue;
         if (auto ids = Browser::tab_and_window_ids(*view_id); !ids.has_value() || ids->tab_id != tab_id)
             continue;

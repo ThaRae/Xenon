@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 18:22:20 -0500
+Subject: [PATCH] LibWebView: Don't let a page claim the browser's UI started a
+ navigation
+
+A navigation the browser's UI starts, from the address bar or a menu,
+starts in the UI process. A page that asks the UI process to start or
+continue a navigation can name it UserNavigationInvolvement::BrowserUI
+all the same, and the UI process kept that claim: it re-derives the
+initiator origin of the navigation, but copied user_involvement into
+the canonical navigation's retry as it came. Anything that trusts the
+retry's involvement then takes a compromised WebContent's word for it
+that the user, not the page, asked for the navigation. Code that serves
+a scheme only to navigations without a web initiator, for one, serves
+it to the page.
+
+No honest page sends that claim. Navigable::navigate() asserts that a
+navigation with a source document is never BrowserUI, so a request to
+navigate another navigable never carries it, and a link the page asks
+the UI to open always uses Activation. The one page that starts a
+BrowserUI navigation itself is the internals object's loadURL() of a
+test.
+
+So treat the claim as misbehavior in did_request_navigation_start()
+outside of tests and WebDriver, and in did_request_navigation_of_
+navigable() always, and ignore a link navigation that makes it.
+---
+ Libraries/LibWebView/WebContentPage.cpp | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
+index e2abc3ee9d6e93ac17ae51c111b4ed46d9a2709f..6ffef4c0bac1e7e2ba5d19c0451279b1d7f20f3c 100644
+--- a/Libraries/LibWebView/WebContentPage.cpp
++++ b/Libraries/LibWebView/WebContentPage.cpp
+@@ -719,6 +719,11 @@ static bool may_navigate_to_a_local_file(WebContentClient& requesting_client);
+ 
+ void WebContentPage::did_request_navigation_of_navigable(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId source_navigable_id, Web::HTML::CrossProcessId source_document_id, Web::HTML::PreparedNavigationDescriptor navigation)
+ {
++    if (navigation.user_involvement == Web::HTML::UserNavigationInvolvement::BrowserUI) {
++        client().did_misbehave("did_request_navigation_of_navigable"sv, "page claims the browser's UI started its navigation"sv);
++        return;
++    }
++
+     if (navigation.url.scheme() == "file"sv && !may_navigate_to_a_local_file(client()))
+         return;
+ 
+@@ -1060,6 +1065,8 @@ static bool may_navigate_to_a_local_file(WebContentClient& requesting_client)
+ // fetch client — as it does for a navigation the page starts itself, so a process names only a source it hosts.
+ static Optional<Web::HTML::PreparedNavigationDescriptor> navigation_from_page(WebContentClient& requesting_client, Web::HTML::PreparedNavigationDescriptor navigation)
+ {
++    if (navigation.user_involvement == Web::HTML::UserNavigationInvolvement::BrowserUI)
++        return {};
+     // A page's own click or context menu names a document the page's process hosts, so only that process vouches for it.
+     auto initiator_origin = initiator_origin_snapshot(navigation.initiator_origin_snapshot, navigation.source_snapshot_params, requesting_client);
+     if (!initiator_origin.has_value())
+@@ -2853,6 +2860,12 @@ void WebContentPage::did_request_navigation_start(Web::HTML::CrossProcessId navi
+         client().did_misbehave("did_request_navigation_start"sv, "start request names another URL"sv);
+         return;
+     }
++    if (start_request.has_value()
++        && start_request->user_involvement == Web::HTML::UserNavigationInvolvement::BrowserUI
++        && !WebContentClient::renderers_may_synthesize_input()) {
++        client().did_misbehave("did_request_navigation_start"sv, "page claims the browser's UI started its navigation"sv);
++        return;
++    }
+     if (start_request.has_value() && url.scheme() == "file"sv && !may_navigate_to_a_local_file(client())) {
+         async_cancel_navigation_params_creation(navigable_id, navigation_id);
+         return;

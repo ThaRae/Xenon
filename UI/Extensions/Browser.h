@@ -36,7 +36,7 @@ struct TabAndWindowIds {
     i64 window_id { -1 };
 };
 Optional<TabAndWindowIds> tab_and_window_ids(u64 view_id);
-Optional<Vector<WebView::ScriptBridgeEndpoint>> frame_documents(i64 tab_id);
+Optional<Vector<WebView::ScriptBridgeEndpoint>> frame_documents(Extension const&, i64 tab_id);
 Optional<JsonObject> tab_json(u64 view_id, Extension const&);
 
 void open_tab(URL::URL const&);

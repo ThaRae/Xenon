@@ -9,6 +9,7 @@
 #include <AK/ByteString.h>
 #include <AK/Function.h>
 #include <AK/HashMap.h>
+#include <AK/HashTable.h>
 #include <AK/JsonValue.h>
 #include <AK/NeverDestroyed.h>
 #include <AK/NonnullOwnPtr.h>
@@ -16,6 +17,7 @@
 #include <AK/RefPtr.h>
 #include <AK/Vector.h>
 #include <LibCore/AnonymousBuffer.h>
+#include <LibWebView/BrowsingSession.h>
 #include <LibWebView/HeadlessWebView.h>
 #include <LibWebView/URLSchemeHandler.h>
 #include <UI/Extensions/Extension.h>
@@ -87,6 +89,11 @@ public:
     void set_controlled_setting(String const& name, Extension const&, JsonValue);
     bool clear_controlled_setting(StringView name, Extension const&);
 
+    bool is_allowed_in_private_windows(Extension const&) const;
+    void set_allowed_in_private_windows(StringView id, bool);
+    bool may_see(Extension const&, WebView::IsPrivate) const;
+    bool may_see_view(Extension const&, Optional<u64> view_id) const;
+
     Vector<RegisteredContentScript> const& registered_content_scripts(StringView id) const;
     void set_registered_content_scripts(StringView id, Vector<RegisteredContentScript>);
 
@@ -126,6 +133,7 @@ private:
     HashMap<String, Vector<String>> m_granted_permissions;
     HashMap<String, ControlledSetting> m_controlled_settings;
     HashMap<String, Vector<RegisteredContentScript>> m_registered_content_scripts;
+    HashTable<String> m_allowed_in_private_windows;
 
     bool m_can_start_background_pages { false };
     Optional<Core::AnonymousBuffer> m_theme;
