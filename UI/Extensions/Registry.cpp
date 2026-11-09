@@ -24,6 +24,7 @@
 #include <LibWebView/HeadlessWebView.h>
 #include <LibWebView/RequestServerManager.h>
 #include <LibWebView/Utilities.h>
+#include <LibWebView/ViewImplementation.h>
 #include <UI/Extensions/CRX.h>
 #include <UI/Extensions/ContentScripts.h>
 #include <UI/Extensions/MatchPattern.h>
@@ -154,6 +155,7 @@ void Registry::remove(StringView id)
     m_install_reasons.remove(id);
     m_granted_permissions.remove(id);
     m_registered_content_scripts.remove(id);
+    m_allowed_in_private_windows.remove(id);
     m_controlled_settings.remove_all_matching([&](auto const&, auto const& setting) { return setting.extension_id == id; });
     m_storage.remove_all_matching([&](auto const& key, auto const&) { return key.starts_with(ByteString::formatted("{}/", id)); });
     save_state();
@@ -375,6 +377,35 @@ bool Registry::clear_controlled_setting(StringView name, Extension const& extens
     m_controlled_settings.remove(name);
     save_state();
     return true;
+}
+
+bool Registry::is_allowed_in_private_windows(Extension const& extension) const
+{
+    return extension.manifest().allows_private_windows && m_allowed_in_private_windows.contains(extension.id());
+}
+
+void Registry::set_allowed_in_private_windows(StringView id, bool allowed)
+{
+    auto extension = this->extension(id);
+    if (!extension)
+        return;
+    if (allowed)
+        m_allowed_in_private_windows.set(extension->id());
+    else
+        m_allowed_in_private_windows.remove(extension->id());
+    save_state();
+    notify_extensions_changed();
+}
+
+bool Registry::may_see(Extension const& extension, WebView::IsPrivate is_private) const
+{
+    return is_private == WebView::IsPrivate::No || is_allowed_in_private_windows(extension);
+}
+
+bool Registry::may_see_view(Extension const& extension, Optional<u64> view_id) const
+{
+    auto view = view_id.has_value() ? WebView::ViewImplementation::find_view_by_id(*view_id) : Optional<WebView::ViewImplementation&> {};
+    return may_see(extension, view.has_value() ? view->is_private() : WebView::IsPrivate::Yes);
 }
 
 void Registry::on_extensions_change(Function<bool()> listener)
@@ -661,6 +692,12 @@ void Registry::load_state()
             m_registered_content_scripts.set(id, move(list));
         });
     }
+    if (auto allowed = json.value().get_array("allowedInPrivateWindows"sv); allowed.has_value()) {
+        for (auto const& id : allowed->values()) {
+            if (id.is_string() && is_valid_extension_id(id.as_string()))
+                m_allowed_in_private_windows.set(id.as_string());
+        }
+    }
     if (auto settings = json.value().get_object("settings"sv); settings.has_value()) {
         settings->for_each_member([&](String const& name, JsonValue const& setting) {
             if (!setting.is_object())
@@ -732,12 +769,17 @@ void Registry::save_state() const
             content_scripts.set(id, move(list));
     }
 
+    JsonArray allowed_in_private_windows;
+    for (auto const& id : m_allowed_in_private_windows)
+        allowed_in_private_windows.must_append(id);
+
     JsonObject state;
     state.set("unpacked"sv, move(directories));
     state.set("installed"sv, move(installed));
     state.set("versions"sv, move(versions));
     state.set("granted"sv, move(granted));
     state.set("contentScripts"sv, move(content_scripts));
+    state.set("allowedInPrivateWindows"sv, move(allowed_in_private_windows));
     state.set("settings"sv, move(settings));
 
     auto write = [&]() -> ErrorOr<void> {

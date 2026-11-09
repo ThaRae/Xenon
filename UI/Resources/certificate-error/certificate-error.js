@@ -143,7 +143,7 @@ advanced.addEventListener("click", () => {
 });
 
 proceed?.addEventListener("click", () => {
-    window.xenonCertificateError.send({ name: "proceed" });
+    window.xenonCertificateError.send({ name: "proceed", fingerprint: certificate?.fingerprint });
 });
 
 retry.addEventListener("click", () => {

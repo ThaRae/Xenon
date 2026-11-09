@@ -263,6 +263,13 @@ void handle_message(WebView::ScriptBridgeEndpoint const& endpoint, String const&
         auto const* rejected = rejected_certificate(session, *url);
         if (!rejected || is_known_hsts_host(session, *url))
             return;
+        auto shown_fingerprint = json.value().as_object().get_string("fingerprint"sv);
+        auto rejected_description = describe_rejected_certificate(rejected->certificate.bytes(), *url);
+        auto rejected_fingerprint = rejected_description.get_string("fingerprint"sv);
+        if (!shown_fingerprint.has_value() || !rejected_fingerprint.has_value() || *shown_fingerprint != *rejected_fingerprint) {
+            view->load(warning_url(*url), Web::Bindings::NavigationHistoryBehavior::Replace);
+            return;
+        }
         WebView::RequestServerManager::the().add_certificate_exception(session, *url, rejected->certificate);
         view->load(*url, Web::Bindings::NavigationHistoryBehavior::Replace);
     } else if (*name == "leave"sv) {

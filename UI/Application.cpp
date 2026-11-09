@@ -1431,7 +1431,9 @@ void Application::display_error_dialog(StringView error_message) const
         return;
     }
 
-    QMessageBox::warning(active_tab(), "Xenon", qstring_from_ak_string(error_message));
+    QMessageBox dialog(QMessageBox::Warning, "Xenon", qstring_from_ak_string(error_message), QMessageBox::Ok, active_tab());
+    dialog.setTextFormat(Qt::PlainText);
+    dialog.exec();
 }
 
 void Application::open_download(WebView::FileDownloader::Download const& download) const
@@ -1522,6 +1524,11 @@ void Application::set_clipboard_text(String text, ClipboardType type)
     clipboard->setText(qstring_from_ak_string(text), mode);
 }
 
+static bool is_web_clipboard_format(StringView format)
+{
+    return format.is_one_of("text/plain"sv, "text/html"sv, "image/png"sv);
+}
+
 Web::Clipboard::SystemClipboardItem Application::clipboard_item() const
 {
     if (browser_options().headless_mode.has_value())
@@ -1534,7 +1541,7 @@ Web::Clipboard::SystemClipboardItem Application::clipboard_item() const
     if (!mime_data)
         return {};
 
-    if (mime_data->hasUrls()) {
+    if (mime_data->hasUrls() && !clipboard->ownsClipboard()) {
         QMimeDatabase mime_database;
 
         for (auto const& url : mime_data->urls()) {
@@ -1575,6 +1582,8 @@ void Application::insert_clipboard_item(Web::Clipboard::SystemClipboardItem item
 
     auto* mime_data = new QMimeData();
     for (auto const& entry : item.system_clipboard_representations) {
+        if (!is_web_clipboard_format(entry.name.bytes_as_string_view()))
+            continue;
         if (auto const* data = entry.data.get_pointer<ByteString>())
             mime_data->setData(qstring_from_ak_string(entry.name), qbytearray_from_ak_string(*data));
     }

@@ -190,8 +190,9 @@ void ActionToolbar::rebuild()
         delete item;
     }
 
+    auto view_id = m_tab.is_loaded() ? Optional<u64> { m_tab.view().view_id() } : Optional<u64> {};
     for (auto const& extension : Registry::the().extensions()) {
-        if (extension->manifest().action.has_value())
+        if (extension->manifest().action.has_value() && Registry::the().may_see_view(extension, view_id))
             m_layout->addWidget(new ActionButton(this, m_tab, extension));
     }
     setVisible(m_layout->count() > 0);

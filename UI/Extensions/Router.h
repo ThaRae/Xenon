@@ -46,7 +46,6 @@ public:
     void on_message(WebView::ScriptBridgeEndpoint const&, String const& message);
 
     void dispatch_event(Extension const&, StringView name, JsonArray args, Optional<ContextKind> = {});
-    void dispatch_event_to_all(StringView name, JsonArray args);
 
     void set_popup_size_listener(String const& extension_id, Function<void(int width, int height)>);
 
@@ -110,7 +109,7 @@ private:
         i64 frame_id { 0 };
         i64 parent_frame_id { -1 };
     };
-    Optional<Vector<Frame>> frames_of_tab(i64 tab_id);
+    Optional<Vector<Frame>> frames_of_tab(Extension const&, i64 tab_id);
     ErrorOr<Vector<Frame>, String> injection_frames(Extension const&, Optional<JsonObject const&> target);
     void handle_scripting_call(Context&, u64 call_id, String const& name, JsonArray const& args);
     void execute_script(Context&, u64 call_id, JsonObject const& injection);
