@@ -376,7 +376,8 @@ the whole session, and new ones the next time Xenon starts.
   factor between 0.99 and 1.
 - `navigator.hardwareConcurrency` is between 4 and 8 (never above the real count), and `navigator.deviceMemory` is
   1, 2, or 4 (never above the real amount).
-- The User-Agent and client hints are exactly those of Chrome on the same platform, without a Ladybird token.
+- The User-Agent keeps the Ladybird token and sends Chrome's tokens alongside it, so Cloudflare's Turnstile does not reject
+  it as a browser that claims to be Chrome but sends a different TLS handshake. The client hints name Ladybird.
 
 It's on by default. **Settings → Privacy and data → Fingerprinting protection** turns it off, for pages and workers
 alike. `navigator.webdriver` is false unless WebDriver is driving the browser. The code is in

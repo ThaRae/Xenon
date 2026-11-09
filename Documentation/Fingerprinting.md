@@ -31,10 +31,11 @@ over three canvas readbacks would undo the noise. A process that hasn't been sen
 | `navigator.hardwareConcurrency` | Between 4 and min(8, real count); between 2 and the real count below 4. In WebKit navigator compatibility mode it stays 4 or 8, as Safari reports, since anything else would give the navigator away |
 | `navigator.deviceMemory` | One of 1, 2, 4, never above the real value |
 
-The default User-Agent is Chrome's, without a Ladybird token, and the `Sec-CH-UA` brand list for it is GREASE,
-Chromium, and Google Chrome at the same major version, as Chrome sends. A User-Agent that does have a `Ladybird/`
-token still gets the Ladybird brand. `navigator.webdriver` stays false unless WebDriver is active, which Ladybird
-already did.
+The default User-Agent keeps the Ladybird token and sends Chrome's tokens alongside it. Dropping Ladybird would make
+the browser claim to be Chrome while sending a different TLS handshake, which Cloudflare's Turnstile refuses, so the
+token stays. The `Sec-CH-UA` brand list for it is GREASE, Chromium, and Ladybird. A User-Agent without the token, from a
+preset or a site-compatibility rule, is answered with GREASE, Chromium, and Google Chrome, as Chrome sends.
+`navigator.webdriver` stays false unless WebDriver is active, which Ladybird already did.
 
 Not farbled (follow-ups): WebGL `UNMASKED_VENDOR` / `UNMASKED_RENDERER`, font enumeration, screen coordinates, plugin
 names. Seeds are keyed by the origin's host, not eTLD+1.
@@ -46,5 +47,5 @@ through `set_enable_fingerprinting_protection` on WebContent and workers through
 lands in `LoaderConfig::enable_fingerprinting_protection`. In test mode it's forced off, since test output has to be
 deterministic. `internals.setFingerprintingProtection()` turns it back on for the LibWeb text tests of farbling.
 
-Engine patches `0034`–`0037` carry the LibWeb farbling, the setting, the Chrome User-Agent, and the AudioBuffer
+Engine patches `0034`–`0037` carry the LibWeb farbling, the setting, the User-Agent, and the AudioBuffer
 write path plus text tests.

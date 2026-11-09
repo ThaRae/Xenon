@@ -29,7 +29,7 @@ It's early. macOS is the main platform; on Linux, it runs as an AppImage.
 - uBlock Origin's filter lists and features built in, scriptlets for YouTube ads and anti-adblock walls included
 - A popup and dashboard laid out like uBlock Origin's, with an element picker
 - The lists update daily, from a signed source
-- Fingerprinting protection inspired by Brave: canvas, audio, and hardware details differ slightly per site and session, and Xenon identifies itself as Chrome
+- Fingerprinting protection inspired by Brave: canvas, audio, and hardware details differ slightly per site and session, and Xenon keeps the Ladybird User-Agent token that Cloudflare needs
 
 **Password managers**
 

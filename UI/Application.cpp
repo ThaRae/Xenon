@@ -11,7 +11,6 @@
 #include <LibWebView/PictureInPictureManager.h>
 #include <LibWebView/SessionStore.h>
 #include <LibWebView/URL.h>
-#include <LibWebView/UserAgent.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Application.h>
 #include <UI/BookmarkDialog.h>
@@ -620,22 +619,9 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
     });
 }
 
-void Application::create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions&, WebView::WebContentOptions& web_content_options)
+void Application::create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions&, WebView::WebContentOptions&)
 {
     browser_options.prewarm_spare_web_content_process = WebView::PrewarmSpareWebContentProcess::No;
-
-    if (web_content_options.user_agent_preset.has_value() || web_content_options.is_test_mode == WebView::IsTestMode::Yes)
-        return;
-
-#if defined(AK_OS_MACOS)
-    static constexpr auto chrome_preset = "Chrome macOS Desktop"sv;
-#elif defined(AK_OS_LINUX) && !defined(AK_OS_ANDROID)
-    static constexpr auto chrome_preset = "Chrome Linux Desktop"sv;
-#else
-    static constexpr StringView chrome_preset {};
-#endif
-    if (!chrome_preset.is_empty() && WebView::user_agents.contains(chrome_preset))
-        web_content_options.user_agent_preset = chrome_preset;
 }
 
 void Application::initialize_extensions()
