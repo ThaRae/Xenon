@@ -748,19 +748,17 @@ pub fn find_key(s: &mut Browser, view: ViewId, event: &KeyEvent, tx: &mut Tx) ->
     }
 }
 
-pub fn tooltip_changed(s: &mut Browser, view: ViewId, text: String, _x: f32, _y: f32) {
+pub fn tooltip_changed(s: &mut Browser, view: ViewId, text: String, _x: f32, _y: f32) -> bool {
     if !view_exists(s, view) {
-        return;
+        return false;
     }
     let prompts = s.page_prompts.of_mut(view);
     if text.trim().is_empty() {
         prompts.tooltip_area = None;
-        if !prompts.tooltip_overridden {
-            prompts.tooltip = None;
-        }
-        return;
+        return !prompts.tooltip_overridden && prompts.tooltip.take().is_some();
     }
     prompts.tooltip_area = Some(text);
+    false
 }
 
 pub fn tooltip_override(s: &mut Browser, view: ViewId, text: String, x: f32, y: f32) {

@@ -28,8 +28,10 @@ use crate::tab_list::{Activation, Tab, TabInsertion, TabList, WindowInfo, Window
 pub const NEW_TAB_URL: &str = "about:newtab";
 pub const APP_NAME: &str = "Xenon";
 pub const INITIAL_WINDOW_SIZE: (f32, f32) = (1280.0, 800.0);
-pub const TAB_STRIP_HEIGHT: f32 = 40.0;
-pub const TOOLBAR_HEIGHT: f32 = 44.0;
+#[cfg(target_os = "linux")]
+const NATIVE_RESYNC_DELAY: f64 = 0.05;
+pub const TAB_STRIP_HEIGHT: f32 = 42.0;
+pub const TOOLBAR_HEIGHT: f32 = 43.0;
 
 pub struct PageGeometry {
     size: Cell<(f32, f32)>,
@@ -151,6 +153,8 @@ pub struct Browser {
     native_waiting_for_cpu: bool,
     #[cfg(target_os = "linux")]
     native_rate_view: Option<ViewId>,
+    #[cfg(target_os = "linux")]
+    native_resync_at: Option<f64>,
 }
 
 impl Browser {
@@ -205,6 +209,8 @@ impl Browser {
             native_waiting_for_cpu: false,
             #[cfg(target_os = "linux")]
             native_rate_view: None,
+            #[cfg(target_os = "linux")]
+            native_resync_at: None,
         }
     }
 
@@ -326,7 +332,7 @@ impl Browser {
         let tab_overlay = self
             .tabs
             .active()
-            .is_some_and(|tab| !tab.hovered_link.is_empty() || tab.crashed || tab.unresponsive);
+            .is_some_and(|tab| tab.crashed || tab.unresponsive);
         page_prompts
             || tab_overlay
             || self.page_prompts.menu.is_some()
@@ -367,10 +373,17 @@ impl Browser {
         )
     }
 
-    pub fn poll_native(&mut self) -> bool {
+    pub fn poll_native(&mut self, now: f64, tx: &mut Tx) -> bool {
+        #[cfg(not(target_os = "linux"))]
+        let _ = (now, tx);
         #[cfg(target_os = "linux")]
         {
             let page_rect = self.page_rect();
+            let link_status = self
+                .tabs
+                .active()
+                .map(|tab| crate::view::link_status_size(&tab.hovered_link))
+                .unwrap_or_default();
             let window = self.shown_window();
             let active_view = self.tabs.active_view();
             let split_blocked = self.split.shown(&self.tabs).is_some();
@@ -416,6 +429,26 @@ impl Browser {
                         wayland.show(view);
                     }
                     None => wayland.hide(),
+                }
+            }
+            let notch = if active.is_some() {
+                link_status
+            } else {
+                (0, 0)
+            };
+            if wayland.notch() != notch {
+                wayland.set_notch(notch);
+                self.native_resync_at = Some(now + NATIVE_RESYNC_DELAY);
+                tx.wake_after(std::time::Duration::from_secs_f64(NATIVE_RESYNC_DELAY));
+            } else if wayland.is_synchronized() {
+                match self.native_resync_at {
+                    Some(at) if now < at => {
+                        tx.wake_after(std::time::Duration::from_secs_f64(at - now));
+                    }
+                    _ => {
+                        self.native_resync_at = None;
+                        wayland.desynchronize();
+                    }
                 }
             }
         }
@@ -1036,19 +1069,24 @@ impl Browser {
         }
     }
 
-    pub fn cursor_changed(&mut self, view: ViewId, cursor: u32) {
+    pub fn cursor_changed(&mut self, view: ViewId, cursor: u32) -> bool {
         if self.extension_popup_cursor_changed(view, cursor) {
-            return;
+            return true;
         }
-        if let Some(tab) = self.tabs.get_mut(view) {
-            tab.cursor = cursor;
-        }
+        self.tabs
+            .get_mut(view)
+            .is_some_and(|tab| std::mem::replace(&mut tab.cursor, cursor) != cursor)
     }
 
-    pub fn link_hovered(&mut self, view: ViewId, url: String) {
-        if let Some(tab) = self.tabs.get_mut(view) {
-            tab.hovered_link = url;
+    pub fn link_hovered(&mut self, view: ViewId, url: String) -> bool {
+        let Some(tab) = self.tabs.get_mut(view) else {
+            return false;
+        };
+        if tab.hovered_link == url {
+            return false;
         }
+        tab.hovered_link = url;
+        true
     }
 
     pub fn crashed(&mut self, view: ViewId) {
@@ -1534,5 +1572,24 @@ mod tests {
         assert!(browser.shows_view(7));
         assert!(!browser.shows_view(8));
         assert!(!browser.shows_view(9));
+    }
+
+    #[test]
+    fn a_pointer_move_that_reports_the_same_cursor_and_link_changes_nothing() {
+        let mut browser = Browser::new(Arc::default());
+        browser.windows.opened(WindowInfo {
+            id: 1,
+            private: false,
+        });
+        browser
+            .tabs
+            .insert(Tab::new(7, "about:blank", Pixels::new()), 0);
+        assert!(browser.cursor_changed(7, crate::ffi::XENON_CURSOR_POINTER));
+        assert!(!browser.cursor_changed(7, crate::ffi::XENON_CURSOR_POINTER));
+        assert!(browser.link_hovered(7, "https://example.com/".to_owned()));
+        assert!(!browser.link_hovered(7, "https://example.com/".to_owned()));
+        assert!(browser.link_hovered(7, String::new()));
+        assert!(!browser.link_hovered(7, String::new()));
+        assert!(!browser.link_hovered(9, "https://example.com/".to_owned()));
     }
 }

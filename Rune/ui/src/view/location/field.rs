@@ -13,8 +13,8 @@ use crate::view::icons;
 use crate::view::location::style::{LOCATION_FONT, LOCK, LocationColors, PILL_FONT, SEARCH};
 use crate::view::palette::Palette;
 
-const FIELD_HEIGHT: f32 = 32.0;
-const FIELD_PADDING: f32 = 14.0;
+const FIELD_HEIGHT: f32 = 34.0;
+const FIELD_PADDING: f32 = 16.0;
 const INDICATOR_PADDING: f32 = 6.0;
 const INDICATOR_SIZE: f32 = 24.0;
 const PILL_HEIGHT: f32 = 22.0;
@@ -176,8 +176,6 @@ pub fn location_field(s: &Browser, p: &Palette, dark: bool, cx: &mut Cx<Browser>
         .grow(1.0)
         .shrink()
         .h(FIELD_HEIGHT)
-        .ml(6.0)
-        .mr(4.0)
         .pl(if leading.is_some() {
             INDICATOR_PADDING
         } else {
@@ -204,11 +202,11 @@ pub fn location_field(s: &Browser, p: &Palette, dark: bool, cx: &mut Cx<Browser>
     }
     if focused {
         field
-            .fill(p.field_focused)
-            .border(1.5, p.focus_ring)
+            .fill(p.location_focused)
+            .border(1.0, p.location_focused_border)
             .outline(3.0, 0.0, p.focus_glow)
     } else {
-        field.fill(p.field).border(p.hairline, Color::TRANSPARENT)
+        field.fill(p.location).border(1.0, p.location_border)
     }
 }
 

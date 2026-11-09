@@ -1,0 +1,40 @@
+diff --git a/crates/rune/src/window/handle.rs b/crates/rune/src/window/handle.rs
+--- a/crates/rune/src/window/handle.rs
++++ b/crates/rune/src/window/handle.rs
+@@ -72,6 +72,36 @@
+     pub fn set_always_on_top(&self, on: bool) {
+         self.send(move |slot| WakeEvent::Level(slot, on));
+     }
++    /// Minimize the window, for an app that draws its own title bar. Unlike [`Tx::minimize`]
++    /// it also minimizes a borderless window.
++    pub fn minimize(&self) {
++        if let Ok(window) = self.window() { window.set_minimized(true); }
++    }
++    /// Whether the window fills its display's work area.
++    pub fn is_maximized(&self) -> bool {
++        self.window().is_ok_and(|window| window.is_maximized())
++    }
++    pub fn set_maximized(&self, maximized: bool) {
++        if let Ok(window) = self.window() { window.set_maximized(maximized); }
++    }
++    /// Let the user resize the window by the edge the pointer was just pressed on, for a
++    /// borderless window that draws its own frame. `(horizontal, vertical)` name the edge or
++    /// corner: -1 for the left or top, 1 for the right or bottom, 0 for neither.
++    pub fn drag_resize(&self, edge: (i8, i8)) {
++        use winit::window::ResizeDirection as Direction;
++        let direction = match (edge.0.signum(), edge.1.signum()) {
++            (-1, -1) => Direction::NorthWest,
++            (0, -1) => Direction::North,
++            (1, -1) => Direction::NorthEast,
++            (-1, 0) => Direction::West,
++            (1, 0) => Direction::East,
++            (-1, 1) => Direction::SouthWest,
++            (0, 1) => Direction::South,
++            (1, 1) => Direction::SouthEast,
++            _ => return,
++        };
++        if let Ok(window) = self.window() { let _ = window.drag_resize_window(direction); }
++    }
+     /// Physical desktop pixels; retained across recreation. Unsupported on Wayland.
+     pub fn set_position(&self, position: (i32, i32)) {
+         self.send(move |slot| WakeEvent::Position(slot, position));

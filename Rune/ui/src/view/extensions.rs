@@ -22,7 +22,7 @@ use crate::view::page_overlays::controls::{
 };
 use crate::view::palette::{Palette, srgb};
 
-const BUTTON_SIZE: f32 = 32.0;
+const BUTTON_SIZE: f32 = 34.0;
 const ACTION_ICON_SIZE: f32 = 16.0;
 const BADGE_FONT: TextStyle = TextStyle::new(9.0, 700.0);
 const NAME_FONT: TextStyle = TextStyle::new(14.0, 650.0);
@@ -64,7 +64,7 @@ fn action_button(s: &Browser, action: &ActionButton, p: &Palette) -> El {
         .help(action.title.clone())
         .checked(open)
         .size(BUTTON_SIZE, BUTTON_SIZE)
-        .radius(8.0)
+        .radius(BUTTON_SIZE / 2.0)
         .center()
         .focusable(false);
     let glyph = match &action.icon {

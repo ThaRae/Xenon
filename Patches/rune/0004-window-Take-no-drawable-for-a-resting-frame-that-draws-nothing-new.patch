@@ -1,0 +1,15 @@
+diff --git a/crates/rune/src/window/draw.rs b/crates/rune/src/window/draw.rs
+--- a/crates/rune/src/window/draw.rs
++++ b/crates/rune/src/window/draw.rs
+@@ -138,8 +138,9 @@
+         #[cfg(target_os = "macos")]
+         { self.rt.native_materials = l.native.materials.native(); }
+         // Only a timer woke the resting window: build the frame first, and take no drawable
+-        // when it draws what's on screen.
+-        let quiet = std::mem::take(&mut l.quiet) && !hidden && !live_resize && l.presented.is_some() && self.comp.is_none()
++        // when it draws what's on screen. Off macOS any frame of a resting window does the
++        // same, so a pointer move or an update that changes nothing presents nothing.
++        let quiet = (std::mem::take(&mut l.quiet) || (cfg!(not(target_os = "macos")) && l.rests())) && !hidden && !live_resize && l.presented.is_some() && self.comp.is_none()
+             && self.trace.is_none() && self.args.trace.is_none() && self.rt.live_visible()
+             && self.rt.window_frame.is_none() && self.frame_anim.is_none();
+         #[cfg(target_os = "macos")]

@@ -284,7 +284,7 @@ unsafe extern "C" fn tooltip_changed(
     y: f32,
 ) {
     let tooltip = text(tooltip);
-    unsafe { handle(context) }.update(view, move |browser, _| {
+    unsafe { handle(context) }.update_if(view, move |browser, _| {
         page_prompts::tooltip_changed(browser, view, tooltip, x, y)
     });
 }

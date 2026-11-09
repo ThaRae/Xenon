@@ -150,6 +150,7 @@ fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int
     let surfaces = Arc::new(PageSurfaces::default());
     let options = || WindowOptions {
         transparent: true,
+        borderless: view::draws_window_frame(),
         ..WindowOptions::default()
     };
     let mut app = App::new(browser_spec())
@@ -233,7 +234,7 @@ fn poll(browser: &mut Browser, now: f64, tx: &mut Tx) -> bool {
         | split_view::poll(browser, now, tx)
         | screenshots::poll(browser, now, tx)
         | page_drop::poll(browser, tx)
-        | browser.poll_native()
+        | browser.poll_native(now, tx)
 }
 
 fn window_key(browser: &mut Browser, event: &KeyEvent, tx: &mut Tx) -> bool {

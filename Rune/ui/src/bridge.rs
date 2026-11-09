@@ -268,14 +268,15 @@ unsafe extern "C" fn view_favicon_changed(
 unsafe extern "C" fn view_cursor_changed(context: *mut c_void, view: ViewId, cursor: u32) {
     unsafe { ui(context) }
         .handle
-        .update_showing(view, move |browser, _| browser.cursor_changed(view, cursor));
+        .update_showing_if(view, move |browser, _| browser.cursor_changed(view, cursor));
 }
 
 unsafe extern "C" fn view_link_hovered(context: *mut c_void, view: ViewId, url: XenonStr) {
     let url = unsafe { url.to_string_lossy() };
     unsafe { ui(context) }
         .handle
-        .update_showing(view, move |browser, _| {
+        .update_showing_if(view, move |browser, tx| {
+            tx.instant();
             browser.link_hovered(view, url.clone())
         });
 }

@@ -24,6 +24,8 @@ const NOTICE_TITLE_FONT: TextStyle = TextStyle::new(15.0, 600.0);
 const NOTICE_BODY_FONT: TextStyle = TextStyle::new(13.0, 400.0);
 const BUTTON_FONT: TextStyle = TextStyle::new(13.0, 550.0);
 const STATUS_MAX_WIDTH: f32 = 560.0;
+const STATUS_HEIGHT: f32 = 24.0;
+const STATUS_PADDING: f32 = 9.0;
 
 pub fn page_area(s: &Browser, p: &Palette) -> El {
     let area = col()
@@ -54,7 +56,7 @@ pub fn page_area(s: &Browser, p: &Palette) -> El {
 pub fn page_content(s: &Browser, tab: &Tab, p: &Palette) -> Vec<El> {
     let mut content = vec![page_surface(s, tab, !s.native_page_active())];
     if !tab.hovered_link.is_empty() {
-        content.push(status_bubble(&tab.hovered_link, p));
+        content.push(status_bubble(&tab.hovered_link, s.native_page_active(), p));
     }
     if tab.crashed {
         content.push(crashed_notice(tab.view, p));
@@ -149,27 +151,40 @@ fn page_surface(s: &Browser, tab: &Tab, draw_pixels: bool) -> El {
         .child(surface)
 }
 
-fn status_bubble(url: &str, p: &Palette) -> El {
-    row()
+pub fn link_status_size(url: &str) -> (i32, i32) {
+    if url.is_empty() {
+        return (0, 0);
+    }
+    let width = rune::text::advance(url, STATUS_FONT) + STATUS_PADDING * 2.0;
+    (
+        width.min(STATUS_MAX_WIDTH).ceil() as i32,
+        STATUS_HEIGHT as i32,
+    )
+}
+
+fn status_bubble(url: &str, beside_native_page: bool, p: &Palette) -> El {
+    let bubble = row()
         .key("status")
         .role("status")
         .pin(Some(0.0), None, None, Some(0.0))
-        .max_w(STATUS_MAX_WIDTH)
-        .h(24.0)
-        .px(9.0)
+        .h(STATUS_HEIGHT)
+        .px(STATUS_PADDING)
         .center_y()
         .fill(p.bubble)
-        .border(p.hairline, p.bubble_border)
-        .corners([0.0, 7.0, 0.0, 0.0])
-        .inert()
-        .child(
-            text(url)
-                .key("status-text")
-                .font(STATUS_FONT)
-                .color(p.text_muted)
-                .truncate()
-                .shrink(),
-        )
+        .border(p.hairline, p.bubble_border);
+    let bubble = if beside_native_page {
+        bubble.w(link_status_size(url).0 as f32)
+    } else {
+        bubble.max_w(STATUS_MAX_WIDTH).corners([0.0, 7.0, 0.0, 0.0])
+    };
+    bubble.inert().child(
+        text(url)
+            .key("status-text")
+            .font(STATUS_FONT)
+            .color(p.text_muted)
+            .truncate()
+            .shrink(),
+    )
 }
 
 fn prompt_button(key: &'static str, label: &'static str, primary: bool, p: &Palette) -> El {
@@ -311,5 +326,25 @@ pub(crate) fn cursor_for(cursor: u32) -> Cursor {
         ffi::XENON_CURSOR_RESIZE_NS | ffi::XENON_CURSOR_RESIZE_ROW => Cursor::ResizeRow,
         ffi::XENON_CURSOR_HIDDEN => Cursor::Hidden,
         _ => Cursor::Default,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_link_status_leaves_no_room_when_no_link_is_hovered() {
+        assert_eq!(link_status_size(""), (0, 0));
+    }
+
+    #[test]
+    fn the_link_status_grows_with_its_address_up_to_its_limit() {
+        let (short, height) = link_status_size("https://a.example/");
+        let (longer, _) = link_status_size("https://a.example/a/longer/address");
+        let (longest, _) = link_status_size(&"https://a.example/".repeat(40));
+        assert_eq!(height, STATUS_HEIGHT as i32);
+        assert!(short > 0 && short < longer);
+        assert_eq!(longest, STATUS_MAX_WIDTH as i32);
     }
 }

@@ -132,6 +132,40 @@ from the UI thread without a deadlock. The Rust UI keeps a mirror and changes it
   nothing: Rune has no full-screen call and keeps winit's window to itself.
 - Each model window gets a Rune window of its own; see [Windows](#windows).
 
+## The chrome's look
+
+The chrome follows the Qt frontend's Classic layout, from `UI/ChromeStyle.cpp`, `UI/TabBar.cpp` and `UI/Tab.cpp`, so
+the two can be compared side by side. The colours are the ones Qt arrives at when the system palette doesn't match the
+colour scheme (`view/palette.rs`); Rune doesn't read the desktop's palette.
+
+- **Tab strip** (`view/tabs.rs`): 42 points high. A tab is a 28 point pill, 232 points wide with its 5 point gap, down
+  to 40, and 40 when pinned. The active tab takes the toolbar's colour, keeps only its top corners round, and reaches
+  the toolbar with a 19 point flare on each side (`TAB_FOOT_LEFT` and `TAB_FOOT_RIGHT` in `view/icons.rs`). Titles are
+  one weight; an inactive tab's is slightly faded. A 1.5 by 20 point separator stands between two inactive tabs and
+  after the last one, and the new tab button is a 28 point circle. An unfocused window's strip moves 40% toward the
+  toolbar's colour. The accent line the active tab used to carry is gone, as Qt has none.
+- **Toolbar** (`view/toolbar.rs`, `view/location/field.rs`): 43 points high with its hairline, 12 points of padding,
+  34 point round buttons with 20 point icons, 2 points apart in the navigation group and 6 elsewhere, in Qt's order
+  (navigation, split view, address, downloads, Private, extensions, content blocking, update, menu). The address field
+  is a 34 point pill with a 1 point border, and a rose border and glow when focused.
+- **Not matched**: the font is Rune's, not the desktop's, and tab hover and separator fades are not animated.
+
+### The window frame
+
+Off macOS the window has no system title bar (`WindowOptions::borderless`), as the Qt frontend's doesn't, and draws
+its own (`view/window_controls.rs`):
+
+- Minimize, maximize or restore, and close sit at the end of the tab strip, each 40 by 40 points, and at the end of
+  the one row the Compact and Vertical layouts have. Close goes through
+  `request_close_shown_window`, so pages are asked first, as from the keyboard. They act through the Rune patch's
+  `WindowHandle` calls.
+- The strip and the toolbar drag the window, and a double click on them maximizes it (Rune's `window_drag`).
+- A 1 point outline surrounds the window and the content is inset by it; a maximized window has neither.
+- Eight invisible handles, 6 points along the edges and 12 at the corners, start a resize with
+  `WindowHandle::drag_resize`. Rune has no diagonal resize cursors, so a corner shows the vertical one.
+- The window has no shadow of its own.
+
+## Windows
 ## Windows
 
 Rune creates every window before `App::run` and can't add one afterwards (`App::window` only registers a window for the
@@ -613,26 +647,66 @@ stop when macOS reports it, see [Windows](#windows)). Slots nobody has bound hav
   every window they change.
 - **Idle timers**: the accessibility check runs every two seconds rather than on every frame, and its wake is armed
   only when it runs.
+- **Pointer moves**: Rune asks for a frame on every pointer move, and used to render and present the whole window for
+  each one, changed or not, at the display's rate. Three things stop that. A patch makes any frame of a resting window
+  build first and take no drawable when it would draw what is already on screen, as Rune already did for timer frames.
+  A second patch lets the window come to rest after a live-only event when nothing in it is bound live, which is the
+  case whenever the page is on its native surface; without it the page's pointer handler (`Tx::live_only`) left the
+  window awake for good. And the engine's answers to a mouse move (cursor, hovered link, tooltip area), which arrive
+  whether or not they differ from the last ones, redraw only when they change something (`update_showing_if` in
+  `window_slots.rs`, `cursor_changed` and `link_hovered` in `state.rs`, `tooltip_changed` in `page_prompts.rs`).
+- **Link status** (`link_status_size` in `view/page.rs`, `set_notch` in `wayland_page.rs`): the address of a hovered
+  link no longer sends the window back to the CPU pixels path. The page gives up a notch at its bottom left corner the
+  size of the status: the page's surface is cropped above it with `wp_viewport`, a second subsurface shows the strip
+  to its right from a buffer of its own imported from the same dma-buf, and the window draws the status, square
+  cornered and at an explicit width, in the gap. A change of the notch is committed in synchronized mode so it lands
+  with the window's frame that draws or removes the status, and the subsurfaces go back to desynchronized 50 ms later.
+  The status appears and goes without a fade (`Tx::instant`), since a fade over a row of links kept the window
+  animating for as long as the pointer moved.
 - **Native pages on Wayland** (`wayland_page.rs`, `view_dmabuf_frame` in `bridge.rs`, `xenon_engine_set_window_surface`):
   each page is presented as a `wl_subsurface` of the Rune window from the dma-buf the Compositor painted it into, so
   the page never enters Rune's image atlas and Rune never draws its quad. The window is transparent and its page area
   is left clear; the page surface is above the window's surface, because KWin does not composite a subsurface placed
   below its parent. While an overlay covers the page (a menu, dialog, permission prompt, picker, find bar, location
-  suggestion list, hover card, link status, picture-in-picture or the task manager) the window falls back to the CPU
+  suggestion list, hover card, tooltip, picture-in-picture or the task manager) the window falls back to the CPU
   pixels path, which keeps those overlays above the page; it returns to the native surface when they close. The page
   behind such an overlay is capped to 10 frames per second (`xenon_engine_set_view_frame_rate`), and its rate goes back
   to the display's when the overlay closes, so an animation there can't hold the whole fallback at 60.
-  `Meta/rune.py` prepares a patched Rune checkout under `Build/rune` and `Patches/rune` holds the three small patches it
-  applies: `WindowHandle::with_raw_display_handle`, which winit's raw window handle does not expose, an
-  `allow(dead_code)` for the tooling's performance meters in release builds, and one that hands the IME cursor area to
-  the window only when it moves (sending it every frame kept KWin repositioning its input-method popup at the display's
-  rate, which cost about 7% GPU with a text field focused).
+  `Meta/rune.py` prepares a patched Rune checkout under `Build/rune` and `Patches/rune` holds the small patches it
+  applies:
+  1. `WindowHandle::with_raw_display_handle`, which winit's raw window handle does not expose.
+  2. An `allow(dead_code)` for the tooling's performance meters in release builds.
+  3. The IME cursor area goes to the window only when it moves (sending it every frame kept KWin repositioning its
+     input-method popup at the display's rate, which cost about 7% GPU with a text field focused).
+  4. Off macOS, any frame of a resting window is built before a drawable is taken, and takes none when it draws what
+     is on screen ("Pointer moves" above).
+  5. `WindowHandle::minimize`, `is_maximized`, `set_maximized` and `drag_resize`, for a borderless window that draws
+     its own title bar ("The window frame" below).
+  6. A live-only event with nothing bound live leaves the window able to rest ("Pointer moves" above).
+  7. A Wayland window takes a requested size at once and sends no `Resized` for it, so Rune now resizes its drawable
+     and lays out at that size itself. Before, a window opened with a saved size kept drawing at its first size and the
+     compositor stretched it to fit, with the page out of place.
 
 Measured in a KWin session with OpenGL compositing (`compositingType` `gl2`), 1280×800, a 60 fps CSS-animated page and
 `gpu_busy_percent`: Rune with the native page surface **3.0%**, Qt **3.0%**, before the native surface 10.0%. With the
 find bar open and focused, Rune measures **0.0%** on a settled page and **1.6%** over the same animation, Qt **3.0%**.
-Moving the pointer over a settled page costs Rune **0.0%**, and a page that scrolls itself measures Rune **4.0%** against
-Qt's **4.1%**. X11 and macOS keep the CPU pixels path, so the conversion above still applies there; on Linux and Windows
+A page that scrolls itself measures Rune **4.0%** against Qt's **4.1%**.
+
+Pointer movement, measured the same way with a pointer driven at 125 moves a second through KWin's fake input
+protocol (`gpu_busy_percent`, and per process from the DRM `fdinfo` counters):
+
+| Pointer moving over | Rune before | Rune | Qt |
+| --- | --- | --- | --- |
+| a settled page | 4.0% | **0.0%** | 0.0% |
+| a page of links, each with a hover style | 6.5% | **0.8%** | 0.2% |
+| the tab strip and toolbar | | **0.7%** | 0.0% |
+
+The earlier figure of 0.0% for a pointer over a settled page was wrong: the pointer in that run wasn't reaching the
+window. What is left over links and the chrome is the frame Rune draws when the status or a hover highlight changes;
+it draws the whole window for it, where Qt repaints one widget on the CPU. CPU use is the same in both frontends (7 to
+8% of a core over the settled page, 10 to 12% over the links, nearly all of it WebContent).
+
+X11 and macOS keep the CPU pixels path, so the conversion above still applies there; on Linux and Windows
 a window's pages also keep painting while the window is minimised or covered, because only the macOS side learns about
 that from AppKit.
 

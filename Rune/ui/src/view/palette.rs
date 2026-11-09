@@ -27,8 +27,19 @@ pub fn srgb(rgb: u32) -> Color {
 pub struct Palette {
     pub hairline: f32,
     pub chrome: Color,
+    pub toolbar: Color,
+    pub toolbar_edge: Color,
     pub surface: Color,
     pub tab_hover: Color,
+    pub tab_separator: Color,
+    pub location: Color,
+    pub location_border: Color,
+    pub location_focused: Color,
+    pub location_focused_border: Color,
+    pub window_control_hover: Color,
+    pub window_control_press: Color,
+    pub window_close_hover: Color,
+    pub window_outline: Color,
     pub text: Color,
     pub text_muted: Color,
     pub icon: Color,
@@ -54,9 +65,20 @@ impl Palette {
         if dark {
             Palette {
                 hairline,
-                chrome: oklch(0.185, 0.004, 265.0),
+                chrome: srgb(0x211f22),
+                toolbar: srgb(0x3d3a3c),
+                toolbar_edge: srgb(0x3c393c),
                 surface: oklch(0.25, 0.005, 265.0),
-                tab_hover: oklcha(1.0, 0.0, 0.0, 0.05),
+                tab_hover: Color::WHITE.alpha(24.0 / 255.0),
+                tab_separator: srgb(0x454448),
+                location: srgb(0x211e20),
+                location_border: srgb(0x211e20),
+                location_focused: srgb(0x282527),
+                location_focused_border: srgb(0x9d1c46),
+                window_control_hover: srgb(0x393437),
+                window_control_press: srgb(0x464145),
+                window_close_hover: srgb(WINDOW_CLOSE_RED),
+                window_outline: srgb(0x3c383c),
                 text: oklch(0.94, 0.003, 265.0),
                 text_muted: oklch(0.7, 0.008, 265.0),
                 icon: oklch(0.86, 0.004, 265.0),
@@ -77,9 +99,20 @@ impl Palette {
         } else {
             Palette {
                 hairline,
-                chrome: oklch(0.925, 0.004, 265.0),
+                chrome: srgb(0xd9d5d8),
+                toolbar: srgb(0xf5f4f5),
+                toolbar_edge: srgb(0xd4d3d4),
                 surface: oklch(0.99, 0.001, 265.0),
-                tab_hover: oklcha(0.2, 0.01, 265.0, 0.06),
+                tab_hover: Color::BLACK.alpha(22.0 / 255.0),
+                tab_separator: srgb(0xa8a7ab),
+                location: srgb(0xffffff),
+                location_border: srgb(0xd4d3d4),
+                location_focused: srgb(0xffffff),
+                location_focused_border: srgb(0xeb618c),
+                window_control_hover: srgb(0xf0eeee),
+                window_control_press: srgb(0xe8e5e7),
+                window_close_hover: srgb(WINDOW_CLOSE_RED),
+                window_outline: srgb(0xaba9aa),
                 text: oklch(0.24, 0.006, 265.0),
                 text_muted: oklch(0.5, 0.01, 265.0),
                 icon: oklch(0.36, 0.006, 265.0),
@@ -107,13 +140,15 @@ impl Palette {
             return self;
         }
         Palette {
-            chrome: self.chrome.mix(self.surface, INACTIVE_CHROME_MIX),
+            chrome: self.chrome.mix(self.toolbar, INACTIVE_CHROME_MIX),
+            tab_separator: self.tab_separator.mix(self.toolbar, INACTIVE_CHROME_MIX),
             ..self
         }
     }
 }
 
 const INACTIVE_CHROME_MIX: f32 = 0.4;
+const WINDOW_CLOSE_RED: u32 = 0xc42b1c;
 
 #[cfg(test)]
 mod tests {
@@ -127,7 +162,7 @@ mod tests {
         assert_ne!(inactive.chrome.hex(), active.chrome.hex());
         assert_eq!(
             inactive.chrome.hex(),
-            active.chrome.mix(active.surface, 0.4).hex()
+            active.chrome.mix(active.toolbar, 0.4).hex()
         );
     }
 

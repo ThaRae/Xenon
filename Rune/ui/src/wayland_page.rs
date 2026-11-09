@@ -55,6 +55,12 @@ struct Page {
     surface: WlSurface,
     viewport: WpViewport,
     subsurface: WlSubsurface,
+    strip: WlSurface,
+    strip_viewport: WpViewport,
+    strip_subsurface: WlSubsurface,
+    strip_mapped: bool,
+    strip_stale: bool,
+    frame: Option<DmaBufFrame>,
     sibling: WlSurface,
     sibling_subsurface: WlSubsurface,
     buffers: Vec<WlBuffer>,
@@ -75,6 +81,107 @@ pub struct WindowPage {
     pages: HashMap<ViewId, Page>,
     active: Option<ViewId>,
     rect: (i32, i32, i32, i32),
+    notch: (i32, i32),
+    synchronized: bool,
+}
+
+fn import(dmabuf: &ZwpLinuxDmabufV1, qh: &QueueHandle<State>, frame: &DmaBufFrame) -> WlBuffer {
+    let params = dmabuf.create_params(qh, ());
+    for (index, plane) in frame.planes.iter().enumerate() {
+        params.add(
+            plane.fd.as_fd(),
+            index as u32,
+            plane.offset,
+            plane.pitch,
+            (frame.modifier >> 32) as u32,
+            (frame.modifier & 0xffff_ffff) as u32,
+        );
+    }
+    let buffer = params.create_immed(
+        frame.width as i32,
+        frame.height as i32,
+        frame.format,
+        Flags::empty(),
+        qh,
+        (),
+    );
+    params.destroy();
+    buffer
+}
+
+impl Page {
+    fn hide_strip(&mut self) {
+        if std::mem::take(&mut self.strip_mapped) {
+            self.strip.attach(None, 0, 0);
+            self.strip.commit();
+        }
+    }
+
+    fn lay_out(
+        &mut self,
+        rect: (i32, i32, i32, i32),
+        notch: (i32, i32),
+        dmabuf: &ZwpLinuxDmabufV1,
+        qh: &QueueHandle<State>,
+    ) {
+        let (x, y, width, height) = rect;
+        self.subsurface.set_position(x, y);
+        let shown = self
+            .frame
+            .as_ref()
+            .filter(|frame| {
+                self.has_buffer && width > 0 && height > 0 && frame.width > 0 && frame.height > 0
+            })
+            .map(|frame| (f64::from(frame.width), f64::from(frame.height)));
+        let Some((buffer_width, buffer_height)) = shown else {
+            self.hide_strip();
+            return;
+        };
+        let (notch_width, notch_height) = notch;
+        if notch_width <= 0 || notch_height <= 0 || notch_width >= width || notch_height >= height {
+            self.viewport
+                .set_source(0.0, 0.0, buffer_width, buffer_height);
+            self.viewport.set_destination(width, height);
+            self.hide_strip();
+            return;
+        }
+        let across = buffer_width / f64::from(width);
+        let down = buffer_height / f64::from(height);
+        let strip_left = (f64::from(notch_width) * across).min(buffer_width - 1.0);
+        let strip_top = (buffer_height - f64::from(notch_height) * down).max(1.0);
+        self.viewport.set_source(0.0, 0.0, buffer_width, strip_top);
+        self.viewport.set_destination(width, height - notch_height);
+        self.strip_viewport.set_source(
+            strip_left,
+            strip_top,
+            buffer_width - strip_left,
+            buffer_height - strip_top,
+        );
+        self.strip_viewport
+            .set_destination(width - notch_width, notch_height);
+        self.strip_subsurface
+            .set_position(x + notch_width, y + height - notch_height);
+        if (!self.strip_mapped || self.strip_stale)
+            && let Some(frame) = &self.frame
+        {
+            let buffer = import(dmabuf, qh, frame);
+            self.strip.attach(Some(&buffer), 0, 0);
+            self.strip.damage_buffer(0, 0, i32::MAX, i32::MAX);
+            self.buffers.push(buffer);
+            self.strip_mapped = true;
+            self.strip_stale = false;
+        }
+        self.strip.commit();
+    }
+}
+
+impl Page {
+    fn unmap(&mut self) {
+        self.surface.attach(None, 0, 0);
+        self.surface.commit();
+        self.hide_strip();
+        self.has_buffer = false;
+    }
 }
 
 impl WindowPage {
@@ -106,7 +213,44 @@ impl WindowPage {
             pages: HashMap::new(),
             active: None,
             rect: (0, 0, 0, 0),
+            notch: (0, 0),
+            synchronized: false,
         })
+    }
+
+    pub fn notch(&self) -> (i32, i32) {
+        self.notch
+    }
+
+    pub fn set_notch(&mut self, notch: (i32, i32)) {
+        if self.notch == notch {
+            return;
+        }
+        self.notch = notch;
+        let rect = self.rect;
+        let (dmabuf, qh) = (self.dmabuf.clone(), self.qh.clone());
+        let Some(page) = self.active.and_then(|view| self.pages.get_mut(&view)) else {
+            return;
+        };
+        page.subsurface.set_sync();
+        page.strip_subsurface.set_sync();
+        self.synchronized = true;
+        page.lay_out(rect, notch, &dmabuf, &qh);
+        page.surface.commit();
+    }
+
+    pub fn is_synchronized(&self) -> bool {
+        self.synchronized
+    }
+
+    pub fn desynchronize(&mut self) {
+        if !std::mem::take(&mut self.synchronized) {
+            return;
+        }
+        for page in self.pages.values() {
+            page.subsurface.set_desync();
+            page.strip_subsurface.set_desync();
+        }
     }
 
     pub fn set_rect(&mut self, rect: (i32, i32, i32, i32)) {
@@ -117,10 +261,13 @@ impl WindowPage {
         if rect.2 <= 0 || rect.3 <= 0 {
             return;
         }
+        let notch = self.notch;
+        let (dmabuf, qh) = (self.dmabuf.clone(), self.qh.clone());
         if let Some(view) = self.active
-            && let Some(page) = self.pages.get(&view)
+            && let Some(page) = self.pages.get_mut(&view)
         {
-            page.subsurface.set_position(rect.0, rect.1);
+            page.lay_out(rect, notch, &dmabuf, &qh);
+            page.surface.commit();
         }
     }
 
@@ -131,20 +278,19 @@ impl WindowPage {
         if let Some(previous) = self.active
             && let Some(page) = self.pages.get_mut(&previous)
         {
-            page.surface.attach(None, 0, 0);
-            page.surface.commit();
-            page.has_buffer = false;
+            page.unmap();
         }
         self.active = Some(view);
-        let rect = self.rect;
+        let (rect, notch) = (self.rect, self.notch);
+        let (dmabuf, qh) = (self.dmabuf.clone(), self.qh.clone());
         let page = self.page(view);
         page.subsurface.set_position(rect.0, rect.1);
         if let Some(buffer) = &page.current {
             page.surface.attach(Some(buffer), 0, 0);
             page.surface.damage_buffer(0, 0, i32::MAX, i32::MAX);
-            page.viewport.set_destination(rect.2, rect.3);
-            page.surface.commit();
             page.has_buffer = true;
+            page.lay_out(rect, notch, &dmabuf, &qh);
+            page.surface.commit();
         }
     }
 
@@ -152,9 +298,7 @@ impl WindowPage {
         if let Some(view) = self.active.take()
             && let Some(page) = self.pages.get_mut(&view)
         {
-            page.surface.attach(None, 0, 0);
-            page.surface.commit();
-            page.has_buffer = false;
+            page.unmap();
         }
     }
 
@@ -164,43 +308,21 @@ impl WindowPage {
             && previous != view
             && let Some(page) = self.pages.get_mut(&previous)
         {
-            page.surface.attach(None, 0, 0);
-            page.surface.commit();
-            page.has_buffer = false;
+            page.unmap();
         }
         self.active = Some(view);
-        let rect = self.rect;
+        let (rect, notch) = (self.rect, self.notch);
         let (qh, dmabuf) = (self.qh.clone(), self.dmabuf.clone());
-        let params = dmabuf.create_params(&qh, ());
-        for (index, plane) in frame.planes.into_iter().enumerate() {
-            params.add(
-                plane.fd.as_fd(),
-                index as u32,
-                plane.offset,
-                plane.pitch,
-                (frame.modifier >> 32) as u32,
-                (frame.modifier & 0xffff_ffff) as u32,
-            );
-        }
-        let buffer = params.create_immed(
-            frame.width as i32,
-            frame.height as i32,
-            frame.format,
-            Flags::empty(),
-            &qh,
-            (),
-        );
-        params.destroy();
+        let buffer = import(&dmabuf, &qh, &frame);
         let page = self.page(view);
         page.surface.attach(Some(&buffer), 0, 0);
-        page.viewport
-            .set_source(0.0, 0.0, f64::from(frame.width), f64::from(frame.height));
-        page.viewport.set_destination(rect.2, rect.3);
         page.surface.damage_buffer(0, 0, i32::MAX, i32::MAX);
-        page.surface.commit();
-        page.subsurface.set_position(rect.0, rect.1);
+        page.frame = Some(frame);
+        page.strip_stale = true;
         page.current = Some(buffer.clone());
         page.has_buffer = true;
+        page.lay_out(rect, notch, &dmabuf, &qh);
+        page.surface.commit();
         page.buffers.push(buffer);
     }
 
@@ -235,11 +357,21 @@ impl WindowPage {
             let sibling_subsurface =
                 self.subcompositor
                     .get_subsurface(&sibling, &self.parent, &self.qh, ());
+            let strip = self.compositor.create_surface(&self.qh, ());
+            let strip_viewport = self.viewporter.get_viewport(&strip, &self.qh, ());
+            let strip_subsurface =
+                self.subcompositor
+                    .get_subsurface(&strip, &self.parent, &self.qh, ());
             subsurface.place_below(&sibling);
-            subsurface.set_desync();
+            strip_subsurface.place_below(&sibling);
+            if !self.synchronized {
+                subsurface.set_desync();
+                strip_subsurface.set_desync();
+            }
             let region = self.compositor.create_region(&self.qh, ());
             region.add(0, 0, 0, 0);
             surface.set_input_region(Some(&region));
+            strip.set_input_region(Some(&region));
             region.destroy();
             self.pages.insert(
                 view,
@@ -247,6 +379,12 @@ impl WindowPage {
                     surface,
                     viewport,
                     subsurface,
+                    strip,
+                    strip_viewport,
+                    strip_subsurface,
+                    strip_mapped: false,
+                    strip_stale: false,
+                    frame: None,
                     sibling,
                     sibling_subsurface,
                     buffers: Vec::new(),
@@ -265,6 +403,9 @@ impl Drop for WindowPage {
             for buffer in page.buffers {
                 buffer.destroy();
             }
+            page.strip_viewport.destroy();
+            page.strip_subsurface.destroy();
+            page.strip.destroy();
             page.viewport.destroy();
             page.subsurface.destroy();
             page.sibling_subsurface.destroy();

@@ -26,6 +26,9 @@ mod task_manager;
 mod toolbar;
 mod update_button;
 mod window;
+mod window_controls;
 mod window_overlays;
 
+pub use page::link_status_size;
 pub use window::browser_view;
+pub use window_controls::draws_window_frame;

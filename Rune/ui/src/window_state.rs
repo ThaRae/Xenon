@@ -107,6 +107,34 @@ impl Browser {
         self.shown_tabs_changed(previous, tx);
     }
 
+    fn window_handle(&self) -> Option<&rune::WindowHandle> {
+        let link = self.window.link.as_ref()?;
+        link.slots.window_handle(link.slot)
+    }
+
+    pub fn window_is_maximized(&self) -> bool {
+        self.window_handle()
+            .is_some_and(rune::WindowHandle::is_maximized)
+    }
+
+    pub fn minimize_window(&mut self) {
+        if let Some(handle) = self.window_handle() {
+            handle.minimize();
+        }
+    }
+
+    pub fn toggle_window_maximized(&mut self) {
+        if let Some(handle) = self.window_handle() {
+            handle.set_maximized(!handle.is_maximized());
+        }
+    }
+
+    pub fn resize_window_from(&mut self, edge: (i8, i8)) {
+        if let Some(handle) = self.window_handle() {
+            handle.drag_resize(edge);
+        }
+    }
+
     pub fn is_bound_to(&self, window: WindowId) -> bool {
         self.window.link.is_none() || self.shown_window() == Some(window)
     }
@@ -179,8 +207,10 @@ impl Browser {
             return;
         }
         let slot = self.platform_slot();
-        let maximized = slot
-            .is_some_and(|slot| unsafe { ffi_windows::xenon_platform_window_is_maximized(slot) });
+        let maximized = self.window_is_maximized()
+            || slot.is_some_and(|slot| unsafe {
+                ffi_windows::xenon_platform_window_is_maximized(slot)
+            });
         let fullscreen = slot
             .is_some_and(|slot| unsafe { ffi_windows::xenon_platform_window_is_fullscreen(slot) });
         if fullscreen {

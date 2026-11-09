@@ -16,7 +16,11 @@ use crate::view::palette::Palette;
 use crate::view::shield::shield_button;
 use crate::view::update_button::update_button;
 
-const BUTTON_SIZE: f32 = 32.0;
+const BUTTON_SIZE: f32 = 34.0;
+const ICON_SIZE: f32 = 20.0;
+const TOOLBAR_PADDING: f32 = 12.0;
+const ITEM_GAP: f32 = 6.0;
+const NAVIGATION_GAP: f32 = 2.0;
 
 pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
     let dark = cx.system_dark();
@@ -43,33 +47,39 @@ pub fn toolbar_controls(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
         .role("toolbar")
         .label("Navigation")
         .h(TOOLBAR_HEIGHT - p.hairline)
-        .gap(2.0)
+        .gap(ITEM_GAP)
         .center_y()
         .window_drag()
         .on_secondary_press(|s: &mut Browser, at, tx| chrome_menu::show_window_menu(s, at, tx))
         .child(
-            nav_button("back", "Back", &icons::BACK, can_go_back, p, |s| {
-                s.go_back()
-            })
-            .on_secondary_press(|s: &mut Browser, _, _| s.open_history_menu(-1)),
+            row()
+                .key("navigation")
+                .gap(NAVIGATION_GAP)
+                .center_y()
+                .child(
+                    nav_button("back", "Back", &icons::BACK, can_go_back, p, |s| {
+                        s.go_back()
+                    })
+                    .on_secondary_press(|s: &mut Browser, _, _| s.open_history_menu(-1)),
+                )
+                .child(
+                    nav_button(
+                        "forward",
+                        "Forward",
+                        &icons::FORWARD,
+                        can_go_forward,
+                        p,
+                        |s| s.go_forward(),
+                    )
+                    .on_secondary_press(|s: &mut Browser, _, _| s.open_history_menu(1)),
+                )
+                .child(reload),
         )
-        .child(
-            nav_button(
-                "forward",
-                "Forward",
-                &icons::FORWARD,
-                can_go_forward,
-                p,
-                |s| s.go_forward(),
-            )
-            .on_secondary_press(|s: &mut Browser, _, _| s.open_history_menu(1)),
-        )
-        .child(reload)
         .children(crate::view::split_view::toolbar_button(s, p))
         .child(location_field(s, p, dark, cx))
-        .children(crate::view::extensions::action_buttons(s, p))
-        .children(s.windows.shown_is_private().then(|| private_badge(p)))
         .children(downloads_button(s, p))
+        .children(s.windows.shown_is_private().then(|| private_badge(p)))
+        .children(crate::view::extensions::action_buttons(s, p))
         .children(shield_button(s, p))
         .children(update_button(s))
         .child(nav_button(
@@ -87,9 +97,9 @@ pub fn toolbar(s: &Browser, p: &Palette, cx: &mut Cx<Browser>) -> El {
         row()
             .key("toolbar-row")
             .w_full()
-            .px(8.0)
+            .px(TOOLBAR_PADDING)
             .child(toolbar_controls(s, p, cx).grow(1.0).shrink()),
-        p.surface,
+        p.toolbar,
         p,
     )
 }
@@ -104,7 +114,7 @@ pub fn toolbar_band(content: El, fill: Color, p: &Palette) -> El {
             el().key("toolbar-edge")
                 .w_full()
                 .h(p.hairline)
-                .fill(p.separator)
+                .fill(p.toolbar_edge)
                 .a11y_hidden(),
         )
 }
@@ -122,11 +132,11 @@ fn nav_button(
         .role("button")
         .label(label)
         .size(BUTTON_SIZE, BUTTON_SIZE)
-        .radius(8.0)
+        .radius(BUTTON_SIZE / 2.0)
         .center()
         .focusable(false)
         .child(
-            icon(glyph, 18.0)
+            icon(glyph, ICON_SIZE)
                 .color(if enabled { p.icon } else { p.icon_disabled })
                 .a11y_hidden(),
         );

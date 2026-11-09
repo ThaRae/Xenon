@@ -28,6 +28,9 @@ use crate::view::tabs::{
 use crate::view::task_manager::task_manager_overlay;
 use crate::view::toolbar::{toolbar, toolbar_band, toolbar_controls};
 use crate::view::update_button::update_popover;
+use crate::view::window_controls::{
+    OUTLINE_WIDTH, resize_edges, toolbar_window_controls, window_outline,
+};
 use crate::view::window_overlays::{devtools_banner, stop_downloads_dialog};
 
 const COMPACT_TOOLBAR_MIN_WIDTH: f32 = 380.0;
@@ -52,6 +55,12 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
         window
     } else {
         window.fill(palette.chrome)
+    };
+    let outline = window_outline(s, &palette);
+    let window = if outline.is_some() {
+        window.padding(OUTLINE_WIDTH)
+    } else {
+        window
     };
     let window = if chrome_hidden(s) {
         window.child(page_area(s, &palette))
@@ -113,6 +122,7 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
             .children(stop_downloads_dialog(s, &palette))
             .children(chrome_menu(s, &palette));
     }
+    let frame = outline.into_iter().chain(resize_edges(s));
     window
         .children(hover_card(s, &palette, layout == ChromeLayout::Vertical))
         .children(downloads_popover(s, &palette))
@@ -124,6 +134,7 @@ pub fn browser_view(s: &Browser, cx: &mut Cx<Browser>) -> El {
         .children(stop_downloads_dialog(s, &palette))
         .children(crate::view::extensions::extension_overlays(s, &palette))
         .children(chrome_menu(s, &palette))
+        .children(frame)
 }
 
 fn chrome_menu(s: &Browser, p: &Palette) -> Vec<El> {
@@ -148,8 +159,9 @@ fn compact_bar(s: &Browser, p: &Palette, titlebar_inset: f32, cx: &mut Cx<Browse
             .window_drag()
             .on_secondary_press(|s: &mut Browser, at, tx| chrome_menu::show_window_menu(s, at, tx))
             .child(toolbar_controls(s, p, cx).w(toolbar_width).shrink())
-            .child(horizontal_tabs(s, p))
-            .child(new_tab_button(p)),
+            .child(horizontal_tabs(s, p, false))
+            .child(new_tab_button(p))
+            .children(toolbar_window_controls(s, p, true)),
         p.chrome,
         p,
     )
@@ -165,8 +177,9 @@ fn vertical_toolbar(s: &Browser, p: &Palette, titlebar_inset: f32, cx: &mut Cx<B
             .gap(4.0)
             .center_y()
             .child(sidebar_toggle(s, p))
-            .child(toolbar_controls(s, p, cx).grow(1.0).shrink()),
-        p.surface,
+            .child(toolbar_controls(s, p, cx).grow(1.0).shrink())
+            .children(toolbar_window_controls(s, p, false)),
+        p.toolbar,
         p,
     )
 }

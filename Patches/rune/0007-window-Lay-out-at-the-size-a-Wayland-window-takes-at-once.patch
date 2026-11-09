@@ -1,0 +1,40 @@
+diff --git a/crates/rune/src/window/stepping.rs b/crates/rune/src/window/stepping.rs
+--- a/crates/rune/src/window/stepping.rs
++++ b/crates/rune/src/window/stepping.rs
+@@ -136,12 +136,17 @@
+             let window = &w.window;
+             // Read before the resize request, which may apply at once.
+             let geometry = (window.current_monitor(), window.outer_position(), window.outer_size(), window.inner_size());
++            let mut taken = None;
+             if let Some((width, height)) = request.size {
+                 self.frame_jump = Some((width, height));
+-                let _ = window.request_inner_size(LogicalSize::new(width, height));
++                taken = window.request_inner_size(LogicalSize::new(width, height));
++            }
++            // Wayland windows can't see or set their position. They take a size at once and
++            // send no `Resized` for it, so the drawable and the layout follow here.
++            if self.wayland {
++                if let Some(size) = taken { self.take_inner_size(size); }
++                return;
+             }
+-            // Wayland windows can't see or set their position.
+-            if self.wayland { return; }
+             let (Some(monitor), Ok(position), outer, inner) = geometry else { return };
+             let scale = window.scale_factor() as f32;
+             let size = request.size.map(|(width, height)| (
+@@ -159,6 +164,15 @@
+         }
+     }
+ 
++    #[cfg(not(target_os = "macos"))]
++    fn take_inner_size(&mut self, size: winit::dpi::PhysicalSize<u32>) {
++        let (Some(l), Some((gpu, ..))) = (self.win.as_mut(), self.gpu.as_ref()) else { return };
++        if size.width == 0 || size.height == 0 || !l.resize_surface(&gpu.device, size) { return; }
++        let scale = l.window.scale_factor() as f32;
++        self.frame_jump = None;
++        self.rt.set_viewport((size.width as f32 / scale, size.height as f32 / scale), scale);
++    }
++
+     /// Moves the frame one display frame along, before the frame's drawable is acquired, and
+     /// lays the content out at the new size: content follows the edge in the same frame, with
+     /// no stretched or blank strip.

@@ -244,6 +244,18 @@ impl Slots {
         }
     }
 
+    pub fn update_showing_if(
+        &self,
+        view: ViewId,
+        f: impl Fn(&mut Browser, &mut Tx) -> bool + Send + Sync + 'static,
+    ) {
+        let f = Arc::new(f);
+        for handle in &self.handles {
+            let f = f.clone();
+            handle.update_if(move |browser, tx| f(browser, tx) && browser.shows_view(view));
+        }
+    }
+
     pub fn update_view(
         &self,
         view: ViewId,
@@ -452,6 +464,14 @@ pub struct ViewRoute<'a>(pub &'a Slots);
 impl ViewRoute<'_> {
     pub fn update(&self, view: ViewId, f: impl FnOnce(&mut Browser, &mut Tx) + Send + 'static) {
         self.0.update_view(view, f);
+    }
+
+    pub fn update_if(
+        &self,
+        view: ViewId,
+        f: impl FnOnce(&mut Browser, &mut Tx) -> bool + Send + 'static,
+    ) {
+        self.0.update_view_if(view, f);
     }
 }
 

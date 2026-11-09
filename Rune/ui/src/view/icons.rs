@@ -78,3 +78,43 @@ pub static CRASHED: Icon = stroked!(
     "xenon-crashed",
     "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M8.5 15.5c2-1.6 5-1.6 7 0M9 9.5h.01M15 9.5h.01"
 );
+pub static TAB_FOOT_LEFT: Icon = Icon {
+    name: "xenon-tab-foot-left",
+    view: 19.0,
+    body: r#"<path d="M0 19A19 19 0 0 0 19 0V19Z" fill="currentColor"/>"#,
+};
+pub static TAB_FOOT_RIGHT: Icon = Icon {
+    name: "xenon-tab-foot-right",
+    view: 19.0,
+    body: r#"<path d="M0 0A19 19 0 0 0 19 19H0Z" fill="currentColor"/>"#,
+};
+
+macro_rules! window_control {
+    ($name:literal, $width:literal, $path:literal) => {
+        Icon {
+            name: $name,
+            view: 20.0,
+            body: concat!(
+                r#"<path d=""#,
+                $path,
+                r#"" fill="none" stroke="currentColor" stroke-width=""#,
+                $width,
+                r#"" stroke-linecap="round" stroke-linejoin="round"/>"#
+            ),
+        }
+    };
+}
+
+pub static WINDOW_MINIMIZE: Icon = window_control!("xenon-window-minimize", "1.65", "M5.2 10h9.6");
+pub static WINDOW_MAXIMIZE: Icon = window_control!(
+    "xenon-window-maximize",
+    "1.55",
+    "M6.4 5h7.2a1.4 1.4 0 0 1 1.4 1.4v7.2a1.4 1.4 0 0 1-1.4 1.4H6.4A1.4 1.4 0 0 1 5 13.6V6.4A1.4 1.4 0 0 1 6.4 5z"
+);
+pub static WINDOW_RESTORE: Icon = window_control!(
+    "xenon-window-restore",
+    "1.55",
+    "M6.3 7h5.5a1.2 1.2 0 0 1 1.2 1.2v5.5a1.2 1.2 0 0 1-1.2 1.2H6.3a1.2 1.2 0 0 1-1.2-1.2V8.2A1.2 1.2 0 0 1 6.3 7zM7.2 5.1h7.7v7.8"
+);
+pub static WINDOW_CLOSE: Icon =
+    window_control!("xenon-window-close", "1.65", "M5.5 5.5l9 9M14.5 5.5l-9 9");

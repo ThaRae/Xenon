@@ -22,16 +22,25 @@ use crate::view::icons;
 use crate::view::palette::Palette;
 use crate::view::split_view::pair_split_tabs;
 use crate::view::tab_groups as group_views;
+use crate::view::window_controls::window_controls;
 
-const TAB_WIDTH: f32 = 232.0;
-const TAB_MIN_WIDTH: f32 = 44.0;
-const TAB_TOP_INSET: f32 = 6.0;
-const TAB_HEIGHT: f32 = TAB_STRIP_HEIGHT - TAB_TOP_INSET;
-const TAB_RADIUS: f32 = 9.0;
-const STRIP_PADDING: f32 = 8.0;
+const TAB_GAP: f32 = 5.0;
+const TAB_WIDTH: f32 = 232.0 - TAB_GAP;
+const TAB_MIN_WIDTH: f32 = 40.0 - TAB_GAP;
+const TAB_TOP_INSET: f32 = 9.0;
+const TAB_BOTTOM_INSET: f32 = 5.0;
+const TAB_HEIGHT: f32 = TAB_STRIP_HEIGHT - TAB_TOP_INSET - TAB_BOTTOM_INSET;
+const TAB_RADIUS: f32 = TAB_HEIGHT / 2.0;
+const TAB_FLARE: f32 = TAB_RADIUS + TAB_BOTTOM_INSET;
+const TAB_CONTENT_INSET: f32 = 8.0;
+const TAB_SEPARATOR_WIDTH: f32 = 1.5;
+const TAB_SEPARATOR_HEIGHT: f32 = 20.0;
+const STRIP_PADDING: f32 = 19.5;
 const ICON_SIZE: f32 = 16.0;
-const TITLE_FONT: TextStyle = TextStyle::new(12.5, 450.0);
-const ACTIVE_TITLE_FONT: TextStyle = TextStyle::new(12.5, 550.0);
+const CLOSE_BUTTON_SIZE: f32 = 22.0;
+const NEW_TAB_BUTTON_SIZE: f32 = 28.0;
+const TITLE_FONT: TextStyle = TextStyle::new(13.0, 400.0);
+const INACTIVE_TITLE_ALPHA: f32 = 0.86;
 
 pub const VERTICAL_TABS_EXPANDED_WIDTH: f32 = 232.0;
 pub const VERTICAL_TABS_COLLAPSED_WIDTH: f32 = 52.0;
@@ -52,29 +61,43 @@ pub fn tab_strip(s: &Browser, p: &Palette, titlebar_inset: f32) -> El {
         .w_full()
         .h(TAB_STRIP_HEIGHT)
         .fill(p.chrome)
-        .pl(titlebar_inset + STRIP_PADDING)
-        .pr(STRIP_PADDING)
-        .pt(TAB_TOP_INSET)
-        .items_end()
-        .gap(4.0)
         .window_drag()
         .on_secondary_press(|s: &mut Browser, at, tx| chrome_menu::show_window_menu(s, at, tx))
-        .child(horizontal_tabs(s, p))
-        .child(new_tab_button(p))
+        .child(
+            row()
+                .key("tab-strip-tabs")
+                .h_full()
+                .grow(1.0)
+                .shrink()
+                .min_w(0.0)
+                .pl(titlebar_inset + STRIP_PADDING)
+                .pr(TAB_FLARE)
+                .pt(TAB_TOP_INSET)
+                .gap(TAB_GAP)
+                .child(horizontal_tabs(s, p, true))
+                .child(new_tab_button(p)),
+        )
+        .children(window_controls(s, p))
 }
 
-pub fn horizontal_tabs(s: &Browser, p: &Palette) -> El {
+pub fn horizontal_tabs(s: &Browser, p: &Palette, joins_toolbar: bool) -> El {
     let tabs = row()
         .key("tabs")
         .role("tablist")
         .label("Tabs")
-        .h_full()
-        .items_end()
-        .gap(2.0)
+        .h(TAB_HEIGHT)
+        .gap(TAB_GAP)
         .shrink();
     let groups = s.tab_groups.groups(s.shown_window());
     let mut entries = Vec::new();
-    for entry in tab_groups::strip_entries(s.tabs.iter().map(|tab| tab.view), groups) {
+    let strip = tab_groups::strip_entries(s.tabs.iter().map(|tab| tab.view), groups);
+    let stands_apart = |entry: Option<&StripEntry>| match entry {
+        Some(StripEntry::Tab { view, .. }) => s.tabs.is_active(*view),
+        Some(StripEntry::Header(_)) => true,
+        None => false,
+    };
+    for (index, entry) in strip.iter().copied().enumerate() {
+        let separated = !stands_apart(Some(&entry)) && !stands_apart(strip.get(index + 1));
         match entry {
             StripEntry::Header(id) => {
                 if let Some(group) = groups.iter().find(|group| group.id == id) {
@@ -96,6 +119,8 @@ pub fn horizontal_tabs(s: &Browser, p: &Palette) -> El {
                             s.window_focused,
                             group,
                             last_in_group,
+                            separated,
+                            joins_toolbar,
                             p,
                         ),
                     ));
@@ -133,12 +158,12 @@ fn with_tab_events(tab_el: El, view: ViewId) -> El {
 fn tab_title(tab: &Tab, active: bool, p: &Palette) -> El {
     text(tab.display_title())
         .key("title")
-        .font(if active {
-            ACTIVE_TITLE_FONT
+        .font(TITLE_FONT)
+        .color(if active {
+            p.text
         } else {
-            TITLE_FONT
+            p.text.alpha(INACTIVE_TITLE_ALPHA)
         })
-        .color(if active { p.text } else { p.text_muted })
         .truncate()
         .grow(1.0)
         .shrink()
@@ -151,6 +176,8 @@ fn tab_button(
     window_focused: bool,
     group: Option<&Group>,
     last_in_group: bool,
+    separated: bool,
+    joins_toolbar: bool,
     p: &Palette,
 ) -> El {
     let view = tab.view;
@@ -163,12 +190,12 @@ fn tab_button(
         .shrink()
         .min_w(TAB_MIN_WIDTH)
         .h(TAB_HEIGHT)
-        .pl(10.0)
-        .pr(6.0)
-        .gap(8.0)
+        .pl(TAB_CONTENT_INSET)
+        .pr(TAB_CONTENT_INSET - 5.0)
+        .gap(7.0)
         .center_y()
-        .corners([TAB_RADIUS, TAB_RADIUS, 0.0, 0.0])
         .child(tab_icon(tab, active && window_focused, p));
+    let tab_el = if tab.pinned { tab_el.center() } else { tab_el };
     let tab_el = with_tab_events(tab_el, view);
     let tab_el = with_tab_drag(tab_el, view, tab_groups::Axis::Horizontal).children(
         group_views::horizontal_line(group, last_in_group, TAB_RADIUS, p),
@@ -181,18 +208,59 @@ fn tab_button(
             .children(audio_button(tab, p))
             .child(close_button(view, p))
     };
-    if active {
-        tab_el.fill(p.surface).child(
-            el().key("indicator")
-                .pin(Some(TAB_RADIUS), Some(0.0), Some(TAB_RADIUS), None)
-                .h(2.0)
-                .corners([0.0, 0.0, 2.0, 2.0])
-                .fill(p.accent)
-                .a11y_hidden(),
-        )
+    if active && joins_toolbar {
+        tab_el
+            .corners([TAB_RADIUS, TAB_RADIUS, 0.0, 0.0])
+            .fill(p.toolbar)
+            .children(active_tab_base(p))
+    } else if active {
+        tab_el.radius(TAB_RADIUS).fill(p.toolbar)
     } else {
-        tab_el.hover(p.tab_hover)
+        tab_el
+            .radius(TAB_RADIUS)
+            .hover(p.tab_hover)
+            .children(separated.then(|| tab_separator(p)))
     }
+}
+
+fn active_tab_base(p: &Palette) -> [El; 3] {
+    let foot = |key: &'static str, glyph: &'static rune::Icon| {
+        icon(glyph, TAB_FLARE)
+            .key(key)
+            .color(p.toolbar)
+            .inert()
+            .a11y_hidden()
+    };
+    [
+        el().key("base")
+            .pin(Some(0.0), Some(TAB_HEIGHT), Some(0.0), None)
+            .h(TAB_BOTTOM_INSET)
+            .fill(p.toolbar)
+            .inert()
+            .a11y_hidden(),
+        foot("foot-left", &icons::TAB_FOOT_LEFT).absolute(-TAB_FLARE, TAB_RADIUS),
+        foot("foot-right", &icons::TAB_FOOT_RIGHT).pin(
+            None,
+            Some(TAB_RADIUS),
+            Some(-TAB_FLARE),
+            None,
+        ),
+    ]
+}
+
+fn tab_separator(p: &Palette) -> El {
+    el().key("separator")
+        .pin(
+            None,
+            Some((TAB_HEIGHT - TAB_SEPARATOR_HEIGHT) / 2.0),
+            Some(-(TAB_GAP + TAB_SEPARATOR_WIDTH) / 2.0),
+            None,
+        )
+        .size(TAB_SEPARATOR_WIDTH, TAB_SEPARATOR_HEIGHT)
+        .radius(TAB_SEPARATOR_WIDTH / 2.0)
+        .fill(p.tab_separator)
+        .inert()
+        .a11y_hidden()
 }
 
 pub fn vertical_tab_sidebar(s: &Browser, p: &Palette) -> El {
@@ -348,7 +416,7 @@ fn vertical_tab(tab: &Tab, active: bool, window_focused: bool, expanded: bool, p
         tab_el
     };
     if active {
-        tab_el.fill(p.surface).child(
+        tab_el.fill(p.toolbar).child(
             el().key("indicator")
                 .pin(Some(0.0), Some(8.0), None, Some(8.0))
                 .w(2.0)
@@ -529,14 +597,18 @@ fn close_button(view: ViewId, p: &Palette) -> El {
     el().key("close")
         .role("button")
         .label("Close tab")
-        .size(20.0, 20.0)
-        .radius(6.0)
+        .size(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+        .radius(CLOSE_BUTTON_SIZE / 2.0)
         .center()
         .focusable(false)
         .hover(p.hover)
         .press(p.press)
         .on_press_tx(move |s: &mut Browser, tx| s.close_tab(view, tx))
-        .child(icon(&icons::CLOSE, 13.0).color(p.icon).a11y_hidden())
+        .child(
+            icon(&icons::CLOSE, 14.0)
+                .color(p.icon.alpha(0.8))
+                .a11y_hidden(),
+        )
 }
 
 pub fn new_tab_button(p: &Palette) -> El {
@@ -544,11 +616,11 @@ pub fn new_tab_button(p: &Palette) -> El {
         el().key("new-tab")
             .role("button")
             .label("New tab")
-            .size(28.0, 28.0)
-            .radius(8.0)
+            .size(NEW_TAB_BUTTON_SIZE, NEW_TAB_BUTTON_SIZE)
+            .radius(NEW_TAB_BUTTON_SIZE / 2.0)
             .center()
             .focusable(false)
-            .hover(p.hover)
+            .hover(p.tab_hover)
             .press(p.press)
             .on_press_tx(|s: &mut Browser, tx| s.new_tab(tx))
             .child(icon(&icons::PLUS, 16.0).color(p.icon).a11y_hidden()),
