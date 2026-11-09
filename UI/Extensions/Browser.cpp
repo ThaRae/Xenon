@@ -1217,7 +1217,7 @@ Optional<Vector<WebView::ScriptBridgeEndpoint>> frame_documents(Extension const&
     auto tab = find_tab(extension, tab_id);
     if (!tab.has_value())
         return {};
-    return tab->tab->view().frame_document_endpoints();
+    return tab->tab->view().hub_view().frame_document_endpoints();
 }
 
 ErrorOr<JsonValue, String> handle_call(Extension const& extension, Optional<u64> caller_view_id, StringView name, JsonArray const& args)

@@ -37,7 +37,7 @@ static QString message_for(QString const& page_title, QString const& host)
 
 void PageUnresponsivePrompt::attach(WebContentView& view)
 {
-    view.on_page_unresponsive_changed = [&view](bool unresponsive) {
+    view.hub_view().on_page_unresponsive_changed = [&view](bool unresponsive) {
         auto* prompt = static_cast<PageUnresponsivePrompt*>(view.findChild<QWidget*>(PROMPT_OBJECT_NAME, Qt::FindDirectChildrenOnly));
         dbgln("Page unresponsive prompt {} for {}", unresponsive ? "shown" : "hidden", view.url());
         if (!unresponsive) {
@@ -96,7 +96,7 @@ PageUnresponsivePrompt::PageUnresponsivePrompt(WebContentView& view)
     exit_button->setObjectName("LadybirdMessagePopoverDismissButton");
     QObject::connect(exit_button, &QPushButton::clicked, this, [this] {
         hide();
-        m_view.terminate_unresponsive_page();
+        m_view.hub_view().terminate_unresponsive_page();
     });
     button_layout->addWidget(exit_button);
 
@@ -105,7 +105,7 @@ PageUnresponsivePrompt::PageUnresponsivePrompt(WebContentView& view)
     wait_button->setDefault(true);
     QObject::connect(wait_button, &QPushButton::clicked, this, [this] {
         hide();
-        m_view.keep_waiting_for_unresponsive_page();
+        m_view.hub_view().keep_waiting_for_unresponsive_page();
     });
     button_layout->addWidget(wait_button);
 

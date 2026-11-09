@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Sun, 8 Nov 2026 23:14:58 -0500
+Subject: [PATCH] Tests: Skip a timing-sensitive test on loaded runners
+
+The event-timing test depends on the page laying out within a few
+frames, and on a loaded CI runner its observer can miss the pointer move
+it waits for. It passes on faster runners, which still run it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Tests/LibWeb/TestConfig.ini | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Tests/LibWeb/TestConfig.ini b/Tests/LibWeb/TestConfig.ini
+index aa05e1ddd1fcba203baaf7b4a69686c46989236b..312f196bc0e19c2874c7a013df1a14b19d4a3324 100644
+--- a/Tests/LibWeb/TestConfig.ini
++++ b/Tests/LibWeb/TestConfig.ini
+@@ -1360,6 +1360,7 @@ Text/input/Crypto/SubtleCrypto-generateKey.html
+ 
+ ; Flaky on CI
+ Text/input/wpt-import/event-timing/pointerdown-pointerup-no-overlap.html
++Text/input/wpt-import/event-timing/shadow-dom-null-target.html
+ 
+ ; Flaky on CI on every platform, in one of its "Underlying connection closed" subtests, which wait for the test server to
+ ; see the connection close after an abort: https://github.com/LadybirdBrowser/ladybird/issues/13500

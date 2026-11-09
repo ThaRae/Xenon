@@ -7,8 +7,8 @@
 #pragma once
 
 #include <AK/Platform.h>
-#include <LibWebView/Menu.h>
 #include <QPointer>
+#include <UI/Actions.h>
 
 class QAction;
 class QMenu;
@@ -29,13 +29,13 @@ enum class IncludeActionShortcut : u8 {
     Yes,
 };
 
-QMenu* create_application_menu(QWidget& parent, WebView::Menu&, IncludeActionShortcut = IncludeActionShortcut::Yes);
-void repopulate_application_menu(QMenu& menu, QWidget& parent, WebView::Menu& source, IncludeActionShortcut = IncludeActionShortcut::Yes);
+QMenu* create_application_menu(QWidget& parent, Menu&, IncludeActionShortcut = IncludeActionShortcut::Yes);
+void repopulate_application_menu(QMenu& menu, QWidget& parent, Menu& source, IncludeActionShortcut = IncludeActionShortcut::Yes);
 void update_history_menu(QMenu& menu, WebContentView*);
 void populate_session_history_traversal_menu(QMenu& menu, WebContentView&, int direction);
 
-QMenu& replace_context_menu(QPointer<QMenu>& shown_menu, QWidget& parent, WebView::Menu&);
-QAction* create_application_action(QWidget& parent, WebView::Action&, IncludeActionIcon = IncludeActionIcon::Yes, IncludeActionShortcut = IncludeActionShortcut::Yes);
+QMenu& replace_context_menu(QPointer<QMenu>& shown_menu, QWidget& parent, Menu&);
+QAction* create_application_action(QWidget& parent, Action&, IncludeActionIcon = IncludeActionIcon::Yes, IncludeActionShortcut = IncludeActionShortcut::Yes);
 
 #if defined(AK_OS_MACOS)
 void enable_menu_icons(QMenu&);

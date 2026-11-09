@@ -21,10 +21,10 @@ by hand keeps it listening as before.
  2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 4032e95fc8960dd53f4aebb93ebf965636b788ba..921f45e10738391fb7566652f5a1d3aa0fe27b67 100644
+index f646e643dffe90e9959ab5aac623ff5ec4771c1a..af7f268b783b4751e98e8c5cd8847362c8e72889 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -2397,6 +2397,7 @@ ErrorOr<void> Application::inspect_element(ViewImplementation& view)
+@@ -2218,6 +2218,7 @@ ErrorOr<void> Application::inspect_element(ViewImplementation& view)
      if (!m_devtools) {
          TRY(launch_devtools_server());
          started_devtools = true;
@@ -32,7 +32,7 @@ index 4032e95fc8960dd53f4aebb93ebf965636b788ba..921f45e10738391fb7566652f5a1d3aa
      }
  
      if (auto result = launch_devtools_client(view.view_id()); result.is_error()) {
-@@ -3743,6 +3744,7 @@ ErrorOr<void> Application::toggle_devtools_enabled()
+@@ -3116,6 +3117,7 @@ ErrorOr<void> Application::toggle_devtools_enabled()
      if (m_devtools) {
          m_devtools_client.clear();
          m_devtools_launched_for_view_id.clear();
@@ -40,7 +40,7 @@ index 4032e95fc8960dd53f4aebb93ebf965636b788ba..921f45e10738391fb7566652f5a1d3aa
          m_devtools.clear();
          ViewImplementation::for_each_view([](ViewImplementation& view) {
              view.clear_pending_inspect_element();
-@@ -4770,6 +4772,15 @@ void Application::did_close_devtools_connection()
+@@ -4105,6 +4107,15 @@ void Application::did_close_devtools_connection()
  {
      m_devtools_client.clear();
      m_devtools_launched_for_view_id.clear();
@@ -57,10 +57,10 @@ index 4032e95fc8960dd53f4aebb93ebf965636b788ba..921f45e10738391fb7566652f5a1d3aa
  
  }
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 9da9e41af34a848d6e65782852d17879efa2ba24..10e82ac1e20ff37d0975eb68596fe705f2f2e154 100644
+index b27dca72021bc2ecbcdb3c08bb7edc3351e202e5..1a8a1037afe4f4d8b48033c8e567e56bc47c63d8 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -830,6 +830,7 @@ private:
+@@ -709,6 +709,7 @@ private:
      OwnPtr<DevTools::FirefoxClient> m_devtools_client;
      // The tab the client was launched for, which may not have an attached client yet.
      Optional<u64> m_devtools_launched_for_view_id;

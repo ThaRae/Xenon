@@ -29,7 +29,6 @@ RESULTS_DIR = XENON_SOURCE_DIR / "Meta" / "measure-results"
 
 PROCESS_TYPES = (
     "WebContent",
-    "WebWorker",
     "RequestServer",
     "ImageDecoder",
     "Compositor",

@@ -32,12 +32,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Libraries/LibWebView/WebAuthn/HIDAuthenticator.h
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index f2c9d8b72b6898b19f13078d6dc352dd47d1962a..43360cb9278ed4c3a93024bcff7da2d2e3331325 100644
+index a257f4d8fb9290dfd2970b73f06708986e41e13d..2eb1e734db4a5d9ff075bf6267232dc399a876f3 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -80,6 +80,9 @@
- #include <LibWebView/UserAgent.h>
+@@ -77,6 +77,9 @@
  #include <LibWebView/Utilities.h>
+ #include <LibWebView/ViewImplementation.h>
  #include <LibWebView/WebAuthn/Coordinator.h>
 +#if defined(AK_OS_MACOS)
 +#    include <LibWebView/WebAuthn/HIDAuthenticator.h>
@@ -45,7 +45,7 @@ index f2c9d8b72b6898b19f13078d6dc352dd47d1962a..43360cb9278ed4c3a93024bcff7da2d2
  #include <LibWebView/WebAuthn/VirtualAuthenticator.h>
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
-@@ -1841,6 +1844,9 @@ ErrorOr<void> Application::launch_services()
+@@ -1731,6 +1734,9 @@ ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
      WebAuthnCoordinator::the().add_authenticator_source(VirtualAuthenticators::the());
@@ -56,20 +56,20 @@ index f2c9d8b72b6898b19f13078d6dc352dd47d1962a..43360cb9278ed4c3a93024bcff7da2d2
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index 6f1b46b1caa4cd8ca486b2298d8677ee87c765ef..4e2d694f71983e361530271010a912b76c27f59d 100644
+index 5afad52aec7a8186aa731be1afaa323246c4bb53..759da3775503892ea1e247862d4285f9d2a73045 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -121,6 +121,9 @@ if (APPLE)
-         QuarantineMacOS.mm
+@@ -113,6 +113,9 @@ if (APPLE)
+         StringConversionsMacOS.mm
      )
-     set_source_files_properties(MicrophoneAuthorizerMacOS.mm NotificationBackendMacOS.mm QuarantineMacOS.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+     set_source_files_properties(NotificationBackendMacOS.mm QuarantineMacOS.mm StringConversionsMacOS.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
 +    if (NOT IOS)
 +        list(APPEND SOURCES WebAuthn/HIDAuthenticator.cpp)
 +    endif()
  elseif (LINUX)
      list(APPEND SOURCES AudioDaemonSocket.cpp CrashReportPOSIX.cpp)
  endif()
-@@ -199,6 +202,13 @@ if (LINUX OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+@@ -191,6 +194,13 @@ if (LINUX OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
      target_link_libraries(LibWebView PRIVATE PkgConfig::DBUS)
  endif()
  
@@ -569,7 +569,7 @@ index 0000000000000000000000000000000000000000..06dcf962df7c7f177e476c1293e6d4a7
 +
 +}
 diff --git a/vcpkg.json b/vcpkg.json
-index bfebfcb9441226c2d714219fa7c92be5beefdddb..d65e227aec7ac5a3de8326a870794f57ed816eae 100644
+index 41ce348e9ed76457316e7cc7b40f52f47bd0add4..159944b9f619a573f3a2f3ff65ae9ac280e82684 100644
 --- a/vcpkg.json
 +++ b/vcpkg.json
 @@ -102,6 +102,10 @@

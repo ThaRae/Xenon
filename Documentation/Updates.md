@@ -159,7 +159,7 @@ executable and run it. Inside is an AppDir laid out as the build's own prefix (`
 | In the AppDir | What it is |
 | --- | --- |
 | `usr/bin/Xenon` | Xenon, and `qt.conf`, which points Qt at `usr/plugins` |
-| `usr/libexec/` | The engine's helper processes: WebContent, RequestServer, ImageDecoder, WebWorker, and the rest |
+| `usr/libexec/` | The engine's helper processes: WebContent, RequestServer, ImageDecoder, and the rest |
 | `usr/share/Lagom/` | Ladybird's resources, with Xenon's overrides and its own, as the build installs them |
 | `usr/plugins/` | Qt's plugins: the X11 and Wayland platforms, and what each needs to draw and take input, the image formats, and GeoClue for geolocation |
 | `usr/lib/` | Every library those load that systems don't bring themselves: the engine's, vcpkg's, Qt's |

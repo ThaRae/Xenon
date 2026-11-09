@@ -32,7 +32,7 @@ void WebAuthnPopover::attach(WebContentView& view)
         return static_cast<WebAuthnPopover*>(view.findChild<QWidget*>(POPOVER_OBJECT_NAME, Qt::FindDirectChildrenOnly));
     };
 
-    view.on_web_authn_prompt = [&view, find_popover](WebView::WebAuthnPrompt const& prompt) {
+    view.hub_view().on_web_authn_prompt = [&view, find_popover](WebView::WebAuthnPrompt const& prompt) {
         auto* popover = find_popover();
         if (!popover)
             popover = new WebAuthnPopover(view);
@@ -41,7 +41,7 @@ void WebAuthnPopover::attach(WebContentView& view)
             popover->show_over_view();
     };
 
-    view.on_web_authn_prompt_closed = [find_popover] {
+    view.hub_view().on_web_authn_prompt_closed = [find_popover] {
         if (auto* popover = find_popover())
             popover->close_without_cancelling();
     };
@@ -99,7 +99,7 @@ WebAuthnPopover::WebAuthnPopover(WebContentView& view)
     m_dismiss_button->setFocusPolicy(Qt::NoFocus);
     QObject::connect(m_dismiss_button, &QPushButton::clicked, this, [this] {
         if (m_state == State::AttestationConsent) {
-            m_view.web_authn_allow_attestation(false);
+            m_view.hub_view().web_authn_allow_attestation(false);
             return;
         }
         close();
@@ -224,15 +224,15 @@ void WebAuthnPopover::submit()
         m_pin->clear();
         if (pin.isEmpty())
             return;
-        m_view.web_authn_provide_pin(ak_string_from_qstring(pin));
+        m_view.hub_view().web_authn_provide_pin(ak_string_from_qstring(pin));
         return;
     }
     case State::ChooseAccount:
         if (auto row = m_accounts->currentRow(); row >= 0)
-            m_view.web_authn_choose_account(static_cast<size_t>(row));
+            m_view.hub_view().web_authn_choose_account(static_cast<size_t>(row));
         return;
     case State::AttestationConsent:
-        m_view.web_authn_allow_attestation(true);
+        m_view.hub_view().web_authn_allow_attestation(true);
         return;
     default:
         return;
@@ -261,7 +261,7 @@ void WebAuthnPopover::hideEvent(QHideEvent* event)
 {
     Popover::hideEvent(event);
     if (!m_is_closing_without_cancelling)
-        m_view.web_authn_cancel();
+        m_view.hub_view().web_authn_cancel();
     setObjectName({});
     deleteLater();
 }

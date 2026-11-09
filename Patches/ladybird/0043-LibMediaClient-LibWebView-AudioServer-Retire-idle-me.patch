@@ -1,0 +1,148 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Thu, 29 Oct 2026 09:40:57 -0400
+Subject: [PATCH] LibMediaClient+LibWebView+AudioServer: Retire idle media
+ servers
+
+A renderer gives up its MediaServer once it has had no media stream,
+playback session, or decode request for a while. Shorten that from 30
+to 15 seconds, which still covers a pause between two playback
+requests; a playing or paused media element keeps its session.
+
+The AudioServer only ever exited when the Browser dropped its control
+connection, which the Browser held for the renderer's whole life, so a
+page that had finished playing kept one for good. Have it exit 15
+seconds after its last client goes. The Browser already launches and
+initializes a new one when a page next asks for a client, retrying
+once when the request finds the server gone just before it arrived.
+Have a worker's request retry the same way.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibMediaClient/Client.cpp      |  4 +++-
+ Libraries/LibWebView/WebWorkerClient.cpp | 12 ++++++++++--
+ Services/AudioServer/Tabs.cpp            | 21 +++++++++++++++++++++
+ Services/AudioServer/Tabs.h              |  5 +++++
+ 4 files changed, 39 insertions(+), 3 deletions(-)
+
+diff --git a/Libraries/LibMediaClient/Client.cpp b/Libraries/LibMediaClient/Client.cpp
+index 7863fdaa10e27c0c7ee6101e04ed4e2de4fc5578..b5ada363d9fa81895d41c26b0862f324a82cb7ae 100644
+--- a/Libraries/LibMediaClient/Client.cpp
++++ b/Libraries/LibMediaClient/Client.cpp
+@@ -14,7 +14,9 @@
+ 
+ namespace MediaClient {
+ 
+-static constexpr int IDLE_EXIT_DELAY_MS = 30'000;
++// A renderer with no media session, stream, or decode request for this long gives up its MediaServer, which
++// exits with it; the next use launches a new one.
++static constexpr int IDLE_EXIT_DELAY_MS = 15'000;
+ 
+ // A connection serves the thread that made it, so each agent has one of its own.
+ static thread_local NeverDestroyed<Client::TransportFactory> s_transport_factory;
+diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
+index 6f4ab554414ac44dd4817dd99231d42a71c90223..19768302e5c411b1ba5eeddfe3f4ec17d0c1e7ad 100644
+--- a/Libraries/LibWebView/WebWorkerClient.cpp
++++ b/Libraries/LibWebView/WebWorkerClient.cpp
+@@ -241,8 +241,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
+         auto self = weak_self.strong_ref();
+         if (!self)
+             return Error::from_string_literal("The worker is gone");
+-        TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id()));
+-        return connect_new_audio_server_client(*self->m_audio_server_client, self->m_audio_tab_id);
++        // An idle AudioServer exits by itself, so it may have gone just before this request reached it. The failed
++        // request closes its connection, and a second try launches a new server.
++        auto connect = [&]() -> ErrorOr<IPC::TransportHandle> {
++            TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id()));
++            return connect_new_audio_server_client(*self->m_audio_server_client, self->m_audio_tab_id);
++        };
++        auto handle = connect();
++        if (handle.is_error())
++            handle = connect();
++        return handle;
+     });
+     if (connection.is_error()) {
+         warnln("Unable to connect a MediaServer client: {}", connection.error());
+diff --git a/Services/AudioServer/Tabs.cpp b/Services/AudioServer/Tabs.cpp
+index 4322e1f6b8d826ffbfb3ae3d64885f64606aeb40..9b7daef1eef04679b8e6450294067b58c9d41e7c 100644
+--- a/Services/AudioServer/Tabs.cpp
++++ b/Services/AudioServer/Tabs.cpp
+@@ -14,6 +14,8 @@
+ #include <LibAudio/PlaybackStream.h>
+ #include <LibAudio/RecordStream.h>
+ #include <LibCore/EventLoop.h>
++#include <LibCore/Process.h>
++#include <LibCore/Timer.h>
+ #include <LibIPC/Transport.h>
+ 
+ namespace AudioServer {
+@@ -21,6 +23,8 @@ namespace AudioServer {
+ // The device never underruns, since the mix is silence where no client has frames, so its own buffer can stay well
+ // below the lookahead the clients keep in their rings.
+ static constexpr u32 DEVICE_TARGET_LATENCY_MS = 40;
++// No client for this long after the last one went: the renderer is not playing anything.
++static constexpr int IDLE_EXIT_DELAY_MS = 15'000;
+ 
+ Tabs& Tabs::the()
+ {
+@@ -145,6 +149,9 @@ Audio::CaptureDevices& Tabs::capture_devices()
+ 
+ ErrorOr<IPC::TransportHandle> Tabs::connect_client(u64 tab_id)
+ {
++    if (m_idle_exit_timer)
++        m_idle_exit_timer->stop();
++
+     auto paired_transports = TRY(IPC::Transport::create_paired());
+     auto handle = move(paired_transports.remote_handle);
+ 
+@@ -246,6 +253,20 @@ void Tabs::connection_died(u64 tab_id, int client_id)
+         return;
+     tab->mixer->report_every_group_inaudible();
+     m_tabs.remove(tab_id);
++    if (m_tabs.is_empty())
++        schedule_idle_exit();
++}
++
++void Tabs::schedule_idle_exit()
++{
++    if (!m_idle_exit_timer) {
++        m_idle_exit_timer = Core::Timer::create_single_shot(AK::Duration::from_milliseconds(IDLE_EXIT_DELAY_MS), [] {
++            if (!Tabs::the().m_tabs.is_empty())
++                return;
++            Core::Process::terminate_immediately(0);
++        });
++    }
++    m_idle_exit_timer->restart();
+ }
+ 
+ }
+diff --git a/Services/AudioServer/Tabs.h b/Services/AudioServer/Tabs.h
+index 2687849d04ab03694f1d0202528c0fa4a20c3be4..594c5d83a80b8169af098d39b0e3d7719919ec6e 100644
+--- a/Services/AudioServer/Tabs.h
++++ b/Services/AudioServer/Tabs.h
+@@ -19,6 +19,7 @@
+ #include <AudioServer/ServerConnection.h>
+ #include <LibAudio/AudioOutput.h>
+ #include <LibAudio/PlaybackGroupId.h>
++#include <LibCore/Forward.h>
+ #include <LibIPC/TransportHandle.h>
+ 
+ namespace AudioServer {
+@@ -56,6 +57,9 @@ private:
+     };
+ 
+     Tab& tab_for(u64 tab_id);
++    // The server exists for the renderers it serves, so with no client left for a while it exits by itself and
++    // the Browser launches a new one when a renderer next asks for a client.
++    void schedule_idle_exit();
+     Audio::CaptureDevices& capture_devices();
+     void connection_died(u64 tab_id, int client_id);
+     void request_capture_permission(u64 tab_id, ByteString const& device_id, Audio::PlaybackGroupId, Function<void(bool)> on_decided);
+@@ -68,6 +72,7 @@ private:
+     int m_next_client_id { 1 };
+     Audio::AudioOutput m_audio_output { Audio::AudioOutput::Platform };
+ 
++    RefPtr<Core::Timer> m_idle_exit_timer;
+     WeakPtr<ControlConnection> m_control_connection;
+     HashMap<u64, Function<void(bool)>> m_pending_capture_decisions;
+     u64 m_next_capture_request_id { 1 };

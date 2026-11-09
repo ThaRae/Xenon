@@ -11,17 +11,17 @@
 #include <AK/QuickSort.h>
 #include <LibURL/Parser.h>
 #include <LibWebView/Application.h>
-#include <LibWebView/BookmarkStore.h>
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/CanonicalDocument.h>
 #include <LibWebView/CanonicalTraversable.h>
 #include <LibWebView/FaviconStore.h>
 #include <LibWebView/HistoryStore.h>
-#include <LibWebView/SessionStore.h>
 #include <LibWebView/ViewImplementation.h>
 #include <LibWebView/WebContentClient.h>
 #include <LibWebView/WebContentPage.h>
+#include <UI/BookmarkStore.h>
 #include <UI/NewTabPage.h>
+#include <UI/SessionStore.h>
 
 namespace Ladybird::NewTabPage {
 
@@ -100,13 +100,10 @@ static JsonArray top_sites(WebView::HistoryStore& history)
     return sites;
 }
 
-static JsonArray recently_closed(WebView::BrowsingSession& session)
+static JsonArray recently_closed(Sources const& sources)
 {
     JsonArray closed;
-    if (!session.session_store)
-        return closed;
-
-    for (auto const& unit : session.session_store->recently_closed_units(RECENTLY_CLOSED_CONSIDERED)) {
+    for (auto const& unit : sources.recently_closed_units(RECENTLY_CLOSED_CONSIDERED)) {
         auto host = web_host(unit.active_url);
         if (!host.has_value())
             continue;
@@ -117,8 +114,8 @@ static JsonArray recently_closed(WebView::BrowsingSession& session)
         item.set("closedAt"sv, unit.closed_at.milliseconds_since_epoch());
         if (unit.was_window)
             item.set("tabCount"sv, static_cast<u64>(unit.tab_count));
-        if (session.history_store) {
-            if (auto entry = session.history_store->entry_for_url(unit.active_url); entry.has_value()) {
+        if (sources.history_store) {
+            if (auto entry = sources.history_store->entry_for_url(unit.active_url); entry.has_value()) {
                 if (entry->title.has_value())
                     item.set("title"sv, *entry->title);
                 if (entry->favicon_png.has_value()) {
@@ -135,10 +132,10 @@ static JsonArray recently_closed(WebView::BrowsingSession& session)
     return closed;
 }
 
-static JsonArray bookmarks_bar(WebView::BrowsingSession& session)
+static JsonArray bookmarks_bar(Sources const& sources)
 {
     JsonArray bookmarks;
-    for (auto const& item : WebView::Application::bookmark_store().root_items()) {
+    for (auto const& item : sources.bookmarks) {
         if (!item.is_bookmark())
             continue;
 
@@ -152,8 +149,8 @@ static JsonArray bookmarks_bar(WebView::BrowsingSession& session)
         site.set("host"sv, host.release_value());
         if (bookmark.title.has_value())
             site.set("title"sv, *bookmark.title);
-        if (bookmark.favicon_hash.has_value() && session.favicon_store) {
-            if (auto png = session.favicon_store->favicon_png(*bookmark.favicon_hash); png.has_value()) {
+        if (bookmark.favicon_hash.has_value()) {
+            if (auto png = sources.favicon_store.favicon_png(*bookmark.favicon_hash); png.has_value()) {
                 if (auto icon = favicon_data_url(*png); icon.has_value())
                     site.set("icon"sv, icon.release_value());
             }
@@ -178,20 +175,20 @@ static bool is_in_a_process_of_its_own(WebView::ViewImplementation& view)
     return hosted_web_ui.has_value() && *hosted_web_ui == "newtab"sv;
 }
 
-void populate(WebView::ViewImplementation& view, WebView::BrowsingSession& session, ShowRecentlyClosed show_recently_closed)
+void populate(WebView::ViewImplementation& view, Sources const& sources, ShowRecentlyClosed show_recently_closed)
 {
     if (!is_in_a_process_of_its_own(view))
         return;
 
-    auto is_private = session.is_private() == WebView::IsPrivate::Yes;
+    auto is_private = sources.is_private == WebView::IsPrivate::Yes;
 
     JsonObject data;
     data.set("isPrivate"sv, is_private);
-    data.set("sites"sv, session.history_store ? top_sites(*session.history_store) : JsonArray {});
+    data.set("sites"sv, sources.history_store ? top_sites(*sources.history_store) : JsonArray {});
     if (!is_private) {
-        data.set("bookmarksBar"sv, bookmarks_bar(session));
+        data.set("bookmarksBar"sv, bookmarks_bar(sources));
         if (show_recently_closed == ShowRecentlyClosed::Yes)
-            data.set("recentlyClosed"sv, recently_closed(session));
+            data.set("recentlyClosed"sv, recently_closed(sources));
     }
 
     view.run_javascript(MUST(String::formatted("window.xenonNewTab?.show({});", data.serialized())));

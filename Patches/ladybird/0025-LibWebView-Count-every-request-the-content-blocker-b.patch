@@ -1,0 +1,100 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan <ryan@esterlines.com>
+Date: Wed, 28 Oct 2026 09:20:59 -0400
+Subject: [PATCH] LibWebView: Count every request the content blocker blocks on
+ a page
+
+The content blocking snapshot lists what was blocked on a page by host
+and kind of resource, once each, and only so many of them. That says
+which resources were blocked, but not how many requests: a page that
+asks a blocked ad server for a dozen images lists it once.
+
+A browser that shows a count of blocked requests, as uBlock Origin's
+badge and popup do, needs every request counted. The snapshot now
+carries that count too, which starts again with each navigation, as
+the list does.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/ContentBlocking.h      |  2 ++
+ Libraries/LibWebView/ViewImplementation.cpp | 10 +++++-----
+ Libraries/LibWebView/ViewImplementation.h   |  1 +
+ Services/Hub/HubClient.ipc                  |  1 +
+ 4 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/Libraries/LibWebView/ContentBlocking.h b/Libraries/LibWebView/ContentBlocking.h
+index 4fb5d56f184d6d5c659dbadfcce85533a5500b6d..95472d120fa0f2995152ce1bc38fd31d564727e4 100644
+--- a/Libraries/LibWebView/ContentBlocking.h
++++ b/Libraries/LibWebView/ContentBlocking.h
+@@ -32,6 +32,8 @@ struct ContentBlockingSnapshot {
+     Optional<String> site;
+     ContentBlockingState state { ContentBlockingState::Unavailable };
+     Vector<BlockedResource> blocked_resources;
++    // Every request blocked on the page, including those of a resource listed already and those past the list's limit.
++    u64 blocked_request_count { 0 };
+ 
+     bool enabled() const { return state == ContentBlockingState::Enabled || state == ContentBlockingState::NoRules; }
+     bool can_toggle() const { return site.has_value() && (enabled() || state == ContentBlockingState::SiteDisabled); }
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index c0d0aa5483d2d8e3830ce01eec1aa95608f1e2b3..279999a3f7ad06ef3f2a0eaa5c3dac3ad797d4af 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -2663,22 +2663,21 @@ static StringView known_blocked_resource_kind(StringView kind)
+ 
+ void ViewImplementation::did_block_resource(Badge<WebContentPage>, URL::URL const& url, StringView kind)
+ {
+-    if (m_blocked_resources.size() >= MAX_BLOCKED_RESOURCES)
+-        return;
++    ++m_blocked_request_count;
+ 
+     auto host = MUST(String::from_utf8(url.serialized_host()));
+     auto resource_kind = known_blocked_resource_kind(kind);
+     auto is_listed = any_of(m_blocked_resources, [&](auto const& resource) { return resource.host == host && resource.kind == resource_kind; });
+-    if (host.is_empty() || is_listed)
+-        return;
++    if (m_blocked_resources.size() < MAX_BLOCKED_RESOURCES && !host.is_empty() && !is_listed)
++        m_blocked_resources.append({ move(host), MUST(String::from_utf8(resource_kind)) });
+ 
+-    m_blocked_resources.append({ move(host), MUST(String::from_utf8(resource_kind)) });
+     notify_content_blocking_changed();
+ }
+ 
+ void ViewImplementation::reset_blocked_resources()
+ {
+     m_blocked_resources.clear();
++    m_blocked_request_count = 0;
+     notify_content_blocking_changed();
+ }
+ 
+@@ -2692,6 +2691,7 @@ ContentBlockingSnapshot ViewImplementation::content_blocking_snapshot() const
+ {
+     ContentBlockingSnapshot snapshot;
+     snapshot.blocked_resources = m_blocked_resources;
++    snapshot.blocked_request_count = m_blocked_request_count;
+ 
+     if (m_crash_state.has_value() || !traversable().active_document().host())
+         return snapshot;
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index 4ab02ff905c927fecef6a7c5bd85a6e7d7e7a4bc..aea49a534fbaf31ef03b0630efc1b368f64edaed 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -1248,6 +1248,7 @@ protected:
+     u64 m_next_navigation_listener_id { 1 };
+ 
+     Vector<BlockedResource> m_blocked_resources;
++    u64 m_blocked_request_count { 0 };
+ 
+     enum class NodePickerRequestType : u8 {
+         Hovered,
+diff --git a/Services/Hub/HubClient.ipc b/Services/Hub/HubClient.ipc
+index 8812b3d2192e4203212ff012e6f1d409e134b35d..0b2796ee6f8fb9d3837ec7051c97674231ea4bb2 100644
+--- a/Services/Hub/HubClient.ipc
++++ b/Services/Hub/HubClient.ipc
+@@ -45,6 +45,7 @@ struct WebView::ContentBlockingSnapshot {
+     Optional<String> site;
+     WebView::ContentBlockingState state;
+     Vector<WebView::BlockedResource> blocked_resources;
++    u64 blocked_request_count;
+ }
+ 
+ [ExistingCpp]

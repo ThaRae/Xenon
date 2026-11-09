@@ -244,7 +244,7 @@ window.
   tabs. At launch, tab groups come back too. Tabs other than a window's current one load when they're selected.
 - After two crashes in a row, nothing comes back by itself, in case a page is what crashes Xenon. Reopen Recently Closed
   Tab still brings the windows back.
-- Ladybird's session store (`LibWebView/SessionStore`, the profile's `Sessions.db`) writes the session every 30 seconds
+- Ladybird's session store (`UI/SessionStore`, the profile's `Sessions.db`) writes the session every 30 seconds
   and when Xenon quits. Xenon has it write a tab's new page, the active tab, and the tab order within a second of a
   change (`UI/SessionSaving.cpp`), so that tabs opened, reopened, or duplicated just before a crash don't come back blank.
 

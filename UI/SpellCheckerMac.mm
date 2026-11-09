@@ -8,6 +8,7 @@
 #include <AK/HashMap.h>
 #include <AK/RefPtr.h>
 #include <LibCore/EventLoop.h>
+#include <LibWebView/StringConversionsMacOS.h>
 #include <UI/SpellCheckerMac.h>
 
 #import <AppKit/AppKit.h>
@@ -20,6 +21,8 @@
 @end
 
 namespace Ladybird {
+
+using namespace WebView;
 
 // The private text checking type that asks for a single completion of the word at the caret.
 static constexpr NSTextCheckingTypes text_checking_type_single_completion = 1ULL << 29;
@@ -95,7 +98,7 @@ public:
                                                    completionHandler:handler];
     }
 
-    virtual Vector<Utf16String> guesses(DocumentTag tag, Utf16String const& word) override
+    virtual void guesses(DocumentTag tag, Utf16String const& word, Function<void(Vector<Utf16String>)> on_complete) override
     {
         auto* string = ns_string_from_utf16(word);
         NSArray<NSString*>* guesses = [[NSSpellChecker sharedSpellChecker] guessesForWordRange:NSMakeRange(0, string.length)
@@ -104,8 +107,8 @@ public:
                                                                         inSpellDocumentWithTag:tag];
         Vector<Utf16String> result;
         for (NSString* guess in guesses)
-            result.append(utf16_from_ns_string(guess));
-        return result;
+            result.append(ns_string_to_utf16_string(guess));
+        on_complete(move(result));
     }
 
     virtual void ignore(DocumentTag tag, Utf16String const& word) override

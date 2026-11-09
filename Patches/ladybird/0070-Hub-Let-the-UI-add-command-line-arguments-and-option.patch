@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Mon, 9 Nov 2026 09:36:45 -0500
+Subject: [PATCH] Hub: Let the UI add command-line arguments and options of its
+ own
+
+A UI that runs the Hub in its own process, as on Windows, can have
+options of its own to read from the command line, such as an
+embedder's, and may want to change the browser's defaults before the
+Hub starts its helpers. ApplicationHost can now add arguments to the
+Hub's parser and adjust the options it settles on, as a
+WebView::Application subclass could before the Hub took that role.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Services/Hub/Application.cpp | 8 ++++++++
+ Services/Hub/Application.h   | 3 +++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/Services/Hub/Application.cpp b/Services/Hub/Application.cpp
+index 2f970fdeef43765e0271312f09c29563ae17534e..809c5c133f28e0f506260889db549af3d8731960 100644
+--- a/Services/Hub/Application.cpp
++++ b/Services/Hub/Application.cpp
+@@ -26,6 +26,14 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
+ {
+     args_parser.add_option(m_encoded_ui_info, "What the UI tells the Hub to start with", "ui-info", 0, "hex");
+     args_parser.add_option(m_ui_mach_server_name, "Mach server to get the connection to the UI from", "ui-mach-server", 0, "name");
++    if (m_host)
++        m_host->create_platform_arguments(args_parser);
++}
++
++void Application::create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions& request_server_options, WebView::WebContentOptions& web_content_options)
++{
++    if (m_host)
++        m_host->create_platform_options(browser_options, request_server_options, web_content_options);
+ }
+ 
+ Hub::UIInfo const* Application::ui_info() const
+diff --git a/Services/Hub/Application.h b/Services/Hub/Application.h
+index 2004bb12084ac2e945334258a7bbde7454de75c2..d957c6c4c03d2dc18516542f8c811be615cfec5c 100644
+--- a/Services/Hub/Application.h
++++ b/Services/Hub/Application.h
+@@ -24,6 +24,8 @@ public:
+     virtual void will_create_event_loop(Main::Arguments&) = 0;
+     virtual void did_create_event_loop(Core::EventLoop&) = 0;
+ 
++    virtual void create_platform_arguments(Core::ArgsParser&) { }
++    virtual void create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&) { }
+     virtual void create_platform_actions() = 0;
+     virtual Optional<String> ui_font_family() const = 0;
+     virtual Web::CSS::PreferredColorScheme interface_color_scheme() const = 0;
+@@ -77,6 +79,7 @@ private:
+     // ^WebView::Application
+     virtual Core::EventLoop& create_platform_event_loop() override;
+     virtual void create_platform_arguments(Core::ArgsParser&) override;
++    virtual void create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&) override;
+     virtual Optional<WebView::ViewImplementation&> active_web_view() const override;
+     virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab, WebView::ViewImplementation const* related_view = nullptr) const override;
+     virtual void open_url_in_new_tab(URL::URL const&, Web::HTML::ActivateTab, WebView::ViewImplementation const* source_view = nullptr) const override;

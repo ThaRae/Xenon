@@ -48,7 +48,7 @@ index d84b9989978cca42c8747c2f2a53e870036069b0..973b4c80edb282f532ff0248b5ed9ae1
  }
  
 diff --git a/Libraries/LibWebCommon/WebView/Utilities.cpp b/Libraries/LibWebCommon/WebView/Utilities.cpp
-index 1afa64a04985104ecc813e514963347c37f93e94..773baeabe348095beb6bfb4f8a1c5ea3bc083076 100644
+index 146fc0759cbddc2960a82bee5fbc39b6f77e2142..a15341dd499fa6661124fb9ab97afd6a3421ebfa 100644
 --- a/Libraries/LibWebCommon/WebView/Utilities.cpp
 +++ b/Libraries/LibWebCommon/WebView/Utilities.cpp
 @@ -49,6 +49,19 @@ ByteString mach_server_name_for_process(StringView process_name, pid_t pid)
@@ -72,10 +72,10 @@ index 1afa64a04985104ecc813e514963347c37f93e94..773baeabe348095beb6bfb4f8a1c5ea3
  {
      if (s_ladybird_binary_path.has_value())
 diff --git a/Libraries/LibWebCommon/WebView/Utilities.h b/Libraries/LibWebCommon/WebView/Utilities.h
-index bd493c671915852725945e10d7f303da57dcafb0..d532b1ed5292251633c18bc6877b7e8988f6047c 100644
+index a73ac9add5904d62a6c16389c83eb9b6f3848d7f..9e60860b3e94b6781a50563d897df8206485e0e3 100644
 --- a/Libraries/LibWebCommon/WebView/Utilities.h
 +++ b/Libraries/LibWebCommon/WebView/Utilities.h
-@@ -26,4 +26,10 @@ WEBCOMMON_API ByteString mach_server_name_for_process(StringView process_name, p
+@@ -31,4 +31,10 @@ WEBCOMMON_API ByteString mach_server_name_for_process(StringView process_name, p
  
  WEBCOMMON_API ErrorOr<void> handle_attached_debugger();
  
@@ -87,7 +87,7 @@ index bd493c671915852725945e10d7f303da57dcafb0..d532b1ed5292251633c18bc6877b7e89
 +
  }
 diff --git a/Libraries/LibWebView/CrashReportStore.cpp b/Libraries/LibWebView/CrashReportStore.cpp
-index 0b9732cc9c4d57cef539be8f443252d8036ca8ed..3601aa9b3e6b55dac9af5c678bab9c561ac79b91 100644
+index bf91716b6e81a8b3faa03a250d09945d44d2042e..5ab0323ce1e90aca5a8f06c56714efc97f669d94 100644
 --- a/Libraries/LibWebView/CrashReportStore.cpp
 +++ b/Libraries/LibWebView/CrashReportStore.cpp
 @@ -21,6 +21,7 @@
@@ -144,7 +144,7 @@ index 5407a6cded5ecd9384e3fd581922a34cbaa435b1..674f5df9edc38fa1b664b83ad21ed3d8
  
      TRY(create_profile_directories(paths));
 diff --git a/Tests/LibWebView/TestProfile.cpp b/Tests/LibWebView/TestProfile.cpp
-index e980437a580df0827a4c56ada0836270d5fc867b..5751812cd246dea5b138bc24b0f2bb42f1a55ab6 100644
+index ab25bc658b91c4beae0e84963ecf5d1926eaf7f7..ffad78e4199b02bce2f875c0ef0d3b9c9d235774 100644
 --- a/Tests/LibWebView/TestProfile.cpp
 +++ b/Tests/LibWebView/TestProfile.cpp
 @@ -20,6 +20,7 @@
@@ -152,10 +152,10 @@ index e980437a580df0827a4c56ada0836270d5fc867b..5751812cd246dea5b138bc24b0f2bb42
  #include <LibTest/TestCase.h>
  #include <LibURL/Parser.h>
 +#include <LibWebCommon/WebView/Utilities.h>
- #include <LibWebView/BookmarkStore.h>
  #include <LibWebView/CookieJar.h>
  #include <LibWebView/FaviconStore.h>
-@@ -126,6 +127,28 @@ TEST_CASE(legacy_layout)
+ #include <LibWebView/HSTSStore.h>
+@@ -125,6 +126,28 @@ TEST_CASE(legacy_layout)
      remove_test_root();
  }
  

@@ -8,7 +8,6 @@
 #include <LibMain/Main.h>
 #include <LibURL/InternalURLs.h>
 #include <LibWebView/Application.h>
-#include <LibWebView/BrowserProcess.h>
 #include <LibWebView/URL.h>
 #include <LibWebView/Utilities.h>
 #include <UI/Application.h>
@@ -18,6 +17,7 @@
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
 #include <UI/FilterLists.h>
+#include <UI/HubConnection.h>
 #include <UI/MemoryPressureRelease.h>
 #include <UI/PasswordManagers.h>
 #include <UI/SiteSecurity.h>
@@ -85,13 +85,11 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
     Ladybird::install_web_ui_interfaces();
 
     auto app = TRY(Ladybird::Application::create(Ladybird::FilterLists::with_bundled_filter_lists(arguments)));
+    if (auto exit_status = app->exit_status_if_done(); exit_status.has_value())
+        return *exit_status;
 #if defined(AK_OS_MACOS)
-    app->set_spell_checker(Ladybird::create_platform_spell_checker());
+    WebView::Application::the().set_spell_checker(Ladybird::create_platform_spell_checker());
 #endif
-    if (app->should_exit_after_profile_coordination()) {
-        outln("Opening in existing process");
-        return 0;
-    }
 
     app->initialize_extensions();
 
@@ -104,11 +102,10 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
     Ladybird::FilterLists::Updater::initialize();
     Ladybird::PasswordManagers::the().initialize(app->password_manager_choice());
 
-    auto& browser_process = app->browser_process();
-
     if (auto const& browser_options = Ladybird::Application::browser_options(); !browser_options.headless_mode.has_value()) {
 #if defined(AK_OS_MACOS)
-        Ladybird::set_profile_application_icon(Ladybird::Application::profile());
+        auto const& profile = WebView::Application::profile();
+        Ladybird::set_profile_application_icon(profile.identifier(), profile.paths().identity, profile.is_temporary());
 #endif
         Ladybird::Updater::initialize();
 
@@ -129,18 +126,15 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
             app->new_window({ file_url });
         };
 
-        browser_process.on_open_urls = [&](auto const& urls) {
-            for (auto const& url : urls)
-                app->on_open_file(url);
-        };
-
-        browser_process.on_new_tab = [&](auto const& urls) {
-            if (!app->active_window_if_any()) {
+        // NB: URLs from outside the browser, such as a link clicked in another app, never open in a private window.
+        app->on_new_tab = [&](auto const& urls) {
+            auto* non_private_window = app->non_private_window_if_any();
+            if (!non_private_window) {
                 app->new_window(urls);
                 return;
             }
 
-            auto& window = *app->active_window_if_any();
+            auto& window = *non_private_window;
             for (size_t i = 0; i < urls.size(); ++i) {
                 window.new_tab_from_url(urls[i], (i == 0) ? Web::HTML::ActivateTab::Yes : Web::HTML::ActivateTab::No, Ladybird::BrowserWindow::TabLocation::end());
             }
@@ -149,7 +143,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
             window.raise();
         };
 
-        browser_process.on_new_window = [&](auto const& urls) {
+        app->on_new_window = [&](auto const& urls) {
             app->new_window(urls, app->configuration_for_new_window());
         };
 
@@ -157,7 +151,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
         if (auto* restored_window = app->restore_previous_session(configuration)) {
             // A whole restored session replaces the usual startup tab, so only the URLs the user passed open with it.
             // With only pinned tabs restored, the usual startup tabs open after them.
-            auto restored_everything = app->launch_restore_policy() == WebView::SessionLaunchPolicy::Everything;
+            auto restored_everything = app->launch_restore_policy() == Ladybird::SessionLaunchPolicy::Everything;
             if (!restored_everything || !browser_options.raw_urls.is_empty())
                 app->open_startup_tabs(*restored_window, browser_options.urls);
         } else {
@@ -165,6 +159,10 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
             window.setWindowTitle("Xenon");
         }
     }
+
+    // NB: Messages to the Hub arrive in order, so this comes after whatever these windows have asked to show.
+    if (auto* hub = Ladybird::HubConnection::the_if_connected())
+        hub->async_ui_did_start();
 
     Ladybird::Extensions::Registry::the().start_background_pages();
     Ladybird::TabHibernation::start();

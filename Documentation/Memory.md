@@ -12,7 +12,7 @@ From a Xenon checkout with the `ladybird` submodule initialized:
 # Filter-list engine only (no Qt, no vcpkg). Applies Patches/ladybird if needed.
 ./Meta/measure.py content-blocker
 
-# RSS/PSS of a running Xenon, summed across UI, WebContent, RequestServer, ImageDecoder, WebWorker, Compositor:
+# RSS/PSS of a running Xenon, summed across UI, WebContent, RequestServer, ImageDecoder, Compositor:
 ./Meta/measure.py processes --pid "$(pgrep -n Xenon)"
 
 # Headless Xenon (and Chrome, if you pass it) on a local cross-site-frame page plus github.com, youtube.com, x.com.

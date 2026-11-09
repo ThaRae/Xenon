@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Theo Slater <theoslater1@gmail.com>
+Date: Fri, 9 Oct 2026 18:32:22 +0100
+Subject: [PATCH] LibWeb: Keep loading SVG images from requesting frames of
+ every image
+
+A task for an SVG image document routes its frame requests to that
+document's image. While the document is still loading its image does
+not exist yet, so the request went to every SVG image of the page
+instead. Loading a page with many SVG images then invalidated every
+image once for each image that finished loading: Wikipedia's 206 SVG
+images produced about 13,000 invalidations while loading.
+
+Such a document has drawn nothing yet, and its image notifies its
+clients once it is created, so suppress its frame requests until then.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWeb/SVG/SVGDecodedImageData.cpp | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Libraries/LibWeb/SVG/SVGDecodedImageData.cpp b/Libraries/LibWeb/SVG/SVGDecodedImageData.cpp
+index c4e07f3f8875ca2beba7c2444b2892e29ea80f72..e06634f0aedd99136f2006b784a5397ff9e07a02 100644
+--- a/Libraries/LibWeb/SVG/SVGDecodedImageData.cpp
++++ b/Libraries/LibWeb/SVG/SVGDecodedImageData.cpp
+@@ -92,6 +92,11 @@ ScopedSVGImageDocument::ScopedSVGImageDocument(DOM::Document& document, FrameReq
+         }
+     }
+ 
++    if (!current_image_data && !m_should_unsuppress_frame_requests) {
++        m_page_client->suppress_frame_requests();
++        m_should_unsuppress_frame_requests = true;
++    }
++
+     m_page_client->set_current_svg_image_data(current_image_data);
+ 
+     document.set_browsing_context(m_navigable->active_browsing_context());
