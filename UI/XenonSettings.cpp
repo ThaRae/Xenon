@@ -4,31 +4,57 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <AK/TypeCasts.h>
+#include <AK/JsonArray.h>
+#include <AK/QuickSort.h>
 #include <AK/Vector.h>
+#include <LibCore/Timer.h>
 #include <LibWebView/Application.h>
-#include <UI/BrowserWindow.h>
-#include <UI/StringUtils.h>
 #include <UI/XenonSettings.h>
-
-#include <QApplication>
-#include <QSettings>
+#include <UI/XenonSettingsStore.h>
 
 namespace Ladybird::XenonSettings {
 
-static constexpr auto COMPACT_TOOLBAR_KEY = "layout/compactToolbar";
-static constexpr auto RECENTLY_USED_TAB_ORDER_KEY = "tabs/cycleInRecentlyUsedOrder";
-static constexpr auto FRAMED_PAGES_KEY = "layout/framedPages";
-
-static QSettings& settings()
+static Store& store()
 {
-    static QSettings settings { QStringLiteral("Xenon"), QStringLiteral("Xenon") };
-    return settings;
+    static auto store = Store::open(Store::default_path(), [] {
+        if (auto values = Store::import_qsettings_ini_file(Store::legacy_ini_path()); values.has_value())
+            return values;
+        return Store::import_qsettings_preferences(Store::legacy_preferences_application_id());
+    });
+    return store;
+}
+
+static constexpr auto DEFERRED_SAVE_DELAY = AK::Duration::from_seconds(5);
+
+static void save()
+{
+    if (auto result = store().save(); result.is_error())
+        warnln("Unable to save Xenon's settings to {}: {}", store().path(), result.error());
+}
+
+static Core::Timer& deferred_save_timer()
+{
+    static auto& timer = Core::Timer::create_single_shot(DEFERRED_SAVE_DELAY, [] { save(); }).leak_ref();
+    return timer;
+}
+
+static void set_value(StringView key, JsonValue value)
+{
+    store().set(key, move(value));
+    deferred_save_timer().stop();
+    save();
+}
+
+static void set_value_soon(StringView key, JsonValue value)
+{
+    store().set(key, move(value));
+    if (!deferred_save_timer().is_active())
+        deferred_save_timer().start();
 }
 
 ByteString location()
 {
-    return ak_byte_string_from_qstring(settings().fileName());
+    return store().path();
 }
 
 static Vector<Observer*>& observers()
@@ -47,18 +73,24 @@ Observer::~Observer()
     observers().remove_first_matching([this](auto* observer) { return observer == this; });
 }
 
-static void notify_observers()
+template<typename Callback>
+static void notify_observers(Callback callback)
 {
     auto observers_to_notify = observers();
     for (auto* observer : observers_to_notify) {
         if (observers().contains_slow(observer))
-            observer->xenon_settings_changed();
+            callback(*observer);
     }
+}
+
+static void notify_observers()
+{
+    notify_observers([](Observer& observer) { observer.xenon_settings_changed(); });
 }
 
 bool compact_toolbar()
 {
-    return settings().value(COMPACT_TOOLBAR_KEY, false).toBool();
+    return store().get_bool(Keys::compact_toolbar).value_or(false);
 }
 
 ChromeLayout chrome_layout()
@@ -71,7 +103,7 @@ ChromeLayout chrome_layout()
 void set_chrome_layout(ChromeLayout layout)
 {
     if (layout != ChromeLayout::Vertical)
-        settings().setValue(COMPACT_TOOLBAR_KEY, layout == ChromeLayout::Compact);
+        set_value(Keys::compact_toolbar, layout == ChromeLayout::Compact);
 
     auto tab_settings = WebView::Application::settings().tab_settings();
     auto vertical_tabs_enabled = layout == ChromeLayout::Vertical;
@@ -80,113 +112,105 @@ void set_chrome_layout(ChromeLayout layout)
         WebView::Application::settings().set_tab_settings(tab_settings);
     }
 
-    for (auto* widget : QApplication::topLevelWidgets()) {
-        if (auto* window = as_if<BrowserWindow>(widget))
-            window->update_tabs_display();
-    }
+    notify_observers([](Observer& observer) { observer.xenon_chrome_layout_changed(); });
     notify_observers();
 }
 
-static constexpr auto TAB_HIBERNATION_KEY = "tabs/hibernation";
-static constexpr auto TAB_HIBERNATION_TIMEOUT_KEY = "tabs/hibernationTimeout";
-
 static constexpr auto DEFAULT_TAB_HIBERNATION_TIMEOUT = AK::Duration::from_seconds(2 * 60 * 60);
 static constexpr auto MINIMUM_TAB_HIBERNATION_TIMEOUT = AK::Duration::from_seconds(5);
+static constexpr i64 TAB_HIBERNATION_TIMEOUT_CHOICES_IN_MINUTES[] = { 15, 30, 60, 2 * 60, 4 * 60, 6 * 60 };
 
 bool tab_hibernation_enabled()
 {
-    return settings().value(TAB_HIBERNATION_KEY, true).toBool();
+    return store().get_bool(Keys::tab_hibernation).value_or(true);
 }
 
 void set_tab_hibernation_enabled(bool enabled)
 {
-    settings().setValue(TAB_HIBERNATION_KEY, enabled);
+    set_value(Keys::tab_hibernation, enabled);
     notify_observers();
 }
 
 AK::Duration tab_hibernation_timeout()
 {
-    auto seconds = settings().value(TAB_HIBERNATION_TIMEOUT_KEY, static_cast<qlonglong>(DEFAULT_TAB_HIBERNATION_TIMEOUT.to_seconds())).toLongLong();
+    auto seconds = store().get_i64(Keys::tab_hibernation_timeout).value_or(DEFAULT_TAB_HIBERNATION_TIMEOUT.to_seconds());
     return max(AK::Duration::from_seconds(seconds), MINIMUM_TAB_HIBERNATION_TIMEOUT);
 }
 
 void set_tab_hibernation_timeout(AK::Duration timeout)
 {
-    settings().setValue(TAB_HIBERNATION_TIMEOUT_KEY, static_cast<qlonglong>(timeout.to_seconds()));
+    set_value(Keys::tab_hibernation_timeout, timeout.to_seconds());
     notify_observers();
 }
 
-static constexpr auto TAB_HIBERNATION_ON_MEMORY_PRESSURE_KEY = "tabs/hibernateOnMemoryPressure";
+ReadonlySpan<i64> tab_hibernation_timeout_choices_in_minutes()
+{
+    return TAB_HIBERNATION_TIMEOUT_CHOICES_IN_MINUTES;
+}
 
 bool hibernate_on_memory_pressure()
 {
-    return settings().value(TAB_HIBERNATION_ON_MEMORY_PRESSURE_KEY, true).toBool();
+    return store().get_bool(Keys::hibernate_on_memory_pressure).value_or(true);
 }
 
 void set_hibernate_on_memory_pressure(bool enabled)
 {
-    settings().setValue(TAB_HIBERNATION_ON_MEMORY_PRESSURE_KEY, enabled);
+    set_value(Keys::hibernate_on_memory_pressure, enabled);
     notify_observers();
 }
 
 bool framed_pages()
 {
-    return settings().value(FRAMED_PAGES_KEY, true).toBool();
+    return store().get_bool(Keys::framed_pages).value_or(true);
 }
 
 void set_framed_pages(bool framed)
 {
-    settings().setValue(FRAMED_PAGES_KEY, framed);
+    set_value(Keys::framed_pages, framed);
     notify_observers();
 }
 
 bool cycle_tabs_in_recently_used_order()
 {
-    return settings().value(RECENTLY_USED_TAB_ORDER_KEY, true).toBool();
+    return store().get_bool(Keys::cycle_tabs_in_recently_used_order).value_or(true);
 }
 
 void set_cycle_tabs_in_recently_used_order(bool enabled)
 {
-    settings().setValue(RECENTLY_USED_TAB_ORDER_KEY, enabled);
+    set_value(Keys::cycle_tabs_in_recently_used_order, enabled);
     notify_observers();
 }
 
-static constexpr auto SPLIT_VIEW_DRAG_AND_DROP_KEY = "splitView/dragAndDrop";
-
 bool split_view_drag_and_drop()
 {
-    return settings().value(SPLIT_VIEW_DRAG_AND_DROP_KEY, true).toBool();
+    return store().get_bool(Keys::split_view_drag_and_drop).value_or(true);
 }
 
 void set_split_view_drag_and_drop(bool enabled)
 {
-    settings().setValue(SPLIT_VIEW_DRAG_AND_DROP_KEY, enabled);
+    set_value(Keys::split_view_drag_and_drop, enabled);
     notify_observers();
 }
 
-static constexpr auto NEW_TAB_PAGE_RECENTLY_CLOSED_KEY = "newTab/recentlyClosed";
-
 bool new_tab_page_shows_recently_closed()
 {
-    return settings().value(NEW_TAB_PAGE_RECENTLY_CLOSED_KEY, true).toBool();
+    return store().get_bool(Keys::new_tab_page_recently_closed).value_or(true);
 }
 
 void set_new_tab_page_shows_recently_closed(bool shown)
 {
-    settings().setValue(NEW_TAB_PAGE_RECENTLY_CLOSED_KEY, shown);
+    set_value(Keys::new_tab_page_recently_closed, shown);
     notify_observers();
 }
 
-static constexpr auto BANGS_KEY = "search/bangs";
-
 bool bangs_enabled()
 {
-    return settings().value(BANGS_KEY, true).toBool();
+    return store().get_bool(Keys::bangs).value_or(true);
 }
 
 void set_bangs_enabled(bool enabled)
 {
-    settings().setValue(BANGS_KEY, enabled);
+    set_value(Keys::bangs, enabled);
     notify_observers();
 }
 
@@ -201,64 +225,61 @@ void set_fingerprinting_protection(bool enabled)
     notify_observers();
 }
 
-static constexpr auto AUTOMATIC_UPDATES_KEY = "updates/automatic";
-
 bool automatic_updates_enabled()
 {
-    return settings().value(AUTOMATIC_UPDATES_KEY, true).toBool();
+    return store().get_bool(Keys::automatic_updates).value_or(true);
 }
 
 void set_automatic_updates_enabled(bool enabled)
 {
-    settings().setValue(AUTOMATIC_UPDATES_KEY, enabled);
+    set_value(Keys::automatic_updates, enabled);
     notify_observers();
 }
-
-static constexpr auto DISABLED_FILTER_LISTS_KEY = "blocking/disabledFilterLists";
-static constexpr auto SHOW_BLOCKED_REQUEST_COUNT_KEY = "blocking/showBlockedRequestCount";
-static constexpr auto BLOCKED_REQUEST_TOTAL_KEY = "blocking/blockedRequestTotal";
 
 HashTable<String> disabled_filter_lists()
 {
     HashTable<String> ids;
-    for (auto const& id : settings().value(DISABLED_FILTER_LISTS_KEY).toStringList())
-        ids.set(ak_string_from_qstring(id));
+    for (auto& id : store().get_strings(Keys::disabled_filter_lists))
+        ids.set(move(id));
     return ids;
 }
 
 void set_filter_list_enabled(StringView id, bool enabled)
 {
-    auto ids = settings().value(DISABLED_FILTER_LISTS_KEY).toStringList();
-    auto qid = qstring_from_ak_string(id);
-    ids.removeAll(qid);
+    auto ids = store().get_strings(Keys::disabled_filter_lists);
+    ids.remove_all_matching([&](auto const& existing) { return existing == id; });
     if (!enabled)
-        ids.append(qid);
-    ids.sort();
-    settings().setValue(DISABLED_FILTER_LISTS_KEY, ids);
+        ids.append(MUST(String::from_utf8(id)));
+    quick_sort(ids);
+
+    JsonArray array;
+    for (auto& existing : ids)
+        array.must_append(move(existing));
+    set_value(Keys::disabled_filter_lists, move(array));
     notify_observers();
 }
 
 bool show_blocked_request_count()
 {
-    return settings().value(SHOW_BLOCKED_REQUEST_COUNT_KEY, false).toBool();
+    return store().get_bool(Keys::show_blocked_request_count).value_or(false);
 }
 
 void set_show_blocked_request_count(bool show)
 {
-    settings().setValue(SHOW_BLOCKED_REQUEST_COUNT_KEY, show);
+    set_value(Keys::show_blocked_request_count, show);
     notify_observers();
 }
 
 u64 blocked_request_total()
 {
-    return settings().value(BLOCKED_REQUEST_TOTAL_KEY, 0).toULongLong();
+    return store().get_u64(Keys::blocked_request_total).value_or(0);
 }
 
 void add_to_blocked_request_total(u64 count)
 {
     if (count == 0)
         return;
-    settings().setValue(BLOCKED_REQUEST_TOTAL_KEY, static_cast<qulonglong>(blocked_request_total() + count));
+    set_value_soon(Keys::blocked_request_total, blocked_request_total() + count);
 }
 
 }

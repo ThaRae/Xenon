@@ -13,6 +13,7 @@
 #include <LibWebView/UserScriptHandler.h>
 #include <LibWebView/ViewImplementation.h>
 #include <UI/Blocking.h>
+#include <UI/BlockingDashboard.h>
 #include <UI/BrowserWindow.h>
 #include <UI/Tab.h>
 #include <UI/XenonSettings.h>
@@ -22,8 +23,6 @@
 
 namespace Ladybird::Blocking {
 
-static constexpr auto DASHBOARD_URL = "xenon://blocking/"sv;
-
 static constexpr auto DOMAINS_WORLD = "xenon-blocking"sv;
 static constexpr auto DOMAINS_SCRIPT = R"~~~([location.href, ...performance.getEntriesByType("resource").map(entry => entry.name)])~~~"sv;
 
@@ -31,7 +30,7 @@ static constexpr int DOMAINS_REFRESH_DELAY_MS = 250;
 
 URL::URL dashboard_url()
 {
-    return URL::Parser::basic_parse(DASHBOARD_URL).release_value();
+    return BlockingDashboard::url();
 }
 
 void count_blocked_requests(WebView::ViewImplementation const& view, WebView::ContentBlockingSnapshot const& snapshot)

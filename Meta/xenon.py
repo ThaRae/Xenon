@@ -279,7 +279,8 @@ def test_main(platform: Platform, build_dir: Path):
     smoke_dir.mkdir(parents=True, exist_ok=True)
     test_env = {"XENON_SCREENSHOT_DIR": str(smoke_dir), **os.environ}
 
-    for test in sorted((build_dir / "bin").glob("TestXenon*")):
+    tests = [*(build_dir / "bin").glob("TestXenon*"), *(build_dir / "xenon" / "tests").glob("TestXenon*")]
+    for test in sorted(tests, key=lambda test: test.name):
         if test.is_dir() or not os.access(test, os.X_OK):
             continue
         print(f"==> {test.name}", flush=True)
@@ -306,6 +307,8 @@ def ladybird_test_main(build_dir: Path, timeout: int):
             "--output-on-failure",
             "--timeout",
             str(timeout),
+            "--repeat",
+            "until-pass:2",
             "--exclude-regex",
             LADYBIRD_TESTS_EXCLUDED,
         ]

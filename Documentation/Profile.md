@@ -11,7 +11,7 @@ of its own:
 | HTTP cache | `~/Library/Caches/Xenon/Profiles/default` | `~/.cache/Xenon/Profiles/default` |
 | The running browser's lock and socket | `~/Library/Application Support/Xenon/Profiles/default` | `$XDG_RUNTIME_DIR/Xenon/Profiles/default` |
 | Crash reports | `~/Library/Application Support/Xenon/Profiles/default/CrashReports` | `~/.local/share/Xenon/Profiles/default/CrashReports` |
-| Xenon's own settings (layout and the like) | `~/Library/Preferences/com.xenon.Xenon.plist` | `~/.config/Xenon/Xenon.conf` |
+| Xenon's own settings (layout and the like) | `~/Library/Preferences/Xenon/XenonSettings.json` | `~/.config/Xenon/XenonSettings.json` |
 
 **Settings → Profile and files** lists the running profile's directories, with a button that shows each one.
 

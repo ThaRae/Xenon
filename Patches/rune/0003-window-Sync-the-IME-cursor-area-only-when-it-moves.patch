@@ -1,0 +1,101 @@
+diff --git a/crates/rune/src/window.rs b/crates/rune/src/window.rs
+index c942850c..508d6e2f 100644
+--- a/crates/rune/src/window.rs
++++ b/crates/rune/src/window.rs
+@@ -368,6 +368,9 @@ struct Host<S: 'static> {
+     clipboard: crate::clipboard::Client,
+     secure_input: crate::input::secure_input::SecureInput,
+     ime_allowed: bool,
++    /// The IME cursor area last handed to the window, so a frame that doesn't move it
++    /// doesn't touch the input method again.
++    ime_cursor: Option<[f32; 4]>,
+     comp: Option<Box<dyn Compositor<S>>>,
+     #[cfg_attr(target_os = "macos", allow(dead_code))]
+     wayland: bool,
+@@ -508,6 +511,7 @@ impl<S: 'static> Host<S> {
+             clipboard,
+             secure_input: Default::default(),
+             ime_allowed: false,
++            ime_cursor: None,
+             comp,
+             wayland,
+             frame_anim: None,
+diff --git a/crates/rune/src/window/draw.rs b/crates/rune/src/window/draw.rs
+index 72ec3b8c..02ba18e8 100644
+--- a/crates/rune/src/window/draw.rs
++++ b/crates/rune/src/window/draw.rs
+@@ -155,7 +155,7 @@ impl<S: 'static> Host<S> {
+             let next_tick = l.next_tick(now);
+             if renderer.srgb_blend() == rt.srgb_blend()
+                 && l.presented.as_ref().is_some_and(|p| p.unchanged(rt, &l.config, animating, next_tick)) {
+-                sync_platform(l, rt, &mut self.secure_input, &mut self.ime_allowed, &self.clipboard);
++                sync_platform(l, rt, &mut self.secure_input, &mut self.ime_allowed, &mut self.ime_cursor, &self.clipboard);
+                 l.stop_pacing();
+                 self.meter.set_pacing(l.pacing_state(false));
+                 self.frame_reports.unchanged(target);
+@@ -246,7 +246,7 @@ impl<S: 'static> Host<S> {
+         l.hidden_wait = TIMEOUT_RETRY;
+         if hidden { l.hidden_pace.rendered(now); }
+         let update_ms = now.elapsed().as_secs_f64() * 1000.0;
+-        sync_platform(l, rt, &mut self.secure_input, &mut self.ime_allowed, &self.clipboard);
++        sync_platform(l, rt, &mut self.secure_input, &mut self.ime_allowed, &mut self.ime_cursor, &self.clipboard);
+         let target_format = if rt.srgb_blend() { l.config.format.remove_srgb_suffix() } else { l.config.format };
+         let view = frame.texture.create_view(&wgpu::TextureViewDescriptor {
+             format: (target_format != l.config.format).then_some(target_format),
+diff --git a/crates/rune/src/window/events.rs b/crates/rune/src/window/events.rs
+index 7487961a..c635d1f6 100644
+--- a/crates/rune/src/window/events.rs
++++ b/crates/rune/src/window/events.rs
+@@ -359,6 +359,7 @@ impl<S: 'static> Host<S> {
+                     rt.cancel_composition();
+                     l.window.set_ime_allowed(false);
+                     self.ime_allowed = false;
++                    self.ime_cursor = None;
+                     // A minimized or occluded window skips redraw.
+                     l.apply_cursor(rt, false);
+                 } else if rt.stale() {
+@@ -369,8 +370,12 @@ impl<S: 'static> Host<S> {
+                         l.window.set_ime_allowed(false);
+                         l.window.set_ime_allowed(ime_allowed);
+                         self.ime_allowed = ime_allowed;
++                        self.ime_cursor = None;
+                     }
+-                    if let Some(a) = rt.ime_area {
++                    if let Some(a) = rt.ime_area
++                        && self.ime_cursor != Some(a)
++                    {
++                        self.ime_cursor = Some(a);
+                         l.window.set_ime_cursor_area(
+                             LogicalPosition::new(a[0] as f64, a[1] as f64),
+                             LogicalSize::new(a[2] as f64, a[3] as f64),
+diff --git a/crates/rune/src/window/platform_sync.rs b/crates/rune/src/window/platform_sync.rs
+index 50698db4..7a4b2ab0 100644
+--- a/crates/rune/src/window/platform_sync.rs
++++ b/crates/rune/src/window/platform_sync.rs
+@@ -6,7 +6,7 @@ use super::Win;
+ /// What a built frame hands the window besides its pixels: secure input, the IME, the cursor,
+ /// help tags and the clipboard.
+ pub(super) fn sync_platform<S: 'static>(l: &mut Win, rt: &mut Runtime<S>, secure_input: &mut crate::input::secure_input::SecureInput,
+-    ime: &mut bool, clipboard: &crate::clipboard::Client) {
++    ime: &mut bool, ime_cursor: &mut Option<[f32; 4]>, clipboard: &crate::clipboard::Client) {
+     let focused = l.window.has_focus();
+     secure_input.set(rt.has_secure_focus() && focused);
+     let ime_allowed = rt.ime_area.is_some() && !rt.has_secure_focus() && focused;
+@@ -14,12 +14,16 @@ pub(super) fn sync_platform<S: 'static>(l: &mut Win, rt: &mut Runtime<S>, secure
+         l.window.set_ime_allowed(false);
+         l.window.set_ime_allowed(ime_allowed);
+         *ime = ime_allowed;
++        *ime_cursor = None;
+     }
+     l.apply_cursor(rt, focused);
+     #[cfg(target_os = "macos")]
+     l.native.help.sync(&l.window, rt.help_regions());
+     clipboard.flush(rt);
+-    if let Some(a) = rt.ime_area {
++    if let Some(a) = rt.ime_area
++        && *ime_cursor != Some(a)
++    {
++        *ime_cursor = Some(a);
+         l.window.set_ime_cursor_area(
+             LogicalPosition::new(a[0] as f64, a[1] as f64),
+             LogicalSize::new(a[2] as f64, a[3] as f64),

@@ -162,7 +162,7 @@ jobs:
             ladybird/Build/caches
           key: ${{ matrix.cache }}-${{ env.XCODE_VERSION }}-${{ github.sha }}
           restore-keys: ${{ matrix.cache }}-${{ env.XCODE_VERSION }}-
-          fail-on-cache-miss: true
+          fail-on-cache-miss: ${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build Xenon
         run: |
@@ -278,7 +278,7 @@ jobs:
             ladybird/Build/caches
           key: linux-${{ env.IMAGE_VERSION }}-${{ github.sha }}
           restore-keys: linux-${{ env.IMAGE_VERSION }}-
-          fail-on-cache-miss: true
+          fail-on-cache-miss: ${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build Xenon, and Meta/release.py package
         timeout-minutes: 320

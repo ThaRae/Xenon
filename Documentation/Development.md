@@ -19,7 +19,8 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 | --- | --- |
 | `ladybird/` | The Ladybird engine, as a shallow git submodule pinned to a known-good upstream commit. |
 | `Patches/ladybird/` | Xenon's changes to the engine, as a patch series applied to the pinned commit at build time. |
-| `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. |
+| `Patches/rune/` | Xenon's changes to Rune, applied to the checkout `Meta/rune.py` prepares under `Build/rune`. |
+| `UI/` | Xenon's Qt frontend. It started as a copy of `ladybird/UI/Qt` and keeps that layout and the `Ladybird` C++ namespace, so upstream frontend fixes can still be diffed and merged in. Its Qt-free files (Xenon's settings, bangs, filter lists, the blocking dashboard, certificate errors, extensions' engine side, password managers, the new tab and settings pages' interfaces) build into the `xenon-core` static library, which the Qt `xenon` target and the Rune host (`Rune/`) both link. |
 | `UI/Resources/` | Xenon's versions of Ladybird's internal pages (welcome, new tab, settings, and the shared web UI stylesheet) and of its logo, with `xenon.css` for what its own pages share, the bundled filter lists, and the !bang list. The build ships these in place of upstream's copies, which stay untouched. |
 | `UI/Icons/` | The app icon's artwork. |
 | `UI/Linux/` | The Linux AppImage's desktop file and entry point. |
@@ -28,11 +29,25 @@ the Ladybird engine, the filter lists, and the !bang list. [CLAUDE.md](../CLAUDE
 | `Meta/xenon.py` | Builds, runs, and tests Xenon. |
 | `Meta/check.py` | Fast checks: formatting, and the mistakes that break Xenon quietly. |
 | `Meta/patches.py` | Applies and exports the engine patch series. |
+| `Meta/rune.py` | Prepares Rune's source tree, patched by `Patches/rune`, for the Rune frontend. |
 | `Meta/release.py` | Packages, publishes and tests releases: the macOS app on a Mac, the AppImage on Linux. |
 | `Meta/aur.py` | Moves the AUR packages to a release, and pushes them to the AUR. |
 | `VERSION.txt` | Xenon's version. |
 | `Meta/CMake/XenonHook.cmake` | Injected into Ladybird's CMake build. Once the engine's libraries and helper processes are defined, it pulls in `UI/Xenon.cmake`, which defines the `xenon` target. |
 | `Documentation/` | This file, the [feature notes](Features.md), and the deeper write-ups on extensions, WebAuthn, filter list updates, and releases. |
+
+`xenon-core` doesn't depend on a frontend, so what it needs from one is handed to it: `SettingsPage::set_host` takes how
+to open a directory, reveal a file, show the extensions manager and install an update, and the frontend calls
+`SettingsPage::application_did_become_active()` so the settings page refreshes. Each frontend also provides the
+`Updater` and `Extensions::Browser` functions (`UI/Updater.cpp` and `UI/Extensions/Browser.cpp` for Qt, stand-ins in
+`Rune/Bridge` for now). A layout change reaches the windows through `XenonSettings::Observer::xenon_chrome_layout_changed`.
+
+Xenon's own settings (`UI/XenonSettings`) live in `XenonSettings.json` in the `Xenon` folder of the config directory
+(`~/.config/Xenon` on Linux, `~/Library/Preferences/Xenon` on macOS), whichever frontend runs. Xenon used to keep them
+with QSettings; the first time a build without QSettings starts and finds no JSON file, it imports the old values,
+from `~/.config/Xenon/Xenon.conf` on Linux and, through CFPreferences, from the `com.xenon.Xenon` domain on macOS, and
+leaves the old store in place. `TestXenonSettings` covers the store and the INI import; the macOS import is untested off
+a Mac.
 
 The submodule always points at an upstream commit. Xenon's engine changes live in `Patches/ladybird` as
 `git format-patch` files, which `Meta/xenon.py` applies with `git am` on a local `xenon-patches` branch before it
@@ -155,7 +170,8 @@ the first time, so the tests build from the same objects as Xenon. It leaves out
 that changes what an upstream test checks updates that test's expectation in the same patch, as it would upstream. CI
 runs it after `Meta/xenon.py test` on Linux and macOS; when a web test fails, the `ladybird-test-dumps-linux` or
 `-macos` artifact has what it rendered or printed. A test may run for 30 minutes, as in Ladybird's CI; `--timeout`
-gives it longer, which the Sanitizer workflow does.
+gives it longer, which the Sanitizer workflow does. A failing test is run once more before it counts, because a few of
+Ladybird's hover and event-timing tests race with the test runner's own work; a real failure fails twice.
 
 Should Xenon not finish loading `about:welcome` at all, the checks after it, which all load pages, are skipped rather
 than each waiting out its timeouts, which would add up to more than CI gives the job. A helper process that crashes on a
@@ -195,7 +211,9 @@ CI runs on GitHub Actions, on GitHub's own runners:
   build takes a few hours, so the build step stops itself in time to save the caches, and the next run carries on from
   there. A change to the flags every file compiles with (the baseline CPU, say) misses all of ccache, though not
   vcpkg's packages. Land it on `main`, and let CI's build of `main` finish and save new caches, before running the
-  release workflow, which builds from `main`'s caches and can't do a cold build in one run.
+  release workflow by hand, which builds from `main`'s caches and can't do a cold build in one run. Its pull request
+  runs need no exact-commit cache, as a packaging change may be tested before `main` has built that commit: they start
+  from whatever cache matches and do a cold build when none does.
 - **The other workflows' caches**: `test262.yml` and `benchmarks.yml` start from `main`'s Linux and macOS caches and
   save none of their own. `macos-intel.yml` keeps its own (`macos-x86_64-…`), which the release workflow's Intel
   build starts from, and runs often enough that GitHub doesn't drop it for going a week unused. `sanitizer.yml` keeps

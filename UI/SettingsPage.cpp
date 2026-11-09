@@ -7,7 +7,6 @@
 #include <AK/Base64.h>
 #include <AK/JsonArray.h>
 #include <AK/JsonObject.h>
-#include <AK/LexicalPath.h>
 #include <AK/QuickSort.h>
 #include <AK/RefCounted.h>
 #include <AK/Weakable.h>
@@ -17,29 +16,30 @@
 #include <LibWebView/CrashReportStore.h>
 #include <LibWebView/WebUI.h>
 #include <UI/Bangs.h>
-#include <UI/Blocking.h>
+#include <UI/BlockingDashboard.h>
 #include <UI/DefaultBrowser.h>
-#include <UI/Extensions/Dialog.h>
 #include <UI/Extensions/Registry.h>
 #include <UI/FilterListUpdates.h>
-#include <UI/RelaunchToUpdate.h>
 #include <UI/SettingsPage.h>
-#include <UI/StringUtils.h>
-#include <UI/TabHibernation.h>
 #include <UI/Updater.h>
 #include <UI/XenonSettings.h>
-
-#include <QApplication>
-#include <QDesktopServices>
-#include <QGuiApplication>
-#include <QProcess>
-#include <QUrl>
 
 namespace Ladybird::SettingsPage {
 
 static constexpr size_t MAXIMUM_BANG_RESULTS = 8;
 static constexpr size_t EXTENSION_ICON_PIXELS = 64;
 static constexpr i64 MAXIMUM_TAB_HIBERNATION_TIMEOUT_SECONDS = 7 * 24 * 60 * 60;
+
+static Host& host()
+{
+    static Host host;
+    return host;
+}
+
+void set_host(Host new_host)
+{
+    host() = move(new_host);
+}
 
 static StringView layout_name(XenonSettings::ChromeLayout layout)
 {
@@ -148,14 +148,12 @@ static void show_location(StringView name)
         return;
 
     if (name == "xenonSettings"sv) {
-#if defined(AK_OS_MACOS)
-        QProcess::startDetached(QStringLiteral("/usr/bin/open"), { QStringLiteral("-R"), qstring_from_ak_string(*path) });
+        if (host().reveal_file)
+            host().reveal_file(*path);
         return;
-#else
-        path = LexicalPath::dirname(*path);
-#endif
     }
-    QDesktopServices::openUrl(QUrl::fromLocalFile(qstring_from_ak_string(*path)));
+    if (host().open_directory)
+        host().open_directory(*path);
 }
 
 static StringView availability_name(Updater::Availability availability)
@@ -235,6 +233,10 @@ static JsonArray search_bangs(StringView query)
     return results;
 }
 
+class Bridge;
+
+static Vector<WeakPtr<Bridge>>& bridges();
+
 class Bridge final
     : public RefCounted<Bridge>
     , public Weakable<Bridge>
@@ -250,10 +252,7 @@ public:
             bridge->send_settings();
             return true;
         });
-        QObject::connect(qApp, &QGuiApplication::applicationStateChanged, [bridge = bridge->make_weak_ptr()](Qt::ApplicationState state) {
-            if (state == Qt::ApplicationActive && bridge)
-                bridge->send_settings();
-        });
+        bridges().append(bridge->make_weak_ptr());
         Updater::on_status_change([bridge = bridge->make_weak_ptr()] {
             if (!bridge)
                 return false;
@@ -289,7 +288,7 @@ private:
         settings.set("newTabPageShowsRecentlyClosed"sv, XenonSettings::new_tab_page_shows_recently_closed());
 
         JsonArray timeout_choices;
-        for (auto minutes : TabHibernation::timeout_choices_in_minutes())
+        for (auto minutes : XenonSettings::tab_hibernation_timeout_choices_in_minutes())
             timeout_choices.must_append(minutes * 60);
         JsonObject tab_hibernation;
         tab_hibernation.set("enabled"sv, XenonSettings::tab_hibernation_enabled());
@@ -319,7 +318,7 @@ private:
             settings.set("filterLists"sv, move(filter_lists));
         }
 
-        settings.set("blockingDashboard"sv, Blocking::dashboard_url().serialize());
+        settings.set("blockingDashboard"sv, BlockingDashboard::url().serialize());
         settings.set("updates"sv, updates());
 
         JsonObject default_browser;
@@ -349,6 +348,22 @@ private:
 
     WeakPtr<WebView::WebUI> m_web_ui;
 };
+
+static Vector<WeakPtr<Bridge>>& bridges()
+{
+    static Vector<WeakPtr<Bridge>> bridges;
+    return bridges;
+}
+
+void application_did_become_active()
+{
+    bridges().remove_all_matching([](auto const& bridge) { return !bridge; });
+    auto bridges_to_refresh = bridges();
+    for (auto& bridge : bridges_to_refresh) {
+        if (bridge)
+            bridge->send_settings();
+    }
+}
 
 void register_interfaces(WebView::WebUI& web_ui)
 {
@@ -431,7 +446,8 @@ void register_interfaces(WebView::WebUI& web_ui)
     });
 
     web_ui.register_interface("xenon/installUpdate"sv, [](auto const&) {
-        RelaunchToUpdate::relaunch(nullptr);
+        if (host().install_update)
+            host().install_update();
     });
 
     web_ui.register_interface("xenon/makeDefaultBrowser"sv, [bridge](auto const&) {
@@ -441,7 +457,8 @@ void register_interfaces(WebView::WebUI& web_ui)
     });
 
     web_ui.register_interface("xenon/showExtensions"sv, [](auto const&) {
-        Extensions::ExtensionsDialog::show_dialog(QApplication::activeWindow());
+        if (host().show_extensions)
+            host().show_extensions();
     });
 
     web_ui.register_interface("xenon/showLocation"sv, [](auto const& data) {

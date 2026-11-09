@@ -1,0 +1,33 @@
+[package]
+name = "xenon_ui"
+version = "0.0.0"
+edition = "2024"
+license = "BSD-2-Clause"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+rune = { git = "https://github.com/anomalyco/rune", rev = "781e2b6d87cd5f32d6f4365956fad4baaf24ee50", features = ["native-file-dialog"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5.19", default-features = false, features = ["async-io", "blocking-api"] }
+libc = "0.2"
+wayland-client = { version = "0.31", features = ["system"] }
+wayland-backend = { version = "0.3", features = ["client_system"] }
+wayland-protocols = { version = "0.32", features = ["client"] }
+
+[dev-dependencies]
+serde_json = "1"
+
+[features]
+mock-engine = []
+
+[[bin]]
+name = "xenon-ui-preview"
+path = "src/bin/xenon-ui-preview.rs"
+required-features = ["mock-engine"]
+
+[patch."https://github.com/anomalyco/rune"]
+rune = { path = "../../Build/rune/crates/rune" }

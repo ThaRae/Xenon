@@ -1,0 +1,18 @@
+--- a/crates/rune/src/tooling/perf_warn/commits.rs
++++ b/crates/rune/src/tooling/perf_warn/commits.rs
+@@ -75,6 +75,7 @@
+     /// Handler `name` on the element at `path`, set at `at`, asked for a commit.
+     #[inline(always)]
+     #[cfg_attr(not(debug_assertions), allow(unused_variables))]
++    #[allow(dead_code)]
+     pub(crate) fn handler(&mut self, name: &'static str, path: Option<&str>, at: Option<&'static std::panic::Location<'static>>) {
+         #[cfg(debug_assertions)]
+         {
+@@ -112,6 +113,7 @@
+     /// asked to move, if any.
+     #[inline(always)]
+     #[cfg_attr(not(debug_assertions), allow(unused_variables))]
++    #[allow(dead_code)]
+     pub(crate) fn frame_ends(&mut self, scrolling: bool, committed: bool, instant: Option<&str>) {
+         #[cfg(debug_assertions)]
+         {

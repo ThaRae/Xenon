@@ -13,11 +13,10 @@
 #include <AK/JsonValue.h>
 #include <AK/Optional.h>
 #include <AK/String.h>
+#include <LibGfx/Color.h>
 #include <LibURL/URL.h>
 #include <LibWebView/URLSchemeHandler.h>
 #include <UI/Extensions/Extension.h>
-
-#include <QColor>
 
 class QWidget;
 
@@ -54,8 +53,8 @@ struct ActionAppearance {
     String title;
     Optional<String> icon_path;
     String badge_text;
-    QColor badge_background_color;
-    Optional<QColor> badge_text_color;
+    Gfx::Color badge_background_color;
+    Optional<Gfx::Color> badge_text_color;
     Optional<String> popup;
     bool enabled { true };
 };

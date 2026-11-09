@@ -578,46 +578,7 @@ void Application::show_process_manager()
 
 void Application::create_platform_arguments(Core::ArgsParser& args_parser)
 {
-    args_parser.add_option(Core::ArgsParser::Option {
-        .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
-        .help_string = "Load the unpacked extensions in these directories, separated by commas",
-        .long_name = "load-extension",
-        .short_name = 0,
-        .value_name = "paths",
-        .accept_value = [this](StringView paths) -> ErrorOr<bool> {
-            for (auto path : paths.split_view(','))
-                m_extensions_to_load.append(path);
-            return true;
-        },
-        .hide_mode = Core::ArgsParser::OptionHideMode::None,
-    });
-    args_parser.add_option(Core::ArgsParser::Option {
-        .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
-        .help_string = "Stop an extension's background once it has been idle this many seconds (30 by default, as in Chrome)",
-        .long_name = "extension-idle-timeout",
-        .short_name = 0,
-        .value_name = "seconds",
-        .accept_value = [](StringView seconds) -> ErrorOr<bool> {
-            auto value = seconds.to_number<u32>();
-            if (!value.has_value() || *value == 0)
-                return false;
-            Extensions::Router::the().set_background_idle_timeout(AK::Duration::from_seconds(*value));
-            return true;
-        },
-        .hide_mode = Core::ArgsParser::OptionHideMode::None,
-    });
-    args_parser.add_option(Core::ArgsParser::Option {
-        .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
-        .help_string = "Install this password manager (bitwarden, proton-pass, 1password, or icloud-passwords on macOS) in place of the profile's, or remove it with none",
-        .long_name = "password-manager",
-        .short_name = 0,
-        .value_name = "name",
-        .accept_value = [this](StringView name) -> ErrorOr<bool> {
-            m_password_manager_choice = name;
-            return true;
-        },
-        .hide_mode = Core::ArgsParser::OptionHideMode::None,
-    });
+    m_xenon_arguments.add_options(args_parser);
 }
 
 void Application::create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions&, WebView::WebContentOptions& web_content_options)
@@ -642,7 +603,7 @@ void Application::initialize_extensions()
 {
     auto languages = platform_preferred_languages();
     auto ui_language = languages.is_empty() ? "en-US"_string : languages.first();
-    Extensions::Registry::the().initialize(profile().paths().data, m_extensions_to_load, move(ui_language));
+    Extensions::Registry::the().initialize(profile().paths().data, m_xenon_arguments.extensions_to_load, move(ui_language));
 }
 
 void Application::create_platform_actions()

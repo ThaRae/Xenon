@@ -13,6 +13,7 @@
 #include <LibCore/File.h>
 #include <LibCore/Resource.h>
 #include <LibHTTP/Header.h>
+#include <LibURL/Parser.h>
 #include <LibWebCommon/Loader/ContentBlocking.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/URLSchemeHandler.h>
@@ -27,6 +28,7 @@ namespace Ladybird::BlockingDashboard {
 
 static constexpr auto SCHEME = "xenon"sv;
 static constexpr auto DASHBOARD_HOST = "blocking"sv;
+static constexpr auto DASHBOARD_URL = "xenon://blocking/"sv;
 
 static constexpr auto CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"sv;
 
@@ -264,6 +266,11 @@ static void handle_message(WebView::ScriptBridgeEndpoint const& endpoint, String
     }
 
     endpoint.post_message(dashboard_state());
+}
+
+URL::URL url()
+{
+    return URL::Parser::basic_parse(DASHBOARD_URL).release_value();
 }
 
 void register_url_scheme()
