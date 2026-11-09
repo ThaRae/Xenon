@@ -1,0 +1,177 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 20:35:12 -0500
+Subject: [PATCH] UI/Qt: Open a link's new tab next to the tab that opened it
+
+A link opened through the page's target=_blank or window.open() request
+reaches the overload of create_new_tab() that takes the Hub's view,
+which always appended the tab to the end of the strip. Other link paths,
+such as middle-clicks and the link context menu, already insert after
+the tab they came from.
+
+Thread a TabLocation through that overload and pass after_tab() from the
+on_open_new_view handler, so the tab lands right after the tab it was
+opened from. The new-tab page, session restore, reopening a closed tab,
+and new windows keep appending as before.
+
+The insertion index calculation now lives in insertion_index_for(),
+which both overloads share.
+---
+ UI/Qt/Application.cpp   |  2 +-
+ UI/Qt/BrowserWindow.cpp | 63 +++++++++++++++++++++++------------------
+ UI/Qt/BrowserWindow.h   |  3 +-
+ 3 files changed, 38 insertions(+), 30 deletions(-)
+
+diff --git a/UI/Qt/Application.cpp b/UI/Qt/Application.cpp
+index 19d0108c4a06e6503798bdc89aedc902931a8784..62aa78b2e1a0c23c997d7579bb0133da56d6b37f 100644
+--- a/UI/Qt/Application.cpp
++++ b/UI/Qt/Application.cpp
+@@ -2154,7 +2154,7 @@ BrowserWindow* Application::window_for_new_tab(Optional<u64> source_view_id, Web
+ void Application::open_view_in_new_tab(u64 view_id, Optional<u64> source_view_id, WebView::IsPrivate is_private, Web::HTML::ActivateTab activate_tab)
+ {
+     if (auto* window = window_for_new_tab(source_view_id, is_private))
+-        window->create_new_tab(activate_tab, view_id);
++        window->create_new_tab(activate_tab, view_id, BrowserWindow::TabLocation::end());
+     else
+         new_window({}, configuration_for_new_window(), BrowserWindow::IsPopupWindow::No, is_private, view_id);
+ }
+diff --git a/UI/Qt/BrowserWindow.cpp b/UI/Qt/BrowserWindow.cpp
+index b01e9fb1a9de085d19a43493d5aa022e27e2a286..67c434886fd3cb88128c7a3384f44021abf27fbd 100644
+--- a/UI/Qt/BrowserWindow.cpp
++++ b/UI/Qt/BrowserWindow.cpp
+@@ -418,7 +418,7 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
+     });
+ 
+     if (hub_view_id.has_value()) {
+-        create_new_tab(Web::HTML::ActivateTab::Yes, hub_view_id);
++        create_new_tab(Web::HTML::ActivateTab::Yes, hub_view_id, TabLocation::end());
+     } else {
+         for (size_t i = 0; i < initial_urls.size(); ++i)
+             create_new_tab((i == 0) ? Web::HTML::ActivateTab::Yes : Web::HTML::ActivateTab::No, TabLocation::end());
+@@ -838,11 +838,11 @@ Tab& BrowserWindow::create_restored_tab(RestoredSessionTab const& restored, int
+     return *tab;
+ }
+ 
+-Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional<u64> hub_view_id)
++Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional<u64> hub_view_id, TabLocation location)
+ {
+     cancel_window_close_preflight();
+     if (!hub_view_id.has_value())
+-        return create_new_tab(activate_tab, TabLocation::end());
++        return create_new_tab(activate_tab, location);
+ 
+     auto* tab = new Tab(this, hub_view_id);
+ 
+@@ -851,7 +851,8 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional
+         set_current_tab(tab);
+     }
+ 
+-    m_tabs_container->add_tab(tab, "New Tab");
++    // A new tab is unpinned, so it never lands inside the pinned group.
++    m_tabs_container->insert_tab(constrain_insertion_index(insertion_index_for(location, activate_tab), false), tab, "New Tab");
+     if (activate_tab == Web::HTML::ActivateTab::Yes)
+         m_tabs_container->set_current_tab(tab);
+ 
+@@ -884,28 +885,7 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
+         set_current_tab(tab);
+     }
+ 
+-    auto insertion_index = m_tabs_container->count();
+-    switch (location.kind()) {
+-    case TabLocation::Kind::End:
+-        break;
+-    case TabLocation::Kind::AfterCurrentTab:
+-        insertion_index = constrain_insertion_index(m_tabs_container->current_index() + 1, false);
+-        // Tabs opened in the background line up after the current tab in the order they were opened.
+-        if (activate_tab == Web::HTML::ActivateTab::No) {
+-            while (insertion_index < m_tabs_container->count() && m_background_tabs_from_current_tab.contains([&](auto const& background_tab) { return background_tab == m_tabs_container->tab(insertion_index); }))
+-                ++insertion_index;
+-        }
+-        break;
+-    case TabLocation::Kind::AfterTab:
+-        if (auto* source_tab = location.tab(); source_tab) {
+-            if (auto source_tab_index = tab_index(source_tab); source_tab_index != -1)
+-                insertion_index = source_tab_index + 1;
+-        }
+-        break;
+-    case TabLocation::Kind::AtIndex:
+-        insertion_index = location.index();
+-        break;
+-    }
++    auto insertion_index = insertion_index_for(location, activate_tab);
+     // A new tab is unpinned, so it never lands inside the pinned group.
+     m_tabs_container->insert_tab(constrain_insertion_index(insertion_index, false), tab, "New Tab");
+ 
+@@ -969,7 +949,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
+         }
+     });
+ 
+-    tab->view().on_open_new_view = [this](auto activate_tab, Web::HTML::WebViewHints hints, u64 hub_view_id) {
++    tab->view().on_open_new_view = [this, tab](auto activate_tab, Web::HTML::WebViewHints hints, u64 hub_view_id) {
+         if (hints.popup) {
+             auto cascaded_configuration = Application::the().configuration_for_new_window();
+             WindowConfiguration configuration {
+@@ -981,7 +961,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
+             Application::the().new_window({}, configuration, IsPopupWindow::Yes, m_is_private, hub_view_id);
+             return;
+         }
+-        create_new_tab(activate_tab, hub_view_id);
++        create_new_tab(activate_tab, hub_view_id, TabLocation::after_tab(*tab));
+     };
+ }
+ 
+@@ -1212,6 +1192,33 @@ int BrowserWindow::pinned_tab_count() const
+     return m_tabs_container->tab_bar()->pinned_tab_count();
+ }
+ 
++int BrowserWindow::insertion_index_for(TabLocation location, Web::HTML::ActivateTab activate_tab)
++{
++    switch (location.kind()) {
++    case TabLocation::Kind::End:
++        return m_tabs_container->count();
++    case TabLocation::Kind::AfterCurrentTab: {
++        auto insertion_index = constrain_insertion_index(m_tabs_container->current_index() + 1, false);
++        // Tabs opened in the background line up after the current tab in the order they were opened.
++        if (activate_tab == Web::HTML::ActivateTab::No) {
++            while (insertion_index < m_tabs_container->count() && m_background_tabs_from_current_tab.contains([&](auto const& background_tab) { return background_tab == m_tabs_container->tab(insertion_index); }))
++                ++insertion_index;
++        }
++        return insertion_index;
++    }
++    case TabLocation::Kind::AfterTab:
++        if (auto* source_tab = location.tab(); source_tab) {
++            if (auto source_tab_index = tab_index(source_tab); source_tab_index != -1)
++                return source_tab_index + 1;
++        }
++        return m_tabs_container->count();
++    case TabLocation::Kind::AtIndex:
++        return location.index();
++    }
++
++    VERIFY_NOT_REACHED();
++}
++
+ int BrowserWindow::constrain_insertion_index(int index, bool pinned) const
+ {
+     auto pinned_count = pinned_tab_count();
+diff --git a/UI/Qt/BrowserWindow.h b/UI/Qt/BrowserWindow.h
+index 6bd3f5e7594a152b401097b3e1a9f12776d7957d..0dd0f34f74e88b9804a9cfa5b097e20b81d5b741 100644
+--- a/UI/Qt/BrowserWindow.h
++++ b/UI/Qt/BrowserWindow.h
+@@ -192,7 +192,7 @@ public:
+     void bring_to_front();
+     // The tab showing this view, if it's one of this window's.
+     Tab* tab_for_view(RemoteView const&) const;
+-    Tab& create_new_tab(Web::HTML::ActivateTab, Optional<u64> hub_view_id);
++    Tab& create_new_tab(Web::HTML::ActivateTab, Optional<u64> hub_view_id, TabLocation);
+     bool is_window_close_approved() const { return m_window_close_approved; }
+     void report_activation_to_session_store();
+     void cancel_window_close_preflight();
+@@ -303,6 +303,7 @@ private:
+ 
+     void update_chrome_style();
+ 
++    int insertion_index_for(TabLocation, Web::HTML::ActivateTab);
+     int constrain_insertion_index(int index, bool pinned) const;
+     void pinned_state_changed(Tab&);
+     TabBarButton* create_tab_close_button(Tab&);

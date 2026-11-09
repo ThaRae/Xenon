@@ -36,7 +36,7 @@ it as a one-step CNAME.
  Libraries/LibRequests/Request.h               |  4 ++
  Libraries/LibRequests/RequestClient.cpp       | 18 ++++++-
  Libraries/LibRequests/RequestClient.h         | 11 +++-
- Libraries/LibWeb/Loader/ContentBlocker.cpp    | 11 ++++
+ Libraries/LibWeb/Loader/ContentBlocker.cpp    | 15 ++++++
  Libraries/LibWeb/Loader/ContentBlocker.h      |  4 ++
  Libraries/LibWeb/Loader/ResourceLoader.cpp    | 24 ++++++++-
  .../RequestServer/ConnectionFromClient.cpp    | 10 +++-
@@ -51,7 +51,7 @@ it as a one-step CNAME.
  Tests/RequestServer/TestExportImport.cpp      |  2 +-
  Tests/RequestServer/TestRequestTimingInfo.cpp |  2 +-
  Tests/RequestServer/TestSiteBinding.cpp       |  2 +-
- 24 files changed, 203 insertions(+), 24 deletions(-)
+ 24 files changed, 207 insertions(+), 24 deletions(-)
 
 diff --git a/Libraries/LibCore/Socket.cpp b/Libraries/LibCore/Socket.cpp
 index 2e4df5a825fd66226293a12c127b5a8f794e2f36..6e5068a518938487d42243a657fb5e2c04460086 100644
@@ -236,15 +236,15 @@ index adf957789f6050aa0493211134f9b1a1fc94d4b6..76d7b8f7ccdc5c642949980db53cdbb8
          Stopped,
          Transferred,
 diff --git a/Libraries/LibRequests/RequestClient.cpp b/Libraries/LibRequests/RequestClient.cpp
-index 536b837a02aeaa5eaa7eb9fa887af1945a6aaa1f..ab1c2269ccbd27ae4e7f7504e11c56cb45514fc6 100644
+index 8e8ac3d3eef57e4509d0edcfe6d662a369655652..4d0252f08d47cd90ea1803c8aaed21e4be4574b6 100644
 --- a/Libraries/LibRequests/RequestClient.cpp
 +++ b/Libraries/LibRequests/RequestClient.cpp
 @@ -61,7 +61,7 @@ void RequestClient::die()
      }
  }
  
--RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL const& url, Optional<HTTP::HeaderList const&> request_headers, ReadonlyBytes request_body, HTTP::CacheMode cache_mode, HTTP::Cookie::IncludeCredentials include_credentials, TransferLease transfer_lease, Optional<u32> address_selection_hint, CacheMissNotification cache_miss_notification, u64 originating_page_id, Optional<HTTP::NetworkIsolationKey> network_isolation_key)
-+RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL const& url, Optional<HTTP::HeaderList const&> request_headers, ReadonlyBytes request_body, HTTP::CacheMode cache_mode, HTTP::Cookie::IncludeCredentials include_credentials, TransferLease transfer_lease, Optional<u32> address_selection_hint, CacheMissNotification cache_miss_notification, u64 originating_page_id, Optional<HTTP::NetworkIsolationKey> network_isolation_key, CheckResolvedAlias check_resolved_alias)
+-RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL const& url, HTTP::Cookie::SameSiteContext same_site_context, Optional<HTTP::HeaderList const&> request_headers, ReadonlyBytes request_body, HTTP::CacheMode cache_mode, HTTP::Cookie::IncludeCredentials include_credentials, TransferLease transfer_lease, Optional<u32> address_selection_hint, CacheMissNotification cache_miss_notification, u64 originating_page_id, Optional<HTTP::NetworkIsolationKey> network_isolation_key)
++RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL const& url, HTTP::Cookie::SameSiteContext same_site_context, Optional<HTTP::HeaderList const&> request_headers, ReadonlyBytes request_body, HTTP::CacheMode cache_mode, HTTP::Cookie::IncludeCredentials include_credentials, TransferLease transfer_lease, Optional<u32> address_selection_hint, CacheMissNotification cache_miss_notification, u64 originating_page_id, Optional<HTTP::NetworkIsolationKey> network_isolation_key, CheckResolvedAlias check_resolved_alias)
  {
      auto request_id = m_next_request_id++;
      auto headers = request_headers.map([](auto const& headers) { return headers.headers().span(); }).value_or({});
@@ -252,8 +252,8 @@ index 536b837a02aeaa5eaa7eb9fa887af1945a6aaa1f..ab1c2269ccbd27ae4e7f7504e11c56cb
      auto transfer_lease_key = transfer_lease == TransferLease::Yes
          ? Optional<RequestTransferLeaseKey> { { m_request_server_client_id, request_id } }
          : Optional<RequestTransferLeaseKey> {};
--    IPCProxy::async_start_request(request_id, method, url, headers, request_body, cache_mode, move(network_isolation_key), include_credentials, transfer_lease_key.has_value(), address_selection_hint, cache_miss_notification == CacheMissNotification::Yes, Core::System::getpid(), originating_page_id);
-+    IPCProxy::async_start_request(request_id, method, url, headers, request_body, cache_mode, move(network_isolation_key), include_credentials, transfer_lease_key.has_value(), address_selection_hint, cache_miss_notification == CacheMissNotification::Yes, Core::System::getpid(), originating_page_id, check_resolved_alias == CheckResolvedAlias::Yes);
+-    IPCProxy::async_start_request(request_id, method, url, headers, request_body, cache_mode, move(network_isolation_key), include_credentials, transfer_lease_key.has_value(), address_selection_hint, cache_miss_notification == CacheMissNotification::Yes, Core::System::getpid(), originating_page_id, same_site_context);
++    IPCProxy::async_start_request(request_id, method, url, headers, request_body, cache_mode, move(network_isolation_key), include_credentials, transfer_lease_key.has_value(), address_selection_hint, cache_miss_notification == CacheMissNotification::Yes, Core::System::getpid(), originating_page_id, same_site_context, check_resolved_alias == CheckResolvedAlias::Yes);
      auto request = Request::create_from_id({}, *this, request_id, move(transfer_lease_key));
      m_requests.set(request_id, request);
      return request;
@@ -279,14 +279,14 @@ index 536b837a02aeaa5eaa7eb9fa887af1945a6aaa1f..ab1c2269ccbd27ae4e7f7504e11c56cb
  {
      if (auto request = m_requests.get(request_id); request.has_value()) {
 diff --git a/Libraries/LibRequests/RequestClient.h b/Libraries/LibRequests/RequestClient.h
-index 31fde3b2817afcf90b5a4cb6b8bbd8da34b5a33c..1b3030287a199a1c43f85339e844bdd1fc612c60 100644
+index c52ce758f55ace2c6fd174ee394c77f3ac130a4d..2d4fb81c8e52a1e008c759d959cc680778e846d4 100644
 --- a/Libraries/LibRequests/RequestClient.h
 +++ b/Libraries/LibRequests/RequestClient.h
 @@ -50,7 +50,14 @@ public:
      virtual ~RequestClient() override;
  
      // Best-effort index into the resolved address pool.
--    RefPtr<Request> start_request(ByteString const& method, URL::URL const&, Optional<HTTP::HeaderList const&> request_headers = {}, ReadonlyBytes request_body = {}, HTTP::CacheMode = HTTP::CacheMode::Default, HTTP::Cookie::IncludeCredentials = HTTP::Cookie::IncludeCredentials::Yes, TransferLease = TransferLease::No, Optional<u32> address_selection_hint = {}, CacheMissNotification = CacheMissNotification::No, u64 originating_page_id = 0, Optional<HTTP::NetworkIsolationKey> = {});
+-    RefPtr<Request> start_request(ByteString const& method, URL::URL const&, HTTP::Cookie::SameSiteContext, Optional<HTTP::HeaderList const&> request_headers = {}, ReadonlyBytes request_body = {}, HTTP::CacheMode = HTTP::CacheMode::Default, HTTP::Cookie::IncludeCredentials = HTTP::Cookie::IncludeCredentials::Yes, TransferLease = TransferLease::No, Optional<u32> address_selection_hint = {}, CacheMissNotification = CacheMissNotification::No, u64 originating_page_id = 0, Optional<HTTP::NetworkIsolationKey> = {});
 +    enum class CheckResolvedAlias {
 +        No,
 +        Yes,
@@ -294,7 +294,7 @@ index 31fde3b2817afcf90b5a4cb6b8bbd8da34b5a33c..1b3030287a199a1c43f85339e844bdd1
 +
 +    // With CheckResolvedAlias::Yes, a request whose host DNS shows to be an alias calls its on_resolved_alias, and waits
 +    // for continue_after_alias_check() before it connects.
-+    RefPtr<Request> start_request(ByteString const& method, URL::URL const&, Optional<HTTP::HeaderList const&> request_headers = {}, ReadonlyBytes request_body = {}, HTTP::CacheMode = HTTP::CacheMode::Default, HTTP::Cookie::IncludeCredentials = HTTP::Cookie::IncludeCredentials::Yes, TransferLease = TransferLease::No, Optional<u32> address_selection_hint = {}, CacheMissNotification = CacheMissNotification::No, u64 originating_page_id = 0, Optional<HTTP::NetworkIsolationKey> = {}, CheckResolvedAlias = CheckResolvedAlias::No);
++    RefPtr<Request> start_request(ByteString const& method, URL::URL const&, HTTP::Cookie::SameSiteContext, Optional<HTTP::HeaderList const&> request_headers = {}, ReadonlyBytes request_body = {}, HTTP::CacheMode = HTTP::CacheMode::Default, HTTP::Cookie::IncludeCredentials = HTTP::Cookie::IncludeCredentials::Yes, TransferLease = TransferLease::No, Optional<u32> address_selection_hint = {}, CacheMissNotification = CacheMissNotification::No, u64 originating_page_id = 0, Optional<HTTP::NetworkIsolationKey> = {}, CheckResolvedAlias = CheckResolvedAlias::No);
      RefPtr<Request> adopt_request(int source_client_id, u64 source_request_id, TransferLease = TransferLease::No);
  
      // Moves a response between RequestServers. The request leaves this client on export; the imported one is a new
@@ -315,29 +315,33 @@ index 31fde3b2817afcf90b5a4cb6b8bbd8da34b5a33c..1b3030287a199a1c43f85339e844bdd1
      virtual void request_body_file_available(u64 request_id, IPC::File, u64 offset, u64 size) override;
      virtual void request_cached_body_file_available(u64 request_id, IPC::File, u64 offset, u64 size) override;
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index 3961e0b793727137e175ea8eb041742231afb5ba..5c3be7593acaeb49d8f60c7c1cf9f80782ead3fa 100644
+index 82114916aa244cdc31b3be1f34b3ba1b39592584..98fc99dc44ea0474ac9f08d4470343f0bb78db07 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-@@ -267,6 +267,17 @@ bool ContentBlocker::is_popup_filtered(URL::URL const& url, URL::URL const& open
-     return ContentBlocking::FFI::rust_content_blocker_matches_popup(m_engine, url_string.bytes(), opener_url_string.bytes());
+@@ -279,6 +279,21 @@ bool ContentBlocker::is_popup_filtered(URL::URL const& url, URL::URL const& open
+     return ContentBlocking::FFI::rust_content_blocker_matches_popup(engine, url_string.bytes(), opener_url_string.bytes());
  }
  
 +bool ContentBlocker::is_uncloaked_request_filtered(URL::URL const& url, StringView alias_target, URL::URL const& source_url, ResourceType resource_type) const
 +{
-+    if (!m_engine)
++    if (!has_rules())
 +        return false;
 +
 +    auto url_string = serialized_url_for_matching(url);
 +    auto source_url_string = serialized_url_for_matching(source_url_for_matching(source_url));
 +    auto request_type = resource_type_to_adblock_request_type(resource_type);
-+    return ContentBlocking::FFI::rust_content_blocker_matches_uncloaked(m_engine, url_string.bytes(), alias_target.bytes(), source_url_string.bytes(), request_type.bytes());
++    MutexLocker locker(m_mutex);
++    auto* engine = m_engine.load();
++    if (!engine)
++        return false;
++    return ContentBlocking::FFI::rust_content_blocker_matches_uncloaked(engine, url_string.bytes(), alias_target.bytes(), source_url_string.bytes(), request_type.bytes());
 +}
 +
  void ContentBlocker::run_page_script(DOM::Document& document) const
  {
      // Scriptlets and procedural filters are cosmetic filters (##+js(), ##...:has-text()).
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.h b/Libraries/LibWeb/Loader/ContentBlocker.h
-index 4ea71815c02582f91e20cb52b19bcb2bb43b811a..f8eb77c9d68e5336ed2da73d01fe929a59ee1c06 100644
+index d03893a0e2924faeb3a235868c2c14a105372ebb..8b3ea3b0967089b45a6eddc7ba014317985280d6 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.h
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.h
 @@ -75,6 +75,10 @@ public:
@@ -352,10 +356,10 @@ index 4ea71815c02582f91e20cb52b19bcb2bb43b811a..f8eb77c9d68e5336ed2da73d01fe929a
      // scripts can run, once per Window.
      void run_page_script(DOM::Document&) const;
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index e7a97a1df9bb4b7202ca05eb502dd200d85edc5b..7ee0f2ac55d423f17dfe71f104fc60d704036c8b 100644
+index 2dd95a195eb5c90938406dae3c879ebf7c1bb9fb..e7f377f4cbf86af1f08a5eefb4159e19addc1b02 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-@@ -659,8 +659,11 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
+@@ -670,8 +670,11 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
      auto protocol_complete = [this, on_complete = move(on_complete), request, &protocol_request = *protocol_request](u64 total_size, Requests::RequestTimingInfo const& timing_info, Optional<Requests::NetworkError> const& network_error) {
          finish_network_request(protocol_request);
  
@@ -368,18 +372,18 @@ index e7a97a1df9bb4b7202ca05eb502dd200d85edc5b..7ee0f2ac55d423f17dfe71f104fc60d7
  
          if (!network_error.has_value()) {
              log_success(request);
-@@ -712,12 +715,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
-     //     requests are attributed through the worker process's browser-level owners.
+@@ -723,12 +726,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
+     //     requests are attributed through the worker's browser-level owners.
      auto originating_page_id = request.page() && request.page()->has_top_level_traversable() ? request.page()->client().id().value() : 0;
      auto headers = headers_with_normalized_values(request.headers());
--    auto protocol_request = request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key());
+-    auto protocol_request = request_client->start_request(request.method(), request.url().value(), request.same_site_context(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key());
 +
 +    // Content blocking uncloaks CNAMEs: if DNS shows the host to be an alias, the filters also see where it leads.
 +    auto check_resolved_alias = Requests::RequestClient::CheckResolvedAlias::No;
 +    if (ContentBlocker::the().has_rules() && (!request.page() || request.page()->content_blocking_enabled_for_url(request.top_level_creation_url())))
 +        check_resolved_alias = Requests::RequestClient::CheckResolvedAlias::Yes;
 +
-+    auto protocol_request = request_client->start_request(request.method(), request.url().value(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key(), check_resolved_alias);
++    auto protocol_request = request_client->start_request(request.method(), request.url().value(), request.same_site_context(), *headers, request.body(), request.cache_mode(), request.include_credentials(), transfer_lease, {}, cache_miss_notification, originating_page_id, request.network_isolation_key(), check_resolved_alias);
      if (!protocol_request) {
          log_failure(request, "Failed to initiate load"sv);
          return nullptr;
@@ -400,15 +404,15 @@ index e7a97a1df9bb4b7202ca05eb502dd200d85edc5b..7ee0f2ac55d423f17dfe71f104fc60d7
          Optional<String> initiator_type_string;
          if (request.initiator_type().has_value())
 diff --git a/Services/RequestServer/ConnectionFromClient.cpp b/Services/RequestServer/ConnectionFromClient.cpp
-index bc3ebf7976287f8da0db9f112953edbed16cec47..3db57539f504b77c8e40a58059911c7970b3e899 100644
+index 18ac916d8afedb2ca4e56720d4ae9dc5266ef539..e2d4b4d6f14d485293c8397d88bba3ddc915e343 100644
 --- a/Services/RequestServer/ConnectionFromClient.cpp
 +++ b/Services/RequestServer/ConnectionFromClient.cpp
 @@ -291,7 +291,7 @@ bool ConnectionFromClient::is_live_request_id(u64 request_id) const
      return m_active_requests.contains(request_id) || m_request_transfer_leases.contains({ client_id(), request_id });
  }
  
--void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id)
-+void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, bool check_resolved_alias)
+-void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, HTTP::Cookie::SameSiteContext same_site_context)
++void ConnectionFromClient::start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, HTTP::Cookie::SameSiteContext same_site_context, bool check_resolved_alias)
  {
      note_event_tick("ipc-start-request"sv);
      dbgln_if(REQUESTSERVER_DEBUG, "RequestServer: start_request({}, {})", request_id, url);
@@ -416,8 +420,8 @@ index bc3ebf7976287f8da0db9f112953edbed16cec47..3db57539f504b77c8e40a58059911c79
      auto transfer_lease = create_transfer_lease
          ? Optional<Requests::RequestTransferLeaseKey> { lease_key }
          : Optional<Requests::RequestTransferLeaseKey> {};
--    auto request = Request::fetch(request_id, m_disk_cache, move(network_isolation_key), cache_mode, *this, m_curl_multi, m_resolver, move(url), move(method), HTTP::HeaderList::create(move(request_headers)), move(request_body), include_credentials, transfer_lease, address_selection_hint, notify_on_cache_miss);
-+    auto request = Request::fetch(request_id, m_disk_cache, move(network_isolation_key), cache_mode, *this, m_curl_multi, m_resolver, move(url), move(method), HTTP::HeaderList::create(move(request_headers)), move(request_body), include_credentials, transfer_lease, address_selection_hint, notify_on_cache_miss, check_resolved_alias);
+-    auto request = Request::fetch(request_id, m_disk_cache, move(network_isolation_key), cache_mode, *this, m_curl_multi, m_resolver, move(url), move(method), HTTP::HeaderList::create(move(request_headers)), move(request_body), include_credentials, same_site_context, transfer_lease, address_selection_hint, notify_on_cache_miss);
++    auto request = Request::fetch(request_id, m_disk_cache, move(network_isolation_key), cache_mode, *this, m_curl_multi, m_resolver, move(url), move(method), HTTP::HeaderList::create(move(request_headers)), move(request_body), include_credentials, same_site_context, transfer_lease, address_selection_hint, notify_on_cache_miss, check_resolved_alias);
      request->set_performance_origin(originating_process_id, originating_page_id);
      m_active_requests.set(request_id, move(request));
  
@@ -435,39 +439,39 @@ index bc3ebf7976287f8da0db9f112953edbed16cec47..3db57539f504b77c8e40a58059911c79
  {
      auto request = m_active_requests.take(request_id);
 diff --git a/Services/RequestServer/ConnectionFromClient.h b/Services/RequestServer/ConnectionFromClient.h
-index e03c57ca5fc5463ba8e33e3661cfedf551a55c8b..fa428548626405262746a06f5d79206eeb7a13d8 100644
+index 25d84e5e6a87adcebbd86eeb3f5b9ec611d579ae..51c684fde27eadaeee91ef2e2f1a08946b661859 100644
 --- a/Services/RequestServer/ConnectionFromClient.h
 +++ b/Services/RequestServer/ConnectionFromClient.h
 @@ -86,7 +86,8 @@ private:
  
      virtual Messages::RequestServer::IsSupportedProtocolResponse is_supported_protocol(ByteString) override;
      virtual Messages::RequestServer::GetClientIdResponse get_client_id() override;
--    virtual void start_request(u64 request_id, ByteString, URL::URL, Vector<HTTP::Header>, ByteBuffer, HTTP::CacheMode, Optional<HTTP::NetworkIsolationKey>, HTTP::Cookie::IncludeCredentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id) override;
-+    virtual void start_request(u64 request_id, ByteString, URL::URL, Vector<HTTP::Header>, ByteBuffer, HTTP::CacheMode, Optional<HTTP::NetworkIsolationKey>, HTTP::Cookie::IncludeCredentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, bool check_resolved_alias) override;
+-    virtual void start_request(u64 request_id, ByteString, URL::URL, Vector<HTTP::Header>, ByteBuffer, HTTP::CacheMode, Optional<HTTP::NetworkIsolationKey>, HTTP::Cookie::IncludeCredentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, HTTP::Cookie::SameSiteContext) override;
++    virtual void start_request(u64 request_id, ByteString, URL::URL, Vector<HTTP::Header>, ByteBuffer, HTTP::CacheMode, Optional<HTTP::NetworkIsolationKey>, HTTP::Cookie::IncludeCredentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, HTTP::Cookie::SameSiteContext, bool check_resolved_alias) override;
 +    virtual void continue_request_after_alias_check(u64 request_id, bool block) override;
      virtual void adopt_request(int source_client_id, u64 source_request_id, u64 target_request_id, bool preserve_transfer_lease) override;
      virtual void release_request_transfer_lease(int source_client_id, u64 source_request_id) override;
      virtual Messages::RequestServer::StopRequestResponse stop_request(u64 request_id) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index c25fefa23623f72807b27cea0a76ac69ade5e869..6afdc8e0cb74da3a9275733f7ab47bc041392142 100644
+index a9c6b2631e0e045c48d342c9ba584e2be4b7a3f8..dd4319b83458201a82487f15beb0036768a18ceb 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
-@@ -505,11 +505,13 @@ NonnullOwnPtr<Request> Request::fetch(
-     HTTP::Cookie::IncludeCredentials include_credentials,
+@@ -441,11 +441,13 @@ NonnullOwnPtr<Request> Request::fetch(
+     HTTP::Cookie::SameSiteContext same_site_context,
      Optional<Requests::RequestTransferLeaseKey> transfer_lease,
      Optional<u32> address_selection_hint,
 -    bool notify_on_cache_miss)
 +    bool notify_on_cache_miss,
 +    bool check_resolved_alias)
  {
-     auto request = adopt_own(*new Request { request_id, RequestType::Fetch, disk_cache, move(network_isolation_key), cache_mode, client, curl_multi, resolver, move(url), move(method), move(request_headers), move(request_body), include_credentials, move(transfer_lease) });
+     auto request = adopt_own(*new Request { request_id, RequestType::Fetch, disk_cache, move(network_isolation_key), cache_mode, client, curl_multi, resolver, move(url), move(method), move(request_headers), move(request_body), include_credentials, same_site_context, move(transfer_lease) });
      request->m_address_selection_hint = address_selection_hint;
      request->m_notify_on_cache_miss = notify_on_cache_miss;
 +    request->m_check_resolved_alias = check_resolved_alias;
      request->process();
  
      return request;
-@@ -1384,10 +1386,59 @@ void Request::handle_dns_lookup_state()
+@@ -1323,10 +1325,59 @@ void Request::handle_dns_lookup_state()
                  return;
              }
              self.m_dns_result = move(dns_result);
@@ -528,11 +532,11 @@ index c25fefa23623f72807b27cea0a76ac69ade5e869..6afdc8e0cb74da3a9275733f7ab47bc0
  {
      if (m_alternative_service.has_value() && !m_alternative_service->host.is_empty())
 diff --git a/Services/RequestServer/Request.h b/Services/RequestServer/Request.h
-index 4311637893391f26382d756129dab6b8286dd482..5dfaa488580bd5c6628353165bd2a1930efbdddf 100644
+index 53e15d8e439441e4532cad0f430682fb2d75eba5..a73de0349138be746e861e2830536d803cdf40bb 100644
 --- a/Services/RequestServer/Request.h
 +++ b/Services/RequestServer/Request.h
-@@ -64,7 +64,11 @@ public:
-         HTTP::Cookie::IncludeCredentials include_credentials,
+@@ -65,7 +65,11 @@ public:
+         HTTP::Cookie::SameSiteContext,
          Optional<Requests::RequestTransferLeaseKey>,
          Optional<u32> address_selection_hint,
 -        bool notify_on_cache_miss);
@@ -544,7 +548,7 @@ index 4311637893391f26382d756129dab6b8286dd482..5dfaa488580bd5c6628353165bd2a193
  
      static NonnullOwnPtr<Request> connect(
          u64 request_id,
-@@ -383,6 +387,10 @@ private:
+@@ -387,6 +391,10 @@ private:
  
      Optional<u32> m_address_selection_hint;
  
@@ -570,95 +574,95 @@ index 630753c68e7be1c24f210aa8a2a56df0ac45b89d..20fdcccfae0086f6045d4a49c12737c9
      request_body_file_available(u64 request_id, IPC::File fd, u64 offset, u64 size) =|
      request_cached_body_file_available(u64 request_id, IPC::File fd, u64 offset, u64 size) =|
 diff --git a/Services/RequestServer/RequestServer.ipc b/Services/RequestServer/RequestServer.ipc
-index b3568f4987f41db6d930cea4c1810f4693d1c04a..956b73e2bd605afd480850dcc522e7b1ada37d46 100644
+index c81ea13fb5e53842126199798bd829b63d300f1b..141e33303c15f2d3388933083e7b6c1ca6fb9def 100644
 --- a/Services/RequestServer/RequestServer.ipc
 +++ b/Services/RequestServer/RequestServer.ipc
-@@ -16,7 +16,9 @@ endpoint RequestServer
+@@ -17,7 +17,9 @@ endpoint RequestServer
      is_supported_protocol(ByteString protocol) => (bool supported)
      get_client_id() => (int client_id)
  
--    start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id) =|
-+    start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, bool check_resolved_alias) =|
+-    start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, HTTP::Cookie::SameSiteContext same_site_context) =|
++    start_request(u64 request_id, ByteString method, URL::URL url, Vector<HTTP::Header> request_headers, ByteBuffer request_body, HTTP::CacheMode cache_mode, Optional<HTTP::NetworkIsolationKey> network_isolation_key, HTTP::Cookie::IncludeCredentials include_credentials, bool create_transfer_lease, Optional<u32> address_selection_hint, bool notify_on_cache_miss, i32 originating_process_id, u64 originating_page_id, HTTP::Cookie::SameSiteContext same_site_context, bool check_resolved_alias) =|
 +    // Answers request_resolved_alias: whether the content blocker blocks the request now that DNS showed its host to be an alias.
 +    continue_request_after_alias_check(u64 request_id, bool block) =|
      adopt_request(int source_client_id, u64 source_request_id, u64 target_request_id, bool preserve_transfer_lease) =|
      release_request_transfer_lease(int source_client_id, u64 source_request_id) =|
      stop_request(u64 request_id) => (bool success)
 diff --git a/Tests/RequestServer/TestContentCodingRetry.cpp b/Tests/RequestServer/TestContentCodingRetry.cpp
-index f6258da81a7f45a3e9927f31af8533543b7b309c..e7d5d0f116086bc59c16fb96aeb5f544d8c6ad45 100644
+index 2c34d8cf117a57767c5ef0dc013f633145b6b259..ba0bae2dd8fda67497769f6be9573fcdd1831497 100644
 --- a/Tests/RequestServer/TestContentCodingRetry.cpp
 +++ b/Tests/RequestServer/TestContentCodingRetry.cpp
 @@ -105,7 +105,7 @@ TEST_CASE(content_coding_retry_keeps_client_supplied_cookie_header)
      UnsupportedCodingServer server;
      auto message = make<Messages::RequestServer::StartRequest>(
          0, ByteString { "GET" }, server.url(), Vector<HTTP::Header> { { "Cookie", "supplied=by-the-client" } }, ByteBuffer {},
--        HTTP::CacheMode::NoStore, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0);
-+        HTTP::CacheMode::NoStore, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, false);
+-        HTTP::CacheMode::NoStore, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {});
++        HTTP::CacheMode::NoStore, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {}, false);
      VERIFY(!MUST(static_cast<RequestServerEndpoint::Stub&>(*connection).handle(move(message))));
  
      event_loop.spin_until([&] { return server.request_heads().size() >= 2; });
 diff --git a/Tests/RequestServer/TestCookieResponses.cpp b/Tests/RequestServer/TestCookieResponses.cpp
-index b70b9fdae81130bc82c544abb34322592e3ce716..36cba527dea1835e41ef8f6186f6d22233b75172 100644
+index fb3bb06a544015ef97e101a3ca91f8fd88931a7b..997471c5ae2058c29d1d529f85ef0c889c6d6e98 100644
 --- a/Tests/RequestServer/TestCookieResponses.cpp
 +++ b/Tests/RequestServer/TestCookieResponses.cpp
 @@ -169,7 +169,7 @@ public:
      void start_request(u64 request_id, Optional<URL::URL> target_url = {}, ByteString method = "GET"sv, Vector<HTTP::Header> headers = {}, Optional<HTTP::NetworkIsolationKey> network_isolation_key = {})
      {
          auto url = target_url.value_or(URL::Parser::basic_parse("http://localhost"sv).release_value());
--        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(headers), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::Yes, true, Optional<u32> {}, false, 0, 0);
-+        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(headers), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::Yes, true, Optional<u32> {}, false, 0, 0, false);
+-        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(headers), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::Yes, true, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {});
++        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(headers), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::Yes, true, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {}, false);
          auto response = dispatch(move(message));
          VERIFY(!response);
      }
 diff --git a/Tests/RequestServer/TestDiskCacheWaiters.cpp b/Tests/RequestServer/TestDiskCacheWaiters.cpp
-index ab0f027f3a1e1a1860d1b6fe1a6ca6855990a34b..81a2ae858b8a769184fb86eddd2aa94ebd944614 100644
+index dfd3e9be469df2a3e91a295b469b573d3fcb58cf..0eedcf33f99bb9ef4896df4a59880ad69750b55b 100644
 --- a/Tests/RequestServer/TestDiskCacheWaiters.cpp
 +++ b/Tests/RequestServer/TestDiskCacheWaiters.cpp
 @@ -249,7 +249,7 @@ public:
              { ByteString { HTTP::TEST_CACHE_ENABLED_HEADER }, "1"sv },
          };
  
--        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(request_headers), ByteBuffer {}, HTTP::CacheMode::Default, test_network_isolation_key(), HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0);
-+        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(request_headers), ByteBuffer {}, HTTP::CacheMode::Default, test_network_isolation_key(), HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, false);
+-        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(request_headers), ByteBuffer {}, HTTP::CacheMode::Default, test_network_isolation_key(), HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {});
++        auto message = make<Messages::RequestServer::StartRequest>(request_id, move(method), move(url), move(request_headers), ByteBuffer {}, HTTP::CacheMode::Default, test_network_isolation_key(), HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {}, false);
          auto response = MUST(static_cast<RequestServerEndpoint::Stub&>(*m_connection).handle(move(message)));
          VERIFY(!response);
      }
 diff --git a/Tests/RequestServer/TestExportImport.cpp b/Tests/RequestServer/TestExportImport.cpp
-index fbc03bf01b17f099fc94b4ea624f99582921ad10..fb56b4654fa4f7c99ef453ae505f8ae72e1b884e 100644
+index 374e3253e5202e5b68cff67c9da94e5bfdbf2255..cd58576eb5058985ce86dc1df5cd2cc4c6cadb11 100644
 --- a/Tests/RequestServer/TestExportImport.cpp
 +++ b/Tests/RequestServer/TestExportImport.cpp
 @@ -92,7 +92,7 @@ public:
  
      void start_request(u64 request_id, URL::URL url, HTTP::NetworkIsolationKey network_isolation_key, bool create_transfer_lease)
      {
--        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), cacheable_request_headers(), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::No, create_transfer_lease, Optional<u32> {}, false, 0, 0);
-+        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), cacheable_request_headers(), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::No, create_transfer_lease, Optional<u32> {}, false, 0, 0, false);
+-        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), cacheable_request_headers(), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::No, create_transfer_lease, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {});
++        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), cacheable_request_headers(), ByteBuffer {}, HTTP::CacheMode::Default, move(network_isolation_key), HTTP::Cookie::IncludeCredentials::No, create_transfer_lease, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {}, false);
          VERIFY(!dispatch(move(message)));
      }
  
 diff --git a/Tests/RequestServer/TestRequestTimingInfo.cpp b/Tests/RequestServer/TestRequestTimingInfo.cpp
-index 6dc9f407a5013489538186d04344cb804cd2fc0c..2e3029442dc6afc86f0b1fc3e3672bd75832ae33 100644
+index a91ae8ff12926044c652666bc333dc7238c6fce9..d8563687d59aaef92444e157cf3cfec1e14e7526 100644
 --- a/Tests/RequestServer/TestRequestTimingInfo.cpp
 +++ b/Tests/RequestServer/TestRequestTimingInfo.cpp
 @@ -139,7 +139,7 @@ public:
          auto started_at = MonotonicTime::now();
          m_started_at.set(request_id, started_at);
  
--        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), Vector<HTTP::Header> {}, ByteBuffer {}, HTTP::CacheMode::Default, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0);
-+        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), Vector<HTTP::Header> {}, ByteBuffer {}, HTTP::CacheMode::Default, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, false);
+-        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), Vector<HTTP::Header> {}, ByteBuffer {}, HTTP::CacheMode::Default, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {});
++        auto message = make<Messages::RequestServer::StartRequest>(request_id, ByteString { "GET" }, move(url), Vector<HTTP::Header> {}, ByteBuffer {}, HTTP::CacheMode::Default, Optional<HTTP::NetworkIsolationKey> {}, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {}, false);
          auto response = MUST(static_cast<RequestServerEndpoint::Stub&>(*m_connection).handle(move(message)));
          VERIFY(!response);
  
 diff --git a/Tests/RequestServer/TestSiteBinding.cpp b/Tests/RequestServer/TestSiteBinding.cpp
-index 55f6e45f8b9832cf639c7424462c2c82664ec46b..46566b7373e077075773c7823f6b08eab0482c6d 100644
+index 7b41eae9b80eba279ef99c4542d37a56db428294..59cfc6a266d2cae377144c72709060444f1a64f8 100644
 --- a/Tests/RequestServer/TestSiteBinding.cpp
 +++ b/Tests/RequestServer/TestSiteBinding.cpp
 @@ -80,7 +80,7 @@ struct TestServer {
      {
          auto message = make<Messages::RequestServer::StartRequest>(
              request_id, ByteString { "GET" }, URL::Parser::basic_parse(url).release_value(), Vector<HTTP::Header> {}, ByteBuffer {},
--            HTTP::CacheMode::NoStore, network_isolation_key, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0);
-+            HTTP::CacheMode::NoStore, network_isolation_key, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, false);
+-            HTTP::CacheMode::NoStore, network_isolation_key, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {});
++            HTTP::CacheMode::NoStore, network_isolation_key, HTTP::Cookie::IncludeCredentials::No, false, Optional<u32> {}, false, 0, 0, HTTP::Cookie::SameSiteContext {}, false);
          VERIFY(!MUST(static_cast<RequestServerEndpoint::Stub&>(*connection).handle(move(message))));
      }
  

@@ -43,6 +43,20 @@ Ladybird's build is configured with `-DCMAKE_PROJECT_ladybird_INCLUDE=Meta/CMake
 LibWebView, and the engine's helper processes (WebContent, RequestServer, ImageDecoder, ...) are built into
 `Xenon.app`.
 
+Ladybird splits the browser in two: the Hub (`ladybird/Services/Hub`), which is the `WebView::Application` and holds
+each tab's `Hub::View` (a `ViewImplementation`) with its pages and helper processes, and the Qt UI, which shows them.
+The UI's `RemoteView` stands in for a tab's view, and `HubConnection` carries what the two say to each other; the UI
+keeps the settings, bookmarks, browsing history and sessions of its own (`UI/BookmarkStore`, `UI/SessionStore`), and
+builds every action and menu (`UI/Actions.h`, `UI/ContextMenus.cpp`). On Linux and macOS upstream runs the Hub in a
+process of its own. Xenon runs it in the UI's process, as Ladybird does on Windows: `UI/Xenon.cmake` links
+`hubservice` and leaves `LADYBIRD_HUB_IN_OWN_PROCESS` undefined. That lets Xenon's features use what the Hub has and
+upstream doesn't pass to the UI, such as the engine patches' view calls and callbacks (the element picker, WebAuthn
+prompts, unresponsive pages, preparing a tab to be discarded): `RemoteView::hub_view()` is the tab's `Hub::View`, and
+`WebView::Application::the()` is the Hub's application. Xenon's own command-line options and its changes to the
+browser's options go in through `Hub::ApplicationHost` (`create_platform_arguments()`, `create_platform_options()`),
+which an engine patch adds. In headless mode, where upstream leaves the UI out, Xenon still sets up the UI's stores, as
+its features keep their state there.
+
 ## Building
 
 On macOS you need Xcode (or Homebrew LLVM), CMake 3.30+, Rust via rustup, and:

@@ -90,7 +90,7 @@ PasswordManagers::PasswordManagers()
 
 void PasswordManagers::initialize(Optional<ByteString> const& command_line_choice)
 {
-    m_state_file = LexicalPath::join(Application::profile().paths().data, "Extensions"sv, STATE_NAME).string();
+    m_state_file = LexicalPath::join(WebView::Application::profile().paths().data, "Extensions"sv, STATE_NAME).string();
     load_state();
 
     Extensions::Registry::the().on_extensions_change([this] {

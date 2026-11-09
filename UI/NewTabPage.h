@@ -6,8 +6,12 @@
 
 #pragma once
 
+#include <AK/Function.h>
 #include <LibURL/URL.h>
+#include <LibWebView/BrowsingSession.h>
 #include <LibWebView/Forward.h>
+#include <UI/BookmarkStore.h>
+#include <UI/SessionStore.h>
 
 namespace Ladybird::NewTabPage {
 
@@ -21,6 +25,14 @@ enum class ShowRecentlyClosed {
     Yes,
 };
 
-void populate(WebView::ViewImplementation&, WebView::BrowsingSession&, ShowRecentlyClosed);
+struct Sources {
+    WebView::IsPrivate is_private { WebView::IsPrivate::No };
+    WebView::HistoryStore* history_store { nullptr };
+    WebView::FaviconStore& favicon_store;
+    ReadonlySpan<BookmarkItem> bookmarks;
+    Function<Vector<RecentlyClosedSessionUnit>(size_t limit)> recently_closed_units;
+};
+
+void populate(WebView::ViewImplementation&, Sources const&, ShowRecentlyClosed);
 
 }

@@ -28,7 +28,14 @@ class ProcessManagerWindow final : public QDialog {
 public:
     AK_ALLOC_WITH_KMALLOC;
 
-    explicit ProcessManagerWindow(WebView::ProcessManager&);
+    struct Source {
+        Function<Vector<WebView::ProcessSnapshot>()> take_snapshots;
+        Function<bool(u64 child_id)> end_process;
+        Function<Optional<String>(WebView::ProcessPageSnapshot const&)> favicon_hash;
+        Function<Optional<ByteBuffer>(String const& favicon_hash)> favicon_png;
+    };
+
+    explicit ProcessManagerWindow(Source);
 
 private:
     virtual void showEvent(QShowEvent*) override;
@@ -41,7 +48,8 @@ private:
     void end_selected_process();
     void show_context_menu(QPoint const&);
 
-    WebView::ProcessManager& m_process_manager;
+    Source m_source;
+    HashMap<u64, WebView::ProcessType> m_process_types;
     QAction* m_end_process_action { nullptr };
     QAction* m_copy_pid_action { nullptr };
     QPushButton* m_end_process_button { nullptr };

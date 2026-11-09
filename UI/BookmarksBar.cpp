@@ -6,7 +6,9 @@
 
 #include <AK/ScopeGuard.h>
 #include <LibWebView/Application.h>
-#include <LibWebView/BookmarkStore.h>
+#include <UI/Application.h>
+#include <UI/BookmarkStore.h>
+#include <UI/Bookmarks.h>
 #include <UI/BookmarksBar.h>
 #include <UI/ChromeStyle.h>
 #include <UI/Icon.h>
@@ -234,10 +236,10 @@ void BookmarksBar::rebuild()
         button->installEventFilter(this);
     };
 
-    for (auto const& item : WebView::Application::the().bookmarks_menu().items()) {
+    for (auto const& item : Application::bookmarks().menu().items()) {
         item.visit(
-            [&](NonnullRefPtr<WebView::Action> const& bookmark) {
-                if (bookmark->id() != WebView::ActionID::BookmarkItem)
+            [&](NonnullRefPtr<Action> const& bookmark) {
+                if (bookmark->id() != ActionID::BookmarkItem)
                     return;
 
                 auto* action = create_application_action(*this, *bookmark);
@@ -246,7 +248,7 @@ void BookmarksBar::rebuild()
                 if (auto* button = as_if<QToolButton>(widgetForAction(action)))
                     set_button_properties(button, qstring_from_ak_string(bookmark->text()));
             },
-            [&](NonnullRefPtr<WebView::Menu> const& folder) {
+            [&](NonnullRefPtr<Menu> const& folder) {
                 if (folder->properties().get("type"sv) != "folder"sv)
                     return;
 
@@ -269,12 +271,12 @@ void BookmarksBar::rebuild()
                     set_button_properties(button, title);
                 }
             },
-            [](WebView::Separator) {
+            [](Separator) {
             });
     }
 }
 
-void BookmarksBar::show_context_menu(QPoint position, Optional<WebView::BookmarkItem const&> item, Optional<String const&> target_folder_id, Optional<String const&> parent_folder_id)
+void BookmarksBar::show_context_menu(QPoint position, Optional<BookmarkItem const&> item, Optional<String const&> target_folder_id, Optional<String const&> parent_folder_id)
 {
     if (item.has_value()) {
         m_selected_bookmark_menu_item_id = item->id;
@@ -333,13 +335,13 @@ bool BookmarksBar::handle_middle_mouse_click(QMouseEvent* event, QObject* item)
         extract_item_properties(action);
 
         if (m_selected_bookmark_menu_item_type == "bookmark")
-            WebView::Application::the().open_bookmark_in_new_tab(m_selected_bookmark_menu_item_id, activate_tab);
+            Application::bookmarks().open_in_new_tab(m_selected_bookmark_menu_item_id, activate_tab);
     } else if (auto* menu = as_if<QMenu>(item)) {
         if (auto* action = menu->actionAt(event->pos())) {
             extract_item_properties(action);
 
             if (m_selected_bookmark_menu_item_type == "bookmark")
-                WebView::Application::the().open_bookmark_in_new_tab(m_selected_bookmark_menu_item_id, activate_tab);
+                Application::bookmarks().open_in_new_tab(m_selected_bookmark_menu_item_id, activate_tab);
         }
     }
 
@@ -390,16 +392,25 @@ bool BookmarksBar::handle_right_mouse_click(QMouseEvent* event, QObject* item)
         //        to avoid this duplicated menu.
         QMenu context_menu(menu);
 
+        report_context_menu_item();
         if (m_selected_bookmark_menu_item_type == "bookmark")
-            repopulate_application_menu(context_menu, context_menu, m_tab->view().bookmark_context_menu());
+            repopulate_application_menu(context_menu, context_menu, Application::bookmarks().bookmark_context_menu());
         else if (m_selected_bookmark_menu_item_type == "folder")
-            repopulate_application_menu(context_menu, context_menu, m_tab->view().bookmark_folder_context_menu());
+            repopulate_application_menu(context_menu, context_menu, Application::bookmarks().bookmark_folder_context_menu());
 
         if (!context_menu.isEmpty() && context_menu.exec(event->globalPosition().toPoint()))
             menu->close();
     }
 
     return true;
+}
+
+void BookmarksBar::report_context_menu_item() const
+{
+    Optional<String> item_id;
+    if (!m_selected_bookmark_menu_item_id.is_empty())
+        item_id = m_selected_bookmark_menu_item_id;
+    Application::bookmarks().set_context_menu_item(AK::move(item_id), m_selected_bookmark_menu_target_folder_id, m_selected_bookmark_menu_parent_folder_id);
 }
 
 void BookmarksBar::extract_item_properties(QObject* item)
@@ -418,22 +429,25 @@ void BookmarksBar::extract_item_properties(QObject* item)
 
 QMenu& BookmarksBar::bookmarks_bar_context_menu()
 {
+    report_context_menu_item();
     if (!m_bookmarks_bar_context_menu)
-        m_bookmarks_bar_context_menu = create_application_menu(*this, m_tab->view().bookmarks_bar_context_menu());
+        m_bookmarks_bar_context_menu = create_application_menu(*this, Application::bookmarks().bookmarks_bar_context_menu());
     return *m_bookmarks_bar_context_menu;
 }
 
 QMenu& BookmarksBar::bookmark_context_menu()
 {
+    report_context_menu_item();
     if (!m_bookmark_context_menu)
-        m_bookmark_context_menu = create_application_menu(*this, m_tab->view().bookmark_context_menu());
+        m_bookmark_context_menu = create_application_menu(*this, Application::bookmarks().bookmark_context_menu());
     return *m_bookmark_context_menu;
 }
 
 QMenu& BookmarksBar::bookmark_folder_context_menu()
 {
+    report_context_menu_item();
     if (!m_bookmark_folder_context_menu)
-        m_bookmark_folder_context_menu = create_application_menu(*this, m_tab->view().bookmark_folder_context_menu());
+        m_bookmark_folder_context_menu = create_application_menu(*this, Application::bookmarks().bookmark_folder_context_menu());
     return *m_bookmark_folder_context_menu;
 }
 

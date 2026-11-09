@@ -9,7 +9,7 @@
 #include <AK/Optional.h>
 #include <AK/Vector.h>
 #include <AK/kmalloc.h>
-#include <LibWebView/SessionStore.h>
+#include <UI/SessionStore.h>
 
 #include <QHash>
 #include <QObject>
@@ -117,7 +117,7 @@ public:
     void did_remove_tab();
     void did_move_tab(int from, int to);
 
-    void restore(WebView::SessionWindowId);
+    void restore(SessionWindowId);
 
 signals:
     void changed();

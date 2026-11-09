@@ -23,7 +23,7 @@ The blocker now also gets the request method, so $method filters match.
  2 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 4b625df515ab36973aab3a3962644c982eb06ecf..a27b8b01cb910460e66342a5191e78725cfb2a8f 100644
+index 434114afb9e5b3308f8560745101cef168b8f704..f9c0a637d5805ed903bc34e26b6cd7e960f87ecc 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 @@ -67,6 +67,7 @@
@@ -34,7 +34,7 @@ index 4b625df515ab36973aab3a3962644c982eb06ecf..a27b8b01cb910460e66342a5191e7872
  #include <LibWeb/Loader/LoadRequest.h>
  #include <LibWeb/Loader/LoaderConfig.h>
  #include <LibWeb/Loader/ResourceLoader.h>
-@@ -562,6 +563,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
+@@ -563,6 +564,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
          request.set_client_snapshot(client->visit([](auto const& client) { return snapshot_client_context(*client); }));
  }
  
@@ -64,17 +64,17 @@ index 4b625df515ab36973aab3a3962644c982eb06ecf..a27b8b01cb910460e66342a5191e7872
  // https://fetch.spec.whatwg.org/#concept-main-fetch
  GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParams const& fetch_params, Recursive recursive)
  {
-@@ -636,6 +660,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -637,6 +661,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
          request->current_url().set_scheme("https"sv);
      }
  
 +    remove_tracking_parameters(realm, *request);
 +
-     auto get_response = GC::create_function(GC::Heap::the(), [&realm, fetch_params = NonnullRefPtr { fetch_params }, controller = fetch_params.controller(), request]() -> GC::Ref<PendingResponse> {
+     auto get_response = GC::create_function<GC::Ref<PendingResponse>()>(GC::Heap::the(), GC::captures(realm, NonnullRefPtr { fetch_params }, fetch_params.controller(), request), [](auto& realm, NonnullRefPtr<Infrastructure::FetchParams const>& fetch_params, GC::Ref<Infrastructure::FetchController>& controller, NonnullRefPtr<Infrastructure::Request>& request) -> GC::Ref<PendingResponse> {
          dbgln_if(WEB_FETCH_DEBUG, "Fetch: Running 'main fetch' get_response() function");
          auto const* origin = request->origin().get_pointer<URL::Origin>();
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index 4ec36e7d279328fd19c237f7f67c3590e75cfec9..e7a97a1df9bb4b7202ca05eb502dd200d85edc5b 100644
+index 588fefbbfc77936cf78d6273409846feb1fdf428..2dd95a195eb5c90938406dae3c879ebf7c1bb9fb 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
 @@ -30,6 +30,7 @@
@@ -85,7 +85,7 @@ index 4ec36e7d279328fd19c237f7f67c3590e75cfec9..e7a97a1df9bb4b7202ca05eb502dd200
  #include <LibWebCommon/Loader/UserAgent.h>
  
  namespace Web {
-@@ -293,7 +294,12 @@ static StringView blocked_resource_kind(LoadRequest const& request)
+@@ -305,7 +306,12 @@ static StringView blocked_resource_kind(LoadRequest const& request)
      VERIFY_NOT_REACHED();
  }
  
@@ -99,7 +99,7 @@ index 4ec36e7d279328fd19c237f7f67c3590e75cfec9..e7a97a1df9bb4b7202ca05eb502dd200
  {
      auto const& url = request.url().value();
  
-@@ -308,19 +314,45 @@ static bool should_block_request(LoadRequest const& request)
+@@ -320,19 +326,45 @@ static bool should_block_request(LoadRequest const& request)
  
      if (is_port_blocked(url.port_or_default())) {
          log_failure(request, ByteString::formatted("Port #{} is blocked", url.port_or_default()));
@@ -149,7 +149,7 @@ index 4ec36e7d279328fd19c237f7f67c3590e75cfec9..e7a97a1df9bb4b7202ca05eb502dd200
  }
  
  template<typename FileHandler, typename ErrorHandler>
-@@ -515,7 +547,9 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
+@@ -526,7 +558,9 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
      log_request_start(request);
      request.start_timer();
  

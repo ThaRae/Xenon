@@ -14,9 +14,9 @@
 #include <LibWebCommon/Page/PageId.h>
 #include <LibWebView/BrowsingSession.h>
 #include <LibWebView/Forward.h>
-#include <LibWebView/SessionStore.h>
 #include <LibWebView/Settings.h>
 #include <UI/FullscreenDebounce.h>
+#include <UI/SessionStore.h>
 #include <UI/Tab.h>
 #include <UI/TabBar.h>
 #include <UI/WindowCloseCoordinator.h>
@@ -138,13 +138,18 @@ public:
         int m_index { 0 };
     };
 
-    BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow is_popup_window = IsPopupWindow::No, WebView::IsPrivate = WebView::IsPrivate::No, Tab* parent_tab = nullptr, Optional<WebView::CanonicalTraversable&> traversable = {}, Optional<WebView::SessionWindowId> restored_session_window_id = {});
+    BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow is_popup_window = IsPopupWindow::No, WebView::IsPrivate = WebView::IsPrivate::No, Optional<u64> hub_view_id = {}, Optional<SessionWindowId> restored_session_window_id = {});
     virtual ~BrowserWindow() override;
 
     WebContentView& view() const { return m_current_tab->view(); }
     WebView::IsPrivate is_private() const { return m_is_private; }
-    WebView::BrowsingSession& session() const { return *m_session; }
-    Optional<WebView::SessionWindowId> session_window_id() const { return m_session_window_id; }
+    SessionStore& session() const;
+    // Unminimizes, raises and activates the window, so the user sees it in front.
+    void bring_to_front();
+    // The tab showing this view, if it's one of this window's.
+    Tab* tab_for_view(RemoteView const&) const;
+    Optional<WebView::HistoryEntry> history_entry_for_url(URL::URL const&) const;
+    Optional<SessionWindowId> session_window_id() const { return m_session_window_id; }
 
     int tab_count() { return m_tabs_container->count(); }
     int tab_index(Tab*);
@@ -161,11 +166,12 @@ public:
     void activate_first_unpinned_tab();
 
     Tab& create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocation);
+    Tab& create_new_tab(Web::HTML::ActivateTab, Optional<u64> hub_view_id, TabLocation);
     void duplicate_tab(Tab&);
     void open_history_entry_in_new_tab(Tab&, int delta);
     void update_tab_audio_button(Tab&);
     // Opens a window's restored tabs, keeping the session rows the store re-adopted for them.
-    void restore_tabs(Vector<WebView::RestoredSessionTab> const&, i64 active_tab_index);
+    void restore_tabs(Vector<RestoredSessionTab> const&, i64 active_tab_index);
     Tab* current_tab() const { return m_current_tab; }
     Tab* activate_tab_with_url(URL::URL const&, URL::ExcludeFragment);
     // Asks every tab's page if the window may close, without closing it, and reports the answer. Once the pages agree,
@@ -243,8 +249,7 @@ private:
     virtual void appearance_changed() override;
     virtual void config_variable_changed(WebView::ConfigVariableID) override;
 
-    Tab& create_new_tab(Web::HTML::ActivateTab, Optional<WebView::CanonicalTraversable&>);
-    Tab& create_restored_tab(WebView::RestoredSessionTab const&, int index, bool defer);
+    Tab& create_restored_tab(RestoredSessionTab const&, int index, bool defer);
     void initialize_tab(Tab*);
     void initialize_tab_view(Tab*);
     void uninitialize_tab(Tab*);
@@ -274,6 +279,7 @@ private:
 
     void update_chrome_style();
 
+    int insertion_index_for(TabLocation);
     int constrain_insertion_index(int index, bool pinned) const;
     void pinned_state_changed(Tab&);
     TabBarButton* create_tab_close_button(Tab&);
@@ -296,7 +302,6 @@ private:
     WindowScreenObserver* m_screen_observer { nullptr };
 
     WebView::IsPrivate m_is_private { WebView::IsPrivate::No };
-    NonnullRefPtr<WebView::BrowsingSession> m_session;
 
     TabWidget* m_tabs_container { nullptr };
     Tab* m_current_tab { nullptr };
@@ -320,7 +325,7 @@ private:
 
     IsPopupWindow m_is_popup_window { IsPopupWindow::No };
 
-    Optional<WebView::SessionWindowId> m_session_window_id;
+    Optional<SessionWindowId> m_session_window_id;
     Optional<i64> m_window_close_active_tab_index;
     QPointer<Tab> m_window_close_original_active_tab;
     QPointer<Tab> m_window_close_current_preflight_tab;

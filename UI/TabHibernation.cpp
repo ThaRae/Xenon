@@ -77,7 +77,7 @@ public:
             return false;
 
         auto& view = tab.view();
-        if (view.tab_indicator_visible(WebView::TabIndicator::PlayingAudio) || view.has_devtools_client() || has_picture_in_picture_window(view))
+        if (view.tab_indicator_visible(WebView::TabIndicator::PlayingAudio) || view.hub_view().has_devtools_client() || has_picture_in_picture_window(view.hub_view()))
             return false;
         if (auto state = m_tabs.get(&tab); state.has_value() && state->last_audible.has_value() && MonotonicTime::now() - *state->last_audible < AUDIO_PROTECTION_TIME)
             return false;
@@ -106,7 +106,7 @@ public:
         state.is_preparing = true;
         state.request = request;
 
-        auto preparation = tab.view().prepare_for_discard();
+        auto preparation = tab.view().hub_view().prepare_for_discard();
         preparation->when_resolved([this, tab = QPointer { &tab }](auto& result) {
             QTimer::singleShot(0, tab, [this, tab, has_unsubmitted_input = result.has_unsubmitted_input] {
                 finish_hibernating(*tab, has_unsubmitted_input);

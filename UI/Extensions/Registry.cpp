@@ -467,8 +467,7 @@ void Registry::close_hidden_view(NonnullOwnPtr<WebView::HeadlessWebView> view)
     if (auto site = URL::Site::serialize_for_partitioning(view->url().origin()); site.has_value())
         WebView::RequestServerManager::the().retire_when_idle(view->session(), *site);
 
-    auto request_close = view->prepare_for_immediate_close();
-    request_close();
+    view->prepare_for_immediate_close();
     Core::deferred_invoke([view = move(view)] { });
 }
 

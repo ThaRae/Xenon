@@ -8,8 +8,8 @@ What's shared is the design: small, deterministic randomization keyed per sessio
 ## Seeds
 
 `Web::Fingerprinting::session_secret()` is 64 random bits that the browser makes once per run
-(`WebView::Application::fingerprinting_session_secret()`) and sends to every WebContent and WebWorker process with the
-setting, as `LoaderConfig::fingerprinting_session_secret`. `seed_for_host()` mixes it with the host of the origin
+(`WebView::Application::fingerprinting_session_secret()`) and sends to every WebContent process, and to each worker, with
+the setting, as `LoaderConfig::fingerprinting_session_secret`. `seed_for_host()` mixes it with the host of the origin
 asking, so one site always sees the same values in a session, two sites see unrelated values, and a restart changes
 all of them. Opaque origins use the session secret alone. Each API derives its own stream from the seed
 (`seed_for_key()`), so learning one value tells nothing about another.
@@ -43,8 +43,8 @@ names. Seeds are keyed by the origin's host, not eTLD+1.
 ## The setting
 
 `WebView::Settings::fingerprinting_protection()` (key `fingerprintingProtection`) is on by default. It reaches pages
-through `set_enable_fingerprinting_protection` on WebContent and workers through the same message on WebWorker, and
-lands in `LoaderConfig::enable_fingerprinting_protection`. In test mode it's forced off, since test output has to be
+through `set_enable_fingerprinting_protection` on WebContent, and workers, which run on threads of a WebContent process,
+through the same message from `WorkerAgentManager`, as they get the languages. It lands in `LoaderConfig::enable_fingerprinting_protection`. In test mode it's forced off, since test output has to be
 deterministic. `internals.setFingerprintingProtection()` turns it back on for the LibWeb text tests of farbling.
 
 Engine patches `0034`–`0037` carry the LibWeb farbling, the setting, the User-Agent, and the AudioBuffer

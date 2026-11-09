@@ -15,6 +15,7 @@
 
 namespace Ladybird {
 
+struct BookmarkItem;
 class Tab;
 
 class BookmarksBar final : public QToolBar {
@@ -32,7 +33,7 @@ public:
     Optional<String> const& selected_bookmark_menu_target_folder_id() const { return m_selected_bookmark_menu_target_folder_id; }
     Optional<String> const& selected_bookmark_menu_parent_folder_id() const { return m_selected_bookmark_menu_parent_folder_id; }
 
-    void show_context_menu(QPoint, Optional<WebView::BookmarkItem const&>, Optional<String const&> target_folder_id, Optional<String const&> parent_folder_id);
+    void show_context_menu(QPoint, Optional<BookmarkItem const&>, Optional<String const&> target_folder_id, Optional<String const&> parent_folder_id);
 
 private:
     virtual bool eventFilter(QObject* object, QEvent* event) override;
@@ -41,6 +42,7 @@ private:
     bool handle_middle_mouse_click(QMouseEvent*, QObject*);
     bool handle_right_mouse_click(QMouseEvent*, QObject*);
     void extract_item_properties(QObject*);
+    void report_context_menu_item() const;
 
     QMenu& bookmarks_bar_context_menu();
     QMenu& bookmark_context_menu();

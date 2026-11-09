@@ -134,12 +134,12 @@ static BrowserWindow* browser_window_of(QWidget& widget)
 
 static Optional<QString> saved_tab_groups_path()
 {
-    if (!WebView::Application::default_session().session_store->is_persistent())
+    if (!Application::session_store(WebView::IsPrivate::No).is_persistent())
         return {};
     return qstring_from_ak_string(LexicalPath::join(WebView::Application::profile().paths().data, "TabGroups.json"sv).string());
 }
 
-static QString saved_tab_groups_key(WebView::SessionWindowId window_id)
+static QString saved_tab_groups_key(SessionWindowId window_id)
 {
     return QStringLiteral("window%1").arg(window_id);
 }
@@ -430,7 +430,7 @@ void TabGroups::move_group_to_new_window(TabGroup& group)
     auto title = group.title();
     auto color = group.color();
 
-    auto& target_window = Application::the().new_window({}, Application::the().configuration_for_new_window(), BrowserWindow::IsPopupWindow::No, source_window->is_private(), nullptr, {}, ShowWindow::No);
+    auto& target_window = Application::the().new_window({}, Application::the().configuration_for_new_window(), BrowserWindow::IsPopupWindow::No, source_window->is_private(), {}, ShowWindow::No);
     auto& target_groups = target_window.tab_groups();
     TabGroup* target_group = nullptr;
     for (auto& tab : tabs) {
@@ -661,7 +661,7 @@ void TabGroups::save() const
     write_saved_tab_groups(saved_groups);
 }
 
-void TabGroups::restore(WebView::SessionWindowId window_id)
+void TabGroups::restore(SessionWindowId window_id)
 {
     auto saved_groups = read_saved_tab_groups().value(saved_tab_groups_key(window_id)).toArray();
     if (saved_groups.isEmpty())

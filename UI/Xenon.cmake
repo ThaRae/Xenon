@@ -25,23 +25,31 @@ endif()
 
 set(XENON_SOURCES
     main.cpp
+    Actions.cpp
     Application.cpp
+    ApplicationActions.cpp
     Autocomplete.cpp
     Bangs.cpp
     Blocking.cpp
     BlockingDashboard.cpp
     BlockingPopover.cpp
     BookmarkDialog.cpp
+    Bookmarks.cpp
     BookmarksBar.cpp
+    BookmarksPage.cpp
+    BookmarkStore.cpp
     BrowserWindow.cpp
     CertificateDetails.cpp
     CertificateErrors.cpp
     ChromeStyle.cpp
     ContentBlockingButton.cpp
     ContentBlockingPopover.cpp
+    ContextMenus.cpp
     CrashReportReviewWidget.cpp
     DevToolsBanner.cpp
     Download.cpp
+    DownloadPresentation.cpp
+    DownloadsPage.cpp
     ElementPicker.cpp
     EventLoopImplementationQt.cpp
     EventLoopImplementationQtEventTarget.cpp
@@ -66,6 +74,8 @@ set(XENON_SOURCES
     FilterListUpdates.cpp
     FilterLists.cpp
     FindInPageWidget.cpp
+    HistoryPage.cpp
+    HubConnection.cpp
     Icon.cpp
     HiddenPageSizing.cpp
     InputMethodUtils.cpp
@@ -84,16 +94,21 @@ set(XENON_SOURCES
     PictureInPictureWindow.cpp
     Popover.cpp
     RelaunchToUpdate.cpp
+    RemoteDownloads.cpp
+    RemoteView.cpp
     ReportReview.cpp
     ScreenshotSelectionOverlay.cpp
     ScreenshotViewer.cpp
     SelectDropdown.cpp
+    SessionHistorySnapshotStorage.cpp
     SessionSaving.cpp
+    SessionStore.cpp
     SettingsPage.cpp
     SiteSecurity.cpp
     SiteSecurityPopover.cpp
     SplitView.cpp
     StringUtils.cpp
+    SuggestionProvider.cpp
     Tab.cpp
     TabBar.cpp
     TabCycler.cpp
@@ -102,10 +117,12 @@ set(XENON_SOURCES
     TabHibernation.cpp
     TabMemory.cpp
     UpdateButton.cpp
+    VersionPage.cpp
     WebAuthnPopover.cpp
     WebCompatReportReview.cpp
     WebContentView.cpp
     WebUIInterfaces.cpp
+    WebUIPage.cpp
     WindowExposure.cpp
     WindowCloseCoordinator.cpp
     WindowControlButton.cpp
@@ -140,6 +157,7 @@ endif()
 
 set(XENON_ARC_SOURCES
     LadybirdAccessibilityElement.mm
+    MicrophoneAuthorizerMacOS.mm
     SpellCheckerMac.mm
     Updater.mm
     WebContentViewAccessibility.mm
@@ -151,6 +169,7 @@ if (APPLE)
         Conversions.mm
         DictionaryLookup.mm
         ExternalURLHandler.mm
+        LaunchURLsMacOS.cpp
         MacWindow.mm
         MacWindowFocus.mm
         NativeTextEditingBindings.mm
@@ -217,10 +236,10 @@ qt_add_executable(xenon MANUAL_FINALIZATION ${XENON_SOURCES})
 set_target_properties(xenon PROPERTIES AUTOMOC ON AUTORCC ON AUTOUIC ON)
 
 target_link_libraries(xenon PRIVATE Qt::Core Qt::Gui Qt::Widgets)
-target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibFileSystem LibGfx LibHTTP LibIPC LibMain LibRequests LibWebView LibURL LibWakeLock LibXML)
+target_link_libraries(xenon PRIVATE AK LibCore LibCrypto LibDatabase LibFileSystem LibGamepad LibGfx LibHTTP LibIPC LibMain LibRequests LibUnicode LibWebView LibURL LibWakeLock LibXML hubipc hubservice)
 target_link_libraries(xenon PRIVATE OpenSSL::Crypto OpenSSL::SSL ZLIB::ZLIB)
 target_include_directories(xenon BEFORE PRIVATE ${XENON_SOURCE_DIR})
-target_include_directories(xenon PRIVATE ${LADYBIRD_SOURCE_DIR} ${LADYBIRD_SOURCE_DIR}/Services/ ${XENON_GENERATED_DIR})
+target_include_directories(xenon PRIVATE ${LADYBIRD_SOURCE_DIR} ${LADYBIRD_SOURCE_DIR}/Services/ ${XENON_GENERATED_DIR} ${CMAKE_BINARY_DIR}/Services)
 target_compile_definitions(xenon PRIVATE XENON_VERSION="${XENON_VERSION}")
 add_dependencies(xenon xenon_generate_bang_table)
 
@@ -241,7 +260,7 @@ if (TARGET xenon_generate_web_content_view_linux_shaders)
 endif()
 
 if (APPLE)
-    target_link_libraries(xenon PRIVATE Qt::GuiPrivate "-framework ApplicationServices" "-framework Cocoa" "-framework IOSurface" "-framework QuartzCore")
+    target_link_libraries(xenon PRIVATE Qt::GuiPrivate "-framework ApplicationServices" "-framework AVFoundation" "-framework Carbon" "-framework Cocoa" "-framework CoreServices" "-framework IOSurface" "-framework QuartzCore")
     set_source_files_properties(${XENON_ARC_SOURCES} PROPERTIES COMPILE_FLAGS "-fobjc-arc")
 
     set(XENON_SPARKLE_VERSION 2.10.1)

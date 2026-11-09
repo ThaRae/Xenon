@@ -6,8 +6,9 @@
 
 #include <LibWebView/Application.h>
 #include <LibWebView/BrowsingSession.h>
-#include <LibWebView/SessionStore.h>
+#include <UI/Application.h>
 #include <UI/SessionSaving.h>
+#include <UI/SessionStore.h>
 
 #include <QApplication>
 #include <QTimer>
@@ -18,7 +19,7 @@ static constexpr int SAVE_DELAY_MILLISECONDS = 1000;
 
 void save_soon()
 {
-    auto& session_store = *WebView::Application::default_session().session_store;
+    auto& session_store = Application::session_store(WebView::IsPrivate::No);
     if (!session_store.is_persistent())
         return;
 
@@ -27,7 +28,7 @@ void save_soon()
         save_timer->setSingleShot(true);
         save_timer->setInterval(SAVE_DELAY_MILLISECONDS);
         QObject::connect(save_timer, &QTimer::timeout, save_timer, [] {
-            WebView::Application::default_session().session_store->flush_dirty_state();
+            Application::session_store(WebView::IsPrivate::No).flush_dirty_state();
         });
         return save_timer;
     }();

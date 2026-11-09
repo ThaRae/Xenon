@@ -1,0 +1,205 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 21:51:53 -0500
+Subject: [PATCH] LibWebView+WebContent+Hub+UI/Qt: Run menu Copy and Cut
+ through the page
+
+The context menu's Copy read the selection out of the page from the UI
+process, and Cut did the same through the Hub, so neither fired the DOM
+copy and cut events. Pages that implement editing themselves, such as
+contenteditable editors, therefore did nothing, while the keyboard
+shortcuts worked because WebContent runs the clipboard actions for
+those.
+
+Run the copy and cut actions in WebContent for both the context menu
+and the application menu, as the keyboard shortcuts do, and give the
+page user activation first so that it may write the clipboard. The UI
+asks the Hub for them with view_copy_selection and view_cut_selection.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Libraries/LibWebView/ViewImplementation.cpp  | 14 ++++++++++++++
+ Libraries/LibWebView/ViewImplementation.h    |  2 ++
+ Services/Hub/ConnectionFromUI.cpp            | 14 ++++++++------
+ Services/Hub/ConnectionFromUI.h              |  1 +
+ Services/Hub/HubServer.ipc                   |  1 +
+ Services/WebContent/ConnectionFromClient.cpp | 18 ++++++++++++++++++
+ Services/WebContent/ConnectionFromClient.h   |  2 ++
+ Services/WebContent/WebContentServer.ipc     |  2 ++
+ UI/Qt/ApplicationActions.cpp                 |  5 +----
+ UI/Qt/ContextMenus.cpp                       |  2 +-
+ 10 files changed, 50 insertions(+), 11 deletions(-)
+
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index cf648005588f8dbaabef2f5bc69442349ad0da97..6a7b5482d086acbd3b55e36b9ca1d5f7c58ef768 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -3083,6 +3083,20 @@ void ViewImplementation::paste_from_clipboard()
+     });
+ }
+ 
++void ViewImplementation::copy_selection()
++{
++    auto& host = focused_navigable_host();
++    host.give_user_activation();
++    host.async_copy_selection();
++}
++
++void ViewImplementation::cut_selection()
++{
++    auto& host = focused_navigable_host();
++    host.give_user_activation();
++    host.async_cut_selection();
++}
++
+ void ViewImplementation::set_marked_text_from_input_method(Utf16String const& text)
+ {
+     auto& host = focused_navigable_host();
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index b240011c3a4612c91eca9fa8a64661d38eeb6421..89feb8d3da27777ddbcc3a6d5cb6965d4d9d911e 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -401,6 +401,8 @@ public:
+     void did_receive_selected_text_for_lookup(Badge<WebContentPage>, u64 request_id, Optional<DictionaryLookup> lookup);
+     void did_select_word_for_dictionary_lookup(Badge<WebContentPage>, u64 request_id, bool selected);
+     void did_cut_selected_text(Badge<WebContentPage>, u64 request_id, ByteString selection);
++    void copy_selection();
++    void cut_selection();
+     void select_all();
+     void undo();
+     void redo();
+diff --git a/Services/Hub/ConnectionFromUI.cpp b/Services/Hub/ConnectionFromUI.cpp
+index 0a1a3cb4e1506f9a91373526d062de0862e40598..68bd4b521c2c8c9fba292e64099cd3d768b815e8 100644
+--- a/Services/Hub/ConnectionFromUI.cpp
++++ b/Services/Hub/ConnectionFromUI.cpp
+@@ -970,14 +970,16 @@ void ConnectionFromUI::view_redo(u64 view_id)
+         view->redo();
+ }
+ 
++void ConnectionFromUI::view_copy_selection(u64 view_id)
++{
++    if (auto* view = find_view(view_id))
++        view->copy_selection();
++}
++
+ void ConnectionFromUI::view_cut_selection(u64 view_id)
+ {
+-    if (auto* view = find_view(view_id)) {
+-        view->cut_selected_text()->when_resolved([](auto& text) {
+-            if (!text.is_empty())
+-                Application::the().insert_clipboard_entry({ "text/plain"_string, text });
+-        });
+-    }
++    if (auto* view = find_view(view_id))
++        view->cut_selection();
+ }
+ 
+ void ConnectionFromUI::view_paste(u64 view_id)
+diff --git a/Services/Hub/ConnectionFromUI.h b/Services/Hub/ConnectionFromUI.h
+index 220a1ecdc41907f311d864d85abf87b965cbe433..2b95abdfe079a1bdf80f9088fb4a6a0657f265a1 100644
+--- a/Services/Hub/ConnectionFromUI.h
++++ b/Services/Hub/ConnectionFromUI.h
+@@ -167,6 +167,7 @@ private:
+     virtual void view_stop_loading(u64 view_id) override;
+     virtual void view_undo(u64 view_id) override;
+     virtual void view_redo(u64 view_id) override;
++    virtual void view_copy_selection(u64 view_id) override;
+     virtual void view_cut_selection(u64 view_id) override;
+     virtual void view_paste(u64 view_id) override;
+     virtual void view_select_all(u64 view_id) override;
+diff --git a/Services/Hub/HubServer.ipc b/Services/Hub/HubServer.ipc
+index 9cc931a78cedb812aa5202104d09a754357db8ab..de8f36d68a84977c5b293902d32cd1006831c669 100644
+--- a/Services/Hub/HubServer.ipc
++++ b/Services/Hub/HubServer.ipc
+@@ -245,6 +245,7 @@ endpoint HubServer
+     view_stop_loading(u64 view_id) =|
+     view_undo(u64 view_id) =|
+     view_redo(u64 view_id) =|
++    view_copy_selection(u64 view_id) =|
+     view_cut_selection(u64 view_id) =|
+     view_paste(u64 view_id) =|
+     view_select_all(u64 view_id) =|
+diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
+index 7452b43dcddfd49cd54c0b20c64e39bf82b35dbe..752de5cd3f8ffed2f8d33d2a75711e3f9b261037 100644
+--- a/Services/WebContent/ConnectionFromClient.cpp
++++ b/Services/WebContent/ConnectionFromClient.cpp
+@@ -3198,6 +3198,24 @@ void ConnectionFromClient::select_all(Web::PageId page_id)
+     }
+ }
+ 
++void ConnectionFromClient::copy_selection(Web::PageId page_id)
++{
++    if (auto page = this->page(page_id); page.has_value()) {
++        if (auto navigable = page->page().hosted_focused_navigable())
++            (void)navigable->event_handler().perform_copy_action(Web::EventHandler::ClipboardActionTrigger::User);
++    }
++}
++
++void ConnectionFromClient::cut_selection(Web::PageId page_id)
++{
++    if (auto page = this->page(page_id); page.has_value()) {
++        if (auto navigable = page->page().hosted_focused_navigable()) {
++            (void)navigable->event_handler().perform_cut_action(Web::EventHandler::ClipboardActionTrigger::User);
++            update_input_method_state(page_id);
++        }
++    }
++}
++
+ void ConnectionFromClient::undo(Web::PageId page_id)
+ {
+     if (auto page = this->page(page_id); page.has_value()) {
+diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
+index 82e0d23dca680adb862c991187b4dc7c6b33d61d..d2ea43ca2db9f311c584feded381e4d7a671e2b2 100644
+--- a/Services/WebContent/ConnectionFromClient.h
++++ b/Services/WebContent/ConnectionFromClient.h
+@@ -352,6 +352,8 @@ private:
+     virtual void get_selected_text_for_lookup(Web::PageId page_id, u64 request_id) override;
+     virtual void select_word_for_dictionary_lookup(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) override;
+     virtual void cut_selected_text(Web::PageId page_id, u64 request_id) override;
++    virtual void copy_selection(Web::PageId page_id) override;
++    virtual void cut_selection(Web::PageId page_id) override;
+     virtual void select_all(Web::PageId page_id) override;
+     virtual void undo(Web::PageId page_id) override;
+     virtual void redo(Web::PageId page_id) override;
+diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
+index 0b57ed8439783955c2bb81a587dbc25b35fc77b8..25dc7f6e38a519bc850d55d8965136700c08b6e7 100644
+--- a/Services/WebContent/WebContentServer.ipc
++++ b/Services/WebContent/WebContentServer.ipc
+@@ -253,6 +253,8 @@ endpoint WebContentServer routed by Web::PageId page_id
+     get_selected_text_for_lookup(Web::PageId page_id, u64 request_id) =|
+     select_word_for_dictionary_lookup(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) =|
+     cut_selected_text(Web::PageId page_id, u64 request_id) =|
++    copy_selection(Web::PageId page_id) =|
++    cut_selection(Web::PageId page_id) =|
+     select_all(Web::PageId page_id) =|
+     undo(Web::PageId page_id) =|
+     redo(Web::PageId page_id) =|
+diff --git a/UI/Qt/ApplicationActions.cpp b/UI/Qt/ApplicationActions.cpp
+index 0d10fad53b005a6c80002af491a2bbf0a4b07546..4c9745ab3537f8d45afa4c7e85c90ffeae1389fd 100644
+--- a/UI/Qt/ApplicationActions.cpp
++++ b/UI/Qt/ApplicationActions.cpp
+@@ -102,10 +102,7 @@ ApplicationActions::ApplicationActions(PageOptions const& options)
+         HubConnection::the().async_view_redo(view.view_id());
+     }));
+     m_copy_selection_action = Action::create("Copy"sv, ActionID::CopySelection, on_focused_text_field_or_active_view(copy_text_field, [](RemoteView& view) {
+-        view.selected_text()->when_resolved([](ByteString const& text) {
+-            if (!text.is_empty())
+-                Application::the().set_clipboard_text(MUST(String::from_byte_string(text)));
+-        });
++        HubConnection::the().async_view_copy_selection(view.view_id());
+     }));
+     m_cut_selection_action = Action::create("Cut"sv, ActionID::CutSelection, on_focused_text_field_or_active_view(cut_text_field, [](RemoteView& view) {
+         HubConnection::the().async_view_cut_selection(view.view_id());
+diff --git a/UI/Qt/ContextMenus.cpp b/UI/Qt/ContextMenus.cpp
+index cc9574acc7d3146134614a4ff50c434812cd0411..aa836fe667c9ebd9ae29df38ff9a860b5df94e35 100644
+--- a/UI/Qt/ContextMenus.cpp
++++ b/UI/Qt/ContextMenus.cpp
+@@ -118,7 +118,7 @@ static void add_text_edit_actions(Menu& menu, u64 view_id, bool is_editable, boo
+     }
+     if (is_editable || has_selected_text) {
+         menu.add_action(Action::create("Copy"sv, ActionID::CopySelection, on_view(view_id, [](RemoteView& view) {
+-            view.selected_text()->when_resolved(copy_text);
++            HubConnection::the().async_view_copy_selection(view.view_id());
+         })));
+     }
+     if (is_editable) {

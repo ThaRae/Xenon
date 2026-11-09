@@ -13,17 +13,18 @@
 #include <LibWakeLock/DisplaySleepInhibitor.h>
 #include <LibWebCommon/HTML/SelectedFile.h>
 #include <LibWebView/Application.h>
-#include <LibWebView/DownloadPresentation.h>
 #include <LibWebView/URL.h>
 #include <LibWebView/Utilities.h>
 #include <LibWebView/WebContentClient.h>
 #include <UI/Application.h>
+#include <UI/ApplicationActions.h>
 #include <UI/Blocking.h>
 #include <UI/BlockingPopover.h>
 #include <UI/BrowserWindow.h>
 #include <UI/ChromeLayout.h>
 #include <UI/ChromeStyle.h>
 #include <UI/ContentBlockingButton.h>
+#include <UI/DownloadPresentation.h>
 #include <UI/ElementPicker.h>
 #include <UI/Extensions/Toolbar.h>
 #include <UI/Icon.h>
@@ -484,7 +485,7 @@ public:
         m_file_name_label->setText(qstring_from_ak_string(download.destination.basename()));
         m_file_name_label->setToolTip(qstring_from_ak_string(download.destination.string()));
 
-        auto status_text = qstring_from_ak_string(WebView::download_status_text(download));
+        auto status_text = qstring_from_ak_string(download_status_text(download));
         m_status_label->setText(status_text);
         m_status_label->setToolTip(status_text);
 
@@ -590,7 +591,7 @@ public:
     bool set_downloads(ReadonlySpan<WebView::FileDownloader::Download> downloads)
     {
         bool geometry_changed = false;
-        auto visible_downloads = WebView::recent_downloads_for_popover(downloads);
+        auto visible_downloads = recent_downloads_for_popover(downloads);
 
         if (!rows_match(visible_downloads)) {
             rebuild_rows(visible_downloads);
@@ -677,12 +678,12 @@ private:
     Vector<DownloadRow*> m_download_rows;
 };
 
-Tab::Tab(BrowserWindow* window, Optional<WebView::CanonicalTraversable&> traversable)
+Tab::Tab(BrowserWindow* window, Optional<u64> hub_view_id)
     : QWidget(window)
     , m_window(window)
 {
     create_tab_shell();
-    initialize(traversable);
+    initialize(hub_view_id);
 }
 
 Tab::Tab(BrowserWindow* window, DeferredTab deferred_tab)
@@ -712,19 +713,20 @@ void Tab::create_tab_shell()
     m_tab_shell_children = children();
 }
 
-void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
+void Tab::initialize(Optional<u64> hub_view_id)
 {
-    auto& application = WebView::Application::the();
+    auto& application = ApplicationActions::the();
     auto* tab_layout = static_cast<QBoxLayout*>(layout());
 
     auto view_initial_state = WebContentViewInitialState {
         .is_private = m_window->is_private(),
         .maximum_frames_per_second = m_window->refresh_rate(),
         .display_id = m_window->display_id(),
-        .owner_view = nullptr,
+        .owner_view_id = {},
+        .is_tab = true,
     };
 
-    m_view = new WebContentView(this, traversable, AK::move(view_initial_state));
+    m_view = new WebContentView(this, hub_view_id, AK::move(view_initial_state));
     // The window reports its geometry to its tabs as it is moved and resized, so a tab opened later has to be told
     // where the window stands now.
     m_view->set_window_position({ m_window->x(), m_window->y() });
@@ -859,7 +861,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
     m_content_blocking_button->setToolTip("Ad Block");
     QObject::connect(m_content_blocking_button, &QToolButton::clicked, this, [this] { show_content_blocking_popover(); });
     view().on_content_blocking_change = [this](auto const& snapshot) {
-        Blocking::count_blocked_requests(view(), snapshot);
+        Blocking::count_blocked_requests(view().hub_view(), snapshot);
         update_content_blocking_controls(snapshot);
     };
     view().on_element_picker_filter = [this](auto const& filter) { ElementPicker::confirm_filter(*this, filter); };
@@ -909,9 +911,11 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
     recreate_toolbar_icons();
 
-    view().on_context_menu_created = [this](QMenu& menu, WebView::Menu& source) {
+    view().on_context_menu_created = [this](QMenu& menu, Menu& source) {
         if (source.title() == "Link Context Menu"sv)
             SplitView::add_link_context_menu_action(*this, menu);
+        if (source.title().is_one_of("Page Context Menu"sv, "Image Context Menu"sv))
+            add_block_element_action(menu);
     };
 
     auto* navigation_button_cluster = new QWidget(m_toolbar);
@@ -1027,7 +1031,16 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
             auto show_recently_closed = XenonSettings::new_tab_page_shows_recently_closed()
                 ? NewTabPage::ShowRecentlyClosed::Yes
                 : NewTabPage::ShowRecentlyClosed::No;
-            NewTabPage::populate(view(), m_window->session(), show_recently_closed);
+            auto is_private = m_window->is_private();
+            NewTabPage::populate(view().hub_view(),
+                {
+                    .is_private = is_private,
+                    .history_store = is_private == WebView::IsPrivate::No ? &Application::history_store() : nullptr,
+                    .favicon_store = Application::favicon_store(is_private),
+                    .bookmarks = Application::bookmark_store().root_items(),
+                    .recently_closed_units = [is_private](size_t limit) { return Application::session_store(is_private).recently_closed_units(limit); },
+                },
+                show_recently_closed);
         }
 
         if (!view().is_loading() && url.scheme() != "about"sv)
@@ -1061,10 +1074,10 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         location_edit_return_pressed(AK::move(input), AK::move(fallback_url), destination_kind);
     };
     m_location_edit->on_site_security_requested = [this](QToolButton& anchor) {
-        SiteSecurityPopover::toggle(*this, anchor, view());
+        SiteSecurityPopover::toggle(*this, anchor, view().hub_view());
     };
     m_location_edit->has_accepted_certificate_error = [this](URL::URL const& url) {
-        return SiteSecurity::has_certificate_exception(view().session(), url);
+        return SiteSecurity::has_certificate_exception(view().hub_view().session(), url);
     };
     QObject::connect(m_location_edit, &LocationEdit::focus_return_requested, this, [this] {
         view().setFocus();
@@ -1205,7 +1218,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         }
     };
 
-    view().on_request_external_url_confirmation = [this](auto const& url, auto const& initiator_origin, auto const& handler, auto on_complete) {
+    view().on_request_external_url_confirmation = [this](auto const& url, auto const& initiator_origin, String const& handler_name, auto on_complete) {
         if (m_javascript_dialog->is_open() || m_color_picker_dialog || m_external_url_confirmation_dialog) {
             on_complete(false);
             return;
@@ -1214,11 +1227,11 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
         hide_hover_label();
 
         auto initiator = initiator_origin.is_opaque() ? "This page"_string : initiator_origin.serialize();
-        auto application_name = handler.application_name().is_empty() ? "another application"sv : handler.application_name().bytes_as_string_view();
-        auto title = handler.application_name().is_empty() ? "Open external application?"_string : MUST(String::formatted("Open {}?", application_name));
+        auto application_name = handler_name.is_empty() ? "another application"sv : handler_name.bytes_as_string_view();
+        auto title = handler_name.is_empty() ? "Open external application?"_string : MUST(String::formatted("Open {}?", application_name));
         auto message = MUST(String::formatted("{} wants to open a {} link with {}.", initiator, url.scheme(), application_name));
         auto details = MUST(String::formatted("URL: '{}'", url));
-        auto open_button_text = handler.application_name().is_empty() ? "Open"_string : MUST(String::formatted("Open {}", application_name));
+        auto open_button_text = handler_name.is_empty() ? "Open"_string : MUST(String::formatted("Open {}", application_name));
 
         auto* dialog = new QMessageBox(&view());
         m_external_url_confirmation_dialog = dialog;
@@ -1443,7 +1456,7 @@ void Tab::initialize(Optional<WebView::CanonicalTraversable&> traversable)
 
 void Tab::create_tab_context_menu()
 {
-    auto& application = WebView::Application::the();
+    auto& application = ApplicationActions::the();
 
     auto* duplicate_tab_action = new QAction("&Duplicate Tab", this);
     QObject::connect(duplicate_tab_action, &QAction::triggered, this, [this]() {
@@ -1560,7 +1573,7 @@ void Tab::ensure_loaded()
     emit loaded();
 
     if (!history.has_value() && m_session_tab_id.has_value())
-        history = m_window->session().session_store->load_tab_history(*m_session_tab_id);
+        history = m_window->session().load_tab_history(*m_session_tab_id);
     if (!history.has_value() || view().restore_session_history_from_snapshot(history.release_value()).is_error())
         navigate(deferred_url);
 }
@@ -1572,7 +1585,28 @@ URL::URL Tab::url() const
     return view().url();
 }
 
-Optional<WebView::SessionTabId> Tab::session_tab_id() const
+void Tab::add_block_element_action(QMenu& menu)
+{
+    auto* block_element_action = new QAction("Block Element...", &menu);
+    QObject::connect(block_element_action, &QAction::triggered, this, [this] {
+        view().hub_view().start_element_picker([tab = QPointer { this }](Optional<String> filter) {
+            if (tab && filter.has_value() && tab->view().on_element_picker_filter)
+                tab->view().on_element_picker_filter(*filter);
+        });
+    });
+
+    auto actions = menu.actions();
+    for (qsizetype i = 0; i < actions.size(); ++i) {
+        if (actions[i]->text() != "Inspect Element")
+            continue;
+        auto* before = i > 0 && actions[i - 1]->isSeparator() ? actions[i - 1] : actions[i];
+        menu.insertAction(before, block_element_action);
+        return;
+    }
+    menu.addAction(block_element_action);
+}
+
+Optional<SessionTabId> Tab::session_tab_id() const
 {
     // A loaded tab's view holds the ID it reports its state under.
     if (is_loaded())
@@ -1580,7 +1614,7 @@ Optional<WebView::SessionTabId> Tab::session_tab_id() const
     return m_session_tab_id;
 }
 
-void Tab::set_session_tab_id(WebView::SessionTabId session_tab_id)
+void Tab::set_session_tab_id(SessionTabId session_tab_id)
 {
     m_session_tab_id = session_tab_id;
     if (is_loaded())
@@ -2097,7 +2131,7 @@ void Tab::update_downloads_button()
         return;
 
     auto downloads = WebView::Application::the().file_downloader().downloads_of_session(m_window->is_private());
-    auto button_state = WebView::downloads_button_state(downloads);
+    auto button_state = downloads_button_state(downloads);
 
     m_downloads_button->setVisible(button_state.has_downloads);
     if (!button_state.has_downloads) {
@@ -2500,9 +2534,8 @@ void Tab::request_close()
     m_already_requested_close = already_requested_close;
 
     if (!view().needs_beforeunload_check()) {
-        auto request_close = view().prepare_for_immediate_close();
-        if (m_window->definitely_close_tab(tab_index()))
-            Core::deferred_invoke(AK::move(request_close));
+        view().prepare_for_immediate_close();
+        m_window->definitely_close_tab(tab_index());
         return;
     }
 

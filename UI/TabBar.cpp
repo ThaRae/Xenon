@@ -13,6 +13,7 @@
 #include <AK/kmalloc.h>
 #include <LibCore/EventLoop.h>
 #include <UI/Application.h>
+#include <UI/ApplicationActions.h>
 #include <UI/BrowserWindow.h>
 #include <UI/ChromeLayout.h>
 #include <UI/ChromeStyle.h>
@@ -2953,7 +2954,7 @@ TabWidget::TabWidget(QWidget* parent)
 
     m_vertical_tabs_toggle_button = new VerticalTabsToggleButton(m_vertical_tab_bar_column);
     m_vertical_tabs_toggle_button->setObjectName("LadybirdVerticalTabsToggleButton");
-    m_vertical_tabs_toggle_button->setDefaultAction(create_application_action(*this, Application::the().toggle_vertical_tabs_expanded_action()));
+    m_vertical_tabs_toggle_button->setDefaultAction(create_application_action(*this, ApplicationActions::the().toggle_vertical_tabs_expanded_action()));
     m_vertical_tabs_toggle_button->setAutoRaise(true);
     m_vertical_tabs_toggle_button->setFocusPolicy(Qt::NoFocus);
     m_vertical_tabs_toggle_button->setIconSize({ 20, 20 });

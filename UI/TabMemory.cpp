@@ -15,7 +15,6 @@
 #include <LibWebView/ViewImplementation.h>
 #include <LibWebView/WebContentClient.h>
 #include <LibWebView/WebContentPage.h>
-#include <LibWebView/WorkerProcessManager.h>
 #include <UI/StringUtils.h>
 #include <UI/Tab.h>
 #include <UI/TabHibernation.h>
@@ -31,13 +30,6 @@ struct SampledUsage {
     Usage usage;
 };
 static Optional<SampledUsage> s_last_usage;
-
-static u64 tab_view_id(u64 view_id)
-{
-    if (auto view = WebView::ViewImplementation::find_view_by_id(view_id); view.has_value())
-        return view->owner_view_id().value_or(view_id);
-    return view_id;
-}
 
 static HashMap<pid_t, HashTable<u64>> tabs_by_process()
 {
@@ -62,10 +54,6 @@ static HashMap<pid_t, HashTable<u64>> tabs_by_process()
     HashMap<u64, pid_t> pids_by_child_id;
     process_manager.for_each_process([&](WebView::Process& process) {
         pids_by_child_id.set(process.child_id(), process.pid());
-        if (process.type() == WebView::ProcessType::WebWorker) {
-            if (auto owner = WebView::WorkerProcessManager::the().exclusive_performance_owner(process.pid()); owner.has_value())
-                tabs.ensure(process.pid()).set(tab_view_id(*owner));
-        }
     });
 
     process_manager.for_each_process([&](WebView::Process& process) {

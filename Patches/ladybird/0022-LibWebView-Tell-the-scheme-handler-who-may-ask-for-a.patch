@@ -20,9 +20,9 @@ renderer. Site isolation keeps them to one site.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- Libraries/LibWebView/URLSchemeHandler.h       |  5 +++++
- Libraries/LibWebView/WebContentPage.cpp       | 11 ++++++++++-
- Libraries/LibWebView/WorkerProcessManager.cpp |  1 +
+ Libraries/LibWebView/URLSchemeHandler.h  |  5 +++++
+ Libraries/LibWebView/WebContentPage.cpp  | 11 ++++++++++-
+ Libraries/LibWebView/WebWorkerClient.cpp |  1 +
  3 files changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/URLSchemeHandler.h b/Libraries/LibWebView/URLSchemeHandler.h
@@ -42,10 +42,10 @@ index 29f3cab80d12c5a7280145f57851eaab00ce34cf..0b5bc6d988baf5001186956a628358dd
  
  struct URLSchemeResponse {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 058d731cb8a654273b7813e09c1230224d8bc5f2..bb3d1cf99c029464ae4083cb9ef1652b09a8e1c9 100644
+index 048802d1ad0b76e6807e5e8c38387b9a12f40d8d..6f1070d40970878aff825172a0b853922c683abb 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1649,7 +1649,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1658,7 +1658,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return;
      }
  
@@ -54,7 +54,7 @@ index 058d731cb8a654273b7813e09c1230224d8bc5f2..bb3d1cf99c029464ae4083cb9ef1652b
      traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
          auto navigation = navigable.uncommitted_navigation();
          if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
-@@ -1661,6 +1661,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1670,6 +1670,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return IterationDecision::Break;
      });
  
@@ -70,15 +70,15 @@ index 058d731cb8a654273b7813e09c1230224d8bc5f2..bb3d1cf99c029464ae4083cb9ef1652b
      auto response = (*handler)(request);
      if (response.is_error()) {
          async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
-diff --git a/Libraries/LibWebView/WorkerProcessManager.cpp b/Libraries/LibWebView/WorkerProcessManager.cpp
-index f9012a1113ed5f0b63f5eb153b28307af2b20857..7e464b341e645df1d632199bc2a1acc86834f798 100644
---- a/Libraries/LibWebView/WorkerProcessManager.cpp
-+++ b/Libraries/LibWebView/WorkerProcessManager.cpp
-@@ -757,6 +757,7 @@ void WorkerProcessManager::worker_did_request_embedder_resource(Web::HTML::Worke
-         .from_same_origin_process = agent.inside_settings->origin().is_same_origin(url.origin()),
+diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
+index 1aacc58f86f44ef6b5fa5fabebfa4721c86872c9..6f4ab554414ac44dd4817dd99231d42a71c90223 100644
+--- a/Libraries/LibWebView/WebWorkerClient.cpp
++++ b/Libraries/LibWebView/WebWorkerClient.cpp
+@@ -219,6 +219,7 @@ void WebWorkerClient::did_request_embedder_resource(URL::URL url, i32 request_id
+         .from_same_origin_process = m_inside_settings->origin().is_same_origin(url.origin()),
          .is_navigation = false,
          .navigation_initiator = {},
-+        .requester_origins = { agent.inside_settings->origin() },
++        .requester_origins = { m_inside_settings->origin() },
      };
      auto response = (*handler)(request);
      if (response.is_error()) {

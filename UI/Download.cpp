@@ -49,7 +49,7 @@ void Download::fetch(URL::URL url)
     request_headers->set({ "User-Agent"sv, Web::default_user_agent });
 
     m_url = move(url);
-    m_request = client.value()->start_request("GET"sv, m_url, *request_headers, {}, HTTP::CacheMode::NoStore, HTTP::Cookie::IncludeCredentials::No);
+    m_request = client.value()->start_request("GET"sv, m_url, HTTP::Cookie::SameSiteContext {}, *request_headers, {}, HTTP::CacheMode::NoStore, HTTP::Cookie::IncludeCredentials::No);
     if (!m_request) {
         finish(Error::from_string_literal("the request didn't start"));
         return;

@@ -112,7 +112,7 @@ void ActionPopup::hideEvent(QHideEvent* event)
     Popover::hideEvent(event);
 
     Browser::did_close_popup(m_view->view_id());
-    m_view->prepare_for_immediate_close()();
+    m_view->prepare_for_immediate_close();
     deleteLater();
     Core::deferred_invoke([] { Router::the().prune_closed_contexts(); });
 }

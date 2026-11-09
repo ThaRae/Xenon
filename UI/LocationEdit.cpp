@@ -18,6 +18,7 @@
 #include <UI/Menu.h>
 #include <UI/NewTabPage.h>
 #include <UI/StringUtils.h>
+#include <UI/SuggestionProvider.h>
 #include <UI/XenonSettings.h>
 
 #include <QAction>
@@ -107,7 +108,7 @@ static constexpr int LOCATION_BANG_CHIP_MAX_TEXT_WIDTH = 160;
 
 LocationEdit::LocationEdit(QWidget* parent, WebView::IsPrivate is_private)
     : NativeTextEditingLineEdit(parent)
-    , m_omnibox(is_private)
+    , m_omnibox(make<SuggestionProvider>(is_private))
     , m_autocomplete(new Autocomplete(this))
 {
     setObjectName("LadybirdLocationEdit");

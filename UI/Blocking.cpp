@@ -201,7 +201,7 @@ void connect_popover(Tab& tab, BlockingPopover& popover)
     domains_timer->setSingleShot(true);
     domains_timer->setInterval(DOMAINS_REFRESH_DELAY_MS);
     QObject::connect(domains_timer, &QTimer::timeout, &popover, [&tab, popover = QPointer(&popover)] {
-        DomainQuery::run(tab.view(), [popover](Vector<BlockingDomain> domains) {
+        DomainQuery::run(tab.view().hub_view(), [popover](Vector<BlockingDomain> domains) {
             if (popover)
                 popover->set_domains(move(domains));
         });
@@ -231,14 +231,14 @@ void connect_popover(Tab& tab, BlockingPopover& popover)
     };
 
     popover.on_pick_element = [&tab] {
-        tab.view().start_element_picker([&tab](Optional<String> filter) {
+        tab.view().hub_view().start_element_picker([&tab](Optional<String> filter) {
             if (filter.has_value() && tab.view().on_element_picker_filter)
                 tab.view().on_element_picker_filter(*filter);
         });
     };
 
     popover.on_zap_element = [&tab] {
-        start_zapper(tab.view());
+        start_zapper(tab.view().hub_view());
     };
 
     popover.on_open_dashboard = [&tab] {

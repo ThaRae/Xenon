@@ -1,0 +1,271 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <tharae@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 20:37:24 -0500
+Subject: [PATCH] LibWebView: Let Inspect Element open DevTools on demand
+
+The Inspect Element context-menu item was only shown once a DevTools
+client was already attached to the tab, and its handler dropped the
+request without one. Nothing starts the DevTools server by default, so
+in a fresh session the item never appeared and right-clicking a page
+offered no way in.
+
+Show the item whenever a page context menu is opened, keep the node
+found by the hit test, and start the DevTools server and client when it
+is chosen. The node is held until the client asks the tab's frame actor
+to listen for inspect requests, then delivered, so the inspector opens
+on the element the user clicked.
+
+Until then, a second request from the tab the client was launched for
+is accepted even though the connection is up, so it is not reported as
+coming from another tab.
+---
+ Libraries/LibWebView/Application.cpp        | 54 +++++++++++++++++++--
+ Libraries/LibWebView/Application.h          |  5 +-
+ Libraries/LibWebView/ViewImplementation.cpp | 50 +++++++++++++++----
+ Libraries/LibWebView/ViewImplementation.h   |  5 ++
+ 4 files changed, 99 insertions(+), 15 deletions(-)
+
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index 6560fcc37fffdc3c222d3b99e41da89febe0811f..f646e643dffe90e9959ab5aac623ff5ec4771c1a 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -2174,7 +2174,7 @@ ErrorOr<void> Application::launch_devtools_server()
+     return {};
+ }
+ 
+-ErrorOr<void> Application::launch_devtools_client()
++ErrorOr<void> Application::launch_devtools_client(Optional<u64> view_id)
+ {
+     if (!m_devtools || !m_browser_options.devtools_port.has_value())
+         return Error::from_string_literal("DevTools is not currently enabled");
+@@ -2182,14 +2182,52 @@ ErrorOr<void> Application::launch_devtools_client()
+     if (m_devtools->has_active_connection())
+         return Error::from_string_literal("A DevTools client is already connected");
+ 
+-    auto view = active_web_view();
++    auto view = view_id.has_value()
++        ? ViewImplementation::find_view_by_id(*view_id)
++        : active_web_view();
+     if (!view.has_value())
+         return Error::from_string_literal("No active tab is available for DevTools");
+ 
+     if (!m_devtools_client)
+         m_devtools_client = DevTools::FirefoxClient::create();
+ 
+-    return m_devtools_client->ensure_running(*m_browser_options.devtools_port, view->view_id());
++    TRY(m_devtools_client->ensure_running(*m_browser_options.devtools_port, view->view_id()));
++    m_devtools_launched_for_view_id = view->view_id();
++    return {};
++}
++
++ErrorOr<void> Application::inspect_element(ViewImplementation& view)
++{
++    // A pending node is only kept when the tab is waiting for a DevTools client to ask for it.
++    ArmedScopeGuard clear_pending_on_error = [&] { view.clear_pending_inspect_element(); };
++
++    if (view.owner_view_id().has_value())
++        return Error::from_string_literal("DevTools cannot inspect a picture-in-picture window");
++
++    if (m_devtools && m_devtools->has_active_connection()) {
++        // Firefox opens its connection before it asks the tab's frame actor to listen for inspect requests, so the tab
++        // it was launched for has no client for a moment. Its node is still its own and is delivered once it asks.
++        if (!view.has_devtools_client() && m_devtools_launched_for_view_id != view.view_id())
++            return Error::from_string_literal("DevTools is attached to another tab");
++
++        clear_pending_on_error.disarm();
++        return {};
++    }
++
++    bool started_devtools = false;
++    if (!m_devtools) {
++        TRY(launch_devtools_server());
++        started_devtools = true;
++    }
++
++    if (auto result = launch_devtools_client(view.view_id()); result.is_error()) {
++        if (started_devtools)
++            TRY(toggle_devtools_enabled());
++        return result.release_error();
++    }
++
++    clear_pending_on_error.disarm();
++    return {};
+ }
+ 
+ static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, u32 screenshot_timeout)
+@@ -3077,7 +3115,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
+ {
+     if (m_devtools) {
+         m_devtools_client.clear();
++        m_devtools_launched_for_view_id.clear();
+         m_devtools.clear();
++        ViewImplementation::for_each_view([](ViewImplementation& view) {
++            view.clear_pending_inspect_element();
++            return IterationDecision::Continue;
++        });
+         on_devtools_disabled();
+     } else {
+         TRY(launch_devtools_server());
+@@ -4028,7 +4071,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
+     if (!view.has_value())
+         return;
+ 
+-    view->on_inspect_element_request = move(on_inspect_element_request);
++    view->set_inspect_element_request(move(on_inspect_element_request));
+ }
+ 
+ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescription const& description) const
+@@ -4037,7 +4080,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
+     if (!view.has_value())
+         return;
+ 
+-    view->on_inspect_element_request = nullptr;
++    view->clear_inspect_element_request();
+ }
+ 
+ void Application::did_connect_devtools_client(DevTools::TabDescription const& description) const
+@@ -4061,6 +4104,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
+ void Application::did_close_devtools_connection()
+ {
+     m_devtools_client.clear();
++    m_devtools_launched_for_view_id.clear();
+ }
+ 
+ }
+diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
+index 35e109934611d8847537bc6c5fcf2fbac1d312a8..b27dca72021bc2ecbcdb3c08bb7edc3351e202e5 100644
+--- a/Libraries/LibWebView/Application.h
++++ b/Libraries/LibWebView/Application.h
+@@ -399,7 +399,8 @@ public:
+     void apply_view_options(Badge<ViewImplementation>, ViewImplementation&, WebContentPage&);
+ 
+     ErrorOr<void> toggle_devtools_enabled();
+-    ErrorOr<void> launch_devtools_client();
++    ErrorOr<void> launch_devtools_client(Optional<u64> view_id = {});
++    ErrorOr<void> inspect_element(ViewImplementation&);
+     void refresh_tab_list();
+ 
+     Optional<Core::TimeZoneWatcher&> time_zone_watcher();
+@@ -706,6 +707,8 @@ private:
+ 
+     OwnPtr<DevTools::DevToolsServer> m_devtools;
+     OwnPtr<DevTools::FirefoxClient> m_devtools_client;
++    // The tab the client was launched for, which may not have an attached client yet.
++    Optional<u64> m_devtools_launched_for_view_id;
+ 
+     mutable HashMap<u64, u64> m_navigation_listener_ids;
+ };
+diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
+index 5f986fa750a747c9b3ac65d43401b794f5e81aa7..ff0da531c453bdbb8a4f3f4ae511087d0f372957 100644
+--- a/Libraries/LibWebView/ViewImplementation.cpp
++++ b/Libraries/LibWebView/ViewImplementation.cpp
+@@ -1986,9 +1986,8 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
+         if (node_id != 0)
+             m_inspect_element_node_id = node_id;
+ 
+-        // The user chose Inspect Element before the hit test came back.
+-        if (exchange(m_inspect_element_activated_before_hit_test, false) && m_inspect_element_node_id.has_value() && on_inspect_element_request)
+-            on_inspect_element_request(*m_inspect_element_node_id);
++        if (exchange(m_inspect_element_activated_before_hit_test, false) && m_inspect_element_node_id.has_value())
++            inspect_element(*m_inspect_element_node_id);
+         return;
+     }
+ 
+@@ -2584,6 +2583,42 @@ void ViewImplementation::did_disconnect_devtools_client()
+     page().async_set_has_devtools_client(false);
+ }
+ 
++void ViewImplementation::set_inspect_element_request(Function<void(Web::UniqueNodeID)> request)
++{
++    on_inspect_element_request = move(request);
++    if (!m_pending_inspect_element_node_id.has_value() || !on_inspect_element_request)
++        return;
++
++    auto node_id = m_pending_inspect_element_node_id.release_value();
++    Core::deferred_invoke([weak_this = make_weak_ptr(), node_id] {
++        if (weak_this && weak_this->on_inspect_element_request)
++            weak_this->on_inspect_element_request(node_id);
++    });
++}
++
++void ViewImplementation::clear_inspect_element_request()
++{
++    on_inspect_element_request = nullptr;
++    m_pending_inspect_element_node_id.clear();
++}
++
++void ViewImplementation::clear_pending_inspect_element()
++{
++    m_pending_inspect_element_node_id.clear();
++}
++
++void ViewImplementation::inspect_element(Web::UniqueNodeID node_id)
++{
++    if (on_inspect_element_request) {
++        on_inspect_element_request(node_id);
++        return;
++    }
++
++    m_pending_inspect_element_node_id = node_id;
++    if (auto result = Application::the().inspect_element(*this); result.is_error())
++        Application::the().display_error_dialog(MUST(String::formatted("Unable to open DevTools: {}", result.error())));
++}
++
+ void ViewImplementation::get_dom_node_inner_html(Web::UniqueNodeID node_id)
+ {
+     page().async_get_dom_node_inner_html(node_id);
+@@ -4940,7 +4975,7 @@ ErrorOr<LexicalPath> ViewImplementation::dump_gc_graph()
+ void ViewImplementation::send_context_menu_request(ContextMenuRequest request, Gfx::IntPoint content_position)
+ {
+     request.widget_position = to_widget_position(content_position);
+-    request.can_inspect_element = static_cast<bool>(on_inspect_element_request);
++    request.can_inspect_element = true;
+     did_request_context_menu(move(request));
+ }
+ 
+@@ -4948,8 +4983,8 @@ void ViewImplementation::inspect_context_menu_element()
+ {
+     if (m_inspect_element_hit_test_request_id.has_value())
+         m_inspect_element_activated_before_hit_test = true;
+-    else if (m_inspect_element_node_id.has_value() && on_inspect_element_request)
+-        on_inspect_element_request(*m_inspect_element_node_id);
++    else if (m_inspect_element_node_id.has_value())
++        inspect_element(*m_inspect_element_node_id);
+ }
+ 
+ void ViewImplementation::replace_context_menu_misspelling(Utf16String const& replacement)
+@@ -5189,9 +5224,6 @@ void ViewImplementation::prepare_inspect_element(Gfx::IntPoint content_position)
+     m_inspect_element_hit_test_request_id.clear();
+     m_inspect_element_activated_before_hit_test = false;
+ 
+-    if (!on_inspect_element_request)
+-        return;
+-
+     auto request_id = m_next_node_hit_test_request_id++;
+     m_inspect_element_hit_test_request_id = request_id;
+     page().async_get_node_id_at_position(request_id, { content_position.x(), content_position.y() });
+diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
+index 1e0afc2d23e9271d59a3d68216c038ffbfd57c03..55c7f3a75986e7b2d1d07357c872e69b680324ae 100644
+--- a/Libraries/LibWebView/ViewImplementation.h
++++ b/Libraries/LibWebView/ViewImplementation.h
+@@ -472,6 +472,9 @@ public:
+     void did_connect_devtools_client();
+     void did_disconnect_devtools_client();
+     void start_sending_console_output(bool messages, bool errors);
++    void set_inspect_element_request(Function<void(Web::UniqueNodeID)>);
++    void clear_inspect_element_request();
++    void clear_pending_inspect_element();
+     bool has_devtools_client() const { return m_devtools_connected; }
+     void get_dom_node_inner_html(Web::UniqueNodeID node_id);
+     void get_dom_node_outer_html(Web::UniqueNodeID node_id);
+@@ -974,8 +977,10 @@ protected:
+     HashMap<u64, NonnullRefPtr<Core::Promise<DiscardPreparation>>> m_pending_discard_preparations;
+ 
+     void prepare_inspect_element(Gfx::IntPoint content_position);
++    void inspect_element(Web::UniqueNodeID);
+     Optional<u64> m_inspect_element_hit_test_request_id;
+     Optional<Web::UniqueNodeID> m_inspect_element_node_id;
++    Optional<Web::UniqueNodeID> m_pending_inspect_element_node_id;
+     bool m_inspect_element_activated_before_hit_test { false };
+ 
+     struct PendingInputEvent {

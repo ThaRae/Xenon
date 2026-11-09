@@ -13,7 +13,7 @@ Ladybird has no extension support. Some of the groundwork is there, though, and 
 | WebUI: a JSON channel between an internal page and the UI process, one IPC transport per page | `LibWebView/WebUI.cpp`, `WebContent/WebUIConnection.cpp` | The model for extension messaging. It only exists for a hardcoded list of `about:` pages, and only after the page loads, so it can't be used as is. |
 | A process per WebUI host and for local file content | `CanonicalNavigable.cpp`, `WebContentClient::hosted_web_ui()` | The model for a process per extension |
 | File loads that WebContent asks the UI process for | `ResourceLoader.cpp` (`request_file`) | How `chrome-extension://` files get past the renderer sandbox |
-| Dedicated and shared workers, in the WebWorker process | `Services/WebWorker`, `LibWebView/WorkerProcessManager` | A host for the background service worker |
+| Dedicated and shared workers, on threads of a WebContent process | `Services/WebContent/Worker`, `LibWebView/WorkerAgentManager` | A host for the background service worker |
 | Service worker registration, but not execution | `LibWeb/ServiceWorker/Job.cpp` rejects with "Run Service Worker" not implemented | Nothing yet. See [Background context](#background-context). |
 
 And it lacks these, each of which needs an engine change:
@@ -81,7 +81,7 @@ outright once upstream has the equivalent. A fork does make engine work a little
    Its URLs get tuple origins (`scheme://host`), are potentially trustworthy (secure contexts), and are fetch schemes,
    with CORS requests allowed. LibURL's origin computation, SecureContexts, and Fetch consult a registry
    (`LibURL/EmbedderSchemes.h`), which renderers learn from `--embedder-scheme` arguments. A request for such a URL
-   or WebWorker goes to the UI process, as a `file://` load does, and the embedder's handler answers it with a file and
+   or a worker goes to the UI process, as a `file://` load does, and the embedder's handler answers it with a file and
    headers, or refuses it. The handler learns whether the asking process hosts a document (or runs a worker) of the
    URL's origin, and, for a navigation, who started it.
 2. **A script bridge for the embedder's pages** (`0002`, done). `register_url_scheme()` takes an optional
@@ -94,7 +94,7 @@ outright once upstream has the equivalent. A fork does make engine work a little
    were the same origin: with no CORS, and with a same-origin request's credentials. Blink and WebKit keep the same
    kind of list for browser extensions. An entry is a source origin, a destination scheme and host (or any host), and
    whether the host's subdomains count; ports aren't compared. Main fetch treats a matching request as same-origin, and
-   `Application::set_origin_access_allow_list()` gives the list to every WebContent and WebWorker process.
+   `Application::set_origin_access_allow_list()` gives the list to every WebContent process, whose workers share it.
 4. **User scripts in isolated worlds** (`0016`, done). Between it and patch 3 come the six content blocker patches
    from xenon-ublock and the six WebAuthn patches, `0004` to `0015`, which their own documents describe. The embedder
    sets a `WebView::UserScriptHandler`, as WebKit's `WKUserContentController`. While it has one, each document asks the
@@ -151,7 +151,7 @@ outright once upstream has the equivalent. A fork does make engine work a little
 The background didn't need a patch of its own. The plan was embedder-owned workers: workers the UI process starts with
 no owning document. A hidden extension page that starts the background script as a dedicated worker does the same job
 with what the engine already has (see [Background context](#background-context)). The one engine change it needed was
-letting the WebWorker process load `chrome-extension://` URLs, which went into patch 1.
+letting workers load `chrome-extension://` URLs, which went into patch 1.
 
 Site isolation already gives every `chrome-extension://<id>` origin processes of its own, as a site of its own, so
 the "embedder-chosen processes" patch planned at first isn't needed.
@@ -298,7 +298,8 @@ Xenon runs the background script the way Chrome ran MV2 background pages, with a
 - It stops once it has been idle for 30 seconds, as Chrome stops a service worker, and starts again for the next event
   it has a listener for. Each event, runtime message, port message, and call to or from the background keeps it running
   another 30 seconds, and so does a runtime message it owes a response to or waits for one on. Stopping closes the
-  background page, which takes its four processes with it (WebContent, WebWorker, and an ImageDecoder for each); its
+  background page, which takes its processes with it (WebContent, with the worker on one of its threads, and an
+  ImageDecoder); its
   ports close, and its offscreen document stays open. The extension's RequestServer goes as soon as none of its pages
   is left, rather than a minute later as a site's otherwise does (engine patch `0033`).
   `--extension-idle-timeout=<seconds>` changes the 30 seconds.

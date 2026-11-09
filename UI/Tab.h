@@ -17,11 +17,11 @@
 #include <LibWebCommon/Page/PageId.h>
 #include <LibWebCommon/Page/ScreenWakeLockState.h>
 #include <LibWebView/FileDownloader.h>
-#include <LibWebView/SessionStore.h>
 #include <LibWebView/Settings.h>
 #include <UI/BookmarksBar.h>
 #include <UI/FindInPageWidget.h>
 #include <UI/LocationEdit.h>
+#include <UI/SessionStore.h>
 #include <UI/WebContentView.h>
 #include <UI/XenonSettings.h>
 
@@ -82,7 +82,7 @@ signals:
 
 // What a restored tab shows until it's selected: It has no view, and so no WebContent process, until then.
 struct DeferredTab {
-    WebView::SessionTabId session_tab_id { 0 };
+    SessionTabId session_tab_id { 0 };
     URL::URL url;
     QString title;
     QIcon favicon;
@@ -99,7 +99,7 @@ class Tab final
 public:
     AK_ALLOC_WITH_KMALLOC;
 
-    Tab(BrowserWindow* window, Optional<WebView::CanonicalTraversable&> traversable = {});
+    Tab(BrowserWindow* window, Optional<u64> hub_view_id = {});
     Tab(BrowserWindow* window, DeferredTab);
     virtual ~Tab() override;
 
@@ -123,8 +123,9 @@ public:
 
     URL::URL url() const;
 
-    Optional<WebView::SessionTabId> session_tab_id() const;
-    void set_session_tab_id(WebView::SessionTabId);
+    Optional<SessionTabId> session_tab_id() const;
+    void add_block_element_action(QMenu&);
+    void set_session_tab_id(SessionTabId);
     void clear_session_tab_id();
 
     // A page that has never had a real size must be sized while hidden, so that it doesn't load into Qt's placeholder
@@ -199,7 +200,7 @@ signals:
 private:
     void create_tab_shell();
     void create_tab_context_menu();
-    void initialize(Optional<WebView::CanonicalTraversable&>);
+    void initialize(Optional<u64> hub_view_id);
 
     void location_edit_return_pressed(String, Optional<URL::URL>, WebView::OmniboxDestinationKind);
 #ifdef AK_OS_MACOS
@@ -330,7 +331,7 @@ private:
     bool m_is_pinned { false };
 
     bool m_toolbar_window_controls_visible { false };
-    Optional<WebView::SessionTabId> m_session_tab_id;
+    Optional<SessionTabId> m_session_tab_id;
     Optional<DeferredTab> m_deferred_tab;
     QObjectList m_tab_shell_children;
 };

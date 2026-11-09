@@ -104,9 +104,23 @@ static QWidget* initial_web_content_view_parent([[maybe_unused]] QWidget* window
 #endif
 }
 
-WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTraversable&> traversable, WebContentViewInitialState initial_state)
+static Core::AnonymousBuffer make_system_theme_from_qt_palette(QWidget&, WebContentView::PaletteMode);
+static Optional<RemoteView::ScreenRects> screen_rects_from_qt();
+
+WebContentView::WebContentView(QWidget* window, Optional<u64> hub_view_id, WebContentViewInitialState initial_state)
     : WebContentViewBase(initial_web_content_view_parent(window))
-    , WebView::ViewImplementation(initial_state.is_private, initial_state.enable_content_blocker)
+    , RemoteView(hub_view_id, {
+                                  .is_private = initial_state.is_private,
+                                  .device_pixel_ratio = devicePixelRatio(),
+                                  .maximum_frames_per_second = initial_state.maximum_frames_per_second,
+                                  .display_id = initial_state.display_id,
+                                  .system_theme = make_system_theme_from_qt_palette(*this, PaletteMode::Default),
+                                  .screen_rects = screen_rects_from_qt(),
+                                  .owner_view_id = initial_state.owner_view_id,
+                                  .websites_prefer_dark = is_using_dark_system_theme(*this),
+                                  .is_tab = initial_state.is_tab,
+                                  .enable_content_blocker = initial_state.enable_content_blocker,
+                              })
 {
 #ifdef LADYBIRD_QT_USE_RHI_WIDGET
     // Keep the QRhiWidget out of the top-level QWidget backing store. If it is
@@ -145,11 +159,6 @@ WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTrave
         create_vulkan_window();
 #endif
 
-    m_device_pixel_ratio = devicePixelRatio();
-    m_maximum_frames_per_second = initial_state.maximum_frames_per_second;
-    m_display_id = initial_state.display_id;
-
-    set_page_background_color_to_system_canvas(is_using_dark_system_theme(*this));
 #ifdef LADYBIRD_QT_USE_IOSURFACE_LAYER
     on_page_background_color_change = [this](Gfx::Color) {
         update_iosurface_layer_background_color();
@@ -185,9 +194,11 @@ WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTrave
                 this);
     });
 
-    if (initial_state.owner_view)
-        set_owner_view(*initial_state.owner_view);
-    initialize_tab(Web::HTML::VisibilityState::Hidden, traversable);
+    // NB: The Hub made this view without knowing what the UI knows about the screens and its theme.
+    if (hub_view_id.has_value()) {
+        update_palette();
+        update_screen_rects();
+    }
 
     m_accessibility_manager = make<WebView::AccessibilityTreeManager>();
 
@@ -320,24 +331,6 @@ WebContentView::WebContentView(QWidget* window, Optional<WebView::CanonicalTrave
         show_appkit_dictionary_lookup(*this, lookup, position);
     };
 #endif
-
-    on_request_tooltip_override = [this](auto position, auto const& tooltip) {
-        m_tooltip_override = true;
-        if (m_tooltip_hover_timer.isActive())
-            m_tooltip_hover_timer.stop();
-
-        auto tooltip_without_carriage_return = tooltip.contains("\r"sv)
-            ? tooltip.replace("\r\n"sv, "\n"sv, ReplaceMode::All).replace("\r"sv, "\n"sv, ReplaceMode::All)
-            : tooltip;
-        QToolTip::showText(
-            mapToGlobal(QPoint(position.x(), position.y())),
-            Qt::convertFromPlainText(qstring_from_ak_string(tooltip_without_carriage_return)),
-            this);
-    };
-
-    on_stop_tooltip_override = [this]() {
-        m_tooltip_override = false;
-    };
 
     on_enter_tooltip_area = [this](auto const& tooltip) {
         m_tooltip_text = tooltip.contains("\r"sv)
@@ -866,11 +859,9 @@ void WebContentView::mouseMoveEvent(QMouseEvent* event)
         return;
     }
 
-    if (!m_tooltip_override) {
-        if (QToolTip::isVisible())
-            QToolTip::hideText();
-        m_tooltip_hover_timer.start(600);
-    }
+    if (QToolTip::isVisible())
+        QToolTip::hideText();
+    m_tooltip_hover_timer.start(600);
 
     enqueue_native_event(Web::MouseEvent::Type::MouseMove, *event);
     WebContentViewBase::mouseMoveEvent(event);
@@ -1025,25 +1016,15 @@ void WebContentView::update_page_focus()
 
 Optional<WebContentView::Paintable> WebContentView::current_paintable() const
 {
-    Gfx::SharedImageBuffer const* shared_image_buffer = nullptr;
-    Gfx::IntSize bitmap_size;
-    i32 bitmap_id = -1;
-    u64 page_id = 0;
-
-    if (m_has_usable_bitmap) {
-        VERIFY(m_front_bitmap.shared_image_buffer);
-        shared_image_buffer = m_front_bitmap.shared_image_buffer.ptr();
-        bitmap_size = m_front_bitmap.last_painted_size.to_type<int>();
-        bitmap_id = m_front_bitmap.id;
-        page_id = page().id().value();
-    } else if (m_backup_shared_image_buffer) {
-        shared_image_buffer = m_backup_shared_image_buffer.ptr();
-        bitmap_size = m_backup_bitmap_size.to_type<int>();
-    }
-
-    if (!shared_image_buffer)
+    auto frame = backing_stores().displayed_frame();
+    if (!frame.has_value())
         return {};
-    return Paintable { shared_image_buffer, bitmap_size, bitmap_id, page_id };
+    return Paintable {
+        .shared_image_buffer = frame->shared_image_buffer,
+        .bitmap_size = frame->size,
+        .bitmap_id = frame->bitmap_id.value_or(-1),
+        .page_id = frame->bitmap_id.has_value() ? backing_stores_page_id() : 0,
+    };
 }
 
 void WebContentView::schedule_repaint()
@@ -1079,10 +1060,10 @@ void WebContentView::schedule_frame_damage_repaint()
         return;
     }
 
-    auto logical_left = static_cast<int>(floor(m_pending_frame_damage.x() / m_device_pixel_ratio));
-    auto logical_top = static_cast<int>(floor(m_pending_frame_damage.y() / m_device_pixel_ratio));
-    auto logical_right = static_cast<int>(ceil(m_pending_frame_damage.right() / m_device_pixel_ratio));
-    auto logical_bottom = static_cast<int>(ceil(m_pending_frame_damage.bottom() / m_device_pixel_ratio));
+    auto logical_left = static_cast<int>(floor(m_pending_frame_damage.x() / device_pixel_ratio()));
+    auto logical_top = static_cast<int>(floor(m_pending_frame_damage.y() / device_pixel_ratio()));
+    auto logical_right = static_cast<int>(ceil(m_pending_frame_damage.right() / device_pixel_ratio()));
+    auto logical_bottom = static_cast<int>(ceil(m_pending_frame_damage.bottom() / device_pixel_ratio()));
     update(QRect(logical_left, logical_top, logical_right - logical_left, logical_bottom - logical_top).intersected(rect()));
 }
 #endif
@@ -1116,7 +1097,7 @@ void WebContentView::paintEvent(QPaintEvent*)
 #    endif
 
     QPainter painter(this);
-    painter.scale(1 / m_device_pixel_ratio, 1 / m_device_pixel_ratio);
+    painter.scale(1 / device_pixel_ratio(), 1 / device_pixel_ratio());
 
     auto paintable = current_paintable();
     RefPtr<Gfx::Bitmap const> bitmap;
@@ -1133,7 +1114,7 @@ void WebContentView::paintEvent(QPaintEvent*)
         auto background_color = page_background_color();
         auto fallback_color = QColor(background_color.red(), background_color.green(), background_color.blue());
 
-        if (m_scales_frames_to_fit && !bitmap_size.is_empty()) {
+        if (scales_frames_to_fit() && !bitmap_size.is_empty()) {
             auto destination = rect_fitting_frame(bitmap_size, m_viewport_size);
             painter.fillRect(QRect(0, 0, m_viewport_size.width(), m_viewport_size.height()), fallback_color);
             painter.setRenderHint(QPainter::SmoothPixmapTransform);
@@ -1512,9 +1493,9 @@ void WebContentView::start_web_compat_report()
         return;
 
     WebCompatReportCapture capture {
-        .page = WebView::WebCompatReport::describe_page(*this),
+        .page = describe_page(),
         .screenshot = {},
-        .page_dumps = WebView::WebCompatReport::request_page_dumps(*this),
+        .page_dumps = request_page_dumps(),
     };
     select_web_compat_report_screenshot([this, capture = AK::move(capture)](QImage screenshot) mutable {
         capture.screenshot = AK::move(screenshot);
@@ -1737,7 +1718,7 @@ void WebContentView::resizeEvent(QResizeEvent* event)
 #ifdef LADYBIRD_HAS_WAYLAND_GPU_QUERY
     // NB: The page surface would stick out of a browser window that shrinks, so it is cropped to the view, and shows
     //     that only together with the browser window's next commit at its new size.
-    if (m_page_surface && !QRect { QPoint { 0, 0 }, size() * m_device_pixel_ratio }.contains(m_page_surface_rect)) {
+    if (m_page_surface && !QRect { QPoint { 0, 0 }, size() * device_pixel_ratio() }.contains(m_page_surface_rect)) {
         m_page_surface->set_synchronized(true);
         update_page_surface();
     }
@@ -1759,7 +1740,7 @@ void WebContentView::resizeEvent(QResizeEvent* event)
 void WebContentView::set_viewport_rect(Gfx::IntRect rect)
 {
     m_viewport_size = rect.size();
-    handle_resize();
+    set_device_pixel_ratio_and_viewport(device_pixel_ratio(), viewport_size());
 }
 
 // A view in a tab that isn't the current one gets its geometry, but Qt holds the resize event back until the tab is
@@ -1773,7 +1754,7 @@ void WebContentView::push_viewport_size()
 
 void WebContentView::set_device_pixel_ratio(double device_pixel_ratio)
 {
-    m_device_pixel_ratio = device_pixel_ratio;
+    set_device_pixel_ratio_and_viewport(device_pixel_ratio, viewport_size());
     update_viewport_size();
 #ifdef LADYBIRD_QT_USE_IOSURFACE_LAYER
     present_current_paintable_as_layer_contents();
@@ -1820,17 +1801,10 @@ void WebContentView::set_bookmarks_bar_overlay_height([[maybe_unused]] int heigh
 #endif
 }
 
-void WebContentView::set_zoom_level(double zoom_level)
-{
-    m_zoom_level = zoom_level;
-    page().async_set_zoom_level(m_zoom_level);
-    update_zoom();
-}
-
 void WebContentView::update_viewport_size()
 {
-    auto scaled_width = int(width() * m_device_pixel_ratio);
-    auto scaled_height = int(height() * m_device_pixel_ratio);
+    auto scaled_width = int(width() * device_pixel_ratio());
+    auto scaled_height = int(height() * device_pixel_ratio());
     Gfx::IntRect rect(0, 0, scaled_width, scaled_height);
 
     set_viewport_rect(rect);
@@ -1838,7 +1812,6 @@ void WebContentView::update_viewport_size()
 
 void WebContentView::update_zoom()
 {
-    ViewImplementation::update_zoom();
     update_viewport_size();
 }
 
@@ -1850,12 +1823,13 @@ void WebContentView::set_system_visibility_state(Web::HTML::VisibilityState visi
 
 void WebContentView::window_exposure_changed()
 {
-    if (!has_traversable())
+    auto& view = hub_view();
+    if (!view.has_traversable())
         return;
-    auto requested = m_requested_system_visibility_state.value_or(traversable().system_visibility_state());
+    auto requested = m_requested_system_visibility_state.value_or(view.traversable().system_visibility_state());
     m_requested_system_visibility_state = requested;
     auto shown = requested == Web::HTML::VisibilityState::Visible && !WindowExposure::hides_pages_in(window());
-    ViewImplementation::set_system_visibility_state(shown ? Web::HTML::VisibilityState::Visible : Web::HTML::VisibilityState::Hidden);
+    RemoteView::set_system_visibility_state(shown ? Web::HTML::VisibilityState::Visible : Web::HTML::VisibilityState::Hidden);
 }
 
 void WebContentView::showEvent(QShowEvent* event)
@@ -1963,11 +1937,6 @@ void WebContentView::update_palette(PaletteMode mode)
 #ifdef LADYBIRD_QT_USE_IOSURFACE_LAYER
     update_iosurface_layer_border();
 #endif
-}
-
-Core::AnonymousBuffer WebContentView::system_theme()
-{
-    return make_system_theme_from_qt_palette(*this, PaletteMode::Default);
 }
 
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
@@ -2111,12 +2080,12 @@ void WebContentView::watch_screen_geometry(QScreen& screen)
     });
 }
 
-Optional<WebView::ViewImplementation::ScreenRects> WebContentView::screen_rects() const
+static Optional<RemoteView::ScreenRects> screen_rects_from_qt()
 {
     auto screens = QGuiApplication::screens();
 
     if (!screens.empty()) {
-        ScreenRects result;
+        RemoteView::ScreenRects result;
         for (auto const& screen : screens) {
             // NOTE: QScreen::geometry() returns the 'device-independent pixels', we multiply
             //       by the device pixel ratio to get the 'physical pixels' of the display.
@@ -2136,14 +2105,12 @@ Optional<WebView::ViewImplementation::ScreenRects> WebContentView::screen_rects(
     return {};
 }
 
-void WebContentView::prepare_page_for_navigable(WebView::WebContentPage& page)
+Optional<RemoteView::ScreenRects> WebContentView::screen_rects() const
 {
-    ViewImplementation::prepare_page_for_navigable(page);
-
-    update_compositor_display_metadata(page);
+    return screen_rects_from_qt();
 }
 
-void WebContentView::show_context_menu(WebView::Menu& menu, Gfx::IntPoint widget_position)
+void WebContentView::show_context_menu(Menu& menu, Gfx::IntPoint widget_position)
 {
     auto& context_menu = replace_context_menu(m_context_menu, *this, menu);
     if (on_context_menu_created)
@@ -2251,7 +2218,7 @@ void WebContentView::apply_web_content_cursor(QCursor const& cursor)
 
 Web::DevicePixelPoint WebContentView::node_picker_position_for(QSinglePointEvent const& event) const
 {
-    return { event.position().x() * m_device_pixel_ratio, event.position().y() * m_device_pixel_ratio };
+    return { event.position().x() * device_pixel_ratio(), event.position().y() * device_pixel_ratio() };
 }
 
 Web::DevicePixelSize WebContentView::viewport_size() const
@@ -2292,7 +2259,7 @@ bool WebContentView::event(QEvent* event)
         if (native_gesture_event.gestureType() == Qt::ZoomNativeGesture) {
             Web::PinchEvent pinch_event;
             auto const local_position = mapFromGlobal(native_gesture_event.globalPosition());
-            pinch_event.position = { local_position.x() * m_device_pixel_ratio, local_position.y() * m_device_pixel_ratio };
+            pinch_event.position = { local_position.x() * device_pixel_ratio(), local_position.y() * device_pixel_ratio() };
             pinch_event.modifiers = get_modifiers_from_qt_keyboard_modifiers(native_gesture_event.modifiers());
             pinch_event.scale_delta = native_gesture_event.value();
             enqueue_input_event(AK::move(pinch_event));
@@ -2391,7 +2358,7 @@ bool WebContentView::handle_vulkan_window_event(QEvent* event)
         if (native_gesture_event.gestureType() == Qt::ZoomNativeGesture) {
             Web::PinchEvent pinch_event;
             auto const local_position = mapFromGlobal(native_gesture_event.globalPosition());
-            pinch_event.position = { local_position.x() * m_device_pixel_ratio, local_position.y() * m_device_pixel_ratio };
+            pinch_event.position = { local_position.x() * device_pixel_ratio(), local_position.y() * device_pixel_ratio() };
             pinch_event.modifiers = get_modifiers_from_qt_keyboard_modifiers(native_gesture_event.modifiers());
             pinch_event.scale_delta = native_gesture_event.value();
             enqueue_input_event(AK::move(pinch_event));
@@ -2417,8 +2384,8 @@ bool WebContentView::handle_vulkan_window_event(QEvent* event)
 
 void WebContentView::enqueue_native_event(Web::MouseEvent::Type type, QSinglePointEvent const& event)
 {
-    Web::DevicePixelPoint position = { event.position().x() * m_device_pixel_ratio, event.position().y() * m_device_pixel_ratio };
-    auto screen_position = Gfx::IntPoint { event.globalPosition().x() * m_device_pixel_ratio, event.globalPosition().y() * m_device_pixel_ratio };
+    Web::DevicePixelPoint position = { event.position().x() * device_pixel_ratio(), event.position().y() * device_pixel_ratio() };
+    auto screen_position = Gfx::IntPoint { event.globalPosition().x() * device_pixel_ratio(), event.globalPosition().y() * device_pixel_ratio() };
 
     auto button = get_button_from_qt_mouse_button(event.button());
     auto buttons = get_buttons_from_qt_mouse_buttons(event.buttons());
@@ -2462,10 +2429,10 @@ struct DragData : Web::BrowserInputData {
 
 void WebContentView::enqueue_native_event(Web::DragEvent::Type type, QDropEvent const& event)
 {
-    Web::DevicePixelPoint position = { event.position().x() * m_device_pixel_ratio, event.position().y() * m_device_pixel_ratio };
+    Web::DevicePixelPoint position = { event.position().x() * device_pixel_ratio(), event.position().y() * device_pixel_ratio() };
 
     auto global_position = mapToGlobal(event.position());
-    auto screen_position = Gfx::IntPoint { global_position.x() * m_device_pixel_ratio, global_position.y() * m_device_pixel_ratio };
+    auto screen_position = Gfx::IntPoint { global_position.x() * device_pixel_ratio(), global_position.y() * device_pixel_ratio() };
 
     auto button = get_button_from_qt_mouse_button(Qt::LeftButton);
     auto buttons = get_buttons_from_qt_mouse_buttons(event.buttons());
