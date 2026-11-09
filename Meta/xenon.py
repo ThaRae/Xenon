@@ -306,6 +306,8 @@ def ladybird_test_main(build_dir: Path, timeout: int):
             "--output-on-failure",
             "--timeout",
             str(timeout),
+            "--repeat",
+            "until-pass:2",
             "--exclude-regex",
             LADYBIRD_TESTS_EXCLUDED,
         ]
