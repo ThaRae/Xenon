@@ -184,6 +184,17 @@ pub extern "C" fn xenon_engine_set_window_viewport(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_window_surface(
+    _window: XenonWindowId,
+    _display: *mut std::ffi::c_void,
+    _surface: *mut std::ffi::c_void,
+) {
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn xenon_engine_set_view_frame_rate(_view: XenonViewId, _frames_per_second: f64) {}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn xenon_engine_set_system_dark(_dark: bool) {}
 
 #[unsafe(no_mangle)]

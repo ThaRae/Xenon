@@ -26,6 +26,7 @@ namespace Ladybird::Extensions::Browser {
 using Xenon::BrowserModel;
 using Xenon::Engine;
 
+static constexpr i64 WINDOW_ID_NONE = -1;
 static constexpr i64 WINDOW_ID_CURRENT = -2;
 static constexpr u32 TOOLBAR_ICON_PIXELS = 32;
 static constexpr u32 DIALOG_ICON_PIXELS = 80;
@@ -141,6 +142,39 @@ static Optional<TabInWindow> find_tab(i64 id)
     return TabInWindow { tab, window };
 }
 
+static bool may_see_window(Extension const& extension, BrowserModel::Window const& window)
+{
+    return Registry::the().may_see(extension, window.is_private);
+}
+
+static Optional<TabInWindow> find_tab(Extension const& extension, i64 id)
+{
+    auto tab = find_tab(id);
+    if (tab.has_value() && !may_see_window(extension, *tab->window))
+        return {};
+    return tab;
+}
+
+static BrowserModel::Window const* window_with_id(Extension const& extension, i64 id)
+{
+    auto const* window = window_with_id(id);
+    return window && may_see_window(extension, *window) ? window : nullptr;
+}
+
+static void dispatch_window_event(StringView name, WebView::IsPrivate is_private, JsonArray const& args)
+{
+    for (auto const& extension : Registry::the().extensions()) {
+        if (Registry::the().may_see(extension, is_private))
+            Router::the().dispatch_event(extension, name, args);
+    }
+}
+
+static void dispatch_window_event(StringView name, XenonWindowId id, JsonArray const& args)
+{
+    auto const* window = window_with_id(static_cast<i64>(id));
+    dispatch_window_event(name, window ? window->is_private : WebView::IsPrivate::Yes, args);
+}
+
 static BrowserModel::Window const* focused_window()
 {
     auto* browser_model = model();
@@ -161,6 +195,18 @@ static BrowserModel::Window const* current_window(Optional<u64> caller_view_id)
         }
     }
     return focused_window();
+}
+
+static BrowserModel::Window const* focused_window(Extension const& extension)
+{
+    auto const* window = focused_window();
+    return window && may_see_window(extension, *window) ? window : nullptr;
+}
+
+static BrowserModel::Window const* current_window(Extension const& extension, Optional<u64> caller_view_id)
+{
+    auto const* window = current_window(caller_view_id);
+    return window && may_see_window(extension, *window) ? window : nullptr;
 }
 
 static Optional<XenonViewId> active_tab_of(BrowserModel::Window const* window)
@@ -297,6 +343,15 @@ static JsonObject window_to_json(BrowserModel::Window const& window, Extension c
     return json;
 }
 
+static Vector<BrowserModel::Window const*> all_windows();
+
+static Vector<BrowserModel::Window const*> windows_visible_to(Extension const& extension)
+{
+    auto windows = all_windows();
+    windows.remove_all_matching([&](auto const* window) { return !may_see_window(extension, *window); });
+    return windows;
+}
+
 static Vector<BrowserModel::Window const*> all_windows()
 {
     Vector<BrowserModel::Window const*> windows;
@@ -341,15 +396,15 @@ Optional<JsonObject> tab_json(u64 web_view_id, Extension const& extension)
     auto view_id = xenon_view_id(web_view_id);
     if (!view_id.has_value())
         return {};
-    auto tab = find_tab(static_cast<i64>(*view_id));
+    auto tab = find_tab(extension, static_cast<i64>(*view_id));
     if (!tab.has_value())
         return {};
     return tab_to_json(*tab->tab, *tab->window, extension);
 }
 
-Optional<Vector<WebView::ScriptBridgeEndpoint>> frame_documents(i64 tab_id)
+Optional<Vector<WebView::ScriptBridgeEndpoint>> frame_documents(Extension const& extension, i64 tab_id)
 {
-    if (tab_id <= 0)
+    if (!find_tab(extension, tab_id).has_value())
         return {};
     auto* view = tab_view(static_cast<XenonViewId>(tab_id));
     if (!view)
@@ -363,7 +418,7 @@ void open_tab(URL::URL const& url)
     if (!browser_model)
         return;
     auto window = browser_model->active_window();
-    if (!window.has_value())
+    if (auto const* active = window.has_value() ? browser_model->window(*window) : nullptr; !active || active->is_private == WebView::IsPrivate::Yes)
         window = browser_model->open_window(WebView::IsPrivate::No);
     browser_model->open_tab(*window, { .url = url });
 }
@@ -377,6 +432,8 @@ bool is_popup_view(u64 web_view_id)
 static void dispatch_tab_event(StringView name, BrowserModel::Tab const& tab, BrowserModel::Window const& window)
 {
     for (auto const& extension : Registry::the().extensions()) {
+        if (!may_see_window(extension, window))
+            continue;
         JsonArray args;
         args.must_append(tab_to_json(tab, window, extension));
         Router::the().dispatch_event(extension, name, move(args));
@@ -390,6 +447,8 @@ static void dispatch_tab_updated(XenonViewId view, JsonObject const& change)
         return;
 
     for (auto const& extension : Registry::the().extensions()) {
+        if (!may_see_window(extension, *tab->window))
+            continue;
         auto json = tab_to_json(*tab->tab, *tab->window, extension);
 
         JsonObject visible_change;
@@ -472,7 +531,7 @@ static void report_actions(XenonViewId tab)
     actions.ensure_capacity(extensions.size());
 
     for (auto const& extension : extensions) {
-        if (!extension->manifest().action.has_value())
+        if (!extension->manifest().action.has_value() || !find_tab(extension, static_cast<i64>(tab)).has_value())
             continue;
         auto appearance = appearance_for(extension, tab);
         ByteString icon_path;
@@ -659,7 +718,7 @@ static void open_popup(Extension const& extension, XenonViewId tab, String const
 
 static void open_popup_in_focused_window(Extension const& extension)
 {
-    auto tab = active_tab_of(focused_window());
+    auto tab = active_tab_of(focused_window(extension));
     if (!tab.has_value())
         return;
     auto appearance = appearance_for(extension, *tab);
@@ -671,7 +730,7 @@ static void action_clicked_in_tab(Extension const& extension, Optional<XenonView
 {
     JsonArray args;
     if (tab.has_value()) {
-        if (auto found = find_tab(static_cast<i64>(*tab)); found.has_value())
+        if (auto found = find_tab(extension, static_cast<i64>(*tab)); found.has_value())
             args.must_append(tab_to_json(*found->tab, *found->window, extension));
     }
     Router::the().dispatch_event(extension, "action.onClicked"sv, move(args));
@@ -691,19 +750,19 @@ static Optional<i64> integer_argument(JsonArray const& args, size_t index)
     return {};
 }
 
-static ErrorOr<TabInWindow, String> tab_argument(JsonArray const& args, size_t index, Optional<u64> caller_view_id)
+static ErrorOr<TabInWindow, String> tab_argument(Extension const& extension, JsonArray const& args, size_t index, Optional<u64> caller_view_id)
 {
     if (auto id = integer_argument(args, index); id.has_value()) {
-        if (auto tab = find_tab(*id); tab.has_value())
+        if (auto tab = find_tab(extension, *id); tab.has_value())
             return tab.release_value();
         return MUST(String::formatted("No tab with id: {}.", *id));
     }
 
-    auto const* window = current_window(caller_view_id);
+    auto const* window = current_window(extension, caller_view_id);
     auto active = active_tab_of(window);
     if (!active.has_value())
         return "No current tab."_string;
-    auto tab = find_tab(static_cast<i64>(*active));
+    auto tab = find_tab(extension, static_cast<i64>(*active));
     if (!tab.has_value())
         return "No current tab."_string;
     return tab.release_value();
@@ -727,12 +786,12 @@ static bool tab_matches_query(BrowserModel::Tab const& tab, BrowserModel::Window
     if (!matches_bool("audible"sv, false) || !matches_bool("muted"sv, false) || !matches_bool("discarded"sv, tab_view(tab.view) == nullptr))
         return false;
 
-    if (auto current = query.get_bool("currentWindow"sv); current.has_value() && (*current != (&window == current_window(caller_view_id))))
+    if (auto current = query.get_bool("currentWindow"sv); current.has_value() && (*current != (&window == current_window(extension, caller_view_id))))
         return false;
-    if (auto last_focused = query.get_bool("lastFocusedWindow"sv); last_focused.has_value() && (*last_focused != (&window == focused_window())))
+    if (auto last_focused = query.get_bool("lastFocusedWindow"sv); last_focused.has_value() && (*last_focused != (&window == focused_window(extension))))
         return false;
     if (auto window_id_value = query.get_i64("windowId"sv); window_id_value.has_value()) {
-        auto const* wanted = *window_id_value == WINDOW_ID_CURRENT ? current_window(caller_view_id) : window_with_id(*window_id_value);
+        auto const* wanted = *window_id_value == WINDOW_ID_CURRENT ? current_window(extension, caller_view_id) : window_with_id(extension, *window_id_value);
         if (&window != wanted)
             return false;
     }
@@ -783,7 +842,7 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
     if (name == "tabs.query"sv) {
         auto query = object_argument(args, 0);
         JsonArray tabs;
-        for (auto const* window : all_windows()) {
+        for (auto const* window : windows_visible_to(extension)) {
             for (auto view : window->tabs) {
                 auto const* tab = browser_model->tab(view);
                 if (tab && tab_matches_query(*tab, *window, query, caller_view_id, extension))
@@ -796,14 +855,14 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
     if (name == "tabs.get"sv) {
         if (!integer_argument(args, 0).has_value())
             return "tabs.get() needs a tab ID."_string;
-        auto tab = TRY(tab_argument(args, 0, caller_view_id));
+        auto tab = TRY(tab_argument(extension, args, 0, caller_view_id));
         return JsonValue { tab_to_json(*tab.tab, *tab.window, extension) };
     }
 
     if (name == "tabs.getCurrent"sv) {
         if (!caller_view_id.has_value())
             return JsonValue {};
-        auto tab = find_tab(static_cast<i64>(*caller_view_id));
+        auto tab = find_tab(extension, static_cast<i64>(*caller_view_id));
         if (!tab.has_value())
             return JsonValue {};
         return JsonValue { tab_to_json(*tab->tab, *tab->window, extension) };
@@ -811,9 +870,9 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
 
     if (name == "tabs.create"sv) {
         auto properties = object_argument(args, 0);
-        auto const* window = current_window(caller_view_id);
+        auto const* window = current_window(extension, caller_view_id);
         if (auto id = properties.get_i64("windowId"sv); id.has_value() && *id != WINDOW_ID_CURRENT)
-            window = window_with_id(*id);
+            window = window_with_id(extension, *id);
         if (!window)
             return "No window to create the tab in."_string;
 
@@ -831,21 +890,21 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
         };
         if (auto index = properties.get_i64("index"sv); index.has_value() && *index >= 0)
             new_tab.index = static_cast<size_t>(*index);
-        if (auto opener = properties.get_i64("openerTabId"sv); opener.has_value() && find_tab(*opener).has_value())
+        if (auto opener = properties.get_i64("openerTabId"sv); opener.has_value() && find_tab(extension, *opener).has_value())
             new_tab.opener = static_cast<XenonViewId>(*opener);
 
         auto window_id = window->id;
         auto id = browser_model->open_tab(window_id, move(new_tab));
         if (properties.get_bool("pinned"sv).value_or(false))
             browser_model->set_tab_pinned(id, true);
-        auto created = find_tab(static_cast<i64>(id));
+        auto created = find_tab(extension, static_cast<i64>(id));
         if (!created.has_value())
             return JsonValue {};
         return JsonValue { tab_to_json(*created->tab, *created->window, extension) };
     }
 
     if (name == "tabs.update"sv) {
-        auto tab = TRY(tab_argument(args, 0, caller_view_id));
+        auto tab = TRY(tab_argument(extension, args, 0, caller_view_id));
         auto properties = object_argument(args, integer_argument(args, 0).has_value() ? 1 : 0);
         auto view_id = tab.tab->view;
 
@@ -863,7 +922,7 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
         if (auto pinned = properties.get_bool("pinned"sv); pinned.has_value() && *pinned != tab.tab->pinned)
             browser_model->set_tab_pinned(view_id, *pinned);
 
-        auto updated = find_tab(static_cast<i64>(view_id));
+        auto updated = find_tab(extension, static_cast<i64>(view_id));
         if (!updated.has_value())
             return JsonValue {};
         return JsonValue { tab_to_json(*updated->tab, *updated->window, extension) };
@@ -880,7 +939,7 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
             return "tabs.remove() needs tab IDs."_string;
         }
         for (auto id : ids) {
-            if (!find_tab(id).has_value())
+            if (!find_tab(extension, id).has_value())
                 return MUST(String::formatted("No tab with id: {}.", id));
         }
         for (auto id : ids) {
@@ -893,7 +952,7 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
     }
 
     if (name == "tabs.reload"sv) {
-        auto tab = TRY(tab_argument(args, 0, caller_view_id));
+        auto tab = TRY(tab_argument(extension, args, 0, caller_view_id));
         auto properties = object_argument(args, integer_argument(args, 0).has_value() ? 1 : 0);
         if (auto* view = tab_view(tab.tab->view))
             view->reload(properties.get_bool("bypassCache"sv).value_or(false) ? WebView::BypassCache::Yes : WebView::BypassCache::No);
@@ -901,11 +960,11 @@ static ErrorOr<JsonValue, String> handle_tabs_call(Extension const& extension, O
     }
 
     if (name == "tabs.duplicate"sv) {
-        auto tab = TRY(tab_argument(args, 0, caller_view_id));
+        auto tab = TRY(tab_argument(extension, args, 0, caller_view_id));
         auto& engine = Engine::the();
         auto duplicate = engine.allocate_view_id();
         engine.duplicate_tab(tab.tab->view, duplicate);
-        auto created = find_tab(static_cast<i64>(duplicate));
+        auto created = find_tab(extension, static_cast<i64>(duplicate));
         if (!created.has_value())
             return JsonValue {};
         return JsonValue { tab_to_json(*created->tab, *created->window, extension) };
@@ -926,9 +985,9 @@ static ErrorOr<JsonValue, String> handle_windows_call(Extension const& extension
         auto id = integer_argument(args, index);
         BrowserModel::Window const* window = nullptr;
         if (!id.has_value() || *id == WINDOW_ID_CURRENT)
-            window = current_window(caller_view_id);
+            window = current_window(extension, caller_view_id);
         else
-            window = window_with_id(*id);
+            window = window_with_id(extension, *id);
         if (!window)
             return MUST(String::formatted("No window with id: {}.", id.value_or(WINDOW_ID_CURRENT)));
         return window;
@@ -939,7 +998,7 @@ static ErrorOr<JsonValue, String> handle_windows_call(Extension const& extension
     if (name == "windows.getCurrent"sv)
         return JsonValue { window_to_json(*TRY(window_argument(args.size())), extension, populate(0)) };
     if (name == "windows.getLastFocused"sv) {
-        auto const* window = focused_window();
+        auto const* window = focused_window(extension);
         if (!window)
             return "No last-focused window."_string;
         return JsonValue { window_to_json(*window, extension, populate(0)) };
@@ -949,7 +1008,7 @@ static ErrorOr<JsonValue, String> handle_windows_call(Extension const& extension
         auto filter = object_argument(args, 0);
         auto types = filter.get_array("windowTypes"sv);
         JsonArray windows;
-        for (auto const* window : all_windows()) {
+        for (auto const* window : windows_visible_to(extension)) {
             auto type = window_type(*window);
             if (types.has_value() && !any_of(types->values(), [&](auto const& wanted) { return wanted.is_string() && wanted.as_string() == type; }))
                 continue;
@@ -982,12 +1041,14 @@ static ErrorOr<JsonValue, String> handle_windows_call(Extension const& extension
 
         Optional<XenonViewId> moved_tab;
         if (auto tab_id = data.get_i64("tabId"sv); tab_id.has_value()) {
-            if (!find_tab(*tab_id).has_value())
+            if (!find_tab(extension, *tab_id).has_value())
                 return MUST(String::formatted("No tab with id: {}.", *tab_id));
             moved_tab = static_cast<XenonViewId>(*tab_id);
         }
 
         auto is_private = data.get_bool("incognito"sv).value_or(false) ? WebView::IsPrivate::Yes : WebView::IsPrivate::No;
+        if (!Registry::the().may_see(extension, is_private))
+            return "This extension isn't allowed in private windows."_string;
         auto id = Engine::the().allocate_window_id();
         if (data.get_string("type"sv) == "popup"sv)
             state().popup_windows.set(id);
@@ -1089,7 +1150,7 @@ static ErrorOr<JsonValue, String> handle_action_call(Extension const& extension,
     Optional<i64> tab = details.get_i64("tabId"sv);
     if (name.is_one_of("action.enable"sv, "action.disable"sv, "action.isEnabled"sv))
         tab = integer_argument(args, 0);
-    if (tab.has_value() && !find_tab(*tab).has_value())
+    if (tab.has_value() && !find_tab(extension, *tab).has_value())
         return MUST(String::formatted("No tab with id: {}.", *tab));
 
     auto& action = state().actions.ensure(extension.id());
@@ -1279,6 +1340,8 @@ void stop()
 void window_opened(BrowserModel::Window const& window)
 {
     for (auto const& extension : Registry::the().extensions()) {
+        if (!may_see_window(extension, window))
+            continue;
         JsonArray args;
         args.must_append(window_to_json(window, extension, false));
         Router::the().dispatch_event(extension, "windows.onCreated"sv, move(args));
@@ -1296,14 +1359,16 @@ void window_closed(BrowserModel::Window const& window)
     state().popup_windows.remove(window.id);
     JsonArray args;
     args.must_append(static_cast<i64>(window.id));
-    Router::the().dispatch_event_to_all("windows.onRemoved"sv, move(args));
+    dispatch_window_event("windows.onRemoved"sv, window.is_private, args);
 }
 
 void window_activated(BrowserModel::Window const& window)
 {
-    JsonArray args;
-    args.must_append(static_cast<i64>(window.id));
-    Router::the().dispatch_event_to_all("windows.onFocusChanged"sv, move(args));
+    for (auto const& extension : Registry::the().extensions()) {
+        JsonArray args;
+        args.must_append(may_see_window(extension, window) ? static_cast<i64>(window.id) : WINDOW_ID_NONE);
+        Router::the().dispatch_event(extension, "windows.onFocusChanged"sv, move(args));
+    }
     notify_action_listeners();
 }
 
@@ -1330,7 +1395,7 @@ void tab_removed(BrowserModel::Window const& window, BrowserModel::Tab const& ta
     JsonArray args;
     args.must_append(id);
     args.must_append(move(remove_info));
-    Router::the().dispatch_event_to_all("tabs.onRemoved"sv, move(args));
+    dispatch_window_event("tabs.onRemoved"sv, window.is_private, args);
 }
 
 void tab_moved(BrowserModel::Tab const& tab, XenonWindowId from, size_t index)
@@ -1343,7 +1408,7 @@ void tab_moved(BrowserModel::Tab const& tab, XenonWindowId from, size_t index)
         JsonArray args;
         args.must_append(id);
         args.must_append(move(move_info));
-        Router::the().dispatch_event_to_all("tabs.onMoved"sv, move(args));
+        dispatch_window_event("tabs.onMoved"sv, tab.window, args);
         return;
     }
 
@@ -1352,7 +1417,7 @@ void tab_moved(BrowserModel::Tab const& tab, XenonWindowId from, size_t index)
     JsonArray detach_args;
     detach_args.must_append(id);
     detach_args.must_append(move(detach_info));
-    Router::the().dispatch_event_to_all("tabs.onDetached"sv, move(detach_args));
+    dispatch_window_event("tabs.onDetached"sv, from, detach_args);
 
     JsonObject attach_info;
     attach_info.set("newWindowId"sv, static_cast<i64>(tab.window));
@@ -1360,7 +1425,7 @@ void tab_moved(BrowserModel::Tab const& tab, XenonWindowId from, size_t index)
     JsonArray attach_args;
     attach_args.must_append(id);
     attach_args.must_append(move(attach_info));
-    Router::the().dispatch_event_to_all("tabs.onAttached"sv, move(attach_args));
+    dispatch_window_event("tabs.onAttached"sv, tab.window, attach_args);
 }
 
 void tab_activated(BrowserModel::Window const& window, BrowserModel::Tab const& tab)
@@ -1370,7 +1435,7 @@ void tab_activated(BrowserModel::Window const& window, BrowserModel::Tab const& 
     info.set("windowId"sv, static_cast<i64>(window.id));
     JsonArray args;
     args.must_append(move(info));
-    Router::the().dispatch_event_to_all("tabs.onActivated"sv, move(args));
+    dispatch_window_event("tabs.onActivated"sv, window.is_private, args);
 
     if (state().started)
         report_actions(tab.view);
@@ -1406,7 +1471,7 @@ void view_loading_changed(View& view, bool is_loading)
 void action_clicked(XenonViewId tab, StringView extension_id)
 {
     auto extension = Registry::the().extension(extension_id);
-    if (!extension || !extension->manifest().action.has_value())
+    if (!extension || !extension->manifest().action.has_value() || !find_tab(*extension, static_cast<i64>(tab)).has_value())
         return;
 
     for (auto const& [view, popup] : state().popups) {
@@ -1454,7 +1519,10 @@ void run_command(XenonViewId tab, StringView extension_id, StringView command)
 
     JsonArray args;
     args.must_append(MUST(String::from_utf8(command)));
-    if (auto found = find_tab(static_cast<i64>(tab)); found.has_value())
+    auto found = find_tab(static_cast<i64>(tab));
+    if (found.has_value() && !may_see_window(*extension, *found->window))
+        return;
+    if (found.has_value())
         args.must_append(tab_to_json(*found->tab, *found->window, *extension));
     Router::the().dispatch_event(*extension, "commands.onCommand"sv, move(args));
 }
