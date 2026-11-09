@@ -202,7 +202,9 @@ CI runs on GitHub Actions, on GitHub's own runners:
   `Meta/ci/install-macos-dependencies.sh` installs the build tools from MacPorts instead, which still builds binaries
   for Intel Macs: it installs MacPorts' pinned release (checked against its SHA-256) and runs `port -b install`, which
   takes binaries only, and fails rather than compile anything. `llvm@22` is left out, as Xenon compiles with Xcode's
-  clang on both Macs. The release workflow installs with the script on both Macs; on Apple silicon it does what CI's
+  clang on both Macs. Ninja comes from its own pinned release (`ninja-mac.zip`, checked against its SHA-256) instead,
+  because MacPorts' ninja depends on its Python, whose dependencies are more ports whose Intel binaries can lag behind
+  a version bump. The release workflow installs with the script on both Macs; on Apple silicon it does what CI's
   macOS job does, from Homebrew. To move to a newer MacPorts, change the version and SHA-256 in the script (the
   release's `MacPorts-<version>.chk.txt` lists it), and its macOS name when the Intel runner's macOS changes.
 - **Caches**: ccache's objects (`Build/caches`) and vcpkg's prebuilt packages (`ladybird/Build/caches`) are kept in
