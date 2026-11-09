@@ -144,7 +144,9 @@ Update button's, which runs Xenon with `XENON_TEST_UPDATE_READY` standing in for
 through the UI process by Ladybird's `internals` object (`--expose-internals-object`), and an extension that navigates
 the tab away. Linux CI runs the tests under Xvfb, so the windows are real X11 ones; without a
 display, they go to Qt's offscreen platform. The unit tests that draw Xenon's popovers and buttons save how they look in
-`Build/release/smoke`, beside the welcome page's render (`XENON_SCREENSHOT_DIR`, which `Meta/xenon.py test` sets).
+`Build/release/smoke`, beside the welcome page's render (`XENON_SCREENSHOT_DIR`, which `Meta/xenon.py test` sets). The
+app checks run again when one fails, so a timing flake on a loaded runner does not fail the job; a real failure still
+fails both runs.
 
 `Meta/xenon.py ladybird-test` builds Ladybird's own tests and runs them with ctest, as Ladybird's CI does: AK's and
 the libraries' unit tests, `test-js`, `test-web`'s web tests (text, layout, ref, screenshot, and crash tests), and the
@@ -154,8 +156,9 @@ the first time, so the tests build from the same objects as Xenon. It leaves out
 `test-web`'s TLS tests, `six` for WPT's WebSocket server) go in a virtual environment in the build directory. A patch
 that changes what an upstream test checks updates that test's expectation in the same patch, as it would upstream. CI
 runs it after `Meta/xenon.py test` on Linux and macOS; when a web test fails, the `ladybird-test-dumps-linux` or
-`-macos` artifact has what it rendered or printed. A test may run for 30 minutes, as in Ladybird's CI; `--timeout`
-gives it longer, which the Sanitizer workflow does.
+`-macos` artifact has what it rendered or printed. A test that fails is run again, so a timing flake on a loaded runner
+does not fail the job, while a real failure still fails both times. A test may run for 30 minutes, as in Ladybird's CI;
+`--timeout` gives it longer, which the Sanitizer workflow does.
 
 Should Xenon not finish loading `about:welcome` at all, the checks after it, which all load pages, are skipped rather
 than each waiting out its timeouts, which would add up to more than CI gives the job. A helper process that crashes on a
