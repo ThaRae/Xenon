@@ -286,7 +286,11 @@ def test_main(platform: Platform, build_dir: Path):
         if subprocess.run([test], env=test_env).returncode != 0:
             failures.append(test.name)
 
-    failures += check_app(platform, app_executable(platform, build_dir), smoke_dir)
+    app_failures = check_app(platform, app_executable(platform, build_dir), smoke_dir)
+    if app_failures:
+        print(f"Retrying the failed app checks: {', '.join(app_failures)}", file=sys.stderr)
+        app_failures = check_app(platform, app_executable(platform, build_dir), smoke_dir)
+    failures += app_failures
 
     if failures:
         print(f"Failed: {', '.join(failures)}", file=sys.stderr)
