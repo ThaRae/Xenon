@@ -436,7 +436,7 @@ for Bitwarden in Chrome.
 | Manifest, ID, locales, `__MSG_`, match patterns | | `UI/Extensions/Manifest`, `Extension`, `Locales`, `MatchPattern` |
 | `chrome.*` in extension pages | 0002 | `UI/Resources/extensions/chrome-api.js` (the API surface, built into the browser), `UI/Extensions/Router` (answers calls, routes messages, sends events) |
 | `chrome.storage` | | `UI/Extensions/Storage`: a JSON file per extension and area under `<profile data>/Extensions/Storage/<id>/`; `session` and `managed` are in memory |
-| Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`) |
+| Toolbar and popup | | `UI/Extensions/Toolbar` (a button per extension, in each tab's toolbar), `UI/Extensions/Popup` (the popup's popover and `WebContentView`), `UI/Extensions/PopupSize` (how large a popup may be) |
 | Content scripts in isolated worlds | 0016 | `UI/Extensions/ContentScripts` (which scripts a document gets), `Manifest` (matching a document's URL), `Router` (their contexts, calls, and messages) |
 | Web pages messaging an extension (`externally_connectable`) | | `UI/Extensions/ContentScripts` (the page's `chrome.runtime` and a relay world per extension), `Router` (their `ExternalPage` contexts), `UI/Resources/extensions/externally-connectable.js` and `externally-connectable-relay.js` |
 | Web accessible resources as web pages' subresources | 0022 | `UI/Extensions/Registry` |
@@ -453,12 +453,22 @@ for Bitwarden in Chrome.
 ### The toolbar and the popup
 
 - Each enabled extension with an `action` gets a toolbar button after the address bar, with `action.default_icon`
-  (the size closest to the toolbar's, for the screen's scale) and `default_title` as the tooltip. The badge
-  (`setBadgeText`, `setBadgeBackgroundColor`, `setBadgeTextColor`) is drawn on the icon, in the extension's color if
-  it set one and Xenon's rose otherwise. Every `action.set*` given a `tabId` applies to that tab alone.
+  (the size closest to the toolbar's, for the screen's scale) and `default_title` as the tooltip. An icon Xenon can't
+  show — a file that isn't there, a format Qt has no decoder for (the Qt Xenon builds reads PNG, GIF, ICO, and JPEG,
+  not SVG), or an `action` that names no icon at all — is drawn as the extension's initial in a rounded square, with
+  a line on the console naming the path, so that a button is never an empty space. The badge (`setBadgeText`,
+  `setBadgeBackgroundColor`, `setBadgeTextColor`) is drawn on the icon, in the extension's color if it set one and
+  Xenon's rose otherwise. Every `action.set*` given a `tabId` applies to that tab alone. The icon is read again only
+  when an `action.setIcon` changes its path, and a manifest may spell one `./icons/icon.png` or `icons//icon.png`, as
+  Chrome allows.
 - Clicking it opens `action.default_popup` in a `Popover` anchored to the button, as the content blocking popover is,
   hosting a `WebContentView` of the popup page. The popover sizes itself to the page's content, between 25×25 and
-  800×600 as in Chrome. It closes when it loses focus, on Escape, or when the page calls `window.close()`.
+  800×600 as in Chrome, and never past what the screen's usable area has room for, so its card can't be cut off by a
+  screen edge (`UI/Extensions/PopupSize`). A report it can't use — 0×0, or anything under the 25×25 minimum, which is
+  what a page whose body isn't laid out yet sends — leaves the popup at the size it already has, and a report that
+  changes nothing is dropped, so the popup can't resize itself in a loop. It closes when it loses focus, on Escape, or
+  when the page calls `window.close()`, and it closes itself when the button it hangs from goes away, as it does when
+  its extension is reloaded.
 - With no popup, a click fires `action.onClicked` in the background worker and grants `activeTab`.
 - `commands` with a `suggested_key` become shortcuts in every window, with `_execute_action` opening the popup (or
   firing `action.onClicked`). As in Chrome, `Ctrl` means ⌘ on macOS and `MacCtrl` means Control. A shortcut that clashes
@@ -587,7 +597,7 @@ for Bitwarden in Chrome.
   - `__MSG_` in extension CSS files, which Chrome localizes as it serves them.
   - History navigation (back and forward) to extension pages.
   - The popup's size is measured from its page's body, which suits pages that set their width; Chrome lays out the
-    page at its preferred size instead.
+    page at its preferred size instead. Xenon also caps it at the screen's usable area, where Chrome doesn't.
   - Nothing has clicked through the popup, the Extensions dialog, or a command shortcut yet: no test drives the Qt
     side, and they've only been built and seen in the toolbar.
   - Bitwarden logs in and works from its popup (tried by hand). Making it the default password manager needed the

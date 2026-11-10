@@ -460,6 +460,23 @@ TEST_CASE(resolving_urls_stays_inside_the_extension)
     EXPECT(extension->resolve(url("chrome-extension://jpignaibiiemhngfjkcpokkamffknabf/popup/index.html"sv)).is_error());
 }
 
+TEST_CASE(confined_files_tolerate_redundant_separators)
+{
+    auto directory = make_extension(R"({ "manifest_version": 3, "name": "T", "version": "1" })"sv);
+    auto icon = directory.write("icons/icon.png"sv, "png"sv);
+
+    auto root = directory.path();
+    EXPECT_EQ(MUST(Extension::confined_file(root, "icons/icon.png"sv)), icon);
+    EXPECT_EQ(MUST(Extension::confined_file(root, "./icons/icon.png"sv)), icon);
+    EXPECT_EQ(MUST(Extension::confined_file(root, "/icons//icon.png"sv)), icon);
+    EXPECT_EQ(MUST(Extension::confined_file(root, "icons/./icon.png"sv)), icon);
+
+    EXPECT(Extension::confined_file(root, "./"sv).is_error());
+    EXPECT(Extension::confined_file(root, "icons/../icons/icon.png"sv).is_error());
+    EXPECT(Extension::confined_file(root, "../../etc/passwd"sv).is_error());
+    EXPECT(Extension::confined_file(root, "icons/missing.png"sv).is_error());
+}
+
 TEST_CASE(web_accessible_resources)
 {
     auto directory = make_extension(R"({

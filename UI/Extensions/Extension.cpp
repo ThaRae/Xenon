@@ -203,12 +203,21 @@ ErrorOr<ByteString> Extension::confined_file(StringView root, StringView path)
         path = path.substring_view(1);
     if (path.is_empty() || path.contains('\\') || path.contains('\0'))
         return Error::from_errno(EACCES);
-    LexicalPath joined { root };
+
+    Vector<StringView> segments;
     for (auto segment : path.split_view('/')) {
-        if (segment.is_empty() || segment == "."sv || segment == ".."sv)
+        if (segment.is_empty() || segment == "."sv)
+            continue;
+        if (segment == ".."sv)
             return Error::from_errno(EACCES);
-        joined = joined.append(segment);
+        TRY(segments.try_append(segment));
     }
+    if (segments.is_empty())
+        return Error::from_errno(EACCES);
+
+    LexicalPath joined { root };
+    for (auto segment : segments)
+        joined = joined.append(segment);
     auto real_path = TRY(FileSystem::real_path(joined.string()));
     if (!real_path.starts_with(ByteString::formatted("{}/", root)))
         return Error::from_errno(EACCES);

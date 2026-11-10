@@ -10,6 +10,8 @@
 #include <UI/Extensions/Extension.h>
 #include <UI/Popover.h>
 
+#include <QPointer>
+
 namespace Ladybird {
 
 class Tab;
@@ -36,7 +38,7 @@ private:
 
     void resize_to(int width, int height);
 
-    QWidget& m_anchor;
+    QPointer<QWidget> m_anchor;
     NonnullRefPtr<Extension> m_extension;
     String m_popup_path;
     WebContentView* m_view { nullptr };

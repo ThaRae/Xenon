@@ -17,6 +17,8 @@ class QShowEvent;
 
 namespace Ladybird {
 
+constexpr inline int POPOVER_SHADOW_MARGIN = 24;
+
 class Popover : public QWidget {
 public:
     AK_ALLOC_WITH_KMALLOC;

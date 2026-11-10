@@ -15,6 +15,7 @@
 #include <QWidget>
 
 class QHBoxLayout;
+class QPainter;
 
 namespace Ladybird {
 
@@ -42,10 +43,17 @@ private:
     virtual void paintEvent(QPaintEvent*) override;
 
     void clicked();
+    void update_icon();
+    void paint_placeholder(QPainter&);
+    void paint_badge(QPainter&);
 
     Tab& m_tab;
     NonnullRefPtr<Extension> m_extension;
     QPointer<ActionPopup> m_popup;
+    Optional<String> m_icon_path;
+    QString m_placeholder_text;
+    bool m_icon_resolved { false };
+    bool m_shows_placeholder { false };
     QString m_badge_text;
     QColor m_badge_background_color;
     Optional<QColor> m_badge_text_color;

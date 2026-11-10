@@ -8,6 +8,7 @@
 #include <UI/ChromeStyle.h>
 #include <UI/Extensions/Browser.h>
 #include <UI/Extensions/Popup.h>
+#include <UI/Extensions/PopupSize.h>
 #include <UI/Extensions/Router.h>
 #include <UI/StringUtils.h>
 #include <UI/Tab.h>
@@ -17,21 +18,14 @@
 #include <QFrame>
 #include <QKeyEvent>
 #include <QPointer>
+#include <QScreen>
 #include <QVBoxLayout>
 
 namespace Ladybird::Extensions {
 
-static constexpr int MINIMUM_WIDTH = 25;
-static constexpr int MINIMUM_HEIGHT = 25;
-static constexpr int MAXIMUM_WIDTH = 800;
-static constexpr int MAXIMUM_HEIGHT = 600;
-
-static constexpr int INITIAL_WIDTH = 360;
-static constexpr int INITIAL_HEIGHT = 480;
-
 ActionPopup::ActionPopup(Tab& tab, QWidget& anchor, NonnullRefPtr<Extension> extension, String popup_path)
     : Popover(&tab)
-    , m_anchor(anchor)
+    , m_anchor(&anchor)
     , m_extension(AK::move(extension))
     , m_popup_path(AK::move(popup_path))
 {
@@ -69,7 +63,7 @@ QFrame#XenonExtensionPopup {{
             popup->resize_to(width, height);
     });
 
-    resize_to(INITIAL_WIDTH, INITIAL_HEIGHT);
+    resize_to(INITIAL_POPUP_SIZE.width(), INITIAL_POPUP_SIZE.height());
 }
 
 ActionPopup::~ActionPopup()
@@ -79,9 +73,14 @@ ActionPopup::~ActionPopup()
 
 void ActionPopup::show_popup()
 {
+    if (!m_anchor) {
+        close();
+        return;
+    }
+
     m_view->load(m_extension->url_for(m_popup_path));
 
-    move_popover_below(*this, m_anchor);
+    move_popover_below(*this, *m_anchor);
     show();
     raise();
     activateWindow();
@@ -90,12 +89,28 @@ void ActionPopup::show_popup()
 
 void ActionPopup::resize_to(int width, int height)
 {
-    width = clamp(width, MINIMUM_WIDTH, MAXIMUM_WIDTH);
-    height = clamp(height, MINIMUM_HEIGHT, MAXIMUM_HEIGHT);
-    m_view->setFixedSize(width, height);
+    if (!m_anchor) {
+        close();
+        return;
+    }
+
+    auto limit = MAXIMUM_POPUP_SIZE;
+    QScreen* popup_screen = screen();
+    if (!popup_screen)
+        popup_screen = m_anchor->screen();
+    if (!popup_screen && parentWidget())
+        popup_screen = parentWidget()->screen();
+    if (popup_screen)
+        limit = popup_screen->availableGeometry().size() - QSize(4 * POPOVER_SHADOW_MARGIN, 4 * POPOVER_SHADOW_MARGIN);
+
+    auto size = popup_size_for({ width, height }, limit);
+    if (!size.has_value() || *size == m_view->size())
+        return;
+
+    m_view->setFixedSize(*size);
     adjustSize();
     if (isVisible())
-        move_popover_below(*this, m_anchor);
+        move_popover_below(*this, *m_anchor);
 }
 
 void ActionPopup::keyPressEvent(QKeyEvent* event)
