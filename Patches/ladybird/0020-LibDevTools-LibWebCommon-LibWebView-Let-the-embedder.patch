@@ -48,10 +48,10 @@ index d84b9989978cca42c8747c2f2a53e870036069b0..973b4c80edb282f532ff0248b5ed9ae1
  }
  
 diff --git a/Libraries/LibWebCommon/WebView/Utilities.cpp b/Libraries/LibWebCommon/WebView/Utilities.cpp
-index 146fc0759cbddc2960a82bee5fbc39b6f77e2142..a15341dd499fa6661124fb9ab97afd6a3421ebfa 100644
+index eb9a38dd105c48c0fcad4395639fd0c5c67dff63..963b518380e8e4e7e6df21abb108f04e5ff2514f 100644
 --- a/Libraries/LibWebCommon/WebView/Utilities.cpp
 +++ b/Libraries/LibWebCommon/WebView/Utilities.cpp
-@@ -49,6 +49,19 @@ ByteString mach_server_name_for_process(StringView process_name, pid_t pid)
+@@ -50,6 +50,19 @@ ByteString mach_server_name_for_process(StringView process_name, pid_t pid)
      return ByteString::formatted("org.ladybird.{}.helper.{}", process_name, pid);
  }
  
@@ -72,12 +72,12 @@ index 146fc0759cbddc2960a82bee5fbc39b6f77e2142..a15341dd499fa6661124fb9ab97afd6a
  {
      if (s_ladybird_binary_path.has_value())
 diff --git a/Libraries/LibWebCommon/WebView/Utilities.h b/Libraries/LibWebCommon/WebView/Utilities.h
-index a73ac9add5904d62a6c16389c83eb9b6f3848d7f..9e60860b3e94b6781a50563d897df8206485e0e3 100644
+index 11e98a45b5b8a85c7923961409147ce975c2dd60..f02847aae132ed832cd1fe816ad7fa8c4e9aaccb 100644
 --- a/Libraries/LibWebCommon/WebView/Utilities.h
 +++ b/Libraries/LibWebCommon/WebView/Utilities.h
-@@ -31,4 +31,10 @@ WEBCOMMON_API ByteString mach_server_name_for_process(StringView process_name, p
+@@ -35,4 +35,10 @@ WEBCOMMON_API ErrorOr<void> handle_attached_debugger();
  
- WEBCOMMON_API ErrorOr<void> handle_attached_debugger();
+ WEBCOMMON_API String host_for_settings(URL::URL const&);
  
 +// The name of the directory the browser keeps its profiles and crash reports in, under each of the platform's config,
 +// data, cache, and runtime directories. It defaults to "Ladybird". Other browsers built on LibWebView set their own name

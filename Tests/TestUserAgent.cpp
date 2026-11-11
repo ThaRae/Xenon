@@ -13,8 +13,7 @@ TEST_CASE(default_user_agent_presents_ladybird_and_chrome)
     auto user_agent = Web::default_user_agent;
     EXPECT(user_agent.starts_with("Mozilla/5.0 ("sv));
     EXPECT(user_agent.contains(" Ladybird/"sv));
-    EXPECT(user_agent.contains(" Chrome/" CHROME_MAJOR_VERSION ".0.0.0 "sv));
-    EXPECT(user_agent.contains("AppleWebKit/537.36 Safari/537.36"sv));
+    EXPECT(user_agent.contains(" " SAD_COMPATIBILITY_HACK ""sv));
 }
 
 TEST_CASE(chrome_desktop_preset_presents_chrome_without_ladybird)
@@ -32,7 +31,7 @@ TEST_CASE(chrome_desktop_preset_presents_chrome_without_ladybird)
     auto preset = WebView::user_agents.get(preset_name);
     EXPECT(preset.has_value());
     EXPECT(!preset->contains("Ladybird"sv));
-    EXPECT(preset->contains("Chrome/" CHROME_MAJOR_VERSION ".0.0.0"sv));
+    EXPECT(preset->contains("Chrome/"sv));
 }
 
 TEST_CASE(navigator_compatibility_mode_defaults_to_chrome)

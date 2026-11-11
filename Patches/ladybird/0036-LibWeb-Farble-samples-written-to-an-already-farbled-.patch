@@ -56,7 +56,7 @@ index b342d7050ced5012923adc887886c61dbe59f2f4..f9039b4ad5cbe2efae958ee57848f980
          Ok(())
      }
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index dc398ffdb99c48569032558a1d945fb9f4a4935a..6bb1f8b6173670c6c93eed77170062c83fece1ea 100644
+index 94c45ddd4c656c4ba957e93aa7062df07933a83f..c5dd4d2a8cb56c2bc46743172b5c320061d0930b 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 @@ -15,6 +15,7 @@
@@ -76,10 +76,10 @@ index dc398ffdb99c48569032558a1d945fb9f4a4935a..6bb1f8b6173670c6c93eed77170062c8
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index c716ad9eca5e61e9a8564a682610cdca37470fc6..9eb78a75c567fc0baf9294067389c832eee275a8 100644
+index ddb5c549943cdc077309e5a4cc68059c9bbca560..ff9b213deb71ac21f8de305bfcebdd02babcc38e 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1549,6 +1549,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
+@@ -1548,6 +1548,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
      return {};
  }
  
@@ -93,7 +93,7 @@ index c716ad9eca5e61e9a8564a682610cdca37470fc6..9eb78a75c567fc0baf9294067389c832
  {
      page().set_content_blocking_policy(enabled, {});
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index 733316d34e9fec05c223a06fcbda76add3e21d50..14ec49b6bd96d2549f5087c9dcf6940f7cc49104 100644
+index 9c71ef4674edfedfdd517fc5a8edd209df036157..c3e37c6b47c40b3dd8306b72c5258c0ad306b1bf 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
 @@ -188,6 +188,7 @@ public:
@@ -139,7 +139,7 @@ index 0000000000000000000000000000000000000000..563acfec73fecf07ec27e2eee992d8c2
 +deviceMemory is 1, 2, or 4: PASS
 diff --git a/Tests/LibWeb/Text/input/Fingerprinting/protection.html b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
 new file mode 100644
-index 0000000000000000000000000000000000000000..ec0fb4f9c22c1e1afed885baeb7a7992cbe02432
+index 0000000000000000000000000000000000000000..df1100ad76a8ab58c55459f3d47be3e626032c8a
 --- /dev/null
 +++ b/Tests/LibWeb/Text/input/Fingerprinting/protection.html
 @@ -0,0 +1,106 @@
@@ -166,7 +166,7 @@ index 0000000000000000000000000000000000000000..ec0fb4f9c22c1e1afed885baeb7a7992
 +        try {
 +            println(`webdriver is false: ${navigator.webdriver === false ? "PASS" : `FAIL (${navigator.webdriver})`}`);
 +
-+            const chromeShaped = /^Mozilla\/5\.0 \([^)]*\) Ladybird\/\S+ Chrome\/\d+\.0\.0\.0 AppleWebKit\/537\.36 Safari\/537\.36$/.test(navigator.userAgent);
++            const chromeShaped = /^Mozilla\/5\.0 \([^)]*\) Ladybird\/\S+ AppleWebKit\/537\.36 \(KHTML, like Gecko\) Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/.test(navigator.userAgent);
 +            println(`user agent is chrome-shaped: ${chromeShaped ? "PASS" : `FAIL (${navigator.userAgent})`}`);
 +            println(`user agent names Ladybird: ${navigator.userAgent.includes("Ladybird/") ? "PASS" : `FAIL (${navigator.userAgent})`}`);
 +            println(`vendor is Google Inc.: ${navigator.vendor === "Google Inc." ? "PASS" : `FAIL (${navigator.vendor})`}`);

@@ -21,6 +21,7 @@
 #include <LibWebCommon/WebView/Utilities.h>
 #include <LibWebView/AutocompleteService.h>
 #include <LibWebView/CanonicalTraversable.h>
+#include <LibWebView/CrashReport.h>
 #include <LibWebView/CrashReportStore.h>
 #include <LibWebView/FaviconStore.h>
 #include <LibWebView/HistoryStore.h>
@@ -864,6 +865,8 @@ ErrorOr<void> Application::connect_to_hub(Main::Arguments const& arguments)
     create_history_store(state.data_directory, state.uses_sql_database);
     // NB: Reports stay in files, which both of us read. This process keeps its own for when it crashes, and the next
     //     launch recovers that the same as one of the Hub's.
+    m_browser_options.disable_sandbox = state.sandbox_is_disabled ? WebView::DisableSandbox::Yes : WebView::DisableSandbox::No;
+    WebView::CrashReport::set_sandbox_is_disabled(m_browser_options.disable_sandbox);
     auto& crash_report_store = WebView::CrashReportStore::the();
     crash_report_store.set_directory(move(state.crash_report_directory));
     if (auto result = crash_report_store.initialize_browser_crash_handler(); result.is_error())
@@ -2671,6 +2674,7 @@ QMenuBar* Application::create_application_menu_bar(ForBrowserWindow for_browser_
     edit_menu->addAction(create_application_action(*menu_bar, application.cut_selection_action(), IncludeActionIcon::No));
     edit_menu->addAction(create_application_action(*menu_bar, application.copy_selection_action(), IncludeActionIcon::No));
     edit_menu->addAction(create_application_action(*menu_bar, application.paste_action(), IncludeActionIcon::No));
+    edit_menu->addAction(create_application_action(*menu_bar, application.paste_and_match_style_action(), IncludeActionIcon::No));
     edit_menu->addAction(create_application_action(*menu_bar, application.select_all_action(), IncludeActionIcon::No));
     edit_menu->addSeparator();
     if (for_browser_window == ForBrowserWindow::Yes) {

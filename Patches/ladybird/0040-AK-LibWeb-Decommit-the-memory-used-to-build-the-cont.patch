@@ -64,7 +64,7 @@ index da02a54142c94b9e6281b269a46fb21259431e42..de297a61d566a46c86c2e2e84daf903b
  // Sends the calling thread's general allocations to a heap of their own, until ak_leave_scratch_heap() is given what
  // this returned. Work that frees nearly everything it allocates can use it to keep its temporary data out of the pages
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index 1d2539e364ca786b320e964827742e1204a4d1f2..7cb3f4464a2c1dd5c3091c66951aba93144794e7 100644
+index 004bc2a6667e8113ae1b3c798b31625cd8635696..c4d0c52deaa92d99a2428178340f4a9ec8a365d0 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
 @@ -162,7 +162,9 @@ ErrorOr<void> ContentBlocker::set_rules_from_bytes(ReadonlyBytes rules_bytes, Re

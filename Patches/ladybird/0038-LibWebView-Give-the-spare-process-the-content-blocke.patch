@@ -15,10 +15,10 @@ Leave it without the rules until a tab takes it, and send them then.
  4 files changed, 20 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 40a4fe1dfbff00b44e6204bc4042001a870f86e8..5693b3144b6f2e605caa3a8258630e31cc0a669d 100644
+index c072e48b4ffc0e6a739408a43bc6b89234a5b555..86a8ce18cf85da78803893ab8796636663acc356 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -897,8 +897,8 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -906,8 +906,8 @@ void Application::send_content_blockers(WebContentClient& client) const
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
      // Each process builds an engine from the rules, which can take tens of MiB, so while blocking is off it gets none,
@@ -29,7 +29,7 @@ index 40a4fe1dfbff00b44e6204bc4042001a870f86e8..5693b3144b6f2e605caa3a8258630e31
          client.async_set_content_blockers(Core::AnonymousBuffer {}, Core::AnonymousBuffer {}, Core::AnonymousBuffer {});
          return;
      }
-@@ -1183,7 +1183,7 @@ void Application::open_urls_in_new_tabs(ReadonlySpan<URL::URL> urls) const
+@@ -1192,7 +1192,7 @@ void Application::open_urls_in_new_tabs(ReadonlySpan<URL::URL> urls) const
          open_url_in_new_tab(url, Web::HTML::ActivateTab::No);
  }
  
@@ -38,7 +38,7 @@ index 40a4fe1dfbff00b44e6204bc4042001a870f86e8..5693b3144b6f2e605caa3a8258630e31
  {
      // The client's WebContentClient picks up this same session when it is created.
      auto session = session_for_new_view(is_private);
-@@ -1229,6 +1229,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1238,6 +1238,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
          webdriver_bidi->push_session_state_for_client(*client);
  
      client->set_enable_content_blocker(enable_content_blocker);
@@ -46,7 +46,7 @@ index 40a4fe1dfbff00b44e6204bc4042001a870f86e8..5693b3144b6f2e605caa3a8258630e31
      send_content_blockers(*client);
  
      m_web_content_clients.set(client);
-@@ -1672,13 +1673,15 @@ bool Application::same_origin_tabs_may_share_a_process() const
+@@ -1681,13 +1682,15 @@ bool Application::same_origin_tabs_may_share_a_process() const
  ErrorOr<NonnullRefPtr<WebContentPage>> Application::open_page_for_new_tab(IsPrivate is_private, EnableContentBlocker enable_content_blocker)
  {
      RefPtr<WebContentClient> web_content_client;
@@ -63,7 +63,7 @@ index 40a4fe1dfbff00b44e6204bc4042001a870f86e8..5693b3144b6f2e605caa3a8258630e31
          launch_spare_web_content_process();
      } else {
          launch_spare_web_content_process();
-@@ -1724,7 +1727,7 @@ void Application::launch_spare_web_content_process()
+@@ -1733,7 +1736,7 @@ void Application::launch_spare_web_content_process()
      Core::deferred_invoke([this]() {
          m_has_queued_task_to_launch_spare_web_content_process = false;
  
@@ -73,10 +73,10 @@ index 40a4fe1dfbff00b44e6204bc4042001a870f86e8..5693b3144b6f2e605caa3a8258630e31
              dbgln("Unable to create spare web content client: {}", web_content_client.error());
              return;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 426985421b2a6deaf28fe5c00580e02409da0024..35e109934611d8847537bc6c5fcf2fbac1d312a8 100644
+index 991c3b9ce8de2c9585071b044cd8035d532c4a26..8a5e267ddc526dd7d788216d2fd2a1cdbf290ad8 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -453,7 +453,7 @@ private:
+@@ -450,7 +450,7 @@ private:
      ErrorOr<void> create_profile(Optional<StringView> profile_name, Optional<StringView> profile_path, bool force_new_process, bool temporary_profile);
      void create_mach_port_server(ByteString const& profile_identity);
      void update_website_color_scheme();
@@ -86,10 +86,10 @@ index 426985421b2a6deaf28fe5c00580e02409da0024..35e109934611d8847537bc6c5fcf2fba
      ErrorOr<void> launch_services();
      void launch_spare_web_content_process();
 diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
-index e310b5ee982604e3bbe891947fac1fbacbb0f70c..455fe8c4ab704bead5e155655959bb8fde595244 100644
+index f2e3116e5f25e2b510b2bf6578370edd8e240175..7c146cb11e640ab20ff43e12d5d3e80b466e9130 100644
 --- a/Libraries/LibWebView/Options.h
 +++ b/Libraries/LibWebView/Options.h
-@@ -73,6 +73,13 @@ enum class EnableContentBlocker {
+@@ -74,6 +74,13 @@ enum class EnableContentBlocker {
      Yes,
  };
  

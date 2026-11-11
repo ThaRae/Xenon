@@ -233,11 +233,11 @@ main {
     display: none;
 }
 
-.force-dark-sites {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding-block: 4px;
+.setting-controls {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 10px;
 }
 
 .row > label,
@@ -1020,16 +1020,14 @@ dialog .dialog-list {
     border-radius: 10px;
 }
 
-dialog .dialog-list-item,
-.force-dark-sites .dialog-list-item {
+dialog .dialog-list-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
 }
 
-dialog .dialog-list-item + .dialog-list-item,
-.force-dark-sites .dialog-list-item + .dialog-list-item {
+dialog .dialog-list-item + .dialog-list-item {
     border-top: 1px solid var(--xenon-hairline);
 }
 
@@ -1042,13 +1040,27 @@ dialog .dialog-list-item-placeholder {
     color: var(--xenon-muted);
 }
 
-dialog .dialog-list-item-label,
-.force-dark-sites .dialog-list-item-label {
+dialog .dialog-list-item-label {
     flex-grow: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
-dialog .site-permission-row {
+#site-settings .dialog-list-item,
+#host-settings .dialog-list-item {
     gap: 10px;
+}
+
+#site-settings .dialog-list-item .dialog-button svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+}
+
+#host-settings .dialog-list-item-value {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    color: var(--xenon-muted);
 }
 
 dialog .dialog-controls {

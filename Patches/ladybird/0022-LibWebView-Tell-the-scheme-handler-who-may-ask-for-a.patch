@@ -42,7 +42,7 @@ index 29f3cab80d12c5a7280145f57851eaab00ce34cf..0b5bc6d988baf5001186956a628358dd
  
  struct URLSchemeResponse {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 048802d1ad0b76e6807e5e8c38387b9a12f40d8d..6f1070d40970878aff825172a0b853922c683abb 100644
+index c0cd15313554dffbd548b61e4369683b3c4d4003..ad95151387eaa7567da92ef87068473ffffd2457 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -1658,7 +1658,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)

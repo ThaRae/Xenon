@@ -52,7 +52,7 @@ The following commits put these to use.
  create mode 100644 Libraries/LibWeb/ContentBlocker/Rust/src/procedural.js
 
 diff --git a/Cargo.lock b/Cargo.lock
-index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546fd86458c 100644
+index 6b96cdbe5ecf4d7596435dea08b6ffeecd28f56d..bd86a78843414a02edce0dbb047c68366fc4a00c 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -12,6 +12,7 @@ dependencies = [
@@ -71,7 +71,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "serde",
   "serde_json",
   "thiserror 1.0.69",
-@@ -746,6 +748,29 @@ dependencies = [
+@@ -759,6 +761,29 @@ dependencies = [
   "typenum",
  ]
  
@@ -101,7 +101,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "ctr"
  version = "0.9.2"
-@@ -855,6 +880,27 @@ version = "0.5.9"
+@@ -868,6 +893,27 @@ version = "0.5.9"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "9e9de72ce2ad1f90dc62fa25f0f430ef85eb4b0d8fa0be4f30373bc40a21d28e"
  
@@ -129,7 +129,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "digest"
  version = "0.10.7"
-@@ -898,7 +944,7 @@ dependencies = [
+@@ -911,7 +957,7 @@ dependencies = [
   "p256",
   "p384",
   "portable-atomic",
@@ -138,7 +138,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "rand_core 0.6.4",
   "rcgen",
   "ring",
-@@ -914,6 +960,21 @@ dependencies = [
+@@ -927,6 +973,21 @@ dependencies = [
   "x509-parser",
  ]
  
@@ -160,7 +160,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "ecdsa"
  version = "0.16.9"
-@@ -1504,7 +1565,7 @@ dependencies = [
+@@ -1517,7 +1578,7 @@ dependencies = [
   "futures",
   "log",
   "portable-atomic",
@@ -169,7 +169,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "rtcp",
   "rtp",
   "thiserror 1.0.69",
-@@ -2163,6 +2224,12 @@ dependencies = [
+@@ -2188,6 +2249,12 @@ dependencies = [
   "jni-sys 0.3.1",
  ]
  
@@ -182,7 +182,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "nix"
  version = "0.26.4"
-@@ -2385,6 +2452,58 @@ version = "2.3.2"
+@@ -2410,6 +2477,58 @@ version = "2.3.2"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
  
@@ -241,7 +241,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "pin-project-lite"
  version = "0.2.17"
-@@ -2585,6 +2704,15 @@ dependencies = [
+@@ -2610,6 +2729,15 @@ dependencies = [
   "ptr_meta",
  ]
  
@@ -257,7 +257,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "rand"
  version = "0.9.5"
-@@ -2778,7 +2906,7 @@ dependencies = [
+@@ -2803,7 +2931,7 @@ dependencies = [
   "bytes",
   "memchr",
   "portable-atomic",
@@ -266,7 +266,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "serde",
   "thiserror 1.0.69",
   "webrtc-util",
-@@ -2897,7 +3025,7 @@ version = "0.17.2"
+@@ -2922,7 +3050,7 @@ version = "0.17.2"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "66b6eecfa5151edef84d544ff3885dff98e5b5fe97586757a4b5118bde51c958"
  dependencies = [
@@ -275,7 +275,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "substring",
   "thiserror 1.0.69",
   "url",
-@@ -2923,6 +3051,25 @@ dependencies = [
+@@ -2948,6 +3076,25 @@ dependencies = [
   "zeroize",
  ]
  
@@ -301,7 +301,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "semver"
  version = "1.0.28"
-@@ -2982,6 +3129,15 @@ dependencies = [
+@@ -3007,6 +3154,15 @@ dependencies = [
   "serde_core",
  ]
  
@@ -317,7 +317,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "sha1"
  version = "0.10.7"
-@@ -3042,6 +3198,12 @@ version = "0.1.5"
+@@ -3067,6 +3223,12 @@ version = "0.1.5"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
  
@@ -330,7 +330,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
  [[package]]
  name = "slab"
  version = "0.4.12"
-@@ -3115,7 +3277,7 @@ dependencies = [
+@@ -3140,7 +3302,7 @@ dependencies = [
   "crc",
   "lazy_static",
   "md-5",
@@ -339,7 +339,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "ring",
   "subtle",
   "thiserror 1.0.69",
-@@ -3385,7 +3547,7 @@ dependencies = [
+@@ -3410,7 +3572,7 @@ dependencies = [
   "log",
   "md-5",
   "portable-atomic",
@@ -348,7 +348,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "ring",
   "stun",
   "thiserror 1.0.69",
-@@ -3633,7 +3795,7 @@ dependencies = [
+@@ -3658,7 +3820,7 @@ dependencies = [
   "lazy_static",
   "log",
   "portable-atomic",
@@ -357,7 +357,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "rcgen",
   "regex",
   "ring",
-@@ -3686,7 +3848,7 @@ dependencies = [
+@@ -3711,7 +3873,7 @@ dependencies = [
   "crc",
   "log",
   "portable-atomic",
@@ -366,7 +366,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "serde",
   "serde_json",
   "stun",
-@@ -3721,7 +3883,7 @@ checksum = "26a6c7335bdd03dc023cb9a3bd7966866d969c92c86987b73aa16dfa39c7ca29"
+@@ -3746,7 +3908,7 @@ checksum = "26a6c7335bdd03dc023cb9a3bd7966866d969c92c86987b73aa16dfa39c7ca29"
  dependencies = [
   "byteorder",
   "bytes",
@@ -375,7 +375,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "rtp",
   "thiserror 1.0.69",
  ]
-@@ -3738,7 +3900,7 @@ dependencies = [
+@@ -3763,7 +3925,7 @@ dependencies = [
   "crc",
   "log",
   "portable-atomic",
@@ -384,7 +384,7 @@ index 377fb97587953ac6a5bbb0d134379112bbb89db4..0e9e060e94218b6c64bda73332f9a546
   "thiserror 1.0.69",
   "tokio",
   "webrtc-util",
-@@ -3781,7 +3943,7 @@ dependencies = [
+@@ -3806,7 +3968,7 @@ dependencies = [
   "log",
   "nix",
   "portable-atomic",
@@ -1064,7 +1064,7 @@ index 551b387897561ff8d6a29ab9995e0e55342cada9..5fd4f7efe4243735706a898dc158fe04
  
  void run_animation_frame_callbacks(DOM::Document&, double now);
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index 6b634caf30ba07a22aef046603f387fa404ac726..82114916aa244cdc31b3be1f34b3ba1b39592584 100644
+index 6b634caf30ba07a22aef046603f387fa404ac726..51a23a1877f13c6b93b4a396857c1e70ae222e5d 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
 @@ -9,6 +9,10 @@
@@ -1201,7 +1201,7 @@ index 6b634caf30ba07a22aef046603f387fa404ac726..82114916aa244cdc31b3be1f34b3ba1b
 +    window->set_content_blocker_page_script_ran();
 +
 +    auto& settings = document.relevant_settings_object();
-+    auto script = HTML::ClassicScript::create("(content blocker)"sv, source.utf16_view(), settings, settings.api_base_url());
++    auto script = HTML::ClassicScript::create("(content blocker)"sv, move(source), settings, settings.api_base_url());
 +    // The scriptlets catch their own errors; an error here should not reach the page's error handlers.
 +    (void)script->run(HTML::ClassicScript::RethrowErrors::Yes);
 +}
@@ -1264,10 +1264,10 @@ index 630535d0f1facf74d69603277fd5c760b32cae33..d03893a0e2924faeb3a235868c2c14a1
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&) const;
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&, ReadonlySpan<Utf16FlyString> classes, ReadonlySpan<Utf16FlyString> ids) const;
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index cdaa310f92079aa64f980f7a6ce4ad0b78f058da..bbfd37f8d9733f9da3eee72499cac60d3978e334 100644
+index 000ed24ab13797ea5a9249a5ed42fca3f217363a..e4beff48adbf59f20a730ca0cf5c0031f8d32bd3 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -327,6 +327,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -323,6 +323,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
      bool disable_sandbox = false;
      bool force_video_decoder_server = false;
      Vector<ByteString> content_blocker_list_paths;
@@ -1276,7 +1276,7 @@ index cdaa310f92079aa64f980f7a6ce4ad0b78f058da..bbfd37f8d9733f9da3eee72499cac60d
      Optional<StringView> resource_substitution_map_path;
      bool enable_autoplay = false;
      bool expose_experimental_interfaces = false;
-@@ -449,6 +451,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -450,6 +452,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
              return true;
          },
      });
@@ -1297,7 +1297,7 @@ index cdaa310f92079aa64f980f7a6ce4ad0b78f058da..bbfd37f8d9733f9da3eee72499cac60d
      args_parser.add_option(enable_autoplay, "Enable multimedia autoplay", "enable-autoplay");
      args_parser.add_option(expose_experimental_interfaces, "Expose experimental IDL interfaces", "expose-experimental-interfaces");
      args_parser.add_option(expose_internals_object, "Expose internals object", "expose-internals-object");
-@@ -520,6 +536,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -521,6 +537,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          return Error::from_string_literal("--profile-output requires --profile-tool cpu");
  
      m_explicit_content_blocker_list_paths = move(content_blocker_list_paths);
@@ -1307,7 +1307,7 @@ index cdaa310f92079aa64f980f7a6ce4ad0b78f058da..bbfd37f8d9733f9da3eee72499cac60d
  
      // Disable site isolation when debugging WebContent. Otherwise, the process swap may interfere with the gdb session.
      if (debug_process_types.contains_slow(ProcessType::WebContent))
-@@ -807,12 +826,67 @@ void Application::rebuild_content_blocker_list_paths()
+@@ -816,12 +835,67 @@ void Application::rebuild_content_blocker_list_paths()
      }
  }
  
@@ -1376,7 +1376,7 @@ index cdaa310f92079aa64f980f7a6ce4ad0b78f058da..bbfd37f8d9733f9da3eee72499cac60d
          m_content_blocker_list_buffer = TRY(Core::AnonymousBuffer::create_with_size(0));
          return true;
      }
-@@ -846,7 +920,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
+@@ -855,7 +929,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
      VERIFY(offset == bytes.size());
  
      if (m_content_blocker_list_buffer.has_value() && m_content_blocker_list_buffer->bytes() == blocker_list_buffer.bytes())
@@ -1385,7 +1385,7 @@ index cdaa310f92079aa64f980f7a6ce4ad0b78f058da..bbfd37f8d9733f9da3eee72499cac60d
  
      m_content_blocker_list_buffer = move(blocker_list_buffer);
      return true;
-@@ -1124,8 +1198,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
+@@ -1133,8 +1207,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
      if (auto* webdriver_bidi = WebDriverBiDi::the(); webdriver_bidi && webdriver_bidi->session_state().is_active)
          webdriver_bidi->push_session_state_for_client(*client);
  
@@ -1395,7 +1395,7 @@ index cdaa310f92079aa64f980f7a6ce4ad0b78f058da..bbfd37f8d9733f9da3eee72499cac60d
  
      m_web_content_clients.set(client);
      return client;
-@@ -2768,7 +2841,7 @@ void Application::apply_content_blocker_settings()
+@@ -2774,7 +2847,7 @@ void Application::apply_content_blocker_settings()
              return IterationDecision::Continue;
          });
          if (rules_changed)
@@ -1405,10 +1405,10 @@ index cdaa310f92079aa64f980f7a6ce4ad0b78f058da..bbfd37f8d9733f9da3eee72499cac60d
      });
      ViewImplementation::for_each_view([](ViewImplementation& view) {
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 6fc9d365f88148b4f26b3600fa125149bf404bfc..518f14c1da30ce5ea51664c5a446e46972ff98be 100644
+index 1a4d4819711f813c9aea558024f6945bc61fa0b6..c3299ddd7ee9647600ca585cd66fb74483361200 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -440,6 +440,8 @@ private:
+@@ -437,6 +437,8 @@ private:
      ErrorOr<void> launch_devtools_server();
      // Returns whether the combined rules changed.
      ErrorOr<bool> load_content_blocker_lists();
@@ -1417,7 +1417,7 @@ index 6fc9d365f88148b4f26b3600fa125149bf404bfc..518f14c1da30ce5ea51664c5a446e469
      void apply_content_blocker_settings();
      void rebuild_content_blocker_list_paths();
      ByteString content_blocker_list_path(StringView identifier) const;
-@@ -578,6 +580,8 @@ private:
+@@ -575,6 +577,8 @@ private:
      JsonValue m_site_compatibility_data;
      Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> m_origin_access_allow_list;
      Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
@@ -1426,7 +1426,7 @@ index 6fc9d365f88148b4f26b3600fa125149bf404bfc..518f14c1da30ce5ea51664c5a446e469
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
          String identifier;
-@@ -588,6 +592,8 @@ private:
+@@ -585,6 +589,8 @@ private:
          u8 redirect_count { 0 };
      };
      Vector<ByteString> m_explicit_content_blocker_list_paths;
@@ -1436,7 +1436,7 @@ index 6fc9d365f88148b4f26b3600fa125149bf404bfc..518f14c1da30ce5ea51664c5a446e469
      Vector<PendingContentBlockerListUpdate> m_pending_content_blocker_list_updates;
      Optional<PendingContentBlockerListUpdate> m_active_content_blocker_list_update;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index bda722cfafcea1d290d7636c9304fc549bfc07bf..9f60bc6c6b34f29d7ba39f9c431b2e62c433b54d 100644
+index 00eb96e011cb844de15b8badbae2074339f76db1..b7e4bcddf71c27efd279ffe5438beeb0f3577dea 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3304,11 +3304,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
@@ -1454,7 +1454,7 @@ index bda722cfafcea1d290d7636c9304fc549bfc07bf..9f60bc6c6b34f29d7ba39f9c431b2e62
          dbgln("Failed to set content blockers: {}", result.error());
          return;
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 3353f9fdc30534836d0e9a06498a2dbfcec714f4..5020ffec3676f7d63fe4c0a0e6bb49756cb756a2 100644
+index 5a328c7d51bd83f3822ff21b9ff33f08759ca3e5..6b91f53c03ad280e37aa200deab9089c6e8b1d1a 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -252,7 +252,7 @@ private:
@@ -1465,9 +1465,9 @@ index 3353f9fdc30534836d0e9a06498a2dbfcec714f4..5020ffec3676f7d63fe4c0a0e6bb4975
 +    virtual void set_content_blockers(Core::AnonymousBuffer patterns, Core::AnonymousBuffer trusted_patterns, Core::AnonymousBuffer resources) override;
  
      virtual void set_force_dark_settings(Web::PageId page_id, bool enabled, HashMap<String, bool> per_host) override;
-     virtual void set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, Vector<Utf16String> allowlist) override;
+     virtual void set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, OrderedHashMap<String, Web::HTML::AutoplayPolicy> site_policies) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 1baadc94524ea2148ef3eb9b6dad150e00b2a29c..9213a99cf928fbb56973e9e633f0ab31452bd1eb 100644
+index 5a8c12f59007f1a61514559d1ee8e85e85a1b882..3eaa1f54525d00c4118ff23e198b380c134b86a4 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -261,7 +261,7 @@ endpoint WebContentServer routed by Web::PageId page_id
@@ -1478,7 +1478,7 @@ index 1baadc94524ea2148ef3eb9b6dad150e00b2a29c..9213a99cf928fbb56973e9e633f0ab31
 +    set_content_blockers(Core::AnonymousBuffer patterns, Core::AnonymousBuffer trusted_patterns, Core::AnonymousBuffer resources) =|
  
      set_force_dark_settings(Web::PageId page_id, bool enabled, HashMap<String, bool> per_host) =|
-     set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, Vector<Utf16String> allowlist) =|
+     set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, OrderedHashMap<String, Web::HTML::AutoplayPolicy> site_policies) =|
 diff --git a/Tests/LibWeb/test-web/TestWebView.cpp b/Tests/LibWeb/test-web/TestWebView.cpp
 index 3a5d404d8600b60d4f0d1292196cd356aad72aee..f6d881d4a21d4290c5acad6f0c5ba724a9b5999c 100644
 --- a/Tests/LibWeb/test-web/TestWebView.cpp

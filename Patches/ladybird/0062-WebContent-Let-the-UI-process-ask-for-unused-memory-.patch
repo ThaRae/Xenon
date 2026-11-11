@@ -18,7 +18,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 10 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index d04786362961990ef2c1d49c11505544d605ad16..7452b43dcddfd49cd54c0b20c64e39bf82b35dbe 100644
+index 648cf437d54b928161801ab04fe1dd47bed6ee82..08bf1629f4c8dd03f7a0b1b4c8947daefe7550e5 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -592,6 +592,14 @@ void ConnectionFromClient::set_navigation_events_enabled(bool enabled)
@@ -37,7 +37,7 @@ index d04786362961990ef2c1d49c11505544d605ad16..7452b43dcddfd49cd54c0b20c64e39bf
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 44838d8a6e5abc1c1a78922af2e0223637ca4352..82e0d23dca680adb862c991187b4dc7c6b33d61d 100644
+index 6850176b8f19372ccc808740efd55d946293e934..86338e380f648a735c9803e8d9fa31c81b43ddbe 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -134,6 +134,7 @@ private:
@@ -49,7 +49,7 @@ index 44838d8a6e5abc1c1a78922af2e0223637ca4352..82e0d23dca680adb862c991187b4dc7c
      virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 44cb2806932afb429881f540bd6ae09b33644333..0b57ed8439783955c2bb81a587dbc25b35fc77b8 100644
+index a000470090bfab6cc5311e6d7b6f03fce123aa72..bad87b1d8dbfdb828e38ac2838e2c675daf8c2d6 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -107,6 +107,7 @@ endpoint WebContentServer routed by Web::PageId page_id

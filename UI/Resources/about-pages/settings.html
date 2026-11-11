@@ -212,7 +212,10 @@ SPDX-License-Identifier: BSD-2-Clause
                         <div class="rows">
                             <div class="row">
                                 <label for="default-zoom-level">Page zoom</label>
-                                <select id="default-zoom-level"></select>
+                                <div class="setting-controls">
+                                    <select id="default-zoom-level"></select>
+                                    <button id="zoom-settings" class="secondary-button" hidden>Sites…</button>
+                                </div>
                             </div>
                             <div class="row">
                                 <label for="enable-force-dark">
@@ -221,14 +224,11 @@ SPDX-License-Identifier: BSD-2-Clause
                                         Darken pages that have no dark theme of their own. Photos stay as they are.
                                     </p>
                                 </label>
-                                <input id="enable-force-dark" type="checkbox" switch />
+                                <div class="setting-controls">
+                                    <input id="enable-force-dark" type="checkbox" switch />
+                                    <button id="force-dark-settings" class="secondary-button" hidden>Sites…</button>
+                                </div>
                             </div>
-                            <div
-                                id="force-dark-sites"
-                                class="row force-dark-sites"
-                                aria-label="Sites with their own dark pages choice"
-                                hidden
-                            ></div>
                             <div class="row" data-keywords="dark mode light theme color scheme">
                                 <div class="label">
                                     <span id="website-color-scheme-title">Light or dark sites</span>
@@ -845,55 +845,51 @@ SPDX-License-Identifier: BSD-2-Clause
                     <div class="group">
                         <div class="rows">
                             <div class="row">
-                                <label for="autoplay-settings">
+                                <label for="autoplay-policy">
                                     Autoplay
-                                    <p class="description">Which sites may play media as soon as they open.</p>
+                                    <p class="description">Whether sites may play media as soon as they open.</p>
                                 </label>
                                 <span id="autoplay-forcibly-enabled" class="forcibly-enabled hidden">
                                     Set on the command line
                                 </span>
-                                <button id="autoplay-settings" class="secondary-button">Edit…</button>
+                                <div id="autoplay-controls" class="setting-controls">
+                                    <select id="autoplay-policy">
+                                        <option value="allow-audio-and-video">Allow audio and video</option>
+                                        <option value="block-audio">Block audio</option>
+                                        <option value="block-audio-and-video">Block audio and video</option>
+                                    </select>
+                                    <button id="autoplay-settings" class="secondary-button">Sites…</button>
+                                </div>
                             </div>
                             <div class="row">
-                                <label for="enable-geolocation">
+                                <label for="geolocation-policy">
                                     Location
                                     <p class="description">Let sites ask for where you are.</p>
                                 </label>
-                                <input id="enable-geolocation" type="checkbox" switch />
+                                <div class="setting-controls">
+                                    <input id="geolocation-policy" type="checkbox" switch />
+                                    <button id="geolocation-settings" class="secondary-button">Sites…</button>
+                                </div>
                             </div>
                             <div class="row">
-                                <label for="location-permissions-settings">
-                                    Location by site
-                                    <p class="description">
-                                        The sites you allowed or blocked from knowing where you are.
-                                    </p>
+                                <label for="microphone-policy">
+                                    Microphone
+                                    <p class="description">Let sites ask to use your microphone.</p>
                                 </label>
-                                <button id="location-permissions-settings" class="secondary-button">Edit…</button>
+                                <div class="setting-controls">
+                                    <input id="microphone-policy" type="checkbox" switch />
+                                    <button id="microphone-settings" class="secondary-button">Sites…</button>
+                                </div>
                             </div>
                             <div class="row">
-                                <label for="microphone-permissions-settings">
-                                    Microphone by site
-                                    <p class="description">
-                                        The sites you allowed or blocked from using your microphone.
-                                    </p>
-                                </label>
-                                <button id="microphone-permissions-settings" class="secondary-button">Edit…</button>
-                            </div>
-                            <div class="row">
-                                <label for="enable-notifications">
+                                <label for="notifications-policy">
                                     Notifications
                                     <p class="description">Let sites ask to send you notifications.</p>
                                 </label>
-                                <input id="enable-notifications" type="checkbox" switch />
-                            </div>
-                            <div class="row">
-                                <label for="notifications-permissions-settings">
-                                    Notifications by site
-                                    <p class="description">
-                                        The sites you allowed or blocked from sending you notifications.
-                                    </p>
-                                </label>
-                                <button id="notifications-permissions-settings" class="secondary-button">Edit…</button>
+                                <div class="setting-controls">
+                                    <input id="notifications-policy" type="checkbox" switch />
+                                    <button id="notifications-settings" class="secondary-button">Sites…</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1067,14 +1063,11 @@ SPDX-License-Identifier: BSD-2-Clause
                 <button id="site-settings-close" class="close-button dialog-button" aria-label="Close">&times;</button>
             </div>
             <div class="dialog-body">
-                <div class="row">
-                    <label for="site-settings-policy">For every site</label>
-                    <select id="site-settings-policy"></select>
-                </div>
-                <p class="dialog-label">Allowed sites</p>
+                <p class="dialog-label">Sites with their own setting</p>
                 <div id="site-settings-list" class="dialog-list"></div>
                 <div class="dialog-controls">
-                    <input id="site-settings-input" type="text" placeholder="example.com" />
+                    <input id="site-settings-input" type="text" placeholder="https://example.com" />
+                    <select id="site-settings-decision" aria-label="Setting for the site"></select>
                     <button id="site-settings-add" class="primary-button">Add</button>
                 </div>
             </div>
@@ -1083,33 +1076,17 @@ SPDX-License-Identifier: BSD-2-Clause
             </div>
         </dialog>
 
-        <dialog id="site-permissions-geolocation" class="site-permissions" closedby="any">
+        <dialog id="host-settings" closedby="any" aria-labelledby="host-settings-title">
             <div class="dialog-header">
-                <h3 class="dialog-title">Location</h3>
-                <button class="close-button dialog-button" aria-label="Close">&times;</button>
+                <h3 id="host-settings-title" class="dialog-title"></h3>
+                <button id="host-settings-close" class="close-button dialog-button" aria-label="Close">&times;</button>
             </div>
             <div class="dialog-body">
-                <div class="site-permissions-list dialog-list"></div>
+                <p class="dialog-label">Sites without their own setting use the default.</p>
+                <div id="host-settings-list" class="dialog-list"></div>
             </div>
-        </dialog>
-
-        <dialog id="site-permissions-microphone" class="site-permissions" closedby="any">
-            <div class="dialog-header">
-                <h3 class="dialog-title">Microphone</h3>
-                <button class="close-button dialog-button" aria-label="Close">&times;</button>
-            </div>
-            <div class="dialog-body">
-                <div class="site-permissions-list dialog-list"></div>
-            </div>
-        </dialog>
-
-        <dialog id="site-permissions-notifications" class="site-permissions" closedby="any">
-            <div class="dialog-header">
-                <h3 class="dialog-title">Notifications</h3>
-                <button class="close-button dialog-button" aria-label="Close">&times;</button>
-            </div>
-            <div class="dialog-body">
-                <div class="site-permissions-list dialog-list"></div>
+            <div class="dialog-footer">
+                <button id="host-settings-reset-all" class="secondary-button">Reset all sites</button>
             </div>
         </dialog>
 
@@ -1182,12 +1159,9 @@ SPDX-License-Identifier: BSD-2-Clause
         <script src="resource://ladybird/about-pages/settings/blocking.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/browsing-behavior.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/content.js" type="module"></script>
-        <script src="resource://ladybird/about-pages/settings/geolocation.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/languages.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/network.js" type="module"></script>
-        <script src="resource://ladybird/about-pages/settings/notifications.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/permissions.js" type="module"></script>
-        <script src="resource://ladybird/about-pages/settings/site-permissions.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/privacy.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/search.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/services.js" type="module"></script>

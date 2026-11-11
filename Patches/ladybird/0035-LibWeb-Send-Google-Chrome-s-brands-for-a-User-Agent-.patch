@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ryan E <76752281+ThaRae@users.noreply.github.com>
+Date: Wed, 28 Oct 2026 16:46:41 -0400
+Subject: [PATCH] LibWeb: Send Google Chrome's brands for a User-Agent without
+ Ladybird
+
+A User-Agent that names Chrome but not Ladybird, from a preset or a
+site-compatibility rule, now gets the Sec-CH-UA brand list Google Chrome
+itself sends, so the client hints don't contradict the User-Agent
+header. A User-Agent that carries the Ladybird token keeps naming
+Ladybird among its brands.
+---
+ Libraries/LibWeb/Fetch/Fetching/Fetching.cpp                 | 4 ++++
+ Tests/LibWeb/Text/expected/Fetch/user-agent-client-hints.txt | 2 +-
+ Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html   | 2 +-
+ 3 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+index 0973fd4987dd76061bddb2c8f4cfc78516780c25..5caac81cc6c5744d005bf5f951d61273fd82e159 100644
+--- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
++++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
+@@ -3597,6 +3597,10 @@ void append_user_agent_client_hints_for_request(Infrastructure::Request& request
+     brand_list.append(ByteString::formatted("\"Chromium\";v=\"{}\"", *chrome_version));
+     if (auto version = product_major_version(*user_agent, BROWSER_NAME "/"sv); version.has_value())
+         brand_list.append(ByteString::formatted("\"{}\";v=\"{}\"", BROWSER_NAME, *version));
++    else
++        // A plain Chrome User-Agent, from a preset or a rule, is answered with the brand list Google Chrome itself
++        // sends, so the client hints don't contradict the User-Agent header.
++        brand_list.append(ByteString::formatted("\"Google Chrome\";v=\"{}\"", *chrome_version));
+ 
+     StringBuilder brands;
+     bool first = true;
+diff --git a/Tests/LibWeb/Text/expected/Fetch/user-agent-client-hints.txt b/Tests/LibWeb/Text/expected/Fetch/user-agent-client-hints.txt
+index c684a5ba87a0c273e18f2754c248045a953ae09c..b59fa88a40dea043a45be6f5b840021bc61fcba1 100644
+--- a/Tests/LibWeb/Text/expected/Fetch/user-agent-client-hints.txt
++++ b/Tests/LibWeb/Text/expected/Fetch/user-agent-client-hints.txt
+@@ -5,7 +5,7 @@ own platform hint is quoted: PASS
+ Chrome + Ladybird brands: "Ladybird";v="1", "Not_A Brand";v="8", "Chromium";v="153"
+ Chrome + Ladybird mobile: ?0
+ Chrome + Ladybird platform: "macOS"
+-Chrome without Ladybird: "Chromium";v="153", "Not_A Brand";v="8"
++Chrome without Ladybird: "Google Chrome";v="153", "Not_A Brand";v="8", "Chromium";v="153"
+ Android mobile: ?1
+ Android platform: "Android"
+ Firefox User-Agent sends no hints: PASS
+diff --git a/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html b/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
+index 7474e2a89db6d692a9c6142f14dd2876b70b5d1d..0fd87d31a5394cf755394351e9b8ff89481c62e4 100644
+--- a/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
++++ b/Tests/LibWeb/Text/input/Fetch/user-agent-client-hints.html
+@@ -41,7 +41,7 @@
+             println(`Chrome + Ladybird mobile: ${chrome("Sec-CH-UA-Mobile")}`);
+             println(`Chrome + Ladybird platform: ${chrome("Sec-CH-UA-Platform")}`);
+ 
+-            // A site-compatibility rule hiding the Ladybird token drops the brand along with it.
++            // Without a Ladybird token, the brands are Google Chrome's.
+             const hidden = await hintsFor(chromeUA(""));
+             println(`Chrome without Ladybird: ${hidden("Sec-CH-UA")}`);
+ 

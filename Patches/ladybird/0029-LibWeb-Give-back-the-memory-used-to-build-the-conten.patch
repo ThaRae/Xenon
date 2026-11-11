@@ -18,7 +18,7 @@ Collect the heap once the engine is built or dropped.
  1 file changed, 4 insertions(+)
 
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index 6965beee311430fafc34320fc8409b0d95a0bf91..1d2539e364ca786b320e964827742e1204a4d1f2 100644
+index c36546c8454159220c3cab865dd1d5639b74b3a3..004bc2a6667e8113ae1b3c798b31625cd8635696 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
 @@ -160,6 +160,10 @@ ErrorOr<void> ContentBlocker::set_patterns(ReadonlySpan<String> patterns)

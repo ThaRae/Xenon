@@ -15,6 +15,7 @@
 #include <UI/Tab.h>
 
 #include <QApplication>
+#include <QClipboard>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 
@@ -73,6 +74,20 @@ static constexpr auto undo_text_field = [](auto& text_field) { text_field.undo()
 static constexpr auto redo_text_field = [](auto& text_field) { text_field.redo(); };
 static constexpr auto copy_text_field = [](auto& text_field) { text_field.copy(); };
 static constexpr auto cut_text_field = [](auto& text_field) { text_field.cut(); };
+static constexpr auto paste_text_field = [](auto& text_field) {
+    // NB: With no text on the clipboard, QLineEdit::paste() would delete the selected text.
+    if (!QApplication::clipboard()->text().isEmpty())
+        text_field.paste();
+};
+static constexpr auto paste_and_match_style_text_field = [](auto& text_field) {
+    // NB: QPlainTextEdit::paste() formats Markdown from the clipboard, so insert its plain text directly instead.
+    if constexpr (IsSame<decltype(text_field), QPlainTextEdit&>) {
+        if (auto text = QApplication::clipboard()->text(); !text.isEmpty())
+            text_field.insertPlainText(text);
+    } else {
+        paste_text_field(text_field);
+    }
+};
 static constexpr auto select_all_text_field = [](auto& text_field) { text_field.selectAll(); };
 
 static Function<void()> debug_request(StringView request)
@@ -107,8 +122,11 @@ ApplicationActions::ApplicationActions(PageOptions const& options)
     m_cut_selection_action = Action::create("Cut"sv, ActionID::CutSelection, on_focused_text_field_or_active_view(cut_text_field, [](RemoteView& view) {
         HubConnection::the().async_view_cut_selection(view.view_id());
     }));
-    m_paste_action = Action::create("Paste"sv, ActionID::Paste, on_active_view([](RemoteView& view) {
-        HubConnection::the().async_view_paste(view.view_id());
+    m_paste_action = Action::create("Paste"sv, ActionID::Paste, on_focused_text_field_or_active_view(paste_text_field, [](RemoteView& view) {
+        HubConnection::the().async_view_paste(view.view_id(), Web::Clipboard::PasteMode::AllMimeTypes);
+    }));
+    m_paste_and_match_style_action = Action::create("Paste and Match Style"sv, ActionID::PasteAndMatchStyle, on_focused_text_field_or_active_view(paste_and_match_style_text_field, [](RemoteView& view) {
+        HubConnection::the().async_view_paste(view.view_id(), Web::Clipboard::PasteMode::PlainTextOnly);
     }));
     m_select_all_action = Action::create("Select All"sv, ActionID::SelectAll, on_focused_text_field_or_active_view(select_all_text_field, [](RemoteView& view) {
         HubConnection::the().async_view_select_all(view.view_id());
@@ -140,10 +158,10 @@ ApplicationActions::ApplicationActions(PageOptions const& options)
     m_zoom_menu->add_action(*m_reset_zoom_action);
 
     m_force_dark_action = Action::create_checkable("Force Dark Mode"sv, ActionID::ForceDark, on_active_view([](RemoteView& view) {
-        if (view.is_private() == WebView::IsPrivate::Yes || view.force_dark_host().is_empty())
+        if (view.is_private() == WebView::IsPrivate::Yes || view.current_host_for_settings().is_empty())
             return;
         auto& settings = Application::settings();
-        settings.set_force_dark_for_host(view.force_dark_host(), !settings.force_dark_for_host(view.force_dark_host()));
+        settings.set_force_dark_for_host(view.current_host_for_settings(), !settings.force_dark_for_host(view.current_host_for_settings()));
     }));
 
     auto set_website_color_scheme = [](WebView::ThemePreference color_scheme) {
@@ -342,8 +360,8 @@ void ApplicationActions::update_force_dark_action()
 {
     auto& settings = Application::settings();
     auto* view = active_view();
-    m_force_dark_action->set_enabled(view && view->is_private() == WebView::IsPrivate::No && !view->force_dark_host().is_empty());
-    m_force_dark_action->set_checked(view ? settings.force_dark_for_host(view->force_dark_host()) : settings.content_settings().enable_force_dark);
+    m_force_dark_action->set_enabled(view && view->is_private() == WebView::IsPrivate::No && !view->current_host_for_settings().is_empty());
+    m_force_dark_action->set_checked(view ? settings.force_dark_for_host(view->current_host_for_settings()) : settings.content_settings().enable_force_dark);
 }
 
 void ApplicationActions::devtools_enabled_changed(bool enabled)

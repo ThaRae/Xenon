@@ -12,7 +12,7 @@ content blocker.
  1 file changed, 11 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 83eacf0f18f707ce6aaba9cea62161cf7b68c84d..56579aa8a35a57c68342b51e8b94a379e2cc34b1 100644
+index f97c808491621b297ce8300a99124a85c6e5105c..07c2acc5575edcfa8e557123ce04ff37a82a862c 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -18,6 +18,7 @@

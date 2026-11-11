@@ -182,10 +182,10 @@ index 94e28b427fbdbcc6af7daf46ad8ae0c1cc8b3464..b83310b99bb129485da62c010197006a
              // Return a new opaque origin.
              _ => Origin::new_opaque(OpaqueOriginKind::Standard),
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 24e7d75fa3f312347cfb85f553e24d3f92808563..932026c8cc18e61f65f0ffc3b2d43513360e365f 100644
+index 8534156a56cfc0043044717bf39af6ffee0b521d..8c3acd330cf07a8f5d52526af2fee8b73b0a4fdd 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -21,6 +21,7 @@
+@@ -22,6 +22,7 @@
  #include <LibRequests/Request.h>
  #include <LibRequests/RequestTimingInfo.h>
  #include <LibTextCodec/Encoder.h>
@@ -193,7 +193,7 @@ index 24e7d75fa3f312347cfb85f553e24d3f92808563..932026c8cc18e61f65f0ffc3b2d43513
  #include <LibWeb/Bindings/PrincipalHostDefined.h>
  #include <LibWeb/ContentSecurityPolicy/BlockingAlgorithms.h>
  #include <LibWeb/DOM/Document.h>
-@@ -711,8 +712,11 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -775,8 +776,11 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
  
          // -> request’s current URL’s scheme is not an HTTP(S) scheme
          // AD-HOC: We allow CORS requests for resource:// URLs from opaque origins to enable requesting JS modules from internal pages.
@@ -206,7 +206,7 @@ index 24e7d75fa3f312347cfb85f553e24d3f92808563..932026c8cc18e61f65f0ffc3b2d43513
              // NOTE: At this point all other request modes have been handled. Ensure we're not lying in the error message :^)
              VERIFY(request->mode() == Infrastructure::Request::Mode::CORS);
  
-@@ -1631,6 +1635,10 @@ GC::Ref<PendingResponse> scheme_fetch(JS::Realm& realm, Infrastructure::FetchPar
+@@ -1706,6 +1710,10 @@ GC::Ref<PendingResponse> scheme_fetch(JS::Realm& realm, Infrastructure::FetchPar
  
          return nonstandard_resource_loader_file_or_http_network_fetch(realm, fetch_params);
      }
@@ -413,7 +413,7 @@ index 706748e144b50544592796c11db98de2884f846e..01026b2292d614348d6dd2a36a0e96d8
      // 8. If origin has been configured as a trustworthy origin, return "Potentially Trustworthy".
      // Note: See § 7.2 Development Environments for detail here.
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index 81ee52fd2634b901ed78d3645066fdde07f7fa3a..04601a80b0f1171cbc7470920f46f39a8ada7e81 100644
+index 07dae5e2fca3bb84626ddaeb37f96e48029cb5ec..df655c8202f46218933ce636f6aec89335ea4e98 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
 @@ -78,6 +78,7 @@ set(SOURCES
@@ -548,7 +548,7 @@ index 0000000000000000000000000000000000000000..6eb368b9cfa3e1a5bc8c6e5a70528df5
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index f61fc6d456301e519623cb3cbbfe179518c87a70..8854fcd98abff63a6f6b5e2cc3487d643c7bd658 100644
+index d4a7e492c3dd79e5d018965f61a23227a7bd673d..07e57f13ac2917fb88ad7393aee25c09f89434be 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -39,6 +39,7 @@
@@ -663,7 +663,7 @@ index d975bdfdb4554ef9c55a39d6d0009c1c1814231a..20ed9b9394e6995a2b46ddef279c2b61
      virtual Messages::WebWorkerClient::DidRequestPermissionSnapshotResponse did_request_permission_snapshot(URL::Origin top_level_origin) override;
      virtual Messages::WebWorkerClient::RequestMediaServerConnectionResponse request_media_server_connection() override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index dc3998d5f02534516d89d76acdd6590ccabdb16a..ec37e84f5ca0255d5d57c1c8c2e00a03678e2e42 100644
+index 6f97034c84f225f70e46c504427e1187790d6dcf..680602008694ad8b915db663887953fede5caffa 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3492,6 +3492,28 @@ void ConnectionFromClient::request_file(Web::PageId page_id, Web::FileRequest fi
@@ -696,7 +696,7 @@ index dc3998d5f02534516d89d76acdd6590ccabdb16a..ec37e84f5ca0255d5d57c1c8c2e00a03
  {
      if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 8217f4450c22fad8d39e0977a25c17dd301bcb73..5fa423c059a64ddb55b36712f832a7cbba16eda2 100644
+index c6a8cc89787a614c9c6a7072f8776a2abbcef2c7..187eab4d9cf598a570866c6ed1471554b8a9ae2b 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -24,6 +24,7 @@
@@ -772,7 +772,7 @@ index dd361dd47e79dcf90751bba15c23b7785252b0b8..594ec151f8979413ea8c09c95f401de0
      did_request_date_picker(Web::PageId page_id, Utf16String input_type, Utf16String value, Utf16String minimum, Utf16String maximum) =|
      did_request_geolocation_position(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId document_id) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 8a6419f73833636cdb7829a2726e65f5a1a6b9de..0280e1d89fa19fe3d0568eb86315ad162e5c44a6 100644
+index 9bcc765d7438de2767a0200c4a0dc0bd6349dec2..a1098c7a338a0789241c1d8a215cdba6d6cab872 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -2,6 +2,7 @@
@@ -917,7 +917,7 @@ index 7a521b13eaa73447d661222fc62f4ef289116d34..7d211a6a8d2936b8cf107d426de4d14e
      virtual void page_did_remove_blob_url_entries(Web::HTML::EnvironmentSettingsObject const&, Vector<Utf16String> const& urls) override;
      virtual Optional<Web::FileAPI::SerializedBlobURLEntry> page_did_request_blob_url_entry(Utf16String const& url, Optional<URL::BlobURLEntry::Token> token) override;
 diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
-index ea129945bdce1c84f2cc025fc43ac08c04b29969..0c3c8e19adc7a4b0ff9158f7ccab7746d8df5394 100644
+index 74ee55303588ba0809ca6414378de8c5d47c0962..569ef3c077e5e42075f2b5ec254a4575b2d85a52 100644
 --- a/Services/WebContent/main.cpp
 +++ b/Services/WebContent/main.cpp
 @@ -26,6 +26,7 @@
@@ -928,7 +928,7 @@ index ea129945bdce1c84f2cc025fc43ac08c04b29969..0c3c8e19adc7a4b0ff9158f7ccab7746
  #include <LibURL/Parser.h>
  #include <LibUnicode/TimeZone.h>
  #include <LibWeb/Bindings/MainThreadVM.h>
-@@ -190,6 +191,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -192,6 +193,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
      StringView https_echo_server_port_string_view {};
      StringView default_time_zone {};
      bool file_origins_are_tuple_origins = false;
@@ -936,7 +936,7 @@ index ea129945bdce1c84f2cc025fc43ac08c04b29969..0c3c8e19adc7a4b0ff9158f7ccab7746
  
      StringView stats_log_directory;
      Core::ArgsParser args_parser;
-@@ -211,6 +213,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -213,6 +215,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
      args_parser.add_option(is_headless, "Report that the browser is running in headless mode", "headless");
      args_parser.add_option(default_time_zone, "Default time zone", "default-time-zone", 0, "time-zone-id");
      args_parser.add_option(file_origins_are_tuple_origins, "Treat file:// URLs as having tuple origins", "tuple-file-origins");
@@ -944,7 +944,7 @@ index ea129945bdce1c84f2cc025fc43ac08c04b29969..0c3c8e19adc7a4b0ff9158f7ccab7746
      args_parser.add_option(Core::ArgsParser::Option {
          .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
          .help_string = "URL of a PAC file (not supported yet, requests fail)",
-@@ -251,6 +254,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -253,6 +256,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
  
      if (file_origins_are_tuple_origins)
          URL::set_file_scheme_urls_have_tuple_origins();

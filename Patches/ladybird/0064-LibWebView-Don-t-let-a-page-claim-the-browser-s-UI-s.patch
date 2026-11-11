@@ -30,7 +30,7 @@ navigable() always, and ignore a link navigation that makes it.
  1 file changed, 13 insertions(+)
 
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 274dd9fc7a2e442f4de667d0cd97ff2549d7e9b4..1de130423d94bc994ef60e292b909dc072b4c6b7 100644
+index e46b3e97fd4e06c3546053572967e055533c19b3..8bb4950911f212c47b486c6f8029ea36ba3e1c5f 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -721,6 +721,11 @@ static bool may_navigate_to_a_local_file(WebContentClient& requesting_client);

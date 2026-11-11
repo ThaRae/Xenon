@@ -119,10 +119,10 @@ index a79fea929a7abf37cef51b3ef90fc60fc43ef2d5..6f9d38b7109437625b694b8c10612031
      let transport = video_transport(video)?;
      let mut recorder = Recorder::new(transport);
 diff --git a/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp b/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
-index 1cd457b4cf69aabe7a03e938c7438d6f3006bc75..fe13684e45849dd43ece43596f2d03d83cb59346 100644
+index 28100359ae624d8b82c4515342031e90532defd4..65982fbe47e37deca97d456dd68c16a1e8cbfa03 100644
 --- a/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
 +++ b/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
-@@ -177,6 +177,7 @@ void web_canvas_2d_image_source_size(void* source_wrapper, CanvasImageSourceKind
+@@ -178,6 +178,7 @@ void web_canvas_2d_image_source_size(void* source_wrapper, CanvasImageSourceKind
  bool web_canvas_2d_image_is_not_origin_clean(void* source_wrapper, CanvasImageSourceKind);
  bool web_canvas_2d_image_source_canvas_id(void* source_wrapper, CanvasImageSourceKind, u64* out_canvas_id, bool* out_source_is_2d);
  Gfx::DecodedImageFrame* web_canvas_2d_image_source_frame(void* source_wrapper, CanvasImageSourceKind, i32 raster_width, i32 raster_height, bool* out_rasterized);
@@ -130,7 +130,7 @@ index 1cd457b4cf69aabe7a03e938c7438d6f3006bc75..fe13684e45849dd43ece43596f2d03d8
  bool web_canvas_2d_capture_video_frame(void* source_wrapper, CapturedVideoFrame* out_frame);
  void* web_canvas_2d_video_transport(void* source_wrapper);
  void web_canvas_2d_video_frame_hold_unref(Compositing::VideoFrameHold*);
-@@ -845,6 +846,15 @@ Gfx::DecodedImageFrame* web_canvas_2d_image_source_frame(void* source_wrapper, C
+@@ -850,6 +851,15 @@ Gfx::DecodedImageFrame* web_canvas_2d_image_source_frame(void* source_wrapper, C
      return new Gfx::DecodedImageFrame { frame.release_value() };
  }
  
@@ -147,10 +147,10 @@ index 1cd457b4cf69aabe7a03e938c7438d6f3006bc75..fe13684e45849dd43ece43596f2d03d8
  {
      auto& video = Bindings::impl_from<HTMLVideoElement>(*static_cast<JS::Object*>(source_wrapper));
 diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
-index 0a445f630f0cd92718263f91c1c7fbffe0e0a22d..8bc59495b54fc8bee635404b82e91e671112b6fd 100644
+index 1b59a62db5bd4a28c42f5a65ce595d2d43978d9f..a859d1703c90fdd901786019947a7a5b620c9eaa 100644
 --- a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
-@@ -35,6 +35,8 @@
+@@ -37,6 +37,8 @@
  #include <LibWeb/HTML/Window.h>
  #include <LibWeb/Infra/SerializedURL.h>
  #include <LibWeb/Layout/Box.h>
@@ -159,7 +159,7 @@ index 0a445f630f0cd92718263f91c1c7fbffe0e0a22d..8bc59495b54fc8bee635404b82e91e67
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Painting/PaintFacts.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
-@@ -477,6 +479,23 @@ WebIDL::ExceptionOr<void> HTMLCanvasElement::to_blob(GC::Ref<WebIDL::CallbackTyp
+@@ -525,6 +527,23 @@ WebIDL::ExceptionOr<void> HTMLCanvasElement::to_blob(GC::Ref<WebIDL::CallbackTyp
      return {};
  }
  
@@ -184,10 +184,10 @@ index 0a445f630f0cd92718263f91c1c7fbffe0e0a22d..8bc59495b54fc8bee635404b82e91e67
  {
      if (m_is_placeholder)
 diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.h b/Libraries/LibWeb/HTML/HTMLCanvasElement.h
-index f712af68f30205e95c38fe793713e91c021645e1..3679bfde42c083d3a734a393fb566eaf0e87516b 100644
+index c3db0311e755759ae7ba63819e254e9ddf338978..86d09e01481e325ef2dc350c1883ef59d08bbfa3 100644
 --- a/Libraries/LibWeb/HTML/HTMLCanvasElement.h
 +++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.h
-@@ -71,6 +71,8 @@ public:
+@@ -72,6 +72,8 @@ public:
      WebIDL::ExceptionOr<Utf16String> to_data_url(Utf16View type, Optional<JS::Value> quality);
      WebIDL::ExceptionOr<void> to_blob(GC::Ref<WebIDL::CallbackType> callback, Utf16View type, Optional<JS::Value> quality);
  
@@ -197,7 +197,7 @@ index f712af68f30205e95c38fe793713e91c021645e1..3679bfde42c083d3a734a393fb566eaf
      bool has_unpresented_content() const { return m_canvas_content_dirty; }
      void notify_compositor_backing_storage_lost();
 diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.idl b/Libraries/LibWeb/HTML/HTMLCanvasElement.idl
-index c62337437fc126000902d3d9abef26ae1c96cff6..88e2f4c88d4a3cc829c2c8ffc381f12706db78c6 100644
+index 92174b15545d5c353da62ecfdba51bcf7ee124ac..5e99367423d7f803452113e0e70c6772c7489b46 100644
 --- a/Libraries/LibWeb/HTML/HTMLCanvasElement.idl
 +++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.idl
 @@ -13,6 +13,7 @@ interface HTMLCanvasElement : HTMLElement {
@@ -432,7 +432,7 @@ index abd8532f63202d6152577af7487ba390a2dd254b..90d82d2dab572f254c75ea007d00078e
  
  }
 diff --git a/Libraries/LibWeb/MediaCapture/MediaStreamTrack.cpp b/Libraries/LibWeb/MediaCapture/MediaStreamTrack.cpp
-index ea1943dcb653f11f226b0c4f404ccc8cd92995de..19659f634369eca9490581230e1085af7a455e80 100644
+index 056698ac88fd6b2ccf4de145812ccadb840b7973..4867b3820bd1f2e8bca0b1e139c19bbd73740414 100644
 --- a/Libraries/LibWeb/MediaCapture/MediaStreamTrack.cpp
 +++ b/Libraries/LibWeb/MediaCapture/MediaStreamTrack.cpp
 @@ -13,6 +13,7 @@
@@ -503,10 +503,10 @@ index 3494e2f3e201670422f6f78d4dbda7abde7f29ba..a25d78de3d536d23c304e491f15980f8
      NonnullRefPtr<AudioFrameFanout> m_audio_fanout;
      RefPtr<Audio::RecordStream> m_audio_capture_stream;
 diff --git a/Libraries/LibWeb/Painting/PaintFacts.cpp b/Libraries/LibWeb/Painting/PaintFacts.cpp
-index e5d5bbeeb70693d5277a7cce68d82e381b101e55..c4adf02fcdf2fc3d4fc68b7473f50f5dce2cb870 100644
+index de18f882f1a1f29484b85f7125e3c81327acbbe6..bea66d7e156536604e4b38c1211e765edfa334fb 100644
 --- a/Libraries/LibWeb/Painting/PaintFacts.cpp
 +++ b/Libraries/LibWeb/Painting/PaintFacts.cpp
-@@ -238,9 +238,15 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
+@@ -252,9 +252,15 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
          : video_element.current_representation();
  
      Layout::RustFFI::FfiVideoPaintFacts facts {};
@@ -522,7 +522,7 @@ index e5d5bbeeb70693d5277a7cce68d82e381b101e55..c4adf02fcdf2fc3d4fc68b7473f50f5d
          facts.representation = Layout::RustFFI::FfiVideoRepresentation::VideoFrame;
          auto sink_handle = video_element.video_sink_handle();
          if (sink_handle.has_value() && video_element.natural_media_size().has_value()) {
-@@ -255,7 +261,9 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
+@@ -269,7 +275,9 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
      }
      case HTML::HTMLVideoElement::Representation::PosterFrame:
          facts.representation = Layout::RustFFI::FfiVideoRepresentation::PosterFrame;

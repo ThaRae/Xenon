@@ -23,10 +23,10 @@ The blocker now also gets the request method, so $method filters match.
  2 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 434114afb9e5b3308f8560745101cef168b8f704..f9c0a637d5805ed903bc34e26b6cd7e960f87ecc 100644
+index 231c786127703344ad14cba0a98698943750838e..0973fd4987dd76061bddb2c8f4cfc78516780c25 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -67,6 +67,7 @@
+@@ -69,6 +69,7 @@
  #include <LibWeb/HTML/WorkerGlobalScope.h>
  #include <LibWeb/HighResolutionTime/TimeOrigin.h>
  #include <LibWeb/Infra/SerializedURL.h>
@@ -34,8 +34,8 @@ index 434114afb9e5b3308f8560745101cef168b8f704..f9c0a637d5805ed903bc34e26b6cd7e9
  #include <LibWeb/Loader/LoadRequest.h>
  #include <LibWeb/Loader/LoaderConfig.h>
  #include <LibWeb/Loader/ResourceLoader.h>
-@@ -563,6 +564,29 @@ void populate_request_from_client(Infrastructure::Request& request, Optional<HTM
-         request.set_client_snapshot(client->visit([](auto const& client) { return snapshot_client_context(*client); }));
+@@ -622,6 +623,29 @@ static bool is_request_from_an_svg_image(Infrastructure::Request const& request)
+     return window && window->associated_document().is_decoded_svg();
  }
  
 +static URL::URL content_blocker_source_url_for_request(Infrastructure::Request&);
@@ -64,7 +64,7 @@ index 434114afb9e5b3308f8560745101cef168b8f704..f9c0a637d5805ed903bc34e26b6cd7e9
  // https://fetch.spec.whatwg.org/#concept-main-fetch
  GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParams const& fetch_params, Recursive recursive)
  {
-@@ -637,6 +661,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
+@@ -701,6 +725,8 @@ GC::Ptr<PendingResponse> main_fetch(JS::Realm& realm, Infrastructure::FetchParam
          request->current_url().set_scheme("https"sv);
      }
  

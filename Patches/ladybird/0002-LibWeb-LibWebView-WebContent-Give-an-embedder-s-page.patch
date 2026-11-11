@@ -46,10 +46,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Services/WebContent/EmbedderBridge.h
 
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index 18cd81ddd443b0513dca22986fe47e0c57b95ccd..16efd6c46cfa7bdd912e7c33e3aefee9e0a9850e 100644
+index f6c478e82a40fa98731c219e71841c202ad503b9..a9d45b322bc30e8d2a9a8402a84e50168b55a650 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -8733,6 +8733,10 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+@@ -8719,6 +8719,10 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
  
  void Document::set_ready_to_run_scripts()
  {
@@ -222,7 +222,7 @@ index 6eb368b9cfa3e1a5bc8c6e5a70528df5fbedeefa..7916cd15b545b7407dd048b6fe1193ec
  
  }
 diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
-index fccb4a6129e33ad9f087a03304ba0ddf7541d156..c6203f68e7b9cfa171d4bfcccecce6f00ea75b81 100644
+index 9b4b1d83acab2bdefa2d85080f4407cd07d60717..b2290205c8932d5795c4ebd28c01d64dc92feaee 100644
 --- a/Libraries/LibWebView/WebContentClient.cpp
 +++ b/Libraries/LibWebView/WebContentClient.cpp
 @@ -120,6 +120,14 @@ bool WebContentClient::has_hosted_only_tabs_unlike(CanonicalDocument const& docu
@@ -253,7 +253,7 @@ index 0ef2f0a83dd9c87f51b53f1000e63e5280cdd0f7..a4f069ef6619d44e4764339a8f044966
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
  
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 8854fcd98abff63a6f6b5e2cc3487d643c7bd658..21e6e936a8866459c08deee74e26695cd408ab93 100644
+index 07e57f13ac2917fb88ad7393aee25c09f89434be..c980b991724de61b0fc3fc2b8b0ecf7e1be5e0f3 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -1655,6 +1655,44 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
@@ -360,7 +360,7 @@ index dab5f556976b5d6c3ec93cf4c03d7dfc09b86604..341c977f215e1230cfd5fc28c8da4849
      PageHost.cpp
      TestConnection.cpp
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index ec37e84f5ca0255d5d57c1c8c2e00a03678e2e42..512192f654f4211354b7ad83f6f40adc65299973 100644
+index 680602008694ad8b915db663887953fede5caffa..ec39c99d4e72cd5774d1c06cc8e24c0ad48971b7 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3514,6 +3514,12 @@ void ConnectionFromClient::handle_embedder_resource_return(Web::PageId, i32 erro
@@ -377,7 +377,7 @@ index ec37e84f5ca0255d5d57c1c8c2e00a03678e2e42..512192f654f4211354b7ad83f6f40adc
  {
      if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 5fa423c059a64ddb55b36712f832a7cbba16eda2..3352d3f5bfee610b135fa60488be758792c59770 100644
+index 187eab4d9cf598a570866c6ed1471554b8a9ae2b..f1857a6635b323cfe1d4c307d6be158e6bebec27 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -283,6 +283,7 @@ private:
@@ -390,7 +390,7 @@ index 5fa423c059a64ddb55b36712f832a7cbba16eda2..3352d3f5bfee610b135fa60488be7587
      virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
 diff --git a/Services/WebContent/EmbedderBridge.cpp b/Services/WebContent/EmbedderBridge.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..019a6a9d837eef467ad9960d4e33a66b0c99039e
+index 0000000000000000000000000000000000000000..947600ba1c4a4129087f55cc47389bd55c64bd30
 --- /dev/null
 +++ b/Services/WebContent/EmbedderBridge.cpp
 @@ -0,0 +1,102 @@
@@ -459,7 +459,7 @@ index 0000000000000000000000000000000000000000..019a6a9d837eef467ad9960d4e33a66b
 +
 +    // NB: The bootstrap is a function body, so that the bridge is a parameter rather than something on the global object.
 +    auto source = Utf16String::formatted("(function (bridge) {{\n{}\n}})", *bootstrap);
-+    auto script = Web::HTML::ClassicScript::create("embedder bootstrap", source.utf16_view(), settings, settings.api_base_url());
++    auto script = Web::HTML::ClassicScript::create("embedder bootstrap", move(source), settings, settings.api_base_url());
 +    auto function = script->run(Web::HTML::ClassicScript::RethrowErrors::Yes);
 +    if (function.is_abrupt()) {
 +        Web::HTML::report_exception(function, realm);
@@ -606,7 +606,7 @@ index 594ec151f8979413ea8c09c95f401de08fbf4868..19eec22c189751d77b40acc9d71c3b70
      did_request_date_picker(Web::PageId page_id, Utf16String input_type, Utf16String value, Utf16String minimum, Utf16String maximum) =|
      did_request_geolocation_position(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId document_id) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 0280e1d89fa19fe3d0568eb86315ad162e5c44a6..e0c581a4b5abcc9ccf84ca9edf95a2582fbc2697 100644
+index a1098c7a338a0789241c1d8a215cdba6d6cab872..553a3aae0de73598056d7a32f27c7d0c869e58e0 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -294,6 +294,7 @@ endpoint WebContentServer routed by Web::PageId page_id

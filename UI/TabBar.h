@@ -46,6 +46,7 @@ class QWheelEvent;
 
 namespace Ladybird {
 
+class SandboxOffBar;
 class TabGroupEditor;
 class TabPreviewPopup;
 class TabWidget;
@@ -380,6 +381,7 @@ private:
     QToolButton* m_close_window_button { nullptr };
     QWidget* m_window_controls { nullptr };
     QStackedWidget* m_toolbar_container { nullptr };
+    SandboxOffBar* m_sandbox_off_bar { nullptr };
     QWidget* m_page_column { nullptr };
     QWidget* m_tab_bar_row { nullptr };
     QWidget* m_vertical_tabs_reserved_space { nullptr };

@@ -107,10 +107,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Tests/LibWebView/test-webdriver-webauthn.py
 
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index b319a8aad3971b9f70bd7d518fc1a19b9e5c47ac..c716ad9eca5e61e9a8564a682610cdca37470fc6 100644
+index c8cf3d268aec705ab77dd927cf15134badc58377..ddb5c549943cdc077309e5a4cc68059c9bbca560 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -2481,6 +2481,24 @@ void Internals::pump_gamepad_events()
+@@ -2450,6 +2450,24 @@ void Internals::pump_gamepad_events()
      page().client().pump_gamepad_events();
  }
  
@@ -136,7 +136,7 @@ index b319a8aad3971b9f70bd7d518fc1a19b9e5c47ac..c716ad9eca5e61e9a8564a682610cdca
  {
      auto virtual_gamepad = page().client().create_virtual_gamepad();
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index 05143eb8bb02106bb3f0fb88c0f6e44086fc9771..733316d34e9fec05c223a06fcbda76add3e21d50 100644
+index f460dc9b20f68734be79889523d052a4ba067d7a..9c71ef4674edfedfdd517fc5a8edd209df036157 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
 @@ -277,6 +277,8 @@ public:
@@ -225,10 +225,10 @@ index d9d788a56d36e61e240738ad99addc9cace4fc4d..578349bd0bf380dce72b520effdcd61e
  
  protected:
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index bbfd37f8d9733f9da3eee72499cac60d3978e334..a257f4d8fb9290dfd2970b73f06708986e41e13d 100644
+index e4beff48adbf59f20a730ca0cf5c0031f8d32bd3..7da886f6bfeabe80ff3a9198fbc53cec07b30aec 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -76,6 +76,8 @@
+@@ -77,6 +77,8 @@
  #include <LibWebView/UserAgent.h>
  #include <LibWebView/Utilities.h>
  #include <LibWebView/ViewImplementation.h>
@@ -237,7 +237,7 @@ index bbfd37f8d9733f9da3eee72499cac60d3978e334..a257f4d8fb9290dfd2970b73f0670898
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
  #include <LibWebView/WebDriverBrowserConnection.h>
-@@ -1728,6 +1730,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
+@@ -1737,6 +1739,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
  ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
@@ -246,7 +246,7 @@ index bbfd37f8d9733f9da3eee72499cac60d3978e334..a257f4d8fb9290dfd2970b73f0670898
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index d3cb16be57e3c545853ed1a36aa4064d865ce3ce..5afad52aec7a8186aa731be1afaa323246c4bb53 100644
+index 0fed98d584f802e9bc99e1c446f88d5e493f5518..692b79bfd68d528a4db51de7ad944460fcc497a3 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
 @@ -87,6 +87,7 @@ set(SOURCES
@@ -1358,10 +1358,10 @@ index 7607a950f4d875bd2378d78969abfacef2cf0714..59470421a470633e6c8736c3cd161c33
      LaunchBrowserCallback m_launch_browser_callback;
  };
 diff --git a/Services/WebDriver/Session.cpp b/Services/WebDriver/Session.cpp
-index 93a55dbc7938050114138737bfc78453af8c499b..feebda4f75cdc066fc082a48de35a4e4c4cfa9d8 100644
+index 9e8f45b2dae3fa80420e98c7aba54479273ffdc9..8fbb81460214ec738fc845b32770a05a691dcc52 100644
 --- a/Services/WebDriver/Session.cpp
 +++ b/Services/WebDriver/Session.cpp
-@@ -621,6 +621,13 @@ NonnullRefPtr<Session::WebDriverPromise> Session::load_url(URL::URL url)
+@@ -634,6 +634,13 @@ NonnullRefPtr<Session::WebDriverPromise> Session::load_url(URL::URL url)
      });
  }
  
@@ -1402,7 +1402,7 @@ index 34a9bb1b110dcfe696d6402f5f8e91f1ec6a7437..5405b21062fea77b0367bb73f16beffb
      bidi_command(u64 command_id, String method, JsonValue params) =|
      bidi_get_top_level_traversables(u64 command_id, Vector<String> navigable_ids) =|
 diff --git a/Tests/LibWeb/TestConfig.ini b/Tests/LibWeb/TestConfig.ini
-index 626987af935fb2f87fffc2e8de61a93cde7078d7..aa05e1ddd1fcba203baaf7b4a69686c46989236b 100644
+index 26469a2ea80a48c86e9a67e83c4d2f16df8627ef..e7af42f8da25f6f571deb6c8f3dbcdb0626b22b0 100644
 --- a/Tests/LibWeb/TestConfig.ini
 +++ b/Tests/LibWeb/TestConfig.ini
 @@ -49,6 +49,17 @@ Text/input/wpt-import/html/dom/render-blocking/remove-attr-script-keeps-blocking
@@ -3258,10 +3258,10 @@ index 0000000000000000000000000000000000000000..a45b686ca775c94dc015d6d59a4a6d0b
 +    JSON.stringify(deepSortKeys(expected)), optMsg);
 +}
 diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
-index b2499f25775dee316fa11b17d1bff76df2f726f1..0c0d9c625837fe75339344245c8073d8e4fe9a01 100644
+index dd4a793476f84db16f0206967e45fa203231c00a..2ac3b270bd5e5395372024472c296b6c9f7028ed 100644
 --- a/Tests/LibWebView/CMakeLists.txt
 +++ b/Tests/LibWebView/CMakeLists.txt
-@@ -35,6 +35,7 @@ if (BUILD_TESTING AND NOT WIN32)
+@@ -32,6 +32,7 @@ if (BUILD_TESTING AND NOT WIN32)
      ladybird_python_test(test-webdriver-settings-changes.py ARGS $<TARGET_FILE:WebDriver>)
      ladybird_python_test(test-webdriver-site-zoom.py ARGS $<TARGET_FILE:WebDriver>)
      ladybird_python_test(test-webdriver-web-ui-pages-share-a-process.py ARGS $<TARGET_FILE:WebDriver>)

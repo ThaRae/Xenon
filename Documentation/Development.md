@@ -73,7 +73,11 @@ git submodule update --init --depth 1
 ```
 
 The first build fetches and compiles about 74 third-party dependencies through vcpkg, including Qt and Skia, which
-takes a while. vcpkg caches them, so later builds are incremental. Everything goes under `Build/`:
+takes a while. vcpkg caches them, so later builds are incremental. As Ladybird's `Meta/ladybird.py` does,
+`Meta/xenon.py` builds them before configuring (`Meta/Utils/vcpkg_deps.py` in the submodule), each port as its own
+ninja edge, side by side, sharing one pool of `--jobs` through a jobserver, and then configures CMake with
+`VCPKG_MANIFEST_INSTALL=OFF` and the triplet it built for. Each port's log is in `Build/release/vcpkg-deps/<port>/`.
+Everything goes under `Build/`:
 
 - `Build/vcpkg-release/`: the vcpkg checkout
 - `Build/release/`: the CMake build tree
