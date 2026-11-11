@@ -204,6 +204,13 @@ static void initialize_native_control(Action& action, QAction& qaction, QPalette
     case ActionID::Paste:
         qaction.setShortcut(QKeySequence::StandardKey::Paste);
         break;
+    case ActionID::PasteAndMatchStyle:
+#if defined(AK_OS_MACOS)
+        qaction.setShortcuts({ QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_V), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V) });
+#else
+        qaction.setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
+#endif
+        break;
     case ActionID::SelectAll:
         qaction.setShortcut(QKeySequence::StandardKey::SelectAll);
         break;

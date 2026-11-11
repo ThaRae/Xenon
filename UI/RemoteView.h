@@ -46,8 +46,10 @@ public:
 
     void set_state(Hub::ViewState state)
     {
-        m_state = move(state);
+        auto previous_state = exchange(m_state, move(state));
         update_view_actions();
+        if (on_state_change)
+            on_state_change(previous_state);
     }
     void set_initial_state(Hub::ViewState state) { set_state(move(state)); }
 
@@ -154,7 +156,7 @@ public:
     }
     void enable_picture_in_picture_controls() { HubConnection::the().async_view_enable_picture_in_picture_controls(view_id()); }
     void enqueue_input_event(Web::InputEvent);
-    String force_dark_host() const { return m_state.force_dark_host; }
+    String current_host_for_settings() const { return m_state.host_for_settings; }
     void update_interface_color_scheme() { HubConnection::the().async_view_update_interface_color_scheme(view_id()); }
     void update_system_theme(Core::AnonymousBuffer const& theme) { HubConnection::the().async_view_set_system_theme(view_id(), theme); }
     NonnullRefPtr<Core::Promise<ByteString>> selected_text();
@@ -368,6 +370,7 @@ public:
     decltype(Hub::View::on_request_permission) on_request_permission;
     decltype(Hub::View::on_cancel_permission_prompt) on_cancel_permission_prompt;
     decltype(Hub::View::on_tab_indicator_change) on_tab_indicator_change;
+    Function<void(Hub::ViewState const& previous_state)> on_state_change;
     decltype(Hub::View::on_request_file_picker) on_request_file_picker;
     decltype(Hub::View::on_request_select_dropdown) on_request_select_dropdown;
     decltype(Hub::View::on_finish_handling_key_event) on_finish_handling_key_event;

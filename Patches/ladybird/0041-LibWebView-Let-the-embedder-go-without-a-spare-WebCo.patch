@@ -17,10 +17,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index b29c8b61642e3d5609626c3c3f2c008df34fdfa6..6560fcc37fffdc3c222d3b99e41da89febe0811f 100644
+index cf949e7fb71f27983c6c72b3f92eab5f60a3ff1e..4ad14f153c3d936091eabae78d575d4cae0df430 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -1708,6 +1708,10 @@ ErrorOr<Application::ChildFrameWebContentProcess> Application::launch_child_fram
+@@ -1717,6 +1717,10 @@ ErrorOr<Application::ChildFrameWebContentProcess> Application::launch_child_fram
  
  void Application::launch_spare_web_content_process()
  {
@@ -32,10 +32,10 @@ index b29c8b61642e3d5609626c3c3f2c008df34fdfa6..6560fcc37fffdc3c222d3b99e41da89f
      // session and can race browser shutdown while bootstrapping.
      if (browser_options().webdriver_browser_endpoint.has_value())
 diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
-index c2442baf192a04314550c02fc57bdfff3bf6b13f..95d74fc8465f4eacc9ebb963dd1b7d4eaa4c7952 100644
+index 4dac30ff5c15d1ebc77fc506bd0f96f8eb0d25b1..c1f2e172858ac9be98b89523659e77145b6caae1 100644
 --- a/Libraries/LibWebView/Options.h
 +++ b/Libraries/LibWebView/Options.h
-@@ -80,6 +80,13 @@ enum class DeferContentBlockerRules {
+@@ -81,6 +81,13 @@ enum class DeferContentBlockerRules {
      Yes,
  };
  
@@ -49,7 +49,7 @@ index c2442baf192a04314550c02fc57bdfff3bf6b13f..95d74fc8465f4eacc9ebb963dd1b7d4e
  enum class DisableSandbox {
      No,
      Yes,
-@@ -116,6 +123,7 @@ struct BrowserOptions {
+@@ -118,6 +125,7 @@ struct BrowserOptions {
      Optional<DNSSettings> dns_settings {};
      Optional<u16> devtools_port;
      EnableContentBlocker enable_content_blocker { EnableContentBlocker::Yes };

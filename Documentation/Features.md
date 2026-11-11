@@ -93,8 +93,8 @@ with **Search settings** at the top.
   - **Updates**: the version, whether a new one is ready, automatic updates, and **Check now** or **Relaunch to
     update**.
 - Browsing: startup and the new tab page (and whether it lists recently closed tabs), languages, privacy and browsing
-  data, background connections, site permissions (autoplay, notifications, and the sites allowed or blocked from your
-  location, microphone and notifications), DNS, where the profile keeps its files (each with **Show**), and Ladybird's
+  data, background connections, site permissions (autoplay, location, microphone and notifications, each with the
+  sites that have a setting of their own), DNS, where the profile keeps its files (each with **Show**), and Ladybird's
   configuration keys.
 - A sidebar of sections that follows the scroll, and **Search settings**, which stays at the top and hides everything
   that doesn't match.
@@ -104,7 +104,7 @@ ids, for Ladybird's settings. `UI/SettingsPage.cpp` answers it about Xenon's (`U
 `0025` (`LibWebView: Let the embedder add interfaces to its WebUI pages`), which lets the browser give WebUI pages
 interfaces of its own (`UI/WebUIInterfaces.cpp`). Ladybird's scripts look their elements up when they load and stop at
 the first one that's missing, so the page has to keep every id they use, including ones for settings Xenon lays out
-differently (`#force-dark-sites`, the notifications dialog). When a rebase gives a script a new element, add it to the
+differently (the page zoom and dark pages **Sites…** buttons, and the `#host-settings` dialog they open). When a rebase gives a script a new element, add it to the
 page.
 
 ## Tabs and windows

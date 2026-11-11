@@ -19,7 +19,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 21 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 56579aa8a35a57c68342b51e8b94a379e2cc34b1..742f37f61bab1236108aa6eef38e9a83a8d475c3 100644
+index 07c2acc5575edcfa8e557123ce04ff37a82a862c..b313a00b01b48352b1317290018a5d39cf801bb6 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3627,6 +3627,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
@@ -44,7 +44,7 @@ index 56579aa8a35a57c68342b51e8b94a379e2cc34b1..742f37f61bab1236108aa6eef38e9a83
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index c6512b6bea78c6982221b8b153daa4f568878a7d..6e7dc3de2957540aeba13050af7fba7a19678bdc 100644
+index 77120910c3c17730910b376b3961a46d770245a4..c0589acc1903fa201b53a7a2dc36545ebab8c998 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -16,6 +16,7 @@

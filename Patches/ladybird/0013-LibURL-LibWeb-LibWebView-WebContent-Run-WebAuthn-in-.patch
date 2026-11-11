@@ -159,10 +159,10 @@ index 2c5c2cfb63a42752fb915ebbc0e2ce79f21af1ba..ca8a4967282b8537d7ec6539cfbeaf33
  
          // 4. Let parsedDomain be the result of host parsing domain.
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index 5976786c225cf5f5f05b914afac522e0e1760f7e..ec24c05730397ca8d72cdd9b3d4716397904db37 100644
+index 8339852c1291bd4fe423a320686e1562d6fa8fd8..24153e991b50114d731b6680818a8f2327af7342 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -6500,52 +6500,7 @@ bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_stri
+@@ -6478,52 +6478,7 @@ bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_stri
      if (!host_suffix.has_value())
          return false;
  
@@ -217,10 +217,10 @@ index 5976786c225cf5f5f05b914afac522e0e1760f7e..ec24c05730397ca8d72cdd9b3d471639
  
  // https://html.spec.whatwg.org/multipage/browsers.html#dom-document-domain
 diff --git a/Libraries/LibWeb/DOM/Document.h b/Libraries/LibWeb/DOM/Document.h
-index e29e47f9475871dbbdf64ef96ee2300f12b66f70..87931417d23b8de937b6e64610fc4305c1b000c3 100644
+index b1971cfbab500855460ba5f34d8c86e771a56f1c..11e7e048925ad27abfa014958b6e24bca0ec13c3 100644
 --- a/Libraries/LibWeb/DOM/Document.h
 +++ b/Libraries/LibWeb/DOM/Document.h
-@@ -2686,6 +2686,5 @@ template<>
+@@ -2681,6 +2681,5 @@ template<>
  inline bool Node::fast_is<Document>() const { return is_document(); }
  
  bool is_a_registrable_domain_suffix_of_or_is_equal_to(Utf16View host_suffix_string, URL::Host const& original_host);
@@ -228,7 +228,7 @@ index e29e47f9475871dbbdf64ef96ee2300f12b66f70..87931417d23b8de937b6e64610fc4305
  
  }
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index 04601a80b0f1171cbc7470920f46f39a8ada7e81..d3cb16be57e3c545853ed1a36aa4064d865ce3ce 100644
+index df655c8202f46218933ce636f6aec89335ea4e98..0fed98d584f802e9bc99e1c446f88d5e493f5518 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
 @@ -83,6 +83,10 @@ set(SOURCES
@@ -243,10 +243,10 @@ index 04601a80b0f1171cbc7470920f46f39a8ada7e81..d3cb16be57e3c545853ed1a36aa4064d
      WebContentClient.cpp
      WebContentPage.cpp
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index c023e796325a160e1bf49dbae738614496472b41..30a4bf630e8b970ba3967f5d8df89849b8a8ac5b 100644
+index 97b5671c8386b582cc9c9ffe00d038f354a09e95..279e4fbe50527270938f30ae2f38e8e989e951a0 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -41,6 +41,7 @@
+@@ -42,6 +42,7 @@
  #include <LibWebView/URL.h>
  #include <LibWebView/UserAgent.h>
  #include <LibWebView/ViewImplementation.h>
@@ -254,7 +254,7 @@ index c023e796325a160e1bf49dbae738614496472b41..30a4bf630e8b970ba3967f5d8df89849
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
  #include <math.h>
-@@ -504,6 +505,26 @@ void ViewImplementation::set_has_system_focus(bool has_system_focus)
+@@ -505,6 +506,26 @@ void ViewImplementation::set_has_system_focus(bool has_system_focus)
      traversable().set_has_system_focus(has_system_focus, {});
  }
  
@@ -282,7 +282,7 @@ index c023e796325a160e1bf49dbae738614496472b41..30a4bf630e8b970ba3967f5d8df89849
  {
      load(traversable().prepare_navigation(url, {}, history_handling));
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index f5298d531f3585eba2b80f0331838f15533403d7..ca7bab44592db75d14dadee6eb99a0d7fe84854a 100644
+index 6e385ed08499993d18b492a550e5ba53186bece4..b60a5ed45b69025ce8f438a794064a5e32b924f0 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
 @@ -84,6 +84,7 @@
@@ -306,7 +306,7 @@ index f5298d531f3585eba2b80f0331838f15533403d7..ca7bab44592db75d14dadee6eb99a0d7
      void set_window_position(Gfx::IntPoint);
      void set_window_size(Gfx::IntSize);
      void set_system_visibility_state(Web::HTML::VisibilityState);
-@@ -675,6 +682,12 @@ public:
+@@ -678,6 +685,12 @@ public:
      Function<void(PermissionPromptRequest const&, PermissionPromptCallback)> on_request_permission;
      Function<void(PermissionPromptRequest const&)> on_cancel_permission_prompt;
      Function<void(TabIndicator, bool visible)> on_tab_indicator_change;
@@ -2344,7 +2344,7 @@ index 0000000000000000000000000000000000000000..bfd39cfcfc12ae4ff3e82254ad9b5151
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index a8a77c2cfed6af3bc6549236fc076c4b2f07abc3..24a83eab033df923fde5250f7c8c6373018758bc 100644
+index 8f2e86791331ba6a86352363841a6708e1aba7a3..1a1e93990d1cad839f85d1a7b0f533216c02f144 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -11,6 +11,7 @@
@@ -2493,7 +2493,7 @@ index 1e64062588db30c67d4b4347e50982f1e41f2e40..62d7e340d15f6c2d470ecd069f5beb03
      virtual void did_finish_handling_input_event(u64 event_id, Web::EventResult event_result) override;
      virtual void did_update_input_method_state(Optional<Web::DevicePixelRect> caret_rect, bool is_enabled, i32 cursor_position, i32 anchor_position, Utf16String text_before_cursor, Utf16String text_after_cursor) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index e219ad97b69f1bd30592f2a4197d1019d6d81a7d..5c012e2a45280c85bf867dce7fd229e4836dc815 100644
+index 135b5e2cd1aefc34acda512ac9a4ef68064893ee..c5b5777262490a811cbe3e0689fa2e2918e6d3dc 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3437,6 +3437,12 @@ void ConnectionFromClient::notification_closed(Web::PageId page_id, u64 notifica
@@ -2510,7 +2510,7 @@ index e219ad97b69f1bd30592f2a4197d1019d6d81a7d..5c012e2a45280c85bf867dce7fd229e4
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index a43895c057a36afac533a0fc889da91d0256324d..18889c427037c60d78a6be59ef0472d512ec2fc1 100644
+index ea65f70e6e89912abba5023e6b52304fb977f41c..a3862895467c5e8f12b642a19e196af16361996d 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -272,6 +272,7 @@ private:
@@ -2599,7 +2599,7 @@ index 0f3c54d26889265bbb4f398381a3dd43ff5673a0..f15026135d50033eae69436e83f43915
      did_request_select_dropdown(Web::PageId page_id, Web::HTML::CrossProcessId local_root_id, Gfx::IntPoint content_position, i32 minimum_width, Vector<Web::HTML::SelectItem> items) =|
      did_finish_handling_input_event(Web::PageId page_id, u64 event_id, Web::EventResult event_result) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 9e0778afcf768d49c1b9b33d27355886acbb1cd0..20c2a2630fdf75cbd0a6ba1fa1fe7b3cbc55e6f9 100644
+index fb0d5716135d799273b03b3f903240ac8a995c08..563be2d66d0c796eb88f92575421f4b7e10e4b39 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -61,6 +61,7 @@
@@ -2619,10 +2619,10 @@ index 9e0778afcf768d49c1b9b33d27355886acbb1cd0..20c2a2630fdf75cbd0a6ba1fa1fe7b3c
      set_focused_navigable(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id) =|
      consume_user_activation(Web::PageId page_id, Web::HTML::UserActivationConsumption consumption) =|
 diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
-index 103b935c49fe51e50995f5682aeccc8793c559ef..b2499f25775dee316fa11b17d1bff76df2f726f1 100644
+index e2c384e284e445c2d979f093312edeed91d0d325..dd4a793476f84db16f0206967e45fa203231c00a 100644
 --- a/Tests/LibWebView/CMakeLists.txt
 +++ b/Tests/LibWebView/CMakeLists.txt
-@@ -81,6 +81,7 @@ set(TEST_SOURCES
+@@ -78,6 +78,7 @@ set(TEST_SOURCES
      TestStorageJar.cpp
      TestTabIndicators.cpp
      TestTabPerformanceStats.cpp
@@ -2630,7 +2630,7 @@ index 103b935c49fe51e50995f5682aeccc8793c559ef..b2499f25775dee316fa11b17d1bff76d
      TestWebDriverBiDiNetwork.cpp
      TestWebViewURL.cpp
  )
-@@ -154,7 +155,7 @@ if (NOT WIN32)
+@@ -155,7 +156,7 @@ if (NOT WIN32)
  endif()
  
  target_sources(TestLibWebView PRIVATE ${TEST_SOURCES})

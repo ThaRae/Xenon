@@ -23,6 +23,7 @@
 #endif
 #include <UI/HiddenPageSizing.h>
 #include <UI/Menu.h>
+#include <UI/SandboxOffBar.h>
 #include <UI/StringUtils.h>
 #include <UI/TabBar.h>
 #include <UI/TabGroupEditor.h>
@@ -2902,6 +2903,8 @@ TabWidget::TabWidget(QWidget* parent)
     m_page_column_layout = new QVBoxLayout(m_page_column);
     m_page_column_layout->setSpacing(0);
     m_page_column_layout->setContentsMargins(0, 0, 0, 0);
+    if (Application::browser_options().disable_sandbox == WebView::DisableSandbox::Yes)
+        m_sandbox_off_bar = new SandboxOffBar(m_page_column);
 
     m_new_tab_button = new NewTabButton(*m_tab_bar, this);
     m_new_tab_button->setObjectName("LadybirdNewTabButton");
@@ -3204,6 +3207,8 @@ void TabWidget::set_tab_bar_visible(bool visible)
 
     if (!m_tab_bar_visible)
         set_vertical_tabs_hover_expanded(false);
+    if (m_sandbox_off_bar)
+        m_sandbox_off_bar->setVisible(m_tab_bar_visible);
 
     update_tab_chrome_visibility();
     update_tab_layout();
@@ -3868,6 +3873,8 @@ void TabWidget::rebuild_page_column()
 {
     if (!is_compact_toolbar())
         m_page_column_layout->addWidget(m_toolbar_container);
+    if (m_sandbox_off_bar)
+        m_page_column_layout->addWidget(m_sandbox_off_bar);
     m_page_column_layout->addWidget(m_stacked_widget, 1);
 }
 

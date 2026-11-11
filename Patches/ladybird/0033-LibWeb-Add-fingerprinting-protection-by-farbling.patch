@@ -260,7 +260,7 @@ index e8871a2c64c98ae3f7c0474df7fdaa883a440f50..b342d7050ced5012923adc887886c61d
          }
          Ok(())
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index f67068f941587949a134fed73b1c9951f4568505..dc398ffdb99c48569032558a1d945fb9f4a4935a 100644
+index 24686a3c7256e6ffa9548b11f99e2d4947e14339..94c45ddd4c656c4ba957e93aa7062df07933a83f 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 @@ -30,6 +30,7 @@
@@ -271,7 +271,7 @@ index f67068f941587949a134fed73b1c9951f4568505..dc398ffdb99c48569032558a1d945fb9
  #include <LibWeb/WebIDL/DOMException.h>
  #include <LibWeb/WebIDL/ExceptionOrUtils.h>
  #include <LibWeb/WebIDL/Promise.h>
-@@ -106,6 +107,8 @@ HTML::EnvironmentSettingsObject* web_bindings_relevant_settings_object(JSObject*
+@@ -107,6 +108,8 @@ HTML::EnvironmentSettingsObject* web_bindings_relevant_settings_object(JSObject*
  JSObject* web_bindings_environment_settings_object_global_object(HTML::EnvironmentSettingsObject*);
  void web_bindings_environment_settings_object_id(HTML::EnvironmentSettingsObject*, void* ctx, void (*on_id)(void*, ReadonlyBytes));
  bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope*);
@@ -280,7 +280,7 @@ index f67068f941587949a134fed73b1c9951f4568505..dc398ffdb99c48569032558a1d945fb9
  void web_bindings_with_temporary_execution_context(void* realm, bool callbacks_enabled, void* context, void (*steps)(void*));
  bool web_bindings_object_implements_interface(JSObject* object, u16 interface_name);
  JSObject* web_bindings_create_dom_exception(void* realm, ReadonlyBytes name, FlatPtr message);
-@@ -237,6 +240,23 @@ bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope* worker
+@@ -238,6 +241,23 @@ bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope* worker
      return worker_global_scope->is_closing();
  }
  
@@ -305,10 +305,10 @@ index f67068f941587949a134fed73b1c9951f4568505..dc398ffdb99c48569032558a1d945fb9
  {
      HTML::TemporaryExecutionContext execution_context { *static_cast<JS::Realm*>(realm), callbacks_enabled ? HTML::TemporaryExecutionContext::CallbacksEnabled::Yes : HTML::TemporaryExecutionContext::CallbacksEnabled::No };
 diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
-index 8de0ce23e098b5640079f22c3952a637a92998be..61b7a3c342229ade42402348bcd674ace6af806c 100644
+index 2faf057929dc6b40876380796d4d49464b563fff..f7aa54cd2d56ea09bd379c202882b47f0816605d 100644
 --- a/Libraries/LibWeb/CMakeLists.txt
 +++ b/Libraries/LibWeb/CMakeLists.txt
-@@ -343,6 +343,7 @@ set(SOURCES
+@@ -341,6 +341,7 @@ set(SOURCES
      FileAPI/BlobURLStore.cpp
      FileAPI/File.cpp
      FileAPI/FileList.cpp
@@ -585,7 +585,7 @@ index 0000000000000000000000000000000000000000..a6b190a362366a4954e65f6bc5ac07fd
 +
 +}
 diff --git a/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp b/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
-index 1bc3caa30926c96f3efec48b21b975940caede15..20485351cc3321ebd06474f5fd526fa73a40b19d 100644
+index 0d8e10e863dfbfa6143cd4e3142a02f75d7e4314..7c17322826917a2df1eb3617227960e1d64533cf 100644
 --- a/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
 +++ b/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
 @@ -8,6 +8,7 @@
@@ -596,7 +596,7 @@ index 1bc3caa30926c96f3efec48b21b975940caede15..20485351cc3321ebd06474f5fd526fa7
  #include <LibWeb/HTML/Canvas/Canvas2DContextBase.h>
  #include <LibWeb/HTML/Canvas/CanvasHost.h>
  #include <LibWeb/HTML/Canvas/PredefinedColorSpace.h>
-@@ -85,12 +86,24 @@ Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_from_surface()
+@@ -103,12 +104,24 @@ Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_from_surface()
  
  Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_for_serialization(Utf16View type)
  {
@@ -699,10 +699,10 @@ index 879f645d5f4fa7396d460877b4082c684923d8dc..1e852720251b74aa10c7d3099dc5e622
      String user_agent_for_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_url(url, user_agent); }
      String user_agent_for_websocket_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_websocket_url(url, user_agent); }
 diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
-index 0c3c8e19adc7a4b0ff9158f7ccab7746d8df5394..a2b4745cbc238ea978f704f1d4ffe6afa7288ac9 100644
+index 569ef3c077e5e42075f2b5ec254a4575b2d85a52..83fe46b1ea358b7850b8234134d2bb40948d23d5 100644
 --- a/Services/WebContent/main.cpp
 +++ b/Services/WebContent/main.cpp
-@@ -37,6 +37,7 @@
+@@ -39,6 +39,7 @@
  #include <LibWeb/HTML/WindowOrWorkerGlobalScope.h>
  #include <LibWeb/Internals/Internals.h>
  #include <LibWeb/Loader/GeneratedPagesLoader.h>
@@ -710,7 +710,7 @@ index 0c3c8e19adc7a4b0ff9158f7ccab7746d8df5394..a2b4745cbc238ea978f704f1d4ffe6af
  #include <LibWeb/Loader/ResourceLoader.h>
  #include <LibWeb/Painting/BoxViews.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
-@@ -281,6 +282,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -283,6 +284,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
      OPENSSL_TRY(OSSL_set_max_threads(nullptr, Core::System::hardware_concurrency()));
  
      Web::HTML::Window::set_enable_test_mode(enable_test_mode);

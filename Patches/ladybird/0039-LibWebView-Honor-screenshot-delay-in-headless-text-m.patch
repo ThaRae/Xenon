@@ -20,7 +20,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 39 insertions(+), 14 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 5693b3144b6f2e605caa3a8258630e31cc0a669d..b29c8b61642e3d5609626c3c3f2c008df34fdfa6 100644
+index 86a8ce18cf85da78803893ab8796636663acc356..cf949e7fb71f27983c6c72b3f92eab5f60a3ff1e 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
 @@ -376,7 +376,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
@@ -32,7 +32,7 @@ index 5693b3144b6f2e605caa3a8258630e31cc0a669d..b29c8b61642e3d5609626c3c3f2c008d
      args_parser.add_option(screenshot_path, "Save screenshots to the given location (only supported for headless screenshot mode)", "screenshot-path", 0, "path");
      args_parser.add_option(window_width, "Set viewport width in pixels (default: 800) (currently only supported for headless mode)", "window-width", 0, "pixels");
      args_parser.add_option(window_height, "Set viewport height in pixels (default: 600) (currently only supported for headless mode)", "window-height", 0, "pixels");
-@@ -2212,26 +2212,48 @@ static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventL
+@@ -2221,26 +2221,48 @@ static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventL
      return timer;
  }
  
@@ -91,7 +91,7 @@ index 5693b3144b6f2e605caa3a8258630e31cc0a669d..b29c8b61642e3d5609626c3c3f2c008d
  static void load_page_and_exit_on_close(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url)
  {
      view.on_close = [&event_loop]() {
-@@ -2258,13 +2280,16 @@ ErrorOr<int> Application::execute()
+@@ -2272,13 +2294,16 @@ ErrorOr<int> Application::execute()
  
              switch (*m_browser_options.headless_mode) {
              case HeadlessMode::Screenshot:
@@ -109,12 +109,12 @@ index 5693b3144b6f2e605caa3a8258630e31cc0a669d..b29c8b61642e3d5609626c3c3f2c008d
 +                    load_page_for_info_and_exit(*m_event_loop, *view, m_browser_options.urls.first(), WebView::PageInfoType::Text);
                  break;
              case HeadlessMode::Manual:
-                 load_page_and_exit_on_close(*m_event_loop, *view, m_browser_options.urls.first());
+             case HeadlessMode::Terminal:
 diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
-index 455fe8c4ab704bead5e155655959bb8fde595244..c2442baf192a04314550c02fc57bdfff3bf6b13f 100644
+index 7c146cb11e640ab20ff43e12d5d3e80b466e9130..4dac30ff5c15d1ebc77fc506bd0f96f8eb0d25b1 100644
 --- a/Libraries/LibWebView/Options.h
 +++ b/Libraries/LibWebView/Options.h
-@@ -101,7 +101,7 @@ struct BrowserOptions {
+@@ -102,7 +102,7 @@ struct BrowserOptions {
      Vector<ByteString> raw_urls;
      Optional<HeadlessMode> headless_mode;
      Optional<ByteString> screenshot_path {};
@@ -122,4 +122,4 @@ index 455fe8c4ab704bead5e155655959bb8fde595244..c2442baf192a04314550c02fc57bdfff
 +    Optional<u32> screenshot_delay {};
      int window_width { 800 };
      int window_height { 600 };
-     NewWindow new_window { NewWindow::No };
+     double device_pixel_ratio { 1.0 };

@@ -118,10 +118,10 @@ index d1c85bd4ae293da1d6626af082b898ce4dd7dfc9..c0bd46d82b65f013fc6dea5f1864ae3b
  // or in isolated worlds of the embedder's (see Web::HTML::UserScript), and the messages of those worlds' bridges.
  struct UserScriptHandler {
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 30a4bf630e8b970ba3967f5d8df89849b8a8ac5b..548e4f6baf1e3d5c88dba70f84f4e5558999a225 100644
+index 279e4fbe50527270938f30ae2f38e8e989e951a0..7771e784e70625f6728daafa83d02875645a7c2e 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -185,6 +185,23 @@ CanonicalTraversable& ViewImplementation::traversable() const
+@@ -186,6 +186,23 @@ CanonicalTraversable& ViewImplementation::traversable() const
      return *m_top_level_traversable;
  }
  
@@ -146,7 +146,7 @@ index 30a4bf630e8b970ba3967f5d8df89849b8a8ac5b..548e4f6baf1e3d5c88dba70f84f4e555
  {
      VERIFY(!m_top_level_traversable);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index ca7bab44592db75d14dadee6eb99a0d7fe84854a..8bc41fc8616d29ea9d971a7196c011dafe78d99c 100644
+index b60a5ed45b69025ce8f438a794064a5e32b924f0..03d32e11a54c8d08dede2d329c800d8215c92835 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
 @@ -201,6 +201,8 @@ public:
@@ -159,7 +159,7 @@ index ca7bab44592db75d14dadee6eb99a0d7fe84854a..8bc41fc8616d29ea9d971a7196c011da
      // navigator compatibility mode, the preferred languages and color scheme, the window geometry, and the rest of
      // what the UI decides for the tab. A page that displays the tab gets its viewport and focus on top of that.
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index d5512fc2f21c8ef88885c9cb5d2a0eb504e96333..08e9a0a037217c0a133935e893dabc807f17ac1e 100644
+index 3470e2989f98ba34d8864b54dc4c1a9c5b145a95..38141068354b95a21a2d3e087efaf55196a901e4 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -170,7 +170,12 @@ WebContentPage::WebContentPage(WebContentClient& client, Web::PageId id, Canonic
@@ -254,7 +254,7 @@ index 2d174678a5bb2d578c1d8d4d07ee0a1295c396ff..f505165898a133fdf02a6af15b6c7db6
      bool m_capturing_audio { false };
      Optional<PresentedBackingStores> m_presented_backing_stores;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 4cd7c1072c548c993734016eb17963042b9c6a6b..84f169208f08c54a8d9f869ef55d5a80e18c8c88 100644
+index de541f2569aba2b268377a0af066b83d6650d2a0..a015888ad2a26e6b6891940ee4f58ced1337be1c 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3556,6 +3556,14 @@ void ConnectionFromClient::post_user_script_message(Web::PageId page_id, Web::HT
@@ -273,7 +273,7 @@ index 4cd7c1072c548c993734016eb17963042b9c6a6b..84f169208f08c54a8d9f869ef55d5a80
  {
      if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 1dd61b12cdb59af7357c402bb35b7aba4dd29809..9dd8c5e194e17834c6750a3e9337c10afed254c6 100644
+index 78e6b0f9c9b9b4ca33a2fcc9f3c7e75b2a834b04..60233e78ed34e70ca782dec508374c58a0260947 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -292,6 +292,7 @@ private:
@@ -297,7 +297,7 @@ index c25aeae1e4c1af878545420fcad17dcf57b55e44..84bd5bccc6ee6d8cd64d18b6519b6c16
      void did_handle_webdriver_mouse_event(u64 request_id);
      bool prepare_webdriver_input_command(u64, Optional<Web::HTML::CrossProcessId>, JsonValue&);
 diff --git a/Services/WebContent/UserScripts.cpp b/Services/WebContent/UserScripts.cpp
-index 66314f02a5c2dfd4e549461be6a17bc14956c6b7..e364d5bb93ed84f0dd83b212c8e84faca6bff658 100644
+index a55c47a0e1e99d1d714ea71d36fedbc39d442f97..37c97ff21e63a37616006c7f1766d06de03afa0a 100644
 --- a/Services/WebContent/UserScripts.cpp
 +++ b/Services/WebContent/UserScripts.cpp
 @@ -6,15 +6,19 @@
@@ -375,7 +375,7 @@ index 66314f02a5c2dfd4e549461be6a17bc14956c6b7..e364d5bb93ed84f0dd83b212c8e84fac
 +            return {};
          }
          auto& settings = document.relevant_settings_object();
-         auto classic_script = Web::HTML::ClassicScript::create(script.url.to_byte_string(), source.utf16_view(), settings, script.url);
+         auto classic_script = Web::HTML::ClassicScript::create(script.url.to_byte_string(), move(source), settings, script.url);
 -        (void)classic_script->run();
 -        return;
 +        return classic_script->run();
@@ -594,7 +594,7 @@ index c1c7c12ced1c9dfaaf0d25b502e47c0cc88d568e..50bba9897fd679f7edd609f9dfc3f7ae
      did_request_date_picker(Web::PageId page_id, Utf16String input_type, Utf16String value, Utf16String minimum, Utf16String maximum) =|
      did_request_geolocation_position(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId document_id) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 0fb0cde302bc06e69a39392176ada77e5e9bcca7..691d22108453d6609a3ce899254a90681b81bd11 100644
+index a18a8dcb1b596274bfc8d7901f808be83c17cca8..e4c21f04e06e086267f0cd3181b76ffcfa80c65f 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -35,6 +35,7 @@

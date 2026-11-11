@@ -315,7 +315,7 @@ index c52ce758f55ace2c6fd174ee394c77f3ac130a4d..2d4fb81c8e52a1e008c759d959cc6807
      virtual void request_body_file_available(u64 request_id, IPC::File, u64 offset, u64 size) override;
      virtual void request_cached_body_file_available(u64 request_id, IPC::File, u64 offset, u64 size) override;
 diff --git a/Libraries/LibWeb/Loader/ContentBlocker.cpp b/Libraries/LibWeb/Loader/ContentBlocker.cpp
-index 82114916aa244cdc31b3be1f34b3ba1b39592584..98fc99dc44ea0474ac9f08d4470343f0bb78db07 100644
+index 51a23a1877f13c6b93b4a396857c1e70ae222e5d..114fa0e5a79c1e165d65e9af8626056ae0db57ce 100644
 --- a/Libraries/LibWeb/Loader/ContentBlocker.cpp
 +++ b/Libraries/LibWeb/Loader/ContentBlocker.cpp
 @@ -279,6 +279,21 @@ bool ContentBlocker::is_popup_filtered(URL::URL const& url, URL::URL const& open
@@ -453,7 +453,7 @@ index 25d84e5e6a87adcebbd86eeb3f5b9ec611d579ae..51c684fde27eadaeee91ef2e2f1a0894
      virtual void release_request_transfer_lease(int source_client_id, u64 source_request_id) override;
      virtual Messages::RequestServer::StopRequestResponse stop_request(u64 request_id) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index a9c6b2631e0e045c48d342c9ba584e2be4b7a3f8..dd4319b83458201a82487f15beb0036768a18ceb 100644
+index 618c9134c60e3f426a23fc3b292e8be68288ea89..e3ada111dbe2be6798781d84d0dfa4a3cae61cb8 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -441,11 +441,13 @@ NonnullOwnPtr<Request> Request::fetch(

@@ -1444,9 +1444,14 @@ void Tab::initialize(Optional<u64> hub_view_id)
         m_window->fullscreen_mode().exit(FullscreenMode::ExitInitiatedBy::WebContent);
     };
 
+    view().on_state_change = [this](Hub::ViewState const& previous_state) {
+        if (previous_state.page_mute_state != view().page_mute_state())
+            emit audio_state_changed(tab_index());
+    };
+
     view().on_tab_indicator_change = [this](WebView::TabIndicator indicator, bool) {
         if (indicator == WebView::TabIndicator::PlayingAudio)
-            emit playing_audio_indicator_changed(tab_index());
+            emit audio_state_changed(tab_index());
     };
 
     view().on_screen_wake_lock_state_changed = [this](auto wake_lock_state) {

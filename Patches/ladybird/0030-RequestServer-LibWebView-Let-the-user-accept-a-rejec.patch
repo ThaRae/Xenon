@@ -383,7 +383,7 @@ index f56316405830e2b7c61db7d39cd878415047c221..a9b941df418e3083a77f389bbe4fb7b6
      virtual void remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) override;
      virtual void retrieve_cache_access_profile(u64 access_profile_request_id, AK::Duration granularity) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index dd4319b83458201a82487f15beb0036768a18ceb..25b1143a7b7ce742851b1c6d290789ca022118dc 100644
+index e3ada111dbe2be6798781d84d0dfa4a3cae61cb8..2608b8573930c75b0b2443927fb0700714e6adc4 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -21,6 +21,7 @@
@@ -469,7 +469,7 @@ index dd4319b83458201a82487f15beb0036768a18ceb..25b1143a7b7ce742851b1c6d290789ca
      if (m_content_decoding_disabled) {
          set_option(CURLOPT_ACCEPT_ENCODING, "identity");
          set_option(CURLOPT_HTTP_CONTENT_DECODING, 0L);
-@@ -1689,7 +1741,24 @@ void Request::handle_complete_state()
+@@ -1691,7 +1743,24 @@ void Request::handle_complete_state()
              return;
          }
  

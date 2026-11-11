@@ -30,7 +30,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Services/Compositor/CMakeLists.txt            |   2 +-
  Services/Compositor/CompositorState.cpp       | 168 ++++++++++++++++++
  Services/Compositor/CompositorState.h         |  10 ++
- Services/Compositor/ContextState.h            |   1 +
+ Services/Compositor/ContextPresenter.h        |   1 +
  Services/Compositor/DisplayListPlayerSkia.cpp |   1 +
  .../Compositor/DisplayListRasterCache.cpp     |  33 ++++
  Services/Compositor/DisplayListRasterCache.h  |  24 +++
@@ -39,20 +39,20 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  9 files changed, 247 insertions(+), 1 deletion(-)
 
 diff --git a/Services/Compositor/CMakeLists.txt b/Services/Compositor/CMakeLists.txt
-index 0bc48ab12c8a8108b95cf9a7cabab1ea94aac574..ee9a5584f1635880ba13b0875d6d38714fd3133f 100644
+index 546abe4fbe068f3d61810defcedbf737bc101f44..49559fb9fa93fa10772428e21185014cd110232a 100644
 --- a/Services/Compositor/CMakeLists.txt
 +++ b/Services/Compositor/CMakeLists.txt
-@@ -82,7 +82,7 @@ target_include_directories(compositorservice PRIVATE ${LADYBIRD_SOURCE_DIR}/Serv
+@@ -77,7 +77,7 @@ target_include_directories(compositorservice PRIVATE ${LADYBIRD_SOURCE_DIR}/Serv
  target_link_libraries(Compositor PRIVATE compositorservice LibCore LibMain LibSandbox)
  # ANGLE must precede Skia so macOS GLES symbols bind to ANGLE rather than the
  # OpenGL framework pulled in by Skia.
--target_link_libraries(compositorservice PRIVATE LibCore LibGfx LibImageDecoderClient LibIPC LibMedia LibCompositing ${ANGLE_TARGETS} skia)
-+target_link_libraries(compositorservice PRIVATE LibCore LibGfx LibImageDecoderClient LibIPC LibMedia LibCompositing LibThreading ${ANGLE_TARGETS} skia)
+-target_link_libraries(compositorservice PRIVATE LibCore LibGfx LibImageDecoderClient LibIPC LibMedia LibCompositing compositor_core ${ANGLE_TARGETS} skia)
++target_link_libraries(compositorservice PRIVATE LibCore LibGfx LibImageDecoderClient LibIPC LibMedia LibCompositing LibThreading compositor_core ${ANGLE_TARGETS} skia)
  
- if (HAS_VULKAN)
-     target_sources(compositorservice PRIVATE SkiaVulkanMemoryAllocator.cpp)
+ if ((LINUX OR BSD) AND NOT BUILD_SHARED_LIBS)
+     target_link_options(compositorservice INTERFACE LINKER:--allow-multiple-definition)
 diff --git a/Services/Compositor/CompositorState.cpp b/Services/Compositor/CompositorState.cpp
-index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f428cbca9b 100644
+index 72f518dfe474b827c56c2ff2689e932db9d5ca0f..1c007b6c92eba4b32265a0f7afe1f568c1bc773c 100644
 --- a/Services/Compositor/CompositorState.cpp
 +++ b/Services/Compositor/CompositorState.cpp
 @@ -7,17 +7,51 @@
@@ -104,10 +104,10 @@ index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f4
 +    return logged;
 +}
 +
- NonnullRefPtr<CompositorState> CompositorState::create(RefPtr<Gfx::SkiaBackendContext> skia_backend_context)
+ NonnullRefPtr<CompositorState> CompositorState::create(RefPtr<Gfx::SkiaBackendContext> skia_backend_context, bool scrollbars_always_shown)
  {
-     return adopt_ref(*new CompositorState(move(skia_backend_context)));
-@@ -31,12 +65,134 @@ CompositorState::CompositorState(RefPtr<Gfx::SkiaBackendContext> skia_backend_co
+     return adopt_ref(*new CompositorState(move(skia_backend_context), scrollbars_always_shown));
+@@ -53,12 +87,134 @@ CompositorState::PresentedContext::PresentedContext(Optional<u64> page_id, Compo
  
  CompositorState::~CompositorState()
  {
@@ -133,7 +133,7 @@ index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f4
 +    m_idle_memory_release_timer->restart(delay.is_negative() ? AK::Duration::zero() : delay);
 +}
 +
-+void CompositorState::schedule_idle_memory_release_for(ContextState const& context)
++void CompositorState::schedule_idle_memory_release_for(PresentedContext const& context)
 +{
 +    auto release_delay = context_is_effectively_visible(context) ? visible_context_raster_release_delay : hidden_context_raster_release_delay;
 +    schedule_idle_memory_release(MonotonicTime::now() + release_delay);
@@ -155,11 +155,11 @@ index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f4
 +            next_release_time = release_time;
 +    };
 +
-+    for (auto& context_entry : m_contexts) {
++    for (auto& context_entry : m_presented_contexts) {
 +        auto& context = *context_entry.value;
 +        auto is_visible = context_is_effectively_visible(context);
 +        auto keep_text_blobs = is_visible ? DisplayListRasterCache::KeepTextBlobs::Yes : DisplayListRasterCache::KeepTextBlobs::No;
-+        auto& raster_cache = context.raster_cache();
++        auto& raster_cache = context.presenter.raster_cache();
 +        if (!raster_cache.has_cached_rasters(keep_text_blobs))
 +            continue;
 +
@@ -168,7 +168,7 @@ index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f4
 +        if (idle_time < release_delay) {
 +            release_no_later_than(raster_cache.last_painted() + release_delay);
 +            if (logged)
-+                dbgln("COMPOSITOR-IDLE-KEEP context={} nested={} visible={} idle_ms={}", context_entry.key, context.parent_context_id().has_value(), is_visible, idle_time.to_milliseconds());
++                dbgln("COMPOSITOR-IDLE-KEEP context={} nested={} visible={} idle_ms={}", context_entry.key, context.parent_context_id.has_value(), is_visible, idle_time.to_milliseconds());
 +            continue;
 +        }
 +
@@ -176,7 +176,7 @@ index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f4
 +        m_free_page_release_is_pending = true;
 +        if (logged) {
 +            dbgln("COMPOSITOR-IDLE-RELEASE context={} nested={} visible={} gpu={} idle_ms={} tiles={} nested_lists={} text={}",
-+                context_entry.key, context.parent_context_id().has_value(), is_visible, !m_skia_backend_context.is_null(),
++                context_entry.key, context.parent_context_id.has_value(), is_visible, !m_skia_backend_context.is_null(),
 +                idle_time.to_milliseconds(), released_bytes.repeated_tiles, released_bytes.nested_display_lists, released_bytes.text_blobs);
 +        }
 +    }
@@ -239,10 +239,10 @@ index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f4
 +#endif
 +}
 +
- void CompositorState::register_presentation(CompositorStateClient& presentation, PresentationCapabilities capabilities)
+ WebContentClientId CompositorState::register_web_content_client(CompositorStateWebContentClient& client)
  {
-     m_presentations.set(&presentation, capabilities);
-@@ -1596,6 +1752,8 @@ void CompositorState::set_context_visibility(Web::CompositorContextId context_id
+     WebContentClientId client_id { m_next_web_content_client_id++ };
+@@ -928,6 +1084,8 @@ void CompositorState::set_context_visibility(Web::CompositorContextId context_id
  
      if (visibility == Compositing::ContextVisibility::Visible)
          resume_presentation_after_becoming_visible(context_id, *context);
@@ -251,34 +251,38 @@ index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f4
  }
  
  void CompositorState::set_context_presents_from_cpu_memory(Web::CompositorContextId context_id, bool presents_from_cpu_memory)
-@@ -1691,7 +1849,10 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Gfx::In
- void CompositorState::present_frame(Web::CompositorContextId context_id, ContextState& context, PendingFrame pending_frame)
+@@ -1023,7 +1181,10 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Gfx::In
+ void CompositorState::present_frame(Web::CompositorContextId context_id, PresentedContext& context, PendingFrame pending_frame)
  {
      auto composited_context_resolver = resolver_for(context_id);
-+    auto repaints_released_rasters = context.raster_cache().was_released_since_last_paint();
++    auto repaints_released_rasters = context.presenter.raster_cache().was_released_since_last_paint();
 +    auto preparation_start_time = MonotonicTime::now();
-     auto prepared_frame = context.prepare_frame(*m_display_list_player, pending_frame, &composited_context_resolver);
+     auto prepared_frame = context.presenter.prepare_frame(*m_display_list_player, pending_frame, m_core.frame_inputs(context_id, MonotonicTime::now()), &composited_context_resolver);
 +    auto preparation_time = MonotonicTime::now() - preparation_start_time;
      if (!prepared_frame.has_value())
          return;
  
-@@ -1707,6 +1868,9 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Context
+@@ -1039,6 +1200,9 @@ void CompositorState::present_frame(Web::CompositorContextId context_id, Present
          });
      });
-     context.presenter().did_submit_prepared_frame(pending_frame.viewport_rect);
+     context.presenter.did_submit_prepared_frame(pending_frame.viewport_rect);
 +    if (idle_memory_release_is_logged())
 +        dbgln("COMPOSITOR-FRAME context={} prepare_us={} after_release={}", context_id, preparation_time.to_microseconds(), repaints_released_rasters);
 +    schedule_idle_memory_release_for(context);
  #ifdef AK_OS_MACOS
      // The window server's reads of an IOSurface wait for GPU work that is already scheduled to write it. Handing the
      // frame to the client before that work finishes keeps it ahead of the window server's deadline for the next refresh.
-@@ -1908,8 +2072,12 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
+@@ -1251,12 +1415,16 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
          return false;
  
      auto composited_context_resolver = resolver_for(context_id);
-+    auto repaints_released_rasters = context->raster_cache().was_released_since_last_paint();
-     if (auto scrollbar_fade_frame = context->paint_screenshot(*m_display_list_player, target_bitmap, &composited_context_resolver); scrollbar_fade_frame.has_value())
-         schedule_present_frame(context_id, *context, *scrollbar_fade_frame);
++    auto repaints_released_rasters = context->presenter.raster_cache().was_released_since_last_paint();
+     auto screenshot_inputs = m_core.frame_inputs_for_screenshot(context_id, now);
+     context->presenter.paint_screenshot(*m_display_list_player, target_bitmap, screenshot_inputs.frame_inputs, &composited_context_resolver);
+     if (!screenshot_inputs.scrollbar_fade_damage_rect.is_empty()) {
+         if (auto viewport_rect = context->presenter.viewport_rect_for_ui_overlay(); viewport_rect.has_value())
+             schedule_present_frame(context_id, *context, { *viewport_rect, screenshot_inputs.scrollbar_fade_damage_rect });
+     }
 +    if (idle_memory_release_is_logged())
 +        dbgln("COMPOSITOR-SCREENSHOT context={} after_release={}", context_id, repaints_released_rasters);
 +    schedule_idle_memory_release_for(*context);
@@ -286,10 +290,10 @@ index 7de9c42381b1d67e07d908f785c29eedfb224f36..0802908953652d31a137e05b4dc267f4
  }
  
 diff --git a/Services/Compositor/CompositorState.h b/Services/Compositor/CompositorState.h
-index 718801f23ba49fe5674f5bcb689f8995aebd948e..a2e907ce68ab99579cf1be3bdd8e6db758572d2d 100644
+index 0f4ab5db429537e0be8560b75e5160514b58ef7b..942537f38edee8ef217fccf5b0cda66434fb349a 100644
 --- a/Services/Compositor/CompositorState.h
 +++ b/Services/Compositor/CompositorState.h
-@@ -34,6 +34,7 @@
+@@ -37,6 +37,7 @@
  #include <LibMedia/Sinks/DisplayingVideoSink.h>
  #include <LibMedia/VideoSinkHandle.h>
  #include <LibMediaCodecs/VideoFramePool.h>
@@ -297,18 +301,18 @@ index 718801f23ba49fe5674f5bcb689f8995aebd948e..a2e907ce68ab99579cf1be3bdd8e6db7
  
  namespace Compositor {
  
-@@ -327,6 +328,10 @@ private:
+@@ -280,6 +281,10 @@ private:
      void cancel_pending_async_presents_for_context(Web::CompositorContextId);
      void schedule_gpu_completion_check();
      void check_gpu_completions();
 +    void schedule_idle_memory_release(MonotonicTime);
-+    void schedule_idle_memory_release_for(ContextState const&);
++    void schedule_idle_memory_release_for(PresentedContext const&);
 +    void release_idle_memory();
 +    void release_free_pages();
  
-     HashMap<Web::CompositorContextId, OwnPtr<ContextState>> m_contexts;
- 
-@@ -336,6 +341,11 @@ private:
+     HashMap<Web::CompositorContextId, NonnullOwnPtr<PresentedContext>> m_presented_contexts;
+     u64 m_next_web_content_client_id { 1 };
+@@ -292,6 +297,11 @@ private:
      OwnPtr<DisplayListPlayerSkia> m_display_list_player;
      HashMap<Optional<u64>, OwnPtr<VSyncScheduler>> m_vsync_schedulers_by_display;
      RefPtr<Core::Timer> m_gpu_completion_timer;
@@ -319,26 +323,26 @@ index 718801f23ba49fe5674f5bcb689f8995aebd948e..a2e907ce68ab99579cf1be3bdd8e6db7
 +    RefPtr<Threading::Thread> m_heap_trim_thread;
  
      HashMap<CompositorStateClient*, PresentationCapabilities> m_presentations;
-     HashMap<Web::CompositorContextId, CompositorStateClient*> m_context_presentations;
-diff --git a/Services/Compositor/ContextState.h b/Services/Compositor/ContextState.h
-index a196ea6f45403a8cad2f8bce46ee59eb8c65fbba..26cdaa1d508d645ad303e6cf9acd5fa5eb4d6427 100644
---- a/Services/Compositor/ContextState.h
-+++ b/Services/Compositor/ContextState.h
-@@ -180,6 +180,7 @@ public:
-     Optional<Web::CompositorContextId> parent_context_id() const { return m_parent_context_id; }
-     ContextPresenter& presenter() { return m_presenter; }
-     ContextPresenter const& presenter() const { return m_presenter; }
-+    DisplayListRasterCache& raster_cache() { return m_scene.raster_cache(); }
+     u64 m_next_presentation_id { 1 };
+diff --git a/Services/Compositor/ContextPresenter.h b/Services/Compositor/ContextPresenter.h
+index 0e0b5e12941166ba79c552dc1ef4092bb8381c9f..05f26fe2f85dd3c2e4b2f02f65523d633593d67a 100644
+--- a/Services/Compositor/ContextPresenter.h
++++ b/Services/Compositor/ContextPresenter.h
+@@ -64,6 +64,7 @@ public:
+     Compositing::DisplayListResourceStorage& resource_storage() { return m_resource_storage; }
+     Compositing::DisplayListResourceStorage const& resource_storage() const { return m_resource_storage; }
+     void apply_resource_transaction(Compositing::DisplayListResourceTransaction&&);
++    DisplayListRasterCache& raster_cache() { return m_raster_cache; }
  
-     void apply_display_list_resource_transaction(Compositing::DisplayListResourceTransaction&&);
-     void install_display_list_update(
+     bool presents_to_client() const { return m_presents_to_client; }
+     void stop_presenting_to_client() { m_presents_to_client = false; }
 diff --git a/Services/Compositor/DisplayListPlayerSkia.cpp b/Services/Compositor/DisplayListPlayerSkia.cpp
-index 2e0c316eb4a19fdaa645504419b0693339b1ba04..86454cb000b55a28892a146a813a987eb1cdb3f0 100644
+index 4dc2b598d13214b255f5a2fd1a7206df978fb0a6..fe39979e82739cf988a94bf447d46dc73ef298da 100644
 --- a/Services/Compositor/DisplayListPlayerSkia.cpp
 +++ b/Services/Compositor/DisplayListPlayerSkia.cpp
-@@ -77,6 +77,7 @@ void DisplayListPlayerSkia::execute(
+@@ -76,6 +76,7 @@ void DisplayListPlayerSkia::execute(
      TemporaryChange composited_context_resolver_change { m_composited_context_resolver, composited_context_resolver };
-     TemporaryChange scrollbar_controller_change { m_scrollbar_controller, scrollbar_controller };
+     TemporaryChange scrollbars_of_frame_change { m_scrollbars_of_frame, scrollbars_of_frame };
      raster_cache.drop_clip_paths_not_used_since_last_frame();
 +    raster_cache.did_paint();
      TemporaryChange raster_cache_change { m_raster_cache, &raster_cache };
@@ -431,10 +435,10 @@ index b0f7ab7cec28dc3523e0f27019278f325721e4af..11598c3904f0088f6b79434ae00f095a
  
  }
 diff --git a/Services/Compositor/SkiaBackendContext.cpp b/Services/Compositor/SkiaBackendContext.cpp
-index 740b10371384c4a1391e28905a6322b533636182..4e0553dd5cfb9871a8f121e6724921d07a2c9512 100644
+index ac1a0e414f7168d2516249852c0ba8a6acc3c8b4..27a71f0c69b80ea3cf73d7009b4420dbfc5782d9 100644
 --- a/Services/Compositor/SkiaBackendContext.cpp
 +++ b/Services/Compositor/SkiaBackendContext.cpp
-@@ -171,6 +171,14 @@ size_t SkiaBackendContext::resource_cache_bytes() const
+@@ -181,6 +181,14 @@ size_t SkiaBackendContext::resource_cache_bytes() const
      return bytes;
  }
  
@@ -450,10 +454,10 @@ index 740b10371384c4a1391e28905a6322b533636182..4e0553dd5cfb9871a8f121e6724921d0
  {
      VERIFY(!main_thread_context());
 diff --git a/Services/Compositor/SkiaBackendContext.h b/Services/Compositor/SkiaBackendContext.h
-index 8a93975a4a718c4fc3fc796a1f59e2a1dad42923..00a673e77849643ef8143c96da382d2958d97f92 100644
+index 2ab6318b0380c3fc1f96a304db01e7be087a19af..64cd8d53ea210075c697a2ba3cbe6ae00c31fbc2 100644
 --- a/Services/Compositor/SkiaBackendContext.h
 +++ b/Services/Compositor/SkiaBackendContext.h
-@@ -63,6 +63,7 @@ public:
+@@ -64,6 +64,7 @@ public:
      void flush_and_submit_async(PaintingSurface&, Function<void()>&&);
      void check_async_work_completion();
      size_t resource_cache_bytes() const;

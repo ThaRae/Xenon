@@ -31,10 +31,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  10 files changed, 50 insertions(+), 11 deletions(-)
 
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index cf648005588f8dbaabef2f5bc69442349ad0da97..6a7b5482d086acbd3b55e36b9ca1d5f7c58ef768 100644
+index 71c171a530a73f8e1a0d0603736544ae811c2b5b..cd63aa47b3d09c2fe2519363e36ab64e34945877 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -3083,6 +3083,20 @@ void ViewImplementation::paste_from_clipboard()
+@@ -3093,6 +3093,20 @@ void ViewImplementation::paste_from_clipboard(Web::Clipboard::PasteMode paste_mo
      });
  }
  
@@ -56,10 +56,10 @@ index cf648005588f8dbaabef2f5bc69442349ad0da97..6a7b5482d086acbd3b55e36b9ca1d5f7
  {
      auto& host = focused_navigable_host();
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index b240011c3a4612c91eca9fa8a64661d38eeb6421..89feb8d3da27777ddbcc3a6d5cb6965d4d9d911e 100644
+index 7e7df945285c9441ecdc887fd4a2ecfdcbd606a2..fa84ed76ea085229a9a73fb2f50a8be640c13336 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -401,6 +401,8 @@ public:
+@@ -404,6 +404,8 @@ public:
      void did_receive_selected_text_for_lookup(Badge<WebContentPage>, u64 request_id, Optional<DictionaryLookup> lookup);
      void did_select_word_for_dictionary_lookup(Badge<WebContentPage>, u64 request_id, bool selected);
      void did_cut_selected_text(Badge<WebContentPage>, u64 request_id, ByteString selection);
@@ -69,10 +69,10 @@ index b240011c3a4612c91eca9fa8a64661d38eeb6421..89feb8d3da27777ddbcc3a6d5cb6965d
      void undo();
      void redo();
 diff --git a/Services/Hub/ConnectionFromUI.cpp b/Services/Hub/ConnectionFromUI.cpp
-index 0a1a3cb4e1506f9a91373526d062de0862e40598..68bd4b521c2c8c9fba292e64099cd3d768b815e8 100644
+index 1a951ff8c5921f84ed2104b85ad6dfacc404f32d..b808903c780e7bc006ec92c985c1ea3166de2581 100644
 --- a/Services/Hub/ConnectionFromUI.cpp
 +++ b/Services/Hub/ConnectionFromUI.cpp
-@@ -970,14 +970,16 @@ void ConnectionFromUI::view_redo(u64 view_id)
+@@ -971,14 +971,16 @@ void ConnectionFromUI::view_redo(u64 view_id)
          view->redo();
  }
  
@@ -94,9 +94,9 @@ index 0a1a3cb4e1506f9a91373526d062de0862e40598..68bd4b521c2c8c9fba292e64099cd3d7
 +        view->cut_selection();
  }
  
- void ConnectionFromUI::view_paste(u64 view_id)
+ void ConnectionFromUI::view_paste(u64 view_id, Web::Clipboard::PasteMode paste_mode)
 diff --git a/Services/Hub/ConnectionFromUI.h b/Services/Hub/ConnectionFromUI.h
-index 220a1ecdc41907f311d864d85abf87b965cbe433..2b95abdfe079a1bdf80f9088fb4a6a0657f265a1 100644
+index 01454ecf3c8a65a7c9cada2bada0084443a6c8cd..259d5b1eab07f5cffef415563a5e8d38a2e33d4c 100644
 --- a/Services/Hub/ConnectionFromUI.h
 +++ b/Services/Hub/ConnectionFromUI.h
 @@ -167,6 +167,7 @@ private:
@@ -105,10 +105,10 @@ index 220a1ecdc41907f311d864d85abf87b965cbe433..2b95abdfe079a1bdf80f9088fb4a6a06
      virtual void view_redo(u64 view_id) override;
 +    virtual void view_copy_selection(u64 view_id) override;
      virtual void view_cut_selection(u64 view_id) override;
-     virtual void view_paste(u64 view_id) override;
+     virtual void view_paste(u64 view_id, Web::Clipboard::PasteMode) override;
      virtual void view_select_all(u64 view_id) override;
 diff --git a/Services/Hub/HubServer.ipc b/Services/Hub/HubServer.ipc
-index 9cc931a78cedb812aa5202104d09a754357db8ab..de8f36d68a84977c5b293902d32cd1006831c669 100644
+index 90a1b51345f46e0a130f5e1bd680b97a81c10005..3e9b789499613abb134cdbbc588b7590919b3359 100644
 --- a/Services/Hub/HubServer.ipc
 +++ b/Services/Hub/HubServer.ipc
 @@ -245,6 +245,7 @@ endpoint HubServer
@@ -117,10 +117,10 @@ index 9cc931a78cedb812aa5202104d09a754357db8ab..de8f36d68a84977c5b293902d32cd100
      view_redo(u64 view_id) =|
 +    view_copy_selection(u64 view_id) =|
      view_cut_selection(u64 view_id) =|
-     view_paste(u64 view_id) =|
+     view_paste(u64 view_id, Web::Clipboard::PasteMode paste_mode) =|
      view_select_all(u64 view_id) =|
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 7452b43dcddfd49cd54c0b20c64e39bf82b35dbe..752de5cd3f8ffed2f8d33d2a75711e3f9b261037 100644
+index 08bf1629f4c8dd03f7a0b1b4c8947daefe7550e5..5eab310bf9b53d3f683c594bf47b4574e5c4e031 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3198,6 +3198,24 @@ void ConnectionFromClient::select_all(Web::PageId page_id)
@@ -149,7 +149,7 @@ index 7452b43dcddfd49cd54c0b20c64e39bf82b35dbe..752de5cd3f8ffed2f8d33d2a75711e3f
  {
      if (auto page = this->page(page_id); page.has_value()) {
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 82e0d23dca680adb862c991187b4dc7c6b33d61d..d2ea43ca2db9f311c584feded381e4d7a671e2b2 100644
+index 86338e380f648a735c9803e8d9fa31c81b43ddbe..e4356905baf92184cc5cfa4e79d0429ee4c54016 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -352,6 +352,8 @@ private:
@@ -162,7 +162,7 @@ index 82e0d23dca680adb862c991187b4dc7c6b33d61d..d2ea43ca2db9f311c584feded381e4d7
      virtual void undo(Web::PageId page_id) override;
      virtual void redo(Web::PageId page_id) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 0b57ed8439783955c2bb81a587dbc25b35fc77b8..25dc7f6e38a519bc850d55d8965136700c08b6e7 100644
+index bad87b1d8dbfdb828e38ac2838e2c675daf8c2d6..cca7d991db1edc174808bdd844d478db6da33889 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -253,6 +253,8 @@ endpoint WebContentServer routed by Web::PageId page_id
@@ -175,10 +175,10 @@ index 0b57ed8439783955c2bb81a587dbc25b35fc77b8..25dc7f6e38a519bc850d55d896513670
      undo(Web::PageId page_id) =|
      redo(Web::PageId page_id) =|
 diff --git a/UI/Qt/ApplicationActions.cpp b/UI/Qt/ApplicationActions.cpp
-index 0d10fad53b005a6c80002af491a2bbf0a4b07546..4c9745ab3537f8d45afa4c7e85c90ffeae1389fd 100644
+index d27ab114c76d1dddec5c9d7bb79b3f02bc6fe95a..1c3074179ccdf32d5163c5b2b65e7a45fe5b0814 100644
 --- a/UI/Qt/ApplicationActions.cpp
 +++ b/UI/Qt/ApplicationActions.cpp
-@@ -102,10 +102,7 @@ ApplicationActions::ApplicationActions(PageOptions const& options)
+@@ -117,10 +117,7 @@ ApplicationActions::ApplicationActions(PageOptions const& options)
          HubConnection::the().async_view_redo(view.view_id());
      }));
      m_copy_selection_action = Action::create("Copy"sv, ActionID::CopySelection, on_focused_text_field_or_active_view(copy_text_field, [](RemoteView& view) {
@@ -191,7 +191,7 @@ index 0d10fad53b005a6c80002af491a2bbf0a4b07546..4c9745ab3537f8d45afa4c7e85c90ffe
      m_cut_selection_action = Action::create("Cut"sv, ActionID::CutSelection, on_focused_text_field_or_active_view(cut_text_field, [](RemoteView& view) {
          HubConnection::the().async_view_cut_selection(view.view_id());
 diff --git a/UI/Qt/ContextMenus.cpp b/UI/Qt/ContextMenus.cpp
-index cc9574acc7d3146134614a4ff50c434812cd0411..aa836fe667c9ebd9ae29df38ff9a860b5df94e35 100644
+index a372c68801644928524444647317b51c9a7331d0..8b4dca018b432a1e79b06a604325de43a31e0b75 100644
 --- a/UI/Qt/ContextMenus.cpp
 +++ b/UI/Qt/ContextMenus.cpp
 @@ -118,7 +118,7 @@ static void add_text_edit_actions(Menu& menu, u64 view_id, bool is_editable, boo

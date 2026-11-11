@@ -26,10 +26,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  8 files changed, 74 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 24d332fd817d5de9befa3d94c364618a9ca1b3ca..cf648005588f8dbaabef2f5bc69442349ad0da97 100644
+index d3b06a2e2f918ef365537a14fed272143e00992c..71c171a530a73f8e1a0d0603736544ae811c2b5b 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -130,6 +130,14 @@ ViewImplementation::ViewImplementation(IsPrivate is_private, EnableContentBlocke
+@@ -131,6 +131,14 @@ ViewImplementation::ViewImplementation(IsPrivate is_private, EnableContentBlocke
      m_page_response_timer = Core::Timer::create_single_shot(AK::Duration::zero(), [this] {
          update_page_response_watchdog();
      });
@@ -44,7 +44,7 @@ index 24d332fd817d5de9befa3d94c364618a9ca1b3ca..cf648005588f8dbaabef2f5bc6944234
  }
  
  ViewImplementation::~ViewImplementation()
-@@ -466,6 +474,13 @@ void ViewImplementation::server_did_paint(Badge<WebContentPage>, i32 bitmap_id,
+@@ -467,6 +475,13 @@ void ViewImplementation::server_did_paint(Badge<WebContentPage>, i32 bitmap_id,
          on_ready_to_paint();
  }
  
@@ -58,7 +58,7 @@ index 24d332fd817d5de9befa3d94c364618a9ca1b3ca..cf648005588f8dbaabef2f5bc6944234
  void ViewImplementation::release_backing_store(i32 bitmap_id)
  {
      page().release_presented_bitmap(bitmap_id);
-@@ -495,6 +510,10 @@ void ViewImplementation::set_system_visibility_state(Web::HTML::VisibilityState
+@@ -496,6 +511,10 @@ void ViewImplementation::set_system_visibility_state(Web::HTML::VisibilityState
      traversable().set_system_visibility_state(visibility_state);
      Application::the().update_compositor_context_visibility(page().compositor_context_id(), visibility_state);
      report_permission_presence();
@@ -69,7 +69,7 @@ index 24d332fd817d5de9befa3d94c364618a9ca1b3ca..cf648005588f8dbaabef2f5bc6944234
      update_page_response_watchdog();
  }
  
-@@ -1522,16 +1541,21 @@ void ViewImplementation::update_page_response_watchdog()
+@@ -1536,16 +1555,21 @@ void ViewImplementation::update_page_response_watchdog()
              oldest_input_time = pending.enqueued_at;
      }
  
@@ -94,7 +94,7 @@ index 24d332fd817d5de9befa3d94c364618a9ca1b3ca..cf648005588f8dbaabef2f5bc6944234
      if (m_page_unresponsive == unresponsive)
          return;
      m_page_unresponsive = unresponsive;
-@@ -1543,17 +1567,37 @@ void ViewImplementation::stop_watching_page_response()
+@@ -1557,17 +1581,37 @@ void ViewImplementation::stop_watching_page_response()
  {
      for (auto& pending : m_pending_input_events)
          pending.watches_page_response = false;
@@ -135,7 +135,7 @@ index 24d332fd817d5de9befa3d94c364618a9ca1b3ca..cf648005588f8dbaabef2f5bc6944234
      update_page_response_watchdog();
  }
  
-@@ -4425,6 +4469,7 @@ void ViewImplementation::handle_web_content_process_crash()
+@@ -4440,6 +4484,7 @@ void ViewImplementation::handle_web_content_process_crash()
      // for this tab are stale once its tree is abandoned or restored.
      m_pending_input_events.clear();
      m_page_has_open_dialog = false;
@@ -144,7 +144,7 @@ index 24d332fd817d5de9befa3d94c364618a9ca1b3ca..cf648005588f8dbaabef2f5bc6944234
  
      set_loading_state(false);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index b226cc0bbd114bfa3b3f02f731cfbef9f8cca7d9..b240011c3a4612c91eca9fa8a64661d38eeb6421 100644
+index c186074fa86ccf367d3eef0ea0804d8bb66c33d1..7e7df945285c9441ecdc887fd4a2ecfdcbd606a2 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
 @@ -228,6 +228,7 @@ public:
@@ -155,7 +155,7 @@ index b226cc0bbd114bfa3b3f02f731cfbef9f8cca7d9..b240011c3a4612c91eca9fa8a64661d3
  
      // What the user does in the WebAuthn prompt.
      void web_authn_cancel();
-@@ -825,6 +826,9 @@ protected:
+@@ -828,6 +829,9 @@ protected:
      bool page_response_watch_is_suspended() const;
      void update_page_response_watchdog();
      void stop_watching_page_response();
@@ -165,7 +165,7 @@ index b226cc0bbd114bfa3b3f02f731cfbef9f8cca7d9..b240011c3a4612c91eca9fa8a64661d3
      void did_open_page_dialog();
      void did_close_page_dialog();
      void complete_webdriver_navigation_completion(u64 request_id, Web::WebDriver::Response);
-@@ -1030,6 +1034,11 @@ protected:
+@@ -1034,6 +1038,11 @@ protected:
      MonotonicTime m_page_response_watch_resumed_at { MonotonicTime::now_coarse() };
      bool m_page_response_watch_was_suspended { true };
      bool m_page_has_open_dialog { false };
@@ -178,7 +178,7 @@ index b226cc0bbd114bfa3b3f02f731cfbef9f8cca7d9..b240011c3a4612c91eca9fa8a64661d3
  
      struct ClipboardWrite {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index f2d306fd0623253d046b3965e6ea894cd3a2a3f1..274dd9fc7a2e442f4de667d0cd97ff2549d7e9b4 100644
+index cb255f172818c3e0d333f53921224b426395f10f..e46b3e97fd4e06c3546053572967e055533c19b3 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -2856,6 +2856,11 @@ void WebContentPage::did_request_set_system_focus(bool has_system_focus)
@@ -206,7 +206,7 @@ index ef03a2419f5cdf643ff0addf303a3a424670b350..60299c907abebbf248f7ce121957a040
      virtual void did_complete_navigation_unload_check(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id) override;
      virtual void did_finish_navigation_params_creation(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id, Optional<Web::HTML::NavigationPopulationResult> result) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 742f37f61bab1236108aa6eef38e9a83a8d475c3..04a954def83593d1501a298cb3869a66528c1feb 100644
+index b313a00b01b48352b1317290018a5d39cf801bb6..8645683bc13096516c40bde69290e091ab8d2e4f 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3641,6 +3641,11 @@ void ConnectionFromClient::schedule_memory_release_after_load()
@@ -222,7 +222,7 @@ index 742f37f61bab1236108aa6eef38e9a83a8d475c3..04a954def83593d1501a298cb3869a66
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 6e7dc3de2957540aeba13050af7fba7a19678bdc..44838d8a6e5abc1c1a78922af2e0223637ca4352 100644
+index c0589acc1903fa201b53a7a2dc36545ebab8c998..6850176b8f19372ccc808740efd55d946293e934 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -304,6 +304,7 @@ private:
@@ -246,7 +246,7 @@ index c3608b1c1fa8688c7e6fcb9790539f297c8d7e87..15739d4277aa259cdbfed5710c51c870
      revoke_history_operation(Web::PageId page_id, Web::HTML::CrossProcessId operation_id) =|
      beforeunload_check_result(Web::PageId page_id, Web::HTML::CrossProcessId check_id, Web::HTML::CheckIfUnloadingIsCanceledResult result, Web::HTML::UnloadPromptShown unload_prompt_shown) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 591dc523e3155e3cbb834823d72471836bd5b3aa..44cb2806932afb429881f540bd6ae09b33644333 100644
+index 4f4659e00916a91f6c6cb0be2b50c63082e34521..a000470090bfab6cc5311e6d7b6f03fce123aa72 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -311,6 +311,7 @@ endpoint WebContentServer routed by Web::PageId page_id

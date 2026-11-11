@@ -97,6 +97,7 @@ set(XENON_SOURCES
     RemoteDownloads.cpp
     RemoteView.cpp
     ReportReview.cpp
+    SandboxOffBar.cpp
     ScreenshotSelectionOverlay.cpp
     ScreenshotViewer.cpp
     SelectDropdown.cpp

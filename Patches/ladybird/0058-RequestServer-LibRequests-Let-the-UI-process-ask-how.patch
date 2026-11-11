@@ -263,7 +263,7 @@ index a9b941df418e3083a77f389bbe4fb7b62d6d8dec..3994caed7fdc52f9def75eae580c64b1
      virtual void estimate_cache_size_accessed_since(u64 cache_size_estimation_id, UnixDateTime since) override;
      virtual void remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index 25b1143a7b7ce742851b1c6d290789ca022118dc..d45540306a256adbfe7974e7aabf1ddee5882778 100644
+index 2608b8573930c75b0b2443927fb0700714e6adc4..3c4dcee932bb3e83ac9472f74f04abffbe439573 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -27,6 +27,7 @@
@@ -274,7 +274,7 @@ index 25b1143a7b7ce742851b1c6d290789ca022118dc..d45540306a256adbfe7974e7aabf1dde
  #include <string.h>
  
  namespace RequestServer {
-@@ -2322,6 +2323,9 @@ void Request::transfer_headers_to_client_if_needed()
+@@ -2324,6 +2325,9 @@ void Request::transfer_headers_to_client_if_needed()
      if (!m_status_code.has_value())
          m_status_code = acquire_status_code();
  

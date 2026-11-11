@@ -35,10 +35,10 @@ same values.
  18 files changed, 126 insertions(+)
 
 diff --git a/Base/res/ladybird/about-pages/settings.html b/Base/res/ladybird/about-pages/settings.html
-index 3b0869cce2adf6f99b3664f82da818443f33f16b..2a910fa6bed65ce32982b76c7e395a9919046954 100644
+index 2f9441f29baa337f047b370695b623c2916d53f1..d842bc4018dd089eefb5024eb596b2cb13ba4b0e 100644
 --- a/Base/res/ladybird/about-pages/settings.html
 +++ b/Base/res/ladybird/about-pages/settings.html
-@@ -1113,6 +1113,13 @@
+@@ -1130,6 +1130,13 @@
                                  </label>
                                  <input id="global-privacy-control-toggle" type="checkbox" switch />
                              </div>
@@ -87,7 +87,7 @@ index e48c473c78b703b496e4161af704fa807c083705..0ec02462a54189f1b4e969ad90124350
      if (event.detail.name === "loadSettings") {
          loadSettings(event.detail.data);
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 0058a391cae51ae570f2d421bc2fe20efac258fe..40a4fe1dfbff00b44e6204bc4042001a870f86e8 100644
+index 16cb5d5461a503f2a34377521e0d70db5557e31b..c072e48b4ffc0e6a739408a43bc6b89234a5b555 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
 @@ -10,6 +10,7 @@
@@ -98,7 +98,7 @@ index 0058a391cae51ae570f2d421bc2fe20efac258fe..40a4fe1dfbff00b44e6204bc4042001a
  #include <AK/ScopeGuard.h>
  #include <AK/StringBuilder.h>
  #include <AK/Time.h>
-@@ -139,6 +140,11 @@ struct ApplicationSettingsObserver final : public SettingsObserver {
+@@ -144,6 +145,11 @@ struct ApplicationSettingsObserver final : public SettingsObserver {
          Application::the().languages_changed({});
      }
  
@@ -110,7 +110,7 @@ index 0058a391cae51ae570f2d421bc2fe20efac258fe..40a4fe1dfbff00b44e6204bc4042001a
      virtual void browsing_data_settings_changed() override
      {
          Application::request_server_manager().disk_cache_settings_changed();
-@@ -2802,6 +2808,28 @@ void Application::languages_changed(Badge<ApplicationSettingsObserver>)
+@@ -2808,6 +2814,28 @@ void Application::languages_changed(Badge<ApplicationSettingsObserver>)
      WorkerAgentManager::the().update_preferred_languages(m_settings->languages());
  }
  
@@ -140,7 +140,7 @@ index 0058a391cae51ae570f2d421bc2fe20efac258fe..40a4fe1dfbff00b44e6204bc4042001a
  {
      return m_user_agent_string;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 38fedf712c7c4132deb602947c0badb151c2bc96..426985421b2a6deaf28fe5c00580e02409da0024 100644
+index 21830549d70809a084629c3c5af0f87d73db118d..991c3b9ce8de2c9585071b044cd8035d532c4a26 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
 @@ -189,6 +189,13 @@ public:
@@ -158,10 +158,10 @@ index 38fedf712c7c4132deb602947c0badb151c2bc96..426985421b2a6deaf28fe5c00580e024
      // The spoofing choices in effect: what every page and worker reports from its navigator.
      String user_agent_string() const;
 diff --git a/Libraries/LibWebView/Settings.cpp b/Libraries/LibWebView/Settings.cpp
-index bb2e93c5e0476d760ee05fda7e5da8683fb011e3..f6b581bcc2ac864731a4fc0a735d77855fb41973 100644
+index 3c548639576d94866875839e4a8ab11ee3753092..83796c459fbc3148e55aba7bb0a0a495aaddba14 100644
 --- a/Libraries/LibWebView/Settings.cpp
 +++ b/Libraries/LibWebView/Settings.cpp
-@@ -88,6 +88,7 @@ static constexpr auto DISK_CACHE_MAXIMUM_SIZE_KEY = "maxSize"sv;
+@@ -86,6 +86,7 @@ static constexpr auto DISK_CACHE_MAXIMUM_SIZE_KEY = "maxSize"sv;
  
  static constexpr auto GLOBAL_PRIVACY_CONTROL_KEY = "globalPrivacyControl"sv;
  static constexpr auto CRASH_REPORT_SENDING_KEY = "crashReportSending"sv;
@@ -169,7 +169,7 @@ index bb2e93c5e0476d760ee05fda7e5da8683fb011e3..f6b581bcc2ac864731a4fc0a735d7785
  
  static constexpr auto BACKGROUND_NETWORKING_KEY = "backgroundNetworking"sv;
  static constexpr auto BACKGROUND_NETWORKING_ENABLED_KEY = "enabled"sv;
-@@ -478,6 +479,8 @@ void Settings::load_from_json(JsonValue const& json_value)
+@@ -485,6 +486,8 @@ void Settings::load_from_json(JsonValue const& json_value)
  
      if (auto crash_report_sending = json.get_string(CRASH_REPORT_SENDING_KEY); crash_report_sending.has_value())
          m_crash_report_sending = crash_report_sending_from_string(*crash_report_sending);
@@ -178,15 +178,15 @@ index bb2e93c5e0476d760ee05fda7e5da8683fb011e3..f6b581bcc2ac864731a4fc0a735d7785
  
      if (auto background_networking = json.get_object(BACKGROUND_NETWORKING_KEY); background_networking.has_value()) {
          if (auto enabled = background_networking->get_bool(BACKGROUND_NETWORKING_ENABLED_KEY); enabled.has_value())
-@@ -586,6 +589,7 @@ void Settings::replace_with_json(JsonValue const& json, PersistChange persist_ch
+@@ -593,6 +596,7 @@ void Settings::replace_with_json(JsonValue const& json, PersistChange persist_ch
      auto browsing_data_settings_changed = changed(BROWSING_DATA_KEY);
      auto global_privacy_control_changed = changed(GLOBAL_PRIVACY_CONTROL_KEY);
      auto crash_report_sending_changed = changed(CRASH_REPORT_SENDING_KEY);
 +    auto fingerprinting_protection_changed = changed(FINGERPRINTING_PROTECTION_KEY);
      auto dns_settings_changed = changed(DNS_SETTINGS_KEY);
-     auto geolocation_settings_changed = changed(LOCATION_POLICY_KEY);
-     auto microphone_settings_changed = changed(MICROPHONE_POLICY_KEY);
-@@ -618,6 +622,8 @@ void Settings::replace_with_json(JsonValue const& json, PersistChange persist_ch
+     auto background_networking_settings_changed = changed(BACKGROUND_NETWORKING_KEY);
+     auto content_blocker_settings_changed = changed(CONTENT_BLOCKERS_KEY);
+@@ -630,6 +634,8 @@ void Settings::replace_with_json(JsonValue const& json, PersistChange persist_ch
              observer.global_privacy_control_changed();
          if (crash_report_sending_changed)
              observer.crash_report_sending_changed();
@@ -194,8 +194,8 @@ index bb2e93c5e0476d760ee05fda7e5da8683fb011e3..f6b581bcc2ac864731a4fc0a735d7785
 +            observer.fingerprinting_protection_changed();
          if (dns_settings_changed)
              observer.dns_settings_changed();
-         if (geolocation_settings_changed)
-@@ -876,6 +882,7 @@ JsonValue Settings::serialize_json() const
+         if (background_networking_settings_changed)
+@@ -888,6 +894,7 @@ JsonValue Settings::serialize_json() const
  
      settings.set(GLOBAL_PRIVACY_CONTROL_KEY, m_global_privacy_control == GlobalPrivacyControl::Yes);
      settings.set(CRASH_REPORT_SENDING_KEY, crash_report_sending_to_string(m_crash_report_sending));
@@ -203,7 +203,7 @@ index bb2e93c5e0476d760ee05fda7e5da8683fb011e3..f6b581bcc2ac864731a4fc0a735d7785
  
      JsonObject background_network_features;
      background_network_features.set(CONTENT_BLOCKER_SUBSCRIPTION_UPDATES_KEY, m_filter_list_updates_enabled);
-@@ -1448,6 +1455,15 @@ void Settings::set_crash_report_sending(CrashReportSending crash_report_sending)
+@@ -1470,6 +1477,15 @@ void Settings::set_crash_report_sending(CrashReportSending crash_report_sending)
          observer.crash_report_sending_changed();
  }
  
@@ -220,18 +220,18 @@ index bb2e93c5e0476d760ee05fda7e5da8683fb011e3..f6b581bcc2ac864731a4fc0a735d7785
  {
      if (!dns_settings.is_object())
 diff --git a/Libraries/LibWebView/Settings.h b/Libraries/LibWebView/Settings.h
-index c748081d5582e01c8e1d556814c31a1598925425..6a5065ee1755ff1aebe10be63775ce851699dc0c 100644
+index ae46fbc056956a6336ba81added4828c7065d0cc..2c1bd4c0a7be8b64dfda06dd2a913fe6a0a79e6a 100644
 --- a/Libraries/LibWebView/Settings.h
 +++ b/Libraries/LibWebView/Settings.h
-@@ -202,6 +202,7 @@ public:
+@@ -193,6 +193,7 @@ public:
      virtual void browsing_data_settings_changed() { }
      virtual void global_privacy_control_changed() { }
      virtual void crash_report_sending_changed() { }
 +    virtual void fingerprinting_protection_changed() { }
      virtual void dns_settings_changed() { }
      virtual void config_variable_changed(ConfigVariableID) { }
-     virtual void geolocation_settings_changed() { }
-@@ -241,6 +242,7 @@ struct WEBVIEW_API SettingsData {
+     virtual void background_networking_settings_changed() { }
+@@ -227,6 +228,7 @@ struct WEBVIEW_API SettingsData {
      BrowsingDataSettings m_browsing_data_settings;
      GlobalPrivacyControl m_global_privacy_control { GlobalPrivacyControl::No };
      CrashReportSending m_crash_report_sending { CrashReportSending::AskMe };
@@ -239,7 +239,7 @@ index c748081d5582e01c8e1d556814c31a1598925425..6a5065ee1755ff1aebe10be63775ce85
  
      bool m_background_networking_enabled { true };
      bool m_filter_list_updates_enabled { false };
-@@ -357,6 +359,8 @@ public:
+@@ -339,6 +341,8 @@ public:
  
      CrashReportSending crash_report_sending() const { return m_crash_report_sending; }
      void set_crash_report_sending(CrashReportSending);
@@ -249,10 +249,10 @@ index c748081d5582e01c8e1d556814c31a1598925425..6a5065ee1755ff1aebe10be63775ce85
      bool background_networking_enabled() const { return m_background_networking_enabled; }
      void set_background_networking_enabled(bool);
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 977e31f1b3ca02072867f33975f4615a6063d7d1..5f986fa750a747c9b3ac65d43401b794f5e81aa7 100644
+index 66a2b2256c8407badc09475a777ce1262bd23dd2..9578a6c359c0a4b4f57c87743baee45292f569f3 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -1550,6 +1550,11 @@ static void send_global_privacy_control(WebContentPage const& page)
+@@ -1559,6 +1559,11 @@ static void send_global_privacy_control(WebContentPage const& page)
      page.async_set_enable_global_privacy_control(Application::settings().global_privacy_control() == GlobalPrivacyControl::Yes);
  }
  
@@ -264,7 +264,7 @@ index 977e31f1b3ca02072867f33975f4615a6063d7d1..5f986fa750a747c9b3ac65d43401b794
  // Only a page hosting the tab's traversable takes this request: It applies to the page's local traversable, which a page
  // embedding an out-of-process iframe doesn't have.
  static void send_force_dark(WebContentPage const& page)
-@@ -1569,6 +1574,7 @@ void ViewImplementation::send_preferences_to_page(WebContentPage& page)
+@@ -1578,6 +1583,7 @@ void ViewImplementation::send_preferences_to_page(WebContentPage& page)
      send_browsing_behavior(page);
      send_autoplay_settings(page);
      send_global_privacy_control(page);
@@ -272,7 +272,7 @@ index 977e31f1b3ca02072867f33975f4615a6063d7d1..5f986fa750a747c9b3ac65d43401b794
      auto* spell_checker = Application::the().spell_checker();
      page.async_set_spell_checking_available(spell_checker != nullptr);
      page.async_set_writing_suggestions_available(spell_checker && spell_checker->can_suggest());
-@@ -4515,6 +4521,11 @@ void ViewImplementation::global_privacy_control_changed()
+@@ -4523,6 +4529,11 @@ void ViewImplementation::global_privacy_control_changed()
      traversable().for_each_hosting_page(send_global_privacy_control);
  }
  
@@ -285,22 +285,22 @@ index 977e31f1b3ca02072867f33975f4615a6063d7d1..5f986fa750a747c9b3ac65d43401b794
  {
      auto origin = permission_origin();
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 8ae2404dd83dd2f74425517cc856eaeb87ba423b..1e0afc2d23e9271d59a3d68216c038ffbfd57c03 100644
+index 4578216902db2a62fedb04319f36b20d64a62563..bcceec574d1c82f9566baafd858efe5d052af827 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -900,6 +900,7 @@ protected:
+@@ -904,6 +904,7 @@ protected:
      virtual void autoplay_settings_changed() override;
-     virtual void geolocation_settings_changed() override;
+     virtual void permission_settings_changed(Web::Permissions::PermissionName name) override;
      virtual void global_privacy_control_changed() override;
 +    virtual void fingerprinting_protection_changed() override;
  
      void send_context_menu_request(ContextMenuRequest, Gfx::IntPoint content_position);
      void handle_external_url(URL::URL, URL::Origin, bool has_transient_activation);
 diff --git a/Libraries/LibWebView/WebUI/SettingsUI.cpp b/Libraries/LibWebView/WebUI/SettingsUI.cpp
-index efb9406826c293c489f5033812d83e323c47b96e..d471114cc56eaa2cfc3164ff4f8f9b36511c7124 100644
+index cfae886ca9c34d59fed90434078457e858937b6c..2f645f38e1a0a0319f3aee502840580b5d4558f2 100644
 --- a/Libraries/LibWebView/WebUI/SettingsUI.cpp
 +++ b/Libraries/LibWebView/WebUI/SettingsUI.cpp
-@@ -207,6 +207,9 @@ void SettingsUI::register_interfaces()
+@@ -195,6 +195,9 @@ void SettingsUI::register_interfaces()
      register_interface("setCrashReportSending"sv, [this](auto const& data) {
          set_crash_report_sending(data);
      });
@@ -310,7 +310,7 @@ index efb9406826c293c489f5033812d83e323c47b96e..d471114cc56eaa2cfc3164ff4f8f9b36
  
      register_interface("setServicesNetworkAccessEnabled"sv, [this](auto const& data) {
          set_services_network_access_enabled(data);
-@@ -760,6 +763,14 @@ void SettingsUI::set_crash_report_sending(JsonValue const& crash_report_sending)
+@@ -715,6 +718,14 @@ void SettingsUI::set_crash_report_sending(JsonValue const& crash_report_sending)
          CrashReportOutbox::the().discard_all();
  }
  
@@ -326,7 +326,7 @@ index efb9406826c293c489f5033812d83e323c47b96e..d471114cc56eaa2cfc3164ff4f8f9b36
  {
      if (!enabled.is_bool())
 diff --git a/Libraries/LibWebView/WebUI/SettingsUI.h b/Libraries/LibWebView/WebUI/SettingsUI.h
-index 584d8ce33442682fdfdad69f9b2fc43c1ecdf8ea..f002315fec7f937e12c828be62a738f847939712 100644
+index 71a308233fe514e3caf3efc41bc143df6d800ff2..10132f7eb7dfba1d4785dc1c6798912f9a2e83f4 100644
 --- a/Libraries/LibWebView/WebUI/SettingsUI.h
 +++ b/Libraries/LibWebView/WebUI/SettingsUI.h
 @@ -55,6 +55,7 @@ private:
@@ -336,8 +336,8 @@ index 584d8ce33442682fdfdad69f9b2fc43c1ecdf8ea..f002315fec7f937e12c828be62a738f8
 +    virtual void fingerprinting_protection_changed() override { broadcast_settings_change(); }
      virtual void dns_settings_changed() override { broadcast_settings_change(); }
      virtual void config_variable_changed(ConfigVariableID) override { broadcast_settings_change(); }
-     virtual void geolocation_settings_changed() override { broadcast_settings_change(); }
-@@ -101,6 +102,7 @@ private:
+     virtual void permission_settings_changed(Web::Permissions::PermissionName) override { broadcast_settings_change(); }
+@@ -97,6 +98,7 @@ private:
      void clear_browsing_data(JsonValue const&);
      void set_global_privacy_control(JsonValue const&);
      void set_crash_report_sending(JsonValue const&);
@@ -385,7 +385,7 @@ index cd1c75ae134da3be40604253a7c97e386defa1e6..97eba0956faf06e8a4aa2cb4eb7a79dc
      void close_worker_agent(WebContentClient&, Web::HTML::WorkerAgentId, Web::HTML::WorkerAgentOwnerToken);
  
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 82853118ac37ad2d31e6547234483618f98b6d64..83eacf0f18f707ce6aaba9cea62161cf7b68c84d 100644
+index a5be55161291c39222a3ca9aafb752db07186c43..f97c808491621b297ce8300a99124a85c6e5105c 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -3448,6 +3448,14 @@ void ConnectionFromClient::set_enable_global_privacy_control(Web::PageId, bool e
@@ -404,7 +404,7 @@ index 82853118ac37ad2d31e6547234483618f98b6d64..83eacf0f18f707ce6aaba9cea62161cf
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index c32d4c4bf8a6dd32542ca3c87a2701a55acda305..c6512b6bea78c6982221b8b153daa4f568878a7d 100644
+index c6814706fb4bf0af015e98da2c5b46cf196392a9..77120910c3c17730910b376b3961a46d770245a4 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -269,6 +269,7 @@ private:
@@ -416,7 +416,7 @@ index c32d4c4bf8a6dd32542ca3c87a2701a55acda305..c6512b6bea78c6982221b8b153daa4f5
      virtual void set_writing_suggestions_available(Web::PageId page_id, bool available) override;
      virtual void set_geolocation_emulated_position(Web::PageId page_id, WebView::GeolocationPositionData, Optional<u16> error_code) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index a189526cacd23de8a1e76ba62f3778502d072c74..591dc523e3155e3cbb834823d72471836bd5b3aa 100644
+index f033df56379c9ff34b0b134a7290397c50910202..4f4659e00916a91f6c6cb0be2b50c63082e34521 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -277,6 +277,7 @@ endpoint WebContentServer routed by Web::PageId page_id

@@ -79,10 +79,10 @@ index 1c50e32a3abb9cb8102543dd30e63cedb78c4990..be9e57104bc2f7d1f22526008431ceb7
      //     enabled for the active range only, so check whether it is enabled for the text control here.
      if (auto* control = focused_text_control(*this); control && is_html_document() && !m_inside_exec_command) {
 diff --git a/Libraries/LibWeb/Page/EventHandler.cpp b/Libraries/LibWeb/Page/EventHandler.cpp
-index d6012a0cb03f80babcad5258138e58c8a5d2b0bc..686eaf4fc300149f9aae10d27d2f5c9cbf9a793e 100644
+index b2a6406b40ac8ef860dd33b8edb2dba797f69524..5011582310217bd1a09105d8cd81d523e99997bf 100644
 --- a/Libraries/LibWeb/Page/EventHandler.cpp
 +++ b/Libraries/LibWeb/Page/EventHandler.cpp
-@@ -2658,7 +2658,9 @@ EventResult EventHandler::perform_copy_action()
+@@ -2646,7 +2646,9 @@ EventResult EventHandler::perform_copy_action()
  static bool script_may_access_clipboard(DOM::Document& document)
  {
      auto window = document.window();
@@ -142,7 +142,7 @@ index 0b5bc6d988baf5001186956a628358ddb184c9f9..8c4a08074daf3f0e26d286edd47f8ac3
  
  // Serves a URL scheme from the UI process, as a browser serves its extension pages. The scheme's URLs get tuple origins
 diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
-index 561c9141dbd2ada20fa8361c4afa0fc878d5229d..aa9188c5c14c5e6826d2917f8fc1924aa7dec8f5 100644
+index 75d63b07d2e446ef390e61064b1a6fe84ff78946..101a16b24926cdd8c3e8d2830b691c9b962193de 100644
 --- a/Libraries/LibWebView/WebContentClient.cpp
 +++ b/Libraries/LibWebView/WebContentClient.cpp
 @@ -128,6 +128,22 @@ Messages::WebContentClient::DidRequestEmbedderBootstrapResponse WebContentClient
@@ -182,7 +182,7 @@ index 7764875b563fb260acad1a36a6cb8606a0396a6b..8c4902f7031fdb5591858e3b2bc0e1c8
      virtual void did_retain_blob_url_token(Web::HTML::CrossProcessId navigable_id, URL::BlobURLEntry::Token token) override;
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index aab3c9b4545c19dd451daa967d3e54460009e637..3d0500118281ee2d1c7ac2b81aa42ce0117fc4e0 100644
+index 98a40973e1003d93af2b03b92319c4f017297993..450b0f5ce06c7c777460894df514f579e8773bd3 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -1798,6 +1798,60 @@ Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::Cross

@@ -43,6 +43,7 @@ from Utils.build_vcpkg import build_vcpkg  # noqa: E402
 from Utils.find_compiler import pick_host_compiler  # noqa: E402
 from Utils.host_platform import HostSystem  # noqa: E402
 from Utils.host_platform import Platform  # noqa: E402
+from Utils.vcpkg_deps import build_dependencies  # noqa: E402
 
 import patches  # noqa: E402
 
@@ -207,12 +208,13 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
     build_dir, vcpkg_dir = configure_build_env(preset, jobs)
     build_vcpkg(vcpkg_dir)
 
+    cc, cxx = pick_host_compiler(platform, cc, cxx)
+    vcpkg_triplet = build_dependencies(platform, preset, build_dir, cc, cxx, jobs)
+
     if build_dir.joinpath("build.ninja").exists():
         if cmake_cache_value(build_dir, "ENABLE_CI_BASELINE_CPU") != "ON":
             run_command(["cmake", "-S", LADYBIRD_SOURCE_DIR, "-B", build_dir, "-DENABLE_CI_BASELINE_CPU=ON"])
         return build_dir
-
-    cc, cxx = pick_host_compiler(platform, cc, cxx)
 
     run_command(
         [
@@ -228,6 +230,9 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
             f"-DCMAKE_PROJECT_ladybird_INCLUDE={XENON_SOURCE_DIR / 'Meta' / 'CMake' / 'XenonHook.cmake'}",
             "-DBUILD_TESTING=OFF",
             "-DENABLE_CI_BASELINE_CPU=ON",
+            "-DVCPKG_MANIFEST_INSTALL=OFF",
+            f"-DVCPKG_TARGET_TRIPLET={vcpkg_triplet}",
+            f"-DVCPKG_HOST_TRIPLET={vcpkg_triplet}",
         ]
     )
 
