@@ -22,7 +22,6 @@
 namespace Ladybird {
 
 static constexpr int POPOVER_ANCHOR_GAP = 4;
-static constexpr int POPOVER_SHADOW_MARGIN = 24;
 
 // The window is transparent around a card that casts its own shadow. The window has no shadow of its own, which would
 // not follow the card's rounded corners.

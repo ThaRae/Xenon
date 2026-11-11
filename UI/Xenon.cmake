@@ -64,6 +64,7 @@ set(XENON_SOURCES
     Extensions/MatchPattern.cpp
     Extensions/NativeMessaging.cpp
     Extensions/Popup.cpp
+    Extensions/PopupSize.cpp
     Extensions/Registry.cpp
     Extensions/Router.cpp
     Extensions/Scripting.cpp
@@ -557,4 +558,9 @@ if (LINUX AND NOT ANDROID)
     target_link_libraries(TestXenonUpdateButton PRIVATE PkgConfig::XCB_ICCCM)
 endif()
 
-add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonChromeStyle TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonRecentTabOrder TestXenonSiteSecurity TestXenonUpdateButton TestXenonUserAgent)
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestPopupSize.cpp" Xenon NAME TestXenonPopupSize)
+target_sources(TestXenonPopupSize PRIVATE "${XENON_UI_DIR}/Extensions/PopupSize.cpp")
+target_include_directories(TestXenonPopupSize BEFORE PRIVATE ${XENON_SOURCE_DIR})
+target_link_libraries(TestXenonPopupSize PRIVATE Qt::Core Qt::Gui)
+
+add_custom_target(xenon-tests DEPENDS TestXenonAllocatorRelease TestXenonBangs TestXenonBlockingPopover TestXenonCertificateDetails TestXenonChromeStyle TestXenonContentBlockerMemory TestXenonCRX TestXenonExtensions TestXenonFilterLists TestXenonMemoryPressure TestXenonNativeMessaging TestXenonNewTabPage TestXenonPopupSize TestXenonRecentTabOrder TestXenonSiteSecurity TestXenonUpdateButton TestXenonUserAgent)

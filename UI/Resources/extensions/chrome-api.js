@@ -668,6 +668,7 @@ bridge.onmessage = text => {
 };
 
 if (config.isPopup) {
+    let lastSize;
     const reportSize = () => {
         const body = document.body;
         if (!body) return;
@@ -676,7 +677,12 @@ if (config.isPopup) {
         const bodyWidth = rect.width + parseFloat(style.marginLeft) + parseFloat(style.marginRight);
         const width = bodyWidth < innerWidth ? bodyWidth : document.documentElement.scrollWidth;
         const height = Math.max(rect.bottom + parseFloat(style.marginBottom), body.scrollHeight);
-        post({ type: "popup-size", width: Math.ceil(width), height: Math.ceil(height) });
+        if (width <= 0 || height <= 0) return;
+        const roundedWidth = Math.ceil(width);
+        const roundedHeight = Math.ceil(height);
+        if (lastSize && lastSize.width === roundedWidth && lastSize.height === roundedHeight) return;
+        lastSize = { width: roundedWidth, height: roundedHeight };
+        post({ type: "popup-size", width: roundedWidth, height: roundedHeight });
     };
     document.addEventListener("DOMContentLoaded", () => {
         reportSize();

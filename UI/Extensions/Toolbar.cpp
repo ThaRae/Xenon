@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <AK/Format.h>
 #include <AK/LexicalPath.h>
 #include <UI/Application.h>
 #include <UI/BrowserWindow.h>
+#include <UI/ChromeStyle.h>
 #include <UI/Extensions/Browser.h>
 #include <UI/Extensions/Popup.h>
 #include <UI/Extensions/Registry.h>
@@ -19,6 +21,7 @@
 #include <QIcon>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPen>
 
 namespace Ladybird::Extensions {
 
@@ -64,23 +67,61 @@ void ActionButton::update_appearance()
 {
     auto appearance = Browser::action_appearance(*m_extension, &m_tab);
 
-    auto icon_file = appearance.icon_path.has_value()
-        ? Extension::confined_file(m_extension->root(), appearance.icon_path->bytes_as_string_view())
-        : ErrorOr<ByteString> { Error::from_errno(ENOENT) };
-    if (!icon_file.is_error())
-        setIcon(QIcon(qstring_from_ak_string(icon_file.value())));
-    else
-        setIcon(QIcon::fromTheme("application-x-addon"));
-
     auto title = qstring_from_ak_string(appearance.title);
     setToolTip(title);
     setAccessibleName(title);
     setEnabled(appearance.enabled);
 
+    if (!m_icon_resolved || m_icon_path != appearance.icon_path) {
+        m_icon_resolved = true;
+        m_icon_path = appearance.icon_path;
+        update_icon();
+    }
+
     m_badge_text = qstring_from_ak_string(appearance.badge_text);
     m_badge_background_color = appearance.badge_background_color;
     m_badge_text_color = appearance.badge_text_color;
     update();
+}
+
+void ActionButton::update_icon()
+{
+    auto icon_file = m_icon_path.has_value()
+        ? Extension::confined_file(m_extension->root(), m_icon_path->bytes_as_string_view())
+        : ErrorOr<ByteString> { Error::from_errno(ENOENT) };
+
+    auto icon = icon_file.is_error() ? QIcon {} : QIcon { qstring_from_ak_string(icon_file.value()) };
+    if (icon.isNull())
+        icon = QIcon::fromTheme("application-x-addon");
+
+    m_shows_placeholder = icon.isNull();
+    if (m_shows_placeholder) {
+        m_placeholder_text = qstring_from_ak_string(m_extension->manifest().name).left(1).toUpper();
+        if (m_icon_path.has_value())
+            warnln("Extensions: {} has no icon that can be shown from '{}'", m_extension->id(), *m_icon_path);
+    }
+
+    setIcon(icon);
+}
+
+void ActionButton::paint_placeholder(QPainter& painter)
+{
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    auto box = QRectF { rect() }.adjusted(9, 9, -9, -9);
+    painter.setPen(QPen { ChromeStyle::chrome_muted_text(palette()), 1 });
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(box.adjusted(0.5, 0.5, -0.5, -0.5), 3, 3);
+
+    if (m_placeholder_text.isEmpty())
+        return;
+
+    auto font = painter.font();
+    font.setPixelSize(10);
+    font.setBold(true);
+    painter.setFont(font);
+    painter.setPen(ChromeStyle::chrome_button_text(palette()));
+    painter.drawText(box, Qt::AlignCenter, m_placeholder_text);
 }
 
 void ActionButton::clicked()
@@ -115,10 +156,19 @@ void ActionButton::open_popup()
 void ActionButton::paintEvent(QPaintEvent* event)
 {
     QToolButton::paintEvent(event);
-    if (m_badge_text.isEmpty())
+
+    if (!m_shows_placeholder && m_badge_text.isEmpty())
         return;
 
     QPainter painter(this);
+    if (m_shows_placeholder)
+        paint_placeholder(painter);
+    if (!m_badge_text.isEmpty())
+        paint_badge(painter);
+}
+
+void ActionButton::paint_badge(QPainter& painter)
+{
     painter.setRenderHint(QPainter::Antialiasing);
 
     auto font = painter.font();
