@@ -14,10 +14,10 @@ the engine's interfaces.
  2 files changed, 21 insertions(+), 3 deletions(-)
 
 diff --git a/Libraries/LibWebView/WebUI.cpp b/Libraries/LibWebView/WebUI.cpp
-index 441ee7f89b8d286b51b77fe3cbe7dcc49e1d45fb..4e42442eb7a3b30738db137196d6f2b50c0c5818 100644
+index d504cdfbc34d9d858c502c4409bc7034f65a7042..827361f77d24cf647acae7e1d7585fcfbf3621f4 100644
 --- a/Libraries/LibWebView/WebUI.cpp
 +++ b/Libraries/LibWebView/WebUI.cpp
-@@ -26,6 +26,17 @@ static constexpr auto s_pages = to_array<WebUI::Page>({
+@@ -25,6 +25,17 @@ static constexpr auto s_pages = to_array<WebUI::Page>({
      { "welcome"sv, "Welcome"sv, WebUI::PageType::Dynamic },
  });
  
@@ -35,7 +35,7 @@ index 441ee7f89b8d286b51b77fe3cbe7dcc49e1d45fb..4e42442eb7a3b30738db137196d6f2b5
  struct ApplicationPage {
      String host;
      String title;
-@@ -98,6 +109,8 @@ ErrorOr<RefPtr<WebUI>> WebUI::create(WebContentClient& client, Web::PageId page_
+@@ -97,6 +108,8 @@ ErrorOr<RefPtr<WebUI>> WebUI::create(WebContentClient& client, Web::PageId page_
  
      VERIFY(web_ui);
      web_ui->register_interfaces();

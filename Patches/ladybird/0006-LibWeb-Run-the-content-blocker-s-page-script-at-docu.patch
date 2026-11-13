@@ -20,10 +20,10 @@ A Window that outlives its initial about:blank document runs it once.
  3 files changed, 14 insertions(+)
 
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index a9d45b322bc30e8d2a9a8402a84e50168b55a650..8339852c1291bd4fe423a320686e1562d6fa8fd8 100644
+index 9ca3e60762f4b7d744469a22aa6e0b09cb65e97b..defd7bf22e5f0142e47396cdaf02b5114a60122f 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -8705,6 +8705,9 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+@@ -8679,6 +8679,9 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
          if (!scrolling_blocked_in_new_document)
              try_to_scroll_to_the_fragment(allow_text_directive_scroll);
  
@@ -34,7 +34,7 @@ index a9d45b322bc30e8d2a9a8402a84e50168b55a650..8339852c1291bd4fe423a320686e1562
          set_ready_to_run_scripts();
      }
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index b717ff7a2ab31cc14d0018860619bdbacb7ef72b..c33ba6600e09ae1188d867a4e0801d1d64e01a55 100644
+index 73dd4a07cda723315a0e1c92346bf597c082d284..1ffdf7ef675838136918674c030de31d744c1f48 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
 @@ -85,6 +85,7 @@
@@ -45,7 +45,7 @@ index b717ff7a2ab31cc14d0018860619bdbacb7ef72b..c33ba6600e09ae1188d867a4e0801d1d
  #include <LibWeb/Loader/GeneratedPagesLoader.h>
  #include <LibWeb/Page/EventHandler.h>
  #include <LibWeb/Page/Page.h>
-@@ -1199,6 +1200,11 @@ void LocalNavigable::initialize_navigable(NonnullRefPtr<DocumentState> document_
+@@ -1200,6 +1201,11 @@ void LocalNavigable::initialize_navigable(NonnullRefPtr<DocumentState> document_
      // as it hears of each document that later becomes active in the navigable.
      if (!is_top_level_traversable() && !is_stand_in)
          page().client().page_did_change_active_document_in_child_navigable(document);

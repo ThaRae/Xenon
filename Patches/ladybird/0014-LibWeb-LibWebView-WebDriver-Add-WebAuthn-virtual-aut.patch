@@ -107,10 +107,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Tests/LibWebView/test-webdriver-webauthn.py
 
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index c8cf3d268aec705ab77dd927cf15134badc58377..ddb5c549943cdc077309e5a4cc68059c9bbca560 100644
+index 4dfd3fcab36b989d214db0fd5bf07a1f46fdfa14..2d9a84a2560bfcee82030d54866eb1073de4d25c 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -2450,6 +2450,24 @@ void Internals::pump_gamepad_events()
+@@ -2467,6 +2467,24 @@ void Internals::pump_gamepad_events()
      page().client().pump_gamepad_events();
  }
  
@@ -136,10 +136,10 @@ index c8cf3d268aec705ab77dd927cf15134badc58377..ddb5c549943cdc077309e5a4cc68059c
  {
      auto virtual_gamepad = page().client().create_virtual_gamepad();
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index f460dc9b20f68734be79889523d052a4ba067d7a..9c71ef4674edfedfdd517fc5a8edd209df036157 100644
+index 7a92f14bac6221479b2195c2e93007758667433a..3cea28d16675b1aa9e1586ec16f3362eb6bd9ce5 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -277,6 +277,8 @@ public:
+@@ -273,6 +273,8 @@ public:
      void pump_gamepad_events();
  
      GC::Ref<InternalGamepad> connect_virtual_gamepad();
@@ -149,10 +149,10 @@ index f460dc9b20f68734be79889523d052a4ba067d7a..9c71ef4674edfedfdd517fc5a8edd209
  
      void perform_per_test_cleanup();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 5e844b72bcc5e31a4602febb77fc99ea81127d66..ddaff5414f1020a793c79f39ae59b4af4bac3746 100644
+index 516883afae9c2b3856431e2dd450a79f6431cc8f..53ee443753dd880c2fbcfbf751bfac74c1e92e48 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -331,6 +331,10 @@ interface Internals {
+@@ -340,6 +340,10 @@ interface Internals {
  
      InternalGamepad connectVirtualGamepad();
  
@@ -164,7 +164,7 @@ index 5e844b72bcc5e31a4602febb77fc99ea81127d66..ddaff5414f1020a793c79f39ae59b4af
  
      undefined clearElement(HTMLElement element);
 diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
-index 3e986c8683b5d1aa2f36e23787b26654c8a2ce19..bfa6fbe5fa445155836f487765e35aa09ac2bdeb 100644
+index 3f16d8daf2e207d8fe2c2f6ac2655f19130dbd22..4660bceffd7119374d35fc8cd56f776806315e3d 100644
 --- a/Libraries/LibWeb/Page/Page.h
 +++ b/Libraries/LibWeb/Page/Page.h
 @@ -109,6 +109,7 @@
@@ -175,7 +175,7 @@ index 3e986c8683b5d1aa2f36e23787b26654c8a2ce19..bfa6fbe5fa445155836f487765e35aa0
  #include <LibWebCommon/WebView/StorageSetResult.h>
  
  namespace Web {
-@@ -1029,6 +1030,8 @@ public:
+@@ -1031,6 +1032,8 @@ public:
      virtual void page_did_request_stop_gamepad_effects([[maybe_unused]] Gamepad::GamepadHandle handle) { }
  
      virtual Optional<Gamepad::VirtualGamepad> create_virtual_gamepad() { return {}; }
@@ -225,7 +225,7 @@ index d9d788a56d36e61e240738ad99addc9cace4fc4d..578349bd0bf380dce72b520effdcd61e
  
  protected:
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index e4beff48adbf59f20a730ca0cf5c0031f8d32bd3..7da886f6bfeabe80ff3a9198fbc53cec07b30aec 100644
+index b5e80a0cdd11ac9b819dd95c5baa18abdd878972..23e6b4965431a3f73442271b7d92ec4037dde40f 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
 @@ -77,6 +77,8 @@
@@ -237,7 +237,7 @@ index e4beff48adbf59f20a730ca0cf5c0031f8d32bd3..7da886f6bfeabe80ff3a9198fbc53cec
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
  #include <LibWebView/WebDriverBrowserConnection.h>
-@@ -1737,6 +1739,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
+@@ -1831,6 +1833,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
  ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
@@ -246,7 +246,7 @@ index e4beff48adbf59f20a730ca0cf5c0031f8d32bd3..7da886f6bfeabe80ff3a9198fbc53cec
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index 0fed98d584f802e9bc99e1c446f88d5e493f5518..692b79bfd68d528a4db51de7ad944460fcc497a3 100644
+index e6ce48f90bc2b71eae3a45107715584e3dad86c2..5e32c4603d06a58ceb0c975f1d5154dae5e050da 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
 @@ -87,6 +87,7 @@ set(SOURCES
@@ -1118,7 +1118,7 @@ index 0000000000000000000000000000000000000000..b6729cfb3c9b09a30c0e6e4861e8d0a9
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentTestClient.cpp b/Libraries/LibWebView/WebContentTestClient.cpp
-index fb499d176c0f90929502c5841afb641fe9c4477c..cd7aab19c772a1e0fe09f2b09c563ed30c54b964 100644
+index 45c447ba3fe3e605d92420231e1eeaf8adae64a0..b004230acf5444464ad3fa9da85bb16886692427 100644
 --- a/Libraries/LibWebView/WebContentTestClient.cpp
 +++ b/Libraries/LibWebView/WebContentTestClient.cpp
 @@ -4,9 +4,11 @@
@@ -1150,7 +1150,7 @@ index fb499d176c0f90929502c5841afb641fe9c4477c..cd7aab19c772a1e0fe09f2b09c563ed3
  {
      GamepadManager::the().set_virtual_gamepad_button(m_client, handle, button, down);
 diff --git a/Libraries/LibWebView/WebContentTestClient.h b/Libraries/LibWebView/WebContentTestClient.h
-index 10502a966c662e002136c4e5f7f1af1dd1e90e08..3f22de79b187f74ee061b36812f45e4cd0d689df 100644
+index 9357b0d366ba036db3f7cc9227af864804493e33..8a7ddec2e4f2db05d0dcf0c6fffa7c54f4cee432 100644
 --- a/Libraries/LibWebView/WebContentTestClient.h
 +++ b/Libraries/LibWebView/WebContentTestClient.h
 @@ -57,6 +57,7 @@ private:
@@ -1198,10 +1198,10 @@ index 848f7f1518f493c3607ff86dbb2c40d47585ddf4..9ed424bff482335c0b679a4e031868c6
      virtual void switch_to_window(u64 command_id, String window_handle) override;
      virtual void switch_to_parent_frame(u64 command_id, String window_handle) override;
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 0e7075978e6051c44089c36468307bfba0989a8a..b4d03d5e301a6f9f3c9dad462a73be2767932795 100644
+index 8bf2f70e96fe4db49a777671be7249e0469d604b..ec1c51805fffc5cd110b45fb0afd784a32d55f4c 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -2280,6 +2280,18 @@ void PageClient::page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHand
+@@ -2293,6 +2293,18 @@ void PageClient::page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHand
      client().async_gamepad_stop_effects(handle);
  }
  
@@ -1221,10 +1221,10 @@ index 0e7075978e6051c44089c36468307bfba0989a8a..b4d03d5e301a6f9f3c9dad462a73be27
  {
      auto* test_connection = client().test_connection();
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index 9bdc2a3fe73d8b95c20f2b8b2930b46ea1f34665..f6ceb0a541c44e24a766238410d9e2da0ac04f16 100644
+index 62a239426b1be8d77d025db4a12794e3beb93b57..342abcddc87c42a4290a35bad34019dd87379e70 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
-@@ -420,6 +420,7 @@ private:
+@@ -422,6 +422,7 @@ private:
      virtual void page_did_play_gamepad_effect(Web::Gamepad::GamepadHandle, Web::Gamepad::GamepadEffect const&) override;
      virtual void page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHandle) override;
      virtual Optional<Web::Gamepad::VirtualGamepad> create_virtual_gamepad() override;
@@ -1233,7 +1233,7 @@ index 9bdc2a3fe73d8b95c20f2b8b2930b46ea1f34665..f6ceb0a541c44e24a766238410d9e2da
      virtual void set_virtual_gamepad_axis(Web::Gamepad::GamepadHandle, i32 axis, i16 value) override;
      virtual void disconnect_virtual_gamepad(Web::Gamepad::GamepadHandle) override;
 diff --git a/Services/WebContent/WebContentTestClient.ipc b/Services/WebContent/WebContentTestClient.ipc
-index 7127a66454f484ea9139f8c8ee6ed2dda4c26114..611f5032aaf782ee1ffd5020a2809583f0721cdd 100644
+index c646e68278ae0ea951fc63978cc8c7e630e550ce..7855bb78c7728620cc7d9961f869eafb441175c9 100644
 --- a/Services/WebContent/WebContentTestClient.ipc
 +++ b/Services/WebContent/WebContentTestClient.ipc
 @@ -7,6 +7,7 @@
@@ -1402,10 +1402,10 @@ index 34a9bb1b110dcfe696d6402f5f8e91f1ec6a7437..5405b21062fea77b0367bb73f16beffb
      bidi_command(u64 command_id, String method, JsonValue params) =|
      bidi_get_top_level_traversables(u64 command_id, Vector<String> navigable_ids) =|
 diff --git a/Tests/LibWeb/TestConfig.ini b/Tests/LibWeb/TestConfig.ini
-index 26469a2ea80a48c86e9a67e83c4d2f16df8627ef..e7af42f8da25f6f571deb6c8f3dbcdb0626b22b0 100644
+index 0a51e338b6ef805f8a326b61d9c998457dcf3c49..1aad8a6ab22ba369b2e70209c52c6cf367cee0e8 100644
 --- a/Tests/LibWeb/TestConfig.ini
 +++ b/Tests/LibWeb/TestConfig.ini
-@@ -49,6 +49,17 @@ Text/input/wpt-import/html/dom/render-blocking/remove-attr-script-keeps-blocking
+@@ -54,6 +54,17 @@ Text/input/wpt-import/html/dom/render-blocking/remove-attr-script-keeps-blocking
  Text/input/wpt-import/html/dom/render-blocking/parser-inserted-inline-module-with-import.html
  Text/input/wpt-import/html/dom/render-blocking/stylesheet-link-href-change-keeps-blocking.html
  Text/input/wpt-import/html/dom/render-blocking/script-inserted-script.html
@@ -3258,10 +3258,10 @@ index 0000000000000000000000000000000000000000..a45b686ca775c94dc015d6d59a4a6d0b
 +    JSON.stringify(deepSortKeys(expected)), optMsg);
 +}
 diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
-index dd4a793476f84db16f0206967e45fa203231c00a..2ac3b270bd5e5395372024472c296b6c9f7028ed 100644
+index c6e034f691ee749455a1ea272a13e9f1fe968bc6..65030dd4f2df8224588eb9200576179800c15c27 100644
 --- a/Tests/LibWebView/CMakeLists.txt
 +++ b/Tests/LibWebView/CMakeLists.txt
-@@ -32,6 +32,7 @@ if (BUILD_TESTING AND NOT WIN32)
+@@ -36,6 +36,7 @@ if (BUILD_TESTING AND NOT WIN32)
      ladybird_python_test(test-webdriver-settings-changes.py ARGS $<TARGET_FILE:WebDriver>)
      ladybird_python_test(test-webdriver-site-zoom.py ARGS $<TARGET_FILE:WebDriver>)
      ladybird_python_test(test-webdriver-web-ui-pages-share-a-process.py ARGS $<TARGET_FILE:WebDriver>)

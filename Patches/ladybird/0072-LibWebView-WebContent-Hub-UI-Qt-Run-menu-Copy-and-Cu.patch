@@ -31,10 +31,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  10 files changed, 50 insertions(+), 11 deletions(-)
 
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 71c171a530a73f8e1a0d0603736544ae811c2b5b..cd63aa47b3d09c2fe2519363e36ab64e34945877 100644
+index 164b910e27e995624dbbbf12441342bd423ba363..b1d7ab6b6ee1480a6051fd35856c8b251798d752 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -3093,6 +3093,20 @@ void ViewImplementation::paste_from_clipboard(Web::Clipboard::PasteMode paste_mo
+@@ -3197,6 +3197,20 @@ void ViewImplementation::paste_from_clipboard(Web::Clipboard::PasteMode paste_mo
      });
  }
  
@@ -56,10 +56,10 @@ index 71c171a530a73f8e1a0d0603736544ae811c2b5b..cd63aa47b3d09c2fe2519363e36ab64e
  {
      auto& host = focused_navigable_host();
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 7e7df945285c9441ecdc887fd4a2ecfdcbd606a2..fa84ed76ea085229a9a73fb2f50a8be640c13336 100644
+index bd456ffc23f21b1b0a2c18bc1d0de98127243909..cfcd0069846dcef7a71536bfeeac5a870ecb2ed9 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -404,6 +404,8 @@ public:
+@@ -422,6 +422,8 @@ public:
      void did_receive_selected_text_for_lookup(Badge<WebContentPage>, u64 request_id, Optional<DictionaryLookup> lookup);
      void did_select_word_for_dictionary_lookup(Badge<WebContentPage>, u64 request_id, bool selected);
      void did_cut_selected_text(Badge<WebContentPage>, u64 request_id, ByteString selection);
@@ -69,10 +69,10 @@ index 7e7df945285c9441ecdc887fd4a2ecfdcbd606a2..fa84ed76ea085229a9a73fb2f50a8be6
      void undo();
      void redo();
 diff --git a/Services/Hub/ConnectionFromUI.cpp b/Services/Hub/ConnectionFromUI.cpp
-index 1a951ff8c5921f84ed2104b85ad6dfacc404f32d..b808903c780e7bc006ec92c985c1ea3166de2581 100644
+index c068b813395895a3d3c9b7bc8577750136b8ef97..f5ed6862f193799b0cff942a64500abe9f8a7a0b 100644
 --- a/Services/Hub/ConnectionFromUI.cpp
 +++ b/Services/Hub/ConnectionFromUI.cpp
-@@ -971,14 +971,16 @@ void ConnectionFromUI::view_redo(u64 view_id)
+@@ -1020,14 +1020,16 @@ void ConnectionFromUI::view_redo(u64 view_id)
          view->redo();
  }
  
@@ -96,10 +96,10 @@ index 1a951ff8c5921f84ed2104b85ad6dfacc404f32d..b808903c780e7bc006ec92c985c1ea31
  
  void ConnectionFromUI::view_paste(u64 view_id, Web::Clipboard::PasteMode paste_mode)
 diff --git a/Services/Hub/ConnectionFromUI.h b/Services/Hub/ConnectionFromUI.h
-index 01454ecf3c8a65a7c9cada2bada0084443a6c8cd..259d5b1eab07f5cffef415563a5e8d38a2e33d4c 100644
+index 5051a180dac0c45ec9aa7e97373a5da454910c1d..6fefac2c7a0cd729850b32eddfdcd094b2e6d255 100644
 --- a/Services/Hub/ConnectionFromUI.h
 +++ b/Services/Hub/ConnectionFromUI.h
-@@ -167,6 +167,7 @@ private:
+@@ -173,6 +173,7 @@ private:
      virtual void view_stop_loading(u64 view_id) override;
      virtual void view_undo(u64 view_id) override;
      virtual void view_redo(u64 view_id) override;
@@ -108,10 +108,10 @@ index 01454ecf3c8a65a7c9cada2bada0084443a6c8cd..259d5b1eab07f5cffef415563a5e8d38
      virtual void view_paste(u64 view_id, Web::Clipboard::PasteMode) override;
      virtual void view_select_all(u64 view_id) override;
 diff --git a/Services/Hub/HubServer.ipc b/Services/Hub/HubServer.ipc
-index 90a1b51345f46e0a130f5e1bd680b97a81c10005..3e9b789499613abb134cdbbc588b7590919b3359 100644
+index de6bc7d494c670bfaf536f851fc9a9286e00d496..5e9e261066b67425ba86cf0ae91ec245807908fa 100644
 --- a/Services/Hub/HubServer.ipc
 +++ b/Services/Hub/HubServer.ipc
-@@ -245,6 +245,7 @@ endpoint HubServer
+@@ -253,6 +253,7 @@ endpoint HubServer
      view_stop_loading(u64 view_id) =|
      view_undo(u64 view_id) =|
      view_redo(u64 view_id) =|
@@ -120,10 +120,10 @@ index 90a1b51345f46e0a130f5e1bd680b97a81c10005..3e9b789499613abb134cdbbc588b7590
      view_paste(u64 view_id, Web::Clipboard::PasteMode paste_mode) =|
      view_select_all(u64 view_id) =|
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 08bf1629f4c8dd03f7a0b1b4c8947daefe7550e5..5eab310bf9b53d3f683c594bf47b4574e5c4e031 100644
+index e17603a7eef9d4d2e7b00bd2e46650cff6ece326..1fd807def109221fe73f17a133b3d1fcb32129ac 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3198,6 +3198,24 @@ void ConnectionFromClient::select_all(Web::PageId page_id)
+@@ -3285,6 +3285,24 @@ void ConnectionFromClient::select_all(Web::PageId page_id)
      }
  }
  
@@ -149,10 +149,10 @@ index 08bf1629f4c8dd03f7a0b1b4c8947daefe7550e5..5eab310bf9b53d3f683c594bf47b4574
  {
      if (auto page = this->page(page_id); page.has_value()) {
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 86338e380f648a735c9803e8d9fa31c81b43ddbe..e4356905baf92184cc5cfa4e79d0429ee4c54016 100644
+index f6a221424c7f74dc2a051adf1567e79dda22f79f..3289203253be47cffa3b5b06637509dd11458d42 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -352,6 +352,8 @@ private:
+@@ -353,6 +353,8 @@ private:
      virtual void get_selected_text_for_lookup(Web::PageId page_id, u64 request_id) override;
      virtual void select_word_for_dictionary_lookup(Web::PageId page_id, u64 request_id, Web::DevicePixelPoint position) override;
      virtual void cut_selected_text(Web::PageId page_id, u64 request_id) override;
@@ -162,7 +162,7 @@ index 86338e380f648a735c9803e8d9fa31c81b43ddbe..e4356905baf92184cc5cfa4e79d0429e
      virtual void undo(Web::PageId page_id) override;
      virtual void redo(Web::PageId page_id) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index bad87b1d8dbfdb828e38ac2838e2c675daf8c2d6..cca7d991db1edc174808bdd844d478db6da33889 100644
+index 5d2b37a64ad873dfff738e96dd31234d418ce711..099b334bec36374bb038678d8c6234a0b2a28d18 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -253,6 +253,8 @@ endpoint WebContentServer routed by Web::PageId page_id

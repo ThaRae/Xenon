@@ -48,10 +48,10 @@ index d84b9989978cca42c8747c2f2a53e870036069b0..973b4c80edb282f532ff0248b5ed9ae1
  }
  
 diff --git a/Libraries/LibWebCommon/WebView/Utilities.cpp b/Libraries/LibWebCommon/WebView/Utilities.cpp
-index eb9a38dd105c48c0fcad4395639fd0c5c67dff63..963b518380e8e4e7e6df21abb108f04e5ff2514f 100644
+index aee32f1e715f84c2f48a50636a7c862b03a12dc7..a6059447d24c45b1ccc3ddab8eb0771d199ba00c 100644
 --- a/Libraries/LibWebCommon/WebView/Utilities.cpp
 +++ b/Libraries/LibWebCommon/WebView/Utilities.cpp
-@@ -50,6 +50,19 @@ ByteString mach_server_name_for_process(StringView process_name, pid_t pid)
+@@ -48,6 +48,19 @@ ByteString mach_server_name_for_process(StringView process_name, pid_t pid)
      return ByteString::formatted("org.ladybird.{}.helper.{}", process_name, pid);
  }
  
@@ -108,7 +108,7 @@ index bf91716b6e81a8b3faa03a250d09945d44d2042e..5ab0323ce1e90aca5a8f06c56714efc9
  
  // The browser's own store. It moves into the profile once the profile is known.
 diff --git a/Libraries/LibWebView/Profile.cpp b/Libraries/LibWebView/Profile.cpp
-index 5407a6cded5ecd9384e3fd581922a34cbaa435b1..674f5df9edc38fa1b664b83ad21ed3d8f65c52d7 100644
+index e476d3acdc1499bd1f5287609017df634d8b23a5..92b51905a7527f0db840797b0f9621b661a9c4ce 100644
 --- a/Libraries/LibWebView/Profile.cpp
 +++ b/Libraries/LibWebView/Profile.cpp
 @@ -11,13 +11,14 @@
@@ -144,7 +144,7 @@ index 5407a6cded5ecd9384e3fd581922a34cbaa435b1..674f5df9edc38fa1b664b83ad21ed3d8
  
      TRY(create_profile_directories(paths));
 diff --git a/Tests/LibWebView/TestProfile.cpp b/Tests/LibWebView/TestProfile.cpp
-index ab25bc658b91c4beae0e84963ecf5d1926eaf7f7..ffad78e4199b02bce2f875c0ef0d3b9c9d235774 100644
+index 574c4bb85d840c301757eb30ee0ed95126b4580c..b7e9240ca5d31a0f8ee18c2172b153a26f67850d 100644
 --- a/Tests/LibWebView/TestProfile.cpp
 +++ b/Tests/LibWebView/TestProfile.cpp
 @@ -20,6 +20,7 @@
@@ -155,7 +155,7 @@ index ab25bc658b91c4beae0e84963ecf5d1926eaf7f7..ffad78e4199b02bce2f875c0ef0d3b9c
  #include <LibWebView/CookieJar.h>
  #include <LibWebView/FaviconStore.h>
  #include <LibWebView/HSTSStore.h>
-@@ -125,6 +126,28 @@ TEST_CASE(legacy_layout)
+@@ -131,6 +132,28 @@ TEST_CASE(legacy_layout)
      remove_test_root();
  }
  

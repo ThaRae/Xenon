@@ -15,10 +15,10 @@ Leave it without the rules until a tab takes it, and send them then.
  4 files changed, 20 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index c072e48b4ffc0e6a739408a43bc6b89234a5b555..86a8ce18cf85da78803893ab8796636663acc356 100644
+index d70f228828c724adae2991bceaeaa98c34393e18..5dc50490e6381764e3c403a0b52ba3548d37a9e7 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -906,8 +906,8 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -909,8 +909,8 @@ void Application::send_content_blockers(WebContentClient& client) const
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
      // Each process builds an engine from the rules, which can take tens of MiB, so while blocking is off it gets none,
@@ -29,15 +29,15 @@ index c072e48b4ffc0e6a739408a43bc6b89234a5b555..86a8ce18cf85da78803893ab87966366
          client.async_set_content_blockers(Core::AnonymousBuffer {}, Core::AnonymousBuffer {}, Core::AnonymousBuffer {});
          return;
      }
-@@ -1192,7 +1192,7 @@ void Application::open_urls_in_new_tabs(ReadonlySpan<URL::URL> urls) const
+@@ -1195,7 +1195,7 @@ void Application::open_urls_in_new_tabs(ReadonlySpan<URL::URL> urls) const
          open_url_in_new_tab(url, Web::HTML::ActivateTab::No);
  }
  
--ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(IsPrivate is_private, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt, Optional<Web::HTML::CrossProcessId> initial_document_state_id, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry, Web::HTML::VisibilityState system_visibility_state, EnableContentBlocker enable_content_blocker)
-+ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(IsPrivate is_private, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt, Optional<Web::HTML::CrossProcessId> initial_document_state_id, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry, Web::HTML::VisibilityState system_visibility_state, EnableContentBlocker enable_content_blocker, DeferContentBlockerRules defer_content_blocker_rules)
+-ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(BrowsingSession& session, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt, Optional<Web::HTML::CrossProcessId> initial_document_state_id, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry, Web::HTML::VisibilityState system_visibility_state, EnableContentBlocker enable_content_blocker)
++ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(BrowsingSession& session, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt, Optional<Web::HTML::CrossProcessId> initial_document_state_id, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry, Web::HTML::VisibilityState system_visibility_state, EnableContentBlocker enable_content_blocker, DeferContentBlockerRules defer_content_blocker_rules)
  {
-     // The client's WebContentClient picks up this same session when it is created.
-     auto session = session_for_new_view(is_private);
+     auto cross_process_id_allocator = allocate_cross_process_id_allocator();
+     auto root_navigable_id = navigable_to_adopt.has_value() ? *navigable_to_adopt : cross_process_id_allocator.allocate();
 @@ -1238,6 +1238,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
          webdriver_bidi->push_session_state_for_client(*client);
  
@@ -46,16 +46,16 @@ index c072e48b4ffc0e6a739408a43bc6b89234a5b555..86a8ce18cf85da78803893ab87966366
      send_content_blockers(*client);
  
      m_web_content_clients.set(client);
-@@ -1681,13 +1682,15 @@ bool Application::same_origin_tabs_may_share_a_process() const
- ErrorOr<NonnullRefPtr<WebContentPage>> Application::open_page_for_new_tab(IsPrivate is_private, EnableContentBlocker enable_content_blocker)
- {
+@@ -1775,13 +1776,15 @@ ErrorOr<NonnullRefPtr<WebContentPage>> Application::open_page_for_new_tab(IsPriv
+         m_spare_web_content_process = nullptr;
+ 
      RefPtr<WebContentClient> web_content_client;
 -    // NB: The spare process has built the content blocker's engine already.
 +    // NB: The spare process is launched without the content blocker's engine, and is given it here when a tab takes it.
      if (enable_content_blocker == EnableContentBlocker::No) {
-         web_content_client = TRY(create_web_content_client(is_private, allocate_page_id(), {}, {}, {}, {}, Web::HTML::VisibilityState::Hidden, EnableContentBlocker::No));
+         web_content_client = TRY(create_web_content_client(session_for_new_view(is_private), allocate_page_id(), {}, {}, {}, {}, Web::HTML::VisibilityState::Hidden, EnableContentBlocker::No));
      } else if (is_private == IsPrivate::Yes) {
-         web_content_client = TRY(create_web_content_client(IsPrivate::Yes, allocate_page_id()));
+         web_content_client = TRY(create_web_content_client(session_for_new_view(IsPrivate::Yes), allocate_page_id()));
      } else if (m_spare_web_content_process) {
          web_content_client = m_spare_web_content_process.release_nonnull();
 +        web_content_client->set_content_blocker_rules_deferred(false);
@@ -63,25 +63,25 @@ index c072e48b4ffc0e6a739408a43bc6b89234a5b555..86a8ce18cf85da78803893ab87966366
          launch_spare_web_content_process();
      } else {
          launch_spare_web_content_process();
-@@ -1733,7 +1736,7 @@ void Application::launch_spare_web_content_process()
+@@ -1827,7 +1830,7 @@ void Application::launch_spare_web_content_process()
      Core::deferred_invoke([this]() {
          m_has_queued_task_to_launch_spare_web_content_process = false;
  
--        auto web_content_client = create_web_content_client(IsPrivate::No, allocate_page_id());
-+        auto web_content_client = create_web_content_client(IsPrivate::No, allocate_page_id(), {}, {}, {}, {}, Web::HTML::VisibilityState::Hidden, EnableContentBlocker::Yes, DeferContentBlockerRules::Yes);
+-        auto web_content_client = create_web_content_client(default_session(), allocate_page_id());
++        auto web_content_client = create_web_content_client(default_session(), allocate_page_id(), {}, {}, {}, {}, Web::HTML::VisibilityState::Hidden, EnableContentBlocker::Yes, DeferContentBlockerRules::Yes);
          if (web_content_client.is_error()) {
              dbgln("Unable to create spare web content client: {}", web_content_client.error());
              return;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 991c3b9ce8de2c9585071b044cd8035d532c4a26..8a5e267ddc526dd7d788216d2fd2a1cdbf290ad8 100644
+index e97b085586f82180eb25da9360d73175659a717a..f79e1af09c0e3841ab6878627287efe646432ad8 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -450,7 +450,7 @@ private:
+@@ -463,7 +463,7 @@ private:
      ErrorOr<void> create_profile(Optional<StringView> profile_name, Optional<StringView> profile_path, bool force_new_process, bool temporary_profile);
      void create_mach_port_server(ByteString const& profile_identity);
      void update_website_color_scheme();
--    ErrorOr<NonnullRefPtr<WebContentClient>> create_web_content_client(IsPrivate, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt = {}, Optional<Web::HTML::CrossProcessId> initial_document_state_id = {}, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables = {}, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry = {}, Web::HTML::VisibilityState system_visibility_state = Web::HTML::VisibilityState::Hidden, EnableContentBlocker = EnableContentBlocker::Yes);
-+    ErrorOr<NonnullRefPtr<WebContentClient>> create_web_content_client(IsPrivate, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt = {}, Optional<Web::HTML::CrossProcessId> initial_document_state_id = {}, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables = {}, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry = {}, Web::HTML::VisibilityState system_visibility_state = Web::HTML::VisibilityState::Hidden, EnableContentBlocker = EnableContentBlocker::Yes, DeferContentBlockerRules = DeferContentBlockerRules::No);
+-    ErrorOr<NonnullRefPtr<WebContentClient>> create_web_content_client(BrowsingSession&, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt = {}, Optional<Web::HTML::CrossProcessId> initial_document_state_id = {}, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables = {}, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry = {}, Web::HTML::VisibilityState system_visibility_state = Web::HTML::VisibilityState::Hidden, EnableContentBlocker = EnableContentBlocker::Yes);
++    ErrorOr<NonnullRefPtr<WebContentClient>> create_web_content_client(BrowsingSession&, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt = {}, Optional<Web::HTML::CrossProcessId> initial_document_state_id = {}, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables = {}, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry = {}, Web::HTML::VisibilityState system_visibility_state = Web::HTML::VisibilityState::Hidden, EnableContentBlocker = EnableContentBlocker::Yes, DeferContentBlockerRules = DeferContentBlockerRules::No);
  
      ErrorOr<void> launch_services();
      void launch_spare_web_content_process();
@@ -104,10 +104,10 @@ index f2e3116e5f25e2b510b2bf6578370edd8e240175..7c146cb11e640ab20ff43e12d5d3e80b
      No,
      Yes,
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index d1c1020244f7a0cfbc062c279f2ad5d7b73f73e7..d15f10f9fe20e14675d53f89169cc86cddd87fbb 100644
+index f45dc9947a26823dfddbcc6b15dee7d470ba4516..2c7bc6da6a1b855ee49333228c3b95f1ca71f1ec 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
-@@ -153,6 +153,9 @@ public:
+@@ -154,6 +154,9 @@ public:
      // A process launched for a view that goes without the content blocker is never given its rules.
      EnableContentBlocker enable_content_blocker() const { return m_enable_content_blocker; }
      void set_enable_content_blocker(EnableContentBlocker enable_content_blocker) { m_enable_content_blocker = enable_content_blocker; }
@@ -117,7 +117,7 @@ index d1c1020244f7a0cfbc062c279f2ad5d7b73f73e7..d15f10f9fe20e14675d53f89169cc86c
      void register_embedded_page(Web::PageId page_id, CanonicalTraversable&);
      void unregister_embedded_page(Web::PageId page_id);
      Optional<Web::PageId> page_id_for_traversable(CanonicalTraversable const&) const;
-@@ -281,6 +284,7 @@ private:
+@@ -284,6 +287,7 @@ private:
      bool m_hosted_tabs_are_origin_keyed { false };
      bool m_has_hosted_more_than_tabs_of_one_origin { false };
      EnableContentBlocker m_enable_content_blocker { EnableContentBlocker::Yes };

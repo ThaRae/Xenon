@@ -692,7 +692,7 @@ def lifecycle_results(output: str, marker: str):
     results = None
     for line in output.splitlines():
         if marker in line:
-            results = json.loads(line.split(marker, 1)[1].rstrip().removesuffix('"'))
+            results = logged_json(line, marker)
     return results
 
 
@@ -1356,7 +1356,7 @@ def check_filter_list_updates(executable: Path, env: dict) -> bool:
         output = result.stdout + result.stderr
         for line in output.splitlines():
             if FILTER_LIST_UPDATES_MARKER in line:
-                return json.loads(line.split(FILTER_LIST_UPDATES_MARKER, 1)[1].rstrip().removesuffix('"')), output
+                return logged_json(line, FILTER_LIST_UPDATES_MARKER), output
         return None, output
 
     def downloads() -> list[str]:
@@ -1493,7 +1493,7 @@ def check_web_authn(executable: Path, env: dict) -> bool:
     output = result.stdout + result.stderr
     for line in output.splitlines():
         if WEB_AUTHN_TEST_MARKER in line:
-            results = json.loads(line.split(WEB_AUTHN_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
+            results = logged_json(line, WEB_AUTHN_TEST_MARKER)
             for name, passed in results.items():
                 print(f"    {'pass' if passed else 'FAIL'}: {name}")
             return all(results.values())
@@ -1595,7 +1595,7 @@ def check_password_managers(executable: Path, env: dict) -> bool:
         output = result.stdout + result.stderr
         for line in output.splitlines():
             if PASSWORD_MANAGER_TEST_MARKER in line:
-                return json.loads(line.split(PASSWORD_MANAGER_TEST_MARKER, 1)[1].rstrip().removesuffix('"')), output
+                return logged_json(line, PASSWORD_MANAGER_TEST_MARKER), output
         return no_report, output
 
     passed = True
@@ -1766,11 +1766,10 @@ def run_extension_test_page(
         print(output[-4000:], file=sys.stderr)
         print(f"    the browser exited with {result.returncode} on {url}", file=sys.stderr)
         return None
-    for line in output.splitlines():
-        if EXTENSION_TEST_MARKER in line:
-            return json.loads(line.split(EXTENSION_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
-    print(output[-4000:], file=sys.stderr)
-    return None
+    results = chunked_logged_json(output, EXTENSION_TEST_MARKER)
+    if results is None:
+        print(output[-4000:], file=sys.stderr)
+    return results
 
 
 def turn_on_content_blocking(profile: str):
@@ -2659,6 +2658,39 @@ def check_site_security(executable: Path, env: dict) -> bool:
     return passed
 
 
+def logged_text(line: str, marker: str) -> str:
+    payload = line.split(marker, 1)[1].rstrip()
+    opening_quote = line.rfind('"', 0, line.index(marker))
+    if payload.endswith('"') and opening_quote != -1:
+        try:
+            return json.loads(line[opening_quote:].rstrip()).split(marker, 1)[1]
+        except json.JSONDecodeError:
+            return payload.removesuffix('"')
+    return payload
+
+
+def logged_json(line: str, marker: str):
+    return json.loads(logged_text(line, marker))
+
+
+def chunked_logged_json(output: str, marker: str):
+    chunks: dict[int, str] = {}
+    for line in output.splitlines():
+        if marker not in line:
+            continue
+        text = logged_text(line, marker)
+        numbering = re.match(r"(\d+)/(\d+) ", text)
+        if not numbering:
+            return json.loads(text)
+        index, count = int(numbering[1]), int(numbering[2])
+        if index == 1:
+            chunks.clear()
+        chunks[index] = text[numbering.end() :]
+        if len(chunks) == count:
+            return json.loads("".join(chunks[number] for number in range(1, count + 1)))
+    return None
+
+
 def site_security_reports(output: str) -> list[dict]:
     reports = []
     for line in output.splitlines():
@@ -2673,7 +2705,7 @@ def site_security_reports(output: str) -> list[dict]:
 
 def certificate_error_reports(output: str) -> list[dict]:
     return [
-        json.loads(line.split(CERTIFICATE_ERROR_TEST_MARKER, 1)[1].rstrip().removesuffix('"'))
+        logged_json(line, CERTIFICATE_ERROR_TEST_MARKER)
         for line in output.splitlines()
         if CERTIFICATE_ERROR_TEST_MARKER in line
     ]

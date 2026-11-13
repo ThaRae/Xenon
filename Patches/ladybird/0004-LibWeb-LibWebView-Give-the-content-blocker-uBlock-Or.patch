@@ -1264,10 +1264,10 @@ index 630535d0f1facf74d69603277fd5c760b32cae33..d03893a0e2924faeb3a235868c2c14a1
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&) const;
      Utf16String cosmetic_style_sheet_for_url(URL::URL const&, ReadonlySpan<Utf16FlyString> classes, ReadonlySpan<Utf16FlyString> ids) const;
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 000ed24ab13797ea5a9249a5ed42fca3f217363a..e4beff48adbf59f20a730ca0cf5c0031f8d32bd3 100644
+index 5c9026cebba6f15c61a2e9595298e1aa30fe0aaa..b5e80a0cdd11ac9b819dd95c5baa18abdd878972 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -323,6 +323,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -326,6 +326,8 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
      bool disable_sandbox = false;
      bool force_video_decoder_server = false;
      Vector<ByteString> content_blocker_list_paths;
@@ -1276,7 +1276,7 @@ index 000ed24ab13797ea5a9249a5ed42fca3f217363a..e4beff48adbf59f20a730ca0cf5c0031
      Optional<StringView> resource_substitution_map_path;
      bool enable_autoplay = false;
      bool expose_experimental_interfaces = false;
-@@ -450,6 +452,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -453,6 +455,20 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
              return true;
          },
      });
@@ -1297,7 +1297,7 @@ index 000ed24ab13797ea5a9249a5ed42fca3f217363a..e4beff48adbf59f20a730ca0cf5c0031
      args_parser.add_option(enable_autoplay, "Enable multimedia autoplay", "enable-autoplay");
      args_parser.add_option(expose_experimental_interfaces, "Expose experimental IDL interfaces", "expose-experimental-interfaces");
      args_parser.add_option(expose_internals_object, "Expose internals object", "expose-internals-object");
-@@ -521,6 +537,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -524,6 +540,9 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          return Error::from_string_literal("--profile-output requires --profile-tool cpu");
  
      m_explicit_content_blocker_list_paths = move(content_blocker_list_paths);
@@ -1307,7 +1307,7 @@ index 000ed24ab13797ea5a9249a5ed42fca3f217363a..e4beff48adbf59f20a730ca0cf5c0031
  
      // Disable site isolation when debugging WebContent. Otherwise, the process swap may interfere with the gdb session.
      if (debug_process_types.contains_slow(ProcessType::WebContent))
-@@ -816,12 +835,67 @@ void Application::rebuild_content_blocker_list_paths()
+@@ -819,12 +838,67 @@ void Application::rebuild_content_blocker_list_paths()
      }
  }
  
@@ -1376,7 +1376,7 @@ index 000ed24ab13797ea5a9249a5ed42fca3f217363a..e4beff48adbf59f20a730ca0cf5c0031
          m_content_blocker_list_buffer = TRY(Core::AnonymousBuffer::create_with_size(0));
          return true;
      }
-@@ -855,7 +929,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
+@@ -858,7 +932,7 @@ ErrorOr<bool> Application::load_content_blocker_lists()
      VERIFY(offset == bytes.size());
  
      if (m_content_blocker_list_buffer.has_value() && m_content_blocker_list_buffer->bytes() == blocker_list_buffer.bytes())
@@ -1395,7 +1395,7 @@ index 000ed24ab13797ea5a9249a5ed42fca3f217363a..e4beff48adbf59f20a730ca0cf5c0031
  
      m_web_content_clients.set(client);
      return client;
-@@ -2774,7 +2847,7 @@ void Application::apply_content_blocker_settings()
+@@ -2875,7 +2948,7 @@ void Application::apply_content_blocker_settings()
              return IterationDecision::Continue;
          });
          if (rules_changed)
@@ -1405,10 +1405,10 @@ index 000ed24ab13797ea5a9249a5ed42fca3f217363a..e4beff48adbf59f20a730ca0cf5c0031
      });
      ViewImplementation::for_each_view([](ViewImplementation& view) {
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 1a4d4819711f813c9aea558024f6945bc61fa0b6..c3299ddd7ee9647600ca585cd66fb74483361200 100644
+index 20b37330107c1bab2d710021651d3da19b28e344..1794bbdc8ac718249db5c5754bfd34daebdfe903 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -437,6 +437,8 @@ private:
+@@ -450,6 +450,8 @@ private:
      ErrorOr<void> launch_devtools_server();
      // Returns whether the combined rules changed.
      ErrorOr<bool> load_content_blocker_lists();
@@ -1417,7 +1417,7 @@ index 1a4d4819711f813c9aea558024f6945bc61fa0b6..c3299ddd7ee9647600ca585cd66fb744
      void apply_content_blocker_settings();
      void rebuild_content_blocker_list_paths();
      ByteString content_blocker_list_path(StringView identifier) const;
-@@ -575,6 +577,8 @@ private:
+@@ -588,6 +590,8 @@ private:
      JsonValue m_site_compatibility_data;
      Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> m_origin_access_allow_list;
      Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
@@ -1426,7 +1426,7 @@ index 1a4d4819711f813c9aea558024f6945bc61fa0b6..c3299ddd7ee9647600ca585cd66fb744
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
          String identifier;
-@@ -585,6 +589,8 @@ private:
+@@ -598,6 +602,8 @@ private:
          u8 redirect_count { 0 };
      };
      Vector<ByteString> m_explicit_content_blocker_list_paths;
@@ -1436,10 +1436,10 @@ index 1a4d4819711f813c9aea558024f6945bc61fa0b6..c3299ddd7ee9647600ca585cd66fb744
      Vector<PendingContentBlockerListUpdate> m_pending_content_blocker_list_updates;
      Optional<PendingContentBlockerListUpdate> m_active_content_blocker_list_update;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 00eb96e011cb844de15b8badbae2074339f76db1..b7e4bcddf71c27efd279ffe5438beeb0f3577dea 100644
+index 0bd9eb6af4e17f7a61049f849bcd7ab52df7e0b9..a53f97fccdcac4720f5c922ce3e4e746c4a46b79 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3304,11 +3304,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
+@@ -3391,11 +3391,11 @@ void ConnectionFromClient::set_content_blocking_policy(Web::PageId page_id, bool
          page->page().set_content_blocking_policy(enabled, disabled_sites);
  }
  
@@ -1454,7 +1454,7 @@ index 00eb96e011cb844de15b8badbae2074339f76db1..b7e4bcddf71c27efd279ffe5438beeb0
          dbgln("Failed to set content blockers: {}", result.error());
          return;
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 5a328c7d51bd83f3822ff21b9ff33f08759ca3e5..6b91f53c03ad280e37aa200deab9089c6e8b1d1a 100644
+index d695022d84935da7e869408e910e26f1eb51af15..f36488ff334350025ad9419c84d3e460c8062d1a 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -252,7 +252,7 @@ private:
@@ -1467,7 +1467,7 @@ index 5a328c7d51bd83f3822ff21b9ff33f08759ca3e5..6b91f53c03ad280e37aa200deab9089c
      virtual void set_force_dark_settings(Web::PageId page_id, bool enabled, HashMap<String, bool> per_host) override;
      virtual void set_autoplay_settings(Web::PageId page_id, Web::HTML::AutoplayPolicy policy, OrderedHashMap<String, Web::HTML::AutoplayPolicy> site_policies) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 5a8c12f59007f1a61514559d1ee8e85e85a1b882..3eaa1f54525d00c4118ff23e198b380c134b86a4 100644
+index 723f202299eea0f626e0ac492cda03b088fbd369..b3497d8696073287bd0e923bf1c4d64ede386659 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -261,7 +261,7 @@ endpoint WebContentServer routed by Web::PageId page_id

@@ -379,13 +379,16 @@ bool BookmarksBar::handle_right_mouse_click(QMouseEvent* event, QObject* item)
         else if (m_selected_bookmark_menu_item_type == "folder")
             bookmark_folder_context_menu().exec(event->globalPosition().toPoint());
     } else if (auto* menu = as_if<QMenu>(item)) {
+        if (!menu->rect().contains(event->pos()))
+            return false;
+
+        QObject* clicked_item = menu;
         if (auto* action = menu->actionAt(event->pos())) {
             QObject* submenu = action->menu();
-            extract_item_properties(submenu ?: action);
+            if (auto* entry = submenu ?: action; entry->property("type").isValid())
+                clicked_item = entry;
         }
-
-        if (m_selected_bookmark_menu_item_type.isEmpty())
-            extract_item_properties(menu);
+        extract_item_properties(clicked_item);
 
         // FIXME: We create a temporary context menu parented to the dropdown. Otherwise, Qt complains that the context
         //        menu's parent does not match the current topmost popup. It would be nice if we could figure out a way

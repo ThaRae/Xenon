@@ -54,12 +54,23 @@ async function run() {
     const wokenBy = await Promise.race([woken, sleep(10000).then(() => undefined)]);
     check("an event it has a listener for starts it again", typeof wokenBy === "string" && wokenBy !== second?.instance);
 
-    console.log(`XENON-EXTENSION-TEST ${JSON.stringify(results)}`);
+    reportResults(results);
     window.close();
+}
+
+const RESULT_CHUNK_LENGTH = 900;
+
+function reportResults(results) {
+    const text = JSON.stringify(results);
+    const count = Math.max(1, Math.ceil(text.length / RESULT_CHUNK_LENGTH));
+    for (let index = 0; index < count; ++index) {
+        const chunk = text.slice(index * RESULT_CHUNK_LENGTH, (index + 1) * RESULT_CHUNK_LENGTH);
+        console.log(`XENON-EXTENSION-TEST ${index + 1}/${count} ${chunk}`);
+    }
 }
 
 run().catch(error => {
     results.error = String(error?.stack ?? error);
-    console.log(`XENON-EXTENSION-TEST ${JSON.stringify(results)}`);
+    reportResults(results);
     window.close();
 });

@@ -23,10 +23,10 @@ which both overloads share.
  3 files changed, 38 insertions(+), 30 deletions(-)
 
 diff --git a/UI/Qt/Application.cpp b/UI/Qt/Application.cpp
-index eb5c04a55fea908cecf5e4e5a07a2e258c33cc1c..18641df7fc01a563365b7d4162164cb6b7f63a49 100644
+index 2ba209346423cf30e5918642d3ed620cd1ea1952..cc99eae3d6ee50d40555cb4e0cda03db7cf8bdfd 100644
 --- a/UI/Qt/Application.cpp
 +++ b/UI/Qt/Application.cpp
-@@ -2157,7 +2157,7 @@ BrowserWindow* Application::window_for_new_tab(Optional<u64> source_view_id, Web
+@@ -2167,7 +2167,7 @@ BrowserWindow* Application::window_for_new_tab(Optional<u64> source_view_id, Web
  void Application::open_view_in_new_tab(u64 view_id, Optional<u64> source_view_id, WebView::IsPrivate is_private, Web::HTML::ActivateTab activate_tab)
  {
      if (auto* window = window_for_new_tab(source_view_id, is_private))
@@ -36,10 +36,10 @@ index eb5c04a55fea908cecf5e4e5a07a2e258c33cc1c..18641df7fc01a563365b7d4162164cb6
          new_window({}, configuration_for_new_window(), BrowserWindow::IsPopupWindow::No, is_private, view_id);
  }
 diff --git a/UI/Qt/BrowserWindow.cpp b/UI/Qt/BrowserWindow.cpp
-index 97460d9d17668379573d6f47ef37a6812b5659a5..ee89a4aae6955a274f029e75120f3214c43e9291 100644
+index 0a2da16b2ca5a778c0f3c56d088aaa8741fa4a80..077a3d0b0786538521cd739f0107016b5dbd24fb 100644
 --- a/UI/Qt/BrowserWindow.cpp
 +++ b/UI/Qt/BrowserWindow.cpp
-@@ -432,7 +432,7 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
+@@ -438,7 +438,7 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
      });
  
      if (hub_view_id.has_value()) {
@@ -48,7 +48,7 @@ index 97460d9d17668379573d6f47ef37a6812b5659a5..ee89a4aae6955a274f029e75120f3214
      } else {
          for (size_t i = 0; i < initial_urls.size(); ++i)
              create_new_tab((i == 0) ? Web::HTML::ActivateTab::Yes : Web::HTML::ActivateTab::No, TabLocation::end());
-@@ -852,11 +852,11 @@ Tab& BrowserWindow::create_restored_tab(RestoredSessionTab const& restored, int
+@@ -858,11 +858,11 @@ Tab& BrowserWindow::create_restored_tab(RestoredSessionTab const& restored, int
      return *tab;
  }
  
@@ -62,7 +62,7 @@ index 97460d9d17668379573d6f47ef37a6812b5659a5..ee89a4aae6955a274f029e75120f3214
  
      auto* tab = new Tab(this, hub_view_id);
  
-@@ -865,7 +865,8 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional
+@@ -871,7 +871,8 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, Optional
          set_current_tab(tab);
      }
  
@@ -72,7 +72,7 @@ index 97460d9d17668379573d6f47ef37a6812b5659a5..ee89a4aae6955a274f029e75120f3214
      if (activate_tab == Web::HTML::ActivateTab::Yes)
          m_tabs_container->set_current_tab(tab);
  
-@@ -898,28 +899,7 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
+@@ -904,28 +905,7 @@ Tab& BrowserWindow::create_new_tab(Web::HTML::ActivateTab activate_tab, TabLocat
          set_current_tab(tab);
      }
  
@@ -102,7 +102,7 @@ index 97460d9d17668379573d6f47ef37a6812b5659a5..ee89a4aae6955a274f029e75120f3214
      // A new tab is unpinned, so it never lands inside the pinned group.
      m_tabs_container->insert_tab(constrain_insertion_index(insertion_index, false), tab, "New Tab");
  
-@@ -983,7 +963,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
+@@ -989,7 +969,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
          }
      });
  
@@ -111,7 +111,7 @@ index 97460d9d17668379573d6f47ef37a6812b5659a5..ee89a4aae6955a274f029e75120f3214
          if (hints.popup) {
              auto cascaded_configuration = Application::the().configuration_for_new_window();
              WindowConfiguration configuration {
-@@ -995,7 +975,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
+@@ -1001,7 +981,7 @@ void BrowserWindow::initialize_tab_view(Tab* tab)
              Application::the().new_window({}, configuration, IsPopupWindow::Yes, m_is_private, hub_view_id);
              return;
          }
@@ -120,7 +120,7 @@ index 97460d9d17668379573d6f47ef37a6812b5659a5..ee89a4aae6955a274f029e75120f3214
      };
  }
  
-@@ -1226,6 +1206,33 @@ int BrowserWindow::pinned_tab_count() const
+@@ -1232,6 +1212,33 @@ int BrowserWindow::pinned_tab_count() const
      return m_tabs_container->tab_bar()->pinned_tab_count();
  }
  
@@ -155,7 +155,7 @@ index 97460d9d17668379573d6f47ef37a6812b5659a5..ee89a4aae6955a274f029e75120f3214
  {
      auto pinned_count = pinned_tab_count();
 diff --git a/UI/Qt/BrowserWindow.h b/UI/Qt/BrowserWindow.h
-index 281ff3b9f3bd4ca15908890ab48256a830956b4a..b31db9bf45661b4b670c8747f1a32ca3c32140ad 100644
+index 58bf0eb953c2dd36a437d671bfd9a692cc48545b..e54dfc144f90ef1672bbeffcd5da1107d85634a1 100644
 --- a/UI/Qt/BrowserWindow.h
 +++ b/UI/Qt/BrowserWindow.h
 @@ -193,7 +193,7 @@ public:
@@ -167,7 +167,7 @@ index 281ff3b9f3bd4ca15908890ab48256a830956b4a..b31db9bf45661b4b670c8747f1a32ca3
      bool is_window_close_approved() const { return m_window_close_approved; }
      void report_activation_to_session_store();
      void cancel_window_close_preflight();
-@@ -304,6 +304,7 @@ private:
+@@ -305,6 +305,7 @@ private:
  
      void update_chrome_style();
  

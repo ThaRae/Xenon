@@ -34,6 +34,11 @@ profile:
 Xenon's own settings stay where they are with either. Ladybird's engine still names its database in
 the profile `Ladybird.db`.
 
+Ladybird's development builds, which are those built without `LADYBIRD_VERSION`, use a `developer` profile when none is
+selected, to keep apart from an installed release. Xenon builds its releases without it too, so it names `default` as
+the profile to use instead (`create_platform_options()` in `UI/Application.cpp`, through engine patch `0073`), and every
+Xenon build, local ones included, opens the same profile.
+
 ## Profiles from earlier builds
 
 LibWebView put every profile under `Ladybird`, until engine patch `0020` let the browser name the directory. Xenon

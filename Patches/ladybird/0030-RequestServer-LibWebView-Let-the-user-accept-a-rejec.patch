@@ -47,10 +47,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Services/RequestServer/CertificateExceptions.h
 
 diff --git a/Libraries/LibRequests/RequestControlClient.cpp b/Libraries/LibRequests/RequestControlClient.cpp
-index 0d1396e99a6179136b09d93ffb07cef527336069..c195a5322246eca9fa3732f54ceddee7cff35b5f 100644
+index d60d7d26d8fddfb63acd1e34f68686b689293ebc..8e6bf8b1d250c1e5f8dc7bcb74e8098cfab23351 100644
 --- a/Libraries/LibRequests/RequestControlClient.cpp
 +++ b/Libraries/LibRequests/RequestControlClient.cpp
-@@ -36,6 +36,12 @@ void RequestControlClient::die()
+@@ -43,6 +43,12 @@ void RequestControlClient::die()
      }
  }
  
@@ -64,18 +64,18 @@ index 0d1396e99a6179136b09d93ffb07cef527336069..c195a5322246eca9fa3732f54ceddee7
  {
      if (on_network_usage)
 diff --git a/Libraries/LibRequests/RequestControlClient.h b/Libraries/LibRequests/RequestControlClient.h
-index 45e4638d620bdd860516e8dd62d06581da796bde..1971d8280463f44b980d4ee406a0fd0682481501 100644
+index e74f6a3445fe13f4b5cd4df03d363215e5c56737..98dc150d4b19833eb3b8d7ca6b83d28bb5b6ee5d 100644
 --- a/Libraries/LibRequests/RequestControlClient.h
 +++ b/Libraries/LibRequests/RequestControlClient.h
-@@ -35,6 +35,7 @@ public:
-     NonnullRefPtr<Core::Promise<Vector<CacheAccessBucket>>> retrieve_cache_access_profile(AK::Duration granularity);
+@@ -38,6 +38,7 @@ public:
+     NonnullRefPtr<Core::Promise<Empty>> designate_request_adopter(RequestTransferLeaseKey, int adopter_client_id);
  
      Function<void(Vector<NetworkUsage>, u64 interval_microseconds)> on_network_usage;
 +    Function<void(URL::URL const&, ByteBuffer const& certificate)> on_server_certificate_rejected;
      Function<void(int client_id)> on_client_disconnected;
      Function<String(int client_id, URL::URL const&, Optional<HTTP::Cookie::PartitionContext> const&, HTTP::Cookie::SameSiteContext)> on_retrieve_http_cookie;
      Function<void(int client_id, URL::URL const&, Optional<HTTP::Cookie::PartitionContext> const&, HTTP::Cookie::SameSiteContext, Vector<HTTP::Cookie::ParsedCookie> const&, Optional<HTTP::HSTS::ParsedHSTSPolicy> const&)> on_store_response_cookies_and_hsts_policy;
-@@ -44,6 +45,7 @@ public:
+@@ -47,6 +48,7 @@ public:
  private:
      virtual void die() override;
  
@@ -84,7 +84,7 @@ index 45e4638d620bdd860516e8dd62d06581da796bde..1971d8280463f44b980d4ee406a0fd06
      virtual void client_disconnected(int client_id) override;
      virtual void retrieve_http_cookie(int client_id, u64 request_id, RequestServer::RequestType request_type, u64 cookie_request_id, URL::URL url, Optional<HTTP::Cookie::PartitionContext> partition_context, HTTP::Cookie::SameSiteContext same_site_context) override;
 diff --git a/Libraries/LibWebView/BrowsingSession.h b/Libraries/LibWebView/BrowsingSession.h
-index 36bc201546e1a1d029c4cd63581914df02361c9a..751a5e187670c08cc9a4e672074cfd4ae1a94ea3 100644
+index ab58a33a45ad8db769b65b58717633905e1e2eed..2237ec37389d7f04a3d7ef30f995ea1ab8fcf4fb 100644
 --- a/Libraries/LibWebView/BrowsingSession.h
 +++ b/Libraries/LibWebView/BrowsingSession.h
 @@ -6,10 +6,13 @@
@@ -101,7 +101,7 @@ index 36bc201546e1a1d029c4cd63581914df02361c9a..751a5e187670c08cc9a4e672074cfd4a
  #include <AK/Weakable.h>
  #include <LibWebView/Export.h>
  #include <LibWebView/Forward.h>
-@@ -39,6 +42,15 @@ public:
+@@ -42,6 +45,15 @@ public:
      OwnPtr<HSTSStore> hsts_store;
      OwnPtr<PermissionManager> permission_manager;
  
@@ -118,7 +118,7 @@ index 36bc201546e1a1d029c4cd63581914df02361c9a..751a5e187670c08cc9a4e672074cfd4a
      explicit BrowsingSession(IsPrivate);
  
 diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
-index a4e970bf9bd91d38441cc3902bb622531894c379..fa9a0346b2528499e07053fa47bbb3faa0811271 100644
+index 90b2f9fd685a22c93f4a4c5e8f6415b1fcb2d5c8..af2db8cb4e8370cd420e78a9b31f498fd7607e6f 100644
 --- a/Libraries/LibWebView/RequestServerManager.cpp
 +++ b/Libraries/LibWebView/RequestServerManager.cpp
 @@ -150,6 +150,13 @@ ErrorOr<void> RequestServerManager::launch_process(RequestServerInstance& instan
@@ -346,7 +346,7 @@ index 0000000000000000000000000000000000000000..90db3bd6b855076ec3f543fc7477b41d
 +
 +}
 diff --git a/Services/RequestServer/ControlConnectionFromClient.cpp b/Services/RequestServer/ControlConnectionFromClient.cpp
-index 4db4705cd2feb09bac6b55824bc38d2d82838b75..e8fb7e6ff7ca99a96de00dd19583d95c579ce994 100644
+index 51ff5ae658253c9a5a4d5d626e84285b0116a650..580ff4c183996399cc359a586eb77dfabab864bf 100644
 --- a/Services/RequestServer/ControlConnectionFromClient.cpp
 +++ b/Services/RequestServer/ControlConnectionFromClient.cpp
 @@ -8,6 +8,7 @@
@@ -357,7 +357,7 @@ index 4db4705cd2feb09bac6b55824bc38d2d82838b75..e8fb7e6ff7ca99a96de00dd19583d95c
  #include <RequestServer/ControlConnectionFromClient.h>
  #include <RequestServer/Request.h>
  #include <RequestServer/Resolver.h>
-@@ -182,6 +183,11 @@ void ControlConnectionFromClient::set_proxy_configuration(HTTP::ProxyConfigurati
+@@ -190,6 +191,11 @@ void ControlConnectionFromClient::set_proxy_configuration(HTTP::ProxyConfigurati
      RequestServer::set_proxy_configuration(move(proxy_configuration));
  }
  
@@ -370,10 +370,10 @@ index 4db4705cd2feb09bac6b55824bc38d2d82838b75..e8fb7e6ff7ca99a96de00dd19583d95c
  {
      Request::set_performance_monitor_enabled(enabled);
 diff --git a/Services/RequestServer/ControlConnectionFromClient.h b/Services/RequestServer/ControlConnectionFromClient.h
-index f56316405830e2b7c61db7d39cd878415047c221..a9b941df418e3083a77f389bbe4fb7b62d6d8dec 100644
+index 4145b6e1b31f5b114ba771a60ffe146694c7de51..884a5d520636d4366f054e065c5ede6f9863295d 100644
 --- a/Services/RequestServer/ControlConnectionFromClient.h
 +++ b/Services/RequestServer/ControlConnectionFromClient.h
-@@ -49,6 +49,8 @@ private:
+@@ -51,6 +51,8 @@ private:
  
      virtual void set_performance_monitor_enabled(bool) override;
  
@@ -521,10 +521,10 @@ index a73de0349138be746e861e2830536d803cdf40bb..ae9dca6f502753bbd3fa3d51e7b681ea
      bool m_informed_client_requires_network { false };
      bool m_informed_client_request_started { false };
 diff --git a/Services/RequestServer/RequestServerControl.ipc b/Services/RequestServer/RequestServerControl.ipc
-index 9c7964e169917d1aa592c3b16a369ea43a6b900f..fd79fa2320d110e2db6564018fdb71f5de503789 100644
+index 104fb1498d4b749299d18a56d163c9645c6054ae..b5222e47966c3f2a586e5beb3703ac0d9dd77e69 100644
 --- a/Services/RequestServer/RequestServerControl.ipc
 +++ b/Services/RequestServer/RequestServerControl.ipc
-@@ -27,6 +27,11 @@ endpoint RequestServerControl
+@@ -30,6 +30,11 @@ endpoint RequestServerControl
  
      set_performance_monitor_enabled(bool enabled) =|
  
@@ -537,7 +537,7 @@ index 9c7964e169917d1aa592c3b16a369ea43a6b900f..fd79fa2320d110e2db6564018fdb71f5
      remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) =|
  
 diff --git a/Services/RequestServer/RequestServerControlClient.ipc b/Services/RequestServer/RequestServerControlClient.ipc
-index 0d76a27bfcadcbadb20dfb80cc8bf9304169486e..d2a84fd05432eae9bd40c51832252fbdaa9c851e 100644
+index fe5cc6a294d58648c46bd92383cd857e9b02f226..7f10f56512d7adea8a01f56070a386c336d91dba 100644
 --- a/Services/RequestServer/RequestServerControlClient.ipc
 +++ b/Services/RequestServer/RequestServerControlClient.ipc
 @@ -16,6 +16,10 @@ endpoint RequestServerControlClient
