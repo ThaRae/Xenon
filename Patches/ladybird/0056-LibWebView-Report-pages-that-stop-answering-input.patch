@@ -23,10 +23,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 127 insertions(+)
 
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed272143e00992c 100644
+index f5167ec0a87aa193d1de27596cf86cd3c28585d4..a6b0cc61d9ab797a78eb4bd77b40d65b153ef60a 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -68,6 +68,7 @@ static void fail_webdriver_content_commands_after_window_close(auto const& comma
+@@ -69,6 +69,7 @@ static void fail_webdriver_content_commands_after_window_close(auto const& comma
  }
  
  static u64 s_view_count = 1; // This has to start at 1 for Firefox DevTools.
@@ -34,7 +34,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  
  void ViewImplementation::for_each_view(Function<IterationDecision(ViewImplementation&)> callback)
  {
-@@ -126,6 +127,10 @@ ViewImplementation::ViewImplementation(IsPrivate is_private, EnableContentBlocke
+@@ -127,6 +128,10 @@ ViewImplementation::ViewImplementation(IsPrivate is_private, EnableContentBlocke
          if (on_tab_indicator_change)
              on_tab_indicator_change(indicator, visible);
      };
@@ -45,7 +45,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  }
  
  ViewImplementation::~ViewImplementation()
-@@ -135,6 +140,7 @@ ViewImplementation::~ViewImplementation()
+@@ -136,6 +141,7 @@ ViewImplementation::~ViewImplementation()
      // a change in what the tab shows.
      on_url_change = nullptr;
      on_tab_indicator_change = nullptr;
@@ -53,7 +53,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      answer_pending_console_input_completions();
      TabPerformanceMonitor::forget_view(view_id());
      // Leave the views before the permission manager hears: a one-time grant that ends with this view has it revoke
-@@ -490,6 +496,7 @@ void ViewImplementation::set_system_visibility_state(Web::HTML::VisibilityState
+@@ -592,6 +598,7 @@ void ViewImplementation::set_system_visibility_state(Web::HTML::VisibilityState
      traversable().set_system_visibility_state(visibility_state);
      Application::the().update_compositor_context_visibility(page().compositor_context_id(), visibility_state);
      report_permission_presence();
@@ -61,7 +61,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  }
  
  // One-time grants last only while some view shows their site, so each view tells the permission manager what it shows.
-@@ -553,6 +560,7 @@ void ViewImplementation::load(URL::URL const& url, Web::Bindings::NavigationHist
+@@ -655,6 +662,7 @@ void ViewImplementation::load(URL::URL const& url, Web::Bindings::NavigationHist
  // source is still that page.
  void ViewImplementation::load(Web::HTML::PreparedNavigationDescriptor navigation)
  {
@@ -69,7 +69,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      if (on_before_browser_initiated_navigation)
          on_before_browser_initiated_navigation();
  
-@@ -621,6 +629,7 @@ void ViewImplementation::open_url_in_new_window(URL::URL const& url, IsPrivate i
+@@ -723,6 +731,7 @@ void ViewImplementation::open_url_in_new_window(URL::URL const& url, IsPrivate i
  
  void ViewImplementation::load_html(StringView html)
  {
@@ -77,7 +77,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      if (on_before_browser_initiated_navigation)
          on_before_browser_initiated_navigation();
  
-@@ -633,6 +642,7 @@ void ViewImplementation::load_html(StringView html)
+@@ -735,6 +744,7 @@ void ViewImplementation::load_html(StringView html)
  
  void ViewImplementation::reload(BypassCache bypass_cache)
  {
@@ -85,7 +85,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      m_history_visit_transition_for_next_load = HistoryVisitTransition::Reload;
  
      // A load stopped before its document was activated is loaded again, rather than the document it was to replace.
-@@ -711,6 +721,7 @@ void ViewImplementation::traverse_the_history_by_delta(
+@@ -813,6 +823,7 @@ void ViewImplementation::traverse_the_history_by_delta(
      CheckForCancelation check_for_cancelation,
      Function<void()> on_ready)
  {
@@ -93,7 +93,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      if (on_before_browser_initiated_navigation)
          on_before_browser_initiated_navigation();
  
-@@ -723,6 +734,7 @@ void ViewImplementation::traverse_the_history_to_step(
+@@ -825,6 +836,7 @@ void ViewImplementation::traverse_the_history_to_step(
      CheckForCancelation check_for_cancelation,
      Function<void()> on_ready)
  {
@@ -101,7 +101,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      if (on_before_browser_initiated_navigation)
          on_before_browser_initiated_navigation();
  
-@@ -1002,10 +1014,13 @@ void ViewImplementation::enqueue_input_event(Web::InputEvent event)
+@@ -1106,10 +1118,13 @@ void ViewImplementation::enqueue_input_event(Web::InputEvent event)
      // Send the next event over to the WebContent to be handled by JS. We'll later get a message to say whether JS
      // prevented the default event behavior, at which point we either discard or handle that event, and then try to
      // process the next one.
@@ -115,7 +115,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      if (gives_user_activation) {
          auto now = MonotonicTime::now();
          pending.user_activation_time = now;
-@@ -1020,6 +1035,7 @@ void ViewImplementation::enqueue_input_event(Web::InputEvent event)
+@@ -1124,6 +1139,7 @@ void ViewImplementation::enqueue_input_event(Web::InputEvent event)
      if (pending.event.has<Web::KeyEvent>())
          pending.endpoint = focused_navigable_host();
      send_queued_input_events();
@@ -123,7 +123,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  }
  
  // Input waits while the compositor decides whether it forwards a key event, so a key it hands back is not overtaken.
-@@ -1288,6 +1304,7 @@ void ViewImplementation::did_finish_handling_input_event(Badge<WebContentPage>,
+@@ -1392,6 +1408,7 @@ void ViewImplementation::did_finish_handling_input_event(Badge<WebContentPage>,
      auto pending = m_pending_input_events.take(*index);
      auto event = move(pending.event);
      send_queued_input_events();
@@ -131,7 +131,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  
      // The renderer's activation counts from when it handled the event, so the activation the event gives does too. An
      // event the page dropped gives none, and opens no link.
-@@ -1428,6 +1445,7 @@ void ViewImplementation::did_lose_input_event_endpoint(Badge<WebContentPage>, We
+@@ -1532,6 +1549,7 @@ void ViewImplementation::did_lose_input_event_endpoint(Badge<WebContentPage>, We
      // Nothing will finish the events the closed page held, and a pending event holds back compositor input.
      m_pending_input_events.remove_all_matching([&](auto const& pending) { return pending.endpoint == page; });
      send_queued_input_events();
@@ -139,7 +139,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  }
  
  void ViewImplementation::did_consume_input_event_in_compositor(Badge<WebContentPage>, u64 event_id)
-@@ -1437,6 +1455,7 @@ void ViewImplementation::did_consume_input_event_in_compositor(Badge<WebContentP
+@@ -1541,6 +1559,7 @@ void ViewImplementation::did_consume_input_event_in_compositor(Badge<WebContentP
      m_pending_input_events.remove_first_matching([&](auto const& pending) { return Web::input_event_id(pending.event) == event_id; });
      m_inputs_to_open_links_in_new_tabs.remove_all_matching([&](auto const& input) { return input.event_id == event_id; });
      send_queued_input_events();
@@ -147,7 +147,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  }
  
  void ViewImplementation::did_not_dispatch_input_event_through_compositor(Badge<WebContentPage>, u64 event_id)
-@@ -1493,6 +1512,84 @@ void ViewImplementation::discard_input_events_routed_through_lost_compositor(Bad
+@@ -1597,6 +1616,84 @@ void ViewImplementation::discard_input_events_routed_through_lost_compositor(Bad
      // so sending them again could run an event twice. Acknowledgements that still arrive for them are ignored.
      m_pending_input_events.remove_all_matching([](auto const& pending) { return pending.routed_through_compositor; });
      send_queued_input_events();
@@ -232,7 +232,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  }
  
  // A process that hosts a WebUI hosts only the browser's own pages, which follow the interface theme.
-@@ -2322,6 +2419,10 @@ void ViewImplementation::set_debugger_paused(bool paused)
+@@ -2426,6 +2523,10 @@ void ViewImplementation::set_debugger_paused(bool paused)
          apply_tooltip();
      }
      update_ui_overlays();
@@ -243,7 +243,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  }
  
  // The compositor draws the controls and the view handles them, rather than the page, so that they work whatever the
-@@ -2819,6 +2920,7 @@ void ViewImplementation::set_is_fullscreen(Web::ViewportIsFullscreen is_fullscre
+@@ -2923,6 +3024,7 @@ void ViewImplementation::set_is_fullscreen(Web::ViewportIsFullscreen is_fullscre
  // NB: Every page of the tab holds the dialog a document of one of them opened.
  void ViewImplementation::alert_closed()
  {
@@ -251,7 +251,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      traversable().for_each_hosting_page([&](WebContentPage& page) {
          page.async_alert_closed();
      });
-@@ -2826,11 +2928,13 @@ void ViewImplementation::alert_closed()
+@@ -2930,11 +3032,13 @@ void ViewImplementation::alert_closed()
  
  void ViewImplementation::before_unload_closed(bool accepted)
  {
@@ -265,7 +265,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      traversable().for_each_hosting_page([&](WebContentPage& page) {
          page.async_confirm_closed(accepted);
      });
-@@ -2838,6 +2942,7 @@ void ViewImplementation::confirm_closed(bool accepted)
+@@ -2942,6 +3046,7 @@ void ViewImplementation::confirm_closed(bool accepted)
  
  void ViewImplementation::prompt_closed(Optional<Utf16String> const& response)
  {
@@ -273,7 +273,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      traversable().for_each_hosting_page([&](WebContentPage& page) {
          page.async_prompt_closed(response);
      });
-@@ -3439,6 +3544,7 @@ void ViewImplementation::set_loading_state(bool is_loading)
+@@ -3542,6 +3647,7 @@ void ViewImplementation::set_loading_state(bool is_loading)
      m_is_loading = is_loading;
      if (on_loading_state_change)
          on_loading_state_change(is_loading);
@@ -281,7 +281,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  }
  
  void ViewImplementation::run_webdriver_content_command(u64 command_id, Web::WebDriver::SessionBrowsingContext browsing_context, String const& name, JsonValue payload, Vector<String> arguments)
-@@ -4333,6 +4439,8 @@ void ViewImplementation::handle_web_content_process_crash()
+@@ -4441,6 +4547,8 @@ void ViewImplementation::handle_web_content_process_crash()
      // Nothing will finish the input events the crashed process still held, and the events another process holds
      // for this tab are stale once its tree is abandoned or restored.
      m_pending_input_events.clear();
@@ -290,7 +290,7 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
  
      set_loading_state(false);
      traversable().clear_ongoing_navigation();
-@@ -4460,6 +4568,7 @@ void ViewImplementation::set_crash_state(Optional<CrashState> state)
+@@ -4568,6 +4676,7 @@ void ViewImplementation::set_crash_state(Optional<CrashState> state)
  {
      auto active = state.has_value();
      m_crash_state = move(state);
@@ -299,10 +299,10 @@ index 0834e64bda0950428aec67ecb2928a3fb5f4b378..d3b06a2e2f918ef365537a14fed27214
      did_change_state();
      if (on_crash_overlay_state_change)
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 791ac042c378e0a248105b1da3951b5968966462..c186074fa86ccf367d3eef0ea0804d8bb66c33d1 100644
+index be16bfd54ec332df579f376dc6a0db1ef7ae8dae..55495c141bd7162e62f18c94fb4fc2d6ca53de1e 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -341,6 +341,9 @@ public:
+@@ -359,6 +359,9 @@ public:
      void did_not_dispatch_input_event_through_compositor(Badge<WebContentPage>, u64 event_id);
      void did_dispatch_input_event_through_compositor(Badge<WebContentPage>, u64 event_id, bool performed_default_action);
      void discard_input_events_routed_through_lost_compositor(Badge<Application>);
@@ -312,7 +312,7 @@ index 791ac042c378e0a248105b1da3951b5968966462..c186074fa86ccf367d3eef0ea0804d8b
      void handle_external_url(Badge<WebContentPage>, URL::URL, URL::Origin, bool has_transient_activation);
      void did_request_cursor_change(Badge<WebContentPage>, Gfx::Cursor);
      void did_enter_tooltip_area(Badge<WebContentPage>, ByteString title);
-@@ -719,6 +722,7 @@ public:
+@@ -737,6 +740,7 @@ public:
      Function<void(size_t current_match_index, Optional<size_t> const& total_match_count)> on_find_in_page;
      Function<void(Gfx::Color)> on_theme_color_change;
      Function<void(Gfx::Color)> on_page_background_color_change;
@@ -320,7 +320,7 @@ index 791ac042c378e0a248105b1da3951b5968966462..c186074fa86ccf367d3eef0ea0804d8b
      Function<void(Web::ScreenWakeLockState)> on_screen_wake_lock_state_changed;
      enum class WebContentCrashReason {
          ProcessCrash,
-@@ -821,6 +825,11 @@ protected:
+@@ -845,6 +849,11 @@ protected:
      void did_finish_navigation();
      void did_end_uncommitted_navigation(StringView reason);
      void set_loading_state(bool);
@@ -332,7 +332,7 @@ index 791ac042c378e0a248105b1da3951b5968966462..c186074fa86ccf367d3eef0ea0804d8b
      void complete_webdriver_navigation_completion(u64 request_id, Web::WebDriver::Response);
      void set_webdriver_current_browsing_context(CanonicalNavigable const&);
      enum class WebDriverNavigationCompletionSource : u8 {
-@@ -1016,8 +1025,16 @@ protected:
+@@ -1044,8 +1053,16 @@ protected:
  
          // When the view delivered a paste shortcut, until the page reads the clipboard for it.
          Optional<MonotonicTime> paste_shortcut_time {};
@@ -350,10 +350,10 @@ index 791ac042c378e0a248105b1da3951b5968966462..c186074fa86ccf367d3eef0ea0804d8b
      struct ClipboardWrite {
          URL::Origin writer;
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 450b0f5ce06c7c777460894df514f579e8773bd3..cb255f172818c3e0d333f53921224b426395f10f 100644
+index 42268de6a716e3c2f6abdbfbcba9a87c4d7db4a3..755237ffd51caa3f7d053b49c6258435fc714b7d 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -438,6 +438,7 @@ Optional<WebContentPage::ViewPosition> WebContentPage::view_position(Web::HTML::
+@@ -448,6 +448,7 @@ Optional<WebContentPage::ViewPosition> WebContentPage::view_position(Web::HTML::
  // A dialog blocks the whole tab, so every other page of the tab is told of the one a document of this page opened.
  void WebContentPage::did_open_dialog(Web::PendingDialog dialog, Utf16String const& message)
  {

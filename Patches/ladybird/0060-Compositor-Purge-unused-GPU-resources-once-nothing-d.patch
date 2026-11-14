@@ -27,7 +27,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  4 files changed, 54 insertions(+)
 
 diff --git a/Services/Compositor/CompositorState.cpp b/Services/Compositor/CompositorState.cpp
-index 1c007b6c92eba4b32265a0f7afe1f568c1bc773c..c71523d82e19018f4352dc1c2f40148812e3197d 100644
+index 3679836c35e92184f532ce8b211077459bcbd853..ebdf68ee3a06dc88c78505b5c398b38a66ef9394 100644
 --- a/Services/Compositor/CompositorState.cpp
 +++ b/Services/Compositor/CompositorState.cpp
 @@ -36,6 +36,7 @@ static constexpr auto visible_context_raster_release_delay = AK::Duration::from_
@@ -84,7 +84,7 @@ index 1c007b6c92eba4b32265a0f7afe1f568c1bc773c..c71523d82e19018f4352dc1c2f401488
  void CompositorState::release_free_pages()
  {
      m_free_page_release_is_pending = false;
-@@ -1425,6 +1465,7 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
+@@ -1641,6 +1681,7 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
      if (idle_memory_release_is_logged())
          dbgln("COMPOSITOR-SCREENSHOT context={} after_release={}", context_id, repaints_released_rasters);
      schedule_idle_memory_release_for(*context);
@@ -92,7 +92,7 @@ index 1c007b6c92eba4b32265a0f7afe1f568c1bc773c..c71523d82e19018f4352dc1c2f401488
      return true;
  }
  
-@@ -1453,6 +1494,7 @@ void CompositorState::did_finish_async_present(PendingAsyncPresent& pending_pres
+@@ -1763,6 +1804,7 @@ void CompositorState::did_finish_async_present(PendingAsyncPresent& pending_pres
      (void)m_pending_async_presents.remove(pending_present_iterator);
      if (m_pending_async_presents.is_empty() && m_gpu_completion_timer)
          m_gpu_completion_timer->stop();
@@ -101,10 +101,10 @@ index 1c007b6c92eba4b32265a0f7afe1f568c1bc773c..c71523d82e19018f4352dc1c2f401488
      deliver_rendered_frame(finished_present);
  }
 diff --git a/Services/Compositor/CompositorState.h b/Services/Compositor/CompositorState.h
-index 942537f38edee8ef217fccf5b0cda66434fb349a..6bf57ee14f2a1845c047256156da8fb9067ab07c 100644
+index dc52bd987b792947fecc0576c035d79f1feb3851..f762dfda4379e0107a7607475aeb7150450b37a8 100644
 --- a/Services/Compositor/CompositorState.h
 +++ b/Services/Compositor/CompositorState.h
-@@ -285,6 +285,8 @@ private:
+@@ -324,6 +324,8 @@ private:
      void schedule_idle_memory_release_for(PresentedContext const&);
      void release_idle_memory();
      void release_free_pages();
@@ -112,8 +112,8 @@ index 942537f38edee8ef217fccf5b0cda66434fb349a..6bf57ee14f2a1845c047256156da8fb9
 +    void purge_idle_gpu_resources();
  
      HashMap<Web::CompositorContextId, NonnullOwnPtr<PresentedContext>> m_presented_contexts;
-     u64 m_next_web_content_client_id { 1 };
-@@ -302,6 +304,8 @@ private:
+ 
+@@ -353,6 +355,8 @@ private:
      Optional<MonotonicTime> m_last_free_page_release_time;
      bool m_free_page_release_is_pending { false };
      RefPtr<Threading::Thread> m_heap_trim_thread;
@@ -123,10 +123,10 @@ index 942537f38edee8ef217fccf5b0cda66434fb349a..6bf57ee14f2a1845c047256156da8fb9
      HashMap<CompositorStateClient*, PresentationCapabilities> m_presentations;
      u64 m_next_presentation_id { 1 };
 diff --git a/Services/Compositor/SkiaBackendContext.cpp b/Services/Compositor/SkiaBackendContext.cpp
-index 27a71f0c69b80ea3cf73d7009b4420dbfc5782d9..a5557cdeca5da57e54eb91dc91c7d337d6e0a68d 100644
+index 219fa868c9884ea12baf83345eacce05ad82c880..1ead07d71bd6e7d82b4e22bf446c981d1eda9d40 100644
 --- a/Services/Compositor/SkiaBackendContext.cpp
 +++ b/Services/Compositor/SkiaBackendContext.cpp
-@@ -189,6 +189,12 @@ void SkiaBackendContext::purge_unlocked_scratch_resources()
+@@ -201,6 +201,12 @@ void SkiaBackendContext::purge_unlocked_scratch_resources()
          context->purgeUnlockedResources(GrPurgeResourceOptions::kScratchResourcesOnly);
  }
  
@@ -140,7 +140,7 @@ index 27a71f0c69b80ea3cf73d7009b4420dbfc5782d9..a5557cdeca5da57e54eb91dc91c7d337
  {
      VERIFY(!main_thread_context());
 diff --git a/Services/Compositor/SkiaBackendContext.h b/Services/Compositor/SkiaBackendContext.h
-index 64cd8d53ea210075c697a2ba3cbe6ae00c31fbc2..23e9c0702d368f8316c2833db1ee276450ad9a73 100644
+index 906e1acdd237276a157c4680fcb7622b2e0b8c3f..ce093ff7821600c36676b0e982d8df3f47be72a3 100644
 --- a/Services/Compositor/SkiaBackendContext.h
 +++ b/Services/Compositor/SkiaBackendContext.h
 @@ -10,6 +10,7 @@
@@ -151,7 +151,7 @@ index 64cd8d53ea210075c697a2ba3cbe6ae00c31fbc2..23e9c0702d368f8316c2833db1ee2764
  #include <LibCore/Timer.h>
  #include <LibGfx/GpuDeviceIdentity.h>
  
-@@ -65,6 +66,7 @@ public:
+@@ -67,6 +68,7 @@ public:
      void check_async_work_completion();
      size_t resource_cache_bytes() const;
      void purge_unlocked_scratch_resources();

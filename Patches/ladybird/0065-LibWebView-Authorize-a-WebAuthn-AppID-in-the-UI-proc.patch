@@ -20,10 +20,10 @@ misbehavior.
  1 file changed, 17 insertions(+)
 
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 8bb4950911f212c47b486c6f8029ea36ba3e1c5f..6fe1dea9578b79dec8509df990ae45ca639dbf13 100644
+index 9f727728697a26f9c3c8f2cbc8be65d84340a064..6d425e235df77ee98e627eabb3b54810a17325e5 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -2279,6 +2279,18 @@ void WebContentPage::did_request_dismiss_notification_for_testing(u64 notificati
+@@ -2295,6 +2295,18 @@ void WebContentPage::did_request_dismiss_notification_for_testing(u64 notificati
  // https://w3c.github.io/webauthn/#sctn-api
  // The renderer has checked the request already, but this process decides: it knows which document asks, and
  // where, from its own records, which a renderer can't forge.
@@ -42,7 +42,7 @@ index 8bb4950911f212c47b486c6f8029ea36ba3e1c5f..6fe1dea9578b79dec8509df990ae45ca
  ErrorOr<WebAuthnCoordinator::CeremonyContext, Web::WebAuthn::Error> WebContentPage::web_authn_ceremony_context(StringView message_name, Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id, Web::PermissionsPolicy::PolicyControlledFeature feature, String const& rp_id)
  {
      auto not_allowed = [](StringView message) {
-@@ -2366,6 +2378,11 @@ void WebContentPage::did_request_web_authn_get(u64 request_id, Web::HTML::CrossP
+@@ -2382,6 +2394,11 @@ void WebContentPage::did_request_web_authn_get(u64 request_id, Web::HTML::CrossP
          async_web_authn_request_completed(request_id, context.release_error());
          return;
      }

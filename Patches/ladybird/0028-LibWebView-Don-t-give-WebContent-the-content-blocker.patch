@@ -17,10 +17,10 @@ engine it has, and send the rules again when blocking is turned back on.
  2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 5a39fb0335ad139ceea2afe5773aca3c03b9ee1b..762fc0e35368c38b798ef7f024d7f207813b5aa9 100644
+index 4d0e1ab19b5166863d5266dfa75082faddb8a250..da79d11f07bec5abbd33cd0413ce96940bb846f2 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -708,6 +708,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -711,6 +711,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          warnln("\033[31;1mUnable to load all content blocker lists:\033[0m {}", result.error());
          warnln("    Configured lists: {}", m_browser_options.content_blocker_list_paths);
      }
@@ -28,7 +28,7 @@ index 5a39fb0335ad139ceea2afe5773aca3c03b9ee1b..762fc0e35368c38b798ef7f024d7f207
  
      if (!m_event_loop)
          m_event_loop = &create_platform_event_loop();
-@@ -898,6 +899,11 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -901,6 +902,11 @@ void Application::send_content_blockers(WebContentClient& client) const
  {
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
@@ -40,7 +40,7 @@ index 5a39fb0335ad139ceea2afe5773aca3c03b9ee1b..762fc0e35368c38b798ef7f024d7f207
      client.async_set_content_blockers(*m_content_blocker_list_buffer, *m_trusted_content_blocker_list_buffer, *m_content_blocker_resources_buffer);
  }
  
-@@ -2891,7 +2897,11 @@ void Application::apply_content_blocker_settings()
+@@ -2992,7 +2998,11 @@ void Application::apply_content_blocker_settings()
      else
          rules_changed = result.release_value();
  
@@ -53,10 +53,10 @@ index 5a39fb0335ad139ceea2afe5773aca3c03b9ee1b..762fc0e35368c38b798ef7f024d7f207
  
      WebContentClient::for_each_client([&](WebContentClient& client) {
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index cb616c194eb2a4a8ceeaa55b2fc3eb0646ba4ae6..afb89b487b5c6fbca4fb81c2a10866f6c7baaf15 100644
+index 72bce2a92426e9513d345da0a9bfb6f5dab54f8a..bf827e2880817ef21561a4560eb565e6415cdec7 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -599,6 +599,8 @@ private:
+@@ -612,6 +612,8 @@ private:
      Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
      Optional<Core::AnonymousBuffer> m_trusted_content_blocker_list_buffer;
      Optional<Core::AnonymousBuffer> m_content_blocker_resources_buffer;

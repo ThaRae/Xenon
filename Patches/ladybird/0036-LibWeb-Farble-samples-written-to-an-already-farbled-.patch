@@ -20,13 +20,13 @@ hardwareConcurrency, deviceMemory, the Chrome User-Agent, and
 navigator.webdriver.
 ---
  .../Rust/src/web_audio/audio_buffer.rs        |  14 +++
- .../LibWeb/Bindings/RustBindingsServices.cpp  |   2 +-
+ .../LibWeb/Bindings/RustBindingsServices.cpp  |   1 +
  Libraries/LibWeb/Internals/Internals.cpp      |   6 +
  Libraries/LibWeb/Internals/Internals.h        |   1 +
  Libraries/LibWeb/Internals/Internals.idl      |   1 +
  .../expected/Fingerprinting/protection.txt    |  15 +++
  .../Text/input/Fingerprinting/protection.html | 106 ++++++++++++++++++
- 7 files changed, 144 insertions(+), 1 deletion(-)
+ 7 files changed, 144 insertions(+)
  create mode 100644 Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
  create mode 100644 Tests/LibWeb/Text/input/Fingerprinting/protection.html
 
@@ -56,10 +56,10 @@ index b342d7050ced5012923adc887886c61dbe59f2f4..f9039b4ad5cbe2efae958ee57848f980
          Ok(())
      }
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index 94c45ddd4c656c4ba957e93aa7062df07933a83f..c5dd4d2a8cb56c2bc46743172b5c320061d0930b 100644
+index 1fd2eb4600113bb515653791cd9339d9c2393b12..1b865680fdfae9d6eef6ea432e194420edcb3ecc 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-@@ -15,6 +15,7 @@
+@@ -16,6 +16,7 @@
  #include <LibWeb/Bindings/Wrappable.h>
  #include <LibWeb/Bindings/WrapperWorld.h>
  #include <LibWeb/DOM/Document.h>
@@ -67,19 +67,11 @@ index 94c45ddd4c656c4ba957e93aa7062df07933a83f..c5dd4d2a8cb56c2bc46743172b5c3200
  #include <LibWeb/HTML/CrossOrigin/AbstractOperations.h>
  #include <LibWeb/HTML/CustomElements/CustomElementReactions.h>
  #include <LibWeb/HTML/EventLoop/EventLoop.h>
-@@ -30,7 +31,6 @@
- #include <LibWeb/Platform/EventLoopPlugin.h>
- #include <LibWeb/WebIDL/AbstractOperations.h>
- #include <LibWeb/WebIDL/CallbackType.h>
--#include <LibWeb/Fingerprinting/Farbling.h>
- #include <LibWeb/WebIDL/DOMException.h>
- #include <LibWeb/WebIDL/ExceptionOrUtils.h>
- #include <LibWeb/WebIDL/Promise.h>
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index ddb5c549943cdc077309e5a4cc68059c9bbca560..ff9b213deb71ac21f8de305bfcebdd02babcc38e 100644
+index 2d9a84a2560bfcee82030d54866eb1073de4d25c..c7e277e958766469c6ef5cfbe8fbb28fea1a7250 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1548,6 +1548,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
+@@ -1534,6 +1534,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
      return {};
  }
  
@@ -93,29 +85,29 @@ index ddb5c549943cdc077309e5a4cc68059c9bbca560..ff9b213deb71ac21f8de305bfcebdd02
  {
      page().set_content_blocking_policy(enabled, {});
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index 9c71ef4674edfedfdd517fc5a8edd209df036157..c3e37c6b47c40b3dd8306b72c5258c0ad306b1bf 100644
+index 3cea28d16675b1aa9e1586ec16f3362eb6bd9ce5..da20927b7a8b2fea9a3e29ad56a4d75f9872d2a2 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -188,6 +188,7 @@ public:
+@@ -183,6 +183,7 @@ public:
      WebIDL::ExceptionOr<void> send_bad_ipc_message_for_testing(Utf16String const& kind);
      WebIDL::ExceptionOr<void> set_content_blockers(Utf16String const& patterns);
      WebIDL::ExceptionOr<void> set_site_compatibility_data(Utf16String const& source);
 +    void set_fingerprinting_protection(bool enabled);
      void set_content_blocking_enabled(bool enabled);
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
-     WebIDL::UnsignedLongLong partial_layout_count();
+     void begin_layout_trace(Bindings::LayoutTraceOptions const&);
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index ddaff5414f1020a793c79f39ae59b4af4bac3746..ebf93735d8bba8e69fd6f95c0cba53f796cde52b 100644
+index 53ee443753dd880c2fbcfbf751bfac74c1e92e48..606aa205bbaea085dda696c451c89db498bec2ef 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -194,6 +194,7 @@ interface Internals {
+@@ -196,6 +196,7 @@ interface Internals {
      undefined sendBadIpcMessageForTesting(DOMString kind);
      undefined setContentBlockers(DOMString patterns);
      undefined setSiteCompatibilityData(DOMString source);
 +    undefined setFingerprintingProtection(boolean enabled);
      undefined setContentBlockingEnabled(boolean enabled);
      DOMString? cosmeticFilterForElement(Element element);
-     unsigned long long partialLayoutCount();
+     // Traces the layout passes of the document until takeLayoutTrace(), and its layout tree builds where asked.
 diff --git a/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt b/Tests/LibWeb/Text/expected/Fingerprinting/protection.txt
 new file mode 100644
 index 0000000000000000000000000000000000000000..563acfec73fecf07ec27e2eee992d8c2dfb98472

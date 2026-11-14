@@ -183,6 +183,10 @@ than each waiting out its timeouts, which would add up to more than CI gives the
 signal only says so in its crash report, which goes in the profile, so when a check fails, the test prints the reports
 saved in the profiles it ran with.
 
+The checks read what their test pages report from `console.log` lines, which Ladybird prints as escaped string literals
+cut off after 1024 characters. `logged_json()` in `Meta/xenon.py` reads such a line; a page whose results can be longer
+logs them in numbered chunks (`reportResults()` in `Tests/Extensions`), which `chunked_logged_json()` puts together.
+
 CI runs on GitHub Actions, on GitHub's own runners:
 
 | Workflow | Runs on | Does |
