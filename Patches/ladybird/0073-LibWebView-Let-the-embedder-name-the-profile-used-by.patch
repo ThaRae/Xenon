@@ -78,7 +78,7 @@ index 2de8981c5383b9740a20b48cc717c3a56bad83eb..5c143dc1cfb1f8f4db08d57768c1dcbc
  
  struct ProfileRoots {
 diff --git a/Tests/LibWebView/TestProfile.cpp b/Tests/LibWebView/TestProfile.cpp
-index b7e9240ca5d31a0f8ee18c2172b153a26f67850d..569dac8cd3b1d4ec2a872574f2b9b76a86d5b8c1 100644
+index 6955601f22e16250866464bfd148db63141129dc..9f58c07cef9bd99396e670ae8bb5429ccb303357 100644
 --- a/Tests/LibWebView/TestProfile.cpp
 +++ b/Tests/LibWebView/TestProfile.cpp
 @@ -105,6 +105,25 @@ TEST_CASE(named_and_default_layouts)
