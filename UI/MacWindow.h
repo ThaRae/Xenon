@@ -22,11 +22,15 @@ namespace Ladybird {
 #if defined(AK_OS_MACOS)
 // The CGDirectDisplayID of the screen the widget's window is on, or of the main screen while it has no window yet.
 Optional<u64> appkit_display_id_for_window(QWidget&);
+// Whether the screen the widget's window is on can show content brighter than SDR white, at its brightest setting.
+bool appkit_window_screen_shows_high_dynamic_range(QWidget&);
 void hide_appkit_window_title(QWidget&);
 void make_appkit_window_resizable(QWidget&);
 void keep_appkit_window_visible_while_inactive(QWidget&);
 void ensure_appkit_window_is_exposed(QWidget&);
 void set_appkit_window_content_aspect_ratio(QWidget&, Gfx::IntSize);
+// The Core Animation layer that shows the widget's own surface, or null if the widget has no native window.
+void* appkit_content_layer(QWidget&);
 void offset_appkit_window_controls(QWidget&, int x_offset, int y_offset);
 // AppKit puts the window controls back in their default place when the window title changes; this moves them back
 // to their offset right away, before the next frame is drawn.

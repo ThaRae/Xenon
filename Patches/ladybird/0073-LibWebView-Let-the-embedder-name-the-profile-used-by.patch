@@ -1,0 +1,109 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Fri, 13 Nov 2026 09:48:09 -0500
+Subject: [PATCH] LibWebView: Let the embedder name the profile used by default
+
+Development builds use the "developer" profile when none is selected,
+so that they keep apart from an installed release. An embedder that
+builds every release without LADYBIRD_VERSION would move its users to
+an empty profile. BrowserOptions can now name the profile to use when
+none is selected, which explicit selections still take priority over.
+---
+ Libraries/LibWebView/Application.cpp |  2 +-
+ Libraries/LibWebView/Options.h       |  2 ++
+ Libraries/LibWebView/Profile.cpp     |  4 +++-
+ Libraries/LibWebView/Profile.h       |  2 ++
+ Tests/LibWebView/TestProfile.cpp     | 19 +++++++++++++++++++
+ 5 files changed, 27 insertions(+), 2 deletions(-)
+
+diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
+index e2c1f678867f8c4c306d5ce3d3587d20d81eef7b..20ec7a6e82d10c2754abe85e11e70439f2b1afe2 100644
+--- a/Libraries/LibWebView/Application.cpp
++++ b/Libraries/LibWebView/Application.cpp
+@@ -747,7 +747,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+ ErrorOr<void> Application::create_profile([[maybe_unused]] Optional<StringView> profile_name, [[maybe_unused]] Optional<StringView> profile_path, [[maybe_unused]] bool force_new_process, [[maybe_unused]] bool temporary_profile)
+ {
+ #if !defined(AK_OS_ANDROID)
+-    ProfileSelection profile_selection { .temporary = temporary_profile };
++    ProfileSelection profile_selection { .temporary = temporary_profile, .default_name = m_browser_options.default_profile_name };
+ 
+     if (force_new_process) {
+         if (profile_name.has_value() || profile_path.has_value() || temporary_profile)
+diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
+index c1f2e172858ac9be98b89523659e77145b6caae1..426858441df9fd137c5a673eb97672f03df8425c 100644
+--- a/Libraries/LibWebView/Options.h
++++ b/Libraries/LibWebView/Options.h
+@@ -104,6 +104,8 @@ enum class ProfileTool {
+ };
+ 
+ struct BrowserOptions {
++    // The profile to use when no profile is selected, for an embedder that keeps one profile name in every build.
++    Optional<ByteString> default_profile_name {};
+     Vector<String> additional_font_directories {};
+     Vector<URL::URL> urls;
+     Vector<ByteString> raw_urls;
+diff --git a/Libraries/LibWebView/Profile.cpp b/Libraries/LibWebView/Profile.cpp
+index 92b51905a7527f0db840797b0f9621b661a9c4ce..550772771ef4479e8ae507c73539bdf912d73179 100644
+--- a/Libraries/LibWebView/Profile.cpp
++++ b/Libraries/LibWebView/Profile.cpp
+@@ -102,6 +102,8 @@ ErrorOr<Profile> Profile::create(ProfileSelection const& selection, ProfileRoots
+ 
+     if (selection.name.has_value() && !is_valid_name(*selection.name))
+         return Error::from_string_literal("Profile names may only contain lowercase ASCII letters, digits, '_' and '-'");
++    if (selection.default_name.has_value() && !is_valid_name(*selection.default_name))
++        return Error::from_string_literal("Profile names may only contain lowercase ASCII letters, digits, '_' and '-'");
+ 
+     if (selection.path.has_value()) {
+         auto root = LexicalPath { *selection.path };
+@@ -144,7 +146,7 @@ ErrorOr<Profile> Profile::create(ProfileSelection const& selection, ProfileRoots
+         return Profile { "temporary"sv, move(paths), move(root) };
+     }
+ 
+-    auto identifier = selection.name.value_or(DEFAULT_PROFILE_NAME);
++    auto identifier = selection.name.value_or(selection.default_name.value_or(DEFAULT_PROFILE_NAME));
+ 
+     ProfilePaths paths {
+         .config = profile_path(roots.config, identifier),
+diff --git a/Libraries/LibWebView/Profile.h b/Libraries/LibWebView/Profile.h
+index 2de8981c5383b9740a20b48cc717c3a56bad83eb..5c143dc1cfb1f8f4db08d57768c1dcbc112bed87 100644
+--- a/Libraries/LibWebView/Profile.h
++++ b/Libraries/LibWebView/Profile.h
+@@ -20,6 +20,8 @@ struct ProfileSelection {
+     Optional<ByteString> name {};
+     Optional<ByteString> path {};
+     bool temporary { false };
++    // The profile to use when none is selected, in place of DEFAULT_PROFILE_NAME.
++    Optional<ByteString> default_name {};
+ };
+ 
+ struct ProfileRoots {
+diff --git a/Tests/LibWebView/TestProfile.cpp b/Tests/LibWebView/TestProfile.cpp
+index 6955601f22e16250866464bfd148db63141129dc..9f58c07cef9bd99396e670ae8bb5429ccb303357 100644
+--- a/Tests/LibWebView/TestProfile.cpp
++++ b/Tests/LibWebView/TestProfile.cpp
+@@ -105,6 +105,25 @@ TEST_CASE(named_and_default_layouts)
+     remove_test_root();
+ }
+ 
++TEST_CASE(embedder_default_name)
++{
++    remove_test_root();
++    auto profile_roots = roots();
++
++    auto profile = MUST(WebView::Profile::create({ .default_name = "default" }, profile_roots));
++    EXPECT_EQ(profile.identifier(), "default"sv);
++    EXPECT_EQ(profile.paths().config, LexicalPath::join(profile_roots.config, "Ladybird/Profiles/default"sv).string());
++
++    auto named = MUST(WebView::Profile::create({ .name = "work", .default_name = "default" }, profile_roots));
++    EXPECT_EQ(named.identifier(), "work"sv);
++
++    auto temporary = MUST(WebView::Profile::create({ .temporary = true, .default_name = "default" }, profile_roots));
++    EXPECT_EQ(temporary.identifier(), "temporary"sv);
++
++    EXPECT(WebView::Profile::create({ .default_name = "Not Valid" }, profile_roots).is_error());
++    remove_test_root();
++}
++
+ TEST_CASE(custom_layout)
+ {
+     remove_test_root();

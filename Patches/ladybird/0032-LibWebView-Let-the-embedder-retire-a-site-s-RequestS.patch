@@ -19,7 +19,7 @@ connects before then keeps it the usual while.
  2 files changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
-index fa9a0346b2528499e07053fa47bbb3faa0811271..326a56b0360fb97ad18e6c056980d55856c646da 100644
+index af2db8cb4e8370cd420e78a9b31f498fd7607e6f..b9734015f0e5bdfad9d2be79651ef190a96da58a 100644
 --- a/Libraries/LibWebView/RequestServerManager.cpp
 +++ b/Libraries/LibWebView/RequestServerManager.cpp
 @@ -188,6 +188,7 @@ ErrorOr<RequestServerClientConnection> RequestServerManager::connect_new_client(

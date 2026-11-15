@@ -37,26 +37,26 @@ since test output has to be deterministic.
  .../Rust/src/web_audio/analyser_node.rs       |  22 ++-
  .../Rust/src/web_audio/audio_array.rs         |  10 +-
  .../Rust/src/web_audio/audio_buffer.rs        |  26 +++
- .../LibWeb/Bindings/RustBindingsServices.cpp  |  20 ++
+ .../LibWeb/Bindings/RustBindingsServices.cpp  |  19 ++
  Libraries/LibWeb/CMakeLists.txt               |   1 +
  Libraries/LibWeb/Fingerprinting/Farbling.cpp  | 185 ++++++++++++++++++
  Libraries/LibWeb/Fingerprinting/Farbling.h    |  71 +++++++
- Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp   |  25 ++-
+ Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp   |  22 ++-
  .../HTML/NavigatorConcurrentHardware.cpp      |   8 +-
  .../LibWeb/HTML/NavigatorDeviceMemory.cpp     |   9 +-
  .../Loader/LoaderConfigSnapshot.h             |   4 +
  Services/WebContent/main.cpp                  |   3 +
- 14 files changed, 384 insertions(+), 18 deletions(-)
+ 14 files changed, 384 insertions(+), 14 deletions(-)
  create mode 100644 Libraries/LibWeb/Fingerprinting/Farbling.cpp
  create mode 100644 Libraries/LibWeb/Fingerprinting/Farbling.h
 
 diff --git a/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs b/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
-index 25b0cf72278dec98b25a6efb8b8a4a11f827f171..e688b586cf35c48d177614f69a58385ae3371f5b 100644
+index 4f3582681f24c85b6696ace69279b27b34c49ce0..3892dcc9d6eba92815e8c7040a96688240466d6d 100644
 --- a/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
 +++ b/Libraries/LibWeb/Bindings/Rust/src/bindings/services.rs
-@@ -49,6 +49,14 @@ unsafe extern "C" {
-     pub(crate) fn web_bindings_realm_is_window(realm: *mut c_void) -> bool;
-     pub(crate) fn web_bindings_realm_is_secure_context(realm: *mut c_void) -> bool;
+@@ -51,6 +51,14 @@ unsafe extern "C" {
+ 
+     pub(crate) fn web_bindings_report_an_exception(realm: *mut c_void, exception: u64);
  
 +    /// If fingerprinting protection is enabled, farbles the RGBA8888 pixels in place with the seed of the realm's
 +    /// origin (Web::Fingerprinting::perturb_pixels()).
@@ -70,10 +70,10 @@ index 25b0cf72278dec98b25a6efb8b8a4a11f827f171..e688b586cf35c48d177614f69a58385a
      /// HTML::TemporaryExecutionContext puts it there, with callbacks enabled if `callbacks_enabled`.
      pub(crate) fn web_bindings_with_temporary_execution_context(
 diff --git a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
-index 94d8734923cece5a43cd5c3ba4a6710bc572fd56..86670d95d33ac114566daa0a7d58328fa717f404 100644
+index 9dff4b9319c8cf4ccbcc31fded097d5f54cca983..2cca02ee229386e3ed7d41352452478d70d2d1d4 100644
 --- a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
 +++ b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_image_data.rs
-@@ -351,6 +351,16 @@ impl<K: CanvasKind> RenderingContext2D<K> {
+@@ -349,6 +349,16 @@ impl<K: CanvasKind> RenderingContext2D<K> {
          //    bitmap to transparent black.
          // NOTE: No-op, already done during creation.
  
@@ -260,28 +260,20 @@ index e8871a2c64c98ae3f7c0474df7fdaa883a440f50..b342d7050ced5012923adc887886c61d
          }
          Ok(())
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index 24686a3c7256e6ffa9548b11f99e2d4947e14339..94c45ddd4c656c4ba957e93aa7062df07933a83f 100644
+index b2642e61b426e2aeb399e300d9a75fd58b1a2267..1fd2eb4600113bb515653791cd9339d9c2393b12 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-@@ -30,6 +30,7 @@
- #include <LibWeb/Platform/EventLoopPlugin.h>
- #include <LibWeb/WebIDL/AbstractOperations.h>
- #include <LibWeb/WebIDL/CallbackType.h>
-+#include <LibWeb/Fingerprinting/Farbling.h>
- #include <LibWeb/WebIDL/DOMException.h>
- #include <LibWeb/WebIDL/ExceptionOrUtils.h>
- #include <LibWeb/WebIDL/Promise.h>
-@@ -107,6 +108,8 @@ HTML::EnvironmentSettingsObject* web_bindings_relevant_settings_object(JSObject*
- JSObject* web_bindings_environment_settings_object_global_object(HTML::EnvironmentSettingsObject*);
- void web_bindings_environment_settings_object_id(HTML::EnvironmentSettingsObject*, void* ctx, void (*on_id)(void*, ReadonlyBytes));
+@@ -118,6 +118,8 @@ void web_bindings_environment_settings_object_id(HTML::EnvironmentSettingsObject
  bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope*);
+ void web_bindings_set_has_pending_activity(void* realm, DOM::EventTarget*, bool has_pending_activity);
+ void web_bindings_environment_settings_object_encoding_parse_url(HTML::EnvironmentSettingsObject*, FlatPtr url, void* parsed_url, void (*on_url)(void*, URL::FFI::RustUrl const*));
 +void web_bindings_farble_image_data(void* realm, u8* pixels, size_t length);
 +bool web_bindings_farble_audio(void* realm, float* samples, size_t length);
  void web_bindings_with_temporary_execution_context(void* realm, bool callbacks_enabled, void* context, void (*steps)(void*));
  bool web_bindings_object_implements_interface(JSObject* object, u16 interface_name);
  JSObject* web_bindings_create_dom_exception(void* realm, ReadonlyBytes name, FlatPtr message);
-@@ -238,6 +241,23 @@ bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope* worker
-     return worker_global_scope->is_closing();
+@@ -288,6 +290,23 @@ void web_bindings_set_has_pending_activity(void* realm, DOM::EventTarget* event_
+     HTML::relevant_window_or_worker_global_scope(static_cast<JS::Realm*>(realm)->global_object()).set_has_pending_activity(*event_target, has_pending_activity);
  }
  
 +void web_bindings_farble_image_data(void* realm, u8* pixels, size_t length)
@@ -305,7 +297,7 @@ index 24686a3c7256e6ffa9548b11f99e2d4947e14339..94c45ddd4c656c4ba957e93aa7062df0
  {
      HTML::TemporaryExecutionContext execution_context { *static_cast<JS::Realm*>(realm), callbacks_enabled ? HTML::TemporaryExecutionContext::CallbacksEnabled::Yes : HTML::TemporaryExecutionContext::CallbacksEnabled::No };
 diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
-index 2faf057929dc6b40876380796d4d49464b563fff..f7aa54cd2d56ea09bd379c202882b47f0816605d 100644
+index 16c0a51aaf0855f58ce34905c5254cfed524dd3e..7e59da8515eb585e12df45d617c7aaf6c451e585 100644
 --- a/Libraries/LibWeb/CMakeLists.txt
 +++ b/Libraries/LibWeb/CMakeLists.txt
 @@ -341,6 +341,7 @@ set(SOURCES
@@ -585,7 +577,7 @@ index 0000000000000000000000000000000000000000..a6b190a362366a4954e65f6bc5ac07fd
 +
 +}
 diff --git a/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp b/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
-index 0d8e10e863dfbfa6143cd4e3142a02f75d7e4314..7c17322826917a2df1eb3617227960e1d64533cf 100644
+index e8e078490ef35d161e5e2b762dfd9d8e95b094d7..6d2292322f5049d43190014088dbc11760a868ae 100644
 --- a/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
 +++ b/Libraries/LibWeb/HTML/Canvas/CanvasHost.cpp
 @@ -8,6 +8,7 @@
@@ -595,35 +587,33 @@ index 0d8e10e863dfbfa6143cd4e3142a02f75d7e4314..7c17322826917a2df1eb3617227960e1
 +#include <LibWeb/Fingerprinting/Farbling.h>
  #include <LibWeb/HTML/Canvas/Canvas2DContextBase.h>
  #include <LibWeb/HTML/Canvas/CanvasHost.h>
- #include <LibWeb/HTML/Canvas/PredefinedColorSpace.h>
-@@ -103,12 +104,24 @@ Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_from_surface()
+ #include <LibWeb/HTML/Canvas/SerializeBitmap.h>
+@@ -99,9 +100,26 @@ Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_from_surface()
  
  Optional<Gfx::DecodedImageFrame> CanvasHost::get_frame_for_serialization(Utf16View type)
  {
--    if (serialization_of_the_bitmap_supports_color_profiles(type))
--        return get_frame_from_surface();
--    auto bitmap = get_bitmap_from_surface();
--    if (!bitmap)
--        return {};
--    return Gfx::DecodedImageFrame { *bitmap };
 +    Optional<Gfx::DecodedImageFrame> frame;
-+    if (serialization_of_the_bitmap_supports_color_profiles(type)) {
+     if (serialization_of_the_bitmap_supports_color_profiles(type))
+-        return get_frame_from_surface();
+-    return get_srgb_frame_from_surface();
 +        frame = get_frame_from_surface();
-+    } else if (auto bitmap = get_bitmap_from_surface()) {
-+        frame = Gfx::DecodedImageFrame { *bitmap };
-+    }
++    else
++        frame = get_srgb_frame_from_surface();
 +    if (!frame.has_value() || !Fingerprinting::protection_enabled())
 +        return frame;
 +
 +    // Fingerprinting protection: serialize a farbled copy, leaving the canvas itself untouched.
-+    auto copy_or_error = frame->bitmap().clone();
++    auto copy_or_error = frame->bitmap_sharing_pixels()->clone();
 +    if (copy_or_error.is_error())
 +        return frame;
 +    auto copy = copy_or_error.release_value();
 +    Fingerprinting::perturb_pixels({ reinterpret_cast<u8*>(copy->begin()), copy->size_in_bytes() },
 +        Fingerprinting::seed_for_relevant_global(canvas_relevant_global_object()),
 +        copy->has_alpha_channel() ? Fingerprinting::PixelsHaveAlpha::Yes : Fingerprinting::PixelsHaveAlpha::No);
-+    return Gfx::DecodedImageFrame { *copy, frame->color_space() };
++    auto farbled_frame = Gfx::DecodedImageFrame::create(*copy, frame->color_space());
++    if (farbled_frame.is_error())
++        return frame;
++    return farbled_frame.release_value();
  }
  
  // https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-origin-clean

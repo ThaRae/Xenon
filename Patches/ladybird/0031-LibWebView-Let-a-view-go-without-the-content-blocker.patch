@@ -31,10 +31,10 @@ for such a view through the Hub, in the view's initial state.
  12 files changed, 37 insertions(+), 17 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 762fc0e35368c38b798ef7f024d7f207813b5aa9..16cb5d5461a503f2a34377521e0d70db5557e31b 100644
+index da79d11f07bec5abbd33cd0413ce96940bb846f2..6fdd1ca1566b21d5758459b4ab76ff89f4172fbc 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -899,8 +899,9 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -902,8 +902,9 @@ void Application::send_content_blockers(WebContentClient& client) const
  {
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
@@ -46,15 +46,15 @@ index 762fc0e35368c38b798ef7f024d7f207813b5aa9..16cb5d5461a503f2a34377521e0d70db
          client.async_set_content_blockers(Core::AnonymousBuffer {}, Core::AnonymousBuffer {}, Core::AnonymousBuffer {});
          return;
      }
-@@ -1185,7 +1186,7 @@ void Application::open_urls_in_new_tabs(ReadonlySpan<URL::URL> urls) const
+@@ -1188,7 +1189,7 @@ void Application::open_urls_in_new_tabs(ReadonlySpan<URL::URL> urls) const
          open_url_in_new_tab(url, Web::HTML::ActivateTab::No);
  }
  
--ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(IsPrivate is_private, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt, Optional<Web::HTML::CrossProcessId> initial_document_state_id, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry, Web::HTML::VisibilityState system_visibility_state)
-+ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(IsPrivate is_private, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt, Optional<Web::HTML::CrossProcessId> initial_document_state_id, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry, Web::HTML::VisibilityState system_visibility_state, EnableContentBlocker enable_content_blocker)
+-ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(BrowsingSession& session, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt, Optional<Web::HTML::CrossProcessId> initial_document_state_id, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry, Web::HTML::VisibilityState system_visibility_state)
++ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(BrowsingSession& session, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt, Optional<Web::HTML::CrossProcessId> initial_document_state_id, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry, Web::HTML::VisibilityState system_visibility_state, EnableContentBlocker enable_content_blocker)
  {
-     // The client's WebContentClient picks up this same session when it is created.
-     auto session = session_for_new_view(is_private);
+     auto cross_process_id_allocator = allocate_cross_process_id_allocator();
+     auto root_navigable_id = navigable_to_adopt.has_value() ? *navigable_to_adopt : cross_process_id_allocator.allocate();
 @@ -1230,6 +1231,7 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
      if (auto* webdriver_bidi = WebDriverBiDi::the(); webdriver_bidi && webdriver_bidi->session_state().is_active)
          webdriver_bidi->push_session_state_for_client(*client);
@@ -63,27 +63,30 @@ index 762fc0e35368c38b798ef7f024d7f207813b5aa9..16cb5d5461a503f2a34377521e0d70db
      send_content_blockers(*client);
  
      m_web_content_clients.set(client);
-@@ -1670,10 +1672,13 @@ bool Application::same_origin_tabs_may_share_a_process() const
+@@ -1761,13 +1763,16 @@ bool Application::same_origin_tabs_may_share_a_process() const
          && m_web_content_options.is_test_mode == IsTestMode::No;
  }
  
 -ErrorOr<NonnullRefPtr<WebContentPage>> Application::open_page_for_new_tab(IsPrivate is_private)
 +ErrorOr<NonnullRefPtr<WebContentPage>> Application::open_page_for_new_tab(IsPrivate is_private, EnableContentBlocker enable_content_blocker)
  {
+     if (m_spare_web_content_process && !m_spare_web_content_process->is_open())
+         m_spare_web_content_process = nullptr;
+ 
      RefPtr<WebContentClient> web_content_client;
 -    if (is_private == IsPrivate::Yes) {
 +    // NB: The spare process has built the content blocker's engine already.
 +    if (enable_content_blocker == EnableContentBlocker::No) {
-+        web_content_client = TRY(create_web_content_client(is_private, allocate_page_id(), {}, {}, {}, {}, Web::HTML::VisibilityState::Hidden, EnableContentBlocker::No));
++        web_content_client = TRY(create_web_content_client(session_for_new_view(is_private), allocate_page_id(), {}, {}, {}, {}, Web::HTML::VisibilityState::Hidden, EnableContentBlocker::No));
 +    } else if (is_private == IsPrivate::Yes) {
-         web_content_client = TRY(create_web_content_client(IsPrivate::Yes, allocate_page_id()));
+         web_content_client = TRY(create_web_content_client(session_for_new_view(IsPrivate::Yes), allocate_page_id()));
      } else if (m_spare_web_content_process) {
          web_content_client = m_spare_web_content_process.release_nonnull();
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index afb89b487b5c6fbca4fb81c2a10866f6c7baaf15..21830549d70809a084629c3c5af0f87d73db118d 100644
+index bf827e2880817ef21561a4560eb565e6415cdec7..84309db42ef554908e3ea472e175f4a2082838f5 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -256,7 +256,7 @@ public:
+@@ -254,7 +254,7 @@ public:
      void stop_watching_geolocation_position(Core::GeolocationProvider::WatchId);
  
      bool same_origin_tabs_may_share_a_process() const;
@@ -92,12 +95,12 @@ index afb89b487b5c6fbca4fb81c2a10866f6c7baaf15..21830549d70809a084629c3c5af0f87d
      struct ChildFrameWebContentProcess {
          NonnullRefPtr<WebContentClient> client;
          Web::PageId page_id { 0 };
-@@ -443,7 +443,7 @@ private:
+@@ -456,7 +456,7 @@ private:
      ErrorOr<void> create_profile(Optional<StringView> profile_name, Optional<StringView> profile_path, bool force_new_process, bool temporary_profile);
      void create_mach_port_server(ByteString const& profile_identity);
      void update_website_color_scheme();
--    ErrorOr<NonnullRefPtr<WebContentClient>> create_web_content_client(IsPrivate, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt = {}, Optional<Web::HTML::CrossProcessId> initial_document_state_id = {}, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables = {}, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry = {}, Web::HTML::VisibilityState system_visibility_state = Web::HTML::VisibilityState::Hidden);
-+    ErrorOr<NonnullRefPtr<WebContentClient>> create_web_content_client(IsPrivate, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt = {}, Optional<Web::HTML::CrossProcessId> initial_document_state_id = {}, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables = {}, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry = {}, Web::HTML::VisibilityState system_visibility_state = Web::HTML::VisibilityState::Hidden, EnableContentBlocker = EnableContentBlocker::Yes);
+-    ErrorOr<NonnullRefPtr<WebContentClient>> create_web_content_client(BrowsingSession&, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt = {}, Optional<Web::HTML::CrossProcessId> initial_document_state_id = {}, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables = {}, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry = {}, Web::HTML::VisibilityState system_visibility_state = Web::HTML::VisibilityState::Hidden);
++    ErrorOr<NonnullRefPtr<WebContentClient>> create_web_content_client(BrowsingSession&, Web::PageId initial_page_id, Optional<Web::HTML::CrossProcessId> navigable_to_adopt = {}, Optional<Web::HTML::CrossProcessId> initial_document_state_id = {}, Vector<Web::HTML::RemoteNavigableDescriptor> remote_navigables = {}, Optional<Web::HTML::SessionHistoryEntryDescriptor> canonical_initial_history_entry = {}, Web::HTML::VisibilityState system_visibility_state = Web::HTML::VisibilityState::Hidden, EnableContentBlocker = EnableContentBlocker::Yes);
  
      ErrorOr<void> launch_services();
      void launch_spare_web_content_process();
@@ -151,10 +154,10 @@ index e9f41fc35af7c37920090293b650d3dc2e9de060..3f2ed2d02fc0002218ba9a64a2110985
      void propagate_web_content_crash(WebContentCrashReason);
      HeadlessWebView& adopt_child_web_view(NonnullOwnPtr<HeadlessWebView>);
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 64c92a90dcbee93706b2b47819542272fbe5b4e5..66a2b2256c8407badc09475a777ce1262bd23dd2 100644
+index 9e8cae88ba574abdf0138719ba3ba67063177131..8196c62b7156a6ba3287e5b938dcbd7d551da580 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -103,8 +103,9 @@ void ViewImplementation::did_leave_owners_tab(Badge<PictureInPictureWindow>)
+@@ -104,8 +104,9 @@ void ViewImplementation::did_leave_owners_tab(Badge<PictureInPictureWindow>)
      });
  }
  
@@ -165,7 +168,7 @@ index 64c92a90dcbee93706b2b47819542272fbe5b4e5..66a2b2256c8407badc09475a777ce126
      , m_session(Application::session_for_new_view(is_private))
      , m_document_cookie_version_buffer(Core::create_shared_version_buffer())
      , m_view_id(s_view_count++)
-@@ -3156,7 +3157,7 @@ void ViewImplementation::initialize_tab(Web::HTML::VisibilityState system_visibi
+@@ -3259,7 +3260,7 @@ void ViewImplementation::initialize_tab(Web::HTML::VisibilityState system_visibi
  {
      if (!traversable.has_value()) {
          // FIXME: Fail to open the tab, rather than crashing the whole application if this fails.
@@ -175,7 +178,7 @@ index 64c92a90dcbee93706b2b47819542272fbe5b4e5..66a2b2256c8407badc09475a777ce126
      }
      display_traversable(*traversable, system_visibility_state);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index cbd47c8f97142f6f699f2d0e16be499f7108848a..4578216902db2a62fedb04319f36b20d64a62563 100644
+index 5a4f38fedba3382cdf127edee45c3389ef7370e9..192547913b17db20c0a47f8b554a85d44ba37f50 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
 @@ -77,6 +77,7 @@
@@ -186,7 +189,7 @@ index cbd47c8f97142f6f699f2d0e16be499f7108848a..4578216902db2a62fedb04319f36b20d
  #include <LibWebView/PageBackingStores.h>
  #include <LibWebView/PermissionManager.h>
  #include <LibWebView/SessionHistory.h>
-@@ -798,7 +799,9 @@ protected:
+@@ -822,7 +823,9 @@ protected:
      virtual Optional<ScreenRects> screen_rects() const { return {}; }
      void update_compositor_display_metadata(WebContentPage&);
  
@@ -197,7 +200,7 @@ index cbd47c8f97142f6f699f2d0e16be499f7108848a..4578216902db2a62fedb04319f36b20d
  
      void set_owner_view(ViewImplementation const& owner_view) { m_owner_view_id = owner_view.view_id(); }
  
-@@ -922,6 +925,7 @@ protected:
+@@ -949,6 +952,7 @@ protected:
      bool m_accessibility_tree_requested { false };
  
      IsPrivate m_is_private { IsPrivate::No };
@@ -206,7 +209,7 @@ index cbd47c8f97142f6f699f2d0e16be499f7108848a..4578216902db2a62fedb04319f36b20d
  
      // A load the browser's UI started, whose URL the address bar shows while it is the ongoing navigation.
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index 8c4902f7031fdb5591858e3b2bc0e1c80211c62a..d1c1020244f7a0cfbc062c279f2ad5d7b73f73e7 100644
+index c6c578bd44ee17d63f0d5a10c0975d488464e47b..f45dc9947a26823dfddbcc6b15dee7d470ba4516 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
 @@ -63,6 +63,7 @@
@@ -217,7 +220,7 @@ index 8c4902f7031fdb5591858e3b2bc0e1c80211c62a..d1c1020244f7a0cfbc062c279f2ad5d7
  #include <LibWebView/RequestServerSiteBindings.h>
  #include <LibWebView/StorageAreaRegistry.h>
  #include <LibWebView/WebContentPage.h>
-@@ -149,6 +150,9 @@ public:
+@@ -150,6 +151,9 @@ public:
      void note_hosted_document(CanonicalDocument const&);
      bool has_hosted_only_tabs_like(CanonicalDocument const&) const;
      bool has_hosted_only_tabs_unlike(CanonicalDocument const&) const;
@@ -227,7 +230,7 @@ index 8c4902f7031fdb5591858e3b2bc0e1c80211c62a..d1c1020244f7a0cfbc062c279f2ad5d7
      void register_embedded_page(Web::PageId page_id, CanonicalTraversable&);
      void unregister_embedded_page(Web::PageId page_id);
      Optional<Web::PageId> page_id_for_traversable(CanonicalTraversable const&) const;
-@@ -276,6 +280,7 @@ private:
+@@ -279,6 +283,7 @@ private:
      Optional<URL::Origin> m_origin_of_hosted_tabs;
      bool m_hosted_tabs_are_origin_keyed { false };
      bool m_has_hosted_more_than_tabs_of_one_origin { false };
@@ -236,10 +239,10 @@ index 8c4902f7031fdb5591858e3b2bc0e1c80211c62a..d1c1020244f7a0cfbc062c279f2ad5d7
  
      WebContentPage& open_page(Web::PageId, CanonicalTraversable&);
 diff --git a/Services/Hub/ConnectionFromUI.cpp b/Services/Hub/ConnectionFromUI.cpp
-index 6609442cd5e18e4095b31daaccfda72d67710ed6..1a951ff8c5921f84ed2104b85ad6dfacc404f32d 100644
+index 50dd46b343be81d345c4a8fd2bade00d5106c3b5..c068b813395895a3d3c9b7bc8577750136b8ef97 100644
 --- a/Services/Hub/ConnectionFromUI.cpp
 +++ b/Services/Hub/ConnectionFromUI.cpp
-@@ -573,6 +573,7 @@ Messages::HubServer::CreateViewResponse ConnectionFromUI::create_view(Hub::NewVi
+@@ -574,6 +574,7 @@ Messages::HubServer::CreateViewResponse ConnectionFromUI::create_view(Hub::NewVi
          .owner_view_id = request.owner_view_id,
          .websites_prefer_dark = request.websites_prefer_dark,
          .is_tab = request.is_tab,
@@ -248,10 +251,10 @@ index 6609442cd5e18e4095b31daaccfda72d67710ed6..1a951ff8c5921f84ed2104b85ad6dfac
      return { view.view_id(), view.current_state() };
  }
 diff --git a/Services/Hub/HubServer.ipc b/Services/Hub/HubServer.ipc
-index ee26d5498671beeb168107d61b760d0c1f4e5a65..90a1b51345f46e0a130f5e1bd680b97a81c10005 100644
+index 8e2d0fd8d51a8f4ee297116f441ae17115131048..de6bc7d494c670bfaf536f851fc9a9286e00d496 100644
 --- a/Services/Hub/HubServer.ipc
 +++ b/Services/Hub/HubServer.ipc
-@@ -114,6 +114,7 @@ struct Hub::NewViewRequest {
+@@ -115,6 +115,7 @@ struct Hub::NewViewRequest {
      Optional<u64> owner_view_id;
      bool websites_prefer_dark;
      bool is_tab;
@@ -260,10 +263,10 @@ index ee26d5498671beeb168107d61b760d0c1f4e5a65..90a1b51345f46e0a130f5e1bd680b97a
  
  // What the UI asks of the Hub.
 diff --git a/Services/Hub/View.cpp b/Services/Hub/View.cpp
-index 46252c092f35bdbcb831feb7a2151619fe1e12f2..f84a2178a9d5a393169e0a8084073b178edd789a 100644
+index 03fbaa3e2ec543482b5bf4b0002f67eaf510d1b3..9897e46994db3b88b3a019f7a31c39164ab47f44 100644
 --- a/Services/Hub/View.cpp
 +++ b/Services/Hub/View.cpp
-@@ -80,7 +80,7 @@ private:
+@@ -81,7 +81,7 @@ private:
  };
  
  View::View(InitialState initial_state)
@@ -272,7 +275,7 @@ index 46252c092f35bdbcb831feb7a2151619fe1e12f2..f84a2178a9d5a393169e0a8084073b17
      , m_system_theme(move(initial_state.system_theme))
      , m_screen_rects(move(initial_state.screen_rects))
      , m_websites_prefer_dark(initial_state.websites_prefer_dark)
-@@ -115,6 +115,7 @@ View::InitialState View::initial_state_for_related_view() const
+@@ -118,6 +118,7 @@ View::InitialState View::initial_state_for_related_view() const
          .owner_view_id = {},
          .websites_prefer_dark = m_websites_prefer_dark,
          .is_tab = true,
@@ -281,10 +284,10 @@ index 46252c092f35bdbcb831feb7a2151619fe1e12f2..f84a2178a9d5a393169e0a8084073b17
  }
  
 diff --git a/Services/Hub/View.h b/Services/Hub/View.h
-index 70ab13ca9da0d7b7d584a54950d3b2ff2cd42ae6..4a471a7296bff7cde88943549ed4db78409e1044 100644
+index 08e5b3d0f7b2a5e256fef57229303af30ca321ca..1cf8266d17bbd424007f31af09abd40fcc910d4d 100644
 --- a/Services/Hub/View.h
 +++ b/Services/Hub/View.h
-@@ -27,6 +27,7 @@ public:
+@@ -28,6 +28,7 @@ public:
          bool websites_prefer_dark { false };
          // The view of a tab can open others and ask the user about things, unlike that of a Picture-in-Picture window.
          bool is_tab { true };
@@ -293,10 +296,10 @@ index 70ab13ca9da0d7b7d584a54950d3b2ff2cd42ae6..4a471a7296bff7cde88943549ed4db78
  
      explicit View(InitialState);
 diff --git a/UI/Qt/RemoteView.cpp b/UI/Qt/RemoteView.cpp
-index 40c97b94c4a56217f0e63e43e493de661645c678..38f952938f9d7531d3a6c016122779bc44e98515 100644
+index f5e1adac60fad0ef63c15bed9d5b000dd85eda38..5ba9fdb4427ac4f491e793b419ca12c97333c0a4 100644
 --- a/UI/Qt/RemoteView.cpp
 +++ b/UI/Qt/RemoteView.cpp
-@@ -51,6 +51,7 @@ RemoteView::RemoteView(Optional<u64> view_id, Hub::View::InitialState initial_st
+@@ -52,6 +52,7 @@ RemoteView::RemoteView(Optional<u64> view_id, Hub::View::InitialState initial_st
              .owner_view_id = initial_state.owner_view_id,
              .websites_prefer_dark = initial_state.websites_prefer_dark,
              .is_tab = initial_state.is_tab,

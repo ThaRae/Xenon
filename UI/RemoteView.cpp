@@ -46,6 +46,7 @@ RemoteView::RemoteView(Optional<u64> view_id, Hub::View::InitialState initial_st
             .device_pixel_ratio = initial_state.device_pixel_ratio,
             .maximum_frames_per_second = initial_state.maximum_frames_per_second,
             .display_id = initial_state.display_id,
+            .screen_shows_high_dynamic_range = initial_state.screen_shows_high_dynamic_range,
             .system_theme = move(initial_state.system_theme),
             .screen_rects = move(initial_state.screen_rects),
             .owner_view_id = initial_state.owner_view_id,
@@ -174,6 +175,29 @@ void RemoteView::did_accept_backing_store(i32 bitmap_id, Gfx::IntRect damage_rec
     did_accept_presented_backing_store(bitmap_id, damage_rect);
     if (on_ready_to_paint)
         on_ready_to_paint();
+}
+
+void RemoteView::did_present_frame_in_remote_layer(Gfx::IntSize size, double device_pixel_ratio)
+{
+    // The view shows the remote layer from now on, so the frames it was given before are of no further use.
+    m_backing_stores.clear();
+    m_backing_stores.clear_backup();
+    m_backing_stores.present_frame_shown_in_remote_layer(size, device_pixel_ratio);
+    if (on_ready_to_paint)
+        on_ready_to_paint();
+}
+
+void RemoteView::take_frame_snapshot(Optional<Gfx::IntSize> maximum_size, Function<void(Optional<Gfx::ShareableBitmap>)> callback)
+{
+    auto request_id = m_next_request_id++;
+    m_pending_frame_snapshots.set(request_id, move(callback));
+    HubConnection::the().async_view_take_frame_snapshot(view_id(), request_id, maximum_size);
+}
+
+void RemoteView::did_take_frame_snapshot(u64 request_id, Optional<Gfx::ShareableBitmap> snapshot)
+{
+    if (auto callback = m_pending_frame_snapshots.take(request_id); callback.has_value())
+        (*callback)(move(snapshot));
 }
 
 void RemoteView::release_backing_store_to_page(u64 page_id, i32 bitmap_id)

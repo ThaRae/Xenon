@@ -42,10 +42,10 @@ index 29f3cab80d12c5a7280145f57851eaab00ce34cf..0b5bc6d988baf5001186956a628358dd
  
  struct URLSchemeResponse {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index c0cd15313554dffbd548b61e4369683b3c4d4003..ad95151387eaa7567da92ef87068473ffffd2457 100644
+index d51f15f6da11193a87b3a4b5eeac33ca6eb23f43..19763594eca807f23d44bbc5a0b672b1d266c98e 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1658,7 +1658,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1674,7 +1674,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return;
      }
  
@@ -54,7 +54,7 @@ index c0cd15313554dffbd548b61e4369683b3c4d4003..ad95151387eaa7567da92ef87068473f
      traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
          auto navigation = navigable.uncommitted_navigation();
          if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
-@@ -1670,6 +1670,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1686,6 +1686,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return IterationDecision::Break;
      });
  
@@ -71,10 +71,10 @@ index c0cd15313554dffbd548b61e4369683b3c4d4003..ad95151387eaa7567da92ef87068473f
      if (response.is_error()) {
          async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index 1aacc58f86f44ef6b5fa5fabebfa4721c86872c9..6f4ab554414ac44dd4817dd99231d42a71c90223 100644
+index 8c24ee0ce9a03771a956945d18d0dabb25ed8f9d..ca83b03290419cfae676a4f90c23183e2c9dcb51 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
-@@ -219,6 +219,7 @@ void WebWorkerClient::did_request_embedder_resource(URL::URL url, i32 request_id
+@@ -218,6 +218,7 @@ void WebWorkerClient::did_request_embedder_resource(URL::URL url, i32 request_id
          .from_same_origin_process = m_inside_settings->origin().is_same_origin(url.origin()),
          .is_navigation = false,
          .navigation_initiator = {},

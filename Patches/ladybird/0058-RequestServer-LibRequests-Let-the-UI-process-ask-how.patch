@@ -55,7 +55,7 @@ index 8eceb4a999c7a673d9b02c3573797913ad5e5a6e..de12884f80bd00a226c5b3d15a24ccc9
  )
  
 diff --git a/Libraries/LibRequests/RequestControlClient.cpp b/Libraries/LibRequests/RequestControlClient.cpp
-index c195a5322246eca9fa3732f54ceddee7cff35b5f..5ce5db4d57ed52c25052c7c8ffb47d5b8d9cdc0b 100644
+index 8e6bf8b1d250c1e5f8dc7bcb74e8098cfab23351..420525195841c77e55ca65e94ce382b48fa2c2e7 100644
 --- a/Libraries/LibRequests/RequestControlClient.cpp
 +++ b/Libraries/LibRequests/RequestControlClient.cpp
 @@ -24,10 +24,13 @@ void RequestControlClient::die()
@@ -70,9 +70,9 @@ index c195a5322246eca9fa3732f54ceddee7cff35b5f..5ce5db4d57ed52c25052c7c8ffb47d5b
      m_pending_cache_access_profile_requests.clear();
 +    m_pending_secure_connection_requests.clear();
  
-     if (auto request_server_died_callback = move(on_request_server_died)) {
-         Core::deferred_invoke([request_server_died_callback = move(request_server_died_callback)]() mutable {
-@@ -42,6 +45,23 @@ void RequestControlClient::server_certificate_rejected(URL::URL url, ByteBuffer
+     if (!m_pending_adopter_designations.is_empty()) {
+         Core::deferred_invoke([pending_adopter_designations = move(m_pending_adopter_designations)] {
+@@ -49,6 +52,23 @@ void RequestControlClient::server_certificate_rejected(URL::URL url, ByteBuffer
          on_server_certificate_rejected(url, certificate);
  }
  
@@ -97,26 +97,26 @@ index c195a5322246eca9fa3732f54ceddee7cff35b5f..5ce5db4d57ed52c25052c7c8ffb47d5b
  {
      if (on_network_usage)
 diff --git a/Libraries/LibRequests/RequestControlClient.h b/Libraries/LibRequests/RequestControlClient.h
-index 1971d8280463f44b980d4ee406a0fd0682481501..5988fcb018cbb8deee5e3b4347e63df4d3782aba 100644
+index 98dc150d4b19833eb3b8d7ca6b83d28bb5b6ee5d..b7b248539738628d189707e3c3828abd75e85ccb 100644
 --- a/Libraries/LibRequests/RequestControlClient.h
 +++ b/Libraries/LibRequests/RequestControlClient.h
-@@ -14,6 +14,7 @@
- #include <LibIPC/ConnectionToServer.h>
+@@ -15,6 +15,7 @@
  #include <LibRequests/CacheSizes.h>
  #include <LibRequests/NetworkUsage.h>
+ #include <LibRequests/RequestTransferLease.h>
 +#include <LibRequests/SecureConnection.h>
  #include <RequestServer/IsPrivate.h>
  #include <RequestServer/RequestServerControlClientEndpoint.h>
  #include <RequestServer/RequestServerControlEndpoint.h>
-@@ -33,6 +34,7 @@ public:
-     NonnullRefPtr<Core::Promise<CacheSizes>> estimate_cache_size_accessed_since(UnixDateTime since);
-     NonnullRefPtr<Core::Promise<Empty>> clear_cache(UnixDateTime since);
+@@ -36,6 +37,7 @@ public:
      NonnullRefPtr<Core::Promise<Vector<CacheAccessBucket>>> retrieve_cache_access_profile(AK::Duration granularity);
+     // Resolves once RequestServer has handled the designation.
+     NonnullRefPtr<Core::Promise<Empty>> designate_request_adopter(RequestTransferLeaseKey, int adopter_client_id);
 +    NonnullRefPtr<Core::Promise<Optional<SecureConnection>>> retrieve_secure_connection(ByteString host, u16 port);
  
      Function<void(Vector<NetworkUsage>, u64 interval_microseconds)> on_network_usage;
      Function<void(URL::URL const&, ByteBuffer const& certificate)> on_server_certificate_rejected;
-@@ -46,6 +48,7 @@ private:
+@@ -49,6 +51,7 @@ private:
      virtual void die() override;
  
      virtual void server_certificate_rejected(URL::URL url, ByteBuffer certificate) override;
@@ -124,10 +124,10 @@ index 1971d8280463f44b980d4ee406a0fd0682481501..5988fcb018cbb8deee5e3b4347e63df4
      virtual void network_usage(Vector<NetworkUsage> usage, u64 interval_microseconds) override;
      virtual void client_disconnected(int client_id) override;
      virtual void retrieve_http_cookie(int client_id, u64 request_id, RequestServer::RequestType request_type, u64 cookie_request_id, URL::URL url, Optional<HTTP::Cookie::PartitionContext> partition_context, HTTP::Cookie::SameSiteContext same_site_context) override;
-@@ -63,6 +66,9 @@ private:
+@@ -70,6 +73,9 @@ private:
  
-     HashMap<u64, NonnullRefPtr<Core::Promise<Vector<CacheAccessBucket>>>> m_pending_cache_access_profile_requests;
-     u64 m_next_cache_access_profile_request_id { 0 };
+     HashMap<u64, NonnullRefPtr<Core::Promise<Empty>>> m_pending_adopter_designations;
+     u64 m_next_adopter_designation_id { 0 };
 +
 +    HashMap<u64, NonnullRefPtr<Core::Promise<Optional<SecureConnection>>>> m_pending_secure_connection_requests;
 +    u64 m_next_secure_connection_request_id { 0 };
@@ -227,7 +227,7 @@ index 202b3fd36808f40dcf2bf35aa3c28d48e9c553f3..eed8e1cff6bb5ad5efaad571d4529321
  )
  
 diff --git a/Services/RequestServer/ControlConnectionFromClient.cpp b/Services/RequestServer/ControlConnectionFromClient.cpp
-index e8fb7e6ff7ca99a96de00dd19583d95c579ce994..e101ffe58f39f9b91cae37ed3f6b39735c8d4e75 100644
+index 580ff4c183996399cc359a586eb77dfabab864bf..6ad1b7e9d52157e7f3c42ef5c1a8660dbfdaf653 100644
 --- a/Services/RequestServer/ControlConnectionFromClient.cpp
 +++ b/Services/RequestServer/ControlConnectionFromClient.cpp
 @@ -12,6 +12,7 @@
@@ -238,7 +238,7 @@ index e8fb7e6ff7ca99a96de00dd19583d95c579ce994..e101ffe58f39f9b91cae37ed3f6b3973
  
  namespace RequestServer {
  
-@@ -188,6 +189,11 @@ void ControlConnectionFromClient::add_certificate_exception(ByteString host, u16
+@@ -196,6 +197,11 @@ void ControlConnectionFromClient::add_certificate_exception(ByteString host, u16
      RequestServer::add_certificate_exception(host, port, certificate);
  }
  
@@ -251,10 +251,10 @@ index e8fb7e6ff7ca99a96de00dd19583d95c579ce994..e101ffe58f39f9b91cae37ed3f6b3973
  {
      Request::set_performance_monitor_enabled(enabled);
 diff --git a/Services/RequestServer/ControlConnectionFromClient.h b/Services/RequestServer/ControlConnectionFromClient.h
-index a9b941df418e3083a77f389bbe4fb7b62d6d8dec..3994caed7fdc52f9def75eae580c64b12d3d0a2f 100644
+index 884a5d520636d4366f054e065c5ede6f9863295d..c75ff34da43a06edd349894b7da3cd92e83c150a 100644
 --- a/Services/RequestServer/ControlConnectionFromClient.h
 +++ b/Services/RequestServer/ControlConnectionFromClient.h
-@@ -50,6 +50,7 @@ private:
+@@ -52,6 +52,7 @@ private:
      virtual void set_performance_monitor_enabled(bool) override;
  
      virtual void add_certificate_exception(ByteString host, u16 port, ByteBuffer certificate) override;
@@ -285,10 +285,10 @@ index 2608b8573930c75b0b2443927fb0700714e6adc4..3c4dcee932bb3e83ac9472f74f04abff
      // A cache MUST invalidate the target URI (Section 7.1 of [HTTP]) when it receives a non-error status code in
      // response to an unsafe request method (including methods whose safety is unknown).
 diff --git a/Services/RequestServer/RequestServerControl.ipc b/Services/RequestServer/RequestServerControl.ipc
-index fd79fa2320d110e2db6564018fdb71f5de503789..46e16eb71f9c1381c4056910336be727afc9deb8 100644
+index b5222e47966c3f2a586e5beb3703ac0d9dd77e69..9879350892b81f35f5624c18048d341789a4ff95 100644
 --- a/Services/RequestServer/RequestServerControl.ipc
 +++ b/Services/RequestServer/RequestServerControl.ipc
-@@ -31,6 +31,7 @@ endpoint RequestServerControl
+@@ -34,6 +34,7 @@ endpoint RequestServerControl
      // take the certificate's key in place of verifying the server's certificate (see CertificateExceptions.h). This is
      // synchronous, so the exception is in place before the UI process loads the page again.
      add_certificate_exception(ByteString host, u16 port, ByteBuffer certificate) => ()
@@ -297,7 +297,7 @@ index fd79fa2320d110e2db6564018fdb71f5de503789..46e16eb71f9c1381c4056910336be727
      estimate_cache_size_accessed_since(u64 cache_size_estimation_id, UnixDateTime since) =|
      remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) =|
 diff --git a/Services/RequestServer/RequestServerControlClient.ipc b/Services/RequestServer/RequestServerControlClient.ipc
-index d2a84fd05432eae9bd40c51832252fbdaa9c851e..11f2e3279861e460ce6ea143146f23dc49972861 100644
+index 7f10f56512d7adea8a01f56070a386c336d91dba..59f6c83409e79e988cdfb4c0cd81a41c0f2405b1 100644
 --- a/Services/RequestServer/RequestServerControlClient.ipc
 +++ b/Services/RequestServer/RequestServerControlClient.ipc
 @@ -3,6 +3,7 @@

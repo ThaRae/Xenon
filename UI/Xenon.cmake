@@ -160,6 +160,7 @@ endif()
 set(XENON_ARC_SOURCES
     LadybirdAccessibilityElement.mm
     MicrophoneAuthorizerMacOS.mm
+    PlatformColorsMac.mm
     SpellCheckerMac.mm
     Updater.mm
     WebContentViewAccessibility.mm

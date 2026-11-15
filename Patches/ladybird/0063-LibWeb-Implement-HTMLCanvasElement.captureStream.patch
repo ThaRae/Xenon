@@ -11,7 +11,7 @@ The video frame callbacks run once per rendering update for such a
 stream.
 ---
  .../Bindings/Rust/src/canvas_2d/canvas.rs     |  7 ++
- .../Rust/src/html/canvas_draw_image.rs        | 21 ++++-
+ .../Rust/src/html/canvas_draw_image.rs        | 20 ++++-
  .../Bindings/Rust/src/html/canvas_pattern.rs  |  5 +-
  .../HTML/Canvas/Canvas2DContextBase.cpp       | 10 +++
  Libraries/LibWeb/HTML/HTMLCanvasElement.cpp   | 19 +++++
@@ -27,7 +27,7 @@ stream.
  .../WebGL/WebGLRenderingContextBase.cpp       |  8 +-
  .../Text/expected/canvas/capture-stream.txt   |  8 ++
  .../Text/input/canvas/capture-stream.html     | 48 +++++++++++
- 17 files changed, 230 insertions(+), 32 deletions(-)
+ 17 files changed, 229 insertions(+), 32 deletions(-)
  create mode 100644 Tests/LibWeb/Text/expected/canvas/capture-stream.txt
  create mode 100644 Tests/LibWeb/Text/input/canvas/capture-stream.html
 
@@ -57,10 +57,10 @@ index a1ace4f7af678fc03f11449e8a1faaf7f0ac21b3..ba262468123fb2053942c26ff33bde17
  pub(crate) fn capture_video_frame(video: CppInterface) -> Option<CapturedVideoFrame> {
      let mut frame = CapturedVideoFrameAbi {
 diff --git a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_draw_image.rs b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_draw_image.rs
-index bc1dd87da4b24e355b02ceb5f71adf887e8ee05b..1f767fa9551813ef90dcc74644ab335de92544c1 100644
+index 9e2ccd31a4834d641c3a9861c5d3c8f8f6aeb6dc..6a0ab67d257be07d365c0a6163f0d37bcd462e33 100644
 --- a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_draw_image.rs
 +++ b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_draw_image.rs
-@@ -17,7 +17,7 @@ use super::image_bitmap::ImageBitmap;
+@@ -15,7 +15,7 @@ use super::image_bitmap::ImageBitmap;
  use crate::bindings::conversions::CppInterface;
  use crate::bindings::interface::Ref;
  use crate::bindings::{CallContext, Exception, WebIdlResult};
@@ -68,15 +68,14 @@ index bc1dd87da4b24e355b02ceb5f71adf887e8ee05b..1f767fa9551813ef90dcc74644ab335d
 +use crate::canvas_2d::canvas::{CanvasImageSourceKind, Usability, canvas_capture_frame, capture_video_frame};
  use crate::canvas_2d::context::{CanvasKind, ContextState, RenderingContext2D};
  use crate::canvas_2d::float;
- use crate::canvas_2d::host::{LentImageFrame, LentVideoFrameHold};
-@@ -287,6 +287,25 @@ impl ContextState {
+ use crate::canvas_2d::host::LentVideoFrameHold;
+@@ -285,6 +285,24 @@ impl ContextState {
          }
  
          if let CanvasImageSource::HTMLVideoElement(video) = image {
 +            if let Some(frame) = canvas_capture_frame(video) {
 +                if self.recorder_is_ready() {
 +                    let state = self.drawing_state();
-+                    let frame = LentImageFrame(NonNull::new(frame.as_raw().cast_mut()).expect("an image frame has a frame"));
 +                    self.record(|recorder| {
 +                        recorder.draw_image_frame(
 +                            &frame,
@@ -96,7 +95,7 @@ index bc1dd87da4b24e355b02ceb5f71adf887e8ee05b..1f767fa9551813ef90dcc74644ab335d
                  return Ok(());
              };
 diff --git a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_pattern.rs b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_pattern.rs
-index a79fea929a7abf37cef51b3ef90fc60fc43ef2d5..6f9d38b7109437625b694b8c10612031800a666c 100644
+index c0af67c74ce8e65fe5e510ea573fcd4c10790546..76a98da996cd30cb0eff4b57f12246875e1af8b4 100644
 --- a/Libraries/LibWeb/Bindings/Rust/src/html/canvas_pattern.rs
 +++ b/Libraries/LibWeb/Bindings/Rust/src/html/canvas_pattern.rs
 @@ -20,7 +20,7 @@ use super::canvas_draw_image::CanvasImageSource;
@@ -119,7 +118,7 @@ index a79fea929a7abf37cef51b3ef90fc60fc43ef2d5..6f9d38b7109437625b694b8c10612031
      let transport = video_transport(video)?;
      let mut recorder = Recorder::new(transport);
 diff --git a/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp b/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
-index 28100359ae624d8b82c4515342031e90532defd4..65982fbe47e37deca97d456dd68c16a1e8cbfa03 100644
+index df6ca5da987a12c4f947c92a481dfbe51e78dff3..e08668de8d607c83e11493bab73e3fc0bc79159a 100644
 --- a/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
 +++ b/Libraries/LibWeb/HTML/Canvas/Canvas2DContextBase.cpp
 @@ -178,6 +178,7 @@ void web_canvas_2d_image_source_size(void* source_wrapper, CanvasImageSourceKind
@@ -130,7 +129,7 @@ index 28100359ae624d8b82c4515342031e90532defd4..65982fbe47e37deca97d456dd68c16a1
  bool web_canvas_2d_capture_video_frame(void* source_wrapper, CapturedVideoFrame* out_frame);
  void* web_canvas_2d_video_transport(void* source_wrapper);
  void web_canvas_2d_video_frame_hold_unref(Compositing::VideoFrameHold*);
-@@ -850,6 +851,15 @@ Gfx::DecodedImageFrame* web_canvas_2d_image_source_frame(void* source_wrapper, C
+@@ -852,6 +853,15 @@ Gfx::DecodedImageFrame* web_canvas_2d_image_source_frame(void* source_wrapper, C
      return new Gfx::DecodedImageFrame { frame.release_value() };
  }
  
@@ -147,7 +146,7 @@ index 28100359ae624d8b82c4515342031e90532defd4..65982fbe47e37deca97d456dd68c16a1
  {
      auto& video = Bindings::impl_from<HTMLVideoElement>(*static_cast<JS::Object*>(source_wrapper));
 diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
-index 1b59a62db5bd4a28c42f5a65ce595d2d43978d9f..a859d1703c90fdd901786019947a7a5b620c9eaa 100644
+index d4d1cc74b67700826de0edcea7deaefee24f6788..02725876f95911bc62d2e409a35ab25e835dd2a5 100644
 --- a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
 @@ -37,6 +37,8 @@
@@ -159,7 +158,7 @@ index 1b59a62db5bd4a28c42f5a65ce595d2d43978d9f..a859d1703c90fdd901786019947a7a5b
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Painting/PaintFacts.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
-@@ -525,6 +527,23 @@ WebIDL::ExceptionOr<void> HTMLCanvasElement::to_blob(GC::Ref<WebIDL::CallbackTyp
+@@ -526,6 +528,23 @@ WebIDL::ExceptionOr<void> HTMLCanvasElement::to_blob(GC::Ref<WebIDL::CallbackTyp
      return {};
  }
  
@@ -184,7 +183,7 @@ index 1b59a62db5bd4a28c42f5a65ce595d2d43978d9f..a859d1703c90fdd901786019947a7a5b
  {
      if (m_is_placeholder)
 diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.h b/Libraries/LibWeb/HTML/HTMLCanvasElement.h
-index c3db0311e755759ae7ba63819e254e9ddf338978..86d09e01481e325ef2dc350c1883ef59d08bbfa3 100644
+index 56932c0379b33b5279b00a90fd58a0c4d953db06..73c0f5a4edf0c4e516b42731180848b9b1043ede 100644
 --- a/Libraries/LibWeb/HTML/HTMLCanvasElement.h
 +++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.h
 @@ -72,6 +72,8 @@ public:
@@ -209,7 +208,7 @@ index 92174b15545d5c353da62ecfdba51bcf7ee124ac..5e99367423d7f803452113e0e70c6772
  };
  
 diff --git a/Libraries/LibWeb/HTML/HTMLMediaElement.cpp b/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
-index b48228377329c1d5d1e0e62af19a3d227e8ec00f..304440dd75efd35d744aab0d98e5001d19542f79 100644
+index 2242b2698f6c59380832086fd80f6929f5ad8280..329eff3c5c4dcf664bcd138ab5f5c3aad2b1fb61 100644
 --- a/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
 @@ -41,6 +41,7 @@
@@ -228,7 +227,7 @@ index b48228377329c1d5d1e0e62af19a3d227e8ec00f..304440dd75efd35d744aab0d98e5001d
  #include <LibWeb/MediaSourceExtensions/MediaSource.h>
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Page/ScreenWakeLockHandle.h>
-@@ -2092,6 +2094,18 @@ Optional<Compositing::VideoSinkResourceId> HTMLMediaElement::video_sink_resource
+@@ -2095,6 +2097,18 @@ Optional<Compositing::VideoSinkResourceId> HTMLMediaElement::video_sink_resource
  }
  
  // https://html.spec.whatwg.org/multipage/media.html#media-data
@@ -248,10 +247,10 @@ index b48228377329c1d5d1e0e62af19a3d227e8ec00f..304440dd75efd35d744aab0d98e5001d
  {
      // NB: Media data from a MediaSource or a MediaStream is provided by the page itself.
 diff --git a/Libraries/LibWeb/HTML/HTMLMediaElement.h b/Libraries/LibWeb/HTML/HTMLMediaElement.h
-index 784609c7991d2665727b7c18a542baa50f3167a6..0e2b641f9325d31933b74d706d4c63f44f70c140 100644
+index 02bbca0e8b061596c3fed39b10211b3d6cb6900f..7ac85600d61e5e2d9f8c16674fcaf6f992652d4b 100644
 --- a/Libraries/LibWeb/HTML/HTMLMediaElement.h
 +++ b/Libraries/LibWeb/HTML/HTMLMediaElement.h
-@@ -201,6 +201,7 @@ public:
+@@ -205,6 +205,7 @@ public:
  
      Optional<Media::VideoSinkHandle> video_sink_handle() const;
      Optional<Compositing::CapturedVideoFrame> capture_current_video_frame() const;
@@ -260,7 +259,7 @@ index 784609c7991d2665727b7c18a542baa50f3167a6..0e2b641f9325d31933b74d706d4c63f4
  
      struct VideoFrameCounts {
 diff --git a/Libraries/LibWeb/HTML/HTMLVideoElement.cpp b/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
-index 741e91928d6bfc1fefc428d79cf3e9fbdba3dc0d..f65ea71f971d040595e0fb10f265bcb757314a1a 100644
+index c755556730191f33d164670a98a2fedb58f07c5b..4b6c8d52409aed46aa20c83436aa723c6d25b3e6 100644
 --- a/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLVideoElement.cpp
 @@ -25,6 +25,7 @@
@@ -319,7 +318,7 @@ index 741e91928d6bfc1fefc428d79cf3e9fbdba3dc0d..f65ea71f971d040595e0fb10f265bcb7
  Optional<CSSPixelSize> HTMLVideoElement::natural_element_size() const
  {
      return m_natural_dimensions;
-@@ -385,6 +401,9 @@ HTMLVideoElement::Representation HTMLVideoElement::current_representation() cons
+@@ -387,6 +403,9 @@ HTMLVideoElement::Representation HTMLVideoElement::current_representation() cons
      // https://html.spec.whatwg.org/multipage/media.html#the-video-element:the-video-element-7
      // A video element represents what is given for the first matching condition in the list below:
  
@@ -329,7 +328,7 @@ index 741e91928d6bfc1fefc428d79cf3e9fbdba3dc0d..f65ea71f971d040595e0fb10f265bcb7
      // -> When no video data is available (the element's readyState attribute is either HAVE_NOTHING, or HAVE_METADATA
      //    but no video data has yet been obtained at all, or the element's readyState attribute is any subsequent value
      //    but the media resource does not have a video channel)
-@@ -613,35 +632,47 @@ void HTMLVideoElement::run_the_video_frame_request_callbacks(HighResolutionTime:
+@@ -615,35 +634,47 @@ void HTMLVideoElement::run_the_video_frame_request_callbacks(HighResolutionTime:
      if (ready_state() < ReadyState::HaveCurrentData)
          return;
  
@@ -402,7 +401,7 @@ index 741e91928d6bfc1fefc428d79cf3e9fbdba3dc0d..f65ea71f971d040595e0fb10f265bcb7
  
      // 6. Let callbacks be the list of video frame request callbacks.
      // 7. Set video's list of video frame request callbacks to be empty.
-@@ -670,7 +701,7 @@ void HTMLVideoElement::request_rendering_update_for_video_frame_callbacks()
+@@ -672,7 +703,7 @@ void HTMLVideoElement::request_rendering_update_for_video_frame_callbacks()
  {
      if (m_list_of_video_frame_request_callbacks.is_empty())
          return;
@@ -503,10 +502,10 @@ index 3494e2f3e201670422f6f78d4dbda7abde7f29ba..a25d78de3d536d23c304e491f15980f8
      NonnullRefPtr<AudioFrameFanout> m_audio_fanout;
      RefPtr<Audio::RecordStream> m_audio_capture_stream;
 diff --git a/Libraries/LibWeb/Painting/PaintFacts.cpp b/Libraries/LibWeb/Painting/PaintFacts.cpp
-index de18f882f1a1f29484b85f7125e3c81327acbbe6..bea66d7e156536604e4b38c1211e765edfa334fb 100644
+index aa45ed621d731df58fbe31e543ec73ee6f00a1e9..fc116cc447c790fa7502bbc4dbece9e98c7ae083 100644
 --- a/Libraries/LibWeb/Painting/PaintFacts.cpp
 +++ b/Libraries/LibWeb/Painting/PaintFacts.cpp
-@@ -252,9 +252,15 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
+@@ -251,9 +251,15 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
          : video_element.current_representation();
  
      Layout::RustFFI::FfiVideoPaintFacts facts {};
@@ -522,7 +521,7 @@ index de18f882f1a1f29484b85f7125e3c81327acbbe6..bea66d7e156536604e4b38c1211e765e
          facts.representation = Layout::RustFFI::FfiVideoRepresentation::VideoFrame;
          auto sink_handle = video_element.video_sink_handle();
          if (sink_handle.has_value() && video_element.natural_media_size().has_value()) {
-@@ -269,7 +275,9 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
+@@ -268,7 +274,9 @@ static void queue_video_paint_facts(HTML::HTMLVideoElement const& element)
      }
      case HTML::HTMLVideoElement::Representation::PosterFrame:
          facts.representation = Layout::RustFFI::FfiVideoRepresentation::PosterFrame;
@@ -534,12 +533,12 @@ index de18f882f1a1f29484b85f7125e3c81327acbbe6..bea66d7e156536604e4b38c1211e765e
          break;
      case HTML::HTMLVideoElement::Representation::TransparentBlack:
 diff --git a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
-index 933169585a6cf2f5b08e88d631bb492c789e5a91..398e0f1d4ef1cfb72511aff125fbfb7fb44535c1 100644
+index f4774b058db3810b8968931e89d23d50cc85b349..047e37ca144b592ca01abdcad1514c68498b1cb6 100644
 --- a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
 +++ b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
 @@ -420,11 +420,15 @@ TexImageSourceResult web_webgl_read_tex_image_source(void* source_wrapper, TexIm
-         if (auto bitmap = Bindings::impl_from<HTML::OffscreenCanvas>(wrapper).get_bitmap_from_surface())
-             frame = Gfx::DecodedImageFrame { *bitmap };
+         if (auto canvas_frame = Bindings::impl_from<HTML::OffscreenCanvas>(wrapper).get_srgb_frame_from_surface(); canvas_frame.has_value())
+             frame = canvas_frame.release_value();
          break;
 -    case TexImageSourceKind::HTMLVideoElement:
 -        if (auto captured_frame = Bindings::impl_from<HTML::HTMLVideoElement>(wrapper).capture_current_video_frame(); captured_frame.has_value())

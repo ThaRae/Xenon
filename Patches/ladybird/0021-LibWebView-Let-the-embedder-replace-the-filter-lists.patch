@@ -21,10 +21,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 7d610df1e9230e52e146dce8c49b8092ba7d06ea..5a39fb0335ad139ceea2afe5773aca3c03b9ee1b 100644
+index b03fdff36e25fdb8136a5743a7224c17ce1d002e..4d0e1ab19b5166863d5266dfa75082faddb8a250 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -829,6 +829,14 @@ Optional<UnixDateTime> Application::content_blocker_list_last_updated_at(StringV
+@@ -832,6 +832,14 @@ Optional<UnixDateTime> Application::content_blocker_list_last_updated_at(StringV
      return {};
  }
  
@@ -40,7 +40,7 @@ index 7d610df1e9230e52e146dce8c49b8092ba7d06ea..5a39fb0335ad139ceea2afe5773aca3c
  {
      m_browser_options.content_blocker_list_paths = m_explicit_content_blocker_list_paths;
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 80debc6f463577b520f135b94a3be7e6adfe33fc..cb616c194eb2a4a8ceeaa55b2fc3eb0646ba4ae6 100644
+index 639c6fa2b4fc581e8e4ec946f64cbd955b0bea91..72bce2a92426e9513d345da0a9bfb6f5dab54f8a 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
 @@ -215,6 +215,10 @@ public:

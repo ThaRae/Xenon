@@ -26,11 +26,11 @@
 #include <LibGfx/Palette.h>
 #include <LibGfx/Rect.h>
 #include <LibGfx/SystemTheme.h>
+#include <LibWebCommon/CSS/SystemColor.h>
 #include <LibWebCommon/UIEvents/KeyCode.h>
 #include <LibWebCommon/UIEvents/MouseButton.h>
 #include <LibWebView/Application.h>
 #include <LibWebView/CrashReport.h>
-#include <LibWebView/PlatformColors.h>
 #include <LibWebView/Utilities.h>
 #include <LibWebView/WebCompatReport.h>
 #include <LibWebView/WebContentClient.h>
@@ -44,6 +44,7 @@
 #include <UI/WindowExposure.h>
 #ifdef AK_OS_MACOS
 #    include <UI/MacWindow.h>
+#    include <UI/PlatformColors.h>
 #endif
 #include <UI/InputMethodUtils.h>
 #include <UI/SelectDropdown.h>
@@ -115,6 +116,7 @@ WebContentView::WebContentView(QWidget* window, Optional<u64> hub_view_id, WebCo
                                   .device_pixel_ratio = devicePixelRatio(),
                                   .maximum_frames_per_second = initial_state.maximum_frames_per_second,
                                   .display_id = initial_state.display_id,
+                                  .screen_shows_high_dynamic_range = initial_state.screen_shows_high_dynamic_range,
                                   .system_theme = make_system_theme_from_qt_palette(*this, PaletteMode::Default),
                                   .screen_rects = screen_rects_from_qt(),
                                   .owner_view_id = initial_state.owner_view_id,
@@ -1605,7 +1607,7 @@ ScreenshotSelectionOverlay& WebContentView::select_screenshot(QImage const& fram
         if (on_close)
             on_close();
     };
-    overlay->on_request_page_frame = [this] { return visible_snapshot(); };
+    overlay->on_request_page_frame = [this](Function<void(QImage)> on_frame) { on_frame(visible_snapshot()); };
     overlay->on_page_visibility_change = [this] { schedule_repaint(); };
     return *overlay;
 }
@@ -1912,27 +1914,51 @@ static Core::AnonymousBuffer make_system_theme_from_qt_palette(QWidget& widget, 
     translate(Gfx::ColorRole::VisitedLink, QPalette::ColorRole::LinkVisited);
     translate(Gfx::ColorRole::Button, QPalette::ColorRole::Button);
     translate(Gfx::ColorRole::ButtonText, QPalette::ColorRole::ButtonText);
+    // NB: Content whose color scheme is not the palette's own takes the selection color for its scheme.
+    auto dark = is_using_dark_system_theme(widget);
 #ifdef AK_OS_MACOS
-    palette.set_color(Gfx::ColorRole::Selection, WebView::macos_web_selection_color());
-    palette.set_color(Gfx::ColorRole::InactiveSelection, WebView::macos_web_inactive_selection_color());
-    palette.set_color(Gfx::ColorRole::InactiveSelectionText, WebView::macos_web_inactive_selection_text_color());
+    palette.set_color(Gfx::ColorRole::Selection, macos_web_selection_color(dark ? Web::CSS::PreferredColorScheme::Dark : Web::CSS::PreferredColorScheme::Light));
+    palette.set_color(Gfx::ColorRole::LightSelection, macos_web_selection_color(Web::CSS::PreferredColorScheme::Light));
+    palette.set_color(Gfx::ColorRole::DarkSelection, macos_web_selection_color(Web::CSS::PreferredColorScheme::Dark));
+    palette.set_color(Gfx::ColorRole::InactiveSelection, macos_web_inactive_selection_color());
 #else
-    translate(Gfx::ColorRole::Selection, QPalette::ColorRole::Highlight);
+    // NB: Desktop highlight colors are mostly strong ones meant for white text, but selected content keeps its own text
+    //     color. On light content, a strong highlight becomes a tint, as in GTK's text views, so dark text and links
+    //     stay readable on it, while a light one already suits dark text. On dark content, a highlight is kept as long
+    //     as light text stays readable on it, so dark accents stay visible against the page, and lighter ones become
+    //     a tint.
+    auto selection_color = [](QColor highlight, Web::CSS::PreferredColorScheme color_scheme) {
+        auto color = Gfx::Color::from_bgra(highlight.rgba());
+        if (color.alpha() < 255)
+            return color;
+        if (color_scheme == Web::CSS::PreferredColorScheme::Dark) {
+            auto canvas = Web::CSS::SystemColor::canvas(color_scheme);
+            auto selection = canvas.blend(Web::CSS::SystemColor::transform_selection_background_color(color, color_scheme));
+            if (Web::CSS::SystemColor::canvas_text(color_scheme).contrast_ratio(selection) >= 4.5)
+                return color;
+            return color.with_alpha(115); // 45%
+        }
+        if (highlight.lightnessF() < 0.75f)
+            return color.with_alpha(77); // 30%
+        return color;
+    };
 
     auto active_highlight = qt_palette.color(QPalette::Active, QPalette::ColorRole::Highlight);
     auto inactive_highlight = qt_palette.color(QPalette::Inactive, QPalette::ColorRole::Highlight);
+    auto palette_color_scheme = dark ? Web::CSS::PreferredColorScheme::Dark : Web::CSS::PreferredColorScheme::Light;
+    palette.set_color(Gfx::ColorRole::Selection, selection_color(active_highlight, palette_color_scheme));
+    palette.set_color(Gfx::ColorRole::LightSelection, selection_color(active_highlight, Web::CSS::PreferredColorScheme::Light));
+    palette.set_color(Gfx::ColorRole::DarkSelection, selection_color(active_highlight, Web::CSS::PreferredColorScheme::Dark));
     if (inactive_highlight != active_highlight) {
-        palette.set_color(Gfx::ColorRole::InactiveSelection, Gfx::Color::from_bgra(inactive_highlight.rgba()));
-        auto inactive_highlighted_text = qt_palette.color(QPalette::Inactive, QPalette::ColorRole::HighlightedText);
-        palette.set_color(Gfx::ColorRole::InactiveSelectionText, Gfx::Color::from_bgra(inactive_highlighted_text.rgba()));
+        palette.set_color(Gfx::ColorRole::InactiveSelection, selection_color(inactive_highlight, palette_color_scheme));
     } else {
         // The Qt theme does not differentiate inactive selections; use a neutral gray.
-        auto inactive_selection = is_using_dark_system_theme(widget) ? Gfx::Color(0x60, 0x60, 0x60) : Gfx::Color(0xd4, 0xd4, 0xd4);
+        auto inactive_selection = dark ? Gfx::Color(0x60, 0x60, 0x60) : Gfx::Color(0xd4, 0xd4, 0xd4);
         palette.set_color(Gfx::ColorRole::InactiveSelection, inactive_selection);
     }
 #endif
 
-    palette.set_flag(Gfx::FlagRole::IsDark, is_using_dark_system_theme(widget));
+    palette.set_flag(Gfx::FlagRole::IsDark, dark);
 
     return theme;
 }

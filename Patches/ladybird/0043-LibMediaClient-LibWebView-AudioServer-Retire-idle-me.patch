@@ -41,10 +41,10 @@ index 7863fdaa10e27c0c7ee6101e04ed4e2de4fc5578..b5ada363d9fa81895d41c26b0862f324
  // A connection serves the thread that made it, so each agent has one of its own.
  static thread_local NeverDestroyed<Client::TransportFactory> s_transport_factory;
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index 6f4ab554414ac44dd4817dd99231d42a71c90223..19768302e5c411b1ba5eeddfe3f4ec17d0c1e7ad 100644
+index ca83b03290419cfae676a4f90c23183e2c9dcb51..3b9efbb1c28dd3142795ffa25d138cc64ef204e5 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
-@@ -241,8 +241,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
+@@ -240,8 +240,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
          auto self = weak_self.strong_ref();
          if (!self)
              return Error::from_string_literal("The worker is gone");

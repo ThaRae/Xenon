@@ -18,6 +18,7 @@
 #include <LibIPC/Transport.h>
 #include <LibURL/InternalURLs.h>
 #include <LibURL/URL.h>
+#include <LibWebCommon/MimeSniff/MimeType.h>
 #include <LibWebCommon/WebView/Utilities.h>
 #include <LibWebView/AutocompleteService.h>
 #include <LibWebView/CanonicalTraversable.h>
@@ -860,9 +861,9 @@ ErrorOr<void> Application::connect_to_hub(Main::Arguments const& arguments)
     m_hub_connection->did_initialize();
 
     m_settings = make<WebView::Settings>(WebView::Settings::create_from_json(TRY(JsonValue::from_string(state.settings_json))));
-    m_bookmark_store = make<BookmarkStore>(BookmarkStore::create(LexicalPath::join(state.config_directory, "Bookmarks.json"sv).string()));
     create_session_store(state.data_directory, state.persists_sessions);
     create_history_store(state.data_directory, state.uses_sql_database);
+    m_bookmark_store = make<BookmarkStore>(BookmarkStore::create(LexicalPath::join(state.config_directory, "Bookmarks.json"sv).string(), *m_favicon_store));
     // NB: Reports stay in files, which both of us read. This process keeps its own for when it crashes, and the next
     //     launch recovers that the same as one of the Hub's.
     m_browser_options.disable_sandbox = state.sandbox_is_disabled ? WebView::DisableSandbox::Yes : WebView::DisableSandbox::No;
@@ -1059,10 +1060,10 @@ void Application::create_platform_actions()
 {
 #ifndef LADYBIRD_HUB_IN_OWN_PROCESS
     m_settings = make<WebView::Settings>(WebView::Settings::create_from_json(WebView::Application::settings().serialize_json()));
-    m_bookmark_store = make<BookmarkStore>(BookmarkStore::create(LexicalPath::join(WebView::Application::profile().paths().config, "Bookmarks.json"sv).string()));
     auto& hub = WebView::Application::the();
     create_session_store(WebView::Application::profile().paths().data, hub.persists_sessions());
     create_history_store(WebView::Application::profile().paths().data, WebView::Application::browser_options().disable_sql_database == WebView::DisableSQLDatabase::No);
+    m_bookmark_store = make<BookmarkStore>(BookmarkStore::create(LexicalPath::join(WebView::Application::profile().paths().config, "Bookmarks.json"sv).string(), *m_favicon_store));
     m_application_actions = make<ApplicationActions>(ApplicationActions::PageOptions {
         .user_agent = hub.user_agent_string(),
         .navigator_compatibility_mode = hub.navigator_compatibility_mode(),
@@ -1152,6 +1153,7 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
 void Application::create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions&, WebView::WebContentOptions&)
 {
     browser_options.prewarm_spare_web_content_process = WebView::PrewarmSpareWebContentProcess::No;
+    browser_options.default_profile_name = "default"sv;
 }
 
 void Application::initialize_extensions()
@@ -2372,6 +2374,11 @@ Web::Clipboard::SystemClipboardItem Application::clipboard_item() const
         for (auto const& format : mime_data->formats()) {
             auto mime_type = ak_string_from_qstring(format);
             if (mime_type == "text/uri-list"sv)
+                continue;
+
+            // Qt can expose X11 selection targets such as SAVE_TARGETS alongside MIME types. These are clipboard
+            // protocol requests, not pasteable data, and reading them can block until Qt's Wayland pipe times out.
+            if (!Web::MimeSniff::MimeType::parse(mime_type).has_value())
                 continue;
 
             auto data = ak_byte_string_from_qbytearray(mime_data->data(format));

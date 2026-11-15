@@ -23,10 +23,10 @@ The blocker now also gets the request method, so $method filters match.
  2 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 231c786127703344ad14cba0a98698943750838e..0973fd4987dd76061bddb2c8f4cfc78516780c25 100644
+index 09b640f3d2cf096c221417a16c0f6d9d23f9bccf..63650bcc54ceb14c9d17589f95381f677bc59ae2 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -69,6 +69,7 @@
+@@ -70,6 +70,7 @@
  #include <LibWeb/HTML/WorkerGlobalScope.h>
  #include <LibWeb/HighResolutionTime/TimeOrigin.h>
  #include <LibWeb/Infra/SerializedURL.h>

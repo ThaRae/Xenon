@@ -38,7 +38,7 @@ changes.
  create mode 100644 Libraries/LibWebCommon/Fetch/Infrastructure/OriginAccessAllowList.ipc
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 8c3acd330cf07a8f5d52526af2fee8b73b0a4fdd..231c786127703344ad14cba0a98698943750838e 100644
+index 521dbfaa188f65a46fa3fef3ee19fa4bbdcf16c6..09b640f3d2cf096c221417a16c0f6d9d23f9bccf 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 @@ -88,6 +88,7 @@
@@ -65,7 +65,7 @@ index 8c3acd330cf07a8f5d52526af2fee8b73b0a4fdd..231c786127703344ad14cba0a9869894
              || request->current_url().scheme() == "data"sv
              || (request->mode() == Infrastructure::Request::Mode::Navigate || request->mode() == Infrastructure::Request::Mode::WebSocket)) {
 diff --git a/Libraries/LibWebCommon/CMakeLists.txt b/Libraries/LibWebCommon/CMakeLists.txt
-index 8af450f1c4860ac0ff9a44932ab271f687459573..780fee381624ef70fc15c282e6648fcfe6151d04 100644
+index 9e437ef5817c89563f82c6689419cc7c8f35836e..06fa44099b5071fb50655a1ce0aadd0ad48871e0 100644
 --- a/Libraries/LibWebCommon/CMakeLists.txt
 +++ b/Libraries/LibWebCommon/CMakeLists.txt
 @@ -7,6 +7,7 @@ set(SOURCES
@@ -197,7 +197,7 @@ index 0000000000000000000000000000000000000000..e2893f0ef38fed8f8e513193ffad2597
 +    bool allow_destination_subdomains;
 +}
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 83ccf360b2496aab79f3b9843e91722c5b6f025a..000ed24ab13797ea5a9249a5ed42fca3f217363a 100644
+index 5f8ffc690d7f75dcc42ff0d7d93fb65d8c29a0fd..5c9026cebba6f15c61a2e9595298e1aa30fe0aaa 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
 @@ -1126,6 +1126,8 @@ ErrorOr<NonnullRefPtr<WebContentClient>> Application::create_web_content_client(
@@ -227,7 +227,7 @@ index 83ccf360b2496aab79f3b9843e91722c5b6f025a..000ed24ab13797ea5a9249a5ed42fca3
  {
      VERIFY(m_next_page_or_compositor_context_id > 0);
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 246f57c0256ca684899c69f7d7b175dcd55364a2..1a4d4819711f813c9aea558024f6945bc61fa0b6 100644
+index 7d6047dc57ff27d49b613f9b5936cf916ffdbc31..20b37330107c1bab2d710021651d3da19b28e344 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
 @@ -36,6 +36,7 @@
@@ -250,7 +250,7 @@ index 246f57c0256ca684899c69f7d7b175dcd55364a2..1a4d4819711f813c9aea558024f6945b
      bool claim_cpu_profiler(ProcessType);
      void set_cpu_profiler_process(Core::Process, OwnPtr<Core::File> control_socket);
  
-@@ -567,6 +573,7 @@ private:
+@@ -580,6 +586,7 @@ private:
      RefPtr<FontService> m_font_service;
      OwnPtr<FontServiceHost> m_font_service_host;
      JsonValue m_site_compatibility_data;
@@ -259,10 +259,10 @@ index 246f57c0256ca684899c69f7d7b175dcd55364a2..1a4d4819711f813c9aea558024f6945b
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
      struct PendingContentBlockerListUpdate {
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index ec39c99d4e72cd5774d1c06cc8e24c0ad48971b7..00eb96e011cb844de15b8badbae2074339f76db1 100644
+index b24ffc8334c3e6d73c8f017438421a473a59797b..0bd9eb6af4e17f7a61049f849bcd7ab52df7e0b9 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -575,6 +575,11 @@ void ConnectionFromClient::set_permission_snapshot(Web::Permissions::PermissionS
+@@ -578,6 +578,11 @@ void ConnectionFromClient::set_permission_snapshot(Web::Permissions::PermissionS
      Web::PermissionsAPI::PermissionStore::the().apply_snapshot(move(snapshot));
  }
  
@@ -275,7 +275,7 @@ index ec39c99d4e72cd5774d1c06cc8e24c0ad48971b7..00eb96e011cb844de15b8badbae20743
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index f1857a6635b323cfe1d4c307d6be158e6bebec27..5a328c7d51bd83f3822ff21b9ff33f08759ca3e5 100644
+index e5bd63fcb4c16f3ea8997ea321e02d483f7e5842..d695022d84935da7e869408e910e26f1eb51af15 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -123,6 +123,7 @@ private:
@@ -287,7 +287,7 @@ index f1857a6635b323cfe1d4c307d6be158e6bebec27..5a328c7d51bd83f3822ff21b9ff33f08
      virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 553a3aae0de73598056d7a32f27c7d0c869e58e0..5a8c12f59007f1a61514559d1ee8e85e85a1b882 100644
+index e41d68a9c3f1ed49ffa097b1af29f533fc5f6667..723f202299eea0f626e0ac492cda03b088fbd369 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -16,6 +16,7 @@

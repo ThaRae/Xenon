@@ -7,7 +7,6 @@
 #include <LibURL/InternalURLs.h>
 #include <LibURL/URL.h>
 #include <LibWebView/AutocompleteRanker.h>
-#include <LibWebView/FaviconStore.h>
 #include <LibWebView/URL.h>
 #include <UI/Application.h>
 #include <UI/Bookmarks.h>
@@ -17,7 +16,6 @@
 
 #ifndef LADYBIRD_HUB_IN_OWN_PROCESS
 #    include <LibWebView/Application.h>
-#    include <LibWebView/FaviconStore.h>
 #endif
 
 namespace Ladybird {
@@ -27,7 +25,6 @@ Bookmarks::Bookmarks(BookmarkStore& store)
     , WebView::SettingsObserver(Application::settings())
     , m_store(store)
 {
-    read_missing_favicons();
     update_autocomplete_bookmarks();
     create_menus();
     create_context_menus();
@@ -46,7 +43,6 @@ Bookmarks::~Bookmarks() = default;
 
 void Bookmarks::bookmarks_changed()
 {
-    read_missing_favicons();
     update_autocomplete_bookmarks();
 
     m_menu->shrink(m_menu_static_size);
@@ -73,7 +69,6 @@ void Bookmarks::create_menus()
             appearance.show_bookmarks_bar = value;
             Application::settings().set_appearance(appearance);
         });
-        action->set_checked(Application::settings().appearance().show_bookmarks_bar == value);
         m_show_bookmarks_bar_menu->add_action(action);
         return action;
     };
@@ -82,6 +77,8 @@ void Bookmarks::create_menus()
     m_show_bookmarks_bar_always_action = add_show_bookmarks_bar_option("Always"sv, WebView::ShowBookmarksBar::Always);
     m_show_bookmarks_bar_never_action = add_show_bookmarks_bar_option("Never"sv, WebView::ShowBookmarksBar::Never);
     m_show_bookmarks_bar_on_hover_action = add_show_bookmarks_bar_option("Only When Hovering the Navigation Toolbar"sv, WebView::ShowBookmarksBar::OnHover);
+    update_show_bookmarks_bar_actions();
+
     m_menu->add_submenu(*m_show_bookmarks_bar_menu);
     m_menu->add_separator();
 
@@ -106,12 +103,11 @@ void Bookmarks::create_menus()
         });
     }));
 
-    m_toggle_bookmark_bar_action = Action::create("Show Bookmarks Bar"sv, ActionID::ToggleBookmarksBar, [] {
-        auto appearance = Application::settings().appearance();
-        appearance.show_bookmarks_bar = appearance.show_bookmarks_bar == WebView::ShowBookmarksBar::Always
-            ? WebView::ShowBookmarksBar::Never
-            : WebView::ShowBookmarksBar::Always;
-        Application::settings().set_appearance(appearance);
+    m_toggle_bookmark_bar_action = Action::create("Show Bookmarks Bar"sv, ActionID::ToggleBookmarksBar, [this] {
+        if (Application::settings().appearance().show_bookmarks_bar == WebView::ShowBookmarksBar::Always)
+            m_show_bookmarks_bar_never_action->activate();
+        else
+            m_show_bookmarks_bar_always_action->activate();
     });
 
     m_menu->add_separator();
@@ -244,7 +240,7 @@ void Bookmarks::create_menu_items(Optional<MenuData> data)
                     open_url(url);
                 });
 
-                action->set_png_icon(bookmark.favicon_hash.has_value() ? favicon_png(*bookmark.favicon_hash) : OptionalNone {});
+                action->set_png_icon(bookmark.favicon_hash.has_value() ? m_store.favicon_png(*bookmark.favicon_hash) : OptionalNone {});
                 action->set_tooltip(bookmark.url.serialize());
 
                 action->add_property("id"sv, item.id);
@@ -292,6 +288,10 @@ void Bookmarks::create_menu_items(Optional<MenuData> data)
 
 void Bookmarks::update_show_bookmarks_bar_actions()
 {
+    auto show_always = Application::settings().appearance().show_bookmarks_bar == WebView::ShowBookmarksBar::Always;
+    m_show_bookmarks_bar_always_action->set_shortcut_hint(show_always ? OptionalNone {} : Optional<ActionID> { ActionID::ToggleBookmarksBar });
+    m_show_bookmarks_bar_never_action->set_shortcut_hint(show_always ? Optional<ActionID> { ActionID::ToggleBookmarksBar } : OptionalNone {});
+
     switch (Application::settings().appearance().show_bookmarks_bar) {
     case WebView::ShowBookmarksBar::Always:
         m_show_bookmarks_bar_always_action->set_checked(true);
@@ -400,26 +400,7 @@ void Bookmarks::open_folder_in_new_tabs(String const& folder_id) const
     Application::the().open_urls_in_new_tabs(internal_urls);
 }
 
-void Bookmarks::read_missing_favicons()
-{
-    Vector<String> missing_hashes;
-    for (auto const& hash : m_store.favicon_hashes()) {
-        if (!m_favicons.contains(hash))
-            missing_hashes.append(hash);
-    }
-    if (missing_hashes.is_empty())
-        return;
-
-    for (auto const& hash : missing_hashes)
-        m_favicons.set(hash, Application::favicon_store(WebView::IsPrivate::No).favicon_png(hash));
-}
-
-Optional<ByteBuffer> Bookmarks::favicon_png(String const& favicon_hash) const
-{
-    return m_favicons.get(favicon_hash).value_or({});
-}
-
-static void append_autocomplete_bookmarks(Bookmarks const& bookmarks, Vector<WebView::AutocompleteBookmark>& autocomplete_bookmarks, ReadonlySpan<BookmarkItem> items, Optional<String> const& parent_folder)
+static void append_autocomplete_bookmarks(BookmarkStore const& store, Vector<WebView::AutocompleteBookmark>& autocomplete_bookmarks, ReadonlySpan<BookmarkItem> items, Optional<String> const& parent_folder)
 {
     for (auto const& item : items) {
         if (item.is_bookmark()) {
@@ -428,7 +409,7 @@ static void append_autocomplete_bookmarks(Bookmarks const& bookmarks, Vector<Web
                 .url = bookmark.url.serialize(URL::ExcludeFragment::Yes),
                 .title = bookmark.title,
                 .folder = parent_folder,
-                .favicon_png = bookmark.favicon_hash.has_value() ? bookmarks.favicon_png(*bookmark.favicon_hash) : OptionalNone {},
+                .favicon_png = bookmark.favicon_hash.has_value() ? store.favicon_png(*bookmark.favicon_hash) : OptionalNone {},
             });
             continue;
         }
@@ -439,14 +420,15 @@ static void append_autocomplete_bookmarks(Bookmarks const& bookmarks, Vector<Web
                 ? MUST(String::formatted("{} / {}", *parent_folder, *item.folder().title))
                 : *item.folder().title;
         }
-        append_autocomplete_bookmarks(bookmarks, autocomplete_bookmarks, item.folder().children, folder);
+
+        append_autocomplete_bookmarks(store, autocomplete_bookmarks, item.folder().children, folder);
     }
 }
 
 void Bookmarks::update_autocomplete_bookmarks()
 {
     m_autocomplete_bookmarks.clear();
-    append_autocomplete_bookmarks(*this, m_autocomplete_bookmarks, m_store.root_items(), {});
+    append_autocomplete_bookmarks(m_store, m_autocomplete_bookmarks, m_store.root_items(), {});
 }
 
 Vector<WebView::AutocompleteSuggestion> Bookmarks::suggestions_for(StringView query, size_t max_suggestions) const
