@@ -201,8 +201,6 @@ public:
 #endif
     double viewport_corner_radius() const { return m_viewport_corner_radius; }
 
-    WebView::AccessibilityTreeManager const* accessibility_tree_manager() const { return m_accessibility_manager.ptr(); }
-
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
     QAccessibleInterface* accessibility_interface_for_node(i64 node_id);
 #endif
@@ -384,6 +382,16 @@ private:
     void release_imported_d3d_textures();
 
     Vector<ImportedD3DTexture> m_imported_d3d_textures;
+
+    virtual void remote_layer_changed(Compositing::RemoteLayerHostHandle) override;
+    virtual void childEvent(QChildEvent*) override;
+    virtual bool eventFilter(QObject*, QEvent*) override;
+    bool has_visible_child_over_page() const;
+    void update_whether_view_hosts_remote_layer();
+    void native_window_changed();
+    bool m_hosts_remote_layer { false };
+    bool m_vertical_tabs_overlay_page { false };
+    bool m_bookmarks_bar_overlays_page { false };
 #endif
 
 #ifdef LADYBIRD_QT_USE_VULKAN_WINDOW
@@ -422,6 +430,7 @@ private:
     void release_retired_backing_stores_no_longer_painted();
     void release_all_retired_backing_stores();
     QRect rect_shown_in_window() const;
+    QPoint position_in_surface_of(QWindow const& parent, QPoint) const;
 
     // Shows the page's frames on Wayland by handing their dma-bufs to the compositor of the desktop. Without it, the
     // page's window draws them in a swap chain of its own.
@@ -429,7 +438,7 @@ private:
     bool m_page_surface_failed { false };
     // Where the page surface shows a frame, in device pixels of the view.
     QRect m_page_surface_rect;
-    // Where the page surface last showed a frame, in the logical coordinates of the browser window.
+    // Where the page surface last showed a frame, in the logical coordinates of the browser window's surface.
     QPoint m_page_surface_position;
     // The backing stores the view is done with that the compositor of the desktop may still read. The page they belong
     // to can stop displaying the tab before the compositor is done.

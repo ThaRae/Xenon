@@ -11,7 +11,7 @@
 #include <AK/StringBuilder.h>
 #include <LibCore/File.h>
 #include <LibCore/MimeData.h>
-#include <LibCrypto/Hash/SHA2.h>
+#include <LibCrypto/Hash/Hash.h>
 #include <LibFileSystem/FileSystem.h>
 #include <UI/Extensions/Extension.h>
 #include <UI/Extensions/MatchPattern.h>
@@ -20,7 +20,7 @@ namespace Ladybird::Extensions {
 
 String extension_id_from_bytes(ReadonlyBytes bytes)
 {
-    auto digest = Crypto::Hash::SHA256::hash(bytes);
+    auto digest = Crypto::Hash::digest(Crypto::Hash::HashKind::SHA256, bytes);
 
     StringBuilder builder;
     for (auto byte : digest.bytes().slice(0, 16)) {

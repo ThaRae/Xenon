@@ -21,26 +21,30 @@ Until the trusted facet list is fetched and checked, the same-origin
 shortcut other browsers use is the only safe one: the caller's host
 must equal the AppID's host.
 ---
- Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ .../Rust/src/web_authn/public_key_credential.rs   | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp b/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
-index b6a14dae7d6b89062553cf62e2e12ec796197bdc..364dda47c07a4b326fc61a90b87d05200cdc92f3 100644
---- a/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
-+++ b/Libraries/LibWeb/WebAuthn/PublicKeyCredential.cpp
-@@ -668,14 +668,7 @@ static bool is_a_caller_s_facet_id_authorized_for_an_app_id(URL::Origin const& c
-     if (caller_origin.is_opaque() || caller_origin.scheme().value_or({}) != "https"sv)
+diff --git a/Libraries/LibWeb/Bindings/Rust/src/web_authn/public_key_credential.rs b/Libraries/LibWeb/Bindings/Rust/src/web_authn/public_key_credential.rs
+index 36dca66370a38990fdfbfdd86afa435e2da7e4d9..2e16b76371e1a24ae00315fd71b9d8483c4a0262 100644
+--- a/Libraries/LibWeb/Bindings/Rust/src/web_authn/public_key_credential.rs
++++ b/Libraries/LibWeb/Bindings/Rust/src/web_authn/public_key_credential.rs
+@@ -939,14 +939,9 @@ fn is_a_caller_s_facet_id_authorized_for_an_app_id(caller_origin: &Origin, app_i
          return false;
+     }
  
--    auto const& caller_host = caller_origin.host();
--    auto const& app_id_host = *app_id_url->host();
--    if (caller_host == app_id_host)
+-    let app_id_host = Host {
+-        kind: app_id_url.host_kind(),
+-        serialization: app_id_host.to_owned(),
+-    };
+-    if *caller_host == app_id_host {
 -        return true;
+-    }
 -
--    auto caller_registrable_domain = caller_host.registrable_domain();
--    auto app_id_registrable_domain = app_id_host.registrable_domain();
--    return caller_registrable_domain.has_value() && caller_registrable_domain == app_id_registrable_domain;
-+    return caller_origin.host() == *app_id_url->host();
+-    let caller_registrable_domain = caller_host.registrable_domain();
+-    caller_registrable_domain.is_some() && caller_registrable_domain == app_id_host.registrable_domain()
++    *caller_host
++        == Host {
++            kind: app_id_url.host_kind(),
++            serialization: app_id_host.to_owned(),
++        }
  }
- 
- // https://w3c.github.io/webauthn/#sctn-discover-from-external-source

@@ -215,7 +215,6 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
     , m_tabs_container(new TabWidget(this))
     , m_is_popup_window(is_popup_window)
 {
-    auto const& browser_options = WebView::Application::browser_options();
 
     // A restored window keeps the session row the store re-adopted for it.
     if (restored_session_window_id.has_value())
@@ -317,7 +316,7 @@ BrowserWindow::BrowserWindow(Vector<URL::URL> const& initial_urls, IsPopupWindow
     setCentralWidget(main_widget);
     setContextMenuPolicy(Qt::PreventContextMenu);
 
-    if (browser_options.devtools_port.has_value())
+    if (Application::the().devtools_port().has_value())
         on_devtools_enabled();
 }
 
@@ -554,7 +553,7 @@ void BrowserWindow::rebuild_bookmarks_menu()
 
 void BrowserWindow::on_devtools_enabled()
 {
-    m_devtools_banner->set_port(WebView::Application::browser_options().devtools_port.value_or(0));
+    m_devtools_banner->set_port(*Application::the().devtools_port());
     m_devtools_banner->show();
 }
 
@@ -631,7 +630,7 @@ Tab& BrowserWindow::create_restored_tab(RestoredSessionTab const& restored, int 
             .session_tab_id = restored.tab_id,
             .url = restored.url,
             .title = entry.has_value() && entry->title.has_value() ? qstring_from_ak_string(*entry->title) : qstring_from_ak_string(restored.url.serialize()),
-            .favicon = entry.has_value() && entry->favicon_png.has_value() ? icon_from_png(entry->favicon_png->bytes(), TAB_ICON_SIZE) : QIcon {},
+            .favicon = entry.has_value() && entry->favicon_png.has_value() ? favicon_from_png(entry->favicon_png->bytes(), TAB_ICON_SIZE) : QIcon {},
         };
         auto* tab = new Tab(this, AK::move(deferred_tab));
         tab->set_pinned(restored.pinned);
@@ -1130,11 +1129,6 @@ void BrowserWindow::request_to_close_tab(int index)
     tab->request_close();
 }
 
-void BrowserWindow::request_to_close_current_tab()
-{
-    request_to_close_tab(m_tabs_container->current_index());
-}
-
 int BrowserWindow::tab_index(Tab* tab)
 {
     return m_tabs_container->index_of(tab);
@@ -1250,11 +1244,15 @@ void BrowserWindow::create_menu_bar_window_controls()
 void BrowserWindow::update_menu_bar_visibility()
 {
     auto show_menu_bar = show_menu_bar_option_available() && Application::settings().appearance().show_menu_bar;
-    menuBar()->setVisible(show_menu_bar);
 
+    // Update the controls first so the menu bar measures its corner widgets with the controls visible when shown.
     if (m_menu_bar_window_controls)
         m_menu_bar_window_controls->setVisible(show_menu_bar && uses_client_side_decorations());
-    m_tabs_container->set_window_controls_visible(!show_menu_bar && has_chrome_in_titlebar());
+
+    menuBar()->setVisible(show_menu_bar);
+
+    // A full-screen window has no window controls of its own on display, so the chrome leaves no room for them.
+    m_tabs_container->set_window_controls_visible(!show_menu_bar && has_chrome_in_titlebar() && !isFullScreen());
 }
 
 void BrowserWindow::update_menu_bar_window_control_icons()
@@ -1532,7 +1530,24 @@ bool BrowserWindow::eventFilter(QObject* object, QEvent* event)
         return true;
     }
 
-    auto const is_button = qobject_cast<QAbstractButton*>(object) != nullptr;
+    auto is_button = qobject_cast<QAbstractButton*>(object) != nullptr;
+
+    // The window controls run to the window's edge. While the window can be resized, that edge still resizes it.
+    if (is_button && uses_client_side_decorations() && !isMaximized() && !isFullScreen()) {
+        auto is_press = event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseButtonDblClick;
+        auto is_mouse_event = is_press || event->type() == QEvent::MouseMove;
+        auto position = is_mouse_event ? widget->mapTo(this, static_cast<QMouseEvent*>(event)->position().toPoint()) : mapFromGlobal(QCursor::pos());
+        if (auto edges = resize_edges_for_position(position); edges & (Qt::LeftEdge | Qt::RightEdge)) {
+            // NB: Even if the resize does not start, a press here must not reach the button and close the window.
+            if (is_press) {
+                auto* handle = windowHandle();
+                if (handle && event->type() == QEvent::MouseButtonPress && static_cast<QMouseEvent*>(event)->button() == Qt::LeftButton)
+                    handle->startSystemResize(edges);
+                return true;
+            }
+            is_button = false;
+        }
+    }
 
     if (is_button && (event->type() == QEvent::Enter || event->type() == QEvent::MouseMove || event->type() == QEvent::Leave)) {
         clear_resize_cursor();

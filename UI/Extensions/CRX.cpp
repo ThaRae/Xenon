@@ -11,7 +11,7 @@
 #include <AK/Vector.h>
 #include <LibCore/Directory.h>
 #include <LibCore/File.h>
-#include <LibCrypto/Hash/SHA2.h>
+#include <LibCrypto/Hash/Hash.h>
 #include <LibFileSystem/FileSystem.h>
 #include <UI/Extensions/CRX.h>
 #include <UI/Extensions/Extension.h>
@@ -261,7 +261,7 @@ ErrorOr<PackedExtension, String> verify_crx(ReadonlyBytes crx, StringView expect
 
         if (extension_id_from_bytes(proof.public_key) == id)
             developer_key = proof.public_key;
-        if (!publisher_key_hash.is_empty() && Crypto::Hash::SHA256::hash(proof.public_key).bytes() == publisher_key_hash)
+        if (!publisher_key_hash.is_empty() && Crypto::Hash::digest(Crypto::Hash::HashKind::SHA256, proof.public_key).bytes() == publisher_key_hash)
             signed_by_publisher = true;
     }
     if (!developer_key.has_value())

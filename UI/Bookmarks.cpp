@@ -56,6 +56,11 @@ void Bookmarks::appearance_changed()
     update_show_bookmarks_bar_actions();
 }
 
+void Bookmarks::tab_settings_changed()
+{
+    update_show_bookmarks_bar_actions();
+}
+
 void Bookmarks::create_menus()
 {
     m_menu = Menu::create("Bookmarks"sv);
@@ -263,6 +268,12 @@ void Bookmarks::create_menu_items(Optional<MenuData> data)
                     .target_folder_id = item.id,
                 });
 
+                if (folder.children.is_empty()) {
+                    auto empty_folder_action = Action::create("(Empty)"sv, ActionID::EmptyBookmarkFolder, [] { });
+                    empty_folder_action->set_enabled(false);
+                    submenu->add_action(move(empty_folder_action));
+                }
+
                 // A folder's menu ends with a way to open every bookmark in it at once.
                 size_t bookmark_count = 0;
                 for (auto const& child : folder.children)
@@ -288,6 +299,9 @@ void Bookmarks::create_menu_items(Optional<MenuData> data)
 
 void Bookmarks::update_show_bookmarks_bar_actions()
 {
+    auto const& tab_settings = Application::settings().tab_settings();
+    m_show_bookmarks_bar_menu->set_visible(!tab_settings.vertical_tabs_enabled || !tab_settings.everything_in_sidebar);
+
     auto show_always = Application::settings().appearance().show_bookmarks_bar == WebView::ShowBookmarksBar::Always;
     m_show_bookmarks_bar_always_action->set_shortcut_hint(show_always ? OptionalNone {} : Optional<ActionID> { ActionID::ToggleBookmarksBar });
     m_show_bookmarks_bar_never_action->set_shortcut_hint(show_always ? Optional<ActionID> { ActionID::ToggleBookmarksBar } : OptionalNone {});
@@ -365,19 +379,6 @@ void Bookmarks::open_url_in_new_window(String const& bookmark_id, WebView::IsPri
         Application::the().open_url_in_new_window(bookmark->bookmark().url, is_private);
 }
 
-static void collect_bookmark_urls(BookmarkItem::Folder const& folder, Vector<URL::URL>& urls)
-{
-    for (auto const& child : folder.children) {
-        child.data.visit(
-            [&](BookmarkItem::Bookmark const& bookmark) {
-                urls.append(bookmark.url);
-            },
-            [&](BookmarkItem::Folder const& child_folder) {
-                collect_bookmark_urls(child_folder, urls);
-            });
-    }
-}
-
 void Bookmarks::open_folder_in_new_tabs(String const& folder_id) const
 {
     auto folder = m_store.find_item_by_id(folder_id);
@@ -385,7 +386,14 @@ void Bookmarks::open_folder_in_new_tabs(String const& folder_id) const
         return;
 
     Vector<URL::URL> urls;
-    collect_bookmark_urls(folder->folder(), urls);
+
+    for (auto const& child : folder->folder().children) {
+        child.data.visit(
+            [&](BookmarkItem::Bookmark const& bookmark) {
+                urls.append(bookmark.url);
+            },
+            [&](BookmarkItem::Folder const&) { });
+    }
 
     // NB: URLs that another application handles go through the view, which knows how to ask about that.
     Vector<URL::URL> internal_urls;

@@ -26,10 +26,10 @@ coming from another tab.
  4 files changed, 99 insertions(+), 15 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index c465e33d70ed32ea98e5470cdc65650ad287cf97..b614f9489d7a5f68ae2125fd1085f01b11f2112e 100644
+index d6c014f117b43d49b28ef590eed16d8350b5e2e1..fb0a2b1915d518985e05392ba4a737b1b9ade500 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -2282,7 +2282,7 @@ ErrorOr<void> Application::launch_devtools_server()
+@@ -2577,7 +2577,7 @@ ErrorOr<void> Application::launch_devtools_server()
      return {};
  }
  
@@ -38,7 +38,7 @@ index c465e33d70ed32ea98e5470cdc65650ad287cf97..b614f9489d7a5f68ae2125fd1085f01b
  {
      if (!m_devtools || !m_browser_options.devtools_port.has_value())
          return Error::from_string_literal("DevTools is not currently enabled");
-@@ -2290,14 +2290,52 @@ ErrorOr<void> Application::launch_devtools_client()
+@@ -2585,14 +2585,52 @@ ErrorOr<void> Application::launch_devtools_client()
      if (m_devtools->has_active_connection())
          return Error::from_string_literal("A DevTools client is already connected");
  
@@ -93,7 +93,7 @@ index c465e33d70ed32ea98e5470cdc65650ad287cf97..b614f9489d7a5f68ae2125fd1085f01b
  }
  
  static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, u32 screenshot_timeout)
-@@ -3184,7 +3222,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
+@@ -3479,7 +3517,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
  {
      if (m_devtools) {
          m_devtools_client.clear();
@@ -106,7 +106,7 @@ index c465e33d70ed32ea98e5470cdc65650ad287cf97..b614f9489d7a5f68ae2125fd1085f01b
          on_devtools_disabled();
      } else {
          TRY(launch_devtools_server());
-@@ -4135,7 +4178,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
+@@ -4430,7 +4473,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
      if (!view.has_value())
          return;
  
@@ -115,7 +115,7 @@ index c465e33d70ed32ea98e5470cdc65650ad287cf97..b614f9489d7a5f68ae2125fd1085f01b
  }
  
  void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescription const& description) const
-@@ -4144,7 +4187,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
+@@ -4439,7 +4482,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
      if (!view.has_value())
          return;
  
@@ -124,7 +124,7 @@ index c465e33d70ed32ea98e5470cdc65650ad287cf97..b614f9489d7a5f68ae2125fd1085f01b
  }
  
  void Application::did_connect_devtools_client(DevTools::TabDescription const& description) const
-@@ -4168,6 +4211,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
+@@ -4463,6 +4506,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
  void Application::did_close_devtools_connection()
  {
      m_devtools_client.clear();
@@ -133,7 +133,7 @@ index c465e33d70ed32ea98e5470cdc65650ad287cf97..b614f9489d7a5f68ae2125fd1085f01b
  
  }
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index f79e1af09c0e3841ab6878627287efe646432ad8..032c6e3b87ca6a42ecf893f6cf01b195fca4750f 100644
+index e8dd1969016df82f4a3c8ff8deb2446bb7bb816f..1871b4c43f715c1cc38b178dac0742bc6dc9073e 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
 @@ -409,7 +409,8 @@ public:
@@ -146,7 +146,7 @@ index f79e1af09c0e3841ab6878627287efe646432ad8..032c6e3b87ca6a42ecf893f6cf01b195
      void refresh_tab_list();
  
      Optional<Core::TimeZoneWatcher&> time_zone_watcher();
-@@ -718,6 +719,8 @@ private:
+@@ -752,6 +753,8 @@ private:
  
      OwnPtr<DevTools::DevToolsServer> m_devtools;
      OwnPtr<DevTools::FirefoxClient> m_devtools_client;
@@ -156,7 +156,7 @@ index f79e1af09c0e3841ab6878627287efe646432ad8..032c6e3b87ca6a42ecf893f6cf01b195
      mutable HashMap<u64, u64> m_navigation_listener_ids;
  };
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 1ed3ea03e7d46c689c5afc9772b32f5676f15540..f5167ec0a87aa193d1de27596cf86cd3c28585d4 100644
+index 376b3c94129436e2bd0354a02ddd89c970f5bde5..f175280225341470e01f3046ae52aa6eacffd97b 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
 @@ -2099,9 +2099,8 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
@@ -214,7 +214,7 @@ index 1ed3ea03e7d46c689c5afc9772b32f5676f15540..f5167ec0a87aa193d1de27596cf86cd3
  void ViewImplementation::get_dom_node_inner_html(Web::UniqueNodeID node_id)
  {
      page().async_get_dom_node_inner_html(node_id);
-@@ -5056,7 +5091,7 @@ ErrorOr<LexicalPath> ViewImplementation::dump_gc_graph()
+@@ -5080,7 +5115,7 @@ ErrorOr<LexicalPath> ViewImplementation::dump_gc_graph()
  void ViewImplementation::send_context_menu_request(ContextMenuRequest request, Gfx::IntPoint content_position)
  {
      request.widget_position = to_widget_position(content_position);
@@ -223,7 +223,7 @@ index 1ed3ea03e7d46c689c5afc9772b32f5676f15540..f5167ec0a87aa193d1de27596cf86cd3
      did_request_context_menu(move(request));
  }
  
-@@ -5064,8 +5099,8 @@ void ViewImplementation::inspect_context_menu_element()
+@@ -5088,8 +5123,8 @@ void ViewImplementation::inspect_context_menu_element()
  {
      if (m_inspect_element_hit_test_request_id.has_value())
          m_inspect_element_activated_before_hit_test = true;
@@ -234,7 +234,7 @@ index 1ed3ea03e7d46c689c5afc9772b32f5676f15540..f5167ec0a87aa193d1de27596cf86cd3
  }
  
  void ViewImplementation::replace_context_menu_misspelling(Utf16String const& replacement)
-@@ -5305,9 +5340,6 @@ void ViewImplementation::prepare_inspect_element(Gfx::IntPoint content_position)
+@@ -5329,9 +5364,6 @@ void ViewImplementation::prepare_inspect_element(Gfx::IntPoint content_position)
      m_inspect_element_hit_test_request_id.clear();
      m_inspect_element_activated_before_hit_test = false;
  
@@ -245,10 +245,10 @@ index 1ed3ea03e7d46c689c5afc9772b32f5676f15540..f5167ec0a87aa193d1de27596cf86cd3
      m_inspect_element_hit_test_request_id = request_id;
      page().async_get_node_id_at_position(request_id, { content_position.x(), content_position.y() });
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 3e98b08dd9a56a0bb120c817974cee568b1cceec..be16bfd54ec332df579f376dc6a0db1ef7ae8dae 100644
+index da8da0b976197d57020f1ca0c965cf16c1afed38..8666bd93d3bdeae0b59f47be8f864dac7678eeb4 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -493,6 +493,9 @@ public:
+@@ -491,6 +491,9 @@ public:
      void did_connect_devtools_client();
      void did_disconnect_devtools_client();
      void start_sending_console_output(bool messages, bool errors);

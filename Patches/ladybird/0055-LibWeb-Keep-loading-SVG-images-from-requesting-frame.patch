@@ -20,10 +20,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 5 insertions(+)
 
 diff --git a/Libraries/LibWeb/SVG/SVGDecodedImageData.cpp b/Libraries/LibWeb/SVG/SVGDecodedImageData.cpp
-index 71a670c7f65911a99a43cc15c1f304e08f997668..97ce127b283d6fddb5689980076b23774dad3b45 100644
+index 36d78970c7b1b1fd5e6335986ee44e802c89bf7a..5103a05b9c2a160feb1b791f047ad6b7e666807b 100644
 --- a/Libraries/LibWeb/SVG/SVGDecodedImageData.cpp
 +++ b/Libraries/LibWeb/SVG/SVGDecodedImageData.cpp
-@@ -92,6 +92,11 @@ ScopedSVGImageDocument::ScopedSVGImageDocument(DOM::Document& document, FrameReq
+@@ -93,6 +93,11 @@ ScopedSVGImageDocument::ScopedSVGImageDocument(DOM::Document& document, FrameReq
          }
      }
  

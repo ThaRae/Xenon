@@ -18,7 +18,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 11 insertions(+)
 
 diff --git a/Services/Hub/Application.cpp b/Services/Hub/Application.cpp
-index 2f970fdeef43765e0271312f09c29563ae17534e..809c5c133f28e0f506260889db549af3d8731960 100644
+index 1ad1f480678fd23d40c081a058a4f07cee75acc1..191d43852f2e3411c2c128d27a1b430279c2997e 100644
 --- a/Services/Hub/Application.cpp
 +++ b/Services/Hub/Application.cpp
 @@ -26,6 +26,14 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)

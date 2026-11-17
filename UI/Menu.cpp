@@ -339,7 +339,7 @@ static QAction* create_session_history_traversal_menu_action(QMenu& menu, WebCon
     auto* action = new QAction(qstring_from_ak_string(item.title), &menu);
     action->setToolTip(qstring_from_ak_string(item.url));
     if (item.favicon_png.has_value())
-        action->setIcon(icon_from_png(item.favicon_png->bytes(), MENU_ICON_SIZE));
+        action->setIcon(favicon_from_png(item.favicon_png->bytes(), MENU_ICON_SIZE));
     else
         action->setIcon(create_chrome_icon(ChromeIcon::Globe, menu.palette()));
     QObject::connect(action, &QAction::triggered, &view, [&view, step = item.step] {
@@ -415,7 +415,7 @@ static QAction* create_recent_history_menu_action(QMenu& menu, WebContentView& v
     auto* action = new QAction(qstring_from_ak_string(title), &menu);
     action->setToolTip(qstring_from_ak_string(entry.url));
     if (entry.favicon_png.has_value())
-        action->setIcon(icon_from_png(entry.favicon_png->bytes(), MENU_ICON_SIZE));
+        action->setIcon(favicon_from_png(entry.favicon_png->bytes(), MENU_ICON_SIZE));
     else
         action->setIcon(create_chrome_icon(ChromeIcon::Globe, menu.palette()));
 

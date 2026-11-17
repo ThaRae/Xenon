@@ -19,10 +19,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 21 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 26ae6c13734df2bf8c31de3e2db701163a5a3231..eaae2a69bc9b309f1c004ac26a8a8c00dd89368a 100644
+index a4b364a6ca035ea7432133a9357918d2775f9d8e..2cf6fda7ffe8591ccd1aa2c341159c447d32cb86 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3720,6 +3720,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
+@@ -3738,6 +3738,20 @@ void ConnectionFromClient::blob_url_entry_removed(Utf16String url)
          Web::FileAPI::remove_entry_from_blob_url_store(*url_record);
  }
  
@@ -44,7 +44,7 @@ index 26ae6c13734df2bf8c31de3e2db701163a5a3231..eaae2a69bc9b309f1c004ac26a8a8c00
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index d5ad0a5cb977c51855d5b2d8a23c39a230149f1d..5c91d25668617a2ea6558a1e4c531a60cdd43559 100644
+index 337c2b6815fbbe78a2f16760855bf2de5cd3c0b7..2a19dd8e80f88c99a5614a42fd37f28808d0fb64 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -16,6 +16,7 @@
@@ -66,7 +66,7 @@ index d5ad0a5cb977c51855d5b2d8a23c39a230149f1d..5c91d25668617a2ea6558a1e4c531a60
      // Whether the UI process has user scripts for documents, which they ask it for as they become ready for scripts.
      bool user_scripts_enabled() const { return m_user_scripts_enabled; }
  
-@@ -395,6 +400,7 @@ private:
+@@ -396,6 +401,7 @@ private:
  
      RefPtr<TestConnection> m_test_connection;
      RefPtr<Web::Compositor::CompositorConnection> m_compositor_connection;
@@ -75,10 +75,10 @@ index d5ad0a5cb977c51855d5b2d8a23c39a230149f1d..5c91d25668617a2ea6558a1e4c531a60
      OwnPtr<DevToolsDebugger> m_devtools_debugger;
  
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index dd74e0f2d3365c7f8a658e07ff88013bb2e90097..6220511e085f8ebfadb992741b330940f7bab396 100644
+index ec9aee07bd33c8d761eba5b758e401a499f239f6..3605c7b3e9947b1e320409970146e55806d5633f 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -1066,6 +1066,7 @@ GC::Ptr<WebContentConsoleClient> PageClient::attach_js_console(Web::DOM::Documen
+@@ -1077,6 +1077,7 @@ GC::Ptr<WebContentConsoleClient> PageClient::attach_js_console(Web::DOM::Documen
  void PageClient::page_did_finish_loading(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId document_id)
  {
      client().async_did_finish_loading(m_id, navigable_id, document_id);

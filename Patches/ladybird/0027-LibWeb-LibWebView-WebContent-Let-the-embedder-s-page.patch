@@ -79,10 +79,10 @@ index 1c50e32a3abb9cb8102543dd30e63cedb78c4990..be9e57104bc2f7d1f22526008431ceb7
      //     enabled for the active range only, so check whether it is enabled for the text control here.
      if (auto* control = focused_text_control(*this); control && is_html_document() && !m_inside_exec_command) {
 diff --git a/Libraries/LibWeb/Page/EventHandler.cpp b/Libraries/LibWeb/Page/EventHandler.cpp
-index a5732dd3dc8b6f6cb9d00ab2e7005020d571113b..37c02f813b55610388bb3e5f26591a060d5b8f75 100644
+index 7079131efcb71401e95caf4730757cf59be4d556..e3d9a5f522d82bb823982a1e8a1a26faa1f44242 100644
 --- a/Libraries/LibWeb/Page/EventHandler.cpp
 +++ b/Libraries/LibWeb/Page/EventHandler.cpp
-@@ -2660,7 +2660,9 @@ EventResult EventHandler::perform_copy_action()
+@@ -2659,7 +2659,9 @@ EventResult EventHandler::perform_copy_action()
  static bool script_may_access_clipboard(DOM::Document& document)
  {
      auto window = document.window();
@@ -94,10 +94,10 @@ index a5732dd3dc8b6f6cb9d00ab2e7005020d571113b..37c02f813b55610388bb3e5f26591a06
  
  static bool has_selected_password_input(DOM::Document& document)
 diff --git a/Libraries/LibWeb/Page/Page.cpp b/Libraries/LibWeb/Page/Page.cpp
-index 5ab91f923df0e3e5c1b523d996709db232ca6b2e..d6227712a169e2225b79d8c28d14667410c2e438 100644
+index 54c535b535f795559a517328d89c8ac02a73610f..ab22391bf0e36b2bd2b0cc4baa05cc97bf6cb2eb 100644
 --- a/Libraries/LibWeb/Page/Page.cpp
 +++ b/Libraries/LibWeb/Page/Page.cpp
-@@ -2884,4 +2884,9 @@ NonnullRefPtr<Audio::RecordStream::CreatePromise> PageClient::create_audio_recor
+@@ -2909,4 +2909,9 @@ NonnullRefPtr<Audio::RecordStream::CreatePromise> PageClient::create_audio_recor
      VERIFY_NOT_REACHED();
  }
  
@@ -108,10 +108,10 @@ index 5ab91f923df0e3e5c1b523d996709db232ca6b2e..d6227712a169e2225b79d8c28d146674
 +
  }
 diff --git a/Libraries/LibWeb/Page/Page.h b/Libraries/LibWeb/Page/Page.h
-index 8d14ea718fb9b9e56a7e8280eeb914d8e58b2660..ec616a8c49c2f569ac5fc96a61b1cba923345052 100644
+index f1c0f4f7228c689f28888e052638d74a357b2395..9d9b91bbce6f6db046bada80a6d82c860d464643 100644
 --- a/Libraries/LibWeb/Page/Page.h
 +++ b/Libraries/LibWeb/Page/Page.h
-@@ -1014,6 +1014,12 @@ public:
+@@ -1021,6 +1021,12 @@ public:
      virtual void page_did_request_clipboard_entries_for_paste([[maybe_unused]] u64 request_id) { }
      virtual void page_did_request_clipboard_entries([[maybe_unused]] u64 request_id, [[maybe_unused]] HTML::CrossProcessId reading_document_id) { }
      virtual void page_did_request_paste_from_clipboard_for_testing() { }
@@ -142,7 +142,7 @@ index 0b5bc6d988baf5001186956a628358ddb184c9f9..8c4a08074daf3f0e26d286edd47f8ac3
  
  // Serves a URL scheme from the UI process, as a browser serves its extension pages. The scheme's URLs get tuple origins
 diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
-index 823893c602eab34cf82a32f63b529c40784e2201..fbeda1540c4457d6f282fae4f9883b1e33530bf8 100644
+index caa7a2ef7debbb134461fd957c4fef9e54a986f2..d0c2d9c0c418cab770f404fe03966867e780cdbb 100644
 --- a/Libraries/LibWebView/WebContentClient.cpp
 +++ b/Libraries/LibWebView/WebContentClient.cpp
 @@ -128,6 +128,22 @@ Messages::WebContentClient::DidRequestEmbedderBootstrapResponse WebContentClient
@@ -182,10 +182,10 @@ index e65bf62ba03f9f54ecdb0547d1c11df8faab721d..c6c578bd44ee17d63f0d5a10c0975d48
      virtual void did_retain_blob_url_token(Web::HTML::CrossProcessId navigable_id, URL::BlobURLEntry::Token token) override;
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 7e77837a7af6876772a4e0121f4920201cb7b5a5..42268de6a716e3c2f6abdbfbcba9a87c4d7db4a3 100644
+index 13af91941126200ce3d263801977d657ab82e91d..591579e30855d1dbb7c9fb2a4fbf789f459c5425 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1814,6 +1814,60 @@ Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::Cross
+@@ -1848,6 +1848,60 @@ Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::Cross
      return url_scheme_bridge(*endpoint->origin().scheme())->bootstrap_script(*endpoint);
  }
  
@@ -246,7 +246,7 @@ index 7e77837a7af6876772a4e0121f4920201cb7b5a5..42268de6a716e3c2f6abdbfbcba9a87c
  void WebContentPage::did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message)
  {
      // NB: A document may post a message as it goes away, so one this page no longer hosts is dropped rather than taken
-@@ -2402,10 +2456,11 @@ void WebContentPage::did_change_background_color(Gfx::Color color)
+@@ -2448,10 +2502,11 @@ void WebContentPage::did_change_background_color(Gfx::Color color)
  }
  
  // NB: The system clipboard belongs to the user, so a page reaches it only right after the user's own input to it, as
@@ -261,7 +261,7 @@ index 7e77837a7af6876772a4e0121f4920201cb7b5a5..42268de6a716e3c2f6abdbfbcba9a87c
      if (writing_document_id.has_value()) {
          if (auto document = hosted_document_with_id(*writing_document_id))
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 354bf498e3d93fded0bde710900eb752761d6c3b..66e7304715d79a07eb7d2b329e49e819c4db512d 100644
+index 3260e9689b517fc19ac14292e130842938e86352..8e2869fa8f53221a6d0660127ddf3c4c1611b734 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
 @@ -190,6 +190,9 @@ public:
@@ -274,7 +274,7 @@ index 354bf498e3d93fded0bde710900eb752761d6c3b..66e7304715d79a07eb7d2b329e49e819
      // An isolated world of the UI process's in a document of this page, which the UI process gave a bridge.
      Optional<ScriptBridgeEndpoint> user_script_endpoint(Web::HTML::CrossProcessId document_id, String const& world);
      // A document of this page, which the page hosts or is creating.
-@@ -427,6 +430,8 @@ private:
+@@ -430,6 +433,8 @@ private:
      Messages::WebContentClient::DidRequestAllCookiesCookiestoreResponse did_request_all_cookies_cookiestore(Web::HTML::EnvironmentId const&, URL::URL);
      Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry);
      Optional<String> did_request_embedder_bootstrap(Web::HTML::CrossProcessId document_id);
@@ -284,7 +284,7 @@ index 354bf498e3d93fded0bde710900eb752761d6c3b..66e7304715d79a07eb7d2b329e49e819
  
      // Test-only handlers, reached over the separate test transport (see WebContentTestClient).
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 050bb218a137d8d6b2f346e70d545bf0cae16bd9..dd74e0f2d3365c7f8a658e07ff88013bb2e90097 100644
+index dedb4ad176c85528846876a7390e784ca65054af..ec9aee07bd33c8d761eba5b758e401a499f239f6 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
 @@ -27,6 +27,7 @@
@@ -295,7 +295,7 @@ index 050bb218a137d8d6b2f346e70d545bf0cae16bd9..dd74e0f2d3365c7f8a658e07ff88013b
  #include <LibWeb/CSS/StyleScope.h>
  #include <LibWeb/CSS/StyleSheetIdentifier.h>
  #include <LibWeb/CSS/StyleSheetImport.h>
-@@ -2213,6 +2214,31 @@ void PageClient::page_did_request_paste_from_clipboard_for_testing()
+@@ -2243,6 +2244,31 @@ void PageClient::page_did_request_paste_from_clipboard_for_testing()
      client().async_did_request_paste_from_clipboard_for_testing(m_id);
  }
  
@@ -328,10 +328,10 @@ index 050bb218a137d8d6b2f346e70d545bf0cae16bd9..dd74e0f2d3365c7f8a658e07ff88013b
  {
      client().async_did_request_spell_check(m_id, request_id, text);
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index f7d02e1018ea59c6f832fdf9b4c51db084e0273b..819c2db1d053ee8857b3e28458086495fb4209e5 100644
+index f2f1305094178f7ef1c464cd3f9ef2cf6cdd3137..87e987b76f34f16a44cf3781bda15ebe13406a49 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
-@@ -409,6 +409,8 @@ private:
+@@ -414,6 +414,8 @@ private:
      virtual void page_did_request_clipboard_entries_for_paste(u64 request_id) override;
      virtual void page_did_request_clipboard_entries(u64 request_id, Web::HTML::CrossProcessId reading_document_id) override;
      virtual void page_did_request_paste_from_clipboard_for_testing() override;
@@ -341,10 +341,10 @@ index f7d02e1018ea59c6f832fdf9b4c51db084e0273b..819c2db1d053ee8857b3e28458086495
      virtual void page_did_request_translation(Web::TranslationUnit const&) override;
      virtual void page_did_request_page_translation_for_testing(String const& target_language) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index 5efafdcfdf1f473986038283a758ccc10cabef65..c3608b1c1fa8688c7e6fcb9790539f297c8d7e87 100644
+index 181f9832d5a1cced5d9d318b84e2bc04c3fccd2e..e7b36f00e42c967d62e8c65c8c21e6d2f1bf129e 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
-@@ -245,6 +245,8 @@ endpoint WebContentClient routed by Web::PageId page_id
+@@ -246,6 +246,8 @@ endpoint WebContentClient routed by Web::PageId page_id
      did_request_embedder_resource(Web::PageId page_id, URL::URL url, i32 request_id) =|
      [NotRouted] did_request_embedder_bootstrap(Web::PageId page_id, Web::HTML::CrossProcessId document_id) => (Optional<String> script)
      did_post_embedder_message(Web::PageId page_id, Web::HTML::CrossProcessId document_id, String message) =|

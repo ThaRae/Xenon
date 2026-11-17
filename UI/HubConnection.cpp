@@ -148,10 +148,10 @@ void HubConnection::view_clear_backing_stores(u64 view_id)
         view->did_clear_backing_stores();
 }
 
-void HubConnection::view_set_remote_layer(u64 view_id, u32 core_animation_context_id)
+void HubConnection::view_set_remote_layer(u64 view_id, Compositing::RemoteLayerHostHandle host_handle)
 {
     if (auto* view = RemoteView::find(view_id))
-        view->did_set_remote_layer(core_animation_context_id);
+        view->did_set_remote_layer(host_handle);
 }
 
 void HubConnection::view_did_present_frame_in_remote_layer(u64 view_id, Gfx::IntSize size, double device_pixel_ratio)
@@ -311,9 +311,9 @@ void HubConnection::app_quit_for_signal()
     Application::the().quit_for_signal();
 }
 
-void HubConnection::app_did_enable_devtools()
+void HubConnection::app_did_enable_devtools(u16 port)
 {
-    Application::the().did_enable_devtools();
+    Application::the().did_enable_devtools(port);
 }
 
 void HubConnection::app_did_disable_devtools()
@@ -709,6 +709,19 @@ void HubConnection::view_page_dumps(u64 view_id, u64 request_id, Optional<String
 {
     if (auto* view = RemoteView::find(view_id))
         view->did_get_page_dumps(request_id, move(dumps));
+}
+
+void HubConnection::fetch_platform_features_description(Function<void(ByteString)> callback)
+{
+    auto request_id = m_next_request_id++;
+    m_platform_features_description_requests.set(request_id, move(callback));
+    async_request_platform_features_description(request_id);
+}
+
+void HubConnection::platform_features_description(u64 request_id, ByteString description)
+{
+    if (auto callback = m_platform_features_description_requests.take(request_id); callback.has_value())
+        (*callback)(move(description));
 }
 
 void HubConnection::app_open_new_tab(Vector<URL::URL> urls)

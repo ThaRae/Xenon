@@ -26,7 +26,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  8 files changed, 74 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index a6b0cc61d9ab797a78eb4bd77b40d65b153ef60a..164b910e27e995624dbbbf12441342bd423ba363 100644
+index df949de17e59df02fc6785dac40a4238dfe8b4e6..3079acdd3ab8c9d9cbf554d087769286c0b2cbee 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
 @@ -132,6 +132,14 @@ ViewImplementation::ViewImplementation(IsPrivate is_private, EnableContentBlocke
@@ -135,7 +135,7 @@ index a6b0cc61d9ab797a78eb4bd77b40d65b153ef60a..164b910e27e995624dbbbf12441342bd
      update_page_response_watchdog();
  }
  
-@@ -4548,6 +4592,7 @@ void ViewImplementation::handle_web_content_process_crash()
+@@ -4556,6 +4600,7 @@ void ViewImplementation::handle_web_content_process_crash()
      // for this tab are stale once its tree is abandoned or restored.
      m_pending_input_events.clear();
      m_page_has_open_dialog = false;
@@ -144,10 +144,10 @@ index a6b0cc61d9ab797a78eb4bd77b40d65b153ef60a..164b910e27e995624dbbbf12441342bd
  
      set_loading_state(false);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 55495c141bd7162e62f18c94fb4fc2d6ca53de1e..bd456ffc23f21b1b0a2c18bc1d0de98127243909 100644
+index 70d1544dc7135dfed86080c7541c3b0128cb2d33..4345f383bb7f5cba82d44839b34d982495c19226 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -230,6 +230,7 @@ public:
+@@ -228,6 +228,7 @@ public:
      void server_did_paint(Badge<WebContentPage>, i32 bitmap_id, Gfx::IntSize size, Gfx::IntRect damage_rect, double device_pixel_ratio);
      // The Compositor showed the frame itself, in the remote layer of this view.
      void server_did_present_frame_in_remote_layer(Badge<WebContentPage>, Gfx::IntSize size, Gfx::IntRect damage_rect, double device_pixel_ratio);
@@ -155,7 +155,7 @@ index 55495c141bd7162e62f18c94fb4fc2d6ca53de1e..bd456ffc23f21b1b0a2c18bc1d0de981
  
      // What the user does in the WebAuthn prompt.
      void web_authn_cancel();
-@@ -852,6 +853,9 @@ protected:
+@@ -850,6 +851,9 @@ protected:
      bool page_response_watch_is_suspended() const;
      void update_page_response_watchdog();
      void stop_watching_page_response();
@@ -178,10 +178,10 @@ index 55495c141bd7162e62f18c94fb4fc2d6ca53de1e..bd456ffc23f21b1b0a2c18bc1d0de981
  
      struct ClipboardWrite {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 755237ffd51caa3f7d053b49c6258435fc714b7d..284a31bf997b08aa11e5c8150e3ce0068a55784b 100644
+index 7d8278a7bbd696f16deeab80cffc94d14098d581..30bb41762278a3f4c75868cf14f999a23322f5cf 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -2872,6 +2872,11 @@ void WebContentPage::did_request_set_system_focus(bool has_system_focus)
+@@ -2918,6 +2918,11 @@ void WebContentPage::did_request_set_system_focus(bool has_system_focus)
      traversable().set_has_system_focus(has_system_focus, *this);
  }
  
@@ -194,10 +194,10 @@ index 755237ffd51caa3f7d053b49c6258435fc714b7d..284a31bf997b08aa11e5c8150e3ce006
  {
      if (!may_change_window(*this, "did_request_set_system_visibility_state"sv))
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 66e7304715d79a07eb7d2b329e49e819c4db512d..dc5ccb4d16a7a4c951ab128c5cecf6f66d1d3b74 100644
+index 8e2869fa8f53221a6d0660127ddf3c4c1611b734..2dea684c458275d5d9912d9a55531531c5dbeec9 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -375,6 +375,7 @@ private:
+@@ -378,6 +378,7 @@ private:
      virtual void did_request_translation(Web::TranslationUnit unit) override;
      virtual void did_request_set_system_focus(bool has_system_focus) override;
      virtual void did_request_set_system_visibility_state(Web::HTML::VisibilityState visibility_state) override;
@@ -206,10 +206,10 @@ index 66e7304715d79a07eb7d2b329e49e819c4db512d..dc5ccb4d16a7a4c951ab128c5cecf6f6
      virtual void did_complete_navigation_unload_check(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id) override;
      virtual void did_finish_navigation_params_creation(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id, Optional<Web::HTML::NavigationPopulationResult> result) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index eaae2a69bc9b309f1c004ac26a8a8c00dd89368a..c48eb5ea155f21bed0b28cb27a4b974c5a9fd713 100644
+index 2cf6fda7ffe8591ccd1aa2c341159c447d32cb86..b3fc2054d98182d6480ecdc79ef8e96e67077e08 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3734,6 +3734,11 @@ void ConnectionFromClient::schedule_memory_release_after_load()
+@@ -3752,6 +3752,11 @@ void ConnectionFromClient::schedule_memory_release_after_load()
      m_memory_release_timer->start();
  }
  
@@ -222,10 +222,10 @@ index eaae2a69bc9b309f1c004ac26a8a8c00dd89368a..c48eb5ea155f21bed0b28cb27a4b974c
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 5c91d25668617a2ea6558a1e4c531a60cdd43559..aa8391be120755dfc64d47d635bf01bc0949b7b2 100644
+index 2a19dd8e80f88c99a5614a42fd37f28808d0fb64..fbe5727e6916d45b2631684abc501d7010fc0175 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -305,6 +305,7 @@ private:
+@@ -306,6 +306,7 @@ private:
      virtual void blob_url_entry_removed(Utf16String url) override;
      virtual void did_delete_all_cookies(Web::PageId page_id, u64 request_id) override;
      virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
@@ -234,10 +234,10 @@ index 5c91d25668617a2ea6558a1e4c531a60cdd43559..aa8391be120755dfc64d47d635bf01bc
      virtual void update_visibility_state(Web::PageId page_id, Web::HTML::CrossProcessId navigable_id, Web::HTML::VisibilityState) override;
      virtual void reset_zoom(Web::PageId page_id) override;
 diff --git a/Services/WebContent/WebContentClient.ipc b/Services/WebContent/WebContentClient.ipc
-index c3608b1c1fa8688c7e6fcb9790539f297c8d7e87..15739d4277aa259cdbfed5710c51c8709ef2b280 100644
+index e7b36f00e42c967d62e8c65c8c21e6d2f1bf129e..7a8753abc19866b10fe648732866535fdf1c529e 100644
 --- a/Services/WebContent/WebContentClient.ipc
 +++ b/Services/WebContent/WebContentClient.ipc
-@@ -299,6 +299,7 @@ endpoint WebContentClient routed by Web::PageId page_id
+@@ -302,6 +302,7 @@ endpoint WebContentClient routed by Web::PageId page_id
      did_request_webdriver_mouse_event(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId local_root_id, Web::MouseEvent event) =|
      did_request_pinch_event_for_testing(Web::PageId page_id, Web::HTML::CrossProcessId local_root_id, Web::PinchEvent event) =|
      did_request_set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState visibility_state) =|
@@ -246,10 +246,10 @@ index c3608b1c1fa8688c7e6fcb9790539f297c8d7e87..15739d4277aa259cdbfed5710c51c870
      revoke_history_operation(Web::PageId page_id, Web::HTML::CrossProcessId operation_id) =|
      beforeunload_check_result(Web::PageId page_id, Web::HTML::CrossProcessId check_id, Web::HTML::CheckIfUnloadingIsCanceledResult result, Web::HTML::UnloadPromptShown unload_prompt_shown) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 6b9fd27524db0d727e06c076de211aad1fed9b50..f1632b6f0aa7091a474cef4d7e5f670c5affa015 100644
+index df04548b2913c9b7d2c2068252b53cb460dd3b74..2faae234a8220ef3641df570fdb5724c2eb3a98c 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -312,6 +312,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -313,6 +313,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      did_delete_all_cookies(Web::PageId page_id, u64 request_id) =|
  
      set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState system_visibility_state) =|

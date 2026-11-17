@@ -19,7 +19,7 @@ connects before then keeps it the usual while.
  2 files changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
-index af2db8cb4e8370cd420e78a9b31f498fd7607e6f..b9734015f0e5bdfad9d2be79651ef190a96da58a 100644
+index faf1208308b640ed782e0949b8118c2678fda59d..86aada2cc86c848ed182cf32fff309f4fbf181cf 100644
 --- a/Libraries/LibWebView/RequestServerManager.cpp
 +++ b/Libraries/LibWebView/RequestServerManager.cpp
 @@ -188,6 +188,7 @@ ErrorOr<RequestServerClientConnection> RequestServerManager::connect_new_client(
@@ -59,7 +59,7 @@ index af2db8cb4e8370cd420e78a9b31f498fd7607e6f..b9734015f0e5bdfad9d2be79651ef190
  {
      if (Core::EventLoop::current().was_exit_requested())
 diff --git a/Libraries/LibWebView/RequestServerManager.h b/Libraries/LibWebView/RequestServerManager.h
-index fa3ddd31d0c4dfd8f9fda1cffc6c6a4d14780494..94a3b540593cb522f1779e33f33cab3583797fc2 100644
+index 7c0089e8fd01676d5de986e0f8da7e8370c1ba31..ca0cb9b5d6950797994366e7b0f8f3835e07c1f1 100644
 --- a/Libraries/LibWebView/RequestServerManager.h
 +++ b/Libraries/LibWebView/RequestServerManager.h
 @@ -63,6 +63,7 @@ private:

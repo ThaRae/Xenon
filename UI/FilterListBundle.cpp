@@ -13,7 +13,7 @@
 #include <AK/JsonValue.h>
 #include <AK/StringBuilder.h>
 #include <LibCrypto/Curves/EdwardsCurve.h>
-#include <LibCrypto/Hash/SHA2.h>
+#include <LibCrypto/Hash/Hash.h>
 #include <UI/FilterListBundle.h>
 
 namespace Ladybird::FilterLists {
@@ -122,7 +122,7 @@ bool bundle_signature_is_valid(ReadonlyBytes manifest, StringView signature, Rea
 
 ByteString sha256_hex(ReadonlyBytes bytes)
 {
-    auto digest = Crypto::Hash::SHA256::hash(bytes);
+    auto digest = Crypto::Hash::digest(Crypto::Hash::HashKind::SHA256, bytes);
 
     StringBuilder builder;
     for (auto byte : digest.bytes())

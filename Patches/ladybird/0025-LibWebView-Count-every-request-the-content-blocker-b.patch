@@ -36,7 +36,7 @@ index 4fb5d56f184d6d5c659dbadfcce85533a5500b6d..95472d120fa0f2995152ce1bc38fd31d
      bool enabled() const { return state == ContentBlockingState::Enabled || state == ContentBlockingState::NoRules; }
      bool can_toggle() const { return site.has_value() && (enabled() || state == ContentBlockingState::SiteDisabled); }
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index d0a15272417ffff213ab785340faaf61e8e1fcfd..9e8cae88ba574abdf0138719ba3ba67063177131 100644
+index 302f7f58a9196ebf05ce3699d9ed903458b6514c..e880353c03e8b5e047f6b13c474ba2b6cc9d9855 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
 @@ -2776,22 +2776,21 @@ static StringView known_blocked_resource_kind(StringView kind)
@@ -75,7 +75,7 @@ index d0a15272417ffff213ab785340faaf61e8e1fcfd..9e8cae88ba574abdf0138719ba3ba670
      if (m_crash_state.has_value() || !traversable().active_document().host())
          return snapshot;
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 4533ae857d916033c67d0e9a73e87792729ebf15..5a4f38fedba3382cdf127edee45c3389ef7370e9 100644
+index 6c50097fa9df8e0e207e2cc89510c4419a0b924f..46ddad4f171164c5f992f637e585cd8f32314b8a 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
 @@ -1280,6 +1280,7 @@ protected:
@@ -87,7 +87,7 @@ index 4533ae857d916033c67d0e9a73e87792729ebf15..5a4f38fedba3382cdf127edee45c3389
      enum class NodePickerRequestType : u8 {
          Hovered,
 diff --git a/Services/Hub/HubClient.ipc b/Services/Hub/HubClient.ipc
-index 65dc0660347b789507d23684321aaad84514af58..548c7fdaafbe2fa5a6c668191922af437b31aed9 100644
+index 0bb24133d9df233d21b10c898a394edf0e0e881e..c558f32440b50be20145f4efe40a6cb5ca1dde52 100644
 --- a/Services/Hub/HubClient.ipc
 +++ b/Services/Hub/HubClient.ipc
 @@ -45,6 +45,7 @@ struct WebView::ContentBlockingSnapshot {

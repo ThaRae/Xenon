@@ -194,16 +194,17 @@ LocationEdit::LocationEdit(QWidget* parent, WebView::IsPrivate is_private)
         }
     };
 
-    m_omnibox.on_suggestions_change = [this] {
-        if (!m_omnibox.is_popup_visible()) {
+    m_omnibox.on_popup_change = [this] {
+        auto const& popup = m_omnibox.popup();
+        if (!popup.is_visible) {
             m_autocomplete->close();
             return;
         }
-        m_autocomplete->show_with_suggestions(m_omnibox.suggestions(), m_omnibox.selected_suggestion());
+        m_autocomplete->show_with_suggestions(popup.suggestions, popup.selected_suggestion);
     };
 
     m_omnibox.on_selection_change = [this] {
-        m_autocomplete->set_selected_suggestion(m_omnibox.selected_suggestion());
+        m_autocomplete->set_selected_suggestion(m_omnibox.popup().selected_suggestion);
     };
 
     m_omnibox.on_commit = [this](String const& input) {
@@ -443,8 +444,8 @@ void LocationEdit::focusInEvent(QFocusEvent* event)
         } else {
             setCursorPosition(parked->cursor_position);
         }
-        if (m_omnibox.is_popup_visible())
-            m_autocomplete->show_with_suggestions(m_omnibox.suggestions(), m_omnibox.selected_suggestion());
+        if (auto const& popup = m_omnibox.popup(); popup.is_visible)
+            m_autocomplete->show_with_suggestions(popup.suggestions, popup.selected_suggestion);
         animate_focus_glow(58);
         return;
     }
