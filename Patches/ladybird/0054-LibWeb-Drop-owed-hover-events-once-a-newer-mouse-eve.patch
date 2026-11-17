@@ -22,10 +22,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 3 insertions(+)
 
 diff --git a/Libraries/LibWeb/Rust/src/render_state/document_host.rs b/Libraries/LibWeb/Rust/src/render_state/document_host.rs
-index a46d9d2b82f036b70ae6eeae8434c29b8438ca3a..bf2080966161b51ff9dec13018cc265be084f6a2 100644
+index fa2f134f9e46b9ad23fe35b4d36d157d640cd613..9c9fdb204b6f9677c4241560463a99e0a2c451db 100644
 --- a/Libraries/LibWeb/Rust/src/render_state/document_host.rs
 +++ b/Libraries/LibWeb/Rust/src/render_state/document_host.rs
-@@ -991,6 +991,9 @@ impl DocumentHost {
+@@ -1003,6 +1003,9 @@ impl DocumentHost {
          if input_event_id < self.newest_pointer_input_event.get() {
              return true;
          }

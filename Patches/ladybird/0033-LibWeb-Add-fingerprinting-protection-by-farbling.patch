@@ -260,19 +260,19 @@ index e8871a2c64c98ae3f7c0474df7fdaa883a440f50..b342d7050ced5012923adc887886c61d
          }
          Ok(())
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index b2642e61b426e2aeb399e300d9a75fd58b1a2267..1fd2eb4600113bb515653791cd9339d9c2393b12 100644
+index ec771f91d3ac91b1e625f6885eb48352a643b9f0..9ec2c5a8c6601cada36f0ceb73f4808916886430 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-@@ -118,6 +118,8 @@ void web_bindings_environment_settings_object_id(HTML::EnvironmentSettingsObject
- bool web_bindings_worker_global_scope_is_closing(HTML::WorkerGlobalScope*);
- void web_bindings_set_has_pending_activity(void* realm, DOM::EventTarget*, bool has_pending_activity);
+@@ -144,6 +144,8 @@ bool web_bindings_environment_settings_object_top_level_origin(HTML::Environment
+ void web_bindings_environment_settings_object_api_base_url(HTML::EnvironmentSettingsObject*, void* url, void (*on_url)(void*, URL::FFI::RustUrl const*));
+ double web_bindings_environment_settings_object_current_wall_time(HTML::EnvironmentSettingsObject*);
  void web_bindings_environment_settings_object_encoding_parse_url(HTML::EnvironmentSettingsObject*, FlatPtr url, void* parsed_url, void (*on_url)(void*, URL::FFI::RustUrl const*));
 +void web_bindings_farble_image_data(void* realm, u8* pixels, size_t length);
 +bool web_bindings_farble_audio(void* realm, float* samples, size_t length);
  void web_bindings_with_temporary_execution_context(void* realm, bool callbacks_enabled, void* context, void (*steps)(void*));
  bool web_bindings_object_implements_interface(JSObject* object, u16 interface_name);
  JSObject* web_bindings_create_dom_exception(void* realm, ReadonlyBytes name, FlatPtr message);
-@@ -288,6 +290,23 @@ void web_bindings_set_has_pending_activity(void* realm, DOM::EventTarget* event_
+@@ -433,6 +435,23 @@ void web_bindings_set_has_pending_activity(void* realm, DOM::EventTarget* event_
      HTML::relevant_window_or_worker_global_scope(static_cast<JS::Realm*>(realm)->global_object()).set_has_pending_activity(*event_target, has_pending_activity);
  }
  
@@ -297,10 +297,10 @@ index b2642e61b426e2aeb399e300d9a75fd58b1a2267..1fd2eb4600113bb515653791cd9339d9
  {
      HTML::TemporaryExecutionContext execution_context { *static_cast<JS::Realm*>(realm), callbacks_enabled ? HTML::TemporaryExecutionContext::CallbacksEnabled::Yes : HTML::TemporaryExecutionContext::CallbacksEnabled::No };
 diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
-index 16c0a51aaf0855f58ce34905c5254cfed524dd3e..7e59da8515eb585e12df45d617c7aaf6c451e585 100644
+index 82fd8d22bed476a9086ccfbd9bff135caeb07a08..443539bdf1da5d4e485c80eea016b2dfeee1c63f 100644
 --- a/Libraries/LibWeb/CMakeLists.txt
 +++ b/Libraries/LibWeb/CMakeLists.txt
-@@ -341,6 +341,7 @@ set(SOURCES
+@@ -320,6 +320,7 @@ set(SOURCES
      FileAPI/BlobURLStore.cpp
      FileAPI/File.cpp
      FileAPI/FileList.cpp
@@ -674,7 +674,7 @@ index 7e1ec77b5ac90d0f1d80b6a3e146c9ec9a5bc2a8..1e7a6e379b867191af4fa86b3f636612
  
  }
 diff --git a/Libraries/LibWebCommon/Loader/LoaderConfigSnapshot.h b/Libraries/LibWebCommon/Loader/LoaderConfigSnapshot.h
-index 879f645d5f4fa7396d460877b4082c684923d8dc..1e852720251b74aa10c7d3099dc5e622792b388a 100644
+index 6b092e56155007556f378e67079efe45e578650f..8ffb964fc7c8ab854423c96bfa49660258a2af1a 100644
 --- a/Libraries/LibWebCommon/Loader/LoaderConfigSnapshot.h
 +++ b/Libraries/LibWebCommon/Loader/LoaderConfigSnapshot.h
 @@ -33,6 +33,10 @@ struct LoaderConfig {
@@ -686,10 +686,10 @@ index 879f645d5f4fa7396d460877b4082c684923d8dc..1e852720251b74aa10c7d3099dc5e622
 +    // until the browser sends one, and then each process makes up its own.
 +    u64 fingerprinting_session_secret { 0 };
  
-     String user_agent_for_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_url(url, user_agent); }
-     String user_agent_for_websocket_url(URL::URL const& url) const { return site_compatibility->data.user_agent_for_websocket_url(url, user_agent); }
+     String user_agent_for(URL::Origin const& top_level_origin, URL::Origin const& origin) const { return site_compatibility->data.user_agent_for(top_level_origin, origin, user_agent); }
+     bool exposes_experimental_interface(URL::Origin const& top_level_origin, URL::Origin const& origin, StringView name) const { return site_compatibility->data.exposes_experimental_interface(top_level_origin, origin, name); }
 diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
-index 569ef3c077e5e42075f2b5ec254a4575b2d85a52..83fe46b1ea358b7850b8234134d2bb40948d23d5 100644
+index fa9f31ba7f014ab363f122b2618bd350b093c683..d4b53c7cb38eadeaacc6533c429b938d6ddf9096 100644
 --- a/Services/WebContent/main.cpp
 +++ b/Services/WebContent/main.cpp
 @@ -39,6 +39,7 @@

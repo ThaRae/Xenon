@@ -47,10 +47,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Services/RequestServer/CertificateExceptions.h
 
 diff --git a/Libraries/LibRequests/RequestControlClient.cpp b/Libraries/LibRequests/RequestControlClient.cpp
-index d60d7d26d8fddfb63acd1e34f68686b689293ebc..8e6bf8b1d250c1e5f8dc7bcb74e8098cfab23351 100644
+index 3bb2bfc17d04e2cd0a7f02d372f541fbf1c577fe..d158a6a2406e6440bfe5b3edad1db90855afa6a6 100644
 --- a/Libraries/LibRequests/RequestControlClient.cpp
 +++ b/Libraries/LibRequests/RequestControlClient.cpp
-@@ -43,6 +43,12 @@ void RequestControlClient::die()
+@@ -45,6 +45,12 @@ void RequestControlClient::die()
      }
  }
  
@@ -64,7 +64,7 @@ index d60d7d26d8fddfb63acd1e34f68686b689293ebc..8e6bf8b1d250c1e5f8dc7bcb74e8098c
  {
      if (on_network_usage)
 diff --git a/Libraries/LibRequests/RequestControlClient.h b/Libraries/LibRequests/RequestControlClient.h
-index e74f6a3445fe13f4b5cd4df03d363215e5c56737..98dc150d4b19833eb3b8d7ca6b83d28bb5b6ee5d 100644
+index acee35761c5cec25f64f3b5f04aa52a21cae1e38..7ce797a3f5e10d51721bd3dd73190673c9aae393 100644
 --- a/Libraries/LibRequests/RequestControlClient.h
 +++ b/Libraries/LibRequests/RequestControlClient.h
 @@ -38,6 +38,7 @@ public:
@@ -118,7 +118,7 @@ index ab58a33a45ad8db769b65b58717633905e1e2eed..2237ec37389d7f04a3d7ef30f995ea1a
      explicit BrowsingSession(IsPrivate);
  
 diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
-index 90b2f9fd685a22c93f4a4c5e8f6415b1fcb2d5c8..af2db8cb4e8370cd420e78a9b31f498fd7607e6f 100644
+index 4d2edcb55028fd73ae7faef4664e14f4493014cf..faf1208308b640ed782e0949b8118c2678fda59d 100644
 --- a/Libraries/LibWebView/RequestServerManager.cpp
 +++ b/Libraries/LibWebView/RequestServerManager.cpp
 @@ -150,6 +150,13 @@ ErrorOr<void> RequestServerManager::launch_process(RequestServerInstance& instan
@@ -159,7 +159,7 @@ index 90b2f9fd685a22c93f4a4c5e8f6415b1fcb2d5c8..af2db8cb4e8370cd420e78a9b31f498f
  {
      for (auto& instance : m_instances)
 diff --git a/Libraries/LibWebView/RequestServerManager.h b/Libraries/LibWebView/RequestServerManager.h
-index b5a075d24a66c5752fc1345cdffc2e914650fee7..fa3ddd31d0c4dfd8f9fda1cffc6c6a4d14780494 100644
+index 5f897057e0842750f8e77807e74d030d70c8c25d..7c0089e8fd01676d5de986e0f8da7e8370c1ba31 100644
 --- a/Libraries/LibWebView/RequestServerManager.h
 +++ b/Libraries/LibWebView/RequestServerManager.h
 @@ -7,6 +7,7 @@
@@ -346,7 +346,7 @@ index 0000000000000000000000000000000000000000..90db3bd6b855076ec3f543fc7477b41d
 +
 +}
 diff --git a/Services/RequestServer/ControlConnectionFromClient.cpp b/Services/RequestServer/ControlConnectionFromClient.cpp
-index 51ff5ae658253c9a5a4d5d626e84285b0116a650..580ff4c183996399cc359a586eb77dfabab864bf 100644
+index 0986357e6b35d98dda648e3ce27015940a432336..911ff28bacd1d41263cea32776c335d6bf05c3c5 100644
 --- a/Services/RequestServer/ControlConnectionFromClient.cpp
 +++ b/Services/RequestServer/ControlConnectionFromClient.cpp
 @@ -8,6 +8,7 @@
@@ -357,7 +357,7 @@ index 51ff5ae658253c9a5a4d5d626e84285b0116a650..580ff4c183996399cc359a586eb77dfa
  #include <RequestServer/ControlConnectionFromClient.h>
  #include <RequestServer/Request.h>
  #include <RequestServer/Resolver.h>
-@@ -190,6 +191,11 @@ void ControlConnectionFromClient::set_proxy_configuration(HTTP::ProxyConfigurati
+@@ -199,6 +200,11 @@ void ControlConnectionFromClient::set_proxy_configuration(HTTP::ProxyConfigurati
      RequestServer::set_proxy_configuration(move(proxy_configuration));
  }
  
@@ -370,10 +370,10 @@ index 51ff5ae658253c9a5a4d5d626e84285b0116a650..580ff4c183996399cc359a586eb77dfa
  {
      Request::set_performance_monitor_enabled(enabled);
 diff --git a/Services/RequestServer/ControlConnectionFromClient.h b/Services/RequestServer/ControlConnectionFromClient.h
-index 4145b6e1b31f5b114ba771a60ffe146694c7de51..884a5d520636d4366f054e065c5ede6f9863295d 100644
+index b31878960fd0fc944b9e63996f668514bdc74755..8785c2b366fabcf2237b4e8b600d748b6aa54dca 100644
 --- a/Services/RequestServer/ControlConnectionFromClient.h
 +++ b/Services/RequestServer/ControlConnectionFromClient.h
-@@ -51,6 +51,8 @@ private:
+@@ -55,6 +55,8 @@ private:
  
      virtual void set_performance_monitor_enabled(bool) override;
  
@@ -383,7 +383,7 @@ index 4145b6e1b31f5b114ba771a60ffe146694c7de51..884a5d520636d4366f054e065c5ede6f
      virtual void remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) override;
      virtual void retrieve_cache_access_profile(u64 access_profile_request_id, AK::Duration granularity) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index e3ada111dbe2be6798781d84d0dfa4a3cae61cb8..2608b8573930c75b0b2443927fb0700714e6adc4 100644
+index 205d925e9ad2aa3a89db6e9218b2d47f377f61f6..e8fa57ff61aa35a795f37ef20961d091c1439265 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -21,6 +21,7 @@
@@ -405,7 +405,7 @@ index e3ada111dbe2be6798781d84d0dfa4a3cae61cb8..2608b8573930c75b0b2443927fb07007
          // If a UA receives more than one STS header field in an HTTP response message over secure transport, then the
          // UA MUST process only the first such header field.
          for (auto const& [name, value] : *m_response_headers) {
-@@ -951,6 +953,41 @@ void Request::retry_after_aia(Badge<ConnectionFromClient>)
+@@ -952,6 +954,41 @@ void Request::retry_after_aia(Badge<ConnectionFromClient>)
      transition_to_state(State::Fetch);
  }
  
@@ -447,7 +447,7 @@ index e3ada111dbe2be6798781d84d0dfa4a3cae61cb8..2608b8573930c75b0b2443927fb07007
  void Request::transition_to_state(State state)
  {
      // Let clients stop waiting for a cache-only result before DNS or a stalled cache writer can delay the response.
-@@ -1502,6 +1539,21 @@ void Request::handle_fetch_state()
+@@ -1528,6 +1565,21 @@ void Request::handle_fetch_state()
      set_option(CURLOPT_SSL_CTX_DATA, m_aia_collector.ptr());
  #endif
  
@@ -469,7 +469,7 @@ index e3ada111dbe2be6798781d84d0dfa4a3cae61cb8..2608b8573930c75b0b2443927fb07007
      if (m_content_decoding_disabled) {
          set_option(CURLOPT_ACCEPT_ENCODING, "identity");
          set_option(CURLOPT_HTTP_CONTENT_DECODING, 0L);
-@@ -1691,7 +1743,24 @@ void Request::handle_complete_state()
+@@ -1708,7 +1760,24 @@ void Request::handle_complete_state()
              return;
          }
  
@@ -495,10 +495,10 @@ index e3ada111dbe2be6798781d84d0dfa4a3cae61cb8..2608b8573930c75b0b2443927fb07007
  
              if (m_network_error == Requests::NetworkError::Unknown) {
 diff --git a/Services/RequestServer/Request.h b/Services/RequestServer/Request.h
-index a73de0349138be746e861e2830536d803cdf40bb..ae9dca6f502753bbd3fa3d51e7b681ea2e38c963 100644
+index 1af6f1f2ffbe88861e4252a85e17b92ab44ca07e..6373e3f165309ce95762c6d4108f928822623330 100644
 --- a/Services/RequestServer/Request.h
 +++ b/Services/RequestServer/Request.h
-@@ -265,6 +265,10 @@ private:
+@@ -266,6 +266,10 @@ private:
      ErrorOr<void> inform_client_request_started();
      bool should_retry_after_fetching_aia_intermediate(int curl_result_code) const;
      void start_aia_fetch_and_retry();
@@ -509,7 +509,7 @@ index a73de0349138be746e861e2830536d803cdf40bb..ae9dca6f502753bbd3fa3d51e7b681ea
      ErrorOr<void> send_request_pipe_to_client();
      ErrorOr<void> send_transferred_body_file_to_client();
      void transfer_headers_to_client_if_needed();
-@@ -342,6 +346,10 @@ private:
+@@ -343,6 +347,10 @@ private:
  
      RefPtr<AIACollector> m_aia_collector;
      size_t m_aia_fetch_count { 0 };
@@ -521,7 +521,7 @@ index a73de0349138be746e861e2830536d803cdf40bb..ae9dca6f502753bbd3fa3d51e7b681ea
      bool m_informed_client_requires_network { false };
      bool m_informed_client_request_started { false };
 diff --git a/Services/RequestServer/RequestServerControl.ipc b/Services/RequestServer/RequestServerControl.ipc
-index 104fb1498d4b749299d18a56d163c9645c6054ae..b5222e47966c3f2a586e5beb3703ac0d9dd77e69 100644
+index 177df17423e4ef83d8841e81bd664bb92de157a1..6d8e54252d7afd35afdfdd258f41e4a0727e9cf2 100644
 --- a/Services/RequestServer/RequestServerControl.ipc
 +++ b/Services/RequestServer/RequestServerControl.ipc
 @@ -30,6 +30,11 @@ endpoint RequestServerControl
@@ -537,7 +537,7 @@ index 104fb1498d4b749299d18a56d163c9645c6054ae..b5222e47966c3f2a586e5beb3703ac0d
      remove_cache_entries_accessed_since(u64 clear_cache_request_id, UnixDateTime since) =|
  
 diff --git a/Services/RequestServer/RequestServerControlClient.ipc b/Services/RequestServer/RequestServerControlClient.ipc
-index fe5cc6a294d58648c46bd92383cd857e9b02f226..7f10f56512d7adea8a01f56070a386c336d91dba 100644
+index 20bd1057dcc28f68bf8000e117bf1496652c480b..44c8fb1aead0d43e4635a1af01fdb5463e81bed5 100644
 --- a/Services/RequestServer/RequestServerControlClient.ipc
 +++ b/Services/RequestServer/RequestServerControlClient.ipc
 @@ -16,6 +16,10 @@ endpoint RequestServerControlClient
@@ -552,7 +552,7 @@ index fe5cc6a294d58648c46bd92383cd857e9b02f226..7f10f56512d7adea8a01f56070a386c3
  
      estimated_cache_size(u64 cache_size_estimation_id, Requests::CacheSizes sizes) =|
 diff --git a/Services/RequestServer/WebSocketImplCurl.cpp b/Services/RequestServer/WebSocketImplCurl.cpp
-index 11005f8a4bc7a5084835bdcb8b5556d88cb5356f..e758d9944a48f8b6fb457858e9d8830e105b3305 100644
+index 26687eaec2b613fab63086fce5cbd86866622299..494414b17a42938d122cb51b98b4c514c7277352 100644
 --- a/Services/RequestServer/WebSocketImplCurl.cpp
 +++ b/Services/RequestServer/WebSocketImplCurl.cpp
 @@ -6,6 +6,7 @@
@@ -561,9 +561,9 @@ index 11005f8a4bc7a5084835bdcb8b5556d88cb5356f..e758d9944a48f8b6fb457858e9d8830e
  #include <RequestServer/CURL.h>
 +#include <RequestServer/CertificateExceptions.h>
  #include <RequestServer/ConnectionFromClient.h>
+ #include <RequestServer/Resolver.h>
  #include <RequestServer/WebSocketImplCurl.h>
- 
-@@ -83,6 +84,15 @@ void WebSocketImplCurl::connect(WebSocket::ConnectionInfo const& info)
+@@ -84,6 +85,15 @@ void WebSocketImplCurl::connect(WebSocket::ConnectionInfo const& info)
          set_option(CURLOPT_CAINFO, root_certs->characters());
      set_option(CURLOPT_SSL_CTX_FUNCTION, configure_ssl_context);
  

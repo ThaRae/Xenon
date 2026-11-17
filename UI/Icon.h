@@ -58,6 +58,7 @@ QIcon load_icon_from_uri(StringView);
 QIcon icon_from_png(ReadonlyBytes, int logical_size);
 QPixmap favicon_with_rounded_corners(QPixmap const&);
 QIcon favicon_with_rounded_corners(QIcon const&, int logical_size);
+QIcon favicon_from_png(ReadonlyBytes, int logical_size);
 QIcon create_chrome_icon(ChromeIcon, QPalette const&);
 QPixmap create_chrome_icon_pixmap(ChromeIcon, QColor, qreal device_pixel_ratio);
 QIcon loading_spinner_icon(QPalette const& palette, int frame);

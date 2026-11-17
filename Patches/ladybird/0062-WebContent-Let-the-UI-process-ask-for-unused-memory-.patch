@@ -18,10 +18,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 10 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 108e231618c44050322525801bfe4ebf00e4601f..e17603a7eef9d4d2e7b00bd2e46650cff6ece326 100644
+index 4f1d76086e3b44763e4a0fb21c394ed8879dcc4b..6ab52cf3d52239b17af7d2ca506d4d25951e20eb 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -595,6 +595,14 @@ void ConnectionFromClient::set_navigation_events_enabled(bool enabled)
+@@ -607,6 +607,14 @@ void ConnectionFromClient::set_navigation_events_enabled(bool enabled)
      WebContent::set_embedder_wants_navigation_events(enabled);
  }
  
@@ -37,7 +37,7 @@ index 108e231618c44050322525801bfe4ebf00e4601f..e17603a7eef9d4d2e7b00bd2e46650cf
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index aa8391be120755dfc64d47d635bf01bc0949b7b2..f6a221424c7f74dc2a051adf1567e79dda22f79f 100644
+index fbe5727e6916d45b2631684abc501d7010fc0175..03c6f490b8724853b6113e3a92bdf41ede7b5dfe 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -134,6 +134,7 @@ private:
@@ -49,7 +49,7 @@ index aa8391be120755dfc64d47d635bf01bc0949b7b2..f6a221424c7f74dc2a051adf1567e79d
      virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index f1632b6f0aa7091a474cef4d7e5f670c5affa015..5d2b37a64ad873dfff738e96dd31234d418ce711 100644
+index 2faae234a8220ef3641df570fdb5724c2eb3a98c..8d8af7af730e40c10eabe4daf76ba1347acf74fb 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -107,6 +107,7 @@ endpoint WebContentServer routed by Web::PageId page_id

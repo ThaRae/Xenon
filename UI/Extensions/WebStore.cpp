@@ -7,7 +7,7 @@
 #include <AK/Hex.h>
 #include <AK/StringBuilder.h>
 #include <LibCore/Environment.h>
-#include <LibCrypto/Hash/SHA2.h>
+#include <LibCrypto/Hash/Hash.h>
 #include <LibURL/Parser.h>
 #include <LibWebCommon/Loader/UserAgent.h>
 #include <LibXML/Parser/Parser.h>
@@ -181,7 +181,7 @@ void fetch(String id, Optional<String> current_version, Callback callback)
                         callback("The store's file isn't the size the store said."_string);
                         return;
                     }
-                    if (details.sha256.has_value() && encode_hex(Crypto::Hash::SHA256::hash(crx.value()).bytes()) != *details.sha256) {
+                    if (details.sha256.has_value() && encode_hex(Crypto::Hash::digest(Crypto::Hash::HashKind::SHA256, crx.value()).bytes()) != *details.sha256) {
                         callback("The store's file isn't the one the store described."_string);
                         return;
                     }

@@ -108,12 +108,12 @@ index bf91716b6e81a8b3faa03a250d09945d44d2042e..5ab0323ce1e90aca5a8f06c56714efc9
  
  // The browser's own store. It moves into the profile once the profile is known.
 diff --git a/Libraries/LibWebView/Profile.cpp b/Libraries/LibWebView/Profile.cpp
-index e476d3acdc1499bd1f5287609017df634d8b23a5..92b51905a7527f0db840797b0f9621b661a9c4ce 100644
+index 918ec037d25df8b3f5822bedbcab8c0ab7d82a9a..ce73289173b7b22ec1d3596a6f9da61aaba1a4db 100644
 --- a/Libraries/LibWebView/Profile.cpp
 +++ b/Libraries/LibWebView/Profile.cpp
 @@ -11,13 +11,14 @@
  #include <LibCore/Directory.h>
- #include <LibCrypto/Hash/SHA2.h>
+ #include <LibCrypto/Hash/Hash.h>
  #include <LibFileSystem/FileSystem.h>
 +#include <LibWebCommon/WebView/Utilities.h>
  #include <LibWebView/Profile.h>

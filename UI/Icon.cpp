@@ -79,6 +79,11 @@ QIcon favicon_with_rounded_corners(QIcon const& favicon, int logical_size)
     return rounded;
 }
 
+QIcon favicon_from_png(ReadonlyBytes favicon_png, int logical_size)
+{
+    return favicon_with_rounded_corners(icon_from_png(favicon_png, logical_size), logical_size);
+}
+
 static QPen chrome_icon_pen(QColor const& color, qreal width)
 {
     return QPen(color, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);

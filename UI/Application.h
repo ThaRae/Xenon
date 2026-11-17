@@ -84,6 +84,7 @@ public:
     Optional<ByteString> const& password_manager_choice() const { return m_password_manager_choice; }
     void initialize_extensions();
 
+    Optional<u16> devtools_port() const { return m_devtools_port; }
     bool has_translator() const;
     WebView::MicrophoneAuthorizer* microphone_authorizer() { return m_microphone_authorizer.ptr(); }
     // The status to exit with right away, if the browser has nothing for this process to do.
@@ -287,8 +288,8 @@ private:
     NonnullRefPtr<BookmarkPromise> display_add_bookmark_folder_dialog(Optional<String const&> default_title = {}, Optional<String const&> target_folder_id = {}) const;
     NonnullRefPtr<BookmarkPromise> display_edit_bookmark_folder_dialog(BookmarkItem const& current_folder, Optional<String const&> parent_folder_id) const;
 
-    void did_enable_devtools() const;
-    void did_disable_devtools() const;
+    void did_enable_devtools(u16 port);
+    void did_disable_devtools();
     void on_recently_closed_entries_changed() const;
     void did_clear_history_since(UnixDateTime);
     void create_session_store(ByteString const& data_directory, bool persists_sessions);
@@ -300,6 +301,7 @@ private:
     String m_command_line;
     Vector<ByteString> m_extensions_to_load;
     Optional<ByteString> m_password_manager_choice;
+    Optional<u16> m_devtools_port;
 
 #ifdef LADYBIRD_HUB_IN_OWN_PROCESS
     ErrorOr<void> connect_to_hub(Main::Arguments const&);

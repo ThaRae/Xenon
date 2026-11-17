@@ -30,7 +30,7 @@ it as a one-step CNAME.
  Libraries/LibCore/Socket.cpp                  | 22 ++++++--
  Libraries/LibCore/Socket.h                    |  7 +++
  Libraries/LibCore/SocketWindows.cpp           |  6 +++
- Libraries/LibDNS/Resolver.h                   | 16 ++++--
+ Libraries/LibDNS/Resolver.h                   | 21 ++++++--
  Libraries/LibRequests/NetworkError.h          |  3 ++
  Libraries/LibRequests/Request.cpp             |  6 +++
  Libraries/LibRequests/Request.h               |  4 ++
@@ -38,7 +38,7 @@ it as a one-step CNAME.
  Libraries/LibRequests/RequestClient.h         | 11 +++-
  Libraries/LibWeb/Loader/ContentBlocker.cpp    | 15 ++++++
  Libraries/LibWeb/Loader/ContentBlocker.h      |  4 ++
- Libraries/LibWeb/Loader/ResourceLoader.cpp    | 24 ++++++++-
+ Libraries/LibWeb/Loader/ResourceLoader.cpp    | 25 ++++++++-
  .../RequestServer/ConnectionFromClient.cpp    | 10 +++-
  Services/RequestServer/ConnectionFromClient.h |  3 +-
  Services/RequestServer/Request.cpp            | 53 ++++++++++++++++++-
@@ -51,7 +51,7 @@ it as a one-step CNAME.
  Tests/RequestServer/TestExportImport.cpp      |  2 +-
  Tests/RequestServer/TestRequestTimingInfo.cpp |  2 +-
  Tests/RequestServer/TestSiteBinding.cpp       |  2 +-
- 24 files changed, 207 insertions(+), 24 deletions(-)
+ 24 files changed, 213 insertions(+), 24 deletions(-)
 
 diff --git a/Libraries/LibCore/Socket.cpp b/Libraries/LibCore/Socket.cpp
 index 2e4df5a825fd66226293a12c127b5a8f794e2f36..6e5068a518938487d42243a657fb5e2c04460086 100644
@@ -142,21 +142,33 @@ index 4e555fb82dbd07e1143f0bc9d7b0b2a1df3bc4b9..eccce578946e57b03a8b560c8e6ececd
  {
      if (address.type() == SocketAddress::Type::IPv6) {
 diff --git a/Libraries/LibDNS/Resolver.h b/Libraries/LibDNS/Resolver.h
-index 846438f25eb9375a56f1e3cd7d87a67bd7c03abd..639d3f9b7d0df83e48745bfadf8d3a0348a4c4e5 100644
+index 93f985c57a77ce0e9ac56bcc1d52e42ddf18f246..b44447799d5e48c8baa328c88dd2fb8d9f7e6d3e 100644
 --- a/Libraries/LibDNS/Resolver.h
 +++ b/Libraries/LibDNS/Resolver.h
-@@ -525,8 +525,8 @@ public:
+@@ -548,7 +548,10 @@ public:
+                         .queue_ms = 0,
+                         .work_ms = (MonotonicTime::now() - state->dispatched_at).to_milliseconds(),
+                     };
+-                    handle_system_resolver_completion(name, pending_key, *state, family, move(record_or_error), timing);
++                    ErrorOr<Core::Socket::ResolvedHost> resolved_host_or_error = record_or_error.is_error()
++                        ? ErrorOr<Core::Socket::ResolvedHost> { record_or_error.release_error() }
++                        : Core::Socket::ResolvedHost { record_or_error.release_value(), {} };
++                    handle_system_resolver_completion(name, pending_key, *state, family, move(resolved_host_or_error), timing);
+                 });
+             };
+ 
+@@ -562,8 +565,8 @@ public:
                          &main_thread_event_loop]() mutable {
                          auto worker_started_at = MonotonicTime::now();
-                         auto record_or_error = m_system_resolver_for_testing.resolve_host
--                            ? m_system_resolver_for_testing.resolve_host(name, family)
+                         auto record_or_error = shared->resolve_host_for_testing
+-                            ? shared->resolve_host_for_testing(name, family)
 -                            : Core::Socket::resolve_host(name, Core::Socket::SocketType::Stream, family);
-+                            ? [&]() -> ErrorOr<Core::Socket::ResolvedHost> { return Core::Socket::ResolvedHost { TRY(m_system_resolver_for_testing.resolve_host(name, family)), {} }; }()
++                            ? [&]() -> ErrorOr<Core::Socket::ResolvedHost> { return Core::Socket::ResolvedHost { TRY(shared->resolve_host_for_testing(name, family)), {} }; }()
 +                            : Core::Socket::resolve_host_and_canonical_name(name, Core::Socket::SocketType::Stream, family);
                          auto worker_finished_at = MonotonicTime::now();
                          PendingSystemResolution::SideTiming timing {
                              .queue_ms = (worker_started_at - state->dispatched_at).to_milliseconds(),
-@@ -937,7 +937,7 @@ private:
+@@ -976,7 +979,7 @@ private:
          ByteString const& pending_key,
          PendingSystemResolution& state,
          Core::Socket::AddressFamily family,
@@ -165,7 +177,7 @@ index 846438f25eb9375a56f1e3cd7d87a67bd7c03abd..639d3f9b7d0df83e48745bfadf8d3a03
          PendingSystemResolution::SideTiming timing)
      {
          (family == Core::Socket::AddressFamily::IPv4Only ? state.a : state.aaaa) = timing;
-@@ -947,7 +947,15 @@ private:
+@@ -986,7 +989,15 @@ private:
          bool got_records_this_side = false;
          if (!record_or_error.is_error()) {
              constexpr u32 SYSTEM_RESOLVER_SYNTHETIC_TTL_SECONDS = 60;
@@ -204,10 +216,10 @@ index ddeb9b60bef425613e4c653f970bb3d7cbe0d0f7..e9e3ca3d1cbcd3a3cb91f7f1ec3dd8bf
          return "An unexpected network error occurred"sv;
      }
 diff --git a/Libraries/LibRequests/Request.cpp b/Libraries/LibRequests/Request.cpp
-index bd1e39f25e169849b9d82638c31ab762f0a04897..a75ce5423e323d4178a8e461c4e0f1b0c0fcc687 100644
+index db6527dcec6b03160d97faf977fb2a2ba3fd9641..02520254368d15b707e3f2ae4b65f093bb069fee 100644
 --- a/Libraries/LibRequests/Request.cpp
 +++ b/Libraries/LibRequests/Request.cpp
-@@ -67,6 +67,12 @@ int Request::request_server_client_id() const
+@@ -68,6 +68,12 @@ int Request::request_server_client_id() const
      return m_client->request_server_client_id();
  }
  
@@ -221,10 +233,10 @@ index bd1e39f25e169849b9d82638c31ab762f0a04897..a75ce5423e323d4178a8e461c4e0f1b0
  {
      RefPtr keep_alive = *this;
 diff --git a/Libraries/LibRequests/Request.h b/Libraries/LibRequests/Request.h
-index adf957789f6050aa0493211134f9b1a1fc94d4b6..76d7b8f7ccdc5c642949980db53cdbb853f17f8d 100644
+index ba94eab08bd9647ca656768a78791f35221fab1e..a19c1dcc063d2df113d01953b27be0d856529099 100644
 --- a/Libraries/LibRequests/Request.h
 +++ b/Libraries/LibRequests/Request.h
-@@ -127,6 +127,10 @@ public:
+@@ -129,6 +129,10 @@ public:
      Function<void()> on_requires_network;
      Function<void(u64 bytes_sent)> on_upload_progress;
  
@@ -236,10 +248,10 @@ index adf957789f6050aa0493211134f9b1a1fc94d4b6..76d7b8f7ccdc5c642949980db53cdbb8
          Stopped,
          Transferred,
 diff --git a/Libraries/LibRequests/RequestClient.cpp b/Libraries/LibRequests/RequestClient.cpp
-index 8c7fb28d575bea35233d65a14c08f580054de216..9e612fe3d6aeba33aa34d3e3d7f84766254b1012 100644
+index 5bbab5a88b433fe58fb86d106c03e6a001b47699..d94e48bc3f7552b81245bd7d2400f2e45e3721aa 100644
 --- a/Libraries/LibRequests/RequestClient.cpp
 +++ b/Libraries/LibRequests/RequestClient.cpp
-@@ -61,7 +61,7 @@ void RequestClient::die()
+@@ -70,7 +70,7 @@ void RequestClient::die()
      }
  }
  
@@ -248,7 +260,7 @@ index 8c7fb28d575bea35233d65a14c08f580054de216..9e612fe3d6aeba33aa34d3e3d7f84766
  {
      auto request_id = m_next_request_id++;
      auto headers = request_headers.map([](auto const& headers) { return headers.headers().span(); }).value_or({});
-@@ -69,7 +69,7 @@ RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL
+@@ -78,7 +78,7 @@ RefPtr<Request> RequestClient::start_request(ByteString const& method, URL::URL
      auto transfer_lease_key = transfer_lease == TransferLease::Yes
          ? Optional<RequestTransferLeaseKey> { { m_request_server_client_id, request_id } }
          : Optional<RequestTransferLeaseKey> {};
@@ -257,7 +269,7 @@ index 8c7fb28d575bea35233d65a14c08f580054de216..9e612fe3d6aeba33aa34d3e3d7f84766
      auto request = Request::create_from_id({}, *this, request_id, move(transfer_lease_key));
      m_requests.set(request_id, request);
      return request;
-@@ -155,6 +155,20 @@ void RequestClient::host_resolved(u64 lookup_id, Vector<ByteString> addresses)
+@@ -164,6 +164,20 @@ void RequestClient::host_resolved(u64 lookup_id, Vector<ByteString> addresses)
          (*on_resolved)(move(addresses));
  }
  
@@ -279,7 +291,7 @@ index 8c7fb28d575bea35233d65a14c08f580054de216..9e612fe3d6aeba33aa34d3e3d7f84766
  {
      if (auto request = m_requests.get(request_id); request.has_value()) {
 diff --git a/Libraries/LibRequests/RequestClient.h b/Libraries/LibRequests/RequestClient.h
-index 6cb0264a8089c274aa64983ec5e5aa84abce0e3a..9c94b2c25aed467d4822c2b75276fc577e9403fc 100644
+index ccd5f976724f7b5ee9daaa7546a7c965207f8b7f..d81a2d4f13b70e8c35d9d63841d5dad339d15753 100644
 --- a/Libraries/LibRequests/RequestClient.h
 +++ b/Libraries/LibRequests/RequestClient.h
 @@ -50,7 +50,14 @@ public:
@@ -306,7 +318,7 @@ index 6cb0264a8089c274aa64983ec5e5aa84abce0e3a..9c94b2c25aed467d4822c2b75276fc57
      void release_request_transfer_lease(Badge<Request>, Request&, RequestTransferLeaseKey);
      void release_request_transfer_lease(RequestTransferLeaseKey);
      void ensure_connection(URL::URL const&, RequestServer::CacheLevel);
-@@ -76,6 +84,7 @@ private:
+@@ -79,6 +87,7 @@ private:
  
      virtual void request_requires_network(u64 request_id) override;
      virtual void request_upload_progress(u64 request_id, u64 bytes_sent) override;
@@ -356,23 +368,23 @@ index d03893a0e2924faeb3a235868c2c14a105372ebb..8b3ea3b0967089b45a6eddc7ba014317
      // scripts can run, once per Window.
      void run_page_script(DOM::Document&) const;
 diff --git a/Libraries/LibWeb/Loader/ResourceLoader.cpp b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-index 2dd95a195eb5c90938406dae3c879ebf7c1bb9fb..e7f377f4cbf86af1f08a5eefb4159e19addc1b02 100644
+index 25fc018626c2fde49fcdccead69ce21d1b3126e2..35d4d8652eb2d26a981870708b0de3f49c43aa9f 100644
 --- a/Libraries/LibWeb/Loader/ResourceLoader.cpp
 +++ b/Libraries/LibWeb/Loader/ResourceLoader.cpp
-@@ -670,8 +670,11 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
-     auto protocol_complete = [this, on_complete = move(on_complete), request, &protocol_request = *protocol_request](u64 total_size, Requests::RequestTimingInfo const& timing_info, Optional<Requests::NetworkError> const& network_error) {
-         finish_network_request(protocol_request);
- 
--        if (auto page = request.page())
-+        if (auto page = request.page()) {
-             page->client().page_did_finish_network_request(protocol_request.id(), total_size, timing_info, network_error);
-+            if (network_error == Requests::NetworkError::BlockedByContentBlocker)
+@@ -670,6 +670,12 @@ RefPtr<Fetch::Engine::NetworkTransportHandle> ResourceLoader::load(LoadRequest&
+             .total_size = total_size,
+             .network_error = network_error,
+         };
++
++        if (network_error == Requests::NetworkError::BlockedByContentBlocker) {
++            if (auto page = request.page())
 +                page->client().page_did_block_resource(request.url().value(), blocked_resource_kind(request));
 +        }
- 
++
          if (!network_error.has_value()) {
              log_success(request);
-@@ -723,12 +726,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
+             on_complete->function()(true, timing_info, {}, network_request_end);
+@@ -720,12 +726,29 @@ RefPtr<Requests::Request> ResourceLoader::start_network_request(LoadRequest cons
      //     requests are attributed through the worker's browser-level owners.
      auto originating_page_id = request.page() && request.page()->has_top_level_traversable() ? request.page()->client().id().value() : 0;
      auto headers = headers_with_normalized_values(request.headers());
@@ -400,11 +412,11 @@ index 2dd95a195eb5c90938406dae3c879ebf7c1bb9fb..e7f377f4cbf86af1f08a5eefb4159e19
 +        };
 +    }
 +
-     if (auto page = request.page()) {
-         Optional<String> initiator_type_string;
-         if (request.initiator_type().has_value())
+     m_active_requests.set(*protocol_request);
+     return protocol_request;
+ }
 diff --git a/Services/RequestServer/ConnectionFromClient.cpp b/Services/RequestServer/ConnectionFromClient.cpp
-index de13799a90f9a4cdde2b769bccaea920463bf6b5..060077995a3833464e5ddf4a0dbf62d5c6a5681a 100644
+index 822c16bdb5a88ad6704037d5994aca0786b0bc3f..a07c07a2f16b7800fe7296f18dc973ffa6aa6081 100644
 --- a/Services/RequestServer/ConnectionFromClient.cpp
 +++ b/Services/RequestServer/ConnectionFromClient.cpp
 @@ -307,7 +307,7 @@ bool ConnectionFromClient::is_live_request_id(u64 request_id) const
@@ -425,7 +437,7 @@ index de13799a90f9a4cdde2b769bccaea920463bf6b5..060077995a3833464e5ddf4a0dbf62d5
      request->set_performance_origin(originating_process_id, originating_page_id);
      m_active_requests.set(request_id, move(request));
  
-@@ -761,6 +761,12 @@ void ConnectionFromClient::fail_websocket(u64 websocket_id, Requests::WebSocket:
+@@ -781,6 +781,12 @@ void ConnectionFromClient::fail_websocket(u64 websocket_id, Requests::WebSocket:
      async_websocket_closed(websocket_id, to_underlying(WebSocket::CloseStatusCode::AbnormalClosure), {}, false);
  }
  
@@ -439,7 +451,7 @@ index de13799a90f9a4cdde2b769bccaea920463bf6b5..060077995a3833464e5ddf4a0dbf62d5
  {
      auto request = m_active_requests.take(request_id);
 diff --git a/Services/RequestServer/ConnectionFromClient.h b/Services/RequestServer/ConnectionFromClient.h
-index 59d988647fc31841fbc304fed918b851ff875727..3c538b6dd59e8f523df3f42fbc45a62eab86fe9d 100644
+index 7b700b7750f693b73960f0690d3954d138329bff..d10f368f2a658177c5d0dbc229e8cabfa5bfebe7 100644
 --- a/Services/RequestServer/ConnectionFromClient.h
 +++ b/Services/RequestServer/ConnectionFromClient.h
 @@ -88,7 +88,8 @@ private:
@@ -453,7 +465,7 @@ index 59d988647fc31841fbc304fed918b851ff875727..3c538b6dd59e8f523df3f42fbc45a62e
      virtual void release_request_transfer_lease(int source_client_id, u64 source_request_id) override;
      virtual Messages::RequestServer::StopRequestResponse stop_request(u64 request_id) override;
 diff --git a/Services/RequestServer/Request.cpp b/Services/RequestServer/Request.cpp
-index 618c9134c60e3f426a23fc3b292e8be68288ea89..e3ada111dbe2be6798781d84d0dfa4a3cae61cb8 100644
+index 342ac53f9d299a6fda0163879377fd4c3a8e9d73..205d925e9ad2aa3a89db6e9218b2d47f377f61f6 100644
 --- a/Services/RequestServer/Request.cpp
 +++ b/Services/RequestServer/Request.cpp
 @@ -441,11 +441,13 @@ NonnullOwnPtr<Request> Request::fetch(
@@ -471,7 +483,7 @@ index 618c9134c60e3f426a23fc3b292e8be68288ea89..e3ada111dbe2be6798781d84d0dfa4a3
      request->process();
  
      return request;
-@@ -1323,10 +1325,59 @@ void Request::handle_dns_lookup_state()
+@@ -1340,6 +1342,13 @@ void Request::handle_dns_lookup_state()
                  return;
              }
              self.m_dns_result = move(dns_result);
@@ -484,6 +496,9 @@ index 618c9134c60e3f426a23fc3b292e8be68288ea89..e3ada111dbe2be6798781d84d0dfa4a3
 +            }
              self.continue_after_dns_lookup();
          }));
+ }
+@@ -1361,6 +1370,48 @@ void Request::set_curl_resolve_list(Optional<ByteString> host_entry)
+     m_curl_string_lists.append(resolve_list);
  }
  
 +// The name the request's host is an alias (CNAME) of, if the client asked to check it and DNS showed one.
@@ -532,7 +547,7 @@ index 618c9134c60e3f426a23fc3b292e8be68288ea89..e3ada111dbe2be6798781d84d0dfa4a3
  {
      if (m_alternative_service.has_value() && !m_alternative_service->host.is_empty())
 diff --git a/Services/RequestServer/Request.h b/Services/RequestServer/Request.h
-index 53e15d8e439441e4532cad0f430682fb2d75eba5..a73de0349138be746e861e2830536d803cdf40bb 100644
+index 15523a9d596d88709f9e2a26ca4fde53b0119b3a..1af6f1f2ffbe88861e4252a85e17b92ab44ca07e 100644
 --- a/Services/RequestServer/Request.h
 +++ b/Services/RequestServer/Request.h
 @@ -65,7 +65,11 @@ public:
@@ -548,7 +563,7 @@ index 53e15d8e439441e4532cad0f430682fb2d75eba5..a73de0349138be746e861e2830536d80
  
      static NonnullOwnPtr<Request> connect(
          u64 request_id,
-@@ -387,6 +391,10 @@ private:
+@@ -390,6 +394,10 @@ private:
  
      Optional<u32> m_address_selection_hint;
  

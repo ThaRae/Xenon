@@ -24,7 +24,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 26 insertions(+)
 
 diff --git a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
-index c15c7ff571de5fd1a866bdcd847a0238ec630cf5..096bc3e386c958c17c15897d71d7077038ea7ec8 100644
+index 579b40db3d085ce70ede591e98a07d170f0f137d..799c0c74a91c4787a8255783ddb0d7cd2462e971 100644
 --- a/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 +++ b/Libraries/LibWeb/ContentSecurityPolicy/BlockingAlgorithms.cpp
 @@ -6,6 +6,7 @@
@@ -35,7 +35,7 @@ index c15c7ff571de5fd1a866bdcd847a0238ec630cf5..096bc3e386c958c17c15897d71d70770
  #include <LibWeb/Bindings/PrincipalHostDefined.h>
  #include <LibWeb/ContentSecurityPolicy/BlockingAlgorithms.h>
  #include <LibWeb/ContentSecurityPolicy/Directives/DirectiveOperations.h>
-@@ -125,6 +126,12 @@ void report_a_violation_found_in_another_process(HTML::EnvironmentSettingsObject
+@@ -160,6 +161,12 @@ void report_a_violation_found_in_another_process(HTML::EnvironmentSettingsObject
  // https://w3c.github.io/webappsec-csp/#should-block-navigation-request
  Directives::Directive::Result should_navigation_request_of_type_be_blocked_by_content_security_policy(NonnullRefPtr<Fetch::Infrastructure::Request> navigation_request, Directives::Directive::NavigationType navigation_type, Page& page)
  {
@@ -49,7 +49,7 @@ index c15c7ff571de5fd1a866bdcd847a0238ec630cf5..096bc3e386c958c17c15897d71d70770
      auto result = Directives::Directive::Result::Allowed;
  
 diff --git a/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp b/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
-index f3efd21e81fb262c984be77b99bfd36c992c32b9..3532cd9cdcb5b4aca1e4e6a753b5bd615e145527 100644
+index bbb36a06fa4479c43a4dfcbd37d9fab44bae2fbb..c8d00c3ea9710df98e0b9faf3a7d3a1d72addab4 100644
 --- a/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
 +++ b/Libraries/LibWeb/ContentSecurityPolicy/FetchIntegration.cpp
 @@ -6,6 +6,7 @@
@@ -60,7 +60,7 @@ index f3efd21e81fb262c984be77b99bfd36c992c32b9..3532cd9cdcb5b4aca1e4e6a753b5bd61
  #include <LibWeb/ContentSecurityPolicy/Directives/FetchIntegration.h>
  #include <LibWeb/ContentSecurityPolicy/FetchIntegration.h>
  #include <LibWeb/ContentSecurityPolicy/PolicyList.h>
-@@ -71,6 +72,12 @@ namespace Web::ContentSecurityPolicy {
+@@ -81,6 +82,12 @@ static PolicyList const& csp_list_governing_request(Fetch::Infrastructure::Reque
  // https://w3c.github.io/webappsec-csp/#report-for-request
  void report_content_security_policy_violations_for_request(Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
  {
@@ -71,9 +71,9 @@ index f3efd21e81fb262c984be77b99bfd36c992c32b9..3532cd9cdcb5b4aca1e4e6a753b5bd61
 +        return;
 +
      // 1. Let CSP list be request’s policy container's CSP list.
-     auto const& csp_list = request.policy_container().get<NonnullRefPtr<HTML::PolicyContainer const>>()->csp_list;
+     auto const& csp_list = csp_list_governing_request(request);
  
-@@ -93,6 +100,12 @@ void report_content_security_policy_violations_for_request(Fetch::Infrastructure
+@@ -103,6 +110,12 @@ void report_content_security_policy_violations_for_request(Fetch::Infrastructure
  // https://w3c.github.io/webappsec-csp/#should-block-request
  Directives::Directive::Result should_request_be_blocked_by_content_security_policy(Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
  {
@@ -84,9 +84,9 @@ index f3efd21e81fb262c984be77b99bfd36c992c32b9..3532cd9cdcb5b4aca1e4e6a753b5bd61
 +        return Directives::Directive::Result::Allowed;
 +
      // 1. Let CSP list be request’s policy container's CSP list.
-     auto const& csp_list = request.policy_container().get<NonnullRefPtr<HTML::PolicyContainer const>>()->csp_list;
+     auto const& csp_list = csp_list_governing_request(request);
  
-@@ -126,6 +139,12 @@ Directives::Directive::Result should_request_be_blocked_by_content_security_poli
+@@ -136,6 +149,12 @@ Directives::Directive::Result should_request_be_blocked_by_content_security_poli
  // https://w3c.github.io/webappsec-csp/#should-block-response
  Directives::Directive::Result should_response_to_request_be_blocked_by_content_security_policy(Fetch::Infrastructure::Response const& response, Fetch::Infrastructure::Request const& request, ViolationReporter const& report_violation)
  {
@@ -97,5 +97,5 @@ index f3efd21e81fb262c984be77b99bfd36c992c32b9..3532cd9cdcb5b4aca1e4e6a753b5bd61
 +        return Directives::Directive::Result::Allowed;
 +
      // 1. Let CSP list be request’s policy container's CSP list.
-     auto const& csp_list = request.policy_container().get<NonnullRefPtr<HTML::PolicyContainer const>>()->csp_list;
+     auto const& csp_list = csp_list_governing_request(request);
  

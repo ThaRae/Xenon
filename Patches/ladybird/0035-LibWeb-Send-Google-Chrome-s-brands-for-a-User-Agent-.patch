@@ -16,10 +16,10 @@ Ladybird among its brands.
  3 files changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 63650bcc54ceb14c9d17589f95381f677bc59ae2..d695a0c80cceecd781bf9daa9b79e98636b28a9e 100644
+index cee92c8c4495617444cf27a0224ff5d7406fdb63..1ac6da880eb7d084f72b0db2151875b3316b8ebc 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-@@ -3540,6 +3540,10 @@ void append_user_agent_client_hints_for_request(Infrastructure::Request& request
+@@ -3599,6 +3599,10 @@ void append_user_agent_client_hints_for_request(Infrastructure::Request& request
      brand_list.append(ByteString::formatted("\"Chromium\";v=\"{}\"", *chrome_version));
      if (auto version = product_major_version(*user_agent, BROWSER_NAME "/"sv); version.has_value())
          brand_list.append(ByteString::formatted("\"{}\";v=\"{}\"", BROWSER_NAME, *version));

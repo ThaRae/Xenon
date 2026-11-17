@@ -179,6 +179,12 @@ static void install_menu_event_filter(QObject* filter, QMenu* menu)
     }
 }
 
+static void close_menu_chain(QMenu& menu)
+{
+    for (auto* open_menu = &menu; open_menu; open_menu = as_if<QMenu>(open_menu->parentWidget()))
+        open_menu->close();
+}
+
 BookmarksBar::BookmarksBar(Tab* parent)
     : QToolBar(parent)
     , m_tab(parent)
@@ -307,6 +313,7 @@ bool BookmarksBar::eventFilter(QObject* object, QEvent* event)
 
     if (event->type() == QEvent::MouseButtonPress) {
         auto& mouse_event = as<QMouseEvent>(*event);
+        m_opened_new_tab_on_menu_press = false;
 
         if (mouse_event.button() == Qt::LeftButton)
             return handle_left_mouse_click(&mouse_event, object);
@@ -314,6 +321,14 @@ bool BookmarksBar::eventFilter(QObject* object, QEvent* event)
             return handle_middle_mouse_click(&mouse_event, object);
         if (mouse_event.button() == Qt::RightButton)
             return handle_right_mouse_click(&mouse_event, object);
+    }
+
+    // Qt takes a release whose press it did not see as a choice of the entry.
+    if (m_opened_new_tab_on_menu_press && event->type() == QEvent::MouseButtonRelease && as_if<QMenu>(object)) {
+        m_opened_new_tab_on_menu_press = false;
+        if (auto* popup = as_if<QMenu>(QApplication::activePopupWidget()))
+            close_menu_chain(*popup);
+        return true;
     }
 
     return QToolBar::eventFilter(object, event);
@@ -340,8 +355,10 @@ bool BookmarksBar::handle_middle_mouse_click(QMouseEvent* event, QObject* item)
         if (auto* action = menu->actionAt(event->pos())) {
             extract_item_properties(action);
 
-            if (m_selected_bookmark_menu_item_type == "bookmark")
+            if (m_selected_bookmark_menu_item_type == "bookmark") {
                 Application::bookmarks().open_in_new_tab(m_selected_bookmark_menu_item_id, activate_tab);
+                m_opened_new_tab_on_menu_press = true;
+            }
         }
     }
 

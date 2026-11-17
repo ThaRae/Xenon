@@ -56,7 +56,7 @@ index b342d7050ced5012923adc887886c61dbe59f2f4..f9039b4ad5cbe2efae958ee57848f980
          Ok(())
      }
 diff --git a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
-index 1fd2eb4600113bb515653791cd9339d9c2393b12..1b865680fdfae9d6eef6ea432e194420edcb3ecc 100644
+index 9ec2c5a8c6601cada36f0ceb73f4808916886430..da0967e5f4fb3ecf404c3d9dcc50c4ed8ad6ae68 100644
 --- a/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 +++ b/Libraries/LibWeb/Bindings/RustBindingsServices.cpp
 @@ -16,6 +16,7 @@
@@ -68,10 +68,10 @@ index 1fd2eb4600113bb515653791cd9339d9c2393b12..1b865680fdfae9d6eef6ea432e194420
  #include <LibWeb/HTML/CustomElements/CustomElementReactions.h>
  #include <LibWeb/HTML/EventLoop/EventLoop.h>
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 2d9a84a2560bfcee82030d54866eb1073de4d25c..c7e277e958766469c6ef5cfbe8fbb28fea1a7250 100644
+index 1b97f9ee4b08b6543fe38ecee4864fcf19d91d13..35e9b958490c5417eadc5cb9de456bdfef4271b3 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1534,6 +1534,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
+@@ -1547,6 +1547,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
      return {};
  }
  
@@ -85,7 +85,7 @@ index 2d9a84a2560bfcee82030d54866eb1073de4d25c..c7e277e958766469c6ef5cfbe8fbb28f
  {
      page().set_content_blocking_policy(enabled, {});
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index 3cea28d16675b1aa9e1586ec16f3362eb6bd9ce5..da20927b7a8b2fea9a3e29ad56a4d75f9872d2a2 100644
+index 6d0d4d6a52b9d15e4f512dda226bf74a068d6cf7..52c855ee3931ca70a6d1d997ec919e8fa90a36a2 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
 @@ -183,6 +183,7 @@ public:
@@ -97,7 +97,7 @@ index 3cea28d16675b1aa9e1586ec16f3362eb6bd9ce5..da20927b7a8b2fea9a3e29ad56a4d75f
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
      void begin_layout_trace(Bindings::LayoutTraceOptions const&);
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 53ee443753dd880c2fbcfbf751bfac74c1e92e48..606aa205bbaea085dda696c451c89db498bec2ef 100644
+index 610e8a9fcdf79370d9d5b592c80ff0afba2d73fc..09ec737a79e078a210186093c23203e277b61ea0 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
 @@ -196,6 +196,7 @@ interface Internals {

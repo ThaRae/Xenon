@@ -419,7 +419,7 @@ void keep_appkit_window_visible_while_inactive(QWidget& widget)
 void ensure_appkit_window_is_exposed(QWidget& widget)
 {
     auto* window = widget.windowHandle();
-    if (!widget.isVisible() || !window || window->isExposed())
+    if (!widget.isVisible() || !window || !window->isVisible() || window->isExposed())
         return;
 
     // Qt restores a native view's exposed state from its content layer's display callback. A view whose backing layer

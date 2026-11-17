@@ -17,10 +17,10 @@ none is selected, which explicit selections still take priority over.
  5 files changed, 27 insertions(+), 2 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index e2c1f678867f8c4c306d5ce3d3587d20d81eef7b..20ec7a6e82d10c2754abe85e11e70439f2b1afe2 100644
+index 966f7a55d15f89da60b8db9f00e011bc2e9eeb4c..6e06aa432e6797020d1b55459188ec5c893d7e2c 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -747,7 +747,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -792,7 +792,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
  ErrorOr<void> Application::create_profile([[maybe_unused]] Optional<StringView> profile_name, [[maybe_unused]] Optional<StringView> profile_path, [[maybe_unused]] bool force_new_process, [[maybe_unused]] bool temporary_profile)
  {
  #if !defined(AK_OS_ANDROID)
@@ -43,7 +43,7 @@ index c1f2e172858ac9be98b89523659e77145b6caae1..426858441df9fd137c5a673eb97672f0
      Vector<URL::URL> urls;
      Vector<ByteString> raw_urls;
 diff --git a/Libraries/LibWebView/Profile.cpp b/Libraries/LibWebView/Profile.cpp
-index 92b51905a7527f0db840797b0f9621b661a9c4ce..550772771ef4479e8ae507c73539bdf912d73179 100644
+index ce73289173b7b22ec1d3596a6f9da61aaba1a4db..a0a4f495927b4cbd003ba2d3e82c861d15744a83 100644
 --- a/Libraries/LibWebView/Profile.cpp
 +++ b/Libraries/LibWebView/Profile.cpp
 @@ -102,6 +102,8 @@ ErrorOr<Profile> Profile::create(ProfileSelection const& selection, ProfileRoots

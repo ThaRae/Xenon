@@ -23,10 +23,10 @@ navigates, and closed if a filter matches.
  6 files changed, 28 insertions(+), 5 deletions(-)
 
 diff --git a/Libraries/LibWeb/DOM/Element.cpp b/Libraries/LibWeb/DOM/Element.cpp
-index 492cf0ad93039b0f46be7c946fcc63c105ab2edf..28d6c452f5faf1fef4f67045f883f07cd47adf4a 100644
+index 5a029f6628147e50df22062d92e557d75a039d8f..e9b98073d64233bc78b05f2d71536efe24ccc924 100644
 --- a/Libraries/LibWeb/DOM/Element.cpp
 +++ b/Libraries/LibWeb/DOM/Element.cpp
-@@ -670,7 +670,7 @@ void Element::follow_the_hyperlink(Optional<Utf16String> hyperlink_suffix, HTML:
+@@ -674,7 +674,7 @@ void Element::follow_the_hyperlink(Optional<Utf16String> hyperlink_suffix, HTML:
  
      // 7. Let targetNavigable be the first return value of applying the rules for choosing a navigable given
      //    targetAttributeValue, subject's node navigable, and noopener.
@@ -36,10 +36,10 @@ index 492cf0ad93039b0f46be7c946fcc63c105ab2edf..28d6c452f5faf1fef4f67045f883f07c
      // 8. If targetNavigable is null, then return.
      if (!target_navigable)
 diff --git a/Libraries/LibWeb/HTML/HTMLFormElement.cpp b/Libraries/LibWeb/HTML/HTMLFormElement.cpp
-index 77bf039761c29ba20915f97f14d766afa96f59c0..55d9e24dde22194788854aaa5a25e67f96439833 100644
+index 0f7a59ad7b0e5619a982e44796096d836dcdcf8e..8e63f0cee61ddd63f639e33c66945651923b36ab 100644
 --- a/Libraries/LibWeb/HTML/HTMLFormElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLFormElement.cpp
-@@ -295,7 +295,7 @@ WebIDL::ExceptionOr<void> HTMLFormElement::submit_form(GC::Ref<HTMLElement> subm
+@@ -303,7 +303,7 @@ WebIDL::ExceptionOr<void> HTMLFormElement::submit_form(GC::Ref<HTMLElement> subm
  
      // 22. Let targetNavigable be the first return value of applying the rules for choosing a navigable given target,
      //     form's node navigable, and noopener.
@@ -49,10 +49,10 @@ index 77bf039761c29ba20915f97f14d766afa96f59c0..55d9e24dde22194788854aaa5a25e67f
      // 23. If targetNavigable is null, then return.
      if (!target_navigable) {
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index 1ffdf7ef675838136918674c030de31d744c1f48..0221e7718f262c15925bda206a50c7d653258344 100644
+index 6d7bc765dfdae2f9ada69b4d75c308e0c3a1a359..8fc494f950870388ebfb5f8f9bfe77f4012d7f93 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-@@ -1851,7 +1851,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
+@@ -1856,7 +1856,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
  }
  
  // https://html.spec.whatwg.org/multipage/document-sequences.html#the-rules-for-choosing-a-navigable
@@ -61,7 +61,7 @@ index 1ffdf7ef675838136918674c030de31d744c1f48..0221e7718f262c15925bda206a50c7d6
  {
      // 1. Let chosen be null.
      GC::Ptr<Navigable> chosen;
-@@ -1913,6 +1913,13 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
+@@ -1918,6 +1918,13 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
              dbgln("Pop-up blocked!");
          }
  
@@ -76,10 +76,10 @@ index 1ffdf7ef675838136918674c030de31d744c1f48..0221e7718f262c15925bda206a50c7d6
          else if (auto new_web_view = request_new_web_view(); new_web_view.page) {
              // 1. Consume user activation of currentNavigable's active window.
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.h b/Libraries/LibWeb/HTML/LocalNavigable.h
-index 8e05be812ab3d27381300094e0a194b97d7bc154..9074bc4d0b4660338ce39a86f832d0b847d8b60a 100644
+index 8f50cb664ae219ad27708405ef23b1fcbc437da9..e8c6f2cdf5de3acd947d2dedaf8e0710a480f365 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.h
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.h
-@@ -179,7 +179,8 @@ public:
+@@ -178,7 +178,8 @@ public:
          WindowType window_type;
      };
  
@@ -129,10 +129,10 @@ index 00c264921245dfbd22dd97c53be4ac7900bf444b..70da41923736b3f1ddd0c6bfb6274cc9
  
      // AD-HOC: Nothing the browser process can see names this URL's blob URL entry until the navigation commits, so
 diff --git a/Libraries/LibWeb/HTML/Window.cpp b/Libraries/LibWeb/HTML/Window.cpp
-index 1dfcad5e0bcd9c30f2294ec8723e47e52a57206b..49f747381d9304d584e2add6902a0987ab686526 100644
+index 0050211f9386be1f3748d6175618f233a84a17a7..bfd9628cca6511091e1d30e2d9e45f8845ba784a 100644
 --- a/Libraries/LibWeb/HTML/Window.cpp
 +++ b/Libraries/LibWeb/HTML/Window.cpp
-@@ -509,7 +509,7 @@ WebIDL::ExceptionOr<Window::OpenedWindow> Window::window_open_steps_internal(Utf
+@@ -508,7 +508,7 @@ WebIDL::ExceptionOr<Window::OpenedWindow> Window::window_open_steps_internal(Utf
          : UserNavigationInvolvement::None;
      // 13. Let targetNavigable and windowType be the result of applying the rules for choosing a navigable given target, sourceDocument's node navigable, and noopener.
      VERIFY(source_document.navigable());

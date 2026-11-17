@@ -18,8 +18,8 @@ Ladybird's says both). It passes the server's options through unchanged, `extens
 
 | Ladybird has | Where | What WebAuthn gets from it |
 | --- | --- | --- |
-| `navigator.credentials`, with `get()`, `create()` and `store()` as stubs that reject with "not implemented" | `LibWeb/CredentialManagement/CredentialsContainer.cpp` | The entry points. Credential Management's own algorithms (which interface handles a request, `sameOriginWithAncestors`, the permissions policy check) aren't there either. |
-| `Credential`, `PasswordCredential` and `FederatedCredential`, as wrappables | `LibWeb/CredentialManagement` | The base class and the pattern for `PublicKeyCredential` |
+| `navigator.credentials`, with `get()`, `create()` and `store()` as stubs that reject with "not implemented" | `LibWeb/Bindings/Rust/src/credential_management/credentials_container.rs`, behind the C++ handle in `LibWeb/CredentialManagement/CredentialsContainer.cpp` | The entry points. Credential Management's own algorithms (which interface handles a request, `sameOriginWithAncestors`, the permissions policy check) aren't there either. |
+| `Credential`, `PasswordCredential` and `FederatedCredential`, implemented in Rust | `LibWeb/Bindings/Rust/src/credential_management` | The base class and the pattern for `PublicKeyCredential`, which has to be in Rust too, as an interface implemented in C++ can't inherit from one implemented in Rust |
 | Permissions policy, including the `allow` attribute, with each document's policy replicated to the UI process | `LibWebCommon/PermissionsPolicy`, `HTML/NavigableContainer.cpp`, `LibWebView/CanonicalDocument.h` | The two features WebAuthn defines, which only need adding to the list |
 | The UI process's own record of every document: its origin, permissions policy, navigable, ancestors, and which WebContent process hosts it | `LibWebView/CanonicalDocument.h`, `CanonicalNavigable.h`, `WebContentPage::did_completely_finish_loading()` | A way to check a request's origin and RP ID without trusting the renderer |
 | Requests that go out to the UI process and come back by ID: geolocation, permission prompts, the file picker | `Page::request_geolocation_position()`, `WebContentClient.ipc`, `WebContentPage::did_request_geolocation_position()`, `ViewImplementation::on_request_*` | The shape of the IPC and of the hooks a frontend implements |
@@ -83,7 +83,9 @@ client data itself. A compromised renderer can then ask for nothing it couldn't 
 
 ### In the renderer (LibWeb)
 
-A new `Libraries/LibWeb/WebAuthn/` directory, named after the spec as Ladybird's other directories are:
+The IDL files are in a new `Libraries/LibWeb/WebAuthn/` directory, named after the spec as Ladybird's other directories
+are, and the interfaces are implemented in Rust, in `Libraries/LibWeb/Bindings/Rust/src/web_authn/`, beside
+Credential Management's. `WebAuthn/Ceremony.cpp` carries a request from Rust to `Page`, and the result back:
 
 - **IDL**: `PublicKeyCredential` (`rawId`, `response`, `authenticatorAttachment`, `getClientExtensionResults()`,
   `toJSON()`, and the statics `isConditionalMediationAvailable()`, `isUserVerifyingPlatformAuthenticatorAvailable()`,
@@ -275,9 +277,12 @@ none depends on those.
    as not implemented. Testable on its own with WPT's `credential-management` tests.
 2. **LibWebCommon: Add the publickey-credentials-create and -get permissions policy features.** Default allowlist
    `'self'`, so `<iframe allow="publickey-credentials-get">` means something.
-3. **LibWeb+LibWebCommon: Add PublicKeyCredential and the WebAuthn API.** The bindings, the shared request and result
-   types, and the renderer's half of the algorithms, ending in `PageClient::page_did_request_web_authn_*()`. With no
-   embedder support, requests reject with `NotAllowedError`, which is what a browser with no authenticators does.
+3. **LibWeb+LibWebCommon+Meta: Add PublicKeyCredential and the WebAuthn API.** The bindings, the shared request and
+   result types, and the renderer's half of the algorithms, ending in `PageClient::page_did_request_web_authn_*()`.
+   With no embedder support, requests reject with `NotAllowedError`, which is what a browser with no authenticators
+   does. The Rust bindings generator learns to convert `CredentialRequestOptions` with its `publicKey` member, a
+   dictionary whose `allowCredentials` hold a `BufferSource` each, and a dictionary that is converted both to and from
+   a JS value, as `parseCreationOptionsFromJSON()` returns what `create()` takes.
 4. **LibURL+LibWeb+LibWebView+WebContent: Run WebAuthn in the UI process.** The IPC, the checks against
    canonical documents, client data, `Coordinator`, `Authenticator`, and the `ViewImplementation` callbacks. Moves
    `is_a_registrable_domain_suffix_of_or_is_equal_to()` into LibURL.

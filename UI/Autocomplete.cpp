@@ -179,16 +179,11 @@ public:
     {
         beginResetModel();
         m_suggestions = move(suggestions);
-        m_favicon_cache.clear();
+        m_favicons.clear_with_capacity();
 
-        for (size_t index = 0; index < m_suggestions.size(); ++index) {
-            auto const& suggestion = m_suggestions[index];
-            if (!suggestion.favicon_png.has_value())
-                continue;
-            QPixmap pixmap;
-            if (!pixmap.loadFromData(suggestion.favicon_png->data(), static_cast<uint>(suggestion.favicon_png->size())))
-                continue;
-            m_favicon_cache.append({ index, QIcon(pixmap) });
+        for (auto const& suggestion : m_suggestions) {
+            auto favicon_png = suggestion.favicon_png.has_value() ? suggestion.favicon_png->bytes() : ReadonlyBytes {};
+            m_favicons.append(favicon_from_png(favicon_png, CELL_ICON_SIZE));
         }
 
         endResetModel();
@@ -222,11 +217,7 @@ public:
                 return qstring_from_ak_string(*suggestion.subtitle);
             return {};
         case FaviconRole:
-            for (auto const& entry : m_favicon_cache) {
-                if (entry.suggestion_index == suggestion_index)
-                    return entry.icon;
-            }
-            return {};
+            return m_favicons[suggestion_index];
         case SourceRole:
             return static_cast<int>(suggestion.source);
         case SuggestionIndexRole:
@@ -245,26 +236,9 @@ public:
         return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
     }
 
-    int table_row_for_suggestion_index(int suggestion_index) const
-    {
-        if (suggestion_index < 0 || suggestion_index >= static_cast<int>(m_suggestions.size()))
-            return -1;
-        return suggestion_index;
-    }
-
-    size_t visible_suggestion_count() const
-    {
-        return m_suggestions.size();
-    }
-
 private:
-    struct FaviconEntry {
-        size_t suggestion_index;
-        QIcon icon;
-    };
-
     Vector<WebView::AutocompleteSuggestion> m_suggestions;
-    Vector<FaviconEntry> m_favicon_cache;
+    Vector<QIcon> m_favicons;
 };
 
 class AutocompleteDelegate final : public QStyledItemDelegate {
@@ -485,18 +459,10 @@ void Autocomplete::set_selected_suggestion(Optional<size_t> suggestion_index)
     if (!m_popup)
         return;
 
-    int table_row = suggestion_index.has_value()
-        ? m_model->table_row_for_suggestion_index(static_cast<int>(*suggestion_index))
-        : -1;
-
-    if (table_row == -1) {
-        m_list_view->setCurrentIndex({});
-        return;
-    }
-
-    auto index = m_model->index(table_row, 0);
+    auto index = suggestion_index.has_value() ? m_model->index(static_cast<int>(*suggestion_index), 0) : QModelIndex {};
     m_list_view->setCurrentIndex(index);
-    m_list_view->scrollTo(index);
+    if (index.isValid())
+        m_list_view->scrollTo(index);
 }
 
 bool Autocomplete::close()
@@ -558,7 +524,7 @@ bool Autocomplete::eventFilter(QObject* watched, QEvent* event)
 
 void Autocomplete::position_popup()
 {
-    int visible_count = static_cast<int>(min(m_model->visible_suggestion_count(), MAXIMUM_VISIBLE_AUTOCOMPLETE_SUGGESTIONS));
+    int visible_count = min(m_model->rowCount(), static_cast<int>(MAXIMUM_VISIBLE_AUTOCOMPLETE_SUGGESTIONS));
     if (visible_count == 0)
         return;
 

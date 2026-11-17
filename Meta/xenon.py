@@ -926,7 +926,7 @@ COMPOSITOR_VISIBLE_RELEASE_DELAY = 30
 COMPOSITOR_REPAINT_MAX_DIFFERING_PIXELS = 32
 COMPOSITOR_RELEASE_PATTERN = re.compile(
     r"COMPOSITOR-IDLE-RELEASE context=(?P<context>\d+) nested=(?P<nested>true|false) visible=(?:true|false) "
-    r"gpu=(?P<gpu>true|false) idle_ms=\d+ tiles=(?P<tiles>\d+) nested_lists=(?P<nested_lists>\d+) text=\d+"
+    r"gpu=(?P<gpu>true|false) idle_ms=\d+ tiles=(?P<tiles>\d+) vector_images=(?P<vector_images>\d+) text=\d+"
 )
 COMPOSITOR_KEEP_PATTERN = re.compile(
     r"COMPOSITOR-IDLE-KEEP context=(?P<context>\d+) nested=(?P<nested>true|false) visible=(?:true|false) "
@@ -993,7 +993,7 @@ COMPOSITOR_BUSY_TEST_PAGE = """<!doctype html><meta charset="utf-8"><title>busy<
 
 
 def released_svg_rasters(release: re.Match) -> bool:
-    return int(release["tiles"]) > 0 and (release["gpu"] == "false" or int(release["nested_lists"]) > 0)
+    return int(release["tiles"]) > 0 and (release["gpu"] == "false" or int(release["vector_images"]) > 0)
 
 
 def check_compositor_idle_memory_release(executable: Path, env: dict) -> bool:
