@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ThaRae <76752281+ThaRae@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 14:20:05 -0500
+Subject: [PATCH] LibFileSystem: Don't follow links when removing a directory
+ tree
+
+A recursive remove treated a link to a directory as a directory, so it
+emptied the directory the link points to and then failed to rmdir the
+link itself. TestResourceMapSandbox links to a sibling directory in
+its temporary tree, so its cleanup failed whenever the directory
+listing reached the link before the sibling. Remove links as files.
+---
+ Libraries/LibFileSystem/FileSystem.cpp |  2 +-
+ Tests/LibCore/TestLibCoreDirectory.cpp | 25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/Libraries/LibFileSystem/FileSystem.cpp b/Libraries/LibFileSystem/FileSystem.cpp
+index 763f8d9f2ff73d70c523c1ceeb4e6d5609bdebdd..ba59a3ce88ecea3b30e7af3dad321c8ec1897685 100644
+--- a/Libraries/LibFileSystem/FileSystem.cpp
++++ b/Libraries/LibFileSystem/FileSystem.cpp
+@@ -361,7 +361,7 @@ ErrorOr<void> rename_without_replacing(StringView destination_path, StringView s
+ 
+ ErrorOr<void> remove(StringView path, RecursionMode mode)
+ {
+-    if (mode == RecursionMode::Allowed && is_directory(path)) {
++    if (mode == RecursionMode::Allowed && is_directory(path) && !is_link(path)) {
+         auto di = Core::DirIterator(path, Core::DirIterator::SkipParentAndBaseDir);
+         if (di.has_error())
+             return di.error();
+diff --git a/Tests/LibCore/TestLibCoreDirectory.cpp b/Tests/LibCore/TestLibCoreDirectory.cpp
+index cbbdc789b905a594cb025909f6ee79eb59f1c485..aecc2f50819227474859e01ffab03db1b28580c3 100644
+--- a/Tests/LibCore/TestLibCoreDirectory.cpp
++++ b/Tests/LibCore/TestLibCoreDirectory.cpp
+@@ -65,3 +65,28 @@ TEST_CASE(directory_open_and_stat)
+ 
+     TRY_OR_FAIL(FileSystem::remove(directory_path, FileSystem::RecursionMode::Allowed));
+ }
++
++#ifndef AK_OS_WINDOWS
++TEST_CASE(recursive_removal_does_not_follow_directory_links)
++{
++    auto root = TRY_OR_FAIL(create_temp_directory());
++    auto root_path = root.path().string();
++    auto inside_path = LexicalPath::join(root_path, "inside"sv).string();
++    auto outside_path = LexicalPath::join(root_path, "outside"sv).string();
++    TRY_OR_FAIL(Core::System::mkdir(inside_path, 0700));
++    TRY_OR_FAIL(Core::System::mkdir(outside_path, 0700));
++
++    auto kept_path = LexicalPath::join(outside_path, "kept.txt"sv).string();
++    {
++        auto file = TRY_OR_FAIL(Core::File::open(kept_path, Core::File::OpenMode::Write));
++        TRY_OR_FAIL(file->write_until_depleted("kept"sv.bytes()));
++    }
++    TRY_OR_FAIL(Core::System::symlink(outside_path, LexicalPath::join(inside_path, "link"sv).string()));
++
++    TRY_OR_FAIL(FileSystem::remove(inside_path, FileSystem::RecursionMode::Allowed));
++    EXPECT(!FileSystem::exists(inside_path));
++    EXPECT(FileSystem::exists(kept_path));
++
++    TRY_OR_FAIL(FileSystem::remove(root_path, FileSystem::RecursionMode::Allowed));
++}
++#endif
