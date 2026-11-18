@@ -7,6 +7,7 @@
 #include <AK/ByteString.h>
 #include <Rune/Bridge/Engine.h>
 #include <Rune/Bridge/Input.h>
+#include <Rune/Bridge/LatestValues.h>
 #include <Rune/Bridge/View.h>
 #include <Rune/Bridge/XenonBridge.h>
 #include <UI/XenonSettings.h>
@@ -29,6 +30,23 @@ static Web::DevicePixelSize viewport_size_from(uint32_t width, uint32_t height)
 static double device_pixel_ratio_from(double device_pixel_ratio)
 {
     return device_pixel_ratio > 0 ? device_pixel_ratio : 1.0;
+}
+
+struct RequestedViewport {
+    Web::DevicePixelSize size;
+    double device_pixel_ratio { 1 };
+};
+
+static Xenon::LatestValues<XenonWindowId, RequestedViewport>& requested_window_viewports()
+{
+    static Xenon::LatestValues<XenonWindowId, RequestedViewport> viewports;
+    return viewports;
+}
+
+static Xenon::LatestValues<XenonViewId, RequestedViewport>& requested_view_viewports()
+{
+    static Xenon::LatestValues<XenonViewId, RequestedViewport> viewports;
+    return viewports;
 }
 
 static void post_to_view(XenonViewId id, Function<void(View&)> command)
@@ -68,8 +86,12 @@ static void post_to_model(Function<void(Xenon::BrowserModel&)> command)
 
 void xenon_engine_set_window_viewport(XenonWindowId window, uint32_t width, uint32_t height, double device_pixel_ratio)
 {
-    Engine::the().post([window, size = viewport_size_from(width, height), device_pixel_ratio = device_pixel_ratio_from(device_pixel_ratio)] {
-        Engine::the().set_window_viewport(window, size, device_pixel_ratio);
+    RequestedViewport viewport { viewport_size_from(width, height), device_pixel_ratio_from(device_pixel_ratio) };
+    if (!requested_window_viewports().set(window, viewport))
+        return;
+    Engine::the().post([window] {
+        if (auto viewport = requested_window_viewports().take(window); viewport.has_value())
+            Engine::the().set_window_viewport(window, viewport->size, viewport->device_pixel_ratio);
     });
 }
 
@@ -319,9 +341,16 @@ void xenon_engine_stop(XenonViewId id)
 
 void xenon_engine_set_viewport(XenonViewId id, uint32_t width, uint32_t height, double device_pixel_ratio)
 {
-    post_to_view(id, [id, size = viewport_size_from(width, height), device_pixel_ratio = device_pixel_ratio_from(device_pixel_ratio)](View& view) {
-        Engine::the().record_view_viewport(id, size, device_pixel_ratio);
-        view.set_viewport(size, device_pixel_ratio);
+    RequestedViewport viewport { viewport_size_from(width, height), device_pixel_ratio_from(device_pixel_ratio) };
+    if (!requested_view_viewports().set(id, viewport))
+        return;
+    Engine::the().post([id] {
+        auto viewport = requested_view_viewports().take(id);
+        auto* view = Engine::the().view(id);
+        if (!viewport.has_value() || !view)
+            return;
+        Engine::the().record_view_viewport(id, viewport->size, viewport->device_pixel_ratio);
+        view->set_viewport(viewport->size, viewport->device_pixel_ratio);
     });
 }
 

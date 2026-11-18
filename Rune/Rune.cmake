@@ -147,6 +147,8 @@ target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/BrowserModel.
 target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/BrowserModelTabGroups.cpp" "${XENON_RUNE_DIR}/Bridge/XenonBridgeTabGroups.cpp")
 ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonBrowserModel.cpp" Xenon NAME TestXenonBrowserModel LIBS xenon-rune-bridge)
 add_dependencies(xenon-tests TestXenonBrowserModel)
+ladybird_test("${XENON_SOURCE_DIR}/Tests/TestXenonLatestValues.cpp" Xenon NAME TestXenonLatestValues LIBS xenon-rune-bridge)
+add_dependencies(xenon-tests TestXenonLatestValues)
 
 target_sources(xenon-rune-bridge PRIVATE "${XENON_RUNE_DIR}/Bridge/XenonBridgeLocation.cpp")
 
