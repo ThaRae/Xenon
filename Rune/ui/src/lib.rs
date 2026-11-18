@@ -65,6 +65,7 @@ mod mock_windows;
 mod page_bridge;
 mod page_drop;
 mod page_prompts;
+mod perf;
 mod pickers;
 mod picture_in_picture;
 mod platform;
@@ -133,6 +134,11 @@ fn browser_window(
 ) -> App<Browser> {
     let created = slots.clone();
     let ready = slots.clone();
+    let app = if perf::enabled() {
+        app.on_frame_encoded(perf::window_frame)
+    } else {
+        app
+    };
     app.init(move || browser)
         .modifier_keys()
         .on_ime(ime)

@@ -157,11 +157,11 @@ unsafe extern "C" fn view_frame(context: *mut c_void, view: ViewId, frame: *cons
     };
     let length = frame.stride * (frame.height as usize - 1) + frame.width as usize * 4;
     let bgra = unsafe { std::slice::from_raw_parts(frame.bgra, length) };
-    surface.set(
-        frame.width,
-        frame.height,
-        straight_rgba_from_premultiplied_bgra(frame.width, frame.height, frame.stride, bgra),
-    );
+    let rgba = crate::perf::time(crate::perf::Stage::Convert, || {
+        straight_rgba_from_premultiplied_bgra(frame.width, frame.height, frame.stride, bgra)
+    });
+    surface.set(frame.width, frame.height, rgba);
+    crate::perf::page_frame(frame.width, frame.height);
     ui.handle
         .update_view_if(view, move |browser, _| browser.cpu_frame(view));
 }
@@ -190,6 +190,7 @@ unsafe extern "C" fn view_dmabuf_frame(
     if planes.is_empty() {
         return;
     }
+    crate::perf::page_frame(frame.width, frame.height);
     let frame = crate::wayland_page::DmaBufFrame {
         width: frame.width,
         height: frame.height,

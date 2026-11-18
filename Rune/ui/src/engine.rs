@@ -429,6 +429,7 @@ impl Engine {
     }
 
     pub fn set_viewport(self, view: ViewId, viewport: Viewport) {
+        crate::perf::viewport_sent();
         unsafe {
             ffi::xenon_engine_set_viewport(view, viewport.width, viewport.height, viewport.scale)
         }
@@ -439,11 +440,15 @@ impl Engine {
     }
 
     pub fn mouse_event(self, view: ViewId, event: &MouseEvent) {
+        if !matches!(event.kind, MouseEventKind::Move | MouseEventKind::Leave) {
+            crate::perf::input_sent();
+        }
         let raw = event.raw();
         unsafe { ffi::xenon_engine_mouse_event(view, &raw) }
     }
 
     pub fn key_event(self, view: ViewId, event: &KeyEvent) {
+        crate::perf::input_sent();
         let raw = ffi::XenonKeyEvent {
             r#type: match event.kind {
                 KeyEventKind::Down => ffi::XENON_KEY_EVENT_DOWN,
@@ -458,6 +463,7 @@ impl Engine {
     }
 
     pub fn insert_text(self, view: ViewId, text: &str) {
+        crate::perf::input_sent();
         unsafe { ffi::xenon_engine_insert_text(view, XenonStr::borrowed(text)) }
     }
 }
