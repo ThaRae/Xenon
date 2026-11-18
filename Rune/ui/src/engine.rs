@@ -116,6 +116,62 @@ pub struct MouseEvent {
     pub buttons: u32,
     pub modifiers: Modifiers,
     pub wheel_delta: (f32, f32),
+    pub wheel_phase: WheelPhase,
+    pub wheel_discrete: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WheelPhase {
+    #[default]
+    None,
+    Ongoing,
+    Momentum,
+    Ended,
+}
+
+impl WheelPhase {
+    fn raw(self) -> u32 {
+        match self {
+            WheelPhase::None => ffi::XENON_WHEEL_PHASE_NONE,
+            WheelPhase::Ongoing => ffi::XENON_WHEEL_PHASE_ONGOING,
+            WheelPhase::Momentum => ffi::XENON_WHEEL_PHASE_MOMENTUM,
+            WheelPhase::Ended => ffi::XENON_WHEEL_PHASE_ENDED,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ScrollGesture {
+    #[default]
+    Idle,
+    Scrolling,
+}
+
+impl ScrollGesture {
+    pub fn step(&mut self, phase: rune::GesturePhase, momentum: bool, precise: bool) -> WheelPhase {
+        if !precise {
+            *self = ScrollGesture::Idle;
+            return WheelPhase::None;
+        }
+        let was_scrolling = *self == ScrollGesture::Scrolling;
+        match phase {
+            rune::GesturePhase::Began => *self = ScrollGesture::Scrolling,
+            rune::GesturePhase::Ended => {
+                *self = ScrollGesture::Idle;
+                return if was_scrolling {
+                    WheelPhase::Ended
+                } else {
+                    WheelPhase::None
+                };
+            }
+            _ => {}
+        }
+        match (*self, momentum) {
+            (ScrollGesture::Idle, _) => WheelPhase::None,
+            (ScrollGesture::Scrolling, true) => WheelPhase::Momentum,
+            (ScrollGesture::Scrolling, false) => WheelPhase::Ongoing,
+        }
+    }
 }
 
 impl MouseEvent {
@@ -128,6 +184,8 @@ impl MouseEvent {
             buttons: 0,
             modifiers: Modifiers::default(),
             wheel_delta: (0.0, 0.0),
+            wheel_phase: WheelPhase::None,
+            wheel_discrete: false,
         }
     }
 
@@ -143,6 +201,8 @@ impl MouseEvent {
             modifiers: self.modifiers.0,
             wheel_delta_x: self.wheel_delta.0,
             wheel_delta_y: self.wheel_delta.1,
+            wheel_phase: self.wheel_phase.raw(),
+            wheel_discrete: self.wheel_discrete,
         }
     }
 }
@@ -399,5 +459,84 @@ impl Engine {
 
     pub fn insert_text(self, view: ViewId, text: &str) {
         unsafe { ffi::xenon_engine_insert_text(view, XenonStr::borrowed(text)) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rune::GesturePhase;
+
+    #[test]
+    fn a_notched_wheel_has_no_gesture() {
+        let mut gesture = ScrollGesture::default();
+        assert_eq!(
+            gesture.step(GesturePhase::Moved, false, false),
+            WheelPhase::None
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Ended, false, false),
+            WheelPhase::None
+        );
+    }
+
+    #[test]
+    fn precise_scrolling_without_phases_has_no_gesture() {
+        let mut gesture = ScrollGesture::default();
+        assert_eq!(
+            gesture.step(GesturePhase::Moved, false, true),
+            WheelPhase::None
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Moved, false, true),
+            WheelPhase::None
+        );
+    }
+
+    #[test]
+    fn a_touchpad_gesture_goes_on_until_the_fingers_lift_then_coasts() {
+        let mut gesture = ScrollGesture::default();
+        assert_eq!(
+            gesture.step(GesturePhase::Began, false, true),
+            WheelPhase::Ongoing
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Moved, false, true),
+            WheelPhase::Ongoing
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Ended, false, true),
+            WheelPhase::Ended
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Began, true, true),
+            WheelPhase::Momentum
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Moved, true, true),
+            WheelPhase::Momentum
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Ended, true, true),
+            WheelPhase::Ended
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Ended, true, true),
+            WheelPhase::None
+        );
+    }
+
+    #[test]
+    fn a_notched_wheel_ends_a_gesture_without_reporting_it() {
+        let mut gesture = ScrollGesture::default();
+        gesture.step(GesturePhase::Began, false, true);
+        assert_eq!(
+            gesture.step(GesturePhase::Moved, false, false),
+            WheelPhase::None
+        );
+        assert_eq!(
+            gesture.step(GesturePhase::Moved, false, true),
+            WheelPhase::None
+        );
     }
 }

@@ -92,6 +92,13 @@ enum XenonMouseEventType {
     XENON_MOUSE_EVENT_LEAVE,
 };
 
+enum XenonWheelPhase {
+    XENON_WHEEL_PHASE_NONE,
+    XENON_WHEEL_PHASE_ONGOING,
+    XENON_WHEEL_PHASE_MOMENTUM,
+    XENON_WHEEL_PHASE_ENDED,
+};
+
 typedef struct XenonMouseEvent {
     uint32_t type;
     float x;
@@ -101,6 +108,8 @@ typedef struct XenonMouseEvent {
     uint32_t modifiers;
     float wheel_delta_x;
     float wheel_delta_y;
+    uint32_t wheel_phase;
+    bool wheel_discrete;
 } XenonMouseEvent;
 
 enum XenonKeyEventType {

@@ -197,6 +197,24 @@ void Application::did_create_view(View& view)
     view.add_navigation_listener(move(listener));
 }
 
+bool Application::platform_reports_scroll_momentum() const
+{
+#if defined(AK_OS_MACOS)
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool Application::platform_scrolls_elastically() const
+{
+#if defined(AK_OS_MACOS)
+    return true;
+#else
+    return false;
+#endif
+}
+
 WebView::SessionLaunchPolicy Application::launch_restore_policy() const
 {
     return Engine::launch_restore_policy();

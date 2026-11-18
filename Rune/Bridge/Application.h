@@ -29,6 +29,8 @@ private:
     virtual void create_platform_actions() override;
 
     virtual WebView::SessionLaunchPolicy launch_restore_policy() const override;
+    virtual bool platform_reports_scroll_momentum() const override;
+    virtual bool platform_scrolls_elastically() const override;
     virtual void on_devtools_enabled() const override;
     virtual void on_devtools_disabled() const override;
 

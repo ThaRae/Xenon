@@ -17,7 +17,7 @@ use crate::bridge::PageSurfaces;
 use crate::chrome_popup::{self, DrawnMenu, PopupMenu};
 use crate::engine::{
     Action, ChromeLayout, Engine, KeyEventKind, Modifiers, MouseButton, MouseEvent, MouseEventKind,
-    RecentDirection, TabIndex, ViewId, Viewport, WindowId,
+    RecentDirection, ScrollGesture, TabIndex, ViewId, Viewport, WindowId,
 };
 use crate::keys::{Platform, Shortcut, page_key_event, shortcut_for};
 use crate::location::LocationBar;
@@ -114,6 +114,7 @@ pub struct Browser {
     page_focused: bool,
     pub(crate) window_focused: bool,
     pressed_buttons: u32,
+    scroll_gesture: ScrollGesture,
     forwarded_keys: HashSet<String>,
     pub page: PageGeometry,
     pub page_prompts: PagePrompts,
@@ -170,6 +171,7 @@ impl Browser {
             page_focused: false,
             window_focused: true,
             pressed_buttons: 0,
+            scroll_gesture: ScrollGesture::Idle,
             forwarded_keys: HashSet::new(),
             page: PageGeometry::default(),
             page_prompts: PagePrompts::default(),
@@ -1531,6 +1533,10 @@ impl Browser {
             buttons: self.pressed_buttons,
             modifiers: Modifiers::from_rune(wheel.mods),
             wheel_delta: (-wheel.dx * scale, -wheel.dy * scale),
+            wheel_phase: self
+                .scroll_gesture
+                .step(wheel.phase, wheel.momentum, wheel.precise),
+            wheel_discrete: !wheel.precise,
             ..MouseEvent::new(MouseEventKind::Wheel, x, y)
         };
         self.engine.mouse_event(view, &event);

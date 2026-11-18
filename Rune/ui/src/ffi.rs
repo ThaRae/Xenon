@@ -77,7 +77,14 @@ pub struct XenonMouseEvent {
     pub modifiers: u32,
     pub wheel_delta_x: f32,
     pub wheel_delta_y: f32,
+    pub wheel_phase: u32,
+    pub wheel_discrete: bool,
 }
+
+pub const XENON_WHEEL_PHASE_NONE: u32 = 0;
+pub const XENON_WHEEL_PHASE_ONGOING: u32 = 1;
+pub const XENON_WHEEL_PHASE_MOMENTUM: u32 = 2;
+pub const XENON_WHEEL_PHASE_ENDED: u32 = 3;
 
 pub const XENON_KEY_EVENT_DOWN: u32 = 0;
 pub const XENON_KEY_EVENT_UP: u32 = 1;

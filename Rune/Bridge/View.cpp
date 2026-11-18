@@ -529,6 +529,20 @@ static void route_to_node_picker(View& view, XenonMouseEvent const& event)
     }
 }
 
+static Web::ScrollGesturePhase scroll_gesture_phase_from(uint32_t phase)
+{
+    switch (phase) {
+    case XENON_WHEEL_PHASE_ONGOING:
+        return Web::ScrollGesturePhase::Ongoing;
+    case XENON_WHEEL_PHASE_MOMENTUM:
+        return Web::ScrollGesturePhase::Momentum;
+    case XENON_WHEEL_PHASE_ENDED:
+        return Web::ScrollGesturePhase::Ended;
+    default:
+        return Web::ScrollGesturePhase::None;
+    }
+}
+
 void View::handle_mouse_event(XenonMouseEvent const& event)
 {
     if (is_node_picker_active()) {
@@ -572,9 +586,14 @@ void View::handle_mouse_event(XenonMouseEvent const& event)
 
     double wheel_delta_x = 0;
     double wheel_delta_y = 0;
+    auto wheel_precision = Web::WheelDeltaPrecision::Precise;
+    auto scroll_gesture_phase = Web::ScrollGesturePhase::None;
     if (type == Web::MouseEvent::Type::MouseWheel) {
         wheel_delta_x = event.wheel_delta_x;
         wheel_delta_y = event.wheel_delta_y;
+        if (event.wheel_discrete)
+            wheel_precision = Web::WheelDeltaPrecision::Discrete;
+        scroll_gesture_phase = scroll_gesture_phase_from(event.wheel_phase);
     }
 
     enqueue_input_event(Web::MouseEvent {
@@ -586,10 +605,10 @@ void View::handle_mouse_event(XenonMouseEvent const& event)
         key_modifiers_from(event.modifiers),
         wheel_delta_x,
         wheel_delta_y,
-        Web::wheel_tick_120ths_from_pixel_delta(wheel_delta_x, Web::WheelDeltaPrecision::Precise),
-        Web::wheel_tick_120ths_from_pixel_delta(wheel_delta_y, Web::WheelDeltaPrecision::Precise),
-        Web::WheelDeltaPrecision::Precise,
-        Web::ScrollGesturePhase::None,
+        Web::wheel_tick_120ths_from_pixel_delta(wheel_delta_x, wheel_precision),
+        Web::wheel_tick_120ths_from_pixel_delta(wheel_delta_y, wheel_precision),
+        wheel_precision,
+        scroll_gesture_phase,
         m_click_count,
         nullptr,
     });
