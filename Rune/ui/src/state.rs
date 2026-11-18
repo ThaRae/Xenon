@@ -105,7 +105,7 @@ impl Download {
 
 pub struct Browser {
     engine: Engine,
-    surfaces: Arc<PageSurfaces>,
+    pub(crate) surfaces: Arc<PageSurfaces>,
     pub tabs: TabList,
     pub windows: Windows,
     cycling_recent_tabs: bool,

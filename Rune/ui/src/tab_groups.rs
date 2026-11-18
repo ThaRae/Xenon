@@ -171,6 +171,13 @@ pub struct TabGroups {
 }
 
 impl TabGroups {
+    pub fn forked(&self) -> TabGroups {
+        TabGroups {
+            windows: self.windows.clone(),
+            ..TabGroups::default()
+        }
+    }
+
     pub fn groups(&self, window: Option<WindowId>) -> &[Group] {
         window
             .and_then(|window| self.windows.get(&window))

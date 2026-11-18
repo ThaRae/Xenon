@@ -151,6 +151,14 @@ pub unsafe extern "C" fn xenon_engine_start(
     true
 }
 
+fn startup_windows() -> usize {
+    std::env::var("XENON_MOCK_WINDOWS")
+        .ok()
+        .and_then(|count| count.parse().ok())
+        .unwrap_or(1)
+        .max(1)
+}
+
 pub fn xenon_engine_allocate_mock_view() -> XenonViewId {
     NEXT_VIEW.fetch_add(1, Ordering::Relaxed)
 }
@@ -450,8 +458,15 @@ impl MockEngine {
                 if let Some(ready) = self.callbacks.engine_ready {
                     unsafe { ready(self.callbacks.context) };
                 }
-                let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
-                self.open_window(window, false);
+                for index in 0..startup_windows() {
+                    let window = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
+                    let url = match index {
+                        0 => std::env::var("XENON_MOCK_START_URL")
+                            .unwrap_or_else(|_| NEW_TAB_URL.to_owned()),
+                        _ => format!("https://window-{}.example/", index + 1),
+                    };
+                    self.open_window_at(window, false, &url);
+                }
             }
             Command::WindowViewport {
                 window,
@@ -559,10 +574,13 @@ impl MockEngine {
     }
 
     fn open_window(&mut self, window: XenonWindowId, private: bool) {
+        self.open_window_at(window, private, NEW_TAB_URL);
+    }
+
+    fn open_window_at(&mut self, window: XenonWindowId, private: bool, url: &str) {
         self.model.open_window(window, private);
         let view = NEXT_VIEW.fetch_add(1, Ordering::Relaxed);
-        self.model
-            .open_tab(window, view, NEW_TAB_URL, None, None, true);
+        self.model.open_tab(window, view, url, None, None, true);
         self.dispatch();
     }
 

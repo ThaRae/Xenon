@@ -49,12 +49,13 @@ impl Default for Settings {
     }
 }
 
+#[derive(Clone)]
 struct UnloadedTab {
     state: LoadState,
     colour_favicon: Option<Pixels>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct TabHibernation {
     unloaded: HashMap<ViewId, UnloadedTab>,
     pub settings: Settings,

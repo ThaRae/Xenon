@@ -21,6 +21,14 @@ pub struct Updates {
 }
 
 impl Updates {
+    pub fn forked(&self) -> Updates {
+        Updates {
+            ready_version: self.ready_version.clone(),
+            put_off_version: self.put_off_version.clone(),
+            popover_open: false,
+        }
+    }
+
     pub fn offered_version(&self) -> Option<&str> {
         self.ready_version
             .as_deref()

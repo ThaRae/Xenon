@@ -91,7 +91,7 @@ use rune::{App, AppSpec, Ime, KeyEvent, Tx, WindowOptions, WindowSpec};
 
 use crate::bridge::{PageSurfaces, UiContext};
 use crate::state::{APP_NAME, Browser, INITIAL_WINDOW_SIZE};
-use crate::window_slots::{PRIMARY_SLOT, SlotLink, Slots, WINDOW_SLOTS, slot_key};
+use crate::window_slots::{HEADLESS_WINDOW_SLOTS, PRIMARY_SLOT, Slot, SlotLink, Slots, slot_key};
 
 const MINIMUM_WINDOW_SIZE: (f32, f32) = (480.0, 360.0);
 const FAILED_TO_START: c_int = 1;
@@ -127,18 +127,13 @@ fn browser_spec() -> AppSpec<Browser> {
 
 fn browser_window(
     app: App<Browser>,
-    slot: usize,
+    slot: Slot,
     slots: &Arc<Slots>,
-    surfaces: &Arc<PageSurfaces>,
+    browser: Browser,
 ) -> App<Browser> {
-    let link = SlotLink {
-        slot,
-        slots: slots.clone(),
-    };
-    let surfaces = surfaces.clone();
     let created = slots.clone();
     let ready = slots.clone();
-    app.init(move || Browser::for_slot(surfaces, link))
+    app.init(move || browser)
         .modifier_keys()
         .on_ime(ime)
         .on_close(window_closed)
@@ -146,37 +141,58 @@ fn browser_window(
         .on_ready(move |handle| ready.window_ready(slot, handle))
 }
 
-fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int {
-    let surfaces = Arc::new(PageSurfaces::default());
-    let options = || WindowOptions {
+fn window_options() -> WindowOptions {
+    WindowOptions {
         transparent: true,
         borderless: view::draws_window_frame(),
         ..WindowOptions::default()
-    };
+    }
+}
+
+fn added_window() -> App<Browser> {
+    App::new(browser_spec())
+        .window_options(window_options())
+        .windowless()
+        .release_gpu_when_closed()
+}
+
+fn slot_link(slot: Slot, slots: &Arc<Slots>) -> SlotLink {
+    SlotLink {
+        slot,
+        slots: slots.clone(),
+    }
+}
+
+fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int {
+    let surfaces = Arc::new(PageSurfaces::default());
     let mut app = App::new(browser_spec())
-        .window_options(options())
+        .window_options(window_options())
         .standard_menus()
         .keep_running();
     for item in app_menu::menu_bar() {
         app = app.menu_item(item);
     }
-    let others: Vec<App<Browser>> = (1..WINDOW_SLOTS)
-        .map(|_| {
-            App::new(browser_spec())
-                .window_options(options())
-                .windowless()
-                .release_gpu_when_closed()
-        })
-        .collect();
+    let headless = rune::tooling::Args::parse_from(rune_args.clone()).headless();
+    let preregistered = if headless { HEADLESS_WINDOW_SLOTS } else { 1 };
+    let others: Vec<App<Browser>> = (1..preregistered).map(|_| added_window()).collect();
     let handles = std::iter::once(app.handle())
         .chain(others.iter().map(App::handle))
         .collect();
     let slots = Slots::new(handles);
-    location_menu::set_headless(rune::tooling::Args::parse_from(rune_args.clone()).headless());
-    let mut app = browser_window(app.args(rune_args), PRIMARY_SLOT, &slots, &surfaces);
+    let factory_slots = Arc::downgrade(&slots);
+    slots.set_factory(Box::new(move |slot, browser| {
+        match factory_slots.upgrade() {
+            Some(slots) => browser_window(added_window(), slot, &slots, browser),
+            None => added_window().init(move || browser),
+        }
+    }));
+    location_menu::set_headless(headless);
+    let primary = Browser::for_slot(surfaces.clone(), slot_link(PRIMARY_SLOT, &slots));
+    let mut app = browser_window(app.args(rune_args), PRIMARY_SLOT, &slots, primary);
     for (index, other) in others.into_iter().enumerate() {
         let slot = PRIMARY_SLOT + 1 + index;
-        let other = browser_window(other, slot, &slots, &surfaces);
+        let browser = Browser::for_slot(surfaces.clone(), slot_link(slot, &slots));
+        let other = browser_window(other, slot, &slots, browser);
         let (_, window) = app.window(WindowSpec::from_app(slot_key(slot), other));
         slots.set_window_handle(slot, window);
     }

@@ -88,6 +88,22 @@ impl Browser {
         browser
     }
 
+    pub fn fork_for_slot(&self, link: SlotLink) -> Browser {
+        let mut browser = Browser::for_slot(self.surfaces.clone(), link);
+        browser.windows = self.windows.forked(&self.tabs);
+        browser.engine_ready = self.engine_ready;
+        browser.chrome = self.chrome;
+        browser.downloads = self.downloads.clone();
+        browser.tab_groups = self.tab_groups.forked();
+        browser.hibernation = self.hibernation.clone();
+        browser.extensions = self.extensions.forked();
+        browser.split = self.split.forked();
+        browser.bookmarks = self.bookmarks.forked();
+        browser.updates = self.updates.forked();
+        browser.window.devtools_port = self.window.devtools_port;
+        browser
+    }
+
     fn platform_slot(&self) -> Option<u32> {
         self.window.slot().map(|slot| slot as u32)
     }
@@ -107,14 +123,14 @@ impl Browser {
         self.shown_tabs_changed(previous, tx);
     }
 
-    fn window_handle(&self) -> Option<&rune::WindowHandle> {
+    fn window_handle(&self) -> Option<rune::WindowHandle> {
         let link = self.window.link.as_ref()?;
         link.slots.window_handle(link.slot)
     }
 
     pub fn window_is_maximized(&self) -> bool {
         self.window_handle()
-            .is_some_and(rune::WindowHandle::is_maximized)
+            .is_some_and(|handle| handle.is_maximized())
     }
 
     pub fn minimize_window(&mut self) {

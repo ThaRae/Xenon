@@ -158,6 +158,14 @@ impl Default for SplitViews {
 }
 
 impl SplitViews {
+    pub fn forked(&self) -> SplitViews {
+        SplitViews {
+            splits: self.splits.clone(),
+            drag_and_drop: self.drag_and_drop,
+            ..SplitViews::default()
+        }
+    }
+
     pub fn split_of(&self, view: ViewId) -> Option<&Split> {
         self.splits.iter().find(|split| split.contains(view))
     }

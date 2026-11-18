@@ -5,18 +5,20 @@
  */
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
-use rune::{AppHandle, Tx, WindowHandle};
+use rune::{App, AppHandle, Tx, WindowHandle, WindowSpec};
 
 use crate::engine::{ViewId, WindowId};
 use crate::state::Browser;
 
-pub const WINDOW_SLOTS: usize = 12;
 pub const PRIMARY_SLOT: usize = 0;
+pub const HEADLESS_WINDOW_SLOTS: usize = 12;
 
 pub type Slot = usize;
+
+pub type SlotFactory = Box<dyn Fn(Slot, Browser) -> App<Browser> + Send + Sync>;
 
 pub fn slot_key(slot: Slot) -> String {
     if slot == PRIMARY_SLOT {
@@ -39,19 +41,20 @@ pub struct Placement {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Opened {
     Bound(Slot),
-    Waiting,
+    Added(Slot),
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct Closed {
-    pub slot: Option<Slot>,
-    pub next: Option<WindowId>,
+impl Opened {
+    pub fn slot(&self) -> Slot {
+        match self {
+            Opened::Bound(slot) | Opened::Added(slot) => *slot,
+        }
+    }
 }
 
 #[derive(Default)]
 pub struct SlotTable {
     bound: Vec<Option<WindowId>>,
-    waiting: Vec<WindowId>,
     views: HashMap<ViewId, WindowId>,
     focused: Option<Slot>,
     active: Option<WindowId>,
@@ -85,42 +88,25 @@ impl SlotTable {
         if let Some(slot) = self.slot_of(window) {
             return Opened::Bound(slot);
         }
-        if self.waiting.contains(&window) {
-            return Opened::Waiting;
+        if let Some(slot) = self.bound.iter().position(Option::is_none) {
+            self.bound[slot] = Some(window);
+            return Opened::Bound(slot);
         }
-        match self.bound.iter().position(Option::is_none) {
-            Some(slot) => {
-                self.bound[slot] = Some(window);
-                Opened::Bound(slot)
-            }
-            None => {
-                self.waiting.push(window);
-                Opened::Waiting
-            }
-        }
+        self.bound.push(Some(window));
+        Opened::Added(self.bound.len() - 1)
     }
 
-    pub fn closed(&mut self, window: WindowId) -> Closed {
+    pub fn closed(&mut self, window: WindowId) -> Option<Slot> {
         self.views.retain(|_, owner| *owner != window);
-        self.waiting.retain(|waiting| *waiting != window);
         if self.active == Some(window) {
             self.active = None;
         }
-        let Some(slot) = self.slot_of(window) else {
-            return Closed::default();
-        };
+        let slot = self.slot_of(window)?;
         self.bound[slot] = None;
         if self.focused == Some(slot) {
             self.focused = None;
         }
-        let next = (!self.waiting.is_empty()).then(|| self.waiting.remove(0));
-        if let Some(next) = next {
-            self.bound[slot] = Some(next);
-        }
-        Closed {
-            slot: Some(slot),
-            next,
-        }
+        Some(slot)
     }
 
     pub fn activated(&mut self, window: WindowId) {
@@ -161,48 +147,94 @@ impl SlotTable {
     }
 }
 
+type SlotUpdate = Box<dyn FnOnce(&mut Browser, &mut Tx) + Send>;
+type SlotUpdateIf = Box<dyn FnOnce(&mut Browser, &mut Tx) -> bool + Send>;
+
+enum Request {
+    Update(SlotUpdate),
+    UpdateIf(SlotUpdateIf),
+    Open,
+    Hide,
+}
+
+impl Request {
+    fn send_to(self, handle: &AppHandle<Browser>) {
+        match self {
+            Request::Update(f) => handle.update(f),
+            Request::UpdateIf(f) => handle.update_if(f),
+            Request::Open => handle.open(),
+            Request::Hide => handle.hide(),
+        }
+    }
+}
+
+enum SlotApp {
+    Running(AppHandle<Browser>),
+    Starting(Vec<Request>),
+}
+
+impl SlotApp {
+    fn send(&mut self, request: Request) {
+        match self {
+            SlotApp::Running(handle) => request.send_to(handle),
+            SlotApp::Starting(queued) => queued.push(request),
+        }
+    }
+}
+
+#[derive(Default)]
+struct SlotWindow {
+    handle: Option<WindowHandle>,
+    always_on_top: bool,
+}
+
 pub struct Slots {
-    handles: Vec<AppHandle<Browser>>,
-    windows: Vec<OnceLock<WindowHandle>>,
+    apps: Mutex<Vec<SlotApp>>,
+    windows: Mutex<Vec<SlotWindow>>,
     table: Mutex<SlotTable>,
-    always_on_top: Vec<AtomicBool>,
     scale_bits: AtomicU32,
     placements: Mutex<HashMap<WindowId, Placement>>,
     pending: Mutex<HashMap<Slot, Placement>>,
+    factory: OnceLock<SlotFactory>,
 }
 
 impl Slots {
     pub fn new(handles: Vec<AppHandle<Browser>>) -> Arc<Slots> {
         let count = handles.len();
         Arc::new(Slots {
-            handles,
-            windows: (0..count).map(|_| OnceLock::new()).collect(),
+            apps: Mutex::new(handles.into_iter().map(SlotApp::Running).collect()),
+            windows: Mutex::new((0..count).map(|_| SlotWindow::default()).collect()),
             table: Mutex::new(SlotTable::with_slots(count)),
-            always_on_top: (0..count).map(|_| AtomicBool::new(false)).collect(),
             scale_bits: AtomicU32::new(1.0f32.to_bits()),
             placements: Mutex::new(HashMap::new()),
             pending: Mutex::new(HashMap::new()),
+            factory: OnceLock::new(),
         })
     }
 
+    pub fn set_factory(&self, factory: SlotFactory) {
+        let _ = self.factory.set(factory);
+    }
+
     pub fn table(&self) -> MutexGuard<'_, SlotTable> {
-        self.table
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        lock(&self.table)
     }
 
-    pub fn handle(&self, slot: Slot) -> Option<&AppHandle<Browser>> {
-        self.handles.get(slot)
-    }
-
-    pub fn set_window_handle(&self, slot: Slot, handle: WindowHandle) {
-        if let Some(cell) = self.windows.get(slot) {
-            let _ = cell.set(handle);
+    pub fn handle(&self, slot: Slot) -> Option<AppHandle<Browser>> {
+        match lock(&self.apps).get(slot)? {
+            SlotApp::Running(handle) => Some(handle.clone()),
+            SlotApp::Starting(_) => None,
         }
     }
 
-    pub fn window_handle(&self, slot: Slot) -> Option<&WindowHandle> {
-        self.windows.get(slot)?.get()
+    pub fn set_window_handle(&self, slot: Slot, handle: WindowHandle) {
+        if let Some(window) = lock(&self.windows).get_mut(slot) {
+            window.handle = Some(handle);
+        }
+    }
+
+    pub fn window_handle(&self, slot: Slot) -> Option<WindowHandle> {
+        lock(&self.windows).get(slot)?.handle.clone()
     }
 
     pub fn observe_scale(&self, scale: f32) {
@@ -215,18 +247,28 @@ impl Slots {
         f32::from_bits(self.scale_bits.load(Ordering::Relaxed))
     }
 
-    pub fn update(&self, f: impl Fn(&mut Browser, &mut Tx) + Send + Sync + 'static) {
-        let f = Arc::new(f);
-        for handle in &self.handles {
-            let f = f.clone();
-            handle.update(move |browser, tx| f(browser, tx));
+    fn send(&self, slot: Slot, request: Request) {
+        if let Some(app) = lock(&self.apps).get_mut(slot) {
+            app.send(request);
         }
     }
 
-    pub fn update_slot(&self, slot: Slot, f: impl FnOnce(&mut Browser, &mut Tx) + Send + 'static) {
-        if let Some(handle) = self.handles.get(slot) {
-            handle.update(f);
+    fn send_all(&self, request: impl Fn() -> Request) {
+        for app in lock(&self.apps).iter_mut() {
+            app.send(request());
         }
+    }
+
+    pub fn update(&self, f: impl Fn(&mut Browser, &mut Tx) + Send + Sync + 'static) {
+        let f = Arc::new(f);
+        self.send_all(|| {
+            let f = f.clone();
+            Request::Update(Box::new(move |browser, tx| f(browser, tx)))
+        });
+    }
+
+    pub fn update_slot(&self, slot: Slot, f: impl FnOnce(&mut Browser, &mut Tx) + Send + 'static) {
+        self.send(slot, Request::Update(Box::new(f)));
     }
 
     pub fn update_showing(
@@ -235,13 +277,13 @@ impl Slots {
         f: impl Fn(&mut Browser, &mut Tx) + Send + Sync + 'static,
     ) {
         let f = Arc::new(f);
-        for handle in &self.handles {
+        self.send_all(|| {
             let f = f.clone();
-            handle.update_if(move |browser, tx| {
+            Request::UpdateIf(Box::new(move |browser, tx| {
                 f(browser, tx);
                 browser.shows_view(view)
-            });
-        }
+            }))
+        });
     }
 
     pub fn update_showing_if(
@@ -250,10 +292,12 @@ impl Slots {
         f: impl Fn(&mut Browser, &mut Tx) -> bool + Send + Sync + 'static,
     ) {
         let f = Arc::new(f);
-        for handle in &self.handles {
+        self.send_all(|| {
             let f = f.clone();
-            handle.update_if(move |browser, tx| f(browser, tx) && browser.shows_view(view));
-        }
+            Request::UpdateIf(Box::new(move |browser, tx| {
+                f(browser, tx) && browser.shows_view(view)
+            }))
+        });
     }
 
     pub fn update_view(
@@ -273,10 +317,8 @@ impl Slots {
         f: impl FnOnce(&mut Browser, &mut Tx) -> bool + Send + 'static,
     ) {
         let slot = self.table().slot_of_view(view);
-        if let Some(slot) = slot
-            && let Some(handle) = self.handles.get(slot)
-        {
-            handle.update_if(f);
+        if let Some(slot) = slot {
+            self.send(slot, Request::UpdateIf(Box::new(f)));
         }
     }
 
@@ -297,38 +339,68 @@ impl Slots {
     }
 
     pub fn quit(&self) {
-        if let Some(handle) = self.handles.first() {
+        if let Some(handle) = self.handle(PRIMARY_SLOT) {
             handle.quit();
         }
     }
 
-    pub fn window_opened(&self, window: WindowId, private: bool) {
+    pub fn window_opened(self: &Arc<Self>, window: WindowId, private: bool) {
         let opened = self.table().opened(window);
-        if let Opened::Bound(slot) = opened {
-            self.bind(slot, window);
+        if let Opened::Added(slot) = opened {
+            self.add_slot(slot);
         }
+        let slot = opened.slot();
+        self.bind(slot, window);
         self.update(move |browser, _| browser.window_opened(window, private));
-        if let Opened::Bound(slot) = opened {
-            self.show(slot);
+        self.show(slot);
+    }
+
+    fn add_slot(self: &Arc<Self>, slot: Slot) {
+        {
+            let mut windows = lock(&self.windows);
+            while windows.len() <= slot {
+                windows.push(SlotWindow::default());
+            }
+        }
+        let slots = self.clone();
+        let start = Request::Update(Box::new(move |primary, _| slots.start_slot(slot, primary)));
+        let mut apps = lock(&self.apps);
+        while apps.len() <= slot {
+            apps.push(SlotApp::Starting(Vec::new()));
+        }
+        apps[PRIMARY_SLOT].send(start);
+    }
+
+    fn start_slot(self: &Arc<Self>, slot: Slot, primary: &Browser) {
+        let Some(factory) = self.factory.get() else {
+            return;
+        };
+        let link = SlotLink {
+            slot,
+            slots: self.clone(),
+        };
+        let app = factory(slot, primary.fork_for_slot(link));
+        let handle = app.handle();
+        let window = rune::open_window(WindowSpec::from_app(slot_key(slot), app));
+        self.set_window_handle(slot, window);
+        let mut apps = lock(&self.apps);
+        let Some(entry) = apps.get_mut(slot) else {
+            return;
+        };
+        if let SlotApp::Starting(queued) =
+            std::mem::replace(entry, SlotApp::Running(handle.clone()))
+        {
+            for request in queued {
+                request.send_to(&handle);
+            }
         }
     }
 
     pub fn window_closed(&self, window: WindowId) {
-        let closed = self.table().closed(window);
+        let slot = self.table().closed(window);
         self.update(move |browser, tx| browser.window_closed(window, tx));
-        let Some(slot) = closed.slot else {
-            return;
-        };
-        match closed.next {
-            Some(next) => {
-                self.bind(slot, next);
-                self.show(slot);
-            }
-            None => {
-                if let Some(handle) = self.handles.get(slot) {
-                    handle.hide();
-                }
-            }
+        if let Some(slot) = slot {
+            self.send(slot, Request::Hide);
         }
     }
 
@@ -342,16 +414,13 @@ impl Slots {
         self.update(move |browser, tx| browser.window_activated(window, tx));
         if let Some(slot) = slot
             && !focused
-            && let Some(handle) = self.handles.get(slot)
         {
-            handle.open();
+            self.show(slot);
         }
     }
 
     pub fn show(&self, slot: Slot) {
-        if let Some(handle) = self.handles.get(slot) {
-            handle.open();
-        }
+        self.send(slot, Request::Open);
     }
 
     fn bind(&self, slot: Slot, window: WindowId) {
@@ -438,17 +507,22 @@ impl Slots {
     }
 
     pub fn is_always_on_top(&self, slot: Slot) -> bool {
-        self.always_on_top
+        lock(&self.windows)
             .get(slot)
-            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+            .is_some_and(|window| window.always_on_top)
     }
 
     pub fn set_always_on_top(&self, slot: Slot, on: bool) {
-        if let Some(flag) = self.always_on_top.get(slot) {
-            flag.store(on, Ordering::Relaxed);
-        }
-        if let Some(window) = self.window_handle(slot) {
-            window.set_always_on_top(on);
+        let handle = {
+            let mut windows = lock(&self.windows);
+            let Some(window) = windows.get_mut(slot) else {
+                return;
+            };
+            window.always_on_top = on;
+            window.handle.clone()
+        };
+        if let Some(handle) = handle {
+            handle.set_always_on_top(on);
         }
     }
 }
@@ -497,33 +571,22 @@ mod tests {
         assert_eq!(table.opened(10), Opened::Bound(0));
         assert_eq!(table.opened(11), Opened::Bound(1));
         assert_eq!(table.opened(10), Opened::Bound(0));
-        assert_eq!(
-            table.closed(10),
-            Closed {
-                slot: Some(0),
-                next: None
-            }
-        );
+        assert_eq!(table.closed(10), Some(0));
         assert_eq!(table.opened(12), Opened::Bound(0));
         assert_eq!(table.bound_slots(), 2);
     }
 
     #[test]
-    fn a_window_beyond_the_slots_waits_for_one() {
+    fn a_window_beyond_the_slots_adds_one() {
         let mut table = SlotTable::with_slots(2);
         table.opened(1);
         table.opened(2);
-        assert_eq!(table.opened(3), Opened::Waiting);
-        assert_eq!(table.opened(4), Opened::Waiting);
-        assert_eq!(table.closed(4), Closed::default());
-        assert_eq!(
-            table.closed(2),
-            Closed {
-                slot: Some(1),
-                next: Some(3)
-            }
-        );
-        assert_eq!(table.window_in(1), Some(3));
+        assert_eq!(table.opened(3), Opened::Added(2));
+        assert_eq!(table.opened(4), Opened::Added(3));
+        assert_eq!(table.closed(4), Some(3));
+        assert_eq!(table.closed(2), Some(1));
+        assert_eq!(table.opened(5), Opened::Bound(1));
+        assert_eq!(table.window_in(2), Some(3));
     }
 
     #[test]

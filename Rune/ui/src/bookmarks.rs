@@ -202,6 +202,16 @@ pub struct Bookmarks {
 }
 
 impl Bookmarks {
+    pub fn forked(&self) -> Bookmarks {
+        Bookmarks {
+            items: self.items.clone(),
+            visibility: self.visibility,
+            hover_expand_delay: self.hover_expand_delay,
+            hover_expand_animation: self.hover_expand_animation,
+            ..Bookmarks::default()
+        }
+    }
+
     pub fn shows_bar_in_layout(&self) -> bool {
         self.visibility == BarVisibility::Always
     }

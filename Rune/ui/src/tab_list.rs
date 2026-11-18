@@ -10,6 +10,7 @@ use rune::Pixels;
 
 use crate::engine::{ViewId, Viewport, WindowId};
 
+#[derive(Clone)]
 pub struct Tab {
     pub view: ViewId,
     pub title: String,
@@ -102,7 +103,7 @@ pub struct Activation {
     pub current: ViewId,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct TabList {
     tabs: Vec<Tab>,
     active: Option<usize>,
@@ -211,6 +212,7 @@ pub struct WindowInfo {
     pub private: bool,
 }
 
+#[derive(Clone)]
 struct HiddenWindow {
     info: WindowInfo,
     tabs: TabList,
@@ -231,6 +233,24 @@ impl Windows {
         Windows {
             slotted: true,
             ..Windows::default()
+        }
+    }
+
+    pub fn forked(&self, shown_tabs: &TabList) -> Windows {
+        let mut hidden = self.hidden.clone();
+        if let Some(info) = self.shown {
+            hidden.push(HiddenWindow {
+                info,
+                tabs: shown_tabs.clone(),
+            });
+        }
+        Windows {
+            shown: None,
+            hidden,
+            activation_order: self.activation_order.clone(),
+            can_reopen_closed_tab: self.can_reopen_closed_tab,
+            slotted: true,
+            bound: None,
         }
     }
 
@@ -566,5 +586,34 @@ mod tests {
         assert!(windows.bind(1, &mut shown));
         assert_eq!(order(&shown), [10]);
         assert_eq!(windows.ids().collect::<Vec<_>>(), [1]);
+    }
+
+    #[test]
+    fn a_forked_window_list_keeps_every_window_and_shows_only_the_one_it_binds() {
+        let mut windows = Windows::slotted();
+        let mut shown = TabList::default();
+        windows.bind(1, &mut shown);
+        windows.opened(info(1));
+        windows.tabs_mut(1, &mut shown).unwrap().insert(tab(10), 0);
+        windows.opened(info(2));
+        windows.tabs_mut(2, &mut shown).unwrap().insert(tab(20), 0);
+        windows.activated(2, &mut shown);
+
+        let mut forked = windows.forked(&shown);
+        let mut forked_shown = TabList::default();
+        assert_eq!(forked.shown_id(), None);
+        assert_eq!(forked.ids().collect::<Vec<_>>(), [2, 1]);
+        forked.bind(3, &mut forked_shown);
+        forked.opened(info(3));
+        assert_eq!(forked.shown_id(), Some(3));
+        assert_eq!(forked.least_recently_active_hidden(), Some(1));
+
+        forked
+            .tabs_mut(3, &mut forked_shown)
+            .unwrap()
+            .insert(tab(30), 0);
+        assert_eq!(order(forked.tabs_mut(1, &mut forked_shown).unwrap()), [10]);
+        assert_eq!(windows.shown_id(), Some(1));
+        assert_eq!(order(&shown), [10]);
     }
 }

@@ -256,6 +256,17 @@ pub struct Extensions {
 }
 
 impl Extensions {
+    pub fn forked(&self) -> Extensions {
+        Extensions {
+            actions: self.actions.clone(),
+            latest_actions: self.latest_actions.clone(),
+            installed: self.installed.clone(),
+            password_managers: self.password_managers.clone(),
+            commands: self.commands.clone(),
+            ..Extensions::default()
+        }
+    }
+
     pub fn actions_for(&self, view: Option<ViewId>) -> &[ActionButton] {
         view.and_then(|view| self.actions.get(&view))
             .unwrap_or(&self.latest_actions)
