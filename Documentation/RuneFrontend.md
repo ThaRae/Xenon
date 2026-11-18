@@ -33,6 +33,11 @@ main() -> xenon_ui_main()
   xenon_engine_shutdown() ------------->  event loop quits, thread joined
 ```
 
+- Rune ends a quitting app's process from inside its event loop unless the app asks otherwise, so nothing after
+  `run` would run. `lib.rs` calls `rune::orderly_exit()`, so `try_run` returns and `xenon_engine_shutdown` saves the
+  session and stops the engine. An `atexit` handler calls it as well, for an exit that skips the end of `run`; the
+  second call does nothing.
+
 - Rune (winit) has to own the main thread, as AppKit requires. LibWebView runs on its own thread, with Ladybird's
   ordinary `Core::EventLoop`. Neither side's event loop is integrated with the other's.
 - Every `xenon_engine_*` function can be called from any thread. Each posts its work to the engine's event loop and
@@ -55,6 +60,13 @@ main() -> xenon_ui_main()
 - A key-down whose `key` is one character types it. `xenon_engine_insert_text` is only for what an input method
   composes; sending typed characters through it as well would insert them twice.
 - Wheel deltas follow the DOM: a positive `y` scrolls down.
+- A wheel event says whether its delta is a notched wheel's step (`wheel_discrete`) or a touchpad's precise distance,
+  and where it is in a touchpad gesture (`wheel_phase`: none, ongoing, momentum or ended), from Rune's `precise`,
+  `phase` and `momentum`. A gesture starts only at Rune's `Began`, so a platform that reports no phases (X11) sends
+  none, as Qt does, rather than a gesture that never ends (`ScrollGesture` in `engine.rs`). With the phase, a
+  touchpad scroll stays on one scroller, and macOS gets Ladybird's elastic overscroll
+  (`platform_scrolls_elastically`). Rune reports momentum only on macOS, so elsewhere
+  `platform_reports_scroll_momentum` is false and Ladybird coasts a flick itself, as with the Qt frontend.
 - The second press of a double click is sent as `XENON_MOUSE_EVENT_DOUBLE_CLICK` in place of `DOWN`, not beside it.
 - If another Xenon already runs with the same profile, the engine hands it the URLs and sends `engine_exited(0)`.
 - `xenon_engine_start` can be called once per process: LibCore ties its signal pipe to the first thread that registers a
@@ -128,8 +140,9 @@ from the UI thread without a deadlock. The Rust UI keeps a mirror and changes it
   blocking shield and popover (`view/shield.rs`), a Private badge in private windows, and the Update pill when an update
   is ready ("Pickers, media and reports").
 - Full screen and Always on Top act on the key AppKit window through `Bridge/Platform.h`. Elsewhere Always on Top goes
-  through Rune's `WindowHandle::set_always_on_top` (X11 and Windows; Wayland lets no app do it), and full screen does
-  nothing: Rune has no full-screen call and keeps winit's window to itself.
+  through Rune's `WindowHandle::set_always_on_top` (X11 and Windows; Wayland lets no app do it), and full screen through
+  the Rune patch's `WindowHandle::set_full_screen` and `is_full_screen` (`Browser::set_window_full_screen`), which make
+  the window borderless over its display.
 - Each model window gets a Rune window of its own; see [Windows](#windows).
 
 ## The chrome's look
@@ -166,17 +179,22 @@ its own (`view/window_controls.rs`):
 - The window has no shadow of its own.
 
 ## Windows
-## Windows
 
-Rune creates every window before `App::run` and can't add one afterwards (`App::window` only registers a window for the
-loop to start; the pinned revision and upstream `dev` as of this writing have nothing newer). So `lib.rs` registers a
-pool of `WINDOW_SLOTS` (12) Rune windows up front: the app's own window and eleven `App::window`s, each `windowless` with
-`release_gpu_when_closed`, so a slot nobody uses has no native window or GPU surface. Every slot runs the same view with a
-`Browser` state of its own (`window_slots.rs`, `window_state.rs`).
+Each model window is shown by a slot: a Rune window running the same view with a `Browser` state of its own
+(`window_slots.rs`, `window_state.rs`). The app's own window is the first slot. The others are added as they are
+needed, with Rune's `open_window`, each `windowless` with `release_gpu_when_closed`, so a slot whose window closed has
+no native window or GPU surface. Slots are kept and reused, never dropped.
 
-- `Slots` binds model windows to slots on the engine thread: `window_opened` takes the lowest free slot, posts
-  `bind_window` to it and opens it; `window_closed` hides it; `window_activated` opens (raises) a slot that isn't
-  focused. A model window past the twelfth waits, mirrored but not shown, and takes the first slot that frees up.
+- `Slots` binds model windows to slots on the engine thread: `window_opened` takes the lowest free slot, or adds one,
+  posts `bind_window` to it and opens it; `window_closed` hides it; `window_activated` opens (raises) a slot that isn't
+  focused. There is no limit on how many windows show at once.
+- A slot is added on the UI thread, which `open_window` requires, by an update on the first slot. That update copies the
+  first slot's mirror of every window and tab (`Browser::fork_for_slot`, and a `forked` on each part that keeps one) and
+  starts the window with it. Everything sent to the slot between the engine asking for it and the copy is queued
+  (`SlotApp::Starting`) and then delivered in order, so the new window misses nothing and sees nothing twice. The parts
+  of `Browser` that belong to one window (prompts, popovers, the location bar, its own panels) start empty.
+- Rune opens no windows at runtime in headless runs, so a headless run registers twelve slots up front with
+  `App::window` (`HEADLESS_WINDOW_SLOTS`), as all runs used to.
 - Each slot's `Browser` keeps the whole mirror, as before, but in bound mode (`Windows::slotted`) it always shows its
   own window: activation never swaps it and closing it adopts no other. Model and tab events (`XenonUiCallbacks`) go to
   every slot, so a tab moved between windows arrives with its title, favicon and state; `UiContext::handle.update` takes
@@ -237,12 +255,11 @@ The engine side is `Bridge/WindowLifecycle.*`, with its own slice of the ABI in 
 
 ### What Rune can't do yet
 
-- Open a window after `App::run`: hence the fixed pool, and the twelve-window limit on what shows at once.
 - Veto a close: the window disappears before the checks run, and comes back if a page keeps it.
 - Report a window's position before it has drawn, or whether it's maximized, minimized or covered: geometry comes from a
   layout callback, and the rest from AppKit, so on Linux and Windows there is no maximized flag, no exposure tracking and
   no maximize or restore for pages.
-- Full screen off macOS, and intercepting the OS's own quit (the Dock, logout), which closes every window unasked.
+- Intercept the OS's own quit (the Dock, logout), which closes every window unasked.
 - Restored windows aren't moved back onto a screen that's still there, as the Qt frontend does.
 
 Headless runs render one window unless they pass `--desktop BACKDROP.png`, which composites every visible window:
@@ -531,7 +548,7 @@ another tab shows.
 - **Tooltips** (`title` attributes) show at the pointer, in the pane under it, once it has rested for 0.6 seconds (`TOOLTIP_DELAY`, Qt's
   hover timer), and moving hides them until it rests again. A tooltip a page sets itself (`on_request_tooltip_override`,
   for example an extension's) shows at once where the page put it, and stays until the page takes it away.
-- **Fullscreen**: Rune can't make its window fullscreen yet, so a page's fullscreen request hides the tab strip and
+- **Fullscreen**: a page's fullscreen request makes the window full screen, hides the tab strip and
   toolbar and gives the page the whole window. Escape, or switching tabs, leaves it.
 - **Permission prompts** (`on_request_permission`) show as a bubble at the page's top left with **Allow**, **Allow this
   time** and **Block**; a request the engine withdraws (`on_cancel_permission_prompt`) or a crash takes it away.
@@ -586,8 +603,8 @@ with its callbacks struct, registered from `lib.rs` before `xenon_engine_start` 
   bottom right (across both panes of a split), above whichever tab is active there. Its edges resize it, keeping the video's shape within the limits LibWebView gives;
   a drag where the page doesn't take the press (`picture_in_picture_press_handled`) moves it, and the press is
   cancelled in the page (`xenon_engine_picture_in_picture_cancel_press`). The compositor draws the Back to tab and
-  Close controls. It stays in the window rather than taking a Rune window of its own from the pool (see
-  [Windows](#windows)), which can't float above other apps' windows or follow the video's aspect ratio.
+  Close controls. It stays in the window rather than taking a Rune window of its own, which can't float above other
+  apps' windows or follow the video's aspect ratio.
 - **Wake lock**: a page's screen wake lock holds a `WakeLock::DisplaySleepInhibitor` while it's acquired. LibWakeLock
   asserts against display sleep on macOS (IOKit) and does nothing elsewhere, as in the Qt build.
 - **Screenshots**: **Take Screenshot…** in the page's context menu freezes the page's current frame on a surface of its
@@ -627,7 +644,18 @@ with its callbacks struct, registered from `lib.rs` before `xenon_engine_start` 
 
 The Rune frontend keeps its GPU work for what changes. A settled page draws nothing: Rune rests until a page frame,
 input or state change wakes it, and a window that's minimized, covered or hidden draws nothing (its page is told to
-stop when macOS reports it, see [Windows](#windows)). Slots nobody has bound have no native window or GPU surface.
+stop when macOS reports it, see [Windows](#windows)). A slot whose window closed has no native window or GPU surface.
+
+- **Measuring**: `XENON_RUNE_PERF=1` prints, every 5 seconds, n, rate, mean, p50, p95 and max for the interval between
+  page frames (any view), the BGRA to RGBA conversion, input to the next page frame, a new viewport size to the first
+  frame of a new size, and, from Rune's per-frame report, the interval between frames a window drew and its update and
+  encode times (`perf.rs`). Off, each hook costs a cached branch. Elaris's `ELARIS_PERF` was the model.
+- **Only new frames are copied**: `View::present_current_frame` runs only from `on_ready_to_paint`, which LibWebView
+  calls only when the Compositor's frame replaces the front buffer, so a frame is never copied twice; and each frame
+  carries the device pixel ratio it was laid out at, so one from before a scale change is drawn at its own scale.
+- **Live resizing**: a window's and a view's viewport requests keep only the newest size (`LatestValues.h`): the first
+  request posts to the engine thread and later ones replace the size it will read, so Ladybird lays out the size the
+  window has now rather than every size it passed through.
 
 - **Page frames** (`Rune/ui/src/frame.rs`, `view_frame` in `bridge.rs`): Ladybird's compositor hands over premultiplied
   BGRA, and `Pixels` needs straight RGBA. A row whose pixels are all opaque is swizzled 16 bytes at a time without
@@ -686,6 +714,15 @@ stop when macOS reports it, see [Windows](#windows)). Slots nobody has bound hav
   7. A Wayland window takes a requested size at once and sends no `Resized` for it, so Rune now resizes its drawable
      and lays out at that size itself. Before, a window opened with a saved size kept drawing at its first size and the
      compositor stretched it to fit, with the page out of place.
+  8. `WindowHandle::is_full_screen` and `set_full_screen`, for a page's fullscreen request and the Toggle Fullscreen
+     shortcut. Rune has `Tx::toggle_full_screen`, but nothing to ask whether a window is full screen.
+
+  Rune's `dev` has since rewritten what patches 3, 4, 6 and 7 touch (a live-wake state machine, a frame-move state
+  machine), and each still applies as a port of the same change. Rune now vendors its own winit, parley_engine,
+  wgpu-hal and AccessKit adapters, which an app building Rune patches in as Rune's workspace does
+  (`[patch.crates-io]` in `Rune/ui/Cargo.toml`).
+
+The measurements below were taken with Rune at `781e2b6`, before the move to `47eaa86`.
 
 Measured in a KWin session with OpenGL compositing (`compositingType` `gl2`), 1280×800, a 60 fps CSS-animated page and
 `gpu_busy_percent`: Rune with the native page surface **3.0%**, Qt **3.0%**, before the native surface 10.0%. With the
@@ -881,8 +918,10 @@ workers, content scripts and `PasswordManagers` are `xenon-core`. What the Qt fr
 
 `Meta/xenon.py build` builds `xenon-rune` beside `xenon`, as `Build/release/xenon/bin/xenon-rune` on Linux, sharing the
 Qt build's helper processes and resources. `ninja -C Build/release xenon-rune` rebuilds it alone: CMake runs cargo for
-`Rune/ui` with `-Dwarnings`, into `Build/release/cargo/xenon_ui`, then links the static library into the executable
-with LibWebView. `Rune.cmake` builds the crate with Ladybird's cargo helpers rather than `import_rust_crate`, which
+`Rune/ui`, into `Build/release/cargo/xenon_ui`, then links the static library into the executable with LibWebView.
+Warnings are errors in `xenon_ui` alone (`[lints.rust]` in its `Cargo.toml`): `Rune.cmake` takes `-Dwarnings` out of
+the `RUSTFLAGS` Ladybird's helpers set, which would reach Rune and its vendored crates too, and those have warnings of
+their own on our toolchain. `Rune.cmake` builds the crate with Ladybird's cargo helpers rather than `import_rust_crate`, which
 expects every crate to bring Ladybird's panic and demangling hooks. `Rune/ui/Cargo.lock` is checked in, and the build
 stops without it.
 
@@ -905,10 +944,22 @@ Rune/ui/target/debug/xenon-ui-preview --snap window.png --size 1280x800 --theme 
 Rune/ui/target/debug/xenon-ui-preview --script two-tabs.json --snap end.png --at mark:end --tree tree.json
 ```
 
-The mock answers each load with a URL, a title, a favicon and a drawn page. It keeps windows and tabs as the engine's model does (`mock_model.rs`), opening one window with the new tab page at start. A URL with `slow` in it keeps loading, and
+The mock answers each load with a URL, a title, a favicon and a drawn page. It keeps windows and tabs as the engine's model does (`mock_model.rs`), opening one window with the new tab page at start. `XENON_MOCK_WINDOWS=N` opens N windows instead, the others at
+`https://window-N.example/`, and `XENON_MOCK_START_URL` loads another page in the first. A URL with `slow` in it keeps loading, and
 the coloured bar on its page is a link. `--snap` without `--at` captures the first frame, before the mock has answered.
 
-Rune pins a revision of its `dev` branch, in `Rune/ui/Cargo.toml`.
+Rune pins a revision of its `dev` branch, in `Rune/ui/Cargo.toml`. To move it, change the `rev`, port the patches in
+`Patches/rune` onto the new revision (apply them as commits and rebase), and run `./Meta/rune.py prepare`, which
+resets `Build/rune` to the pinned revision before it applies them.
+
+Windows that open while the app runs only show on a display, so they're checked in a nested KWin with the mock engine.
+`WAYLAND_DEBUG=client` shows each window's `xdg_toplevel` and its title:
+
+```bash
+dbus-run-session -- kwin_wayland --virtual --socket xenon-test --width 1600 --height 1000 &
+WAYLAND_DISPLAY=xenon-test XENON_MOCK_WINDOWS=15 WAYLAND_DEBUG=client Rune/ui/target/debug/xenon-ui-preview 2>&1 \
+    | grep -o 'xdg_toplevel#[0-9]*.set_title("[^"]*")' | sort -u
+```
 
 `XENON_RUNE_ARGS` hands Rune's own flags to `xenon-rune`, so the real engine can be rendered and scripted headless, with
 no display. Rune's headless clock is virtual and runs ahead of the engine, so give pages time with a late `--at` (each
