@@ -9,7 +9,7 @@ publish = false
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-rune = { git = "https://github.com/anomalyco/rune", rev = "781e2b6d87cd5f32d6f4365956fad4baaf24ee50", features = ["native-file-dialog"] }
+rune = { git = "https://github.com/anomalyco/rune", rev = "47eaa86eba751687597d0aaf6ee325baeecd4666", features = ["native-file-dialog"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5.19", default-features = false, features = ["async-io", "blocking-api"] }
@@ -21,6 +21,9 @@ wayland-protocols = { version = "0.32", features = ["client"] }
 [dev-dependencies]
 serde_json = "1"
 
+[lints.rust]
+warnings = "deny"
+
 [features]
 mock-engine = []
 
@@ -31,3 +34,10 @@ required-features = ["mock-engine"]
 
 [patch."https://github.com/anomalyco/rune"]
 rune = { path = "../../Build/rune/crates/rune" }
+
+[patch.crates-io]
+winit = { path = "../../Build/rune/vendor/winit" }
+parley_engine = { path = "../../Build/rune/vendor/parley_engine" }
+wgpu-hal = { path = "../../Build/rune/vendor/wgpu-hal" }
+accesskit_windows = { path = "../../Build/rune/vendor/accesskit_windows" }
+accesskit_macos = { path = "../../Build/rune/vendor/accesskit_macos" }

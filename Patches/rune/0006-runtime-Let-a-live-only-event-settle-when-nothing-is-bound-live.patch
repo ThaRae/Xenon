@@ -1,15 +1,17 @@
 diff --git a/crates/rune/src/runtime/motion/live_latch.rs b/crates/rune/src/runtime/motion/live_latch.rs
+index 5b839b18..cba98a27 100644
 --- a/crates/rune/src/runtime/motion/live_latch.rs
 +++ b/crates/rune/src/runtime/motion/live_latch.rs
-@@ -65,7 +65,10 @@
-     }
- 
-     pub(super) fn latch_live(&mut self, pending: bool) -> bool {
--        if !self.surface_visible || self.live_subscriptions.is_empty() { return false; }
-+        if !self.surface_visible { return false; }
+@@ -147,7 +147,11 @@ impl LiveLane {
+     /// Whether the frame should read its sources now. The hidden, source-less and clean cases
+     /// return before any transition, as an unpending frame always did.
+     pub(crate) fn latch_begin(&mut self, can: bool, has_subs: bool) -> bool {
+-        if !self.visible() || !has_subs || (!can && !self.state.dirty()) { return false; }
++        if !self.visible() { return false; }
 +        // Nothing is bound live, so a live-only event leaves nothing to latch and the window
 +        // can rest again.
-+        if self.live_subscriptions.is_empty() { self.live_dirty = false; return false; }
-         if !pending && !self.live_dirty { return false; }
-         self.live_dirty = false;
-         for node in &mut self.nodes {
++        if !has_subs { self.state = LiveWake::Idle; return false; }
++        if !can && !self.state.dirty() { return false; }
+         self.apply1(LiveEvent::LatchBegin)
+     }
+ 

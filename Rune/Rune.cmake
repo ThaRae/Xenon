@@ -15,6 +15,8 @@ function(xenon_import_rune_ui_crate)
         TARGET_DIR "${CMAKE_BINARY_DIR}/cargo/${ARG_CRATE_NAME}"
     )
     set(cargo_feature_flags "")
+    string(REPLACE "-Dwarnings" "" rustflags_without_denied_warnings "${RUSTC_TARGET_FLAGS}")
+    list(TRANSFORM cargo_env REPLACE "^(CARGO_TARGET_[A-Z0-9_]+_RUSTFLAGS=).*$" "\\1${rustflags_without_denied_warnings}")
 
     set(output_lib "${cargo_output_dir}/lib${ARG_CRATE_NAME}.a")
     _rust_crate_build_command(OUTPUT "${output_lib}" DEPFILE "${cargo_output_dir}/lib${ARG_CRATE_NAME}.d")

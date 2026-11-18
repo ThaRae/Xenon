@@ -1,6 +1,8 @@
+diff --git a/crates/rune/src/tooling/perf_warn/commits.rs b/crates/rune/src/tooling/perf_warn/commits.rs
+index b7838913..e74eb184 100644
 --- a/crates/rune/src/tooling/perf_warn/commits.rs
 +++ b/crates/rune/src/tooling/perf_warn/commits.rs
-@@ -75,6 +75,7 @@
+@@ -75,6 +75,7 @@ impl CommitMeter {
      /// Handler `name` on the element at `path`, set at `at`, asked for a commit.
      #[inline(always)]
      #[cfg_attr(not(debug_assertions), allow(unused_variables))]
@@ -8,7 +10,7 @@
      pub(crate) fn handler(&mut self, name: &'static str, path: Option<&str>, at: Option<&'static std::panic::Location<'static>>) {
          #[cfg(debug_assertions)]
          {
-@@ -112,6 +113,7 @@
+@@ -112,6 +113,7 @@ impl CommitMeter {
      /// asked to move, if any.
      #[inline(always)]
      #[cfg_attr(not(debug_assertions), allow(unused_variables))]

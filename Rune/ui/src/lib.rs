@@ -206,6 +206,8 @@ fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int
     if !unsafe { ffi::xenon_engine_start(&callbacks, argc, argv) } {
         return FAILED_TO_START;
     }
+    shut_down_engine_at_exit();
+    rune::orderly_exit();
     let outcome = if ui.engine_exited() {
         Ok(())
     } else {
@@ -219,6 +221,21 @@ fn run(argc: c_int, argv: *const *const c_char, rune_args: Vec<String>) -> c_int
             FAILED_TO_START
         }
     }
+}
+
+unsafe extern "C" {
+    fn atexit(callback: extern "C" fn()) -> c_int;
+}
+
+extern "C" fn shut_down_engine() {
+    unsafe { ffi::xenon_engine_shutdown() };
+}
+
+fn shut_down_engine_at_exit() {
+    static REGISTERED: std::sync::Once = std::sync::Once::new();
+    REGISTERED.call_once(|| unsafe {
+        atexit(shut_down_engine);
+    });
 }
 
 fn detached_browser() -> Browser {

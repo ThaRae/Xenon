@@ -1,15 +1,18 @@
 diff --git a/crates/rune/src/window/draw.rs b/crates/rune/src/window/draw.rs
+index 8f321732..e89c298c 100644
 --- a/crates/rune/src/window/draw.rs
 +++ b/crates/rune/src/window/draw.rs
-@@ -138,8 +138,9 @@
-         #[cfg(target_os = "macos")]
+@@ -200,10 +200,11 @@ impl<S: 'static> Host<S> {
          { self.rt.native_materials = l.native.materials.native(); }
+         if self.frame_reports.wanted() { self.frame_reports.set_refresh(display_hz(l)); }
          // Only a timer woke the resting window: build the frame first, and take no drawable
 -        // when it draws what's on screen.
--        let quiet = std::mem::take(&mut l.quiet) && !hidden && !live_resize && l.presented.is_some() && self.comp.is_none()
 +        // when it draws what's on screen. Off macOS any frame of a resting window does the
 +        // same, so a pointer move or an update that changes nothing presents nothing.
-+        let quiet = (std::mem::take(&mut l.quiet) || (cfg!(not(target_os = "macos")) && l.rests())) && !hidden && !live_resize && l.presented.is_some() && self.comp.is_none()
+         #[cfg(feature = "frame-profile")]
+         let fp_entry = crate::frame::live_log::on().then(crate::frame::live_log::Stamp::now);
+-        let quiet = l.timer_frame.take_quiet() && !hidden && !live_resize && l.presented.is_some() && !composed(self.comp.as_deref())
++        let quiet = (l.timer_frame.take_quiet() || (cfg!(not(target_os = "macos")) && l.rests())) && !hidden && !live_resize && l.presented.is_some() && !composed(self.comp.as_deref())
              && self.trace.is_none() && self.args.trace.is_none() && self.rt.live_visible()
-             && self.rt.window_frame.is_none() && self.frame_anim.is_none();
+             && self.rt.window_frame.is_none() && !FrameMove::moving(&self.frame_move);
          #[cfg(target_os = "macos")]

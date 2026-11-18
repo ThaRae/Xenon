@@ -61,6 +61,13 @@ def clone(revision):
     run(["git", "-C", str(VENDOR), "checkout", "-q", "FETCH_HEAD"])
 
 
+def checked_out_revision():
+    if not (VENDOR / ".git").exists():
+        return None
+    result = subprocess.run(["git", "-C", str(VENDOR), "rev-parse", "HEAD"], capture_output=True, text=True)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
 def populate(revision):
     checkout = cargo_checkout(revision)
     if checkout is not None:
@@ -68,7 +75,9 @@ def populate(revision):
             shutil.rmtree(VENDOR)
         shutil.copytree(checkout, VENDOR)
         return
-    if (VENDOR / "crates" / "rune" / "Cargo.toml").exists():
+    if checked_out_revision() == revision:
+        run(["git", "-C", str(VENDOR), "reset", "-q", "--hard", revision])
+        run(["git", "-C", str(VENDOR), "clean", "-q", "-fdx"])
         return
     if VENDOR.exists():
         shutil.rmtree(VENDOR)

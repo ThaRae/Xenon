@@ -1,7 +1,8 @@
 diff --git a/crates/rune/src/window/handle.rs b/crates/rune/src/window/handle.rs
+index ff480c07..3537decd 100644
 --- a/crates/rune/src/window/handle.rs
 +++ b/crates/rune/src/window/handle.rs
-@@ -72,6 +72,36 @@
+@@ -134,6 +134,36 @@ impl WindowHandle {
      pub fn set_always_on_top(&self, on: bool) {
          self.send(move |slot| WakeEvent::Level(slot, on));
      }

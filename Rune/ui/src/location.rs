@@ -471,7 +471,7 @@ impl LocationBar {
     }
 
     fn send_edits(&mut self) -> bool {
-        if !self.edit.focused || self.edit.preedit.is_some() {
+        if !self.edit.focused || self.edit.preedit().is_some() {
             return false;
         }
         let text = self.edit.text.clone();

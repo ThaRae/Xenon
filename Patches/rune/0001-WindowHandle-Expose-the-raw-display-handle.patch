@@ -1,6 +1,8 @@
+diff --git a/crates/rune/src/window/handle.rs b/crates/rune/src/window/handle.rs
+index 1c1e0ca3..ff480c07 100644
 --- a/crates/rune/src/window/handle.rs
 +++ b/crates/rune/src/window/handle.rs
-@@ -118,6 +118,15 @@
+@@ -180,6 +180,15 @@ impl WindowHandle {
          let handle = window.window_handle().map_err(|e| e.to_string())?;
          Ok(f(handle))
      }

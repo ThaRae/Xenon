@@ -1,15 +1,41 @@
+diff --git a/crates/rune/src/window/chrome.rs b/crates/rune/src/window/chrome.rs
+index c6015c67..266c1c7d 100644
+--- a/crates/rune/src/window/chrome.rs
++++ b/crates/rune/src/window/chrome.rs
+@@ -135,8 +135,8 @@ pub(super) fn has_window_menu(window: &Window) -> bool {
+ 
+ /// Sizes the window's content to `size` points.
+ #[cfg(not(target_os = "macos"))]
+-pub(super) fn request_inner_size(window: &Window, size: (f32, f32)) {
++pub(super) fn request_inner_size(window: &Window, size: (f32, f32)) -> Option<winit::dpi::PhysicalSize<u32>> {
+     #[cfg(target_os = "windows")]
+-    if crate::platform::win32::request_inner_size(window, size) { return; }
+-    let _ = window.request_inner_size(LogicalSize::new(size.0, size.1));
++    if crate::platform::win32::request_inner_size(window, size) { return None; }
++    window.request_inner_size(LogicalSize::new(size.0, size.1))
+ }
 diff --git a/crates/rune/src/window/stepping.rs b/crates/rune/src/window/stepping.rs
+index 89eba199..c7cd5c94 100644
 --- a/crates/rune/src/window/stepping.rs
 +++ b/crates/rune/src/window/stepping.rs
-@@ -136,12 +136,17 @@
+@@ -144,7 +144,7 @@ impl<S: 'static> Host<S> {
+             let rect = crate::overlay::options::local_rect(crate::windows::PlaceRequest::at(self.rt.window_viewport()), Some(request.placement),
+                 (area.width as f32 / scale as f32, area.height as f32 / scale as f32));
+             let origin = monitor.position();
+-            chrome::request_inner_size(&w.window, (rect[2], rect[3]));
++            let _ = chrome::request_inner_size(&w.window, (rect[2], rect[3]));
+             w.window.set_outer_position(PhysicalPosition::new(origin.x + (f64::from(rect[0]) * scale).round() as i32,
+                 origin.y + (f64::from(rect[1]) * scale).round() as i32));
+         }
+@@ -206,12 +206,17 @@ impl<S: 'static> Host<S> {
              let window = &w.window;
              // Read before the resize request, which may apply at once.
              let geometry = (window.current_monitor(), window.outer_position(), window.outer_size(), window.inner_size());
 +            let mut taken = None;
              if let Some((width, height)) = request.size {
-                 self.frame_jump = Some((width, height));
--                let _ = window.request_inner_size(LogicalSize::new(width, height));
-+                taken = window.request_inner_size(LogicalSize::new(width, height));
+                 self.frame_move = Some(FrameMove::jumped((width, height)));
+-                chrome::request_inner_size(window, (width, height));
++                taken = chrome::request_inner_size(window, (width, height));
 +            }
 +            // Wayland windows can't see or set their position. They take a size at once and
 +            // send no `Resized` for it, so the drawable and the layout follow here.
@@ -22,17 +48,19 @@ diff --git a/crates/rune/src/window/stepping.rs b/crates/rune/src/window/steppin
              let (Some(monitor), Ok(position), outer, inner) = geometry else { return };
              let scale = window.scale_factor() as f32;
              let size = request.size.map(|(width, height)| (
-@@ -159,6 +164,15 @@
+@@ -229,6 +234,17 @@ impl<S: 'static> Host<S> {
          }
      }
  
 +    #[cfg(not(target_os = "macos"))]
 +    fn take_inner_size(&mut self, size: winit::dpi::PhysicalSize<u32>) {
-+        let (Some(l), Some((gpu, ..))) = (self.win.as_mut(), self.gpu.as_ref()) else { return };
-+        if size.width == 0 || size.height == 0 || !l.resize_surface(&gpu.device, size) { return; }
++        let gpu = self.gpu.as_ref().map(|(gpu, _)| &**gpu);
++        let Some(l) = self.win.as_mut() else { return };
++        if size.width == 0 || size.height == 0 || !l.resize_surface(gpu, size) { return; }
 +        let scale = l.window.scale_factor() as f32;
-+        self.frame_jump = None;
++        self.frame_move = None;
 +        self.rt.set_viewport((size.width as f32 / scale, size.height as f32 / scale), scale);
++        l.request_redraw();
 +    }
 +
      /// Moves the frame one display frame along, before the frame's drawable is acquired, and
