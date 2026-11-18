@@ -824,9 +824,9 @@ pub fn fullscreen_requested(s: &mut Browser, view: ViewId, fullscreen: bool) {
             return;
         }
         s.page_prompts.fullscreen = Some(view);
-        if !crate::platform::is_fullscreen() {
+        if !s.window_is_full_screen() {
             s.page_prompts.window_fullscreen_for_page = true;
-            crate::platform::set_fullscreen(true);
+            s.set_window_full_screen(true);
         }
         PageEngine.set_fullscreen(view, true);
     } else if s.page_prompts.fullscreen == Some(view) {
@@ -838,7 +838,7 @@ pub fn fullscreen_requested(s: &mut Browser, view: ViewId, fullscreen: bool) {
 
 fn leave_window_fullscreen_for_page(s: &mut Browser) {
     if std::mem::take(&mut s.page_prompts.window_fullscreen_for_page) {
-        crate::platform::set_fullscreen(false);
+        s.set_window_full_screen(false);
     }
 }
 

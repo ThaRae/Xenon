@@ -619,7 +619,8 @@ impl Browser {
     }
 
     pub fn toggle_fullscreen(&mut self, _: &mut Tx) {
-        crate::platform::set_fullscreen(!crate::platform::is_fullscreen());
+        let full_screen = self.window_is_full_screen();
+        self.set_window_full_screen(!full_screen);
     }
 
     pub fn downloads_changed(&mut self, downloads: Vec<Download>) {

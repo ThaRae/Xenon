@@ -1,0 +1,21 @@
+diff --git a/crates/rune/src/window/handle.rs b/crates/rune/src/window/handle.rs
+index 3537decd..d345dc60 100644
+--- a/crates/rune/src/window/handle.rs
++++ b/crates/rune/src/window/handle.rs
+@@ -146,6 +146,16 @@ impl WindowHandle {
+     pub fn set_maximized(&self, maximized: bool) {
+         if let Ok(window) = self.window() { window.set_maximized(maximized); }
+     }
++    /// Whether the window covers its display, as `Tx::toggle_full_screen` makes it.
++    pub fn is_full_screen(&self) -> bool {
++        self.window().is_ok_and(|window| window.fullscreen().is_some())
++    }
++    /// Take the window full screen, borderless over its display, or bring it back.
++    pub fn set_full_screen(&self, full_screen: bool) {
++        if let Ok(window) = self.window() {
++            window.set_fullscreen(full_screen.then_some(winit::window::Fullscreen::Borderless(None)));
++        }
++    }
+     /// Let the user resize the window by the edge the pointer was just pressed on, for a
+     /// borderless window that draws its own frame. `(horizontal, vertical)` name the edge or
+     /// corner: -1 for the left or top, 1 for the right or bottom, 0 for neither.

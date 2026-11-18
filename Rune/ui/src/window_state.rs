@@ -133,6 +133,22 @@ impl Browser {
             .is_some_and(|handle| handle.is_maximized())
     }
 
+    pub fn window_is_full_screen(&self) -> bool {
+        if cfg!(target_os = "macos") {
+            return crate::platform::is_fullscreen();
+        }
+        self.window_handle()
+            .is_some_and(|handle| handle.is_full_screen())
+    }
+
+    pub fn set_window_full_screen(&mut self, full_screen: bool) {
+        if cfg!(target_os = "macos") {
+            crate::platform::set_fullscreen(full_screen);
+        } else if let Some(handle) = self.window_handle() {
+            handle.set_full_screen(full_screen);
+        }
+    }
+
     pub fn minimize_window(&mut self) {
         if let Some(handle) = self.window_handle() {
             handle.minimize();
@@ -227,8 +243,12 @@ impl Browser {
             || slot.is_some_and(|slot| unsafe {
                 ffi_windows::xenon_platform_window_is_maximized(slot)
             });
-        let fullscreen = slot
-            .is_some_and(|slot| unsafe { ffi_windows::xenon_platform_window_is_fullscreen(slot) });
+        let fullscreen = self
+            .window_handle()
+            .is_some_and(|handle| handle.is_full_screen())
+            || slot.is_some_and(|slot| unsafe {
+                ffi_windows::xenon_platform_window_is_fullscreen(slot)
+            });
         if fullscreen {
             return;
         }
