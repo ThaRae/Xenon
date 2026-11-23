@@ -18,10 +18,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 10 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 4f1d76086e3b44763e4a0fb21c394ed8879dcc4b..6ab52cf3d52239b17af7d2ca506d4d25951e20eb 100644
+index 5ca0309e001e3e122220db2fc7de0212a2cf1953..b7e35c09e0c82929d2b43737ed1a3b62afaf4dd2 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -607,6 +607,14 @@ void ConnectionFromClient::set_navigation_events_enabled(bool enabled)
+@@ -636,6 +636,14 @@ void ConnectionFromClient::set_navigation_events_enabled(bool enabled)
      WebContent::set_embedder_wants_navigation_events(enabled);
  }
  
@@ -37,10 +37,10 @@ index 4f1d76086e3b44763e4a0fb21c394ed8879dcc4b..6ab52cf3d52239b17af7d2ca506d4d25
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index fbe5727e6916d45b2631684abc501d7010fc0175..03c6f490b8724853b6113e3a92bdf41ede7b5dfe 100644
+index a45f1e89a24a5a068916a205ec4254c571ede4a7..d1f5780aa72f4c067048260aff61eccaab9fa60b 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -134,6 +134,7 @@ private:
+@@ -135,6 +135,7 @@ private:
      virtual void set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) override;
      virtual void set_user_scripts_enabled(bool enabled) override;
      virtual void set_navigation_events_enabled(bool enabled) override;
@@ -49,10 +49,10 @@ index fbe5727e6916d45b2631684abc501d7010fc0175..03c6f490b8724853b6113e3a92bdf41e
      virtual void update_system_theme(Web::PageId page_id, Core::AnonymousBuffer) override;
      virtual void update_screen_rects(Web::PageId page_id, Vector<Web::DevicePixelRect>, Vector<Web::DevicePixelRect>, u32) override;
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 2faae234a8220ef3641df570fdb5724c2eb3a98c..8d8af7af730e40c10eabe4daf76ba1347acf74fb 100644
+index 2198000943d402d15b7a2d8779f9db3fa8846522..0f222f8a0125d5a40681033032576531275701ec 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -107,6 +107,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -108,6 +108,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      set_origin_access_allow_list(Vector<Web::Fetch::Infrastructure::OriginAccessAllowListEntry> allow_list) =|
      set_user_scripts_enabled(bool enabled) =|
      set_navigation_events_enabled(bool enabled) =|

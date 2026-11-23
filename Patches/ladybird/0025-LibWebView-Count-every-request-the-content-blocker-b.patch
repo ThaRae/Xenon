@@ -36,10 +36,10 @@ index 4fb5d56f184d6d5c659dbadfcce85533a5500b6d..95472d120fa0f2995152ce1bc38fd31d
      bool enabled() const { return state == ContentBlockingState::Enabled || state == ContentBlockingState::NoRules; }
      bool can_toggle() const { return site.has_value() && (enabled() || state == ContentBlockingState::SiteDisabled); }
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 302f7f58a9196ebf05ce3699d9ed903458b6514c..e880353c03e8b5e047f6b13c474ba2b6cc9d9855 100644
+index 8cb94c66e953d08eac749e4b6710370e1afa0699..5d65c6a4b0b898144c9a825801b3b814432c3e58 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -2776,22 +2776,21 @@ static StringView known_blocked_resource_kind(StringView kind)
+@@ -2781,22 +2781,21 @@ static StringView known_blocked_resource_kind(StringView kind)
  
  void ViewImplementation::did_block_resource(Badge<WebContentPage>, URL::URL const& url, StringView kind)
  {
@@ -66,7 +66,7 @@ index 302f7f58a9196ebf05ce3699d9ed903458b6514c..e880353c03e8b5e047f6b13c474ba2b6
      notify_content_blocking_changed();
  }
  
-@@ -2805,6 +2804,7 @@ ContentBlockingSnapshot ViewImplementation::content_blocking_snapshot() const
+@@ -2810,6 +2809,7 @@ ContentBlockingSnapshot ViewImplementation::content_blocking_snapshot() const
  {
      ContentBlockingSnapshot snapshot;
      snapshot.blocked_resources = m_blocked_resources;
@@ -75,10 +75,10 @@ index 302f7f58a9196ebf05ce3699d9ed903458b6514c..e880353c03e8b5e047f6b13c474ba2b6
      if (m_crash_state.has_value() || !traversable().active_document().host())
          return snapshot;
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 6c50097fa9df8e0e207e2cc89510c4419a0b924f..46ddad4f171164c5f992f637e585cd8f32314b8a 100644
+index 3d547f2f0097eae3caeec2de63241539c05f0cca..03d7591024fa7b2b5cdf77ec86e56af76fcdf358 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -1280,6 +1280,7 @@ protected:
+@@ -1296,6 +1296,7 @@ protected:
      u64 m_next_navigation_listener_id { 1 };
  
      Vector<BlockedResource> m_blocked_resources;
@@ -87,10 +87,10 @@ index 6c50097fa9df8e0e207e2cc89510c4419a0b924f..46ddad4f171164c5f992f637e585cd8f
      enum class NodePickerRequestType : u8 {
          Hovered,
 diff --git a/Services/Hub/HubClient.ipc b/Services/Hub/HubClient.ipc
-index 0bb24133d9df233d21b10c898a394edf0e0e881e..c558f32440b50be20145f4efe40a6cb5ca1dde52 100644
+index a78611335613578fc7935cde5bf5fc44999002c2..a3772205e04df00295aafa34e307daa3b5294fed 100644
 --- a/Services/Hub/HubClient.ipc
 +++ b/Services/Hub/HubClient.ipc
-@@ -45,6 +45,7 @@ struct WebView::ContentBlockingSnapshot {
+@@ -47,6 +47,7 @@ struct WebView::ContentBlockingSnapshot {
      Optional<String> site;
      WebView::ContentBlockingState state;
      Vector<WebView::BlockedResource> blocked_resources;

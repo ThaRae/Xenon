@@ -26,10 +26,10 @@ coming from another tab.
  4 files changed, 99 insertions(+), 15 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index d6c014f117b43d49b28ef590eed16d8350b5e2e1..fb0a2b1915d518985e05392ba4a737b1b9ade500 100644
+index 7c5011e2a8e1f00537cab39d557c66ca563bef8d..f1ef99ef66b1baf3324ba98e5efc2d99f25331c4 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -2577,7 +2577,7 @@ ErrorOr<void> Application::launch_devtools_server()
+@@ -2623,7 +2623,7 @@ ErrorOr<void> Application::launch_devtools_server()
      return {};
  }
  
@@ -38,7 +38,7 @@ index d6c014f117b43d49b28ef590eed16d8350b5e2e1..fb0a2b1915d518985e05392ba4a737b1
  {
      if (!m_devtools || !m_browser_options.devtools_port.has_value())
          return Error::from_string_literal("DevTools is not currently enabled");
-@@ -2585,14 +2585,52 @@ ErrorOr<void> Application::launch_devtools_client()
+@@ -2631,14 +2631,52 @@ ErrorOr<void> Application::launch_devtools_client()
      if (m_devtools->has_active_connection())
          return Error::from_string_literal("A DevTools client is already connected");
  
@@ -93,7 +93,7 @@ index d6c014f117b43d49b28ef590eed16d8350b5e2e1..fb0a2b1915d518985e05392ba4a737b1
  }
  
  static NonnullRefPtr<Core::Timer> load_page_for_screenshot_and_exit(Core::EventLoop& event_loop, HeadlessWebView& view, URL::URL const& url, u32 screenshot_timeout)
-@@ -3479,7 +3517,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
+@@ -3561,7 +3599,12 @@ ErrorOr<void> Application::toggle_devtools_enabled()
  {
      if (m_devtools) {
          m_devtools_client.clear();
@@ -106,7 +106,7 @@ index d6c014f117b43d49b28ef590eed16d8350b5e2e1..fb0a2b1915d518985e05392ba4a737b1
          on_devtools_disabled();
      } else {
          TRY(launch_devtools_server());
-@@ -4430,7 +4473,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
+@@ -4512,7 +4555,7 @@ void Application::listen_for_inspect_element_requests(DevTools::TabDescription c
      if (!view.has_value())
          return;
  
@@ -115,7 +115,7 @@ index d6c014f117b43d49b28ef590eed16d8350b5e2e1..fb0a2b1915d518985e05392ba4a737b1
  }
  
  void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescription const& description) const
-@@ -4439,7 +4482,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
+@@ -4521,7 +4564,7 @@ void Application::stop_listening_for_inspect_element_requests(DevTools::TabDescr
      if (!view.has_value())
          return;
  
@@ -124,7 +124,7 @@ index d6c014f117b43d49b28ef590eed16d8350b5e2e1..fb0a2b1915d518985e05392ba4a737b1
  }
  
  void Application::did_connect_devtools_client(DevTools::TabDescription const& description) const
-@@ -4463,6 +4506,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
+@@ -4545,6 +4588,7 @@ void Application::did_disconnect_devtools_client(DevTools::TabDescription const&
  void Application::did_close_devtools_connection()
  {
      m_devtools_client.clear();
@@ -133,10 +133,10 @@ index d6c014f117b43d49b28ef590eed16d8350b5e2e1..fb0a2b1915d518985e05392ba4a737b1
  
  }
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index e8dd1969016df82f4a3c8ff8deb2446bb7bb816f..1871b4c43f715c1cc38b178dac0742bc6dc9073e 100644
+index 570662424d21183ad31e59ac27fd76753abb88b0..8693dad3732d5e7cd574840ca06816f16d0f76f0 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -409,7 +409,8 @@ public:
+@@ -419,7 +419,8 @@ public:
      void apply_view_options(Badge<ViewImplementation>, ViewImplementation&, WebContentPage&);
  
      ErrorOr<void> toggle_devtools_enabled();
@@ -146,7 +146,7 @@ index e8dd1969016df82f4a3c8ff8deb2446bb7bb816f..1871b4c43f715c1cc38b178dac0742bc
      void refresh_tab_list();
  
      Optional<Core::TimeZoneWatcher&> time_zone_watcher();
-@@ -752,6 +753,8 @@ private:
+@@ -776,6 +777,8 @@ private:
  
      OwnPtr<DevTools::DevToolsServer> m_devtools;
      OwnPtr<DevTools::FirefoxClient> m_devtools_client;
@@ -156,10 +156,10 @@ index e8dd1969016df82f4a3c8ff8deb2446bb7bb816f..1871b4c43f715c1cc38b178dac0742bc
      mutable HashMap<u64, u64> m_navigation_listener_ids;
  };
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index 376b3c94129436e2bd0354a02ddd89c970f5bde5..f175280225341470e01f3046ae52aa6eacffd97b 100644
+index dca115ba42897085b09c32df1500752fc1f382ab..5eb8d17df0a65f13ea740fd801979ff799784e2b 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
-@@ -2099,9 +2099,8 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
+@@ -2104,9 +2104,8 @@ void ViewImplementation::did_receive_node_hit_test(u64 request_id, Web::UniqueNo
          if (node_id != 0)
              m_inspect_element_node_id = node_id;
  
@@ -171,7 +171,7 @@ index 376b3c94129436e2bd0354a02ddd89c970f5bde5..f175280225341470e01f3046ae52aa6e
          return;
      }
  
-@@ -2697,6 +2696,42 @@ void ViewImplementation::did_disconnect_devtools_client()
+@@ -2702,6 +2701,42 @@ void ViewImplementation::did_disconnect_devtools_client()
      page().async_set_has_devtools_client(false);
  }
  
@@ -214,7 +214,7 @@ index 376b3c94129436e2bd0354a02ddd89c970f5bde5..f175280225341470e01f3046ae52aa6e
  void ViewImplementation::get_dom_node_inner_html(Web::UniqueNodeID node_id)
  {
      page().async_get_dom_node_inner_html(node_id);
-@@ -5080,7 +5115,7 @@ ErrorOr<LexicalPath> ViewImplementation::dump_gc_graph()
+@@ -5163,7 +5198,7 @@ ErrorOr<LexicalPath> ViewImplementation::dump_gc_graph()
  void ViewImplementation::send_context_menu_request(ContextMenuRequest request, Gfx::IntPoint content_position)
  {
      request.widget_position = to_widget_position(content_position);
@@ -223,7 +223,7 @@ index 376b3c94129436e2bd0354a02ddd89c970f5bde5..f175280225341470e01f3046ae52aa6e
      did_request_context_menu(move(request));
  }
  
-@@ -5088,8 +5123,8 @@ void ViewImplementation::inspect_context_menu_element()
+@@ -5171,8 +5206,8 @@ void ViewImplementation::inspect_context_menu_element()
  {
      if (m_inspect_element_hit_test_request_id.has_value())
          m_inspect_element_activated_before_hit_test = true;
@@ -234,7 +234,7 @@ index 376b3c94129436e2bd0354a02ddd89c970f5bde5..f175280225341470e01f3046ae52aa6e
  }
  
  void ViewImplementation::replace_context_menu_misspelling(Utf16String const& replacement)
-@@ -5329,9 +5364,6 @@ void ViewImplementation::prepare_inspect_element(Gfx::IntPoint content_position)
+@@ -5412,9 +5447,6 @@ void ViewImplementation::prepare_inspect_element(Gfx::IntPoint content_position)
      m_inspect_element_hit_test_request_id.clear();
      m_inspect_element_activated_before_hit_test = false;
  
@@ -245,10 +245,10 @@ index 376b3c94129436e2bd0354a02ddd89c970f5bde5..f175280225341470e01f3046ae52aa6e
      m_inspect_element_hit_test_request_id = request_id;
      page().async_get_node_id_at_position(request_id, { content_position.x(), content_position.y() });
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index da8da0b976197d57020f1ca0c965cf16c1afed38..8666bd93d3bdeae0b59f47be8f864dac7678eeb4 100644
+index b5e3bbba0939c1ccd500dae93c6e109f5cf9daa0..b0ac587bcec5e184bb19ba8eb3a780570386ec34 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
-@@ -491,6 +491,9 @@ public:
+@@ -493,6 +493,9 @@ public:
      void did_connect_devtools_client();
      void did_disconnect_devtools_client();
      void start_sending_console_output(bool messages, bool errors);
@@ -258,7 +258,7 @@ index da8da0b976197d57020f1ca0c965cf16c1afed38..8666bd93d3bdeae0b59f47be8f864dac
      bool has_devtools_client() const { return m_devtools_connected; }
      void get_dom_node_inner_html(Web::UniqueNodeID node_id);
      void get_dom_node_outer_html(Web::UniqueNodeID node_id);
-@@ -1006,8 +1009,10 @@ protected:
+@@ -1016,8 +1019,10 @@ protected:
      HashMap<u64, NonnullRefPtr<Core::Promise<DiscardPreparation>>> m_pending_discard_preparations;
  
      void prepare_inspect_element(Gfx::IntPoint content_position);

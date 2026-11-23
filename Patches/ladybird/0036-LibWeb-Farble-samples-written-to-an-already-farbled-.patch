@@ -68,10 +68,10 @@ index 9ec2c5a8c6601cada36f0ceb73f4808916886430..da0967e5f4fb3ecf404c3d9dcc50c4ed
  #include <LibWeb/HTML/CustomElements/CustomElementReactions.h>
  #include <LibWeb/HTML/EventLoop/EventLoop.h>
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index 1b97f9ee4b08b6543fe38ecee4864fcf19d91d13..35e9b958490c5417eadc5cb9de456bdfef4271b3 100644
+index 94c39d489268cd5eaa2df748968f8e6aab206cfb..8f1d8c077b91fe8eb014eeeacf4ecb234e96093c 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -1547,6 +1547,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
+@@ -1562,6 +1562,12 @@ WebIDL::ExceptionOr<void> Internals::set_site_compatibility_data(Utf16String con
      return {};
  }
  
@@ -85,10 +85,10 @@ index 1b97f9ee4b08b6543fe38ecee4864fcf19d91d13..35e9b958490c5417eadc5cb9de456bdf
  {
      page().set_content_blocking_policy(enabled, {});
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index 6d0d4d6a52b9d15e4f512dda226bf74a068d6cf7..52c855ee3931ca70a6d1d997ec919e8fa90a36a2 100644
+index 5ff857ce11395baf815c23017000e07eb7108762..4c30bc01df30c8b9aeaf68971cc7422cc588e193 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -183,6 +183,7 @@ public:
+@@ -184,6 +184,7 @@ public:
      WebIDL::ExceptionOr<void> send_bad_ipc_message_for_testing(Utf16String const& kind);
      WebIDL::ExceptionOr<void> set_content_blockers(Utf16String const& patterns);
      WebIDL::ExceptionOr<void> set_site_compatibility_data(Utf16String const& source);
@@ -97,10 +97,10 @@ index 6d0d4d6a52b9d15e4f512dda226bf74a068d6cf7..52c855ee3931ca70a6d1d997ec919e8f
      Optional<String> cosmetic_filter_for_element(DOM::Element&);
      void begin_layout_trace(Bindings::LayoutTraceOptions const&);
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 610e8a9fcdf79370d9d5b592c80ff0afba2d73fc..09ec737a79e078a210186093c23203e277b61ea0 100644
+index d3e43436ac9c9542a5806b82e0b75893afdf82f1..f3c4e94033cd7b33b75e3268e9b256e0c4f29e39 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -196,6 +196,7 @@ interface Internals {
+@@ -198,6 +198,7 @@ interface Internals {
      undefined sendBadIpcMessageForTesting(DOMString kind);
      undefined setContentBlockers(DOMString patterns);
      undefined setSiteCompatibilityData(DOMString source);

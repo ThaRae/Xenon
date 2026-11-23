@@ -12,6 +12,7 @@
 #include <UI/Application.h>
 #include <UI/ApplicationActions.h>
 #include <UI/Bookmarks.h>
+#include <UI/DefaultBrowser.h>
 #include <UI/HubConnection.h>
 #include <UI/RemoteDownloads.h>
 #include <UI/RemoteView.h>
@@ -30,7 +31,9 @@ HubConnection::HubConnection(NonnullOwnPtr<IPC::Transport> transport)
 
 HubConnection::~HubConnection()
 {
-    s_the = nullptr;
+    // NB: A connection can outlive the one that took its place, as when a launch connects to a second Hub.
+    if (s_the == this)
+        s_the = nullptr;
 }
 
 HubConnection& HubConnection::the()
@@ -321,6 +324,10 @@ void HubConnection::app_did_disable_devtools()
     Application::the().did_disable_devtools();
 }
 
+void HubConnection::app_gpu_painting_changed(bool)
+{
+}
+
 void HubConnection::app_open_urls_in_new_tabs(Vector<URL::URL> urls)
 {
     Application::the().open_urls_in_new_tabs(urls);
@@ -339,6 +346,10 @@ void HubConnection::app_open_view_in_new_tab(u64 view_id, Optional<u64> source_v
 void HubConnection::app_display_error_dialog(String message)
 {
     Application::the().display_error_dialog(message);
+}
+
+void HubConnection::app_display_update_check_result(WebView::UpdateCheckResult::Kind, Optional<String>, WebView::InstallMethod, WebView::UpdateCheckTrigger)
+{
 }
 
 void HubConnection::app_display_download_confirmation_dialog(String download_name, ByteString path)
@@ -567,6 +578,13 @@ void HubConnection::microphone_request_authorization()
     }
     authorizer->request_authorization([this](WebView::MicrophoneAuthorization authorization) {
         async_microphone_authorization_changed(authorization);
+    });
+}
+
+void HubConnection::default_browser_make_default()
+{
+    DefaultBrowser::request_default([this] {
+        async_default_browser_make_default_finished(DefaultBrowser::status() != DefaultBrowser::Status::IsDefault, {});
     });
 }
 

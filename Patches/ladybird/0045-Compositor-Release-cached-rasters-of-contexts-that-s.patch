@@ -50,7 +50,7 @@ index 11833a423de5beaee4107fe59a205ba529ce4b1b..45e8b4355bbdc89eb0a19400c2ee660c
  if ((LINUX OR BSD) AND NOT BUILD_SHARED_LIBS)
      target_link_options(compositorservice INTERFACE LINKER:--allow-multiple-definition)
 diff --git a/Services/Compositor/CompositorState.cpp b/Services/Compositor/CompositorState.cpp
-index fe84630057a2ff87abc64cab1f93bab2b65ed919..8da8199c3995c48ad3a176b4e866f17c8b1b66b1 100644
+index f8299780f94ec612e09205b3e120f8ba4a75528d..4c64dc283b27aa1d3d7e926931ed9ce5155a5c19 100644
 --- a/Services/Compositor/CompositorState.cpp
 +++ b/Services/Compositor/CompositorState.cpp
 @@ -14,19 +14,52 @@
@@ -250,7 +250,7 @@ index fe84630057a2ff87abc64cab1f93bab2b65ed919..8da8199c3995c48ad3a176b4e866f17c
  }
  
  void CompositorState::set_window_server_may_show_high_dynamic_range(bool may_show)
-@@ -1112,6 +1269,11 @@ Compositing::RustFFI::FfiRasterPainter CompositorState::begin_painting(Web::Comp
+@@ -1076,6 +1233,11 @@ Compositing::RustFFI::FfiRasterPainter CompositorState::begin_painting(Web::Comp
      auto& player = *m_display_list_players[m_painting_depth++];
      switch (resources) {
      case RustFFI::PaintingResources::Page:
@@ -259,11 +259,11 @@ index fe84630057a2ff87abc64cab1f93bab2b65ed919..8da8199c3995c48ad3a176b4e866f17c
 +        schedule_idle_memory_release(MonotonicTime::now() + hidden_context_raster_release_delay);
 +        if (idle_memory_release_is_logged())
 +            dbgln("COMPOSITOR-FRAME context={} after_release={}", context_id, raster_targets.raster_cache().was_released_since_last_paint());
-         return player.begin_painting(surface, raster_targets.fonts(), &raster_targets.image_frames(), raster_targets.raster_cache(), &raster_targets.canvas_surfaces(), [this, &client = context.web_content_client](Media::VideoSinkHandle handle) {
-             return current_video_frame(client, handle);
-         });
+         return player.begin_painting(surface, raster_targets.fonts(), &raster_targets.image_frames(), raster_targets.raster_cache(), &raster_targets.canvas_surfaces(), [this, &client = context.web_content_client](Media::VideoSinkHandle handle) { return current_video_frame(client, handle); }, allows_lcd_text);
+     case RustFFI::PaintingResources::Overlays:
+         return player.begin_painting(surface, raster_targets.overlay_fonts(), nullptr, raster_targets.overlay_raster_cache(), nullptr, nullptr);
 diff --git a/Services/Compositor/CompositorState.h b/Services/Compositor/CompositorState.h
-index bc087afd48c1a443203f4bfc07c91ad5441e2d22..89bada9157f1928460d8411ed4539a9573347ff7 100644
+index cba2becd87dabc41ab32acdfe10f40853b346c03..5293b98e31842c37674a9ad159e48d0587bc7024 100644
 --- a/Services/Compositor/CompositorState.h
 +++ b/Services/Compositor/CompositorState.h
 @@ -34,6 +34,7 @@
@@ -274,7 +274,7 @@ index bc087afd48c1a443203f4bfc07c91ad5441e2d22..89bada9157f1928460d8411ed4539a95
  
  namespace Compositor {
  
-@@ -254,6 +255,10 @@ private:
+@@ -255,6 +256,10 @@ private:
      void gpu_work_finished(u64 token);
      void schedule_gpu_completion_check();
      void check_gpu_completions();
@@ -285,7 +285,7 @@ index bc087afd48c1a443203f4bfc07c91ad5441e2d22..89bada9157f1928460d8411ed4539a95
  
      VSyncScheduler& vsync_scheduler_for_display(Optional<u64> display_id);
      void set_maximum_display_refresh_rate(double);
-@@ -314,6 +319,11 @@ private:
+@@ -315,6 +320,11 @@ private:
      HashTable<u64> m_gpu_work_in_flight;
      u64 m_next_gpu_work_token { 1 };
      RefPtr<Core::Timer> m_gpu_completion_timer;
@@ -298,19 +298,19 @@ index bc087afd48c1a443203f4bfc07c91ad5441e2d22..89bada9157f1928460d8411ed4539a95
      Vector<u64>* m_contexts_with_new_video_frames { nullptr };
  
 diff --git a/Services/Compositor/DisplayListPlayerSkia.cpp b/Services/Compositor/DisplayListPlayerSkia.cpp
-index 3c50f2e076f31b2947d6e72af91840551ebb1123..f32db01741cfa92a5798aa500b516800afba25e5 100644
+index 3c68155d36ade39c6b97d9121ab8b24846c57c77..64a33c43c856115ff64fa9446368c923aa58a70f 100644
 --- a/Services/Compositor/DisplayListPlayerSkia.cpp
 +++ b/Services/Compositor/DisplayListPlayerSkia.cpp
-@@ -135,6 +135,7 @@ RustFFI::FfiRasterPainter DisplayListPlayerSkia::begin_painting(Gfx::PaintingSur
+@@ -139,6 +139,7 @@ RustFFI::FfiRasterPainter DisplayListPlayerSkia::begin_painting(Gfx::PaintingSur
      m_fonts = &fonts;
      m_image_frames = image_frames;
      m_raster_cache = &raster_cache;
 +    raster_cache.did_paint();
      m_canvas_surfaces = canvas_surfaces;
-     m_current_video_frame = move(current_video_frame);
-     return PainterCallbacks::for_player(*this);
+     m_allows_lcd_text = allows_lcd_text;
+     m_raster_state->base_save_count = surface.canvas().getSaveCount();
 diff --git a/Services/Compositor/DisplayListRasterCache.cpp b/Services/Compositor/DisplayListRasterCache.cpp
-index f0a60f934b45c5dbf726b86423929e5262e909c6..d2d31f463b5fc20a72aa1d15f5011ae42a6d64ac 100644
+index 14af8e2e9e35b1bb30a4f8fe37bcceeec5b2a951..713dc75df16da2c66d39c765bf1c2747266c63db 100644
 --- a/Services/Compositor/DisplayListRasterCache.cpp
 +++ b/Services/Compositor/DisplayListRasterCache.cpp
 @@ -189,6 +189,39 @@ struct DisplayListRasterCache::ClipPath {
@@ -354,10 +354,10 @@ index f0a60f934b45c5dbf726b86423929e5262e909c6..d2d31f463b5fc20a72aa1d15f5011ae4
  {
      if (font_ids.is_empty())
 diff --git a/Services/Compositor/DisplayListRasterCache.h b/Services/Compositor/DisplayListRasterCache.h
-index 9a97fcc49d0425bcd01319e4d59bc6761139c5de..90590061862382abf2a9e9fcc91181c82111dbf1 100644
+index 4ee9b6413bcd63058a4762b689c2966c8562ea7a..61f5c5f89429ff6ae1878d58a5572e53b334ebb1 100644
 --- a/Services/Compositor/DisplayListRasterCache.h
 +++ b/Services/Compositor/DisplayListRasterCache.h
-@@ -107,6 +107,24 @@ public:
+@@ -109,6 +109,24 @@ public:
      // Drops the clip paths and layer filters that were not used since the last call.
      void drop_what_was_not_used_since_last_frame();
  
@@ -382,7 +382,7 @@ index 9a97fcc49d0425bcd01319e4d59bc6761139c5de..90590061862382abf2a9e9fcc91181c8
  private:
      struct ImageFrameImage;
      struct VideoSinkImage;
-@@ -130,6 +148,8 @@ private:
+@@ -132,6 +150,8 @@ private:
      MonotonicTime m_text_blob_cache_sweep_time { MonotonicTime::now() };
      HashMap<u64, NonnullOwnPtr<ClipPath>> m_clip_paths;
      HashMap<u64, NonnullOwnPtr<ClipPath>> m_clip_paths_from_last_frame;

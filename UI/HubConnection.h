@@ -106,6 +106,7 @@ private:
     virtual void translator_translate(u64 request_id, u64 session_id, Web::TranslationUnit unit) override;
     virtual void translator_open_language_download_settings() override;
     virtual void microphone_request_authorization() override;
+    virtual void default_browser_make_default() override;
     virtual void gamepad_start(bool ignore_system_gamepads) override;
     virtual void gamepad_set_polling(bool polling) override;
     virtual void gamepad_rumble(u32 handle, u16 low_frequency_magnitude, u16 high_frequency_magnitude, u32 duration_ms) override;
@@ -135,10 +136,12 @@ private:
     virtual void app_quit_for_signal() override;
     virtual void app_did_enable_devtools(u16 port) override;
     virtual void app_did_disable_devtools() override;
+    virtual void app_gpu_painting_changed(bool gpu_painting_enabled) override;
     virtual void app_open_urls_in_new_tabs(Vector<URL::URL> urls) override;
     virtual void app_activate_or_open_tab_with_url(URL::URL url) override;
     virtual void app_open_view_in_new_tab(u64 view_id, Optional<u64> source_view_id, WebView::IsPrivate is_private, Web::HTML::ActivateTab activate_tab) override;
     virtual void app_display_error_dialog(String message) override;
+    virtual void app_display_update_check_result(WebView::UpdateCheckResult::Kind, Optional<String> version, WebView::InstallMethod, WebView::UpdateCheckTrigger) override;
     virtual void app_display_download_confirmation_dialog(String download_name, ByteString path) override;
     virtual void app_read_clipboard_text(u64 request_id, WebView::Application::ClipboardType type) override;
     virtual void app_read_clipboard_item(u64 request_id) override;

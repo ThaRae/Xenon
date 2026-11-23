@@ -17,10 +17,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 319b8bb8a2adab1852911ce98c336f2df81eea8a..d6c014f117b43d49b28ef590eed16d8350b5e2e1 100644
+index 736c4ae79d00de8c59fa9807cd234804a1be57d7..7c5011e2a8e1f00537cab39d557c66ca563bef8d 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -1880,6 +1880,10 @@ ErrorOr<Application::ChildFrameWebContentProcess> Application::launch_child_fram
+@@ -1909,6 +1909,10 @@ ErrorOr<Application::ChildFrameWebContentProcess> Application::launch_child_fram
  
  void Application::launch_spare_web_content_process()
  {
@@ -32,7 +32,7 @@ index 319b8bb8a2adab1852911ce98c336f2df81eea8a..d6c014f117b43d49b28ef590eed16d83
      // session and can race browser shutdown while bootstrapping.
      if (browser_options().webdriver_browser_endpoint.has_value())
 diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
-index 4dac30ff5c15d1ebc77fc506bd0f96f8eb0d25b1..c1f2e172858ac9be98b89523659e77145b6caae1 100644
+index 24ced9ea874a947ad55bb99a5d814a9c8b555d79..29f672c2a12f8c96efb4f3b892fd505a39fbda27 100644
 --- a/Libraries/LibWebView/Options.h
 +++ b/Libraries/LibWebView/Options.h
 @@ -81,6 +81,13 @@ enum class DeferContentBlockerRules {

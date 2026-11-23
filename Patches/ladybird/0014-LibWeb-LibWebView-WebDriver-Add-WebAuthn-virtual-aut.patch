@@ -35,7 +35,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  Libraries/LibWebView/Application.cpp          |   3 +
  Libraries/LibWebView/CMakeLists.txt           |   1 +
  Libraries/LibWebView/WebAuthn/Coordinator.cpp |  70 +-
- .../WebAuthn/VirtualAuthenticator.cpp         | 615 ++++++++++++++++
+ .../WebAuthn/VirtualAuthenticator.cpp         | 632 ++++++++++++++++
  .../WebAuthn/VirtualAuthenticator.h           | 120 ++++
  Libraries/LibWebView/WebContentTestClient.cpp |  11 +
  Libraries/LibWebView/WebContentTestClient.h   |   1 +
@@ -77,7 +77,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  .../Text/input/wpt-import/webauthn/helpers.js | 679 ++++++++++++++++++
  Tests/LibWebView/CMakeLists.txt               |   1 +
  Tests/LibWebView/test-webdriver-webauthn.py   | 138 ++++
- 51 files changed, 2800 insertions(+), 9 deletions(-)
+ 51 files changed, 2817 insertions(+), 9 deletions(-)
  create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
  create mode 100644 Libraries/LibWebView/WebAuthn/VirtualAuthenticator.h
  create mode 100644 Tests/LibWeb/Text/data/webauthn-get-in-frame.html
@@ -107,10 +107,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Tests/LibWebView/test-webdriver-webauthn.py
 
 diff --git a/Libraries/LibWeb/Internals/Internals.cpp b/Libraries/LibWeb/Internals/Internals.cpp
-index ca2a68bc78dbeb75f47c039b75379d09acb06484..1b97f9ee4b08b6543fe38ecee4864fcf19d91d13 100644
+index 87908c15284e738b6227fc8c339893d41043c0a4..94c39d489268cd5eaa2df748968f8e6aab206cfb 100644
 --- a/Libraries/LibWeb/Internals/Internals.cpp
 +++ b/Libraries/LibWeb/Internals/Internals.cpp
-@@ -2488,6 +2488,24 @@ void Internals::pump_gamepad_events()
+@@ -2503,6 +2503,24 @@ void Internals::pump_gamepad_events()
      page().client().pump_gamepad_events();
  }
  
@@ -136,10 +136,10 @@ index ca2a68bc78dbeb75f47c039b75379d09acb06484..1b97f9ee4b08b6543fe38ecee4864fcf
  {
      auto virtual_gamepad = page().client().create_virtual_gamepad();
 diff --git a/Libraries/LibWeb/Internals/Internals.h b/Libraries/LibWeb/Internals/Internals.h
-index f56172b39f64f03ea93294f6c43c811ee0e27079..6d0d4d6a52b9d15e4f512dda226bf74a068d6cf7 100644
+index 21532bbbdef329f73f1edf5839fde3432379874c..5ff857ce11395baf815c23017000e07eb7108762 100644
 --- a/Libraries/LibWeb/Internals/Internals.h
 +++ b/Libraries/LibWeb/Internals/Internals.h
-@@ -273,6 +273,8 @@ public:
+@@ -274,6 +274,8 @@ public:
      void pump_gamepad_events();
  
      GC::Ref<InternalGamepad> connect_virtual_gamepad();
@@ -149,10 +149,10 @@ index f56172b39f64f03ea93294f6c43c811ee0e27079..6d0d4d6a52b9d15e4f512dda226bf74a
  
      void perform_per_test_cleanup();
 diff --git a/Libraries/LibWeb/Internals/Internals.idl b/Libraries/LibWeb/Internals/Internals.idl
-index 561b34975a00d4dd9dc0a208939b9abc5321473a..610e8a9fcdf79370d9d5b592c80ff0afba2d73fc 100644
+index 05960b7c19e609e957c35a44cd5ae4924ec993b7..d3e43436ac9c9542a5806b82e0b75893afdf82f1 100644
 --- a/Libraries/LibWeb/Internals/Internals.idl
 +++ b/Libraries/LibWeb/Internals/Internals.idl
-@@ -344,6 +344,10 @@ interface Internals {
+@@ -346,6 +346,10 @@ interface Internals {
  
      InternalGamepad connectVirtualGamepad();
  
@@ -225,10 +225,10 @@ index d9d788a56d36e61e240738ad99addc9cace4fc4d..578349bd0bf380dce72b520effdcd61e
  
  protected:
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index c236acd945291ff986ec87dd228ae0cef8505064..40b4598c6e1e20cadabf4fea51a83dbc384f5759 100644
+index 2ddca6660490a8ca3c3526fb49e1abc98f3d9755..4b7ec7dc949e31991b3022a042f1dee85e6ec83c 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -78,6 +78,8 @@
+@@ -80,6 +80,8 @@
  #include <LibWebView/UserAgent.h>
  #include <LibWebView/Utilities.h>
  #include <LibWebView/ViewImplementation.h>
@@ -237,7 +237,7 @@ index c236acd945291ff986ec87dd228ae0cef8505064..40b4598c6e1e20cadabf4fea51a83dbc
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
  #include <LibWebView/WebDriverBrowserConnection.h>
-@@ -1900,6 +1902,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
+@@ -1929,6 +1931,7 @@ static void notify_devtools_of_storage_change(StorageJar& jar, StorageChange con
  ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
@@ -246,10 +246,10 @@ index c236acd945291ff986ec87dd228ae0cef8505064..40b4598c6e1e20cadabf4fea51a83dbc
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index 7afcf3a79dee5c73702ac41555c524c769ba5008..e48486fe5a69632f32e58674bec15d4ad0be1b1f 100644
+index e7fd45b208c8bad92619c5184cd0f5fbbd7f565a..54d83e9b3c6969e6e98190990421c7819aecf657 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -89,6 +89,7 @@ set(SOURCES
+@@ -90,6 +90,7 @@ set(SOURCES
      WebAuthn/CBOR.cpp
      WebAuthn/ClientData.cpp
      WebAuthn/Coordinator.cpp
@@ -384,10 +384,10 @@ index 14a098cc789c647c3ea75fec25219563d9b2d320..58a5f51d3053c782ffa546c2072a821e
  void WebAuthnCoordinator::ceremony_ended(Ceremony& ceremony)
 diff --git a/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..cf1ec513f8b77e02a9682ad677ae45f6e39a05fe
+index 0000000000000000000000000000000000000000..f32583105ad14b5dd95a4d947e0de173441bbcdc
 --- /dev/null
 +++ b/Libraries/LibWebView/WebAuthn/VirtualAuthenticator.cpp
-@@ -0,0 +1,615 @@
+@@ -0,0 +1,632 @@
 +/*
 + * Copyright (c) 2026-present, the Ladybird developers.
 + *
@@ -401,9 +401,9 @@ index 0000000000000000000000000000000000000000..cf1ec513f8b77e02a9682ad677ae45f6
 +#include <LibCore/EventLoop.h>
 +#include <LibCrypto/ASN1/Constants.h>
 +#include <LibCrypto/ASN1/DER.h>
-+#include <LibCrypto/Certificate/Certificate.h>
 +#include <LibCrypto/Hash/Hash.h>
 +#include <LibCrypto/PK/EC.h>
++#include <LibCrypto/PK/KeyInfo.h>
 +#include <LibCrypto/PK/PK.h>
 +#include <LibWebView/CanonicalTraversable.h>
 +#include <LibWebView/WebAuthn/AttestationObject.h>
@@ -449,16 +449,33 @@ index 0000000000000000000000000000000000000000..cf1ec513f8b77e02a9682ad677ae45f6
 +    return MUST(ByteBuffer::copy(Crypto::Hash::digest(Crypto::Hash::HashKind::SHA256, bytes).bytes()));
 +}
 +
++static ErrorOr<void> append_der_encoded_unsigned_integer(ByteBuffer& output, ReadonlyBytes big_endian_value)
++{
++    while (big_endian_value.size() > 1 && big_endian_value[0] == 0)
++        big_endian_value = big_endian_value.slice(1);
++    bool needs_leading_zero = big_endian_value.is_empty() || (big_endian_value[0] & 0x80) != 0;
++
++    TRY(output.try_append(static_cast<u8>(Crypto::ASN1::Kind::Integer)));
++    TRY(output.try_append(static_cast<u8>(big_endian_value.size() + (needs_leading_zero ? 1 : 0))));
++    if (needs_leading_zero)
++        TRY(output.try_append(0));
++    TRY(output.try_append(big_endian_value));
++    return {};
++}
++
 +// https://www.rfc-editor.org/rfc/rfc3279#section-2.2.3
 +static ErrorOr<ByteBuffer> der_encoded_ecdsa_signature(Crypto::PK::ECDSASignature const& signature)
 +{
-+    Crypto::ASN1::Encoder encoder;
-+    TRY(encoder.write_constructed(Crypto::ASN1::Class::Universal, Crypto::ASN1::Kind::Sequence, [&]() -> ErrorOr<void> {
-+        TRY(encoder.write(Crypto::UnsignedBigInteger { signature.r.bytes() }));
-+        TRY(encoder.write(Crypto::UnsignedBigInteger { signature.s.bytes() }));
-+        return {};
-+    }));
-+    return encoder.finish();
++    ByteBuffer integers;
++    TRY(append_der_encoded_unsigned_integer(integers, signature.r));
++    TRY(append_der_encoded_unsigned_integer(integers, signature.s));
++    VERIFY(integers.size() < 0x80);
++
++    ByteBuffer sequence;
++    TRY(sequence.try_append(static_cast<u8>(Crypto::ASN1::Kind::Sequence) | static_cast<u8>(Crypto::ASN1::Type::Constructed)));
++    TRY(sequence.try_append(static_cast<u8>(integers.size())));
++    TRY(sequence.try_append(integers));
++    return sequence;
 +}
 +
 +Optional<Authenticator::Failure> VirtualAuthenticator::check_user(bool user_verification) const
@@ -871,9 +888,9 @@ index 0000000000000000000000000000000000000000..cf1ec513f8b77e02a9682ad677ae45f6
 +    auto private_key_bytes = decode_base64url_parameter(object, "privateKey"sv);
 +    if (private_key_bytes.is_error())
 +        return private_key_bytes.release_error();
-+    Crypto::ASN1::Decoder decoder { private_key_bytes.value() };
-+    auto private_key = Crypto::Certificate::parse_private_key_info(decoder);
-+    if (private_key.is_error() || private_key.value().ec.scalar_size() != P256_SCALAR_SIZE)
++    size_t consumed = 0;
++    auto private_key = Crypto::PK::parse_private_key_info(private_key_bytes.value(), consumed);
++    if (private_key.is_error() || consumed != private_key_bytes.value().size() || private_key.value().ec.scalar_size() != P256_SCALAR_SIZE)
 +        return invalid_argument("privateKey must be a PKCS #8 P-256 private key"sv);
 +    auto scalar = private_key.value().ec.d_bytes();
 +    if (scalar.is_error())
@@ -1210,10 +1227,10 @@ index 848f7f1518f493c3607ff86dbb2c40d47585ddf4..9ed424bff482335c0b679a4e031868c6
      virtual void switch_to_window(u64 command_id, String window_handle) override;
      virtual void switch_to_parent_frame(u64 command_id, String window_handle) override;
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index a8c51367702d6d594eff953a6b9d778ebedf22e4..b3570e5ae913543817ad0fcdee55805b61d51965 100644
+index 74e5882f8d3d9e998e95de80a8c9d5c5a2c95a75..66fba33c0c4470b0af4096a08e1df449f182cacc 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -2323,6 +2323,18 @@ void PageClient::page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHand
+@@ -2339,6 +2339,18 @@ void PageClient::page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHand
      client().async_gamepad_stop_effects(handle);
  }
  
@@ -1233,10 +1250,10 @@ index a8c51367702d6d594eff953a6b9d778ebedf22e4..b3570e5ae913543817ad0fcdee55805b
  {
      auto* test_connection = client().test_connection();
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index 8659a04846901a56c9c31ca4b8e2144f2e4d9d65..b936bdeb18b8510746d2b9e7b987f4a3b058b4fe 100644
+index 1890d445216b26cd3f507761066f267fc3fc05c8..dea7a3ab50554e9b052c5052b9498efebe5dab45 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
-@@ -427,6 +427,7 @@ private:
+@@ -428,6 +428,7 @@ private:
      virtual void page_did_play_gamepad_effect(Web::Gamepad::GamepadHandle, Web::Gamepad::GamepadEffect const&) override;
      virtual void page_did_request_stop_gamepad_effects(Web::Gamepad::GamepadHandle) override;
      virtual Optional<Web::Gamepad::VirtualGamepad> create_virtual_gamepad() override;
@@ -1414,7 +1431,7 @@ index 34a9bb1b110dcfe696d6402f5f8e91f1ec6a7437..5405b21062fea77b0367bb73f16beffb
      bidi_command(u64 command_id, String method, JsonValue params) =|
      bidi_get_top_level_traversables(u64 command_id, Vector<String> navigable_ids) =|
 diff --git a/Tests/LibWeb/TestConfig.ini b/Tests/LibWeb/TestConfig.ini
-index 54ae2611e2c4529c4a8699c6b01c21c945b30d3c..a53e560d944edf04b4a0a63ae4226d3172032b1c 100644
+index 1220b49e152c5d25fb43c008a19fbf52d6e01676..90b2ab38b5b6f84774e23682c095830d6b178267 100644
 --- a/Tests/LibWeb/TestConfig.ini
 +++ b/Tests/LibWeb/TestConfig.ini
 @@ -58,6 +58,17 @@ Text/input/wpt-import/html/dom/render-blocking/remove-attr-script-keeps-blocking
@@ -3270,10 +3287,10 @@ index 0000000000000000000000000000000000000000..a45b686ca775c94dc015d6d59a4a6d0b
 +    JSON.stringify(deepSortKeys(expected)), optMsg);
 +}
 diff --git a/Tests/LibWebView/CMakeLists.txt b/Tests/LibWebView/CMakeLists.txt
-index 238e5795e63d946454a920c693ceed44b6c3e26b..cab1f747af532161ae41efee07f0fbe87b3320db 100644
+index 16b27d575cadfe18f91d9ca811df2cb76aad01a6..24e25df9b7a4e9dde707d92124ac800d8975433e 100644
 --- a/Tests/LibWebView/CMakeLists.txt
 +++ b/Tests/LibWebView/CMakeLists.txt
-@@ -40,6 +40,7 @@ if (BUILD_TESTING AND NOT WIN32)
+@@ -42,6 +42,7 @@ if (BUILD_TESTING AND NOT WIN32)
      ladybird_python_test(test-webdriver-settings-changes.py ARGS $<TARGET_FILE:WebDriver>)
      ladybird_python_test(test-webdriver-site-zoom.py ARGS $<TARGET_FILE:WebDriver>)
      ladybird_python_test(test-webdriver-web-ui-pages-share-a-process.py ARGS $<TARGET_FILE:WebDriver>)

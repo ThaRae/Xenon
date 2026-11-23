@@ -23,7 +23,7 @@ navigates, and closed if a filter matches.
  6 files changed, 28 insertions(+), 5 deletions(-)
 
 diff --git a/Libraries/LibWeb/DOM/Element.cpp b/Libraries/LibWeb/DOM/Element.cpp
-index 5a029f6628147e50df22062d92e557d75a039d8f..e9b98073d64233bc78b05f2d71536efe24ccc924 100644
+index 5065bc5904a69f8d89dc32837cee4233b5cc8fdb..4a5122274ff69de2571ef36191455d31cd0ae411 100644
 --- a/Libraries/LibWeb/DOM/Element.cpp
 +++ b/Libraries/LibWeb/DOM/Element.cpp
 @@ -674,7 +674,7 @@ void Element::follow_the_hyperlink(Optional<Utf16String> hyperlink_suffix, HTML:
@@ -49,10 +49,10 @@ index 0f7a59ad7b0e5619a982e44796096d836dcdcf8e..8e63f0cee61ddd63f639e33c66945651
      // 23. If targetNavigable is null, then return.
      if (!target_navigable) {
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index 6d7bc765dfdae2f9ada69b4d75c308e0c3a1a359..8fc494f950870388ebfb5f8f9bfe77f4012d7f93 100644
+index 55509488203103392dde47c7b10a5521d5390ada..bf9bc89565a58dc491d9ff92595d9c6535109fb0 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-@@ -1856,7 +1856,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
+@@ -1857,7 +1857,7 @@ Optional<LocalNavigable::NavigationParkedForPopulation> LocalNavigable::take_nav
  }
  
  // https://html.spec.whatwg.org/multipage/document-sequences.html#the-rules-for-choosing-a-navigable
@@ -61,7 +61,7 @@ index 6d7bc765dfdae2f9ada69b4d75c308e0c3a1a359..8fc494f950870388ebfb5f8f9bfe77f4
  {
      // 1. Let chosen be null.
      GC::Ptr<Navigable> chosen;
-@@ -1918,6 +1918,13 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
+@@ -1919,6 +1919,13 @@ LocalNavigable::ChosenNavigable LocalNavigable::choose_a_navigable(Utf16View nam
              dbgln("Pop-up blocked!");
          }
  

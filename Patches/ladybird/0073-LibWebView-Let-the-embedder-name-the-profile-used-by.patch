@@ -17,20 +17,20 @@ none is selected, which explicit selections still take priority over.
  5 files changed, 27 insertions(+), 2 deletions(-)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 966f7a55d15f89da60b8db9f00e011bc2e9eeb4c..6e06aa432e6797020d1b55459188ec5c893d7e2c 100644
+index 8cab7704f3e5028c2d194dd5c4af1bf43a46a30d..3fb0b03094276ea70de3ca64c05de208cd212164 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -792,7 +792,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
- ErrorOr<void> Application::create_profile([[maybe_unused]] Optional<StringView> profile_name, [[maybe_unused]] Optional<StringView> profile_path, [[maybe_unused]] bool force_new_process, [[maybe_unused]] bool temporary_profile)
+@@ -819,7 +819,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+ ErrorOr<void> Application::create_profile([[maybe_unused]] Optional<StringView> profile_name, [[maybe_unused]] Optional<StringView> profile_path, [[maybe_unused]] bool temporary_profile)
  {
  #if !defined(AK_OS_ANDROID)
 -    ProfileSelection profile_selection { .temporary = temporary_profile };
 +    ProfileSelection profile_selection { .temporary = temporary_profile, .default_name = m_browser_options.default_profile_name };
  
-     if (force_new_process) {
-         if (profile_name.has_value() || profile_path.has_value() || temporary_profile)
+     if (profile_name.has_value())
+         profile_selection.name = profile_name->to_byte_string();
 diff --git a/Libraries/LibWebView/Options.h b/Libraries/LibWebView/Options.h
-index c1f2e172858ac9be98b89523659e77145b6caae1..426858441df9fd137c5a673eb97672f03df8425c 100644
+index 29f672c2a12f8c96efb4f3b892fd505a39fbda27..dc3ec7c90f54aa9b8818e2e63371707aaf5fc1e5 100644
 --- a/Libraries/LibWebView/Options.h
 +++ b/Libraries/LibWebView/Options.h
 @@ -104,6 +104,8 @@ enum class ProfileTool {

@@ -17,10 +17,10 @@ engine it has, and send the rules again when blocking is turned back on.
  2 files changed, 12 insertions(+)
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index ef6e2449adb607f0deec724a57527cd1aa8bd8fa..03bebd3b6296b76a63b4deddaa778ace9be92c0b 100644
+index b012038f057901d470d97073a11c54f62e0253d8..4bab88240489c04aee4e008e7c81e5ce8082c9e6 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -756,6 +756,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
+@@ -770,6 +770,7 @@ ErrorOr<void> Application::initialize(Main::Arguments const& arguments)
          warnln("\033[31;1mUnable to load all content blocker lists:\033[0m {}", result.error());
          warnln("    Configured lists: {}", m_browser_options.content_blocker_list_paths);
      }
@@ -28,7 +28,7 @@ index ef6e2449adb607f0deec724a57527cd1aa8bd8fa..03bebd3b6296b76a63b4deddaa778ace
  
      if (!m_event_loop)
          m_event_loop = &create_platform_event_loop();
-@@ -946,6 +947,11 @@ void Application::send_content_blockers(WebContentClient& client) const
+@@ -968,6 +969,11 @@ void Application::send_content_blockers(WebContentClient& client) const
  {
      if (!m_content_blocker_list_buffer.has_value() || !m_trusted_content_blocker_list_buffer.has_value() || !m_content_blocker_resources_buffer.has_value())
          return;
@@ -40,7 +40,7 @@ index ef6e2449adb607f0deec724a57527cd1aa8bd8fa..03bebd3b6296b76a63b4deddaa778ace
      client.async_set_content_blockers(*m_content_blocker_list_buffer, *m_trusted_content_blocker_list_buffer, *m_content_blocker_resources_buffer);
  }
  
-@@ -3287,7 +3293,11 @@ void Application::apply_content_blocker_settings()
+@@ -3350,7 +3356,11 @@ void Application::apply_content_blocker_settings()
      else
          rules_changed = result.release_value();
  
@@ -53,15 +53,15 @@ index ef6e2449adb607f0deec724a57527cd1aa8bd8fa..03bebd3b6296b76a63b4deddaa778ace
  
      WebContentClient::for_each_client([&](WebContentClient& client) {
 diff --git a/Libraries/LibWebView/Application.h b/Libraries/LibWebView/Application.h
-index 81e9bd2597d407080d8fb8df2b31d62fa58b08b6..de9088cafa6789c98fc229a1ad1049518fd1575d 100644
+index 1c546eb571268b258421dbed53c0e3af9b13819a..60bc2c28aa27f173641d88e4b4e1fba6c807816b 100644
 --- a/Libraries/LibWebView/Application.h
 +++ b/Libraries/LibWebView/Application.h
-@@ -634,6 +634,8 @@ private:
+@@ -652,6 +652,8 @@ private:
      Optional<Core::AnonymousBuffer> m_content_blocker_list_buffer;
      Optional<Core::AnonymousBuffer> m_trusted_content_blocker_list_buffer;
      Optional<Core::AnonymousBuffer> m_content_blocker_resources_buffer;
 +    // Whether content blocking was on when every process last got the rules, which it only has while it is.
 +    bool m_content_blocking_was_enabled { false };
      RefPtr<Core::Timer> m_content_blocker_list_update_timer;
-     struct PendingContentBlockerListUpdate {
-         String identifier;
+     ByteString m_instance_data_directory;
+ #if defined(LADYBIRD_HAS_UPDATE_CHECK)

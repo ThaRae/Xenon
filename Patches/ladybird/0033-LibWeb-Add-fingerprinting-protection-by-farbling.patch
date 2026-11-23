@@ -297,7 +297,7 @@ index ec771f91d3ac91b1e625f6885eb48352a643b9f0..9ec2c5a8c6601cada36f0ceb73f48089
  {
      HTML::TemporaryExecutionContext execution_context { *static_cast<JS::Realm*>(realm), callbacks_enabled ? HTML::TemporaryExecutionContext::CallbacksEnabled::Yes : HTML::TemporaryExecutionContext::CallbacksEnabled::No };
 diff --git a/Libraries/LibWeb/CMakeLists.txt b/Libraries/LibWeb/CMakeLists.txt
-index 82fd8d22bed476a9086ccfbd9bff135caeb07a08..443539bdf1da5d4e485c80eea016b2dfeee1c63f 100644
+index c83c97a0f724a255013237111ecd87ac8c50bb22..c87002385e30265e3678f5496b9ce2632c490ddf 100644
 --- a/Libraries/LibWeb/CMakeLists.txt
 +++ b/Libraries/LibWeb/CMakeLists.txt
 @@ -320,6 +320,7 @@ set(SOURCES
@@ -689,7 +689,7 @@ index 6b092e56155007556f378e67079efe45e578650f..8ffb964fc7c8ab854423c96bfa496602
      String user_agent_for(URL::Origin const& top_level_origin, URL::Origin const& origin) const { return site_compatibility->data.user_agent_for(top_level_origin, origin, user_agent); }
      bool exposes_experimental_interface(URL::Origin const& top_level_origin, URL::Origin const& origin, StringView name) const { return site_compatibility->data.exposes_experimental_interface(top_level_origin, origin, name); }
 diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
-index fa9f31ba7f014ab363f122b2618bd350b093c683..d4b53c7cb38eadeaacc6533c429b938d6ddf9096 100644
+index f3208d579d5abb072ece9bf356ece10f82c9ff1b..6c032007fc224b5286089df0b15e824a02e0b639 100644
 --- a/Services/WebContent/main.cpp
 +++ b/Services/WebContent/main.cpp
 @@ -39,6 +39,7 @@
@@ -700,7 +700,7 @@ index fa9f31ba7f014ab363f122b2618bd350b093c683..d4b53c7cb38eadeaacc6533c429b938d
  #include <LibWeb/Loader/ResourceLoader.h>
  #include <LibWeb/Painting/BoxViews.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
-@@ -283,6 +284,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -287,6 +288,8 @@ NEVER_INLINE static ErrorOr<ProcessState> initialize_process(Main::Arguments arg
      OPENSSL_TRY(OSSL_set_max_threads(nullptr, Core::System::hardware_concurrency()));
  
      Web::HTML::Window::set_enable_test_mode(enable_test_mode);

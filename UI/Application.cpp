@@ -777,6 +777,7 @@ ErrorOr<void> Application::connect_to_hub(Main::Arguments const& arguments)
     hub_arguments.extend(take_urls_from_launch_apple_events());
 #    endif
     hub_arguments.append(ByteString::formatted("--ui-info={}", encode_hex(ui_info_buffer.data().span())));
+    hub_arguments.append(ByteString::formatted("--ui-pid={}", Core::System::getpid()));
 
     Core::ProcessSpawnOptions spawn_options {
         .name = "Hub"sv,

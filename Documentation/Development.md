@@ -246,8 +246,13 @@ shows up as a change in Xenon.
 
 ## Updating Ladybird
 
+Xenon follows Ladybird's alpha: the pin is the commit of its latest release tag (`2026.47.7`, say), which is cut from a
+`release/<year>.<week>` branch rather than from `master`. `gh release list -R LadybirdBrowser/ladybird` shows the
+latest. A release branch forks from `master` and takes backports, so the next tag can be missing commits the current
+pin has; a patch built on one of those then needs reworking, not just rebasing.
+
 ```bash
-git -C ladybird fetch --depth 1 origin master
+git -C ladybird fetch --depth 1 origin tag <release tag>
 ./Meta/patches.py apply --base FETCH_HEAD    # fix any patch that stops applying, then:
 ./Meta/patches.py export
 ./Meta/patches.py pin                        # stages the new commit as the pin
@@ -261,7 +266,12 @@ and retry; the blobs are then in the shared object store.
 
 If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon last synced with, and port the relevant
 changes into `UI/`. The weekly Upstream workflow applies the series to `master`, names any patch that no longer
-applies, builds, and lists those UI changes, so a bump holds no surprises.
+applies, builds, and lists those UI changes, so the next release, which branches from `master`, holds no surprises.
+
+Xenon builds with `LADYBIRD_ENABLE_UPDATE_CHECK` off (`XENON_CMAKE_OPTIONS` in `Meta/xenon.py`), so the Hub never
+checks Ladybird's releases and vcpkg never builds Ladybird's Sparkle; Xenon updates itself ([Updates.md](Updates.md)).
+`Meta/xenon.py` writes those options into a new build directory's `CMakeCache.txt` before vcpkg runs, as vcpkg's
+features follow them, and puts them back in an existing one.
 
 A patch that merges cleanly can still be wrong: read what upstream changed around each patch's code, not just the
 conflicts. A bump that moves Ladybird's CI image (`ladybird/Meta/Docker/ci/VERSION`) also starts the Linux caches over,

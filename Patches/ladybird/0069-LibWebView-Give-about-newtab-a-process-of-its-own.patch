@@ -17,28 +17,28 @@ process that hosts nothing but it. It has no interfaces of its own.
  create mode 100644 Libraries/LibWebView/WebUI/NewTabUI.h
 
 diff --git a/Libraries/LibWebView/WebUI.cpp b/Libraries/LibWebView/WebUI.cpp
-index 481f15379eee04125b7af0f61aa5dc804ce3949c..6fec2e1d017bfe682ad527a46548276d4d4cfbe8 100644
+index bc8524f17e1c1f2ab86b6cc30781a5cfcebb4351..9706bad7f01047224dd84a459c0e7d6b32f77845 100644
 --- a/Libraries/LibWebView/WebUI.cpp
 +++ b/Libraries/LibWebView/WebUI.cpp
-@@ -12,6 +12,7 @@
- #include <LibWebView/WebUI.h>
+@@ -13,6 +13,7 @@
+ #include <LibWebView/WebUI/AboutUI.h>
  #include <LibWebView/WebUI/ApplicationWebUI.h>
  #include <LibWebView/WebUI/CrashReportsUI.h>
 +#include <LibWebView/WebUI/NewTabUI.h>
  #include <LibWebView/WebUI/SettingsUI.h>
  #include <LibWebView/WebUI/SupportUI.h>
  
-@@ -21,7 +22,7 @@ static constexpr auto s_pages = to_array<WebUI::Page>({
-     { "about"sv, "About URLs"sv, WebUI::PageType::Static },
+@@ -23,7 +24,7 @@ static constexpr auto s_pages = to_array<WebUI::Page>({
      { "blocking"sv, "Blocking"sv, WebUI::PageType::Static },
      { "crashes"sv, "Crash Reports"sv, WebUI::PageType::Dynamic },
+     { "licenses"sv, "Licenses"sv, WebUI::PageType::Static },
 -    { "newtab"sv, "New Tab"sv, WebUI::PageType::Static },
 +    { "newtab"sv, "New Tab"sv, WebUI::PageType::Dynamic },
      { "settings"sv, "Settings"sv, WebUI::PageType::Dynamic },
      { "support"sv, "Support"sv, WebUI::PageType::Dynamic },
      { "welcome"sv, "Welcome"sv, WebUI::PageType::Dynamic },
-@@ -105,6 +106,8 @@ ErrorOr<RefPtr<WebUI>> WebUI::create(WebContentClient& client, Web::PageId page_
-         web_ui = TRY(create_web_ui<ApplicationWebUI>(client, page_id, move(host)));
+@@ -109,6 +110,8 @@ ErrorOr<RefPtr<WebUI>> WebUI::create(WebContentClient& client, Web::PageId page_
+         web_ui = TRY(create_web_ui<AboutUI>(client, page_id, move(host)));
      else if (page->host == "crashes"sv)
          web_ui = TRY(create_web_ui<CrashReportsUI>(client, page_id, move(host)));
 +    else if (page->host == "newtab"sv)
