@@ -94,7 +94,7 @@ ninja -C Build/release xenon     # an incremental rebuild once configured
 ```
 
 Xenon is built for a baseline CPU, not the machine that builds it. `Meta/xenon.py` configures Ladybird with
-`-DENABLE_CI_BASELINE_CPU=ON`, so C++ and Rust code targets x86-64-v2 (SSE4.2 and POPCNT, no AVX) on x86-64 and the M1
+`-DLADYBIRD_BASELINE_CPU_TARGET=ON`, so C++ and Rust code targets x86-64-v2 (SSE4.2 and POPCNT, no AVX) on x86-64 and the M1
 on Apple silicon, as Ladybird's own packages do. Without it, Ladybird compiles with `-march=native`, and a build can use
 instructions that older machines don't have: an AppImage built on one of GitHub's runners crashed with SIGILL on another
 ([#45](https://github.com/ThaRae/Xenon/issues/45)). Every build uses the baseline, local ones too, so a release
