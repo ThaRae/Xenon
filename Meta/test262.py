@@ -88,7 +88,7 @@ def main() -> int:
     ours = json.loads(ours_path.read_text())
 
     if upstream is None:
-        summary, regressions = describe(base, versions, ours, None), []
+        summary, regressions = describe(base, versions, ours, None)
     else:
         theirs_path = WORK_DIR / "ladybird.json"
         theirs_path.write_text(json.dumps(upstream["per_file"]))

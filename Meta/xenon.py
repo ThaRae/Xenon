@@ -53,6 +53,11 @@ PRESETS = {
     "Sanitizer": ("sanitizer", "vcpkg-sanitizer"),
 }
 
+XENON_CMAKE_OPTIONS = {
+    "LADYBIRD_BASELINE_CPU_TARGET": "ON",
+    "LADYBIRD_ENABLE_UPDATE_CHECK": "OFF",
+}
+
 APP_TARGET = "xenon"
 TESTS_TARGET = "xenon-tests"
 
@@ -209,11 +214,17 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
     build_vcpkg(vcpkg_dir)
 
     cc, cxx = pick_host_compiler(platform, cc, cxx)
+    seed_cmake_cache(build_dir)
     vcpkg_triplet = build_dependencies(platform, preset, build_dir, cc, cxx, jobs)
 
     if build_dir.joinpath("build.ninja").exists():
-        if cmake_cache_value(build_dir, "ENABLE_CI_BASELINE_CPU") != "ON":
-            run_command(["cmake", "-S", LADYBIRD_SOURCE_DIR, "-B", build_dir, "-DENABLE_CI_BASELINE_CPU=ON"])
+        changed_options = [
+            f"-D{name}={value}"
+            for name, value in XENON_CMAKE_OPTIONS.items()
+            if cmake_cache_value(build_dir, name) != value
+        ]
+        if changed_options:
+            run_command(["cmake", "-S", LADYBIRD_SOURCE_DIR, "-B", build_dir, *changed_options])
         return build_dir
 
     run_command(
@@ -229,7 +240,7 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
             f"-DCMAKE_CXX_COMPILER={cxx}",
             f"-DCMAKE_PROJECT_ladybird_INCLUDE={XENON_SOURCE_DIR / 'Meta' / 'CMake' / 'XenonHook.cmake'}",
             "-DBUILD_TESTING=OFF",
-            "-DENABLE_CI_BASELINE_CPU=ON",
+            *(f"-D{name}={value}" for name, value in XENON_CMAKE_OPTIONS.items()),
             "-DVCPKG_MANIFEST_INSTALL=OFF",
             f"-DVCPKG_TARGET_TRIPLET={vcpkg_triplet}",
             f"-DVCPKG_HOST_TRIPLET={vcpkg_triplet}",
@@ -237,6 +248,14 @@ def configure_main(platform: Platform, preset: str, cc: str, cxx: str, jobs: str
     )
 
     return build_dir
+
+
+def seed_cmake_cache(build_dir: Path):
+    cache_path = build_dir / "CMakeCache.txt"
+    if cache_path.exists():
+        return
+    build_dir.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text("".join(f"{name}:BOOL={value}\n" for name, value in XENON_CMAKE_OPTIONS.items()))
 
 
 def enable_ladybird_tests(build_dir: Path):

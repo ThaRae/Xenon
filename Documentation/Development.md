@@ -94,7 +94,7 @@ ninja -C Build/release xenon     # an incremental rebuild once configured
 ```
 
 Xenon is built for a baseline CPU, not the machine that builds it. `Meta/xenon.py` configures Ladybird with
-`-DENABLE_CI_BASELINE_CPU=ON`, so C++ and Rust code targets x86-64-v2 (SSE4.2 and POPCNT, no AVX) on x86-64 and the M1
+`-DLADYBIRD_BASELINE_CPU_TARGET=ON`, so C++ and Rust code targets x86-64-v2 (SSE4.2 and POPCNT, no AVX) on x86-64 and the M1
 on Apple silicon, as Ladybird's own packages do. Without it, Ladybird compiles with `-march=native`, and a build can use
 instructions that older machines don't have: an AppImage built on one of GitHub's runners crashed with SIGILL on another
 ([#45](https://github.com/ThaRae/Xenon/issues/45)). Every build uses the baseline, local ones too, so a release
@@ -203,6 +203,8 @@ CI runs on GitHub Actions, on GitHub's own runners:
 
 - **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
   `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
+  `Meta/ci/build-in-ladybird-image.sh` adds `qt6-base-private-dev` to it first: Ladybird's UI no longer uses Qt's
+  private headers, so the image doesn't have them, but Xenon's Wayland activation tokens need `Qt::GuiPrivate`.
 - **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
   (`ladybird/.github/actions/setup`). The Intel build runs on `macos-15-intel`, GitHub's last Intel image, which
   doesn't have that Xcode, so it takes the newest one there (26.3). Homebrew no longer builds bottles for Intel Macs,
@@ -246,8 +248,13 @@ shows up as a change in Xenon.
 
 ## Updating Ladybird
 
+Xenon follows Ladybird's alpha: the pin is the commit of its latest release tag (`2026.47.7`, say), which is cut from a
+`release/<year>.<week>` branch rather than from `master`. `gh release list -R LadybirdBrowser/ladybird` shows the
+latest. A release branch forks from `master` and takes backports, so the next tag can be missing commits the current
+pin has; a patch built on one of those then needs reworking, not just rebasing.
+
 ```bash
-git -C ladybird fetch --depth 1 origin master
+git -C ladybird fetch --depth 1 origin tag <release tag>
 ./Meta/patches.py apply --base FETCH_HEAD    # fix any patch that stops applying, then:
 ./Meta/patches.py export
 ./Meta/patches.py pin                        # stages the new commit as the pin
@@ -261,7 +268,12 @@ and retry; the blobs are then in the shared object store.
 
 If the engine's API changed, compare `ladybird/UI/Qt` against the commit Xenon last synced with, and port the relevant
 changes into `UI/`. The weekly Upstream workflow applies the series to `master`, names any patch that no longer
-applies, builds, and lists those UI changes, so a bump holds no surprises.
+applies, builds, and lists those UI changes, so the next release, which branches from `master`, holds no surprises.
+
+Xenon builds with `LADYBIRD_ENABLE_UPDATE_CHECK` off (`XENON_CMAKE_OPTIONS` in `Meta/xenon.py`), so the Hub never
+checks Ladybird's releases and vcpkg never builds Ladybird's Sparkle; Xenon updates itself ([Updates.md](Updates.md)).
+`Meta/xenon.py` writes those options into a new build directory's `CMakeCache.txt` before vcpkg runs, as vcpkg's
+features follow them, and puts them back in an existing one.
 
 A patch that merges cleanly can still be wrong: read what upstream changed around each patch's code, not just the
 conflicts. A bump that moves Ladybird's CI image (`ladybird/Meta/Docker/ci/VERSION`) also starts the Linux caches over,

@@ -182,7 +182,7 @@ index 2a4ae6575fa3a350ea5fafbc640f601392f05b7b..ee4fa96236f0e156aab8b63bdaa0a445
              // Return a new opaque origin.
              _ => Origin::new_opaque(OpaqueOriginKind::Standard),
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 08154c5b045f1f3d5c0f3f8e1c7612fa5a15f245..493695847ff7c1ab48aceeb307b9d6708ea9f29e 100644
+index 6dd05f9461986081185f87ef7cace2ddac33c744..be594b2c68f077887e9d372af453c24532348584 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 @@ -22,6 +22,7 @@
@@ -413,7 +413,7 @@ index 706748e144b50544592796c11db98de2884f846e..01026b2292d614348d6dd2a36a0e96d8
      // 8. If origin has been configured as a trustworthy origin, return "Potentially Trustworthy".
      // Note: See § 7.2 Development Environments for detail here.
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index 85bbd681f6d648da79d3bd1f1f85cc969ecaa8cd..54df5a0e46c250a10d10b326ae2763324c8f4914 100644
+index f5abcf3f8cf378db161439119cfde2359849c213..b60b56be196cf0c11a7dd048539648b247478e74 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
 @@ -80,6 +80,7 @@ set(SOURCES
@@ -421,11 +421,11 @@ index 85bbd681f6d648da79d3bd1f1f85cc969ecaa8cd..54df5a0e46c250a10d10b326ae276332
      Translator.cpp
      URL.cpp
 +    URLSchemeHandler.cpp
+     UpdateCheck.cpp
      UserAgent.cpp
      Utilities.cpp
-     VideoDecoderServerControlClient.cpp
 diff --git a/Libraries/LibWebView/HelperProcess.cpp b/Libraries/LibWebView/HelperProcess.cpp
-index 656a125146c2d7a776b94ce1c158a9ebb7d5d483..14eea7bbac48d9dd27789badc1bb5cff6b2b5a24 100644
+index 7a1c5101ca01989bf3a7eadcc56b6337f1ae0435..76c5ecfb0970685e07754e623862e1ce7119f3dc 100644
 --- a/Libraries/LibWebView/HelperProcess.cpp
 +++ b/Libraries/LibWebView/HelperProcess.cpp
 @@ -13,6 +13,7 @@
@@ -436,7 +436,7 @@ index 656a125146c2d7a776b94ce1c158a9ebb7d5d483..14eea7bbac48d9dd27789badc1bb5cff
  #include <LibURL/Parser.h>
  #include <LibWebView/Application.h>
  #include <LibWebView/AudioServerControlClient.h>
-@@ -374,6 +375,8 @@ ErrorOr<NonnullRefPtr<WebView::WebContentClient>> launch_web_content_process(Bro
+@@ -376,6 +377,8 @@ ErrorOr<NonnullRefPtr<WebView::WebContentClient>> launch_web_content_process(Bro
          arguments.append("--disable-scrollbar-painting"sv);
      if (web_content_options.file_scheme_urls_have_tuple_origins == FileSchemeUrlsHaveTupleOrigins::Yes)
          arguments.append("--tuple-file-origins"sv);
@@ -548,7 +548,7 @@ index 0000000000000000000000000000000000000000..6eb368b9cfa3e1a5bc8c6e5a70528df5
 +
 +}
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index f663953981c6a2a78ec435fc04ac00842994c6cd..f150411572849dd0f8ea35ee4aeec8b0c87059a4 100644
+index 2313e38b5470f6bf97ec13e854b2fcdcbab72ff6..5470b6fbc6b0593d823e3830f9c3715fb23486e6 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
 @@ -39,6 +39,7 @@
@@ -559,7 +559,7 @@ index f663953981c6a2a78ec435fc04ac00842994c6cd..f150411572849dd0f8ea35ee4aeec8b0
  #include <LibWebView/Utilities.h>
  #include <LibWebView/ViewImplementation.h>
  #include <LibWebView/WebContentClient.h>
-@@ -1676,6 +1677,34 @@ void WebContentPage::did_request_file(ByteString path, i32 request_id)
+@@ -1699,6 +1700,34 @@ void WebContentPage::did_request_file(ByteString path, i32 request_id)
          async_handle_file_return(0, file.release_value(), request_id);
  }
  
@@ -595,10 +595,10 @@ index f663953981c6a2a78ec435fc04ac00842994c6cd..f150411572849dd0f8ea35ee4aeec8b0
  {
      view().did_request_color_picker({}, *this, current_color);
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 2c69ae41d0eae6ab7785c59f89033961a8c94bbe..49b825b3fa29c5c0ffced8f139aa704d1725c399 100644
+index 2e73840cae23f0fc3e1c84c17d7b0f2b7f8c8031..d2ed2b724ad07f661a07dcd1a16d42883b7989fd 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -283,6 +283,7 @@ private:
+@@ -285,6 +285,7 @@ private:
      virtual void did_change_picture_in_picture_video_size(Gfx::IntSize video_size) override;
      virtual void did_change_picture_in_picture_player_controls_visibility(bool shown) override;
      virtual void did_request_file(ByteString path, i32 request_id) override;
@@ -607,7 +607,7 @@ index 2c69ae41d0eae6ab7785c59f89033961a8c94bbe..49b825b3fa29c5c0ffced8f139aa704d
      virtual void did_request_date_picker(Utf16String input_type, Utf16String value, Utf16String minimum, Utf16String maximum) override;
      virtual void did_request_geolocation_position(u64 request_id, Web::HTML::CrossProcessId document_id) override;
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index 50607c7bfa907fc7fcfbebc4af5f0beac6570ab6..8c24ee0ce9a03771a956945d18d0dabb25ed8f9d 100644
+index 828d837f705d4514fe03d7562098e42f79b69e6e..8dfaac2509be0f2e66300d0e21ee529835a1856c 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
 @@ -14,6 +14,7 @@
@@ -663,10 +663,10 @@ index 07a86f79fb65e03de18209dfb66ff4f1e444565e..bca21314ae7a66faa889465e31cf4080
      virtual Messages::WebWorkerClient::DidRequestPermissionSnapshotResponse did_request_permission_snapshot(URL::Origin top_level_origin) override;
      virtual Messages::WebWorkerClient::RequestMediaServerConnectionResponse request_media_server_connection() override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 5ed892073a0ccc4213fced89cffe924ead4cedc6..9246eb420b69a5b8c2a18c0e28c3ea4bc7d14c7d 100644
+index 92964720d1a36dc59760ba375486a0fb7ed5d11f..98bf00738ba41360d6b40d3aead07ca5983e8320 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3603,6 +3603,28 @@ void ConnectionFromClient::request_file(Web::PageId page_id, Web::FileRequest fi
+@@ -3632,6 +3632,28 @@ void ConnectionFromClient::request_file(Web::PageId page_id, Web::FileRequest fi
      async_did_request_file(page_id, path, id);
  }
  
@@ -696,7 +696,7 @@ index 5ed892073a0ccc4213fced89cffe924ead4cedc6..9246eb420b69a5b8c2a18c0e28c3ea4b
  {
      if (auto url_record = Web::DOMURL::parse(url.utf16_view()); url_record.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 2bb745057a4e5eae9418acd42e0a6744be99a9f8..8e5673da051511349dfb204a4e8736a42d78e8f2 100644
+index a00347f5e9b41663f2bb2b1ec1c66596f81e2be4..2062496118f566bcc6852caa9043f206f50bcfec 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
 @@ -24,6 +24,7 @@
@@ -715,7 +715,7 @@ index 2bb745057a4e5eae9418acd42e0a6744be99a9f8..8e5673da051511349dfb204a4e8736a4
  
      PageHost& page_host() { return *m_page_host; }
      PageHost const& page_host() const { return *m_page_host; }
-@@ -282,6 +284,7 @@ private:
+@@ -283,6 +285,7 @@ private:
      virtual void set_window_size(Web::PageId page_id, Web::DevicePixelSize) override;
      virtual void did_complete_window_rect_request(Web::PageId page_id, u64 completion_id) override;
      virtual void handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) override;
@@ -723,7 +723,7 @@ index 2bb745057a4e5eae9418acd42e0a6744be99a9f8..8e5673da051511349dfb204a4e8736a4
      virtual void blob_url_entry_removed(Utf16String url) override;
      virtual void did_delete_all_cookies(Web::PageId page_id, u64 request_id) override;
      virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
-@@ -384,6 +387,7 @@ private:
+@@ -385,6 +388,7 @@ private:
      OwnPtr<DevToolsDebugger> m_devtools_debugger;
  
      HashMap<int, Web::FileRequest> m_requested_files {};
@@ -732,10 +732,10 @@ index 2bb745057a4e5eae9418acd42e0a6744be99a9f8..8e5673da051511349dfb204a4e8736a4
  
      void enqueue_input_event(Web::QueuedInputEvent);
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index 3833c6be927287a241eca41bb2399d04509d9551..e5b1167534864aac59f060cdbf91e7ab9e7c36bc 100644
+index 46c3160f8a449bbd375fc21a9b0298f6401bcbbe..3517d3f7499553acc6d0b1e3634738f1500e0d35 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
-@@ -2125,6 +2125,11 @@ void PageClient::request_file(Web::FileRequest file_request)
+@@ -2141,6 +2141,11 @@ void PageClient::request_file(Web::FileRequest file_request)
      client().request_file(m_id, move(file_request));
  }
  
@@ -748,10 +748,10 @@ index 3833c6be927287a241eca41bb2399d04509d9551..e5b1167534864aac59f060cdbf91e7ab
  {
      auto response = client().send_sync_but_allow_failure<Messages::WebContentClient::DidAddBlobUrlEntry>(m_id, environment.id, url, entry);
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index eb1b7f2c45b468d8530c800c1003ec5f968f847a..62df4e828fb9730dca4f018c172dc3b50c177eea 100644
+index 0bf42c691b0eac103350a4438ac4ecce69b90ea3..42aff085214ce9eee08ba933172a62fb6a3e7aee 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
-@@ -361,6 +361,7 @@ private:
+@@ -362,6 +362,7 @@ private:
      virtual bool page_did_request_record_reported_session_history_for_testing() override;
      virtual String page_did_request_reported_session_history_for_testing() override;
      virtual void request_file(Web::FileRequest) override;
@@ -772,7 +772,7 @@ index 7244b158f249fe3515359a06ccc4ea6e676c5393..512f6df0bbcb196115f84305c06adb70
      did_request_date_picker(Web::PageId page_id, Utf16String input_type, Utf16String value, Utf16String minimum, Utf16String maximum) =|
      did_request_geolocation_position(Web::PageId page_id, u64 request_id, Web::HTML::CrossProcessId document_id) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index 11746fbd16ede2d924adbec733632ebb19b2022a..b1dd6cb018ebaf67ad1ee72476125c079f7cf6a2 100644
+index 4c4899a9c7e2e1deb4ade2b9b96470ecd446488d..3ef27eed03abb571b9b88e20b7e967f706df1305 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
 @@ -2,6 +2,7 @@
@@ -783,7 +783,7 @@ index 11746fbd16ede2d924adbec733632ebb19b2022a..b1dd6cb018ebaf67ad1ee72476125c07
  #include <LibIPC/File.h>
  #include <LibIPC/TransportHandle.h>
  #include <LibURL/URL.h>
-@@ -294,6 +295,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -295,6 +296,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      reset_zoom(Web::PageId page_id) =|
  
      handle_file_return(Web::PageId page_id, i32 error, Optional<IPC::File> file, i32 request_id) =|
@@ -917,7 +917,7 @@ index 7a521b13eaa73447d661222fc62f4ef289116d34..7d211a6a8d2936b8cf107d426de4d14e
      virtual void page_did_remove_blob_url_entries(Web::HTML::EnvironmentSettingsObject const&, Vector<Utf16String> const& urls) override;
      virtual Optional<Web::FileAPI::SerializedBlobURLEntry> page_did_request_blob_url_entry(Utf16String const& url, Optional<URL::BlobURLEntry::Token> token) override;
 diff --git a/Services/WebContent/main.cpp b/Services/WebContent/main.cpp
-index ae131af5340ae4f367cbea6f50c917badf0ae7cb..fa9f31ba7f014ab363f122b2618bd350b093c683 100644
+index e45c9ec4ba7510f14ca76f44348a28140e3dc8c3..f3208d579d5abb072ece9bf356ece10f82c9ff1b 100644
 --- a/Services/WebContent/main.cpp
 +++ b/Services/WebContent/main.cpp
 @@ -26,6 +26,7 @@
@@ -928,7 +928,7 @@ index ae131af5340ae4f367cbea6f50c917badf0ae7cb..fa9f31ba7f014ab363f122b2618bd350
  #include <LibURL/Parser.h>
  #include <LibUnicode/TimeZone.h>
  #include <LibWeb/Bindings/MainThreadVM.h>
-@@ -192,6 +193,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -196,6 +197,7 @@ NEVER_INLINE static ErrorOr<ProcessState> initialize_process(Main::Arguments arg
      StringView https_echo_server_port_string_view {};
      StringView default_time_zone {};
      bool file_origins_are_tuple_origins = false;
@@ -936,7 +936,7 @@ index ae131af5340ae4f367cbea6f50c917badf0ae7cb..fa9f31ba7f014ab363f122b2618bd350
  
      StringView stats_log_directory;
      Core::ArgsParser args_parser;
-@@ -213,6 +215,7 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -217,6 +219,7 @@ NEVER_INLINE static ErrorOr<ProcessState> initialize_process(Main::Arguments arg
      args_parser.add_option(is_headless, "Report that the browser is running in headless mode", "headless");
      args_parser.add_option(default_time_zone, "Default time zone", "default-time-zone", 0, "time-zone-id");
      args_parser.add_option(file_origins_are_tuple_origins, "Treat file:// URLs as having tuple origins", "tuple-file-origins");
@@ -944,7 +944,7 @@ index ae131af5340ae4f367cbea6f50c917badf0ae7cb..fa9f31ba7f014ab363f122b2618bd350
      args_parser.add_option(Core::ArgsParser::Option {
          .argument_mode = Core::ArgsParser::OptionArgumentMode::Required,
          .help_string = "URL of a PAC file (not supported yet, requests fail)",
-@@ -253,6 +256,8 @@ ErrorOr<int> ladybird_main(Main::Arguments arguments)
+@@ -257,6 +260,8 @@ NEVER_INLINE static ErrorOr<ProcessState> initialize_process(Main::Arguments arg
  
      if (file_origins_are_tuple_origins)
          URL::set_file_scheme_urls_have_tuple_origins();

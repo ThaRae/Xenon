@@ -20,10 +20,10 @@ A Window that outlives its initial about:blank document runs it once.
  3 files changed, 14 insertions(+)
 
 diff --git a/Libraries/LibWeb/DOM/Document.cpp b/Libraries/LibWeb/DOM/Document.cpp
-index 86a831f44beedb9b5a21f8315e9ef1a1a68ef357..2d319c49a0ad35f7f73ea5d4b04d28ecb583623a 100644
+index ed49b9dad5fe8410971383ba2c14eefc099d1784..ebc83d3c2296adb024e8bc7daa68283d519e8e41 100644
 --- a/Libraries/LibWeb/DOM/Document.cpp
 +++ b/Libraries/LibWeb/DOM/Document.cpp
-@@ -8302,6 +8302,9 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
+@@ -8336,6 +8336,9 @@ void Document::update_for_history_step_application(NonnullRefPtr<HTML::SessionHi
          if (!scrolling_blocked_in_new_document)
              try_to_scroll_to_the_fragment(allow_text_directive_scroll);
  
@@ -34,10 +34,10 @@ index 86a831f44beedb9b5a21f8315e9ef1a1a68ef357..2d319c49a0ad35f7f73ea5d4b04d28ec
          set_ready_to_run_scripts();
      }
 diff --git a/Libraries/LibWeb/HTML/LocalNavigable.cpp b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-index ee7a74874fb0c112abd01df2921102a97060d738..6d7bc765dfdae2f9ada69b4d75c308e0c3a1a359 100644
+index fa6d65567dd73daf59a70128578aba12dc92bf29..55509488203103392dde47c7b10a5521d5390ada 100644
 --- a/Libraries/LibWeb/HTML/LocalNavigable.cpp
 +++ b/Libraries/LibWeb/HTML/LocalNavigable.cpp
-@@ -85,6 +85,7 @@
+@@ -84,6 +84,7 @@
  #include <LibWeb/Layout/Node.h>
  #include <LibWeb/Layout/NodeArena.h>
  #include <LibWeb/Layout/Viewport.h>
@@ -45,7 +45,7 @@ index ee7a74874fb0c112abd01df2921102a97060d738..6d7bc765dfdae2f9ada69b4d75c308e0
  #include <LibWeb/Loader/GeneratedPagesLoader.h>
  #include <LibWeb/Page/EventHandler.h>
  #include <LibWeb/Page/Page.h>
-@@ -1205,6 +1206,11 @@ void LocalNavigable::initialize_navigable(NonnullRefPtr<DocumentState> document_
+@@ -1203,6 +1204,11 @@ void LocalNavigable::initialize_navigable(NonnullRefPtr<DocumentState> document_
      // as it hears of each document that later becomes active in the navigable.
      if (!is_top_level_traversable() && !is_stand_in)
          page().client().page_did_change_active_document_in_child_navigable(document);

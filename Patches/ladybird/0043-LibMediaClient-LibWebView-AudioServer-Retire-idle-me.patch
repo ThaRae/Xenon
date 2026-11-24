@@ -26,7 +26,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  4 files changed, 39 insertions(+), 3 deletions(-)
 
 diff --git a/Libraries/LibMediaClient/Client.cpp b/Libraries/LibMediaClient/Client.cpp
-index 7863fdaa10e27c0c7ee6101e04ed4e2de4fc5578..b5ada363d9fa81895d41c26b0862f324a82cb7ae 100644
+index 0dfe06a4fe96bc48104bb8a8e7d4610deca9bbc6..6093143ff7aaecfff326177bb497ac6c715187ef 100644
 --- a/Libraries/LibMediaClient/Client.cpp
 +++ b/Libraries/LibMediaClient/Client.cpp
 @@ -14,7 +14,9 @@
@@ -41,19 +41,19 @@ index 7863fdaa10e27c0c7ee6101e04ed4e2de4fc5578..b5ada363d9fa81895d41c26b0862f324
  // A connection serves the thread that made it, so each agent has one of its own.
  static thread_local NeverDestroyed<Client::TransportFactory> s_transport_factory;
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index ca83b03290419cfae676a4f90c23183e2c9dcb51..3b9efbb1c28dd3142795ffa25d138cc64ef204e5 100644
+index b2a2eaf864a3f10821c6d5de7850f035a4ad45a9..176bed1c0bf1a07fce8af135ba6e6c39c865f6ff 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
 @@ -240,8 +240,16 @@ Messages::WebWorkerClient::RequestMediaServerConnectionResponse WebWorkerClient:
          auto self = weak_self.strong_ref();
          if (!self)
              return Error::from_string_literal("The worker is gone");
--        TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id()));
+-        TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id(), self->is_private()));
 -        return connect_new_audio_server_client(*self->m_audio_server_client, self->m_audio_tab_id);
 +        // An idle AudioServer exits by itself, so it may have gone just before this request reached it. The failed
 +        // request closes its connection, and a second try launches a new server.
 +        auto connect = [&]() -> ErrorOr<IPC::TransportHandle> {
-+            TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id()));
++            TRY(ensure_audio_server_is_running(self->m_audio_server_client, self->child_id(), self->is_private()));
 +            return connect_new_audio_server_client(*self->m_audio_server_client, self->m_audio_tab_id);
 +        };
 +        auto handle = connect();

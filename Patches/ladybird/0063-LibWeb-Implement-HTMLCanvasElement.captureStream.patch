@@ -146,7 +146,7 @@ index aa4c1d684b0b0c10520ac8f5faf0b5f84c786319..d5ebb40513fe9dbcc98039f5b8b6249a
  {
      auto& video = Bindings::impl_from<HTMLVideoElement>(*static_cast<JS::Object*>(source_wrapper));
 diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
-index d4d1cc74b67700826de0edcea7deaefee24f6788..02725876f95911bc62d2e409a35ab25e835dd2a5 100644
+index 95780900db1ba1cd0e0c4a2752a67ab1e67b0574..48302e56927ecb47e26761a75224f9ebc838ffe3 100644
 --- a/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.cpp
 @@ -37,6 +37,8 @@
@@ -158,7 +158,7 @@ index d4d1cc74b67700826de0edcea7deaefee24f6788..02725876f95911bc62d2e409a35ab25e
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Painting/PaintFacts.h>
  #include <LibWeb/Platform/EventLoopPlugin.h>
-@@ -526,6 +528,23 @@ WebIDL::ExceptionOr<void> HTMLCanvasElement::to_blob(GC::Ref<WebIDL::CallbackTyp
+@@ -544,6 +546,23 @@ WebIDL::ExceptionOr<void> HTMLCanvasElement::to_blob(GC::Ref<WebIDL::CallbackTyp
      return {};
  }
  
@@ -183,7 +183,7 @@ index d4d1cc74b67700826de0edcea7deaefee24f6788..02725876f95911bc62d2e409a35ab25e
  {
      if (m_is_placeholder)
 diff --git a/Libraries/LibWeb/HTML/HTMLCanvasElement.h b/Libraries/LibWeb/HTML/HTMLCanvasElement.h
-index 71a3205bfa4d1012cb36b56455e739602e55c01d..281a04aa7a3501bcf6efeb0cf379bdc982a614ce 100644
+index 1385dfad55e0f154dd677ccd3cad7a76e40f3f5b..10488d60c77d911c13d4a13f7e8255b7f54c5948 100644
 --- a/Libraries/LibWeb/HTML/HTMLCanvasElement.h
 +++ b/Libraries/LibWeb/HTML/HTMLCanvasElement.h
 @@ -71,6 +71,8 @@ public:
@@ -208,7 +208,7 @@ index 92174b15545d5c353da62ecfdba51bcf7ee124ac..5e99367423d7f803452113e0e70c6772
  };
  
 diff --git a/Libraries/LibWeb/HTML/HTMLMediaElement.cpp b/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
-index 1b98a3822e74538da1b8722daf927a5fb7fb1186..d07ce698ecdc221d912447c5c53b1e6767dc91a8 100644
+index 6a92796f0e23a684efa2b810ec5e3cff4eea8025..3b24726e489eb363731a13d2079c38df4c4d28c0 100644
 --- a/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
 +++ b/Libraries/LibWeb/HTML/HTMLMediaElement.cpp
 @@ -41,6 +41,7 @@
@@ -227,7 +227,7 @@ index 1b98a3822e74538da1b8722daf927a5fb7fb1186..d07ce698ecdc221d912447c5c53b1e67
  #include <LibWeb/MediaSourceExtensions/MediaSource.h>
  #include <LibWeb/Page/Page.h>
  #include <LibWeb/Page/ScreenWakeLockHandle.h>
-@@ -2107,6 +2109,18 @@ Optional<Media::VideoSinkHandle> HTMLMediaElement::video_sink_handle() const
+@@ -2120,6 +2122,18 @@ Optional<Media::VideoSinkHandle> HTMLMediaElement::video_sink_handle() const
  }
  
  // https://html.spec.whatwg.org/multipage/media.html#media-data
@@ -247,10 +247,10 @@ index 1b98a3822e74538da1b8722daf927a5fb7fb1186..d07ce698ecdc221d912447c5c53b1e67
  {
      // NB: Media data from a MediaSource or a MediaStream is provided by the page itself.
 diff --git a/Libraries/LibWeb/HTML/HTMLMediaElement.h b/Libraries/LibWeb/HTML/HTMLMediaElement.h
-index 663c40074f7fe44dd27b970d859f9a5ee157d4f8..f48de46123fcab078c56aa21219826e4e8525309 100644
+index b874ff6ee57d863d7a431d4cf03bd17243a34483..268f33a27bcea9adb68a9af3dbdc8a204a56b817 100644
 --- a/Libraries/LibWeb/HTML/HTMLMediaElement.h
 +++ b/Libraries/LibWeb/HTML/HTMLMediaElement.h
-@@ -204,6 +204,7 @@ public:
+@@ -206,6 +206,7 @@ public:
  
      Optional<Media::VideoSinkHandle> video_sink_handle() const;
      Optional<Compositing::CapturedVideoFrame> capture_current_video_frame() const;
@@ -533,10 +533,10 @@ index e463bca0a65c01a617c359633b83855c6ef63ae7..5577afbd1cdc6bd12f62f347bb03b644
          break;
      case HTML::HTMLVideoElement::Representation::TransparentBlack:
 diff --git a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
-index f4774b058db3810b8968931e89d23d50cc85b349..047e37ca144b592ca01abdcad1514c68498b1cb6 100644
+index 3a05e64cd4604bb034e51fa69072116ac63a91fc..59a3d16a86b35228037a50617c51e391ed8525c2 100644
 --- a/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
 +++ b/Libraries/LibWeb/WebGL/WebGLRenderingContextBase.cpp
-@@ -420,11 +420,15 @@ TexImageSourceResult web_webgl_read_tex_image_source(void* source_wrapper, TexIm
+@@ -418,11 +418,15 @@ TexImageSourceResult web_webgl_read_tex_image_source(void* source_wrapper, TexIm
          if (auto canvas_frame = Bindings::impl_from<HTML::OffscreenCanvas>(wrapper).get_srgb_frame_from_surface(); canvas_frame.has_value())
              frame = canvas_frame.release_value();
          break;

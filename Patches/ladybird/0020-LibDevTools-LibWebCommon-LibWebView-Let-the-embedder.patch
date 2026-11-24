@@ -87,18 +87,18 @@ index 11e98a45b5b8a85c7923961409147ce975c2dd60..f02847aae132ed832cd1fe816ad7fa8c
 +
  }
 diff --git a/Libraries/LibWebView/CrashReportStore.cpp b/Libraries/LibWebView/CrashReportStore.cpp
-index bf91716b6e81a8b3faa03a250d09945d44d2042e..5ab0323ce1e90aca5a8f06c56714efc97f669d94 100644
+index 99c06bbb3cd126faf99ec805ff88975b620156f4..96367d4203974b751727ea1987ebdaab3ff00807 100644
 --- a/Libraries/LibWebView/CrashReportStore.cpp
 +++ b/Libraries/LibWebView/CrashReportStore.cpp
-@@ -21,6 +21,7 @@
+@@ -20,6 +20,7 @@
+ #include <LibCore/Process.h>
  #include <LibCore/StandardPaths.h>
  #include <LibCore/System.h>
- #include <LibFileSystem/FileSystem.h>
 +#include <LibWebCommon/WebView/Utilities.h>
  #include <LibWebView/CrashReport.h>
  #include <LibWebView/CrashReportStore.h>
  #include <LibWebView/ProcessManager.h>
-@@ -39,7 +40,7 @@ using namespace Core::CrashReportData;
+@@ -38,7 +39,7 @@ using namespace Core::CrashReportData;
  
  ByteString CrashReportStore::default_directory()
  {

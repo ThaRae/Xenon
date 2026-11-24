@@ -12,7 +12,7 @@ content blocker.
  1 file changed, 11 insertions(+)
 
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 80b925828ea0e01649b2f014544221fb1c0509a6..a4b364a6ca035ea7432133a9357918d2775f9d8e 100644
+index ff7e87d77908852799c37fa1390ff63768a18776..e97a55c6d768661f733a47849a0f01e5357b30d4 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
 @@ -18,6 +18,7 @@
@@ -23,7 +23,7 @@ index 80b925828ea0e01649b2f014544221fb1c0509a6..a4b364a6ca035ea7432133a9357918d2
  #include <LibCompositing/FontServiceClient.h>
  #include <LibCore/EventLoop.h>
  #include <LibCore/Process.h>
-@@ -3741,6 +3742,16 @@ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web:
+@@ -3770,6 +3771,16 @@ void ConnectionFromClient::set_system_visibility_state(Web::PageId page_id, Web:
  {
      if (auto page = this->page(page_id); page.has_value())
          page->page().set_system_visibility_state(system_visibility_state);

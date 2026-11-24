@@ -27,7 +27,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  4 files changed, 59 insertions(+), 1 deletion(-)
 
 diff --git a/Services/Compositor/CompositorState.cpp b/Services/Compositor/CompositorState.cpp
-index 8da8199c3995c48ad3a176b4e866f17c8b1b66b1..4fd6f154b6bcbaa462cbd5eeed98f1356ef56522 100644
+index 4c64dc283b27aa1d3d7e926931ed9ce5155a5c19..5704c0bc52ffe28069bf25c1a5c4746af2f0942d 100644
 --- a/Services/Compositor/CompositorState.cpp
 +++ b/Services/Compositor/CompositorState.cpp
 @@ -44,6 +44,7 @@ static constexpr auto visible_context_raster_release_delay = AK::Duration::from_
@@ -84,7 +84,7 @@ index 8da8199c3995c48ad3a176b4e866f17c8b1b66b1..4fd6f154b6bcbaa462cbd5eeed98f135
  void CompositorState::release_free_pages()
  {
      m_free_page_release_is_pending = false;
-@@ -1072,7 +1112,12 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
+@@ -1079,7 +1119,12 @@ bool CompositorState::request_screenshot(Web::CompositorContextId context_id, Gf
      if (!target_bitmap.is_valid() || !target_bitmap.bitmap())
          return false;
      auto target_surface = Gfx::PaintingSurface::wrap_bitmap(*target_bitmap.bitmap());
@@ -98,7 +98,7 @@ index 8da8199c3995c48ad3a176b4e866f17c8b1b66b1..4fd6f154b6bcbaa462cbd5eeed98f135
  }
  
  // How long a screenshot waits for the processes that paint its context's descendants. One whose script never yields
-@@ -1664,6 +1709,7 @@ void CompositorState::gpu_work_finished(u64 token)
+@@ -1626,6 +1671,7 @@ void CompositorState::gpu_work_finished(u64 token)
      m_gpu_work_in_flight.remove(token);
      if (m_gpu_work_in_flight.is_empty() && m_gpu_completion_timer)
          m_gpu_completion_timer->stop();
@@ -107,10 +107,10 @@ index 8da8199c3995c48ad3a176b4e866f17c8b1b66b1..4fd6f154b6bcbaa462cbd5eeed98f135
  }
  
 diff --git a/Services/Compositor/CompositorState.h b/Services/Compositor/CompositorState.h
-index 89bada9157f1928460d8411ed4539a9573347ff7..7618f07bbce4bb1226a263361802210c8f608620 100644
+index 5293b98e31842c37674a9ad159e48d0587bc7024..d1681d36c955b87d983d72dbe064284846d55ab3 100644
 --- a/Services/Compositor/CompositorState.h
 +++ b/Services/Compositor/CompositorState.h
-@@ -259,6 +259,8 @@ private:
+@@ -260,6 +260,8 @@ private:
      void schedule_idle_memory_release_for(Web::CompositorContextId);
      void release_idle_memory();
      void release_free_pages();
@@ -119,7 +119,7 @@ index 89bada9157f1928460d8411ed4539a9573347ff7..7618f07bbce4bb1226a263361802210c
  
      VSyncScheduler& vsync_scheduler_for_display(Optional<u64> display_id);
      void set_maximum_display_refresh_rate(double);
-@@ -324,6 +326,8 @@ private:
+@@ -325,6 +327,8 @@ private:
      Optional<MonotonicTime> m_last_free_page_release_time;
      bool m_free_page_release_is_pending { false };
      RefPtr<Threading::Thread> m_heap_trim_thread;

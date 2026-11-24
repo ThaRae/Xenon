@@ -1152,6 +1152,24 @@ SPDX-License-Identifier: BSD-2-Clause
             const containsValidURL = input => {
                 return input.value.length !== 0 && input.checkValidity();
             };
+
+            const ensureURLHasScheme = value => {
+                value = value.trim();
+                if (!value) {
+                    return value;
+                }
+
+                const hasScheme = /^[a-z][a-z\d+.-]*:/i.test(value);
+                const isHostWithPort =
+                    URL.parse(value)?.origin === "null" &&
+                    /^[^:/?#]+:\d+(?:[/?#]|$)/.test(value) &&
+                    !/^(?:about|blob|data|file|javascript|mailto|tel|urn):/i.test(value);
+                if (hasScheme && !isHostWithPort) {
+                    return value;
+                }
+
+                return value.startsWith("//") ? `https:${value}` : `https://${value}`;
+            };
         </script>
 
         <script src="resource://ladybird/about-pages/settings/advanced.js" type="module"></script>
@@ -1164,8 +1182,6 @@ SPDX-License-Identifier: BSD-2-Clause
         <script src="resource://ladybird/about-pages/settings/permissions.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/privacy.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings/search.js" type="module"></script>
-        <script src="resource://ladybird/about-pages/settings/services.js" type="module"></script>
-        <script src="resource://ladybird/about-pages/settings/startup.js" type="module"></script>
         <script src="resource://ladybird/about-pages/settings.js" type="module"></script>
     </body>
 </html>

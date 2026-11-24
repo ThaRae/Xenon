@@ -26,7 +26,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  8 files changed, 74 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWebView/ViewImplementation.cpp b/Libraries/LibWebView/ViewImplementation.cpp
-index df949de17e59df02fc6785dac40a4238dfe8b4e6..3079acdd3ab8c9d9cbf554d087769286c0b2cbee 100644
+index 7d1b503328660433817ec3958a67ebffcfaaeea5..77867072960f3fa35e3ce0d7d52c63750d23ac11 100644
 --- a/Libraries/LibWebView/ViewImplementation.cpp
 +++ b/Libraries/LibWebView/ViewImplementation.cpp
 @@ -132,6 +132,14 @@ ViewImplementation::ViewImplementation(IsPrivate is_private, EnableContentBlocke
@@ -44,7 +44,7 @@ index df949de17e59df02fc6785dac40a4238dfe8b4e6..3079acdd3ab8c9d9cbf554d087769286
  }
  
  ViewImplementation::~ViewImplementation()
-@@ -569,6 +577,13 @@ void ViewImplementation::recreate_remote_layer_after_compositor_reconnect(Badge<
+@@ -574,6 +582,13 @@ void ViewImplementation::recreate_remote_layer_after_compositor_reconnect(Badge<
      set_hosts_remote_layer(true);
  }
  
@@ -58,7 +58,7 @@ index df949de17e59df02fc6785dac40a4238dfe8b4e6..3079acdd3ab8c9d9cbf554d087769286
  void ViewImplementation::release_backing_store(i32 bitmap_id)
  {
      page().release_presented_bitmap(bitmap_id);
-@@ -598,6 +613,10 @@ void ViewImplementation::set_system_visibility_state(Web::HTML::VisibilityState
+@@ -603,6 +618,10 @@ void ViewImplementation::set_system_visibility_state(Web::HTML::VisibilityState
      traversable().set_system_visibility_state(visibility_state);
      Application::the().update_compositor_context_visibility(page().compositor_context_id(), visibility_state);
      report_permission_presence();
@@ -69,7 +69,7 @@ index df949de17e59df02fc6785dac40a4238dfe8b4e6..3079acdd3ab8c9d9cbf554d087769286
      update_page_response_watchdog();
  }
  
-@@ -1640,16 +1659,21 @@ void ViewImplementation::update_page_response_watchdog()
+@@ -1645,16 +1664,21 @@ void ViewImplementation::update_page_response_watchdog()
              oldest_input_time = pending.enqueued_at;
      }
  
@@ -94,7 +94,7 @@ index df949de17e59df02fc6785dac40a4238dfe8b4e6..3079acdd3ab8c9d9cbf554d087769286
      if (m_page_unresponsive == unresponsive)
          return;
      m_page_unresponsive = unresponsive;
-@@ -1661,17 +1685,37 @@ void ViewImplementation::stop_watching_page_response()
+@@ -1666,17 +1690,37 @@ void ViewImplementation::stop_watching_page_response()
  {
      for (auto& pending : m_pending_input_events)
          pending.watches_page_response = false;
@@ -135,7 +135,7 @@ index df949de17e59df02fc6785dac40a4238dfe8b4e6..3079acdd3ab8c9d9cbf554d087769286
      update_page_response_watchdog();
  }
  
-@@ -4556,6 +4600,7 @@ void ViewImplementation::handle_web_content_process_crash()
+@@ -4632,6 +4676,7 @@ void ViewImplementation::handle_web_content_process_crash(WebContentCrashReason
      // for this tab are stale once its tree is abandoned or restored.
      m_pending_input_events.clear();
      m_page_has_open_dialog = false;
@@ -144,7 +144,7 @@ index df949de17e59df02fc6785dac40a4238dfe8b4e6..3079acdd3ab8c9d9cbf554d087769286
  
      set_loading_state(false);
 diff --git a/Libraries/LibWebView/ViewImplementation.h b/Libraries/LibWebView/ViewImplementation.h
-index 70d1544dc7135dfed86080c7541c3b0128cb2d33..4345f383bb7f5cba82d44839b34d982495c19226 100644
+index 5cf0873ba64e4f0141740c5cb7d3280b8d036a3c..40d84a559613921fa1215327eb762ed8a8fc3f48 100644
 --- a/Libraries/LibWebView/ViewImplementation.h
 +++ b/Libraries/LibWebView/ViewImplementation.h
 @@ -228,6 +228,7 @@ public:
@@ -155,7 +155,7 @@ index 70d1544dc7135dfed86080c7541c3b0128cb2d33..4345f383bb7f5cba82d44839b34d9824
  
      // What the user does in the WebAuthn prompt.
      void web_authn_cancel();
-@@ -850,6 +851,9 @@ protected:
+@@ -859,6 +860,9 @@ protected:
      bool page_response_watch_is_suspended() const;
      void update_page_response_watchdog();
      void stop_watching_page_response();
@@ -165,7 +165,7 @@ index 70d1544dc7135dfed86080c7541c3b0128cb2d33..4345f383bb7f5cba82d44839b34d9824
      void did_open_page_dialog();
      void did_close_page_dialog();
      void complete_webdriver_navigation_completion(u64 request_id, Web::WebDriver::Response);
-@@ -1062,6 +1066,11 @@ protected:
+@@ -1072,6 +1076,11 @@ protected:
      MonotonicTime m_page_response_watch_resumed_at { MonotonicTime::now_coarse() };
      bool m_page_response_watch_was_suspended { true };
      bool m_page_has_open_dialog { false };
@@ -178,10 +178,10 @@ index 70d1544dc7135dfed86080c7541c3b0128cb2d33..4345f383bb7f5cba82d44839b34d9824
  
      struct ClipboardWrite {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 7d8278a7bbd696f16deeab80cffc94d14098d581..30bb41762278a3f4c75868cf14f999a23322f5cf 100644
+index dac976b67c7a68bda3f97a4df20388cedbe1b80a..5e7b2c67e517c82723d7bb7dace162839888720b 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -2918,6 +2918,11 @@ void WebContentPage::did_request_set_system_focus(bool has_system_focus)
+@@ -2941,6 +2941,11 @@ void WebContentPage::did_request_set_system_focus(bool has_system_focus)
      traversable().set_has_system_focus(has_system_focus, *this);
  }
  
@@ -194,10 +194,10 @@ index 7d8278a7bbd696f16deeab80cffc94d14098d581..30bb41762278a3f4c75868cf14f999a2
  {
      if (!may_change_window(*this, "did_request_set_system_visibility_state"sv))
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 8e2869fa8f53221a6d0660127ddf3c4c1611b734..2dea684c458275d5d9912d9a55531531c5dbeec9 100644
+index b63822f5b9ae83673111eb72a39b9531503be8f5..10ce0cb390c1a07d51570627b42cee3e09005cbd 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -378,6 +378,7 @@ private:
+@@ -380,6 +380,7 @@ private:
      virtual void did_request_translation(Web::TranslationUnit unit) override;
      virtual void did_request_set_system_focus(bool has_system_focus) override;
      virtual void did_request_set_system_visibility_state(Web::HTML::VisibilityState visibility_state) override;
@@ -206,10 +206,10 @@ index 8e2869fa8f53221a6d0660127ddf3c4c1611b734..2dea684c458275d5d9912d9a55531531
      virtual void did_complete_navigation_unload_check(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id) override;
      virtual void did_finish_navigation_params_creation(Web::HTML::CrossProcessId navigable_id, Utf16String navigation_id, Optional<Web::HTML::NavigationPopulationResult> result) override;
 diff --git a/Services/WebContent/ConnectionFromClient.cpp b/Services/WebContent/ConnectionFromClient.cpp
-index 2cf6fda7ffe8591ccd1aa2c341159c447d32cb86..b3fc2054d98182d6480ecdc79ef8e96e67077e08 100644
+index 9af753e578f9b80d168ba0c82ee7856ef4eaafd0..877bb6a879ad0c6854064c2c31f784297375c822 100644
 --- a/Services/WebContent/ConnectionFromClient.cpp
 +++ b/Services/WebContent/ConnectionFromClient.cpp
-@@ -3752,6 +3752,11 @@ void ConnectionFromClient::schedule_memory_release_after_load()
+@@ -3781,6 +3781,11 @@ void ConnectionFromClient::schedule_memory_release_after_load()
      m_memory_release_timer->start();
  }
  
@@ -222,10 +222,10 @@ index 2cf6fda7ffe8591ccd1aa2c341159c447d32cb86..b3fc2054d98182d6480ecdc79ef8e96e
  {
      if (auto page = this->page(page_id); page.has_value())
 diff --git a/Services/WebContent/ConnectionFromClient.h b/Services/WebContent/ConnectionFromClient.h
-index 2a19dd8e80f88c99a5614a42fd37f28808d0fb64..fbe5727e6916d45b2631684abc501d7010fc0175 100644
+index 5f0c772aae2f6c30d73b9f4586480bc48643e29b..a45f1e89a24a5a068916a205ec4254c571ede4a7 100644
 --- a/Services/WebContent/ConnectionFromClient.h
 +++ b/Services/WebContent/ConnectionFromClient.h
-@@ -306,6 +306,7 @@ private:
+@@ -307,6 +307,7 @@ private:
      virtual void blob_url_entry_removed(Utf16String url) override;
      virtual void did_delete_all_cookies(Web::PageId page_id, u64 request_id) override;
      virtual void set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState) override;
@@ -246,10 +246,10 @@ index e7b36f00e42c967d62e8c65c8c21e6d2f1bf129e..7a8753abc19866b10fe648732866535f
      revoke_history_operation(Web::PageId page_id, Web::HTML::CrossProcessId operation_id) =|
      beforeunload_check_result(Web::PageId page_id, Web::HTML::CrossProcessId check_id, Web::HTML::CheckIfUnloadingIsCanceledResult result, Web::HTML::UnloadPromptShown unload_prompt_shown) =|
 diff --git a/Services/WebContent/WebContentServer.ipc b/Services/WebContent/WebContentServer.ipc
-index df04548b2913c9b7d2c2068252b53cb460dd3b74..2faae234a8220ef3641df570fdb5724c2eb3a98c 100644
+index 97dbfa28eb5ca1d41ab1c8bf115dd132d2c20b6c..2198000943d402d15b7a2d8779f9db3fa8846522 100644
 --- a/Services/WebContent/WebContentServer.ipc
 +++ b/Services/WebContent/WebContentServer.ipc
-@@ -313,6 +313,7 @@ endpoint WebContentServer routed by Web::PageId page_id
+@@ -314,6 +314,7 @@ endpoint WebContentServer routed by Web::PageId page_id
      did_delete_all_cookies(Web::PageId page_id, u64 request_id) =|
  
      set_system_visibility_state(Web::PageId page_id, Web::HTML::VisibilityState system_visibility_state) =|

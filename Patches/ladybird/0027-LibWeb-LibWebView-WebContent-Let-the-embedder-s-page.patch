@@ -142,7 +142,7 @@ index 0b5bc6d988baf5001186956a628358ddb184c9f9..8c4a08074daf3f0e26d286edd47f8ac3
  
  // Serves a URL scheme from the UI process, as a browser serves its extension pages. The scheme's URLs get tuple origins
 diff --git a/Libraries/LibWebView/WebContentClient.cpp b/Libraries/LibWebView/WebContentClient.cpp
-index caa7a2ef7debbb134461fd957c4fef9e54a986f2..d0c2d9c0c418cab770f404fe03966867e780cdbb 100644
+index 4a3dad329e5ca2e0392b8fc9bd908fd5e5e9254b..cb9cce811f9c615ad2929bb625edbff1f749ebbc 100644
 --- a/Libraries/LibWebView/WebContentClient.cpp
 +++ b/Libraries/LibWebView/WebContentClient.cpp
 @@ -128,6 +128,22 @@ Messages::WebContentClient::DidRequestEmbedderBootstrapResponse WebContentClient
@@ -169,7 +169,7 @@ index caa7a2ef7debbb134461fd957c4fef9e54a986f2..d0c2d9c0c418cab770f404fe03966867
  {
      if (auto* page = this->page(page_id))
 diff --git a/Libraries/LibWebView/WebContentClient.h b/Libraries/LibWebView/WebContentClient.h
-index e65bf62ba03f9f54ecdb0547d1c11df8faab721d..c6c578bd44ee17d63f0d5a10c0975d488464e47b 100644
+index a261ddaf292fe23d180bdc20fa529f0efb05785a..d0690b1da0b976b32d7d07e8a8156d42c4a00fca 100644
 --- a/Libraries/LibWebView/WebContentClient.h
 +++ b/Libraries/LibWebView/WebContentClient.h
 @@ -92,6 +92,8 @@ public:
@@ -182,10 +182,10 @@ index e65bf62ba03f9f54ecdb0547d1c11df8faab721d..c6c578bd44ee17d63f0d5a10c0975d48
      virtual void did_retain_blob_url_token(Web::HTML::CrossProcessId navigable_id, URL::BlobURLEntry::Token token) override;
      virtual Messages::WebContentClient::DidRequestBlobUrlEntryResponse did_request_blob_url_entry(Utf16String url, Optional<URL::BlobURLEntry::Token> token) override;
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 13af91941126200ce3d263801977d657ab82e91d..591579e30855d1dbb7c9fb2a4fbf789f459c5425 100644
+index 0b980111e2f107431361472ff2a96f52fcec366d..fab75b314ea886604fed15713f7c77bdec9febdc 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1848,6 +1848,60 @@ Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::Cross
+@@ -1871,6 +1871,60 @@ Optional<String> WebContentPage::did_request_embedder_bootstrap(Web::HTML::Cross
      return url_scheme_bridge(*endpoint->origin().scheme())->bootstrap_script(*endpoint);
  }
  
@@ -246,7 +246,7 @@ index 13af91941126200ce3d263801977d657ab82e91d..591579e30855d1dbb7c9fb2a4fbf789f
  void WebContentPage::did_post_embedder_message(Web::HTML::CrossProcessId document_id, String message)
  {
      // NB: A document may post a message as it goes away, so one this page no longer hosts is dropped rather than taken
-@@ -2448,10 +2502,11 @@ void WebContentPage::did_change_background_color(Gfx::Color color)
+@@ -2471,10 +2525,11 @@ void WebContentPage::did_change_background_color(Gfx::Color color)
  }
  
  // NB: The system clipboard belongs to the user, so a page reaches it only right after the user's own input to it, as
@@ -261,10 +261,10 @@ index 13af91941126200ce3d263801977d657ab82e91d..591579e30855d1dbb7c9fb2a4fbf789f
      if (writing_document_id.has_value()) {
          if (auto document = hosted_document_with_id(*writing_document_id))
 diff --git a/Libraries/LibWebView/WebContentPage.h b/Libraries/LibWebView/WebContentPage.h
-index 3260e9689b517fc19ac14292e130842938e86352..8e2869fa8f53221a6d0660127ddf3c4c1611b734 100644
+index 5f91efb1288429d93d648e44fca25fdefb9db3a7..b63822f5b9ae83673111eb72a39b9531503be8f5 100644
 --- a/Libraries/LibWebView/WebContentPage.h
 +++ b/Libraries/LibWebView/WebContentPage.h
-@@ -190,6 +190,9 @@ public:
+@@ -192,6 +192,9 @@ public:
  
      // A document of this page whose scheme has a script bridge, which the page hosts or is creating.
      Optional<ScriptBridgeEndpoint> embedder_bridge_endpoint(Web::HTML::CrossProcessId document_id);
@@ -274,7 +274,7 @@ index 3260e9689b517fc19ac14292e130842938e86352..8e2869fa8f53221a6d0660127ddf3c4c
      // An isolated world of the UI process's in a document of this page, which the UI process gave a bridge.
      Optional<ScriptBridgeEndpoint> user_script_endpoint(Web::HTML::CrossProcessId document_id, String const& world);
      // A document of this page, which the page hosts or is creating.
-@@ -430,6 +433,8 @@ private:
+@@ -432,6 +435,8 @@ private:
      Messages::WebContentClient::DidRequestAllCookiesCookiestoreResponse did_request_all_cookies_cookiestore(Web::HTML::EnvironmentId const&, URL::URL);
      Messages::WebContentClient::DidAddBlobUrlEntryResponse did_add_blob_url_entry(Web::HTML::EnvironmentId environment_id, Utf16String url, Web::FileAPI::SerializedBlobURLEntry);
      Optional<String> did_request_embedder_bootstrap(Web::HTML::CrossProcessId document_id);
@@ -284,7 +284,7 @@ index 3260e9689b517fc19ac14292e130842938e86352..8e2869fa8f53221a6d0660127ddf3c4c
  
      // Test-only handlers, reached over the separate test transport (see WebContentTestClient).
 diff --git a/Services/WebContent/PageClient.cpp b/Services/WebContent/PageClient.cpp
-index dedb4ad176c85528846876a7390e784ca65054af..ec9aee07bd33c8d761eba5b758e401a499f239f6 100644
+index a03e81ff9383981c0e76dc80e30f163d6c7d09b6..72634ff77d76e0ed6b0cd735be20c35e809cb62e 100644
 --- a/Services/WebContent/PageClient.cpp
 +++ b/Services/WebContent/PageClient.cpp
 @@ -27,6 +27,7 @@
@@ -292,10 +292,10 @@ index dedb4ad176c85528846876a7390e784ca65054af..ec9aee07bd33c8d761eba5b758e401a4
  #include <LibMedia/Sinks/AudioOutputFactory.h>
  #include <LibMediaClient/RemotePlaybackManager.h>
 +#include <LibURL/EmbedderSchemes.h>
+ #include <LibWeb/Bindings/MainThreadVM.h>
  #include <LibWeb/CSS/StyleScope.h>
  #include <LibWeb/CSS/StyleSheetIdentifier.h>
- #include <LibWeb/CSS/StyleSheetImport.h>
-@@ -2243,6 +2244,31 @@ void PageClient::page_did_request_paste_from_clipboard_for_testing()
+@@ -2259,6 +2260,31 @@ void PageClient::page_did_request_paste_from_clipboard_for_testing()
      client().async_did_request_paste_from_clipboard_for_testing(m_id);
  }
  
@@ -328,10 +328,10 @@ index dedb4ad176c85528846876a7390e784ca65054af..ec9aee07bd33c8d761eba5b758e401a4
  {
      client().async_did_request_spell_check(m_id, request_id, text);
 diff --git a/Services/WebContent/PageClient.h b/Services/WebContent/PageClient.h
-index f2f1305094178f7ef1c464cd3f9ef2cf6cdd3137..87e987b76f34f16a44cf3781bda15ebe13406a49 100644
+index da7fb1b928da48cf4ce23280c720fbc4e2e9cbd3..fecf0550874f7b2459cff68849be1ea89f69a2d7 100644
 --- a/Services/WebContent/PageClient.h
 +++ b/Services/WebContent/PageClient.h
-@@ -414,6 +414,8 @@ private:
+@@ -415,6 +415,8 @@ private:
      virtual void page_did_request_clipboard_entries_for_paste(u64 request_id) override;
      virtual void page_did_request_clipboard_entries(u64 request_id, Web::HTML::CrossProcessId reading_document_id) override;
      virtual void page_did_request_paste_from_clipboard_for_testing() override;

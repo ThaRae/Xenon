@@ -23,7 +23,7 @@ The blocker now also gets the request method, so $method filters match.
  2 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
-index 41327ae4a7f4a4307d7ef2b48a4a00c6fe476cb3..cee92c8c4495617444cf27a0224ff5d7406fdb63 100644
+index d82dcb9ed578b4f009370227a28ea6063f7488a7..3320aab14df9cbe60a1abccfbedb2e4eb7fd0691 100644
 --- a/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 +++ b/Libraries/LibWeb/Fetch/Fetching/Fetching.cpp
 @@ -70,6 +70,7 @@

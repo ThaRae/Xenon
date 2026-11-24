@@ -18,29 +18,36 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 11 insertions(+)
 
 diff --git a/Services/Hub/Application.cpp b/Services/Hub/Application.cpp
-index 1ad1f480678fd23d40c081a058a4f07cee75acc1..191d43852f2e3411c2c128d27a1b430279c2997e 100644
+index cbdd97a17b65597bd42ba3b50c2e8dacdc8c9735..485eeb38a46629dcc7681697e0d39df656234edd 100644
 --- a/Services/Hub/Application.cpp
 +++ b/Services/Hub/Application.cpp
-@@ -26,6 +26,14 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
- {
-     args_parser.add_option(m_encoded_ui_info, "What the UI tells the Hub to start with", "ui-info", 0, "hex");
+@@ -29,6 +29,8 @@ void Application::create_platform_arguments(Core::ArgsParser& args_parser)
      args_parser.add_option(m_ui_mach_server_name, "Mach server to get the connection to the UI from", "ui-mach-server", 0, "name");
+     // NB: main() reads this itself, before the arguments are parsed.
+     args_parser.add_option(m_ui_pid, "Process of the UI, which the Hub ends with", "ui-pid", 0, "pid");
 +    if (m_host)
 +        m_host->create_platform_arguments(args_parser);
-+}
-+
+ }
+ 
+ Optional<pid_t> Application::ui_process_id() const
+@@ -39,6 +41,12 @@ Optional<pid_t> Application::ui_process_id() const
+     return pid;
+ }
+ 
 +void Application::create_platform_options(WebView::BrowserOptions& browser_options, WebView::RequestServerOptions& request_server_options, WebView::WebContentOptions& web_content_options)
 +{
 +    if (m_host)
 +        m_host->create_platform_options(browser_options, request_server_options, web_content_options);
- }
- 
++}
++
  Hub::UIInfo const* Application::ui_info() const
+ {
+     if (!m_ui_info.has_value() && !m_encoded_ui_info.is_empty()) {
 diff --git a/Services/Hub/Application.h b/Services/Hub/Application.h
-index 2004bb12084ac2e945334258a7bbde7454de75c2..d957c6c4c03d2dc18516542f8c811be615cfec5c 100644
+index 903d11f8e0a3f15e4ddc9ab6741b556be3b5087b..f25a3bc805a45246db0b56aca063b08b646ff864 100644
 --- a/Services/Hub/Application.h
 +++ b/Services/Hub/Application.h
-@@ -24,6 +24,8 @@ public:
+@@ -25,6 +25,8 @@ public:
      virtual void will_create_event_loop(Main::Arguments&) = 0;
      virtual void did_create_event_loop(Core::EventLoop&) = 0;
  
@@ -49,11 +56,11 @@ index 2004bb12084ac2e945334258a7bbde7454de75c2..d957c6c4c03d2dc18516542f8c811be6
      virtual void create_platform_actions() = 0;
      virtual Optional<String> ui_font_family() const = 0;
      virtual Web::CSS::PreferredColorScheme interface_color_scheme() const = 0;
-@@ -77,6 +79,7 @@ private:
+@@ -78,6 +80,7 @@ private:
      // ^WebView::Application
      virtual Core::EventLoop& create_platform_event_loop() override;
      virtual void create_platform_arguments(Core::ArgsParser&) override;
 +    virtual void create_platform_options(WebView::BrowserOptions&, WebView::RequestServerOptions&, WebView::WebContentOptions&) override;
+     virtual Optional<pid_t> ui_process_id() const override;
      virtual Optional<WebView::ViewImplementation&> active_web_view() const override;
      virtual Optional<WebView::ViewImplementation&> open_blank_new_tab(Web::HTML::ActivateTab, WebView::ViewImplementation const* related_view = nullptr) const override;
-     virtual void open_url_in_new_tab(URL::URL const&, Web::HTML::ActivateTab, WebView::ViewImplementation const* source_view = nullptr) const override;

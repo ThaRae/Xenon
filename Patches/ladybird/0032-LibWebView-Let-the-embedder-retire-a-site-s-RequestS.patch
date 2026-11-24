@@ -19,10 +19,10 @@ connects before then keeps it the usual while.
  2 files changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/Libraries/LibWebView/RequestServerManager.cpp b/Libraries/LibWebView/RequestServerManager.cpp
-index faf1208308b640ed782e0949b8118c2678fda59d..86aada2cc86c848ed182cf32fff309f4fbf181cf 100644
+index 6a24a3507c91950fbf0491e01e85b7498322de41..a5d57ef2afa205c702f454bdc9b0427d502bb1eb 100644
 --- a/Libraries/LibWebView/RequestServerManager.cpp
 +++ b/Libraries/LibWebView/RequestServerManager.cpp
-@@ -188,6 +188,7 @@ ErrorOr<RequestServerClientConnection> RequestServerManager::connect_new_client(
+@@ -185,6 +185,7 @@ ErrorOr<RequestServerClientConnection> RequestServerManager::connect_new_client(
          if (site_binding == RequestServer::SiteBinding::Bound) {
              instance.m_client_ids.set(client_id);
              instance.m_idle_timer = nullptr;
@@ -30,7 +30,7 @@ index faf1208308b640ed782e0949b8118c2678fda59d..86aada2cc86c848ed182cf32fff309f4
          }
          return RequestServerClientConnection { .handle = response->take_handle(), .client_id = client_id };
      }
-@@ -203,7 +204,8 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
+@@ -200,7 +201,8 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
          return;
  
      auto weak_instance = instance.make_weak_ptr();
@@ -40,7 +40,7 @@ index faf1208308b640ed782e0949b8118c2678fda59d..86aada2cc86c848ed182cf32fff309f4
          auto instance = weak_instance.strong_ref();
          if (instance && instance->m_client_ids.is_empty())
              the().retire(*instance);
-@@ -211,6 +213,17 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
+@@ -208,6 +210,17 @@ void RequestServerManager::client_disconnected(RequestServerInstance& instance,
      instance.m_idle_timer->start();
  }
  

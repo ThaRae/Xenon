@@ -32,10 +32,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 Libraries/LibWebView/WebAuthn/HIDAuthenticator.h
 
 diff --git a/Libraries/LibWebView/Application.cpp b/Libraries/LibWebView/Application.cpp
-index 40b4598c6e1e20cadabf4fea51a83dbc384f5759..557f17a39e322bc9f23ec76d924c38a153907980 100644
+index 4b7ec7dc949e31991b3022a042f1dee85e6ec83c..ef2bdb189a32f856007dd903fbc4fead10e73392 100644
 --- a/Libraries/LibWebView/Application.cpp
 +++ b/Libraries/LibWebView/Application.cpp
-@@ -79,6 +79,9 @@
+@@ -81,6 +81,9 @@
  #include <LibWebView/Utilities.h>
  #include <LibWebView/ViewImplementation.h>
  #include <LibWebView/WebAuthn/Coordinator.h>
@@ -45,7 +45,7 @@ index 40b4598c6e1e20cadabf4fea51a83dbc384f5759..557f17a39e322bc9f23ec76d924c38a1
  #include <LibWebView/WebAuthn/VirtualAuthenticator.h>
  #include <LibWebView/WebContentClient.h>
  #include <LibWebView/WebDriverBiDi.h>
-@@ -1903,6 +1906,9 @@ ErrorOr<void> Application::launch_services()
+@@ -1932,6 +1935,9 @@ ErrorOr<void> Application::launch_services()
  {
      m_default_session = BrowsingSession::create(IsPrivate::No);
      WebAuthnCoordinator::the().add_authenticator_source(VirtualAuthenticators::the());
@@ -56,10 +56,10 @@ index 40b4598c6e1e20cadabf4fea51a83dbc384f5759..557f17a39e322bc9f23ec76d924c38a1
          // Only an attached DevTools has anyone to tell, and the lookup below isn't free on a page's write path.
          if (m_devtools)
 diff --git a/Libraries/LibWebView/CMakeLists.txt b/Libraries/LibWebView/CMakeLists.txt
-index e48486fe5a69632f32e58674bec15d4ad0be1b1f..3b2b2ea758c0cd5368e9270b3eefd4e43fa0d28f 100644
+index 54d83e9b3c6969e6e98190990421c7819aecf657..72654f9e322d3f02542ac0dab9a9f4182905d2f7 100644
 --- a/Libraries/LibWebView/CMakeLists.txt
 +++ b/Libraries/LibWebView/CMakeLists.txt
-@@ -115,6 +115,9 @@ if (APPLE)
+@@ -117,6 +117,9 @@ if (APPLE)
          StringConversionsMacOS.mm
      )
      set_source_files_properties(NotificationBackendMacOS.mm QuarantineMacOS.mm StringConversionsMacOS.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
@@ -69,7 +69,7 @@ index e48486fe5a69632f32e58674bec15d4ad0be1b1f..3b2b2ea758c0cd5368e9270b3eefd4e4
  elseif (LINUX)
      list(APPEND SOURCES AudioDaemonSocket.cpp CrashReportPOSIX.cpp)
  endif()
-@@ -197,6 +200,13 @@ if (LINUX OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+@@ -203,6 +206,13 @@ if (LINUX OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
      target_link_libraries(LibWebView PRIVATE PkgConfig::DBUS)
  endif()
  
@@ -569,10 +569,10 @@ index 0000000000000000000000000000000000000000..06dcf962df7c7f177e476c1293e6d4a7
 +
 +}
 diff --git a/vcpkg.json b/vcpkg.json
-index 90305770cd1bcc027b9544561e909cc4c49b0d1f..bd8d5f2a313e8bebcebc4ef1f65ab17be2083d63 100644
+index d466d914e1f6a4acd8fb066731f2cccc56519d22..ab802e48aa95d80da76eeefa13fbaea76f377e2d 100644
 --- a/vcpkg.json
 +++ b/vcpkg.json
-@@ -102,6 +102,10 @@
+@@ -98,6 +98,10 @@
        "name": "libedit",
        "platform": "!windows & !android"
      },
@@ -580,10 +580,10 @@ index 90305770cd1bcc027b9544561e909cc4c49b0d1f..bd8d5f2a313e8bebcebc4ef1f65ab17b
 +      "name": "libfido2",
 +      "platform": "osx"
 +    },
-     "libtommath",
      {
        "name": "libwebp",
-@@ -335,6 +339,10 @@
+       "features": [
+@@ -380,6 +384,10 @@
        "name": "libavif",
        "version": "1.4.2#1"
      },
@@ -594,7 +594,7 @@ index 90305770cd1bcc027b9544561e909cc4c49b0d1f..bd8d5f2a313e8bebcebc4ef1f65ab17b
      {
        "name": "libdwarf",
        "version": "2.3.3#0"
-@@ -343,6 +351,10 @@
+@@ -388,6 +396,10 @@
        "name": "libedit",
        "version": "2024-08-08#1"
      },

@@ -323,6 +323,7 @@ function renderFilterLists() {
 
 checkFilterLists.addEventListener("click", () => ladybird.sendMessage("xenon/checkFilterLists"));
 filterListUpdates.addEventListener("change", () => {
+    ladybird.sendMessage("setFilterListUpdatesEnabled", filterListUpdates.checked);
     if (XENON) renderFilterLists();
 });
 
@@ -462,7 +463,27 @@ document
     .querySelector("#show-extensions")
     .addEventListener("click", () => ladybird.sendMessage("xenon/showExtensions"));
 
+const restorePreviousSession = document.querySelector("#restore-previous-session");
+
+restorePreviousSession.addEventListener("change", () =>
+    ladybird.sendMessage("setRestorePreviousSession", restorePreviousSession.checked)
+);
+
 const newTabPageURL = document.querySelector("#new-tab-page-url");
+
+newTabPageURL.addEventListener("change", () => {
+    newTabPageURL.classList.remove("success", "error");
+    newTabPageURL.value = ensureURLHasScheme(newTabPageURL.value);
+
+    if (!containsValidURL(newTabPageURL)) {
+        newTabPageURL.classList.add("error");
+        return;
+    }
+
+    ladybird.sendMessage("setNewTabPageURL", newTabPageURL.value);
+    newTabPageURL.classList.add("success");
+    setTimeout(() => newTabPageURL.classList.remove("success"), 1000);
+});
 
 document.querySelector("#new-tab-page-url-reset").addEventListener("click", () => {
     newTabPageURL.value = "about:newtab";
@@ -492,6 +513,20 @@ function renderProfile() {
         row.hidden = !path;
         row.querySelector(".path").textContent = path ?? "";
     }
+}
+
+const allowServicesNetworkAccess = document.querySelector("#allow-services-network-access");
+const servicesPausedNote = document.querySelector("#services-paused-note");
+
+allowServicesNetworkAccess.addEventListener("change", () =>
+    ladybird.sendMessage("setServicesNetworkAccessEnabled", allowServicesNetworkAccess.checked)
+);
+
+function renderServices(backgroundNetworking) {
+    allowServicesNetworkAccess.checked = backgroundNetworking.enabled;
+    filterListUpdates.checked = backgroundNetworking.features.contentBlockerSubscriptionUpdates;
+    filterListUpdates.disabled = !backgroundNetworking.enabled;
+    servicesPausedNote.classList.toggle("hidden", backgroundNetworking.enabled);
 }
 
 const crashReportSending = document.querySelector("#crash-report-sending");
@@ -644,6 +679,13 @@ document.addEventListener("WebUIMessage", event => {
         crashReportsStatus.hidden = !data;
     } else if (name === "loadSettings") {
         if (Object.hasOwn(data, "crashReportSending")) crashReportSending.value = data.crashReportSending;
+        if (Object.hasOwn(data, "restorePreviousSession"))
+            restorePreviousSession.checked = data.restorePreviousSession === true;
+        if (Object.hasOwn(data, "newTabPageURL")) {
+            newTabPageURL.classList.remove("error");
+            newTabPageURL.value = data.newTabPageURL;
+        }
+        if (Object.hasOwn(data, "backgroundNetworking")) renderServices(data.backgroundNetworking);
         if (Object.hasOwn(data, "tabs")) {
             TAB_SETTINGS = data.tabs;
             verticalTabsPosition.value = TAB_SETTINGS.verticalTabsPosition || "left";

@@ -30,10 +30,10 @@ navigable() always, and ignore a link navigation that makes it.
  1 file changed, 13 insertions(+)
 
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 30bb41762278a3f4c75868cf14f999a23322f5cf..724a1c09b9a5247a01cef92cb7603f80b82bfea2 100644
+index 5e7b2c67e517c82723d7bb7dace162839888720b..49e112f06b73dd2bf4435b3c6336f0a9eca0342a 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -737,6 +737,11 @@ static bool may_navigate_to_a_local_file(WebContentClient& requesting_client);
+@@ -740,6 +740,11 @@ static bool may_navigate_to_a_local_file(WebContentClient& requesting_client);
  
  void WebContentPage::did_request_navigation_of_navigable(Web::HTML::CrossProcessId navigable_id, Web::HTML::CrossProcessId source_navigable_id, Web::HTML::CrossProcessId source_document_id, Web::HTML::PreparedNavigationDescriptor navigation)
  {
@@ -45,7 +45,7 @@ index 30bb41762278a3f4c75868cf14f999a23322f5cf..724a1c09b9a5247a01cef92cb7603f80
      if (navigation.url.scheme() == "file"sv && !may_navigate_to_a_local_file(client()))
          return;
  
-@@ -1092,6 +1097,8 @@ static bool may_navigate_to_a_local_file(WebContentClient& requesting_client)
+@@ -1095,6 +1100,8 @@ static bool may_navigate_to_a_local_file(WebContentClient& requesting_client)
  // fetch client — as it does for a navigation the page starts itself, so a process names only a source it hosts.
  static Optional<Web::HTML::PreparedNavigationDescriptor> navigation_from_page(WebContentClient& requesting_client, Web::HTML::PreparedNavigationDescriptor navigation)
  {
@@ -54,13 +54,13 @@ index 30bb41762278a3f4c75868cf14f999a23322f5cf..724a1c09b9a5247a01cef92cb7603f80
      // A page's own click or context menu names a document the page's process hosts, so only that process vouches for it.
      auto initiator_origin = initiator_origin_snapshot(navigation.initiator_origin_snapshot, navigation.source_snapshot_params, requesting_client);
      if (!initiator_origin.has_value())
-@@ -2980,6 +2987,12 @@ void WebContentPage::did_request_navigation_start(Web::HTML::CrossProcessId navi
+@@ -3003,6 +3010,12 @@ void WebContentPage::did_request_navigation_start(Web::HTML::CrossProcessId navi
          client().did_misbehave("did_request_navigation_start"sv, "start request names another URL"sv);
          return;
      }
 +    if (start_request.has_value()
 +        && start_request->user_involvement == Web::HTML::UserNavigationInvolvement::BrowserUI
-+        && !WebContentClient::renderers_may_synthesize_input()) {
++        && !may_synthesize_input(*this)) {
 +        client().did_misbehave("did_request_navigation_start"sv, "page claims the browser's UI started its navigation"sv);
 +        return;
 +    }

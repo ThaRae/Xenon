@@ -42,10 +42,10 @@ index 29f3cab80d12c5a7280145f57851eaab00ce34cf..0b5bc6d988baf5001186956a628358dd
  
  struct URLSchemeResponse {
 diff --git a/Libraries/LibWebView/WebContentPage.cpp b/Libraries/LibWebView/WebContentPage.cpp
-index 932c9a668feaa88bd3280148a241efb956b20393..638c8911e89c443c0cb08663b20aa40cfbd06443 100644
+index c2503f1fb249109aa352e9176e10861b9116b6c5..80ec03f489b9e043aed6369b5b3f701eb36f7893 100644
 --- a/Libraries/LibWebView/WebContentPage.cpp
 +++ b/Libraries/LibWebView/WebContentPage.cpp
-@@ -1708,7 +1708,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1731,7 +1731,7 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return;
      }
  
@@ -54,7 +54,7 @@ index 932c9a668feaa88bd3280148a241efb956b20393..638c8911e89c443c0cb08663b20aa40c
      traversable().for_each_in_inclusive_subtree([&](CanonicalNavigable const& navigable) {
          auto navigation = navigable.uncommitted_navigation();
          if (!navigation || navigation->worker() != this || !navigation->url.equals(url, URL::ExcludeFragment::Yes))
-@@ -1720,6 +1720,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
+@@ -1743,6 +1743,15 @@ void WebContentPage::did_request_embedder_resource(URL::URL url, i32 request_id)
          return IterationDecision::Break;
      });
  
@@ -71,7 +71,7 @@ index 932c9a668feaa88bd3280148a241efb956b20393..638c8911e89c443c0cb08663b20aa40c
      if (response.is_error()) {
          async_handle_embedder_resource_return(response.error().is_errno() ? response.error().code() : ENOENT, {}, {}, request_id);
 diff --git a/Libraries/LibWebView/WebWorkerClient.cpp b/Libraries/LibWebView/WebWorkerClient.cpp
-index 8c24ee0ce9a03771a956945d18d0dabb25ed8f9d..ca83b03290419cfae676a4f90c23183e2c9dcb51 100644
+index 8dfaac2509be0f2e66300d0e21ee529835a1856c..b2a2eaf864a3f10821c6d5de7850f035a4ad45a9 100644
 --- a/Libraries/LibWebView/WebWorkerClient.cpp
 +++ b/Libraries/LibWebView/WebWorkerClient.cpp
 @@ -218,6 +218,7 @@ void WebWorkerClient::did_request_embedder_resource(URL::URL url, i32 request_id

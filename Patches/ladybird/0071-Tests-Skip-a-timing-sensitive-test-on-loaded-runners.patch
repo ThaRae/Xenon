@@ -13,10 +13,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 1 insertion(+)
 
 diff --git a/Tests/LibWeb/TestConfig.ini b/Tests/LibWeb/TestConfig.ini
-index a53e560d944edf04b4a0a63ae4226d3172032b1c..a1a97ed5472c6aaab4109a7f0e219cdd89da626c 100644
+index 90b2ab38b5b6f84774e23682c095830d6b178267..93da19e2869a36c16a5bc29731c15a328c1d2888 100644
 --- a/Tests/LibWeb/TestConfig.ini
 +++ b/Tests/LibWeb/TestConfig.ini
-@@ -1391,6 +1391,7 @@ Text/input/Crypto/SubtleCrypto-generateKey.html
+@@ -1394,6 +1394,7 @@ Text/input/Crypto/SubtleCrypto-generateKey.html
  
  ; Flaky on CI
  Text/input/wpt-import/event-timing/pointerdown-pointerup-no-overlap.html
