@@ -203,6 +203,8 @@ CI runs on GitHub Actions, on GitHub's own runners:
 
 - **Linux** builds in Ladybird's own CI image (`ghcr.io/ladybirdbrowser/ladybird-ci`, at the version in
   `ladybird/Meta/Docker/ci/VERSION`), so the compilers and system libraries match what Ladybird is tested with.
+  `Meta/ci/build-in-ladybird-image.sh` adds `qt6-base-private-dev` to it first: Ladybird's UI no longer uses Qt's
+  private headers, so the image doesn't have them, but Xenon's Wayland activation tokens need `Qt::GuiPrivate`.
 - **macOS** builds natively on `macos-26`, with the Xcode version and Homebrew packages that Ladybird's own CI uses
   (`ladybird/.github/actions/setup`). The Intel build runs on `macos-15-intel`, GitHub's last Intel image, which
   doesn't have that Xcode, so it takes the newest one there (26.3). Homebrew no longer builds bottles for Intel Macs,

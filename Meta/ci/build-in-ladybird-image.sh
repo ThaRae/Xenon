@@ -23,4 +23,10 @@ exec "${docker[@]}" run --rm \
   --volume "$root:/xenon" --workdir /xenon \
   --env JOBS --env CCACHE_MAXSIZE --env CI=true --env PYTHONDONTWRITEBYTECODE=1 \
   --env HOST_OWNER="$(id -u):$(id -g)" \
-  "$image" bash -c '"$@"; status=$?; chown -R "$HOST_OWNER" /xenon; exit $status' bash "$@"
+  "$image" bash -c '
+    if ! dpkg -s qt6-base-private-dev >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -q -o APT::Update::Error-Mode=any >/dev/null &&
+        apt-get install -y -q --no-install-recommends qt6-base-private-dev >/dev/null || exit
+    fi
+    "$@"; status=$?; chown -R "$HOST_OWNER" /xenon; exit $status' bash "$@"
